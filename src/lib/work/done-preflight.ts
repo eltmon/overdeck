@@ -52,7 +52,9 @@ async function listBeadsByStatus(
   const result = await createBeadsResolver(workspacePath).getBeadsForIssue(issueId);
   if (!result.ok) throw result.error;
   return JSON.stringify(result.value.filter((bead) => bead.status === status));
-}async function checkOpenBeadsPromise(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
+}
+
+export async function checkOpenBeadsPromise(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
   let stdout: string;
   try {
     stdout = await listBeadsByStatus(workspacePath, issueId, 'open', preloadedBeads);

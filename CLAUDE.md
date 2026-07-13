@@ -403,6 +403,11 @@ Work agents cannot start without beads tasks in the workspace. The start-agent e
 returns 422 if the canonical Dolt resolver reports no issue beads. Planning must create beads via
 `bd create` before handing off to implementation.
 
+The verification gate also blocks completion while the issue has open beads: `runVerificationForIssue`
+calls `checkOpenBeadsPromise` after the vBRIEF acceptance-criteria check, and a non-empty result (or a
+timeout, which is unknown-not-zero per PAN-1812) produces `failedCheck: 'open-beads'`. Finally,
+merge-time and close-out sweeps remove remaining open beads from terminal issues so that a closed
+issue never carries open beads.
 ## postMergeLifecycle Idempotency (enforced by a test, not by this note)
 
 `postMergeLifecycle` must run **at most once per merge**. If it can re-trigger

@@ -1,10 +1,19 @@
 import { execFile } from 'node:child_process';
-import { readdir } from 'node:fs/promises';
+import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
+import type { BeadTotals } from './resource-discovery-signals.js';
+import {
+  getBeadTotalsForIssue,
+  isWithinRecencyDate,
+  isWithinRecencyMs,
+} from './resource-discovery-signals.js';
+import { getBeadsRollupService } from './beads-rollup-singleton.js';
+
 import { getAgentRuntimeState } from '../../../lib/agents.js';
+import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
 import {
   PAN_CONTINUE_FILENAME,
   PAN_DIRNAME,
@@ -22,7 +31,10 @@ const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
 const RECENT_ACTIVITY_WINDOW_MS = 5_000;
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent';
+export { RECENCY_DAYS } from './resource-discovery-signals.js';
+export type { BeadTotals } from './resource-discovery-signals.js';
+
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent' | 'conversation';
 
 export interface ResourcePullRequest {
   number: number;
@@ -45,10 +57,14 @@ export interface ResourceDetails {
   actualBranch: string | null;
   /** True when the workspace HEAD differs from the expected feature/<id> branch. */
   branchDrifted: boolean;
+  /** True when a feature/* or bypass/* branch for the issue has unmerged commits not on main. */
+  branchAheadOfMain: boolean;
   /** True when the workspace path is configured but missing on disk. */
   workspaceMissing: boolean;
   /** Remote (fly.io) work agent for this issue, when one is active (PAN-1676). */
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
+  /** Non-archived conversations explicitly linked to this issue. */
+  conversations: Array<{ id: number; name: string; title: string | null; status: string }>;
 }
 
 export interface ResourceDetailIdentifiers {
@@ -85,6 +101,7 @@ export interface ResourceAllocatedIssue {
   rawTrackerState?: string;
   resourceSources: ResourceSource[];
   resourceDetails: ResourceDetails;
+  beadTotals: BeadTotals | null;
 }
 
 interface InternalResourceDetails {
@@ -94,12 +111,15 @@ interface InternalResourceDetails {
   remoteBranches: string[];
   prs: GhPullRequest[];
   vbriefPath: string | null;
+  vbriefMtime: number | null;
   beadsPath: string | null;
   dockerContainers: string[];
   actualBranch: string | null;
   branchDrifted: boolean;
+  branchAheadOfMain: boolean;
   workspaceMissing: boolean;
   remoteAgent: { vmName: string; status: string; model: string; startedAt: string } | null;
+  conversations: Array<{ id: number; name: string; title: string | null; status: string; tmuxSession: string | null }>;
 }
 
 interface MutableResourceIssue {
@@ -119,6 +139,7 @@ interface MutableResourceIssue {
   lastActivity: number | null;
   resourceSources: Set<ResourceSource>;
   resourceDetails: InternalResourceDetails;
+  beadTotals: BeadTotals | null;
 }
 
 interface InternalDiscoveredIssue extends Omit<ResourceAllocatedIssue, 'resourceSources' | 'resourceDetails'> {
@@ -216,8 +237,10 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
     dockerContainerCount: details.dockerContainers.length,
     actualBranch: details.actualBranch,
     branchDrifted: details.branchDrifted,
+    branchAheadOfMain: details.branchAheadOfMain,
     workspaceMissing: details.workspaceMissing,
     remoteAgent: details.remoteAgent,
+    conversations: details.conversations.map((conv) => ({ id: conv.id, name: conv.name, title: conv.title, status: conv.status })),
   };
 }
 
@@ -305,6 +328,14 @@ async function loadTmuxSessions(): Promise<string[]> {
   }
 }
 
+function loadConversations(): Conversation[] {
+  try {
+    return listConversations();
+  } catch {
+    return [];
+  }
+}
+
 async function loadDockerContainers(): Promise<string[]> {
   try {
     const { stdout } = await execFileAsync('docker', ['ps', '--format', '{{.Names}}'], {
@@ -357,7 +388,7 @@ async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest[]>> {
 
 async function loadProjectBranches(projectPath: string): Promise<{ local: string[]; remote: string[] }> {
   try {
-    const [localResult, remoteResult] = await Promise.all([
+    const [localFeature, remoteFeature, localBypass, remoteBypass] = await Promise.all([
       execFileAsync('git', ['for-each-ref', 'refs/heads/feature/*', '--format=%(refname:short)'], {
         cwd: projectPath,
         encoding: 'utf-8',
@@ -368,15 +399,55 @@ async function loadProjectBranches(projectPath: string): Promise<{ local: string
         encoding: 'utf-8',
         timeout: 10000,
       }).catch(() => ({ stdout: '' })),
+      execFileAsync('git', ['for-each-ref', 'refs/heads/bypass/*', '--format=%(refname:short)'], {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      }).catch(() => ({ stdout: '' })),
+      execFileAsync('git', ['for-each-ref', 'refs/remotes/origin/bypass/*', '--format=%(refname:short)'], {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      }).catch(() => ({ stdout: '' })),
     ]);
 
     return {
-      local: localResult.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
-      remote: remoteResult.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+      local: [
+        ...localFeature.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+        ...localBypass.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+      ],
+      remote: [
+        ...remoteFeature.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+        ...remoteBypass.stdout.split('\n').map((line) => line.trim()).filter(Boolean),
+      ],
     };
   } catch {
     return { local: [], remote: [] };
   }
+}
+async function loadBranchesAheadOfMain(projectPath: string): Promise<Set<string>> {
+  const ahead = new Set<string>();
+  const run = async (patterns: string[]) => {
+    if (patterns.length === 0) return;
+    try {
+      const { stdout } = await execFileAsync('git', ['for-each-ref', '--format=%(refname:short)', ...patterns, '--no-merged=main'], {
+        cwd: projectPath,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+      for (const line of stdout.split('\n')) {
+        const branch = line.trim();
+        if (branch) ahead.add(branch);
+      }
+    } catch {
+      // fail closed by treating all branches as merged
+    }
+  };
+  await Promise.all([
+    run(['refs/heads/feature/*', 'refs/heads/bypass/*']),
+    run(['refs/remotes/origin/feature/*', 'refs/remotes/origin/bypass/*']),
+  ]);
+  return ahead;
 }
 
 interface WorkspaceScanResult {
@@ -386,6 +457,7 @@ interface WorkspaceScanResult {
   hasState: boolean;
   hasVbrief: boolean;
   vbriefPath: string | null;
+  vbriefMtime: number | null;
   hasBeads: boolean;
 }
 
@@ -406,6 +478,15 @@ async function scanWorkspace(
     ? await Effect.runPromise(findSpecByIssue(projectRoot, issueId)).catch(() => null)
     : null;
   const vbriefPath = specEntry ? specEntry.path : null;
+  let vbriefMtime: number | null = null;
+  if (vbriefPath) {
+    try {
+      const stats = await stat(vbriefPath);
+      vbriefMtime = stats.mtimeMs;
+    } catch {
+      vbriefMtime = null;
+    }
+  }
 
   return {
     workspacePath,
@@ -414,6 +495,7 @@ async function scanWorkspace(
     hasState: panEntries.has(PAN_CONTINUE_FILENAME),
     hasVbrief: vbriefPath !== null,
     vbriefPath,
+    vbriefMtime,
     hasBeads: issueId !== null && beadsPresence.set.has(issueId),
   };
 }
@@ -483,13 +565,17 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         remoteBranches: [],
         prs: [],
         vbriefPath: null,
+        vbriefMtime: null,
         beadsPath: null,
         dockerContainers: [],
         actualBranch: null,
         branchDrifted: false,
+        branchAheadOfMain: false,
         workspaceMissing: false,
         remoteAgent: null,
+        conversations: [],
       },
+      beadTotals: null,
     };
     issueMap.set(upper, created);
     return created;
@@ -517,6 +603,24 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     if (!issue.resourceDetails.tmuxSessions.includes(sessionName)) {
       issue.resourceDetails.tmuxSessions.push(sessionName);
     }
+  }
+
+  // Non-archived conversations explicitly linked to an issue are a distinct
+  // resource signal from tmux/agent sessions (PAN-2602). They indicate active
+  // operator attention even when no agent session is running.
+  const conversations = loadConversations();
+  for (const conv of conversations) {
+    if (!conv.issueId || conv.archivedAt) continue;
+    const issue = ensureIssue(conv.issueId);
+    if (!issue) continue;
+    issue.resourceSources.add('conversation');
+    issue.resourceDetails.conversations.push({
+      id: conv.id,
+      name: conv.name,
+      title: conv.title,
+      status: conv.status,
+      tmuxSession: conv.tmuxSession,
+    });
   }
 
   // Remote (fly.io) work agents have no local tmux session — surface them
@@ -560,6 +664,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       loadProjectBranches(projectPath),
       readIssuesWithBeads(projectPath),
     ]);
+    const aheadBranches = await loadBranchesAheadOfMain(projectPath);
 
     await Promise.all(workspaceEntries.map(async (entry) => {
       if (!entry.isDirectory() || !entry.name.startsWith('feature-')) return;
@@ -575,6 +680,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       if (workspace.vbriefPath) {
         issue.resourceSources.add('vbrief');
         issue.resourceDetails.vbriefPath = workspace.vbriefPath;
+        issue.resourceDetails.vbriefMtime = workspace.vbriefMtime;
       }
       if (workspace.hasBeads) {
         issue.resourceSources.add('beads');
@@ -586,25 +692,20 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       issue.resourceDetails.workspaceMissing = gitInfo.workspaceMissing;
     }));
 
-    for (const branch of branches.local) {
+    for (const [branch, key] of [
+      ...branches.local.map((b) => [b, 'localBranches'] as const),
+      ...branches.remote.map((b) => [b, 'remoteBranches'] as const),
+    ]) {
       const issueId = parseIssueIdFromTextSync(branch);
       if (!issueId) continue;
       const issue = ensureIssue(issueId, project);
       if (!issue) continue;
       issue.resourceSources.add('branch');
-      if (!issue.resourceDetails.localBranches.includes(branch)) {
-        issue.resourceDetails.localBranches.push(branch);
+      if (!issue.resourceDetails[key].includes(branch)) {
+        issue.resourceDetails[key].push(branch);
       }
-    }
-
-    for (const branch of branches.remote) {
-      const issueId = parseIssueIdFromTextSync(branch);
-      if (!issueId) continue;
-      const issue = ensureIssue(issueId, project);
-      if (!issue) continue;
-      issue.resourceSources.add('branch');
-      if (!issue.resourceDetails.remoteBranches.includes(branch)) {
-        issue.resourceDetails.remoteBranches.push(branch);
+      if (aheadBranches.has(branch)) {
+        issue.resourceDetails.branchAheadOfMain = true;
       }
     }
   }));
@@ -653,6 +754,25 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     }
   }
 
+  // PAN-2602: bead rollups give a second signal for issues that have bead work in
+  // flight even when the tracker label is stale or missing. Load the cached rollup
+  // state once per discovery pass and attach totals to each issue.
+  const beadsRollupService = getBeadsRollupService();
+  const projectKeyByName = new Map<string, string>();
+  for (const project of projects) {
+    projectKeyByName.set(project.config.name ?? project.key, project.key);
+  }
+  const getIssueBeadTotals = (issue: MutableResourceIssue): BeadTotals | null => {
+    const projectKey = projectKeyByName.get(issue.projectName);
+    if (!projectKey) return null;
+    const state = beadsRollupService.getProjectRollups(projectKey);
+    if (!state) return null;
+    return getBeadTotalsForIssue(issue.issueId, state.rollups);
+  };
+  for (const issue of issueMap.values()) {
+    issue.beadTotals = getIssueBeadTotals(issue);
+  }
+
   // PRD acceptance (PAN-862): the tree shows ONLY issues with real in-flight work.
   // PAN-1966 (durable-signal membership): an active tracker LABEL is NOT sufficient
   // on its own — labels drift (an issue can stay `in-progress`/`in-review` after its
@@ -665,6 +785,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   // PAN-2054: a CLOSED/done/canceled issue is terminal — the operator (or close-out)
   // has declared it finished. Any workspace, feature branch, or *paused* work-agent
   // tmux session left behind is stale close-out residue, not active pipeline work.
+  // PAN-2602 (pipeline-signal-union): non-terminal issues also qualify when they have
+  // a branch ahead of main, an active linked conversation, recently-active partial
+  // bead completion, beads currently in progress, or a recently-touched vBRIEF spec.
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
     // PAN-2054: drop terminal (closed/done/canceled) issues from the active resource
@@ -674,12 +797,40 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     // (isLiveResource → true) lingers forever as "merged — awaiting close-out". An
     // OPEN PR is the one terminal-state case that still warrants attention.
     .filter((issue) => !isTerminalTrackerState(issue.trackerState) || hasOpenPr(issue))
-    .filter(
-      (issue) =>
-        issue.readyForMerge
-        || isLiveResource(issue)
-        || (isActiveTrackerState(issue.trackerState) && issue.branch != null),
-    )
+    .filter((issue) => {
+      if (issue.readyForMerge) return true;
+      if (isLiveResource(issue)) return true;
+      if (isActiveTrackerState(issue.trackerState) && issue.branch != null) return true;
+
+      // New PAN-2602 signals are gated on non-terminal tracker state so the
+      // PAN-2054 exclusion above remains authoritative.
+      if (!isTerminalTrackerState(issue.trackerState)) {
+        if (issue.resourceDetails.branchAheadOfMain) return true;
+        if (issue.resourceSources.has('conversation')) return true;
+
+        const beadTotals = issue.beadTotals;
+        if (beadTotals) {
+          if (
+            beadTotals.closed > 0
+            && beadTotals.closed < beadTotals.total
+            && isWithinRecencyDate(beadTotals.lastUpdated)
+          ) {
+            return true;
+          }
+          if (beadTotals.inProgress > 0) return true;
+        }
+
+        if (
+          issue.resourceSources.has('vbrief')
+          && issue.resourceDetails.vbriefMtime !== null
+          && isWithinRecencyMs(issue.resourceDetails.vbriefMtime)
+        ) {
+          return true;
+        }
+      }
+
+      return false;
+    })
     .map((issue) => {
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
         const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);
@@ -712,6 +863,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
           rawTrackerState: issue.rawTrackerState,
           resourceSources: new Set([...issue.resourceSources].sort()),
           resourceDetails: issue.resourceDetails,
+          beadTotals: issue.beadTotals,
         } satisfies InternalDiscoveredIssue;
       });
 
@@ -789,8 +941,10 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,
       actualBranch: issue.resourceDetails.actualBranch,
       branchDrifted: issue.resourceDetails.branchDrifted,
+      branchAheadOfMain: issue.resourceDetails.branchAheadOfMain,
       workspaceMissing: issue.resourceDetails.workspaceMissing,
       remoteAgent: issue.resourceDetails.remoteAgent ?? null,
+      conversations: issue.resourceDetails.conversations.map((conv) => ({ id: conv.id, name: conv.name, title: conv.title, status: conv.status })),
     },
   }));
 }

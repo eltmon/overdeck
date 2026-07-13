@@ -456,6 +456,7 @@ function IssueTreeLane({
       hasVbrief: actions.state.hasPlan,
       hasBeads: actions.state.hasBeads,
       dockerContainerCount: 0,
+      conversations: [],
     },
   }), [actions.state.hasBeads, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
 

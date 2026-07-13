@@ -36,6 +36,7 @@ export interface BeadsSyncServiceDependencies {
   intervalMs?: number;
   withLock?: typeof withBdProcessLock;
   remoteDoltHead?: (projectPath: string) => Promise<string | null>;
+  localDoltHead?: (beadsCwd: string) => Promise<string | null>;
 }
 
 function parseHead(status: string): string | null {
@@ -62,6 +63,21 @@ async function defaultRemoteDoltHead(projectPath: string): Promise<string | null
   }
 }
 
+/**
+ * Cheap local-head probe that runs OUTSIDE the bd process lock. Combined with
+ * the remote-head probe, this lets syncOnce skip the expensive locked pull
+ * only when BOTH heads are verifiably unchanged — so a local write that moves
+ * the Dolt head still triggers a sync.
+ */
+async function defaultLocalDoltHead(beadsCwd: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('bd', ['vc', 'status'], { cwd: beadsCwd, encoding: 'utf8', timeout: 10_000 });
+    return parseHead(stdout);
+  } catch {
+    return null;
+  }
+}
+
 function defaultProjects() {
   return listProjectsSync().map(({ key, config }) => ({
     key,
@@ -80,25 +96,34 @@ export function createBeadsSyncService(dependencies: BeadsSyncServiceDependencie
   const intervalMs = dependencies.intervalMs ?? DEFAULT_INTERVAL_MS;
   const withLock = dependencies.withLock ?? withBdProcessLock;
   const remoteDoltHead = dependencies.remoteDoltHead ?? defaultRemoteDoltHead;
+  const localDoltHead = dependencies.localDoltHead ?? defaultLocalDoltHead;
   const lastRemoteHead = new Map<string, string>();
+  const lastObservedHead = new Map<string, string>();
   let stopped = false;
   let failures = 0;
 
   async function syncOnce(): Promise<void> {
     for (const project of projects()) {
       try {
-        // Skip the expensive locked pull when the remote Dolt head is
-        // verifiably unchanged. Unknown (null) fails open into the pull.
+        // Skip the expensive locked pull only when BOTH the remote Dolt head
+        // and the local Dolt head are verifiably unchanged. Unknown (null)
+        // fails open into the pull. This is what lets local writes (which
+        // advance the head before the poll) emit beads.freshness_changed.
         const remoteHead = await remoteDoltHead(project.path);
-        if (remoteHead && remoteHead === lastRemoteHead.get(project.key)) continue;
+        const localHead = await localDoltHead(project.beadsCwd);
+        const previousHead = lastObservedHead.get(project.key);
+        const remoteUnchanged = remoteHead && remoteHead === lastRemoteHead.get(project.key);
+        const localUnchanged = localHead && localHead === previousHead;
+        if (remoteUnchanged && localUnchanged) continue;
+
         await withLock('background beads pull for ' + project.key, async () => {
-          const before = parseHead(await execute(['vc', 'status'], project.beadsCwd));
           await execute(['dolt', 'pull'], project.beadsCwd);
           const after = parseHead(await execute(['vc', 'status'], project.beadsCwd));
           const lastSyncedAt = new Date(now()).toISOString();
           healthByProject.set(project.key, { localHead: after, lastSyncedAt, lastError: null });
           recordBeadsPull(project.key, after, after, new Date(lastSyncedAt));
-          if (after && after !== before) {
+          lastObservedHead.set(project.key, after);
+          if (after && previousHead !== undefined && after !== previousHead) {
             emit({
               type: 'beads.freshness_changed',
               timestamp: lastSyncedAt,

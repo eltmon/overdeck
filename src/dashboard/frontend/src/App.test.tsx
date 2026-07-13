@@ -122,6 +122,8 @@ vi.mock('./lib/store', () => ({
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
   selectAgentsWithPendingAskUserQuestion: (state: { agentsWithPendingAskUserQuestion?: unknown[] }) =>
     state.agentsWithPendingAskUserQuestion ?? [],
+  selectAgentsWithPendingProposedPlan: (state: { agentsWithPendingProposedPlan?: unknown[] }) =>
+    state.agentsWithPendingProposedPlan ?? [],
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
