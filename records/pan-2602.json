@@ -212,6 +212,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-13T16:22:31.718Z"
+    },
+    {
+      "timestamp": "2026-07-13T16:26:16.272Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -337,18 +342,19 @@
     "recordedAt": "2026-07-13T16:25:29.668Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T16:25:29.671Z",
+  "updated": "2026-07-13T16:26:16.325Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T16:19:04.268Z",
+    "updatedAt": "2026-07-13T16:26:16.269Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
+    "reviewedAtCommit": "0fb503c484ad438ee45e69f4517c14b3b19ba0bd",
     "lastVerifiedCommit": "d1bc4dfb119ca34e40f2ed0014ff3296b2a05eed",
     "reviewSpawnedAt": "2026-07-13T16:19:04.267Z"
   },
@@ -363,9 +369,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 23843183,
-            "output": 78208,
-            "cacheRead": 21686016,
+            "input": 27195207,
+            "output": 86900,
+            "cacheRead": 24420992,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -393,10 +399,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 36602,
-            "output": 56642,
-            "cacheRead": 16473629,
-            "cacheWrite": 956271
+            "input": 36936,
+            "output": 70582,
+            "cacheRead": 23547957,
+            "cacheWrite": 1287435
           }
         },
         "review.correctness": {
@@ -441,9 +447,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 4268414,
-            "output": 600028,
-            "cacheRead": 294923008,
+            "input": 4282070,
+            "output": 602430,
+            "cacheRead": 297932032,
             "cacheWrite": 0
           }
         }
@@ -456,9 +462,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 23843183,
-          "output": 78208,
-          "cacheRead": 21686016,
+          "input": 27195207,
+          "output": 86900,
+          "cacheRead": 24420992,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -480,21 +486,21 @@
           "cacheWrite": 683275
         },
         "anthropic/claude-sonnet-5": {
-          "input": 116821,
-          "output": 140379,
-          "cacheRead": 37251540,
-          "cacheWrite": 1665407
+          "input": 117155,
+          "output": 154319,
+          "cacheRead": 44325868,
+          "cacheWrite": 1996571
         },
         "custom/kimi-k2.7-code": {
-          "input": 4268414,
-          "output": 600028,
-          "cacheRead": 294923008,
+          "input": 4282070,
+          "output": 602430,
+          "cacheRead": 297932032,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 150.893539,
-        "pricingAsOf": "2026-07-13T16:19:04.332Z"
+        "usd": 158.584167,
+        "pricingAsOf": "2026-07-13T16:26:16.323Z"
       }
     },
     "merges": [
@@ -503,7 +509,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "sync-local-write-detection": "completed",
     "branch-ahead-signal": "completed",
