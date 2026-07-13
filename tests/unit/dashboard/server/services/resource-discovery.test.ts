@@ -125,6 +125,7 @@ describe('resource-discovery grouping', () => {
           hasBeads: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
+          branchAheadOfMain: false,
         },
       },
       {
@@ -159,6 +160,7 @@ describe('resource-discovery grouping', () => {
           hasBeads: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
+          branchAheadOfMain: false,
         },
       },
       {
@@ -198,6 +200,7 @@ describe('resource-discovery grouping', () => {
           hasBeads: true,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-100-db'],
+          branchAheadOfMain: false,
         },
       },
     ];
@@ -249,6 +252,7 @@ describe('resource-discovery sanitization', () => {
           hasBeads: false,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-300-db'],
+          branchAheadOfMain: false,
         },
       },
     ]);
@@ -382,6 +386,78 @@ describe('resource-discovery session prefix allowlist', () => {
     expect(isDiscoverableAgentSession('conv-371')).toBe(false);
     expect(isDiscoverableAgentSession('overdeck')).toBe(false);
     expect(isDiscoverableAgentSession('0')).toBe(false);
+  });
+});
+
+describe('resource-discovery branch-ahead signal', () => {
+  beforeEach(() => {
+    resetResourceAllocatedIssuesCacheForTests();
+    mocks.execFile.mockImplementation((command: string, args: string[], _options: unknown, callback: (error: Error | null, result?: { stdout: string }) => void) => {
+      if (command === 'git' && args[0] === 'for-each-ref') {
+        const ref = args[1] ?? '';
+        if (ref.includes('feature/*')) {
+          callback(null, { stdout: 'feature/pan-9001\nfeature/pan-9002\n' });
+        } else if (ref.includes('bypass/*')) {
+          callback(null, { stdout: 'bypass/pan-9002\n' });
+        } else {
+          callback(null, { stdout: '' });
+        }
+        return;
+      }
+      if (command === 'git' && args[0] === 'merge-base') {
+        const branch = args[2];
+        // pan-9001 is fully merged into main; everything else is ahead.
+        if (branch === 'feature/pan-9001') {
+          callback(null, { stdout: '' });
+        } else {
+          callback(new Error('not an ancestor'), { stdout: '' });
+        }
+        return;
+      }
+      if (command === 'gh' && args[0] === 'pr') {
+        callback(null, { stdout: JSON.stringify(mocks.openPullRequests) });
+        return;
+      }
+      callback(null, { stdout: '' });
+    });
+  });
+
+  it('records branchAheadOfMain true for a bypass branch with unmerged work', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9002', title: 'Bypass', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9002');
+
+    expect(issue).toBeDefined();
+    expect(issue!.resourceSources).toContain('branch');
+    expect(issue!.resourceDetails.branchAheadOfMain).toBe(true);
+    expect(issue!.resourceDetails.localBranchCount).toBe(2);
+  });
+
+  it('records branchAheadOfMain false for a feature branch fully merged into main', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9001', title: 'Merged', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9001');
+
+    expect(issue).toBeDefined();
+    expect(issue!.resourceSources).toContain('branch');
+    expect(issue!.resourceDetails.branchAheadOfMain).toBe(false);
+  });
+
+  it('does not change the membership filter when only branch details change', async () => {
+    resetResourceAllocatedIssuesCacheForTests();
+    // Re-use the branch mock but give the issue a non-active tracker state.
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9003', title: 'Inactive with branch', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
   });
 });
 
