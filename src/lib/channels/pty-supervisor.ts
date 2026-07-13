@@ -27,16 +27,18 @@ import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
+import {
+  INPUT_ECHO_CONFIRM_INTERVAL_MS,
+  INPUT_ECHO_CONFIRM_ATTEMPTS,
+  INPUT_ECHO_CONFIRM_PREFIX_CHARS,
+  echoConfirmTimeoutMs,
+  inputSettleMs,
+} from './injection-budget.js';
 
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 const SHUTDOWN_GRACE_MS = 2_000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
-const INPUT_ECHO_CONFIRM_TIMEOUT_MS = 2_500;
-const INPUT_ECHO_CONFIRM_INTERVAL_MS = 50;
-const INPUT_ECHO_CONFIRM_ATTEMPTS = 2;
-const INPUT_ECHO_CONFIRM_PREFIX_CHARS = 40;
-const INPUT_SETTLE_MS = 300;
 const INPUT_PURGE_MAX_CHARS = 8_192;
 const INPUT_PURGE_SETTLE_MS = 150;
 
@@ -243,9 +245,9 @@ export function isEchoConfirmed(rawOutput: string, prefix: string): boolean {
   return normalized.includes(prefix) || PASTE_PLACEHOLDER_NORMALIZED_RE.test(normalized);
 }
 
-async function waitForPtyEcho(readOutput: () => string, prefix: string): Promise<boolean> {
+async function waitForPtyEcho(readOutput: () => string, prefix: string, timeoutMs: number): Promise<boolean> {
   const confirmed = (): boolean => isEchoConfirmed(readOutput(), prefix);
-  const deadline = Date.now() + INPUT_ECHO_CONFIRM_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (confirmed()) return true;
     await sleep(INPUT_ECHO_CONFIRM_INTERVAL_MS);
@@ -297,10 +299,11 @@ export async function injectPtyMessage(
         await purgePtyInput(child, trimmed.length);
       }
       child.write(trimmed);
-      confirmed = await waitForPtyEcho(() => observedOutput, prefix);
+      const attemptTimeoutMs = echoConfirmTimeoutMs(trimmed.length);
+      confirmed = await waitForPtyEcho(() => observedOutput, prefix, attemptTimeoutMs);
       if (!confirmed && attempt < INPUT_ECHO_CONFIRM_ATTEMPTS) {
         console.warn(
-          `[pty-supervisor] Input echo not confirmed for ${agentId} after ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms ` +
+          `[pty-supervisor] Input echo not confirmed for ${agentId} after ${attemptTimeoutMs}ms ` +
           `(attempt ${attempt}/${INPUT_ECHO_CONFIRM_ATTEMPTS}); purging and rewriting content before Enter.`,
         );
       }
@@ -313,11 +316,11 @@ export async function injectPtyMessage(
       await purgePtyInput(child, trimmed.length);
       await appendEchoFailureLog(agentId, payload, normalizePtyText(observedOutput).slice(-200));
       throw new Error(
-        `input echo confirmation failed after ${INPUT_ECHO_CONFIRM_ATTEMPTS} attempts × ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms`,
+        `input echo confirmation failed after ${INPUT_ECHO_CONFIRM_ATTEMPTS} attempts × ${echoConfirmTimeoutMs(trimmed.length)}ms`,
       );
     }
 
-    await sleep(INPUT_SETTLE_MS);
+    await sleep(inputSettleMs(trimmed.length));
     child.write('\r');
     if (payload.echo !== false) {
       process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);

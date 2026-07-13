@@ -188,17 +188,19 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
   it('purges between retries and before rejecting so unconfirmed writes never stack', async () => {
     vi.useFakeTimers();
     const fake = createFakePty();
-    const purge = '\x7f'.repeat('missing echo'.length + 8);
+    const content = 'missing echo';
+    const purge = '\x7f'.repeat(content.length + 8);
 
-    const delivered = injectPtyMessage(fake.child, 'agent-unit-miss', { content: 'missing echo', echo: false });
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-miss', { content, echo: false });
     const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
-    expect(fake.writes).toEqual(['missing echo']);
-    await vi.advanceTimersByTimeAsync(2_650);
-    expect(fake.writes).toEqual(['missing echo', purge, 'missing echo']);
-    await vi.advanceTimersByTimeAsync(2_650);
+    expect(fake.writes).toEqual([content]);
+    // 12 bytes => echoConfirmTimeoutMs = 2600ms; second write lands after purge settle.
+    await vi.advanceTimersByTimeAsync(2_800);
+    expect(fake.writes).toEqual([content, purge, content]);
+    await vi.advanceTimersByTimeAsync(2_800);
 
     await rejected;
-    expect(fake.writes).toEqual(['missing echo', purge, 'missing echo', purge]);
+    expect(fake.writes).toEqual([content, purge, content, purge]);
     expect(fake.writes).not.toContain('\r');
   });
 
@@ -231,16 +233,76 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
   it('submits exactly one copy when the echo only appears after the purged retry', async () => {
     vi.useFakeTimers();
     const fake = createFakePty();
-    const purge = '\x7f'.repeat('late echo'.length + 8);
+    const content = 'late echo';
+    const purge = '\x7f'.repeat(content.length + 8);
 
-    const delivered = injectPtyMessage(fake.child, 'agent-unit-late', { content: 'late echo', echo: false });
-    await vi.advanceTimersByTimeAsync(2_650);
-    expect(fake.writes).toEqual(['late echo', purge, 'late echo']);
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-late', { content, echo: false });
+    await vi.advanceTimersByTimeAsync(2_800);
+    expect(fake.writes).toEqual([content, purge, content]);
     fake.emit('late echo');
     await vi.advanceTimersByTimeAsync(400);
 
     await expect(delivered).resolves.toBeUndefined();
-    expect(fake.writes).toEqual(['late echo', purge, 'late echo', '\r']);
+    expect(fake.writes).toEqual([content, purge, content, '\r']);
+  });
+
+  it('scales the echo-confirm window so a large payload confirms without purging', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    // 36 KiB => echoConfirmTimeoutMs = 2500 + 36*100 = 6100ms.
+    const content = 'x'.repeat(36 * 1024);
+    const echoedPrefix = 'x'.repeat(40);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-large', { content, echo: false });
+    expect(fake.writes).toEqual([content]);
+
+    // The old fixed 2.5s window would have purged by now; the scaled window must not.
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(fake.writes).toEqual([content]);
+
+    // Echo arrives at t=6s, still inside the 6100ms window.
+    fake.emit(echoedPrefix);
+    await vi.advanceTimersByTimeAsync(3_500);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual([content, '\r']);
+  });
+
+  it('keeps the small-message echo timeout near the previous fixed floor', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'x'.repeat(512);
+    const purge = '\x7f'.repeat(content.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-small', { content, echo: false });
+    const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
+    expect(fake.writes).toEqual([content]);
+
+    // 512 bytes => echoConfirmTimeoutMs = 2500 + 1*100 = 2600ms.
+    await vi.advanceTimersByTimeAsync(2_800);
+    expect(fake.writes).toEqual([content, purge, content]);
+    await vi.advanceTimersByTimeAsync(2_800);
+
+    await rejected;
+    expect(fake.writes).toEqual([content, purge, content, purge]);
+  });
+
+  it('warns with the computed echo-confirm timeout value', async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fake = createFakePty();
+    // 2 KiB => echoConfirmTimeoutMs = 2500 + 2*100 = 2700ms.
+    const content = 'x'.repeat(2 * 1024);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-warn', { content, echo: false });
+    await vi.advanceTimersByTimeAsync(2_700);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('after 2700ms'),
+    );
+
+    await vi.advanceTimersByTimeAsync(3_000);
+    await expect(delivered).rejects.toThrow(/input echo confirmation failed/);
+    warnSpy.mockRestore();
   });
 
   it('returns non-2xx from the supervisor server when echo confirmation fails', async () => {
