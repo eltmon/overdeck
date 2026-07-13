@@ -4,17 +4,17 @@
     "created": "2026-07-13T03:20:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2616: closed-issue reaper is blind to Linear-tracked issues — isTrackerIssueClosed returns false for any non-GitHub issue",
-    "updated": "2026-07-13T13:40:17.343Z"
+    "updated": "2026-07-13T19:29:35.681Z"
   },
   "plan": {
     "id": "pan-2616",
     "title": "closed-issue reaper is blind to Linear-tracked issues — isTrackerIssueClosed returns false for any non-GitHub issue",
-    "status": "running",
+    "status": "completed",
     "uid": "d307044f-bd2a-4a47-8f93-3d4fb2169331",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-13T03:20:53Z",
-    "updated": "2026-07-13T13:40:17.343Z",
+    "updated": "2026-07-13T19:29:35.681Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2616",
@@ -276,5 +276,5 @@
       "canonicalFilename": "2026-07-13-PAN-2616-closed-issue-reaper-is-blind-to-linear-tracked-issues-istrackerissueclosed-returns-false-for-any-non-github-issue.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
