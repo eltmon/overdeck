@@ -307,19 +307,19 @@
     "recordedAt": "2026-07-13T11:57:13.297Z"
   },
   "created": "2026-07-12T22:33:37.108Z",
-  "updated": "2026-07-13T16:02:48.246Z",
+  "updated": "2026-07-13T16:06:59.016Z",
   "pipeline": {
     "issueId": "PAN-2602",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T12:03:05.509Z",
-    "updatedAt": "2026-07-13T16:02:47.547Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-13T16:06:57.923Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Bead beads-rollup-service ack: extractIssueLabels() now gates bare word-number labels through project.issuePrefixes, preventing phase-N labels from creating spurious rollups; tests cover phase exclusion and workspace: label mapping.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2636",
     "lastVerifiedCommit": "d1bc4dfb119ca34e40f2ed0014ff3296b2a05eed",
@@ -458,9 +458,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 20633139,
-            "output": 67658,
-            "cacheRead": 18762752,
+            "input": 23843183,
+            "output": 78208,
+            "cacheRead": 21686016,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -488,10 +488,10 @@
         },
         "review": {
           "anthropic/claude-sonnet-5": {
-            "input": 34353,
-            "output": 52738,
-            "cacheRead": 14398844,
-            "cacheWrite": 667351
+            "input": 35482,
+            "output": 53768,
+            "cacheRead": 16145131,
+            "cacheWrite": 679711
           }
         },
         "review.correctness": {
@@ -536,9 +536,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3980680,
-            "output": 587258,
-            "cacheRead": 285039360,
+            "input": 4013194,
+            "output": 593818,
+            "cacheRead": 289216768,
             "cacheWrite": 0
           }
         }
@@ -551,9 +551,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 20633139,
-          "output": 67658,
-          "cacheRead": 18762752,
+          "input": 23843183,
+          "output": 78208,
+          "cacheRead": 21686016,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -575,21 +575,21 @@
           "cacheWrite": 683275
         },
         "anthropic/claude-sonnet-5": {
-          "input": 114572,
-          "output": 136475,
-          "cacheRead": 35176755,
-          "cacheWrite": 1376487
+          "input": 115701,
+          "output": 137505,
+          "cacheRead": 36923042,
+          "cacheWrite": 1388847
         },
         "custom/kimi-k2.7-code": {
-          "input": 3980680,
-          "output": 587258,
-          "cacheRead": 285039360,
+          "input": 4013194,
+          "output": 593818,
+          "cacheRead": 289216768,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 144.298397,
-        "pricingAsOf": "2026-07-13T16:02:48.155Z"
+        "usd": 148.753978,
+        "pricingAsOf": "2026-07-13T16:06:58.125Z"
       }
     },
     "merges": [
