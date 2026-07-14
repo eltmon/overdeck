@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { useAlert, useConfirm } from '../DialogProvider';
 import {
@@ -247,7 +247,23 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const issue = useMemo(() => issues.find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()), [issueId, issues]);
   const agent = useMemo(() => activeAgentForIssue(agents, issueId), [agents, issueId]);
 
-  const lifecycle = agent?.lifecycle;
+  // The WS-fed agents store carries no lifecycle, so agent?.lifecycle is
+  // usually undefined here — which silently disabled resumeSession/resetSession
+  // everywhere this hook powers (2026-07-14, MIN-865). For a stopped agent,
+  // fall back to the endpoint purpose-built for this question.
+  const stoppedAgentId = agent && ['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status) ? agent.id : null;
+  const lifecycleFallback = useQuery({
+    queryKey: ['agent-lifecycle', stoppedAgentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${encodeURIComponent(stoppedAgentId ?? '')}/has-session`);
+      if (!res.ok) throw new Error(`has-session failed: ${res.status}`);
+      const data = await res.json() as { lifecycle?: WorkAgentLifecycle };
+      return data.lifecycle ?? null;
+    },
+    enabled: !!stoppedAgentId && !agent?.lifecycle,
+    staleTime: 15_000,
+  });
+  const lifecycle = agent?.lifecycle ?? lifecycleFallback.data ?? undefined;
 
   const workspace = useMemo<WorkspaceInfo | undefined>(() => {
     if (!issue?.workspacePath) return undefined;
