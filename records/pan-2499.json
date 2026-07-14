@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-14T15:48:23.445Z",
+  "updated": "2026-07-14T16:22:31.043Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -21,7 +21,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T15:48:23.392Z",
+    "updatedAt": "2026-07-14T16:22:30.982Z",
     "inspectNotes": "Bead no-loss-manifest ack: inventory.ts enumerates all 44 sections (Console 14 + Cockpit 16 + Rail 13 + ReviewPolicyControl) with home paths; issue-view-no-loss.test.ts hardcodes the same section list independently and asserts existsSync on every home path; npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts passes 5/5."
   },
   "closeOut": {
@@ -39,6 +39,14 @@
             "output": 3279,
             "cacheRead": 1006848,
             "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 19,
+            "output": 13952,
+            "cacheRead": 1192531,
+            "cacheWrite": 22038
           }
         },
         "plan": {
@@ -80,10 +88,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 25971,
-          "output": 55437,
-          "cacheRead": 6213852,
-          "cacheWrite": 404469
+          "input": 25990,
+          "output": 69389,
+          "cacheRead": 7406383,
+          "cacheWrite": 426507
         },
         "anthropic/claude-sonnet-5": {
           "input": 16805,
@@ -99,8 +107,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 52.928608,
-        "pricingAsOf": "2026-07-14T15:48:23.421Z"
+        "usd": 55.094407,
+        "pricingAsOf": "2026-07-14T16:22:31.012Z"
       }
     },
     "merges": [],
