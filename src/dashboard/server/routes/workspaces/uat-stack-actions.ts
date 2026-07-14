@@ -69,7 +69,7 @@ async function discoverComposeProjectName(issueId: string): Promise<string | nul
       'ps',
       '-a',
       '--format',
-      '{{index .Labels "com.docker.compose.project"}}',
+      '{{.Label "com.docker.compose.project"}}',
     ], { encoding: 'utf-8', timeout: 10_000 });
     const projects = [...new Set(stdout.split('\n').map(line => line.trim()).filter(Boolean))];
     return projects.find(name => name.endsWith(suffix)) ?? null;
