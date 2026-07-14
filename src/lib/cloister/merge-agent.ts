@@ -83,6 +83,7 @@ function parseStatusPath(line: string): string {
  */
 export async function autoCommitWorkspaceChangesBeforeSync(
   projectPath: string,
+  issueId?: string,
 ): Promise<{ success: boolean; committed: boolean; reason?: string }> {
   try {
     for (const operationHead of ['MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD']) {
@@ -152,7 +153,10 @@ export async function autoCommitWorkspaceChangesBeforeSync(
       return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
     }
 
-    await execAsync('git commit -m "chore: auto-commit before sync with main"', {
+    const commitMessage = issueId
+      ? `chore: auto-commit before sync with main (${issueId})`
+      : 'chore: auto-commit before sync with main';
+    await execAsync(`git commit -m "${commitMessage}"`, {
       cwd: projectPath,
       encoding: 'utf-8',
     });
@@ -1267,7 +1271,7 @@ export async function syncMainIntoWorkspace(
   // Pre-flight: auto-commit uncommitted changes before merge
   console.log(`[sync-main] Checking for uncommitted changes...`);
   logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
-  const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath);
+  const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath, issueId);
   if (!autoCommit.success) {
     const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
     console.error(`[sync-main] ${message}`);
