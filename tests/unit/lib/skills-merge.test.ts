@@ -44,7 +44,7 @@ describe('skills-merge', () => {
 node_modules
 dist
 # Overdeck-managed symlinks (not committed)
-beads
+tasks
 feature-work
 release
 `;
@@ -67,11 +67,11 @@ release
       const duplicatedContent = `# User content
 node_modules
 # Overdeck-managed symlinks (not committed)
-beads
+tasks
 feature-work
 release
 # Overdeck-managed symlinks (not committed)
-beads
+tasks
 feature-work
 release
 bug-fix
@@ -86,7 +86,7 @@ bug-fix
       // Verify content no longer has Overdeck section
       const content = readFileSync(gitignorePath, 'utf-8');
       expect(content).not.toContain('# Overdeck-managed symlinks');
-      expect(content).not.toContain('beads');
+      expect(content).not.toContain('tasks');
       expect(content).not.toContain('bug-fix');
 
       // User content should be preserved
@@ -107,8 +107,8 @@ build/
 # Dependencies
 node_modules/
 # Overdeck-managed symlinks (not committed)
-beads
-beads
+tasks
+tasks
 feature-work
 `;
       writeFileSync(gitignorePath, content);
@@ -128,7 +128,7 @@ feature-work
 
       // Overdeck section removed
       expect(newContent).not.toContain('# Overdeck-managed symlinks');
-      expect(newContent).not.toContain('beads');
+      expect(newContent).not.toContain('tasks');
       expect(newContent).not.toContain('feature-work');
     });
 
@@ -155,7 +155,7 @@ middle
     it('should handle severely duplicated content by removing entire section', () => {
       const gitignorePath = join(testDir, '.gitignore');
       // Simulate what the old bug produced - multiple identical sections
-      const skills = ['beads', 'bug-fix', 'code-review', 'feature-work', 'refactor', 'release'];
+      const skills = ['tasks', 'bug-fix', 'code-review', 'feature-work', 'refactor', 'release'];
       let content = '# User content\nnode_modules\n';
 
       // Add the same section multiple times (simulating repeated pan sync calls)

@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { VBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/VBriefTab'
-import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
+import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import type { PaneWrapperProps } from '../types'
 import styles from '../stage.module.css'
 
-type PlanView = 'plan' | 'beads'
+type PlanView = 'plan' | 'tasks'
 
 /**
  * PlanPane — paneType='plan' (PAN-1549). A simple sub-toggle between the
- * existing VBriefTab (List/DAG/Raw) and BeadsTab for the workspace issue.
+ * existing VBriefTab (List/DAG/Raw) and TasksTab for the workspace issue.
  * Both tab bodies are reused as-is.
  */
 export function PlanPane({ pane, ctx }: PaneWrapperProps) {
@@ -30,18 +30,18 @@ export function PlanPane({ pane, ctx }: PaneWrapperProps) {
         <button
           type="button"
           role="tab"
-          aria-selected={view === 'beads'}
-          className={`${styles.subTab} ${view === 'beads' ? styles.subTabActive : ''}`}
-          onClick={() => setView('beads')}
+          aria-selected={view === 'tasks'}
+          className={`${styles.subTab} ${view === 'tasks' ? styles.subTabActive : ''}`}
+          onClick={() => setView('tasks')}
         >
-          Beads
+          Tasks
         </button>
       </div>
       <div className={styles.subBody}>
         {view === 'plan' ? (
           <VBriefTab issueId={issueId} />
         ) : (
-          <BeadsTab issueId={issueId} />
+          <TasksTab issueId={issueId} />
         )}
       </div>
     </div>

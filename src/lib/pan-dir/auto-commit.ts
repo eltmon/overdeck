@@ -238,34 +238,6 @@ export function queueAutoCommit(opts: {
 }
 
 /**
- * PAN-1441: queue an auto-commit of the host-main beads export files.
- *
- * Unlike the .pan/* writers, there is no single Overdeck write site for these:
- * `.beads/issues.jsonl` and `.beads/export-state.json` drift on `main` as a
- * side-effect of the `bd` binary re-exporting after dolt syncs (other machines /
- * workspaces pushing to the shared dolt remote). So this is called from the
- * deacon's periodic patrol as a drift sweep rather than wired to a write site.
- *
- * Only existing files are queued: a missing/deleted `issues.jsonl` is skipped so
- * the janitor never stages — and propagates — a transient empty-DB deletion (the
- * PAN-1158 hazard). queueAutoCommit is main-only, coalesced, and a no-op when
- * nothing changed.
- */
-export function queueBeadsAutoCommit(projectRoot: string): void {
-  const project = findProjectByPathSync(projectRoot);
-  const beadsRoot = project && resolveStateReadHomeSync(project).migrated
-    ? resolveStateReadHomeSync(project).root
-    : projectRoot;
-  const candidates = [
-    join(beadsRoot, '.beads', 'issues.jsonl'),
-    join(beadsRoot, '.beads', 'export-state.json'),
-  ];
-  const paths = candidates.filter((p) => existsSync(p));
-  if (paths.length === 0) return;
-  queueAutoCommit({ projectRoot, paths, subject: 'chore(beads): sync beads state on main' });
-}
-
-/**
  * PAN-2516 belt-and-suspenders reconciliation for state writes that predate or
  * bypassed the canonical writer. Patrols commit only the owned spec/record
  * surfaces; unrelated source or operator changes are never staged.
@@ -605,17 +577,15 @@ function warnAutoPush(branch: string, message: string): void {
 }
 
 /**
- * Find the project root for a `.pan/` or `.beads/` file path. Returns null
- * when the path is not under either marker.
+ * Find the project root for a `.pan/` file path. Returns null otherwise.
  */
 export function deriveProjectRoot(path: string): string | null {
-  for (const marker of [`${sep}.pan${sep}`, `${sep}.beads${sep}`]) {
-    const idx = path.indexOf(marker);
-    if (idx !== -1) return path.slice(0, idx);
-  }
-  // Edge case: the path is the .pan/.beads directory itself.
+  const marker = `${sep}.pan${sep}`;
+  const idx = path.indexOf(marker);
+  if (idx !== -1) return path.slice(0, idx);
+  // Edge case: the path is the .pan directory itself.
   const base = dirname(path);
-  if (base.endsWith(`${sep}.pan`) || base.endsWith(`${sep}.beads`)) {
+  if (base.endsWith(`${sep}.pan`)) {
     return dirname(base);
   }
   return null;

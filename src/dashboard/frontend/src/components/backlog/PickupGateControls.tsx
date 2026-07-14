@@ -226,7 +226,7 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
               <button style={BTN_PRIMARY} onClick={() => startPlanning('auto')} disabled={busy}>Plan (Auto)</button>
               <button style={BTN_BASE} onClick={() => startPlanning('interactive')} disabled={busy}>⚑ Plan (Interactive)</button>
             </div>
-            <div style={SECTION_HINT}>Generates the vBRIEF + beads. Auto runs end-to-end and stops before pickup; Interactive opens a Q&amp;A session. The plan must be Released before an agent can pick it up.</div>
+            <div style={SECTION_HINT}>Generates the vBRIEF + tasks. Auto runs end-to-end and stops before pickup; Interactive opens a Q&amp;A session. The plan must be Released before an agent can pick it up.</div>
           </>
         ) : !released ? (
           <>
@@ -261,7 +261,7 @@ export function PickupGateControls({ issueId, onOpenIssueBrowser }: {
             ...(planned
               ? { color: 'var(--info-foreground)', borderColor: 'color-mix(in srgb, var(--info) 34%, transparent)', background: 'color-mix(in srgb, var(--info) 9%, transparent)' }
               : { color: 'var(--warning-foreground)', borderColor: 'color-mix(in srgb, var(--warning) 34%, transparent)', background: 'color-mix(in srgb, var(--warning) 9%, transparent)' }),
-          }}>{planned ? '✓ has spec + beads' : '✗ no spec'}</span>
+          }}>{planned ? '✓ has spec + tasks' : '✗ no spec'}</span>
           <span style={{ fontSize: 10, color: 'var(--muted-foreground)' }}>derived</span>
         </div>
         <ToggleRow label="Blocks main 🔴" color="var(--destructive)" on={blocksMain}

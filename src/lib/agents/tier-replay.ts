@@ -38,7 +38,7 @@ export interface ReplayCommit {
   sha: string;
   subject: string;
   diff: string;
-  beadId?: string;
+  itemId?: string;
 }
 
 export interface ReplayDelivery {
@@ -301,16 +301,16 @@ async function replayTierFeed(
   const includeCallout = feedConfig.callouts !== 'off';
   const apiUrl = target.apiUrl ?? resolveFeedApiUrl();
   for (const commit of commits) {
-    const beadId = commit.beadId;
+    const itemId = commit.itemId;
     const message = composeCommitFeedMessage(
       commit.sha,
       commit.subject,
       commit.diff,
-      includeCallout && beadId
+      includeCallout && itemId
         ? {
           apiUrl,
           issueId: target.issueId,
-          beadId,
+          itemId,
           tierName: target.tierName,
           agentId,
         }
@@ -340,8 +340,8 @@ async function replaySupervisorFeed(
       : undefined;
     const message = buildSupervisorReviewMessage({
       issueId: target.issueId,
-      beadId: item.id,
-      beadTitle: item.title,
+      itemId: item.id,
+      itemTitle: item.title,
       sha: commit.sha,
       diff: commit.diff,
       acceptanceCriteria: extractAcceptanceCriteria(item),

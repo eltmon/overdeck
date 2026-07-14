@@ -38,7 +38,6 @@ export const AUTO_COMMIT_EXCLUDED_PATHS = [
 const SYNC_MAIN_MAIN_PREFERRED_PATHS = [
   '.pan/continues',
   '.pan/specs',
-  '.beads',
 ];
 
 export function isSyncMainMainPreferredPath(relativePath: string): boolean {
@@ -131,7 +130,6 @@ import {
 } from '../paths.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
-import { restoreTrackedBeadsExport } from '../beads-restore.js';
 import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
@@ -433,31 +431,6 @@ export async function postMergeLifecycle(
     triggerPostMergeReleaseIfConfigured(issueId, projectPath).catch((err) => {
       console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     });
-
-    // 2. Compact old beads (via lifecycle module)
-    try {
-      const { compactBeads } = await import('../lifecycle/compact-beads.js');
-      // PAN-1249: compactBeads returns Effect<StepResult>; bridge to Promise.
-      const beadsResult = await Effect.runPromise(compactBeads({ issueId, projectPath }));
-      if (beadsResult.success && !beadsResult.skipped) {
-        console.log(`[merge-agent] ✓ ${beadsResult.details?.join('; ')}`);
-        logActivity('beads_compaction_complete', beadsResult.details?.join('; ') || 'Beads compacted');
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Beads compaction failed: ${err}`);
-    }
-
-    // 2b. Sweep any remaining open beads (backstop for bypass/admin merges that skip verification).
-    try {
-      const { sweepOrphanedBeads } = await import('../lifecycle/orphaned-beads-sweep.js');
-      const sweepResult = await sweepOrphanedBeads({ beadsCwd: projectPath, issueId, reason: 'issue merged; remaining open beads swept' });
-      if (sweepResult.ok && sweepResult.closedIds.length > 0) {
-        console.log(`[merge-agent] ✓ Swept ${sweepResult.closedIds.length} open bead(s) for ${issueId}`);
-        logActivity('beads_sweep_complete', `Swept ${sweepResult.closedIds.length} open bead(s) for ${issueId}`);
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Beads sweep failed: ${err}`);
-    }
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
@@ -1251,13 +1224,6 @@ export async function syncMainIntoWorkspace(
 ): Promise<SyncMainResult> {
   console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
   logActivity('sync_main_start', `Starting sync for ${issueId}`);
-
-  // PAN-1158 safety net: a workspace bd dolt DB that briefly went empty can
-  // leave `.beads/issues.jsonl` reported as deleted by `git status`. The
-  // auto-commit below would then propagate that deletion onto the feature
-  // branch. Restore the tracked export first so the auto-commit only sees
-  // intentional changes.
-  await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
 
   // Pre-flight: auto-commit uncommitted changes before merge
   console.log(`[sync-main] Checking for uncommitted changes...`);

@@ -84,9 +84,9 @@ describe('guard-agent-main-push.sh', () => {
   it('allows agent-context ranges touching only state-plane paths', () => {
     const { root, base } = setupRepo();
     mkdirSync(join(root, '.pan', 'records'), { recursive: true });
-    mkdirSync(join(root, '.beads'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
     writeFileSync(join(root, '.pan', 'records', 'pan-2227.json'), '{}\n');
-    writeFileSync(join(root, '.beads', 'state.json'), '{}\n');
+    writeFileSync(join(root, '.tasks', 'state.json'), '{}\n');
     const head = commitAll(root, 'state sync');
 
     const result = runGuard(root, ['--range', `${base}..${head}`], {

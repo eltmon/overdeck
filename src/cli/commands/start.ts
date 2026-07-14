@@ -1214,8 +1214,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
     // `pan start --host --yes` does not attach to the work-agent tmux session.
     // After spawnAgent finishes session creation, this command only prints the
-    // details below and exits; any remaining pre-spawn delay is bd/tracker/prompt
-    // work, with bd contention now bounded by the retry/lock helpers above.
+    // details below and exits; any remaining pre-spawn delay is tracker/prompt work.
     if (shouldClearPauseBeforeSpawn) {
       clearAgentPausedSync(agentId);
     }

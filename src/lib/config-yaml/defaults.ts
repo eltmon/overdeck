@@ -29,8 +29,6 @@ export const DEFAULT_DOCS_TRIGGER_REGEXES = [
   'workspace',
   'specialist',
   'harness',
-  'bd',
-  'beads',
   'vbrief',
   'workhorse',
 ];

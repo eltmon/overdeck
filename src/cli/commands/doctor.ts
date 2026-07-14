@@ -24,7 +24,6 @@ import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
-import { checkCanonicalBeadsHomes } from './doctor-beads.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
 
@@ -527,7 +526,7 @@ export function checkStoppedListClassification(options: {
   };
 }
 
-type OrphanProposedSpecReason = 'beads-zero' | 'beads-mismatch' | 'no-agent-no-reason';
+type OrphanProposedSpecReason = 'no-agent-no-reason';
 
 type DoctorProjectEntry = { key: string; config: Pick<ProjectConfig, 'name' | 'path'> };
 
@@ -536,7 +535,6 @@ export interface OrphanProposedSpec {
   projectName: string;
   issueId: string;
   reason: OrphanProposedSpecReason;
-  beadCount: number;
   planItemCount: number;
 }
 
@@ -551,45 +549,6 @@ function readJsonFile(path: string): any | null {
     return JSON.parse(readFileSync(path, 'utf-8'));
   } catch {
     return null;
-  }
-}
-
-function resolveBeadsIssuesPath(projectPath: string, issueId: string): string | null {
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const beadsDir = join(workspacePath, '.beads');
-  const localIssuesPath = join(beadsDir, 'issues.jsonl');
-  if (existsSync(localIssuesPath)) return localIssuesPath;
-
-  const redirectPath = join(beadsDir, 'redirect');
-  if (!existsSync(redirectPath)) return null;
-  try {
-    const redirected = readFileSync(redirectPath, 'utf-8').trim();
-    if (!redirected) return null;
-    return join(isAbsolute(redirected) ? redirected : resolve(workspacePath, redirected), 'issues.jsonl');
-  } catch {
-    return null;
-  }
-}
-
-function countBeadsForIssue(projectPath: string, issueId: string): number {
-  const beadsPath = resolveBeadsIssuesPath(projectPath, issueId);
-  if (!beadsPath || !existsSync(beadsPath)) return 0;
-  try {
-    return readFileSync(beadsPath, 'utf-8')
-      .split('\n')
-      .filter(Boolean)
-      .filter((line) => {
-        try {
-          const record = JSON.parse(line) as { _type?: unknown; labels?: unknown };
-          return record._type === 'issue'
-            && Array.isArray(record.labels)
-            && record.labels.some((label) => typeof label === 'string' && label.toLowerCase() === issueId.toLowerCase());
-        } catch {
-          return false;
-        }
-      }).length;
-  } catch {
-    return 0;
   }
 }
 
@@ -625,18 +584,12 @@ export function findOrphanProposedSpecs(options: {
       if (!issueId || hasInFlightAgent(issueId, agentsDir, tmuxSessionNames)) continue;
 
       const planItemCount = Array.isArray(spec.plan?.items) ? spec.plan.items.length : 0;
-      const beadCount = countBeadsForIssue(config.path, issueId);
-      const reason: OrphanProposedSpecReason = beadCount === 0
-        ? 'beads-zero'
-        : beadCount !== planItemCount
-          ? 'beads-mismatch'
-          : 'no-agent-no-reason';
+      const reason: OrphanProposedSpecReason = 'no-agent-no-reason';
       orphans.push({
         projectKey: key,
         projectName: config.name,
         issueId,
         reason,
-        beadCount,
         planItemCount,
       });
     }
@@ -646,14 +599,7 @@ export function findOrphanProposedSpecs(options: {
 }
 
 function orphanProposedHint(reason: OrphanProposedSpecReason): string {
-  switch (reason) {
-    case 'beads-zero':
-      return 'free disk if needed, then re-run planning so beads are materialized before promotion';
-    case 'beads-mismatch':
-      return 're-run planning or inspect bd errors; spec items and bead tasks diverged';
-    case 'no-agent-no-reason':
-      return 'retry spawn with `pan start <id>` after checking stack health; use `--host` only for an explicit operator bypass';
-  }
+  return 'retry spawn with `pan start <id>` after checking stack health; use `--host` only for an explicit operator bypass';
 }
 
 export function checkOrphanProposedSpecs(options: {
@@ -677,7 +623,7 @@ export function checkOrphanProposedSpecs(options: {
   }
 
   const summary = [...grouped.entries()]
-    .map(([project, items]) => `${project}: ${items.map((item) => `${item.issueId} ${item.reason} (${item.beadCount}/${item.planItemCount} beads)`).join(', ')}`)
+    .map(([project, items]) => `${project}: ${items.map((item) => `${item.issueId} ${item.reason} (${item.planItemCount} plan items)`).join(', ')}`)
     .join('; ');
   const fixes = [...new Set(orphans.map((orphan) => `${orphan.reason}: ${orphanProposedHint(orphan.reason)}`))];
 
@@ -742,7 +688,6 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   // Check optional commands
   const optionalCommands = [
     { cmd: 'gh', name: 'GitHub CLI', fix: 'Install: gh auth login' },
-    { cmd: 'bd', name: 'Beads CLI', fix: 'Install beads for task tracking' },
     { cmd: 'docker', name: 'Docker', fix: 'Install Docker for workspace containers' },
   ];
 
@@ -865,7 +810,6 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   checks.push(checkOrphanProposedSpecs());
   checks.push(...await checkMainDivergence());
   checks.push(...await checkStateWorktrees());
-  checks.push(...checkCanonicalBeadsHomes());
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');

@@ -3,7 +3,7 @@ import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsT
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
 import { VBriefTab } from '../../CommandDeck/ZoneCOverviewTabs/VBriefTab'
-import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
+import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import { PrDiffTab } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
 import { usePlanningQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
@@ -16,7 +16,7 @@ export type DigTab =
   | 'prd'
   | 'state'
   | 'vbrief'
-  | 'beads'
+  | 'tasks'
   | 'diff'
   | 'artifacts'
   | 'history'
@@ -26,7 +26,7 @@ const TABS: { id: DigTab; label: string }[] = [
   { id: 'discussions', label: 'Discussions' },
   { id: 'diff', label: 'PR Diff' },
   { id: 'vbrief', label: 'vBRIEF' },
-  { id: 'beads', label: 'Beads' },
+  { id: 'tasks', label: 'Tasks' },
   { id: 'prd', label: 'PRD' },
   { id: 'state', label: 'STATE' },
   { id: 'costs', label: 'Costs' },
@@ -47,7 +47,7 @@ function MarkdownDigTab({ issueId, field }: { issueId: string; field: 'prd' | 's
 
 /**
  * IssueDigTabs — the DIG layer of the cockpit: a tab bar that lazily reveals the
- * deep views (full activity, discussions, diff, vBRIEF, beads, PRD/STATE,
+ * deep views (full activity, discussions, diff, vBRIEF, tasks, PRD/STATE,
  * costs, artifacts, status history). Controlled so the ActivityCard's "full
  * feed" can deep-link here. Nothing renders below the bar until a tab is opened,
  * keeping the cockpit short by default. (Command Deck remodel S3.)
@@ -91,7 +91,7 @@ export function IssueDigTabs({
           {active === 'prd' && <MarkdownDigTab issueId={issueId} field="prd" />}
           {active === 'state' && <MarkdownDigTab issueId={issueId} field="state" />}
           {active === 'vbrief' && <VBriefTab issueId={issueId} />}
-          {active === 'beads' && <BeadsTab issueId={issueId} />}
+          {active === 'tasks' && <TasksTab issueId={issueId} />}
           {active === 'diff' && <PrDiffTab issueId={issueId} />}
           {active === 'artifacts' && <DrawerArtifactsPanel issueId={issueId} />}
           {active === 'history' && <StatusHistoryTab issueId={issueId} />}

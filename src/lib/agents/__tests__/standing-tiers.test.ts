@@ -70,9 +70,9 @@ describe('computeTierRunSchedule', () => {
     );
 
     expect(computeTierRunSchedule(plan, TIER_CONFIG)).toEqual([
-      { tierName: 'cheap', beadIds: ['a', 'b'] },
-      { tierName: 'frontier', beadIds: ['c'] },
-      { tierName: 'standard', beadIds: ['d'] },
+      { tierName: 'cheap', taskIds: ['a', 'b'] },
+      { tierName: 'frontier', taskIds: ['c'] },
+      { tierName: 'standard', taskIds: ['d'] },
     ]);
   });
 
@@ -85,9 +85,9 @@ describe('computeTierRunSchedule', () => {
 describe('tiersNeededForSchedule', () => {
   it('returns exactly the tier names the schedule contains, deduplicated in order', () => {
     const schedule: TierRun[] = [
-      { tierName: 'cheap', beadIds: ['a'] },
-      { tierName: 'frontier', beadIds: ['b'] },
-      { tierName: 'cheap', beadIds: ['c'] },
+      { tierName: 'cheap', taskIds: ['a'] },
+      { tierName: 'frontier', taskIds: ['b'] },
+      { tierName: 'cheap', taskIds: ['c'] },
     ];
     expect(tiersNeededForSchedule(schedule)).toEqual(['cheap', 'frontier']);
   });
@@ -95,9 +95,9 @@ describe('tiersNeededForSchedule', () => {
 
 describe('StandingTierManager', () => {
   const SCHEDULE: TierRun[] = [
-    { tierName: 'cheap', beadIds: ['a', 'b'] },
-    { tierName: 'standard', beadIds: ['c'] },
-    { tierName: 'frontier', beadIds: ['d'] },
+    { tierName: 'cheap', taskIds: ['a', 'b'] },
+    { tierName: 'standard', taskIds: ['c'] },
+    { tierName: 'frontier', taskIds: ['d'] },
   ];
 
   it('reports exactly the scheduled tiers and never spawns a tier absent from the schedule', async () => {
@@ -125,7 +125,7 @@ describe('StandingTierManager', () => {
     expect(calls.map((call) => call.options.slotItemId)).toEqual(['a', 'c', 'd']);
   });
 
-  it('reuses a spawned standing session for subsequent beads instead of respawning', async () => {
+  it('reuses a spawned standing session for subsequent tasks instead of respawning', async () => {
     const { spawn, calls } = fakeSpawn();
     const manager = new StandingTierManager({ issueId: 'PAN-1', schedule: SCHEDULE, spawn });
 
@@ -139,7 +139,7 @@ describe('StandingTierManager', () => {
     expect(calls.map((call) => call.options.slotItemId)).toEqual(['a', 'c']);
   });
 
-  it('routes a bead through the registered-slot spawn path and returns that slot agent id', async () => {
+  it('routes a task through the registered-slot spawn path and returns that slot agent id', async () => {
     const { spawn, calls } = fakeSpawn();
     const manager = new StandingTierManager({ issueId: 'PAN-1', schedule: SCHEDULE, spawn, firstSlotIndex: 7 });
 
@@ -161,32 +161,32 @@ describe('StandingTierManager', () => {
     });
   });
 
-  it('enforces the single-implementer invariant: a second dispatch before completeBead throws', async () => {
+  it('enforces the single-implementer invariant: a second dispatch before completeTask throws', async () => {
     const { spawn } = fakeSpawn();
     const manager = new StandingTierManager({ issueId: 'PAN-1', schedule: SCHEDULE, spawn });
 
-    const agentId = await manager.dispatchBeadToTier('cheap', { id: 'a' });
-    expect(manager.getInFlightBead()).toEqual({ beadId: 'a', tierName: 'cheap', agentId });
+    const agentId = await manager.dispatchTaskToTier('cheap', { id: 'a' });
+    expect(manager.getInFlightTask()).toEqual({ taskId: 'a', tierName: 'cheap', agentId });
 
-    await expect(manager.dispatchBeadToTier('cheap', { id: 'b' })).rejects.toThrow(
-      'only one implementation agent works a bead at a time',
+    await expect(manager.dispatchTaskToTier('cheap', { id: 'b' })).rejects.toThrow(
+      'only one implementation agent works a task at a time',
     );
-    await expect(manager.dispatchBeadToTier('standard', { id: 'c' })).rejects.toThrow(StandingTierError);
+    await expect(manager.dispatchTaskToTier('standard', { id: 'c' })).rejects.toThrow(StandingTierError);
 
-    manager.completeBead('a');
-    expect(manager.getInFlightBead()).toBeUndefined();
-    await expect(manager.dispatchBeadToTier('cheap', { id: 'b' })).resolves.toBe(agentId);
+    manager.completeTask('a');
+    expect(manager.getInFlightTask()).toBeUndefined();
+    await expect(manager.dispatchTaskToTier('cheap', { id: 'b' })).resolves.toBe(agentId);
   });
 
-  it('rejects completing a bead that is not the in-flight bead', async () => {
+  it('rejects completing a task that is not the in-flight task', async () => {
     const { spawn } = fakeSpawn();
     const manager = new StandingTierManager({ issueId: 'PAN-1', schedule: SCHEDULE, spawn });
 
-    expect(() => manager.completeBead('a')).toThrow(StandingTierError);
+    expect(() => manager.completeTask('a')).toThrow(StandingTierError);
 
-    await manager.dispatchBeadToTier('cheap', { id: 'a' });
-    expect(() => manager.completeBead('b')).toThrow(StandingTierError);
-    manager.completeBead('a');
+    await manager.dispatchTaskToTier('cheap', { id: 'a' });
+    expect(() => manager.completeTask('b')).toThrow(StandingTierError);
+    manager.completeTask('a');
   });
 
   it('allocates distinct slot indexes per tier starting at firstSlotIndex', async () => {

@@ -248,7 +248,7 @@ describe('OhmypiRuntime.spawnAgent resume via session.id (PAN-636 / PAN-1989)', 
     } as any)
 
     const launcher = require('node:fs').readFileSync(join(dir, 'ohmypi-launcher.sh'), 'utf-8')
-    // omp uses --resume (updated from pi's --session in PAN-1989 launcher bead)
+    // omp uses --resume (updated from pi's --session in PAN-1989 launcher task)
     expect(launcher).toMatch(/sess-stored-7777/)
   })
 

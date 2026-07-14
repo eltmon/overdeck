@@ -353,7 +353,7 @@ describe('PAN-2372 WI-5 infer_completion default + classifyDoneWithoutSignal mod
   // The default flipped nudge → auto: a stalled, alive-idle, clean+ahead slot now gets ONE
   // completion nudge and then converges to ready-to-merge signal 'inferred' after two stable
   // observations. Explicit 'nudge' (never converges) and 'off' (no nudge, returns null) keep
-  // their prior semantics. classifyDoneWithoutSignal is exercised directly — the bead names it
+  // their prior semantics. classifyDoneWithoutSignal is exercised directly — the task names it
   // — with an injected now/options and mocked ahead/clean deps, so no wall-clock waits.
   const originalEnv = process.env.PAN_SWARM_INFER_COMPLETION;
 

@@ -171,8 +171,8 @@ vi.mock('../../lib/wsTransport', () => ({
   }),
 }));
 
-vi.mock('../BeadsDialog', () => ({
-  BeadsDialog: () => <div data-testid="beads-dialog" />,
+vi.mock('../TasksDialog', () => ({
+  TasksDialog: () => <div data-testid="tasks-dialog" />,
 }));
 
 // Mock lucide-react icons
@@ -219,7 +219,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
                 tmuxSessionCount: 0,
                 prs: [],
                 hasVbrief: false,
-                hasBeads: false,
+                hasTasks: false,
                 dockerContainerCount: 0,
                 conversations: [],
               },

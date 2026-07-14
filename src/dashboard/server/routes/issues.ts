@@ -19,8 +19,8 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/cleanup-workspace
  *   POST /api/issues/:id/deep-wipe
  *   POST /api/issues/:id/close-out
- *   GET  /api/issues/:id/beads
- *   POST /api/issues/:id/beads/:beadId/inspect
+ *   GET  /api/issues/:id/tasks
+ *   POST /api/issues/:id/tasks/:taskId/inspect
  *   GET  /api/issues/:id/costs
  */
 
@@ -112,10 +112,10 @@ import {
 import { bulkCloseOut, closeOutIssue } from '../../../lib/overdeck/issue-close-out.js';
 import {
   analyzeIssue,
-  getIssueBeads,
+  getIssueTasks,
   getIssueResourceDetails,
   getResourceAllocatedIssues,
-  inspectIssueBead,
+  inspectIssueTask,
 } from '../../../lib/overdeck/issue-reads.js';
 
 const execAsync = promisify(exec);
@@ -542,11 +542,11 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/issues/:id/beads ────────────────────────────────────────
+// ─── Route: GET /api/issues/:id/tasks ────────────────────────────────────────
 
-const getIssueBeadsRoute = HttpRouter.add(
+const getIssueTasksRoute = HttpRouter.add(
   'GET',
-  '/api/issues/:id/beads',
+  '/api/issues/:id/tasks',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
@@ -554,15 +554,15 @@ const getIssueBeadsRoute = HttpRouter.add(
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    return yield* getIssueBeads(id);
+    return yield* getIssueTasks(id);
   })),
 );
 
-// ─── Route: POST /api/issues/:id/beads/:beadId/inspect ───────────────────────
+// ─── Route: POST /api/issues/:id/tasks/:taskId/inspect ───────────────────────
 
-const postIssueBeadInspectRoute = HttpRouter.add(
+const postIssueTaskInspectRoute = HttpRouter.add(
   'POST',
-  '/api/issues/:id/beads/:beadId/inspect',
+  '/api/issues/:id/tasks/:itemId/inspect',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);
@@ -570,16 +570,16 @@ const postIssueBeadInspectRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const id = (params['id'] ?? '').toUpperCase();
-    const beadId = params['beadId'] ?? '';
+    const itemId = params['itemId'] ?? '';
     const body = yield* readJsonBody;
-    return yield* inspectIssueBead({ id, beadId, body });
+    return yield* inspectIssueTask({ id, itemId, body });
   })),
 );
 
 // ─── Route: GET /api/issues/:id/planning-state ───────────────────────────────
 //
 // Lightweight summary of an issue's planning artifacts:
-//   { hasPlan, hasBeads, beadsCount }
+//   { hasPlan, hasTasks, tasksCount }
 // Used by kanban cards to color the vBRIEF/Tasks chips and decide whether to
 // show "Generate Tasks" instead of "Tasks". Cheap so it can be polled per-card.
 
@@ -599,10 +599,10 @@ const getIssuePlanningStateRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:id/generate-tasks ──────────────────────────────
 //
-// Runs createBeadsFromVBrief() against the workspace. Same logic as
+// Runs createTasksFromVBrief() against the workspace. Same logic as
 // `pan plan finalize`, exposed so the
 // dashboard can offer a one-click "Generate Tasks" action when a vBRIEF plan
-// exists but beads were never created (e.g. plans authored before the
+// exists but tasks were never created (e.g. plans authored before the
 // agent-driven finalize flow shipped).
 
 const postIssueGenerateTasksRoute = HttpRouter.add(
@@ -828,8 +828,8 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueCopySettingsRoute,
   postIssueCloseOutRoute,
   postIssuesBulkCloseOutRoute,
-  getIssueBeadsRoute,
-  postIssueBeadInspectRoute,
+  getIssueTasksRoute,
+  postIssueTaskInspectRoute,
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,

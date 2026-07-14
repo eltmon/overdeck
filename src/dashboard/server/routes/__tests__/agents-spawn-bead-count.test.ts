@@ -11,9 +11,9 @@ vi.mock('../agents/shared.js', async (importActual) => {
   return { ...actual, execFileAsync: execFileMock };
 });
 
-import { countBeadsForIssue } from '../agents/spawn.js';
+import { countTasksForIssue } from '../agents/spawn.js';
 
-describe('countBeadsForIssue — bd failures must never escape as a 500', () => {
+describe('countTasksForIssue — bd failures must never escape as a 500', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -27,7 +27,7 @@ describe('countBeadsForIssue — bd failures must never escape as a 500', () => 
       + "⚠ Linear data has never been pulled — run 'bd linear sync --pull' to import",
     ));
 
-    const count = await Effect.runPromise(countBeadsForIssue('/ws/pan-2255', 'pan-2255'));
+    const count = await Effect.runPromise(countTasksForIssue('/ws/pan-2255', 'pan-2255'));
     expect(count).toBe(0);
     expect(execFileMock).toHaveBeenCalledWith(
       'bd',
@@ -36,27 +36,27 @@ describe('countBeadsForIssue — bd failures must never escape as a 500', () => 
     );
   });
 
-  it('returns the bead count parsed from valid bd JSON output', async () => {
+  it('returns the task count parsed from valid bd JSON output', async () => {
     execFileMock.mockResolvedValue({
       stdout: JSON.stringify([{ id: 'a' }, { id: 'b' }, { id: 'c' }]),
       stderr: '',
     });
 
-    const count = await Effect.runPromise(countBeadsForIssue('/ws/pan-1', 'pan-1'));
+    const count = await Effect.runPromise(countTasksForIssue('/ws/pan-1', 'pan-1'));
     expect(count).toBe(3);
   });
 
   it('returns 0 for empty bd output', async () => {
     execFileMock.mockResolvedValue({ stdout: '', stderr: '' });
 
-    const count = await Effect.runPromise(countBeadsForIssue('/ws/pan-2', 'pan-2'));
+    const count = await Effect.runPromise(countTasksForIssue('/ws/pan-2', 'pan-2'));
     expect(count).toBe(0);
   });
 
   it('returns 0 when bd output is not parseable JSON rather than throwing', async () => {
     execFileMock.mockResolvedValue({ stdout: 'not json at all', stderr: '' });
 
-    const count = await Effect.runPromise(countBeadsForIssue('/ws/pan-3', 'pan-3'));
+    const count = await Effect.runPromise(countTasksForIssue('/ws/pan-3', 'pan-3'));
     expect(count).toBe(0);
   });
 });

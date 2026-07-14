@@ -6,15 +6,12 @@ import { promisify } from 'node:util';
 import { Command } from 'commander';
 import { Effect } from 'effect';
 
-import { ensureWorkspaceBeadsRedirect } from '../workspace-beads.js';
 import { flushAutoCommits } from '../../../lib/pan-dir/auto-commit.js';
 import { getProjectSync, resolveInfraRepo, type ProjectConfig } from '../../../lib/projects.js';
 import { STATE_BRANCH, MIGRATION_COMPLETE_MARKER, clearStateMigrationCache, stateWorktreePath } from '../../../lib/state-home.js';
 import { STATE_BRANCH_PATHS } from '../../../lib/state-plane.js';
 import { acquireStateMigrationLock } from '../../../lib/state-migration-lock.js';
 import { manifestEntry, verifyStateMigrationManifest, type StateMigrationManifestEntry } from '../../../lib/state-migration-manifest.js';
-import { BEADS_CUTOVER_MARKER, validateBeadsCutoverMarker } from '../../../lib/beads/cutover-marker.js';
-import { detectLiveDoltLayout, isDoltRuntimePath, listLiveDoltLayout } from '../../../lib/beads/dolt-layout.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -24,14 +21,13 @@ async function git(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promis
 }
 
 function destinationForTracked(path: string): string | null {
-  if (path.startsWith('.beads/')) return isDoltRuntimePath(path) ? null : path;
   if (!path.startsWith('.pan/')) return null;
   const flat = path.slice('.pan/'.length);
-  return STATE_BRANCH_PATHS.some((prefix) => prefix !== '.beads/' && flat.startsWith(prefix)) ? flat : null;
+  return STATE_BRANCH_PATHS.some((prefix) => flat.startsWith(prefix)) ? flat : null;
 }
 
 async function trackedManifest(repo: string, sourceSha: string, stateRoot: string): Promise<StateMigrationManifestEntry[]> {
-  const paths = (await git(repo, ['ls-tree', '-r', '--name-only', sourceSha, '--', '.pan', '.beads']))
+  const paths = (await git(repo, ['ls-tree', '-r', '--name-only', sourceSha, '--', '.pan']))
     .split('\n').filter(Boolean);
   return paths.flatMap((path) => {
     const destination = destinationForTracked(path);
@@ -51,7 +47,7 @@ async function createOrphanStateCommit(repo: string, sourceSha: string): Promise
   const env = { GIT_INDEX_FILE: index };
   try {
     await git(repo, ['read-tree', '--empty'], env);
-    const rows = (await git(repo, ['ls-tree', '-r', sourceSha, '--', '.pan', '.beads'])).split('\n').filter(Boolean);
+    const rows = (await git(repo, ['ls-tree', '-r', sourceSha, '--', '.pan'])).split('\n').filter(Boolean);
     for (const row of rows) {
       const match = row.match(/^(\d+)\s+\w+\s+([0-9a-f]+)\t(.+)$/);
       if (!match) continue;
@@ -68,20 +64,17 @@ async function createOrphanStateCommit(repo: string, sourceSha: string): Promise
 function copyLegacyState(sourceRoot: string, stateRoot: string): StateMigrationManifestEntry[] {
   const manifest: StateMigrationManifestEntry[] = [];
   for (const sourcePath of STATE_BRANCH_PATHS) {
-    const isBeads = sourcePath === '.beads/';
-    const source = join(sourceRoot, sourcePath === '.beads/' ? '.beads' : '.pan', sourcePath === '.beads/' ? '' : sourcePath);
+    const source = join(sourceRoot, '.pan', sourcePath);
     if (!existsSync(source)) continue;
     const destination = join(stateRoot, sourcePath);
     cpSync(source, destination, {
       recursive: true,
       preserveTimestamps: true,
-      filter: (path) => !isBeads || !isDoltRuntimePath(path.slice(source.length + 1)),
     });
     const visit = (sourceDir: string, destinationDir: string): void => {
       for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
         const sourceEntry = join(sourceDir, entry.name);
         const destinationEntry = join(destinationDir, entry.name);
-        if (isBeads && isDoltRuntimePath(sourceEntry.slice(source.length + 1))) continue;
         if (entry.isDirectory()) visit(sourceEntry, destinationEntry);
         else if (entry.isFile()) manifest.push(manifestEntry(sourceEntry, destinationEntry));
       }
@@ -104,13 +97,13 @@ function workspacePaths(repo: string): string[] {
     .filter((path) => existsSync(join(path, '.git')));
 }
 
-function hasNonDoltDirtyState(porcelain: string): boolean {
+function hasNonStateDirtyState(porcelain: string): boolean {
   return porcelain.split('\n').filter(Boolean).some((line) => {
     const path = line.slice(3).split(' -> ').at(-1) ?? '';
-    if (path === '.pan' || path.startsWith('.pan/') || path === '.beads' || path.startsWith('.beads/')) {
+    if (path === '.pan' || path.startsWith('.pan/')) {
       return false;
     }
-    return !isDoltRuntimePath(path);
+    return true;
   });
 }
 
@@ -121,7 +114,6 @@ function dedupeManifest(entries: StateMigrationManifestEntry[]): StateMigrationM
 const GITIGNORE_MANAGED_LINES = [
   '# PAN-2541: permanent state is on overdeck-state; workspace runtime stays local.',
   '.pan/',
-  '.beads/',
   '.overdeck/continue.json',
   '.overdeck/spec.vbrief.json',
   '.overdeck/sessions.jsonl',
@@ -155,29 +147,16 @@ export async function migrateProjectState(
   const legacyStateSource = project.path;
   const sourceIsHostRepo = legacyStateSource === repo;
   const stateRoot = stateWorktreePath(project, { projectKey });
-  const liveDoltPaths = listLiveDoltLayout(join(legacyStateSource, '.beads'));
   console.log(`PAN-2541 state migration plan for ${projectKey}:`);
-  console.log(`  ${legacyStateSource}/.pan/{${STATE_BRANCH_PATHS.filter((p) => p !== '.beads/').map((p) => p.slice(0, -1)).join(',')}} -> ${stateRoot}/`);
-  console.log(`  ${legacyStateSource}/.beads -> ${stateRoot}/.beads`);
+  console.log(`  ${legacyStateSource}/.pan/{${STATE_BRANCH_PATHS.map((p) => p.slice(0, -1)).join(',')}} -> ${stateRoot}/`);
   console.log(`  ${legacyStateSource}/.pan/context -> ${legacyStateSource}/.overdeck/context`);
   if (options.dryRun) return;
-
-  if (detectLiveDoltLayout(join(legacyStateSource, '.beads'))) {
-    const markerPath = join(stateRoot, BEADS_CUTOVER_MARKER);
-    const validation = await validateBeadsCutoverMarker(markerPath, repo);
-    if (!validation.valid) {
-      throw new Error(
-        `State migration is blocked because live Dolt data or runtime files exist (${liveDoltPaths.join(', ')}). `
-        + `${validation.reason} Run "pan admin beads reconcile ${projectKey}", review the report, complete the Dolt cutover, and then write a valid ${BEADS_CUTOVER_MARKER}. No state was changed.`,
-      );
-    }
-  }
 
   const release = acquireStateMigrationLock(projectKey);
   try {
     await Effect.runPromise(flushAutoCommits(repo));
-    if (hasNonDoltDirtyState(await git(repo, ['status', '--porcelain']))) {
-      throw new Error('Primary checkout is dirty outside the excluded Dolt runtime; migration refused before mutation');
+    if (hasNonStateDirtyState(await git(repo, ['status', '--porcelain']))) {
+      throw new Error('Primary checkout is dirty outside legacy state paths; migration refused before mutation');
     }
     await git(repo, ['fetch', '--prune', 'origin']);
     const sourceMainSha = await git(repo, ['rev-parse', 'main']);
@@ -208,9 +187,9 @@ export async function migrateProjectState(
 
     // A pipeline may have produced state after the last code commit (the PUZ-1
     // failure mode). Seed tracked blobs for historical fidelity, then overlay
-    // the current working-tree state so untracked .pan/specs and generated
-    // .beads metadata enter the verified manifest before legacy paths are
-    // removed. Unrelated dirty code remains a hard block above.
+    // the current working-tree state so untracked .pan/specs enter the verified
+    // manifest before legacy paths are removed. Unrelated dirty code remains a
+    // hard block above. Legacy .beads data is intentionally left untouched.
     const manifest = sourceIsHostRepo
       ? dedupeManifest([
           ...await trackedManifest(repo, sourceMainSha, stateRoot),
@@ -258,11 +237,10 @@ export async function migrateProjectState(
       await git(stateRoot, ['push', 'origin', STATE_BRANCH]);
     }
 
-    for (const workspace of workspacePaths(repo)) await ensureWorkspaceBeadsRedirect(workspace, project);
     if (await git(repo, ['rev-parse', 'main']) !== sourceMainSha) throw new Error('main advanced during migration; refusing cleanup');
 
     if (sourceIsHostRepo) {
-      await git(repo, ['rm', '-r', '--cached', '--ignore-unmatch', '.pan/records', '.pan/continues', '.pan/specs', '.pan/drafts', '.pan/review', '.pan/test', '.pan/feedback', '.pan/backlog', '.pan/notes', '.beads']);
+      await git(repo, ['rm', '-r', '--cached', '--ignore-unmatch', '.pan/records', '.pan/continues', '.pan/specs', '.pan/drafts', '.pan/review', '.pan/test', '.pan/feedback', '.pan/backlog', '.pan/notes']);
     }
     const oldContext = join(legacyStateSource, '.pan', 'context');
     const newContext = join(legacyStateSource, '.overdeck', 'context');
@@ -293,7 +271,6 @@ export async function migrateProjectState(
     for (const entry of manifest) rmSync(entry.source, { force: true });
     if (!sourceIsHostRepo) {
       rmSync(join(legacyStateSource, '.pan'), { recursive: true, force: true });
-      rmSync(join(legacyStateSource, '.beads'), { recursive: true, force: true });
     }
     stateSha = await git(stateRoot, ['rev-parse', 'HEAD']);
     writeFileSync(join(stateRoot, MIGRATION_COMPLETE_MARKER), `${JSON.stringify({

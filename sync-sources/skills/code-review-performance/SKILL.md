@@ -43,7 +43,6 @@ const { stdout } = await execAsync('command here');
 Common offenders in this codebase:
 - `tmux capture-pane` / `tmux send-keys` / `tmux has-session`
 - `git branch` / `git status` / `git log`
-- `bd list` / `bd show` (beads commands)
 
 ## Output Format
 For each finding:

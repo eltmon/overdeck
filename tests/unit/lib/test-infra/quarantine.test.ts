@@ -27,7 +27,7 @@ describe('readQuarantineList', () => {
     const list = readQuarantineList(process.cwd());
     // The seed file contains at least the two known flakes.
     expect(list).toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(list).toContain('src/lib/vbrief/__tests__/create-beads.test.ts');
+    expect(list).toContain('src/lib/vbrief/__tests__/create-tasks.test.ts');
   });
 
   it('returns an empty array when the quarantine file is absent', () => {

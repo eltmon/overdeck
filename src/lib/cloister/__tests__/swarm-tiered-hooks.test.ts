@@ -61,8 +61,8 @@ function makeDeps(config: ValidatedTieredExecutionConfig | undefined, overrides:
     loadConfig: (() => ({ config: { tieredExecution: config } })) as unknown as FireTieredCommitHooksDeps['loadConfig'],
     getHeadSha: async () => SHA,
     listAssignments: (() => [
-      { slotIndex: 1, itemId: 'bead-a', agentId: 'agent-pan-2385-slot-1', branch: 'feature/pan-2385-slot-1' },
-      { slotIndex: 2, itemId: 'bead-b', agentId: 'agent-pan-2385-slot-2', branch: 'feature/pan-2385-slot-2' },
+      { slotIndex: 1, itemId: 'task-a', agentId: 'agent-pan-2385-slot-1', branch: 'feature/pan-2385-slot-1' },
+      { slotIndex: 2, itemId: 'task-b', agentId: 'agent-pan-2385-slot-2', branch: 'feature/pan-2385-slot-2' },
     ]) as unknown as FireTieredCommitHooksDeps['listAssignments'],
     isSessionAlive: async () => true,
     broadcast: broadcast as unknown as FireTieredCommitHooksDeps['broadcast'],
@@ -76,8 +76,8 @@ function makeDeps(config: ValidatedTieredExecutionConfig | undefined, overrides:
 
 describe('fireTieredCommitHooks (PAN-2385 ignition)', () => {
   it('enabled tiered execution + merged commit produces feed deliveries AND a supervisor review', async () => {
-    const itemA = fixtureItem('bead-a', 'simple');
-    const itemB = fixtureItem('bead-b', 'medium');
+    const itemA = fixtureItem('task-a', 'simple');
+    const itemB = fixtureItem('task-b', 'medium');
     const { deps, broadcast, deliverReview } = makeDeps(tieredConfig());
 
     const actions = await fireTieredCommitHooks(
@@ -99,7 +99,7 @@ describe('fireTieredCommitHooks (PAN-2385 ignition)', () => {
   });
 
   it('does nothing when tiered execution is disabled and no plan override', async () => {
-    const item = fixtureItem('bead-a', 'simple');
+    const item = fixtureItem('task-a', 'simple');
     const { deps, broadcast, deliverReview } = makeDeps(tieredConfig({ enabled: false }));
 
     const actions = await fireTieredCommitHooks(
@@ -113,7 +113,7 @@ describe('fireTieredCommitHooks (PAN-2385 ignition)', () => {
   });
 
   it('honors the per-issue plan.metadata override over a disabled global flag', async () => {
-    const item = fixtureItem('bead-a', 'simple');
+    const item = fixtureItem('task-a', 'simple');
     const { deps, broadcast } = makeDeps(tieredConfig({ enabled: false }));
 
     await fireTieredCommitHooks(
@@ -124,8 +124,8 @@ describe('fireTieredCommitHooks (PAN-2385 ignition)', () => {
     expect(broadcast).toHaveBeenCalledTimes(1);
   });
 
-  it('subscribe=flagged skips the supervisor for unflagged beads but still broadcasts', async () => {
-    const item = fixtureItem('bead-a', 'simple', false);
+  it('subscribe=flagged skips the supervisor for unflagged tasks but still broadcasts', async () => {
+    const item = fixtureItem('task-a', 'simple', false);
     const config = tieredConfig();
     config.supervisor = { ...config.supervisor!, subscribe: 'flagged' };
     const { deps, broadcast, deliverReview } = makeDeps(config);
@@ -140,7 +140,7 @@ describe('fireTieredCommitHooks (PAN-2385 ignition)', () => {
   });
 
   it('spawns the supervisor when its session is missing', async () => {
-    const item = fixtureItem('bead-a', 'simple');
+    const item = fixtureItem('task-a', 'simple');
     const { deps, ensureSupervisor, deliverReview } = makeDeps(tieredConfig(), {
       // slots dead (no broadcast listeners), supervisor session missing too
       isSessionAlive: async () => false,
@@ -157,7 +157,7 @@ describe('fireTieredCommitHooks (PAN-2385 ignition)', () => {
   });
 
   it('a broadcast failure never blocks the supervisor review and never throws', async () => {
-    const item = fixtureItem('bead-a', 'simple');
+    const item = fixtureItem('task-a', 'simple');
     const { deps, deliverReview } = makeDeps(tieredConfig(), {
       broadcast: (async () => { throw new Error('feed exploded'); }) as unknown as FireTieredCommitHooksDeps['broadcast'],
     });

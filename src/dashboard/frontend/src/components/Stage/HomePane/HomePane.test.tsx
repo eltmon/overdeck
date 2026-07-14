@@ -37,7 +37,7 @@ describe('HomePane', () => {
 
   it('accepts an openPane prop (the dock/launcher/timeline wiring point)', () => {
     const openPane = vi.fn()
-    // Smoke: scaffold renders with the callback wired; later beads invoke it.
+    // Smoke: scaffold renders with the callback wired; later tasks invoke it.
     expect(() =>
       render(<HomePane workspaceId="PAN-1549" openPane={openPane} />),
     ).not.toThrow()

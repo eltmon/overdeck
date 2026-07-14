@@ -11,7 +11,7 @@ import DrawerActiveAgent from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerArtifactsPanel from './DrawerArtifactsPanel';
-import DrawerBeadsList from './DrawerBeadsList';
+import DrawerTasksList from './DrawerTasksList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import DrawerVerificationGates from './DrawerVerificationGates';
@@ -296,12 +296,12 @@ export function IssueDrawer() {
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <DrawerActiveAgent />
                 <DrawerVerificationGates />
-                <DrawerBeadsList />
+                <DrawerTasksList />
                 <DrawerReviewSpecialists />
               </div>
-            ) : drawer.tab === 'beads' ? (
-              <div data-testid="drawer-tab-panel-beads">
-                <DrawerBeadsList />
+            ) : drawer.tab === 'tasks' ? (
+              <div data-testid="drawer-tab-panel-tasks">
+                <DrawerTasksList />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
               <DrawerPlanPanel issueId={drawer.issueId} />

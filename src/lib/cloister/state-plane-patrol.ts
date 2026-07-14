@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import type { ProjectConfig } from '../projects.js';
-import { queueBeadsAutoCommit, reconcileStatePlaneDrift } from '../pan-dir/auto-commit.js';
+import { reconcileStatePlaneDrift } from '../pan-dir/auto-commit.js';
 
 export interface StatePlaneReconcileAction {
   message: string;
@@ -13,7 +13,6 @@ export async function reconcileProjectStatePlanes(
   const actions: StatePlaneReconcileAction[] = [];
   for (const { config } of projects) {
     if (!config.path) continue;
-    queueBeadsAutoCommit(config.path);
     const write = await Effect.runPromise(reconcileStatePlaneDrift(config.path));
     if (!write.committed) continue;
     actions.push({

@@ -338,7 +338,7 @@ const postWorkspaceReapRoute = HttpRouter.add(
           projectName: context.projectName,
         }, {
           deleteBranches: false,
-          clearBeads: false,
+          clearTasks: false,
         }));
         for (const step of steps) {
           const detail = step.details?.length ? `: ${step.details.join('; ')}` : '';

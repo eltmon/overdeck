@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 /**
- * PAN-382: pan inspect <issueId> --bead <beadId>
+ * PAN-382: pan inspect <issueId> --bead <itemId>
  *
  * Triggers the inspect specialist to verify a completed bead
  * matches its specification and architectural constraints.

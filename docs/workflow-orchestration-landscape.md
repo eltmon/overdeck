@@ -335,7 +335,7 @@ It would be a mistake to conclude that Overdeck is behind these frameworks. In s
 |------------|-----------|--------|
 | **Multi-agent pipeline** | inspect → review → test → uat → merge | Superpowers has review; Deft has verification but no pipeline |
 | **Cloister watchdog** | Active heartbeat monitoring, stuck detection, emergency stop | Not present in any comparable framework |
-| **DAG-aware task scheduling** | `bd ready -l <issue>` for unblocked beads | vBRIEF has edges; neither Deft nor Superpowers use them for scheduling |
+| **DAG-aware task scheduling** | `pan task next -l <issue>` for unblocked beads | vBRIEF has edges; neither Deft nor Superpowers use them for scheduling |
 | **Baseline-aware merge validation** | Merge-agent compares post-merge failures vs baseline | Not present in any comparable framework |
 | **Circuit breaker** | 3 auto-requeue limit, then human intervention | Not present in any comparable framework |
 | **Worktree isolation** | Git worktree per workspace, Docker-backed | Superpowers uses worktrees; others use directories |

@@ -16,8 +16,8 @@ export interface LauncherIntent {
   keys?: string
 }
 
-/** Default intent set + order. The `launcher-ordering` bead refines ordering;
- * the `launcher-wiring` bead maps selection to actions. */
+/** Default intent set + order. The `launcher-ordering` task refines ordering;
+ * the `launcher-wiring` task maps selection to actions. */
 export const DEFAULT_INTENTS: LauncherIntent[] = [
   { id: 'claude-code', kind: 'agent', agentName: 'Claude Code', keys: '⌘↵' },
   { id: 'terminal', kind: 'terminal', keys: '⌃↵' },

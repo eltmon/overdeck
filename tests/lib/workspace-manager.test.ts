@@ -255,7 +255,7 @@ describe('createWorkspace', () => {
     }));
 
     expect(result.success).toBe(true);
-    expect(result.steps).toContain('Staged pre-worktree .pan/.beads metadata');
+    expect(result.steps).toContain('Staged pre-worktree .pan metadata');
     expect(mockExecAsync).toHaveBeenCalledWith(
       expect.stringContaining(`git worktree add "${workspacePath}" -b "feature/pan-2050"`),
       expect.objectContaining({ cwd: tempDir }),

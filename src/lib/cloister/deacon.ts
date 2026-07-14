@@ -156,7 +156,7 @@ import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type Revi
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
-import { readBeadsForIssueCached } from '../beads/presence.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -1184,9 +1184,9 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         const workspacePath = findWorkspacePath(resolved.projectPath, issueLower);
         if (!workspacePath || !existsSync(workspacePath)) continue;
 
-        const beadResult = await readBeadsForIssueCached(workspacePath, issueId);
-        if (!beadResult.ok || beadResult.value.length === 0) continue;
-        if (beadResult.value.some((bead) => bead.status !== 'closed')) continue;
+        const plan = readWorkspacePlanSync(workspacePath);
+        if (!plan || plan.plan.items.length === 0) continue;
+        if (plan.plan.items.some((item) => !['completed', 'cancelled'].includes(item.status))) continue;
 
         const { stdout } = await execAsync(
           `gh pr list --head feature/${issueLower} --state open --json url --jq '.[0].url'`,

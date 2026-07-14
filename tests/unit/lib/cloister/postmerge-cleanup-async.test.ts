@@ -2,7 +2,7 @@
  * Tests that post-merge cleanup does not wait for the release engine.
  *
  * PAN-399: triggerPostMergeReleaseIfConfigured used to be awaited inside
- * postMergeLifecycle, blocking bead compaction, agent pausing, and tmux
+ * postMergeLifecycle, blocking task compaction, agent pausing, and tmux
  * cleanup while runRelease polled health and ran smoke tests. These tests
  * verify the trigger is fired asynchronously and cleanup proceeds.
  */
@@ -23,8 +23,8 @@ const mockRunRelease = vi.hoisted(() =>
 );
 
 // ── Track cleanup side effects ────────────────────────────────────────────────
-const mockCompactBeads = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: false, details: ['compacted'] })));
-const mockSweepOrphanedBeads = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }));
+const mockCompactTasks = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: false, details: ['compacted'] })));
+const mockSweepOrphanedTasks = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }));
 const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: true, details: ['skipped'] })));
 const mockSetAgentPaused = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
@@ -166,12 +166,12 @@ vi.mock('../../../../src/lib/activity-log.js', () => ({
   logActivity: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/lifecycle/compact-beads.js', () => ({
-  compactBeads: mockCompactBeads,
+vi.mock('../../../../src/lib/lifecycle/compact-tasks.js', () => ({
+  compactTasks: mockCompactTasks,
 }));
 
-vi.mock('../../../../src/lib/lifecycle/orphaned-beads-sweep.js', () => ({
-  sweepOrphanedBeads: mockSweepOrphanedBeads,
+vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
+  sweepOrphanedTasks: mockSweepOrphanedTasks,
 }));
 
 vi.mock('../../../../src/lib/lifecycle/label-cleanup.js', () => ({
@@ -224,7 +224,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     if (releaseResolve) releaseResolve();
   });
 
-  it('runs bead compaction while the release engine is still pending', async () => {
+  it('runs task compaction while the release engine is still pending', async () => {
     const lifecyclePromise = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true });
 
     // Wait for the release engine to have started but NOT resolve it yet.
@@ -234,11 +234,11 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     await vi.waitFor(() => expect(releaseStarted).toBe(true), { timeout: 10_000 });
 
     // Cleanup must have proceeded before release resolves.
-    expect(mockCompactBeads).toHaveBeenCalled();
-    expect(mockSweepOrphanedBeads).toHaveBeenCalledWith({
-      beadsCwd: PROJECT_PATH,
+    expect(mockCompactTasks).toHaveBeenCalled();
+    expect(mockSweepOrphanedTasks).toHaveBeenCalledWith({
+      tasksCwd: PROJECT_PATH,
       issueId: ISSUE_ID,
-      reason: 'issue merged; remaining open beads swept',
+      reason: 'issue merged; remaining open tasks swept',
     });
     expect(mockSetAgentPaused).toHaveBeenCalled();
     expect(mockCreateResetMarker).toHaveBeenCalled();

@@ -585,7 +585,7 @@ export function buildPolyrepoContext(issueId: string, workspacePath: string): st
     // Check which repos actually exist in the workspace
     const existingRepos = readdirSync(workspacePath).filter(f => {
       const fullPath = join(workspacePath, f);
-      return f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
+      return f !== '.claude' && f !== '.pan' && existsSync(fullPath);
     });
     visibleRepos = repos.filter(r => existingRepos.includes(r.name));
   }

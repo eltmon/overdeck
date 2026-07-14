@@ -181,7 +181,7 @@ async function getIndexStats(workspacePath: string): Promise<{
 function resolvePlanLocation(projectPath: string, issueId: string): Effect.Effect<{ path: string; lifecycleDir: string; doc: VBriefDocument } | null, unknown> {
   return Effect.gen(function* () {
     // PAN-2401: every doc this route returns gets the per-issue record's
-    // statusOverrides applied — merged beads must read 'completed', not the
+    // statusOverrides applied — merged tasks must read 'completed', not the
     // spec's immutable 'pending'.
     const issueLower = issueId.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
@@ -647,7 +647,7 @@ const getWorkspaceRoute = HttpRouter.add(
         const planPath = yield* findPlan(workspacePath);
         const hasPlan = planPath !== null;
         const planningComplete = hasPlan ? yield* isPlanningComplete(workspacePath) : false;
-        const hasBeads = planningComplete;
+        const hasTasks = planningComplete;
 
         const issueData = getCostsForIssueSync(issueId);
         const agents = yield* Effect.promise(() => getCachedRunningAgents());
@@ -680,8 +680,8 @@ const getWorkspaceRoute = HttpRouter.add(
           salvageableStashes,
           planningState: {
             hasPlan,
-            hasBeads,
-            beadsCount: 0,
+            hasTasks,
+            tasksCount: 0,
             planningComplete,
             workspacePath,
           },

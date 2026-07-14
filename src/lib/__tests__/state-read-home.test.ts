@@ -44,7 +44,7 @@ describe('resolveStateReadHomeSync (sync read door)', () => {
     overdeckHome = join(root, 'overdeck-home');
     mkdirSync(overdeckHome, { recursive: true });
     // A project path whose basename deliberately differs from the registered
-    // key 'panopticon-cli' used below — the regression this bead fixes.
+    // key 'panopticon-cli' used below — the regression this task fixes.
     projectPath = join(root, 'repo-overdeck');
     mkdirSync(projectPath, { recursive: true });
     process.env.OVERDECK_HOME = overdeckHome;

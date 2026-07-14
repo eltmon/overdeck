@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { X, List, Loader2, CheckCircle, Clock } from 'lucide-react';
 
-interface BeadsDialogProps {
+interface TasksDialogProps {
   issueId: string;
   isOpen: boolean;
   onClose: () => void;
 }
 
-interface BeadTask {
+interface TaskTask {
   id: string;
   title: string;
   status: 'open' | 'in_progress' | 'closed';
@@ -18,18 +18,18 @@ interface BeadTask {
   createdAt: string;
 }
 
-interface BeadsResponse {
-  tasks: BeadTask[];
+interface TasksResponse {
+  tasks: TaskTask[];
   workspacePath: string;
   count: number;
   message?: string;
 }
 
-export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
-  const { data, isLoading, isFetching, error } = useQuery<BeadsResponse>({
-    queryKey: ['beads', issueId],
+export function TasksDialog({ issueId, isOpen, onClose }: TasksDialogProps) {
+  const { data, isLoading, isFetching, error } = useQuery<TasksResponse>({
+    queryKey: ['tasks', issueId],
     queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/beads`);
+      const res = await fetch(`/api/issues/${issueId}/tasks`);
       if (!res.ok) throw new Error('Failed to fetch tasks');
       return res.json();
     },
@@ -92,7 +92,7 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
             <div className="text-muted-foreground text-center py-8">
               <List className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>No tasks created yet</p>
-              <p className="text-xs mt-2">Tasks will appear here once created using beads.</p>
+              <p className="text-xs mt-2">Tasks will appear here once created using tasks.</p>
             </div>
           )}
 
@@ -129,14 +129,14 @@ export function BeadsDialog({ issueId, isOpen, onClose }: BeadsDialogProps) {
         {/* Footer */}
         <div className="px-4 py-3 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
           <span>{data?.count || 0} task{data?.count !== 1 ? 's' : ''}</span>
-          <span className="text-muted-foreground">Beads</span>
+          <span className="text-muted-foreground">Tasks</span>
         </div>
       </div>
     </div>
   );
 }
 
-function TaskItem({ task }: { task: BeadTask }) {
+function TaskItem({ task }: { task: TaskTask }) {
   const statusColors = {
     open: 'bg-popover/50 border-border',
     in_progress: 'badge-bg-primary border-primary/40',

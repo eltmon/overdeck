@@ -208,7 +208,7 @@ describe('tiered execution tier table', () => {
       feed: {
         callouts: 'corroborate',
         exclude: ['bun.lock'],
-        exclude_subjects: ['chore(beads):'],
+        exclude_subjects: ['chore(tasks):'],
         max_diff_bytes: 128_000,
       },
       escalation: {
@@ -222,7 +222,7 @@ describe('tiered execution tier table', () => {
     expect(result.feed).toEqual({
       callouts: 'corroborate',
       exclude: ['bun.lock'],
-      exclude_subjects: ['chore(beads):'],
+      exclude_subjects: ['chore(tasks):'],
       max_diff_bytes: 128_000,
     });
     expect(result.escalation).toEqual({

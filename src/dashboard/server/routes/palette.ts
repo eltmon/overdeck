@@ -53,7 +53,7 @@ const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan issues', description: 'List and triage work across connected trackers', group: 'Issues', keywords: ['list', 'tickets'] },
   { name: 'pan show <id>', description: 'Show agent state, work history, context, or health for an issue', group: 'Issues', keywords: ['inspect', 'detail'] },
   { name: 'pan triage', description: 'Triage backlog with priority + complexity heuristics', group: 'Issues' },
-  { name: 'pan plan <id>', description: 'Plan an issue (interactive vBRIEF + beads)', group: 'Issues', keywords: ['planning', 'vbrief'] },
+  { name: 'pan plan <id>', description: 'Plan an issue (interactive vBRIEF + tasks)', group: 'Issues', keywords: ['planning', 'vbrief'] },
   { name: 'pan plan <id> --auto', description: 'Plan an issue non-interactively (auto mode)', group: 'Issues', keywords: ['planning', 'auto'] },
 
   // Work agents
@@ -67,7 +67,7 @@ const PAN_COMMANDS: PanCommandEntry[] = [
   { name: 'pan recover [id]', description: 'Re-attach to an orphaned agent tmux session', group: 'Agents', keywords: ['attach', 'orphan'] },
   { name: 'pan sync-main <id>', description: 'Merge latest main into the feature branch for an active workspace', group: 'Agents', keywords: ['rebase', 'merge', 'main'] },
   { name: 'pan done <id>', description: 'Mark work complete and signal the review pipeline', group: 'Agents', keywords: ['complete', 'finish'] },
-  { name: 'pan wipe <id>', description: 'Destructive reset to Todo (removes workspace, branches, beads, status)', group: 'Agents', keywords: ['destroy', 'reset', 'danger'] },
+  { name: 'pan wipe <id>', description: 'Destructive reset to Todo (removes workspace, branches, tasks, status)', group: 'Agents', keywords: ['destroy', 'reset', 'danger'] },
 
   // Review pipeline
   { name: 'pan review pending', description: 'List PRs awaiting review action', group: 'Review' },

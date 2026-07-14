@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { disableBdMetricsSync } from '../install.js';
 
 describe('disableBdMetricsSync', () => {
-  it('disables bd metrics without opening a project beads store', () => {
+  it('disables bd metrics without opening a project tasks store', () => {
     const run = vi.fn();
 
     expect(disableBdMetricsSync(run)).toBe(true);

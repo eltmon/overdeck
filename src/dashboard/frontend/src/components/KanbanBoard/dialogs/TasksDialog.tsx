@@ -1,9 +1,9 @@
 import { List, X } from 'lucide-react';
 import type { Issue } from '../../../types';
-import { BeadsTasksPanel } from '../../BeadsTasksPanel';
+import { TasksPanel } from '../../TasksPanel';
 
-// Simple Beads Dialog component
-export function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) {
+// Simple Tasks Dialog component
+export function TasksDialog({ issue, onClose }: { issue: Issue; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
@@ -22,9 +22,9 @@ export function BeadsDialog({ issue, onClose }: { issue: Issue; onClose: () => v
           </button>
         </div>
 
-        {/* BeadsTasksPanel with list/graph toggle */}
+        {/* TasksPanel with list/graph toggle */}
         <div className="flex-1 overflow-hidden">
-          <BeadsTasksPanel issueId={issue.identifier} />
+          <TasksPanel issueId={issue.identifier} />
         </div>
       </div>
     </div>

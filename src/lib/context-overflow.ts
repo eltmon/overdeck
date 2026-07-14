@@ -57,7 +57,7 @@ export function buildCompactRecoverySeedMessage(issueId: string, summary: string
   lines.push(
     'Reconstruct your exact work-in-progress from durable artifacts:',
     '1. Read .pan/continue.json for resumePoint, decisions, hazards, feedback, and sessionHistory.',
-    '2. Run `bd ready` for your open beads and `bd show <id>` for the bead you are working on.',
+    '2. Run `pan task next` for the next open item and `pan task show <issue> <item>` for its current state.',
     '3. Inspect `git status` and `git diff` for uncommitted work already on disk.',
     'Then continue from that reconstructed state and complete the next required bead — do not wait for further instructions.',
   );

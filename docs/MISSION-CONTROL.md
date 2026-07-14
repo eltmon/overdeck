@@ -43,7 +43,7 @@ Quick-access badges appear below the feature header:
 
 | Badge | What it shows |
 |-------|---------------|
-| Tasks | Opens beads task panel for the feature |
+| Tasks | Opens tasks task panel for the feature |
 | STATE | Renders STATE.md from the workspace's `.planning/` directory |
 | PRD | Renders PRD.md (grayed out if not generated) |
 | Status | AI-generated progress review comparing code against PRD |

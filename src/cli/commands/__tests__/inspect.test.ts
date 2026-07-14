@@ -29,6 +29,6 @@ describe('inspect command', () => {
   });
 
   it('rejects ids absent from the vBRIEF without a tracker fallback', async () => {
-    await expect(resolveInspectItem('legacy-bead', '/repo/workspaces/feature-pan-1')).rejects.toThrow('does not exist');
+    await expect(resolveInspectItem('legacy-task', '/repo/workspaces/feature-pan-1')).rejects.toThrow('does not exist');
   });
 });

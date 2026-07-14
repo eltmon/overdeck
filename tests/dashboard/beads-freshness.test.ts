@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { createBeadsSyncService, getBeadsSyncHealth } from '../../src/dashboard/server/services/beads-sync-service.js';
+import { createTasksSyncService, getTasksSyncHealth } from '../../src/dashboard/server/services/tasks-sync-service.js';
 
-describe('beads dashboard freshness', () => {
+describe('tasks dashboard freshness', () => {
   afterEach(() => vi.useRealTimers());
 
   it('emits only when the Dolt head advances across polls', async () => {
@@ -15,8 +15,8 @@ describe('beads dashboard freshness', () => {
     const remoteDoltHead = vi.fn().mockResolvedValueOnce('remote-a').mockResolvedValueOnce('remote-b');
     const localDoltHead = vi.fn().mockResolvedValueOnce('a'.repeat(40)).mockResolvedValueOnce('b'.repeat(40));
     const withLock = vi.fn(async (_caller, fn) => fn());
-    const service = createBeadsSyncService({
-      projects: () => [{ key: 'remote-advance', path: '/repo', beadsCwd: '/state' }],
+    const service = createTasksSyncService({
+      projects: () => [{ key: 'remote-advance', path: '/repo', tasksCwd: '/state' }],
       execute,
       emit,
       withLock,
@@ -28,15 +28,15 @@ describe('beads dashboard freshness', () => {
     // First poll establishes the baseline; no event because there is no previous head.
     await service.syncOnce();
     expect(emit).not.toHaveBeenCalled();
-    expect(getBeadsSyncHealth('remote-advance')).toMatchObject({ lastError: null, localHead: 'a'.repeat(40) });
+    expect(getTasksSyncHealth('remote-advance')).toMatchObject({ lastError: null, localHead: 'a'.repeat(40) });
 
     // Second poll sees a remote change that pulls in a new head; event fires.
     await service.syncOnce();
     expect(emit).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'beads.freshness_changed',
+      type: 'tasks.freshness_changed',
       payload: expect.objectContaining({ projectKey: 'remote-advance', localHead: 'b'.repeat(40) }),
     }));
-    expect(getBeadsSyncHealth('remote-advance')).toMatchObject({ lastError: null, localHead: 'b'.repeat(40) });
+    expect(getTasksSyncHealth('remote-advance')).toMatchObject({ lastError: null, localHead: 'b'.repeat(40) });
   });
 
   it('emits when the head advanced locally before the poll', async () => {
@@ -51,8 +51,8 @@ describe('beads dashboard freshness', () => {
       .mockResolvedValueOnce('a'.repeat(40))
       .mockResolvedValueOnce('b'.repeat(40));
     const withLock = vi.fn(async (_caller, fn) => fn());
-    const service = createBeadsSyncService({
-      projects: () => [{ key: 'local-advance', path: '/repo', beadsCwd: '/state' }],
+    const service = createTasksSyncService({
+      projects: () => [{ key: 'local-advance', path: '/repo', tasksCwd: '/state' }],
       execute,
       emit,
       withLock,
@@ -66,7 +66,7 @@ describe('beads dashboard freshness', () => {
 
     await service.syncOnce();
     expect(emit).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'beads.freshness_changed',
+      type: 'tasks.freshness_changed',
       payload: expect.objectContaining({ projectKey: 'local-advance', localHead: 'b'.repeat(40) }),
     }));
   });
@@ -80,8 +80,8 @@ describe('beads dashboard freshness', () => {
     const remoteDoltHead = vi.fn().mockResolvedValue(null);
     const localDoltHead = vi.fn().mockResolvedValue('a'.repeat(40));
     const withLock = vi.fn(async (_caller, fn) => fn());
-    const service = createBeadsSyncService({
-      projects: () => [{ key: 'no-movement', path: '/repo', beadsCwd: '/state' }],
+    const service = createTasksSyncService({
+      projects: () => [{ key: 'no-movement', path: '/repo', tasksCwd: '/state' }],
       execute,
       emit,
       withLock,
@@ -98,8 +98,8 @@ describe('beads dashboard freshness', () => {
   it('uses fake-timer backoff and exposes a complete stale consequence on failure', async () => {
     vi.useFakeTimers();
     const delays: number[] = [];
-    const service = createBeadsSyncService({
-      projects: () => [{ key: 'broken', path: '/repo', beadsCwd: '/state' }],
+    const service = createTasksSyncService({
+      projects: () => [{ key: 'broken', path: '/repo', tasksCwd: '/state' }],
       execute: async () => { throw new Error('remote unavailable'); },
       withLock: async (_caller, fn) => fn(),
       intervalMs: 100,
@@ -108,6 +108,6 @@ describe('beads dashboard freshness', () => {
     });
     await service.run();
     expect(delays).toEqual([200]);
-    expect(getBeadsSyncHealth('broken').lastError).toMatch(/dashboard bead progress may be stale/);
+    expect(getTasksSyncHealth('broken').lastError).toMatch(/dashboard task progress may be stale/);
   });
 });

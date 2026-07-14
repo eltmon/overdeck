@@ -148,7 +148,7 @@ Beads are a hard prerequisite for starting work agents. The `POST /api/agents` e
 
 ### DAG-Aware Task Scheduling
 
-The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. When Cloister converts items to beads, it preserves these dependencies. Work agents use `bd ready -l <issue>` to find unblocked beads, ensuring tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
+The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. When Cloister converts items to beads, it preserves these dependencies. Work agents use `pan task next -l <issue>` to find unblocked beads, ensuring tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
 
 ### Acceptance Criteria Pipeline
 

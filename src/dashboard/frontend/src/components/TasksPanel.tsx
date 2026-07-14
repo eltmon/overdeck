@@ -4,7 +4,7 @@ import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader
 import { PlanMapViewer } from './vbrief/PlanMapViewer.js';
 import type { VBriefItem, VBriefDocument } from './vbrief/types.js';
 
-interface BeadTask {
+interface TaskTask {
   id: string;
   name?: string;
   title?: string;
@@ -16,19 +16,19 @@ interface BeadTask {
   closedAt?: string;
 }
 
-interface BeadsResponse {
+interface TasksResponse {
   issueId: string;
   workspacePath: string;
-  tasks: BeadTask[];
+  tasks: TaskTask[];
 }
 
-interface BeadsTasksPanelProps {
+interface TasksPanelProps {
   issueId: string;
 }
 
-const VIEW_PREF_KEY = 'beads-panel-view';
+const VIEW_PREF_KEY = 'tasks-panel-view';
 
-export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
+export function TasksPanel({ issueId }: TasksPanelProps) {
   const [view, setView] = useState<'list' | 'graph'>(() => {
     try {
       return (localStorage.getItem(VIEW_PREF_KEY) as 'list' | 'graph') ?? 'list';
@@ -39,11 +39,11 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
 
   const [selectedItem, setSelectedItem] = useState<VBriefItem | null>(null);
 
-  const { data: beadsData, isLoading, refetch, isRefetching } = useQuery<BeadsResponse>({
-    queryKey: ['beads', issueId],
+  const { data: tasksData, isLoading, refetch, isRefetching } = useQuery<TasksResponse>({
+    queryKey: ['tasks', issueId],
     queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/beads`);
-      if (!res.ok) throw new Error('Failed to fetch beads');
+      const res = await fetch(`/api/issues/${issueId}/tasks`);
+      if (!res.ok) throw new Error('Failed to fetch tasks');
       return res.json();
     },
     refetchInterval: 10000,
@@ -61,8 +61,8 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
   });
   const planHasItems = planDoc != null && (planDoc.plan?.items?.length ?? 0) > 0;
 
-  const openTasks = beadsData?.tasks?.filter(t => t.status === 'open') || [];
-  const closedTasks = beadsData?.tasks?.filter(t => t.status === 'closed') || [];
+  const openTasks = tasksData?.tasks?.filter(t => t.status === 'open') || [];
+  const closedTasks = tasksData?.tasks?.filter(t => t.status === 'closed') || [];
 
   function toggleView(next: 'list' | 'graph') {
     setView(next);
@@ -158,7 +158,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
             <PlanItemDetail
               item={selectedItem}
               doc={planDoc}
-              beads={beadsData?.tasks ?? []}
+              tasks={tasksData?.tasks ?? []}
             />
           )}
         </div>
@@ -167,7 +167,7 @@ export function BeadsTasksPanel({ issueId }: BeadsTasksPanelProps) {
       {/* List view — also shown when graph selected but no plan items */}
       {(view === 'list' || !planHasItems) && (
         <>
-          {beadsData?.tasks && beadsData.tasks.length > 0 ? (
+          {tasksData?.tasks && tasksData.tasks.length > 0 ? (
             <div className="space-y-1.5 max-h-64 overflow-y-auto">
               {openTasks.map((task) => (
                 <TaskItem key={task.id} task={task} planDoc={planDoc ?? null} />
@@ -196,10 +196,10 @@ const AC_STATUS_ICONS: Record<string, { color: string; symbol: string }> = {
   cancelled:   { color: '#6b7280', symbol: '○' },
 };
 
-function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument | null }) {
+function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: VBriefDocument | null }) {
   const [expanded, setExpanded] = useState(false);
 
-  // Match bead to plan item using the same pattern as PlanItemDetail
+  // Match task to plan item using the same pattern as PlanItemDetail
   const planItem: VBriefItem | undefined = planDoc
     ? planDoc.plan.items.find(item =>
         `${planDoc.plan.id}: ${item.title}`.toLowerCase() === (task.title || task.name || '').toLowerCase()
@@ -288,18 +288,18 @@ function TaskItem({ task, planDoc }: { task: BeadTask; planDoc: VBriefDocument |
   );
 }
 
-// ── PlanItemDetail — shows narrative, ACs, bead status, blockers/dependents ──
+// ── PlanItemDetail — shows narrative, ACs, task status, blockers/dependents ──
 
 interface PlanItemDetailProps {
   item: VBriefItem;
   doc: VBriefDocument;
-  beads: BeadTask[];
+  tasks: TaskTask[];
 }
 
-function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
-  // Beads are created with title "{plan.id}: {item.title}" — match using plan.id, not issueId
+function PlanItemDetail({ item, doc, tasks }: PlanItemDetailProps) {
+  // Tasks are created with title "{plan.id}: {item.title}" — match using plan.id, not issueId
   const titlePattern = `${doc.plan.id}: ${item.title}`.toLowerCase();
-  const matchedBead = beads.find(b => (b.title || b.name || '').toLowerCase() === titlePattern);
+  const matchedTask = tasks.find(b => (b.title || b.name || '').toLowerCase() === titlePattern);
 
   // All incoming edges (this item is the target)
   const incomingEdges = doc.plan.edges.filter(e => e.to === item.id);
@@ -333,14 +333,14 @@ function PlanItemDetail({ item, doc, beads }: PlanItemDetailProps) {
         </div>
       </div>
 
-      {/* Bead status */}
-      {matchedBead && (
+      {/* Task status */}
+      {matchedTask && (
         <div className="flex items-center gap-1 text-[10px]">
-          {matchedBead.status === 'closed'
+          {matchedTask.status === 'closed'
             ? <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
             : <Circle className="w-3 h-3 text-primary shrink-0" />}
           <span className="text-muted-foreground">
-            Bead: {matchedBead.status === 'closed' ? 'completed' : 'open'} ({matchedBead.id})
+            Task: {matchedTask.status === 'closed' ? 'completed' : 'open'} ({matchedTask.id})
           </span>
         </div>
       )}

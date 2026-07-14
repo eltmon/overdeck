@@ -185,7 +185,7 @@ describe('isSyncMainMainPreferredPath', () => {
   it('matches only pipeline-owned sync state paths', () => {
     expect(isSyncMainMainPreferredPath('.pan/continues/PAN-1.vbrief.json')).toBe(true);
     expect(isSyncMainMainPreferredPath('.pan/specs/PAN-1.vbrief.json')).toBe(true);
-    expect(isSyncMainMainPreferredPath('.beads/issues.jsonl')).toBe(true);
+    expect(isSyncMainMainPreferredPath('.tasks/issues.jsonl')).toBe(true);
 
     expect(isSyncMainMainPreferredPath('.pan/continue.json')).toBe(false);
     expect(isSyncMainMainPreferredPath('.pan/spec.vbrief.json')).toBe(false);
@@ -335,10 +335,10 @@ describe('syncMainIntoWorkspace', () => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
         if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
         if (cmd.includes('git merge origin/main')) {
-          const err: any = new Error('CONFLICT (content): Merge conflict in .beads/issues.jsonl');
+          const err: any = new Error('CONFLICT (content): Merge conflict in .tasks/issues.jsonl');
           err.stdout = [
-            'Auto-merging .beads/issues.jsonl',
-            'CONFLICT (content): Merge conflict in .beads/issues.jsonl',
+            'Auto-merging .tasks/issues.jsonl',
+            'CONFLICT (content): Merge conflict in .tasks/issues.jsonl',
             'Auto-merging .pan/continues/PAN-1.vbrief.json',
             'CONFLICT (content): Merge conflict in .pan/continues/PAN-1.vbrief.json',
             '',
@@ -350,22 +350,22 @@ describe('syncMainIntoWorkspace', () => {
           conflictScanCount += 1;
           return {
             stdout: conflictScanCount === 1
-              ? '.beads/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n'
+              ? '.tasks/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n'
               : '',
             stderr: '',
           };
         }
-        if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .beads')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .tasks')) return { stdout: '', stderr: '' };
         if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .pan/continues')) return { stdout: '', stderr: '' };
         if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .pan/specs')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git checkout origin/main -- .beads')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git checkout origin/main -- .tasks')) return { stdout: '', stderr: '' };
         if (cmd.includes('git checkout origin/main -- .pan/continues')) return { stdout: '', stderr: '' };
         if (cmd.includes('git checkout origin/main -- .pan/specs')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git add -A -- .beads')) return { stdout: '', stderr: '' };
+        if (cmd.includes('git add -A -- .tasks')) return { stdout: '', stderr: '' };
         if (cmd.includes('git add -A -- .pan/continues')) return { stdout: '', stderr: '' };
         if (cmd.includes('git add -A -- .pan/specs')) return { stdout: '', stderr: '' };
         if (cmd.includes('git commit --no-edit')) return { stdout: '[feature abc123] Merge remote-tracking branch origin/main\n', stderr: '' };
-        if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: '.beads/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n', stderr: '' };
+        if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: '.tasks/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n', stderr: '' };
         if (cmd.includes('git log ORIG_HEAD..HEAD --oneline')) return { stdout: 'abc1234 Merge remote-tracking branch origin/main\n', stderr: '' };
         return { stdout: '', stderr: '' };
       });
@@ -374,7 +374,7 @@ describe('syncMainIntoWorkspace', () => {
 
       expect(result.success).toBe(true);
       expect(result.conflictFiles).toBeUndefined();
-      expect(result.changedFiles).toEqual(['.beads/issues.jsonl', '.pan/continues/PAN-1.vbrief.json']);
+      expect(result.changedFiles).toEqual(['.tasks/issues.jsonl', '.pan/continues/PAN-1.vbrief.json']);
       expect(result.commitCount).toBe(1);
       expect(execMock).not.toHaveBeenCalledWith(
         expect.stringContaining('git merge --abort'),

@@ -29,7 +29,7 @@ interface ResourceIssue {
       isDraft: boolean;
     }>;
     hasVbrief: boolean;
-    hasBeads: boolean;
+    hasTasks: boolean;
     dockerContainerCount: number;
   };
 }
@@ -83,7 +83,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
         },
       ],
       hasVbrief: true,
-      hasBeads: true,
+      hasTasks: true,
       dockerContainerCount: 1,
     },
   },
@@ -109,7 +109,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
       tmuxSessionCount: 0,
       prs: [],
       hasVbrief: false,
-      hasBeads: false,
+      hasTasks: false,
       dockerContainerCount: 0,
     },
   },

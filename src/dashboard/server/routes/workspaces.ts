@@ -79,7 +79,6 @@ import {
 import {
   getCachedConflictGateMergeability,
 } from '../../../lib/cloister/conflict-gate.js';
-import { restoreTrackedBeadsExport } from '../../../lib/beads-restore.js';
 import {
   computeQueuePositionFromStatusSync,
   findPositionInQueueSync,
@@ -103,7 +102,6 @@ import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrie
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
-import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
@@ -1093,23 +1091,6 @@ const postWorkspaceStartRoute = HttpRouter.add(
 
     if (!existsSync(workspacePath)) {
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
-    }
-
-    const workspaceBeadsDir = join(workspacePath, '.beads');
-    if (!existsSync(workspaceBeadsDir)) {
-      const projectRootBeadsDir = join(projectPath, '.beads');
-      if (existsSync(projectRootBeadsDir)) {
-        try {
-          yield* Effect.promise(() => execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, {
-            encoding: 'utf-8',
-          }));
-          console.log(
-            `[workspace/start] Copied beads from project root to workspace for ${issueId}`
-          );
-        } catch (e) {
-          console.warn(`[workspace/start] Could not copy beads: ${e}`);
-        }
-      }
     }
 
     // Check for ./dev script

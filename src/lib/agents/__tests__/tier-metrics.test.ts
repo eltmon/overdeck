@@ -17,7 +17,7 @@ function metric(agentId: string, ts: string): TierFeedDeliveryMetric {
     ts,
     issueId: 'PAN-1',
     sha: 'abc123',
-    beadTitle: 'bead',
+    taskTitle: 'task',
     tierName: 'standard',
     agentId,
     tokenCount: 10,

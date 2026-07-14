@@ -113,8 +113,8 @@ describe('spawnInspectAgent', () => {
     mocks.killSession.mockReturnValue(Effect.succeed(undefined));
     mocks.createSession.mockReturnValue(Effect.succeed(undefined));
     mocks.existsSync.mockReturnValue(true);
-    mocks.readFileSync.mockReturnValue('Inspect {{issueId}} {{beadId}} {{diffBase}} {{diffStats}} {{beadDescription}}');
-    mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ title: 'bead title' }), stderr: '' });
+    mocks.readFileSync.mockReturnValue('Inspect {{issueId}} {{itemId}} {{diffBase}} {{diffStats}} {{itemDescription}}');
+    mocks.execFileAsync.mockResolvedValue({ stdout: JSON.stringify({ title: 'task title' }), stderr: '' });
     mocks.getDiffBase.mockReturnValue(Effect.succeed('abcdef1234567890'));
     mocks.getDiffStats.mockReturnValue(Effect.succeed('diff stats'));
     mocks.getCurrentHead.mockReturnValue(Effect.succeed('fedcba9876543210'));
@@ -122,7 +122,7 @@ describe('spawnInspectAgent', () => {
     mocks.generateLauncherScriptSync.mockReturnValue('#!/usr/bin/env bash\n');
     mocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
     mocks.loadConfigSync.mockReturnValue({ config: {} });
-    mocks.readWorkspacePlanSync.mockReturnValue(null);
+    mocks.readWorkspacePlanSync.mockReturnValue(planDoc([planItem('workspace-b95lw')]));
     mocks.spawnTierSupervisor.mockResolvedValue({ id: 'agent-pan-1613-review-supervisor' });
     mocks.loadPrdDraft.mockResolvedValue('# PRD');
     mocks.deliverCommitForReview.mockResolvedValue({ delivered: true });
@@ -135,7 +135,7 @@ describe('spawnInspectAgent', () => {
       projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       workspace: '/workspace',
     }));
 
@@ -154,14 +154,14 @@ describe('spawnInspectAgent', () => {
       projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       workspace: '/workspace',
     }));
 
     expect(result).toEqual(expect.objectContaining({
       success: true,
       tmuxSession: 'inspect-pan-1613-workspace-b95lw',
-      message: 'Spawned inspect for PAN-1613 bead workspace-b95lw',
+      message: 'Spawned inspect for PAN-1613 item workspace-b95lw',
     }));
     expect(result.skipped).toBeUndefined();
     expect(mocks.sessionExists).toHaveBeenCalledWith('inspect-pan-1613-workspace-b95lw');
@@ -179,7 +179,7 @@ describe('spawnInspectAgent', () => {
       projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       workspace: '/workspace',
     }));
 
@@ -208,14 +208,14 @@ describe('spawnInspectAgent', () => {
       projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       workspace: '/workspace',
     }));
 
     expect(result).toEqual(expect.objectContaining({
       success: true,
       tmuxSession: 'agent-pan-1613-review-supervisor',
-      message: 'Routed inspect for PAN-1613 bead workspace-b95lw to standing supervisor',
+      message: 'Routed inspect for PAN-1613 item workspace-b95lw to standing supervisor',
     }));
     expect(mocks.spawnTierSupervisor).not.toHaveBeenCalled();
     expect(mocks.deliverCommitForReview).toHaveBeenCalledTimes(1);
@@ -225,7 +225,7 @@ describe('spawnInspectAgent', () => {
       issueId: 'PAN-1613',
       item,
       sha: 'fedcba9876543210',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       prdMarkdown: '# PRD',
     }));
     expect(mocks.createSession).not.toHaveBeenCalled();
@@ -241,7 +241,7 @@ describe('spawnInspectAgent', () => {
       projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       workspace: '/workspace',
     }));
 
@@ -263,7 +263,7 @@ describe('spawnInspectAgent', () => {
       projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       workspace: '/workspace',
     }));
 
@@ -291,14 +291,14 @@ describe('spawnInspectAgent', () => {
       projectKey: 'overdeck',
       projectPath: '/repo',
       issueId: 'PAN-1613',
-      beadId: 'workspace-b95lw',
+      itemId: 'workspace-b95lw',
       workspace: '/workspace',
     }));
 
     expect(result).toEqual(expect.objectContaining({
       success: true,
       tmuxSession: 'inspect-pan-1613-workspace-b95lw',
-      message: 'Spawned inspect for PAN-1613 bead workspace-b95lw',
+      message: 'Spawned inspect for PAN-1613 item workspace-b95lw',
     }));
     expect(mocks.spawnTierSupervisor).not.toHaveBeenCalled();
     expect(mocks.deliverCommitForReview).not.toHaveBeenCalled();
@@ -338,7 +338,7 @@ function tieredExecutionConfig() {
 function planItem(id: string) {
   return {
     id,
-    title: 'Inspect routing bead',
+    title: 'Inspect routing task',
     status: 'pending',
     metadata: { requiresInspection: false },
     items: [{ id: `${id}-ac`, title: 'routes through supervisor', status: 'pending' }],

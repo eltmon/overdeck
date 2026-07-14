@@ -154,7 +154,7 @@ async function routeInspectToStandingSupervisorIfEnabled(
     issueId: context.issueId,
     item,
     sha,
-    beadId: context.itemId,
+    itemId: context.itemId,
     prdMarkdown,
   });
 

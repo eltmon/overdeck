@@ -130,14 +130,14 @@ gh issue list --state closed --search "closed:>=$SINCE_DATE" --limit 50 \
 ```
 
 Also scan real commits on `main` (drop the bookkeeping noise — `chore(records)`,
-`chore(state)`, `chore(beads)` are per-issue state syncs, not work):
+`chore(state)`, `chore(vBRIEF tasks)` are per-issue state syncs, not work):
 
 ```bash
 echo "=== substantive commits on origin/main ==="
 git fetch -q origin main 2>/dev/null
 git log origin/main --since="$HOURS hours ago" --no-merges \
   --pretty='%h %ad %s' --date=format:'%m-%d %H:%M' \
-  | grep -vE 'chore\((records|state|beads)\)' | head -40
+  | grep -vE 'chore\((records|state|vBRIEF tasks)\)' | head -40
 ```
 
 ### 2. What's in flight — active agents and in-review work

@@ -24,10 +24,6 @@ import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
-import { exportBeadsJsonl } from '../beads/export.js';
-import { resolveCanonicalBeadsHome } from '../beads/home.js';
-import { createBeadsResolver } from '../beads/resolver.js';
-import { runMutationBatch } from '../beads/writer.js';
 
 const execAsync = promisify(exec);
 
@@ -238,89 +234,6 @@ async function killOrphanedProcessesImpl(workspacePath: string): Promise<StepRes
     return stepOk(step, [`Killed ${hostPids.length} orphaned process(es)`]);
   } catch {
     return stepSkipped(step, ['Orphaned process cleanup failed (non-fatal)']);
-  }
-}
-
-/**
- * Sync workspace beads to the project-root beads database before workspace deletion.
- */
-function syncWorkspaceBeads(
-  projectPath: string,
-  workspacePath: string,
-  issueLower: string,
-): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => syncWorkspaceBeadsImpl(projectPath, workspacePath, issueLower),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepFailed('teardown:sync-beads', `Failed to sync workspace beads: ${(err as Error).message}`)),
-    ),
-  );
-}
-
-async function syncWorkspaceBeadsImpl(
-  _projectPath: string,
-  workspacePath: string,
-  issueLower: string,
-): Promise<StepResult> {
-  const step = 'teardown:sync-beads';
-  const workspaceBeadsDir = join(workspacePath, '.beads');
-
-  if (!existsSync(workspaceBeadsDir)) {
-    return stepSkipped(step, ['No .beads directory in workspace']);
-  }
-
-  const canonicalHome = resolveCanonicalBeadsHome(workspacePath);
-
-  try {
-    const result = canonicalHome
-      ? await exportBeadsJsonl(dirname(canonicalHome), { beadsDir: canonicalHome })
-      : await exportBeadsJsonl(workspacePath);
-    return stepOk(step, [`Validated ${result.state.recordCount} canonical beads records for ${issueLower}`]);
-  } catch (err) {
-    return stepFailed(step, `Failed to sync workspace beads: ${(err as Error).message}`);
-  }
-}
-
-/**
- * Clear beads for this issue from the project-root .beads/issues.jsonl.
- */
-function clearProjectBeads(
-  projectPath: string,
-  issueLower: string,
-): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => clearProjectBeadsImpl(projectPath, issueLower),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepFailed('teardown:clear-beads', `Failed to clear beads: ${(err as Error).message}`)),
-    ),
-  );
-}
-
-async function clearProjectBeadsImpl(
-  projectPath: string,
-  issueLower: string,
-): Promise<StepResult> {
-  const step = 'teardown:clear-beads';
-  try {
-    const read = await createBeadsResolver(projectPath).getBeadsForIssue(issueLower);
-    if (!read.ok) return stepFailed(step, read.reason);
-    if (read.value.length === 0) return stepSkipped(step, [`No canonical beads found for ${issueLower}`]);
-    const result = await runMutationBatch(
-      { project: { workspacePath: projectPath }, reason: `clear beads for ${issueLower}` },
-      async (bd) => {
-        for (const bead of read.value) await bd.mutate(['delete', bead.id, '--yes']);
-        return read.value.length;
-      },
-    );
-    return result.ok
-      ? stepOk(step, [`Deleted ${result.value} canonical beads for ${issueLower}`])
-      : stepFailed(step, result.message);
-  } catch (err) {
-    return stepFailed(step, `Failed to clear beads: ${(err as Error).message}`);
   }
 }
 
@@ -789,13 +702,6 @@ export function teardownWorkspace(
       // 5b. Kill orphaned host processes (Vite, node) that survive Docker teardown
       if (shouldDeleteWorkspace) {
         results.push(yield* killOrphanedProcesses(workspacePath));
-      }
-
-      // 6. Beads lifecycle: sync or clear depending on context (PAN-412)
-      if (opts.clearBeads) {
-        results.push(yield* clearProjectBeads(ctx.projectPath, issueLower));
-      } else if (shouldDeleteWorkspace) {
-        results.push(yield* syncWorkspaceBeads(ctx.projectPath, workspacePath, issueLower));
       }
 
       // 7-8: Project-specific cleanup (tunnel, Hume)

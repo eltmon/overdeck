@@ -284,7 +284,7 @@ export function readTierOverrides(workspacePath: string): TierOverridesMap {
 
 export function recordTierPromotion(
   workspacePath: string,
-  beadId: string,
+  itemId: string,
   from: VBriefDifficulty,
   to: VBriefDifficulty,
   reason: string,
@@ -300,10 +300,10 @@ export function recordTierPromotion(
   const current = (state.tierOverrides && typeof state.tierOverrides === 'object')
     ? state.tierOverrides as TierOverridesMap
     : {};
-  const existing = current[beadId];
+  const existing = current[itemId];
   const nextOverrides: TierOverridesMap = {
     ...current,
-    [beadId]: {
+    [itemId]: {
       effectiveDifficulty: to,
       promotions: (existing?.promotions ?? 0) + 1,
       history: [

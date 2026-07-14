@@ -171,13 +171,13 @@ describe('killCommand agent targeting (PAN-1760)', () => {
   it('discovers strike/inspect agents during issue-scoped kills', async () => {
     FAKE_AGENTS_DIR_LISTING.entries = [
       'strike-pan-1723',
-      'inspect-pan-1723-bead-slug',
+      'inspect-pan-1723-task-slug',
       'agent-pan-9999',
     ];
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-1723', {});
     expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('inspect-pan-1723-bead-slug');
+    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('inspect-pan-1723-task-slug');
     expect(agentMocks.stopAgentSync).not.toHaveBeenCalledWith('agent-pan-9999');
   });
 });

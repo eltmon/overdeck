@@ -4,8 +4,7 @@
  * Baseline/final line-count command for the WI-8 report:
  *   git diff --numstat 53fb832a11..HEAD
  *
- * The end-state scans intentionally use `it.fails` while Beads remains. WI-8
- * flips them to ordinary `it` tests after the removal is complete.
+ * End-state scans are live after the removal completed in WI-8.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative } from 'node:path';
@@ -32,7 +31,7 @@ function textFiles(path: string): string[] {
   return readdirSync(absolute, { withFileTypes: true }).flatMap((entry) => {
     const child = join(path, entry.name);
     if (entry.isDirectory()) return textFiles(child);
-    return TEXT_EXTENSIONS.has(extname(entry.name)) ? [join(ROOT, child)] : [];
+    return entry.isFile() && TEXT_EXTENSIONS.has(extname(entry.name)) ? [join(ROOT, child)] : [];
   });
 }
 
@@ -69,19 +68,19 @@ describe('PAN-2648 Beads-removal no-loss audit', () => {
     expect(invalid).toEqual([]);
   });
 
-  it.fails('has no production Beads imports or process-lock/mutation dependencies', () => {
+  it('has no production Beads imports or process-lock/mutation dependencies', () => {
     expect(scan(/BeadsResolver|runMutationBatch|withBdProcessLock/)).toEqual([]);
   });
 
-  it.fails('has no Beads sync or rollup service dependencies', () => {
+  it('has no Beads sync or rollup service dependencies', () => {
     expect(scan(/BeadsRollup|beads-(?:rollup|sync)(?:-service|-singleton)?/i)).toEqual([]);
   });
 
-  it.fails('has no live pan beads or bd ready instructions', () => {
+  it('has no live pan beads or bd ready instructions', () => {
     expect(scan(/\bpan beads\b|\bbd ready\b/)).toEqual([]);
   });
 
-  it.fails('has no code that executes the bd process', () => {
+  it('has no code that executes the bd process', () => {
     expect(scan(/(?:execFile|exec|spawn)(?:Sync)?\s*\([^\n]*['"`]bd['"`]/)).toEqual([]);
   });
 });

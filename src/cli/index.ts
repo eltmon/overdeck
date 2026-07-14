@@ -435,7 +435,7 @@ const planCmd = program
 
 planCmd
   .command('finalize')
-  .description('Materialize plan into beads, mark the workspace spec as proposed, and promote to main')
+  .description('Mark the workspace plan as proposed and promote it to canonical state')
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
@@ -445,7 +445,7 @@ planCmd
 
 planCmd
   .command('done <id>')
-  .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .description('Complete planning — promote the vBRIEF and transition the issue to Planned')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
@@ -578,7 +578,7 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
-  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
+  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
@@ -621,7 +621,7 @@ registerOhmypiAuthCommands(program);
 // Register install command
 registerInstallCommand(program);
 
-// Register inspect command (pan inspect <issueId> --bead <beadId>)
+// Register inspect command (pan inspect <issueId> --item <itemId>)
 registerInspectCommand(program);
 
 // Register caveman commands (pan caveman-compress)
@@ -727,7 +727,7 @@ program
     // content to boot. Deferring it shaves that ~22s off time-to-available.
 
     // Ensure host tools every agent/conversation session needs are installed:
-    // tmux (fatal if missing) and beads/bd (best-effort — only the work
+    // tmux is fatal if missing; the work
     // pipeline needs it). See ensureHostTools in the prereq registry.
     {
       const { ensureHostTools } = await import('../lib/prereqs/registry.js');

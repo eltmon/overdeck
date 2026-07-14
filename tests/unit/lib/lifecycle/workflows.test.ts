@@ -16,13 +16,13 @@ const {
   mockClearReviewStatus,
   mockResetPostMergeState,
   mockMarkRecordPipelineClosedOutSync,
-  mockSweepOrphanedBeads,
+  mockSweepOrphanedTasks,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
   mockResetPostMergeState: vi.fn(),
   mockMarkRecordPipelineClosedOutSync: vi.fn(),
-  mockSweepOrphanedBeads: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
+  mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
 }));
 
 vi.mock('child_process', () => ({
@@ -79,8 +79,8 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../src/lib/lifecycle/orphaned-beads-sweep.js', () => ({
-  sweepOrphanedBeads: mockSweepOrphanedBeads,
+vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
+  sweepOrphanedTasks: mockSweepOrphanedTasks,
 }));
 
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
@@ -199,7 +199,7 @@ describe('workflows', () => {
       expect(result.duration).toBeGreaterThanOrEqual(0);
     });
 
-    it('should include archive, close, teardown, beads, and clear-review steps', async () => {
+    it('should include archive, close, teardown, tasks, and clear-review steps', async () => {
       const ctx = {
         issueId: 'PAN-100',
         projectPath: testDir,
@@ -216,12 +216,12 @@ describe('workflows', () => {
       expect(stepNames.some(s => s === 'clear-review-status')).toBe(true);
     });
 
-    it('should skip beads compaction when skipBeadsCompaction is true', async () => {
+    it('should skip tasks compaction when skipTasksCompaction is true', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await approve(ctx, { skipBeadsCompaction: true });
+      const result = await approve(ctx, { skipTasksCompaction: true });
 
       const stepNames = result.steps.map(s => s.step);
-      expect(stepNames.some(s => s.startsWith('compact-beads'))).toBe(false);
+      expect(stepNames.some(s => s.startsWith('compact-tasks'))).toBe(false);
     });
   });
 
@@ -579,51 +579,6 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
 
-    it('sweeps orphaned beads after vBRIEF completion and before teardown', async () => {
-      mockSweepOrphanedBeads.mockResolvedValueOnce({ ok: true, closedIds: ['bead-1', 'bead-2'], skipped: 1 });
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
-
-      const vbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
-      const sweepIdx = result.steps.findIndex(s => s.step === 'close-out:sweep-orphaned-beads');
-      const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
-      expect(vbriefIdx).toBeGreaterThanOrEqual(0);
-      expect(sweepIdx).toBeGreaterThanOrEqual(0);
-      expect(teardownIdx).toBeGreaterThanOrEqual(0);
-      expect(vbriefIdx).toBeLessThan(sweepIdx);
-      expect(sweepIdx).toBeLessThan(teardownIdx);
-      expect(result.steps[sweepIdx]?.success).toBe(true);
-      expect(result.steps[sweepIdx]?.details?.[0]).toContain('2 orphaned bead(s)');
-    });
-
-    it('uses the cancelled reason when opts.reason indicates not-planned/cancelled close', async () => {
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      await closeOut(ctx, { tracker: successfulTracker(), reason: 'not planned' });
-      expect(mockSweepOrphanedBeads).toHaveBeenLastCalledWith(
-        expect.objectContaining({ reason: 'issue closed (not planned); bead cancelled' }),
-      );
-    });
-
-    it('uses the completed reason by default', async () => {
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      await closeOut(ctx, { tracker: successfulTracker() });
-      expect(mockSweepOrphanedBeads).toHaveBeenLastCalledWith(
-        expect.objectContaining({ reason: 'issue closed (completed); orphaned bead swept' }),
-      );
-    });
-
-    it('continues close-out when the bead sweep fails', async () => {
-      mockSweepOrphanedBeads.mockResolvedValueOnce({ ok: false, closedIds: [], skipped: 0, error: 'beads read timed out' });
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await closeOut(ctx, { tracker: successfulTracker() });
-
-      expect(result.success).toBe(true);
-      const sweepStep = result.steps.find(s => s.step === 'close-out:sweep-orphaned-beads');
-      expect(sweepStep?.success).toBe(true);
-      expect(sweepStep?.skipped).toBe(true);
-      expect(sweepStep?.details?.[0]).toContain('Bead sweep failed (non-fatal)');
-      expect(sweepStep?.details?.[0]).toContain('beads read timed out');
-    });
   });
 
   describe('deepWipe', () => {
@@ -717,50 +672,27 @@ describe('workflows', () => {
     });
   });
 
-  describe('beads lifecycle (PAN-412)', () => {
-    it('approve should NOT clear beads (preserves them for history)', async () => {
-      const beadsDir = join(testDir, '.beads');
-      mkdirSync(beadsDir, { recursive: true });
+  describe('tasks lifecycle (PAN-412)', () => {
+    it('approve should NOT clear tasks (preserves them for history)', async () => {
+      const tasksDir = join(testDir, '.tasks');
+      mkdirSync(tasksDir, { recursive: true });
       writeFileSync(
-        join(beadsDir, 'issues.jsonl'),
+        join(tasksDir, 'issues.jsonl'),
         JSON.stringify({ id: 'b1', title: 'PAN-100: Task', status: 'closed' }) + '\n'
       );
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await approve(ctx);
 
-      // clear-beads step should not appear
-      const clearStep = result.steps.find(s => s.step === 'teardown:clear-beads');
+      // clear-tasks step should not appear
+      const clearStep = result.steps.find(s => s.step === 'teardown:clear-tasks');
       expect(clearStep).toBeUndefined();
 
-      // Beads JSONL should still contain the entry
-      const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
+      // Tasks JSONL should still contain the entry
+      const content = readFileSync(join(tasksDir, 'issues.jsonl'), 'utf-8');
       expect(content).toContain('PAN-100');
     });
 
-    it('deepWipe should clear beads for the issue', async () => {
-      const beadsDir = join(testDir, '.beads');
-      const wsPath = join(testDir, 'workspaces', 'pan-100');
-      mkdirSync(beadsDir, { recursive: true });
-      mkdirSync(wsPath, { recursive: true });
-      writeFileSync(
-        join(beadsDir, 'issues.jsonl'),
-        JSON.stringify({ id: 'b1', title: 'PAN-100: Task', status: 'closed' }) + '\n' +
-        JSON.stringify({ id: 'b2', title: 'PAN-200: Other', status: 'open' }) + '\n'
-      );
-
-      const ctx = { issueId: 'PAN-100', projectPath: testDir };
-      const result = await deepWipe(ctx);
-
-      const clearStep = result.steps.find(s => s.step === 'teardown:clear-beads');
-      expect(clearStep).toBeDefined();
-      expect(clearStep!.success).toBe(true);
-
-      // The derived export is never edited directly; the writer owns its refresh.
-      const content = readFileSync(join(beadsDir, 'issues.jsonl'), 'utf-8');
-      expect(content).toContain('PAN-100');
-      expect(content).toContain('PAN-200');
-    });
   });
 
   describe('step ordering', () => {

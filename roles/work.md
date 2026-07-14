@@ -1,6 +1,6 @@
 ---
 name: work
-description: Overdeck work role — claims beads, writes code, commits per bead, and runs Jidoka inspection gates.
+description: Overdeck work role — claims tasks, writes code, commits per item, and runs Jidoka inspection gates.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.work.model).
 # Hardcoding it here would override the user's config and force everyone onto a
 # single model, defeating the per-role model configurability the dashboard exposes.
@@ -52,27 +52,27 @@ Work is one undifferentiated mode. Do not switch models or behavior by internal 
 
 Never start, stop, kill, or restart the host-level Overdeck dashboard, supervisor, or Deacon. Development and verification target only the feature workspace's own containers and endpoint (`https://api-feature-<issue>.overdeck.localhost`).
 
-## Per-Bead Workflow
+## Per-Task Workflow
 
-For every bead:
+For every item:
 
-1. `bd ready -l <issue-label>` — find the next unblocked bead scoped to this issue.
-2. `pan beads claim <bead-id>` — claim it.
-3. Implement only that bead.
-4. `git add` specific files and `git commit` — one bead = one commit.
-5. Immediately push that commit with `git push -u origin "$(git branch --show-current)"`. Every completed bead must exist on origin before its status is closed; generic project Git profiles do not override this managed-work invariant.
-6. `pan beads close <bead-id> --reason="…"`. (The canonical writer records bead status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
-7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
-8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
+1. `pan task next <ISSUE-ID>` — find the next unblocked item scoped to this issue.
+2. `pan task claim <ISSUE-ID> <item-id>` — claim it.
+3. Implement only that item.
+4. `git add` specific files and `git commit` — one item = one commit.
+5. Immediately push that commit with `git push -u origin "$(git branch --show-current)"`. Every completed item must exist on origin before its status is closed; generic project Git profiles do not override this managed-work invariant.
+6. `pan task done <ISSUE-ID> <item-id> --reason="…"`. (The canonical writer records item status automatically — do **not** write to the record or `.overdeck/continue.json` directly.)
+7. Re-read this item's plan-item metadata (merged view via the spec on main) after the commit.
+8. If `metadata.requiresInspection === true`, run `pan inspect <ISSUE-ID> --item <item-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
 9. If `metadata.requiresInspection === false`, skip inspection and continue.
-10. On `INSPECTION BLOCKED`: fix with a new commit, push it, `pan beads close` again, then re-run the same inspection.
-11. Continue with the next ready bead.
+10. On `INSPECTION BLOCKED`: fix with a new commit, push it, `pan task done` again, then re-run the same inspection.
+11. Continue with the next ready item.
 
-Never batch multiple beads into a single commit. A one-bead diff is what makes inspection, review, and rollback tractable.
+Never batch multiple tasks into a single commit. A one-item diff is what makes inspection, review, and rollback tractable.
 
 ## Foreman wave-driver protocol
 
-The serial per-bead workflow above remains the default. Use the foreman path only when the vBRIEF is swarm-eligible: items are vertical tracer-bullet slices with declared `files_scope`, `files_scope_confidence`, `readiness`, `verify_commands`, and `expected_outputs`.
+The serial per-item workflow above remains the default. Use the foreman path only when the vBRIEF is swarm-eligible: items are vertical tracer-bullet slices with declared `files_scope`, `files_scope_confidence`, `readiness`, `verify_commands`, and `expected_outputs`.
 
 You remain the durable work agent for the issue. The foreman path is not a revived server-side swarm runtime: there is no `SynthesisOutput` state, no slot callback endpoint, no auto-advance poller, and no per-slot PR. The issue still lands as one reviewed branch.
 
@@ -82,7 +82,7 @@ You remain the durable work agent for the issue. The foreman path is not a reviv
 2. Run `analyzeSwarmReadiness(doc)` from `src/lib/vbrief/swarm-readiness.ts`. Use its overlap matrix and conflict groups to serialize items inside a wave when scopes overlap. Overlap orders work; it never refuses the issue.
 3. On every start or restart, run the reconcile helper from `src/lib/agents/slot-reconcile.ts` before dispatching new work. Existing `feature/<issue>-slot-*` branches, `agent-<issue>-slot-<n>` agents, and status overrides determine which items are already merged, in flight, or still pending.
 4. For each pending item in the current wave, call `chooseDispatchTier(item)` from `src/lib/agents/dispatch-tier.ts`.
-5. Dispatch `in-context` items through the harness's in-context subagent primitive. These are cheap/mechanical slices whose output comes back to you for review, staging, and the normal one-bead commit.
+5. Dispatch `in-context` items through the harness's in-context subagent primitive. These are cheap/mechanical slices whose output comes back to you for review, staging, and the normal one-item commit.
 6. Dispatch `registered-slot` items with `spawnRun(issue, 'work', { slotIndex, slotItemId })`. The slot runs in its own worktree on `feature/<issue>-slot-<n>` and registers as `agent-<issue>-slot-<n>`.
 7. Do not advance a dependent wave until every blocking parent is merged, completed serially, or intentionally cancelled.
 
@@ -90,12 +90,12 @@ You remain the durable work agent for the issue. The foreman path is not a reviv
 
 With `tiered_execution` disabled — the default — this subsection is inert: use the wave loop above exactly as written. When it resolves enabled for the plan (global config or `plan.metadata.tiered_execution: "on"`, via `resolveTieredExecutionEnabled` in `src/lib/agents/tier-table.ts`), replace wave-loop steps 4–6 with the tiered path below. Reconcile, wave ordering, convergence synthesis, and failure handling are unchanged.
 
-1. Compute the tier-run schedule once with `computeTierRunSchedule(doc, config)` from `src/lib/agents/standing-tiers.ts` and construct a `StandingTierManager` over it. Before starting a run, call `ensureStandingTiersForRun(currentRunIndex)` — a tier's standing session spawns lazily when its first run is ≤1 run away, and is reused across all its beads.
-2. Before dispatching each ready bead, call `shouldHaltDispatch(verdicts, bead, doc)` from `src/lib/agents/tier-supervisor.ts` using the supervisor verdicts collected from the inspect-status surface. If it returns true, a blocking supervisor finding is unresolved on a dependency of this bead. Do not dispatch the dependent bead yet.
-3. When dispatch is halted by a supervisor finding, send the fix to the tier that owns the blocked dependency first. The fix must land as a new one-bead commit, then the standing supervisor must ack that fix commit on the inspect-status surface. After the ack, re-check `shouldHaltDispatch`; only resume dependent dispatch when it returns false. This mirrors the serial `INSPECTION BLOCKED` flow.
-4. For each ready bead that is not halted, dispatch to its tier's standing agent with `manager.dispatchBeadToTier(tierName, bead)`. The helper enforces the single-implementer invariant: **only one worker agent implements a bead at a time** — standing tiers share your worktree, so a second in-flight bead would race the tree. A second dispatch before `completeBead` throws.
-5. When the standing agent reports the bead done, you stage and commit — `git add` the bead's files and compose the commit yourself. One bead = one foreman-authored commit, same invariant as the serial path.
-6. After the commit lands, call `broadcastCommit` from `src/lib/agents/tier-feed.ts` with the sha, the bead title, and the full standing-tier set, so every standing tier ingests the diff and stays warm. Then call `manager.completeBead(bead.id)` and continue with the next ready bead.
+1. Compute the tier-run schedule once with `computeTierRunSchedule(doc, config)` from `src/lib/agents/standing-tiers.ts` and construct a `StandingTierManager` over it. Before starting a run, call `ensureStandingTiersForRun(currentRunIndex)` — a tier's standing session spawns lazily when its first run is ≤1 run away, and is reused across all its tasks.
+2. Before dispatching each ready item, call `shouldHaltDispatch(verdicts, item, doc)` from `src/lib/agents/tier-supervisor.ts` using the supervisor verdicts collected from the inspect-status surface. If it returns true, a blocking supervisor finding is unresolved on a dependency of this item. Do not dispatch the dependent item yet.
+3. When dispatch is halted by a supervisor finding, send the fix to the tier that owns the blocked dependency first. The fix must land as a new one-item commit, then the standing supervisor must ack that fix commit on the inspect-status surface. After the ack, re-check `shouldHaltDispatch`; only resume dependent dispatch when it returns false. This mirrors the serial `INSPECTION BLOCKED` flow.
+4. For each ready item that is not halted, dispatch to its tier's standing agent with `manager.dispatchItemToTier(tierName, item)`. The helper enforces the single-implementer invariant: **only one worker agent implements a item at a time** — standing tiers share your worktree, so a second in-flight item would race the tree. A second dispatch before `completeItem` throws.
+5. When the standing agent reports the item done, you stage and commit — `git add` the item's files and compose the commit yourself. One item = one foreman-authored commit, same invariant as the serial path.
+6. After the commit lands, call `broadcastCommit` from `src/lib/agents/tier-feed.ts` with the sha, the item title, and the full standing-tier set, so every standing tier ingests the diff and stays warm. Then call `manager.completeItem(item.id)` and continue with the next ready item.
 
 ### Verify then merge
 
@@ -127,11 +127,11 @@ Do not loop forever on a failing worker. One redo, then serial fallback.
 
 ### Fast depth: `inspect`
 
-Beads tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "fast"` or no depth run the fast inspector after the bead commit and before claiming more work. The question is deliberately narrow: **was the deed done?** The inspect sub-run checks the bead narrative and acceptance criteria against the just-created diff and blocks if the commit is missing required artifacts, includes unrelated files, or leaves obvious broken behavior.
+Tasks tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "fast"` or no depth run the fast inspector after the item commit and before claiming more work. The question is deliberately narrow: **was the deed done?** The inspect sub-run checks the item narrative and acceptance criteria against the just-created diff and blocks if the commit is missing required artifacts, includes unrelated files, or leaves obvious broken behavior.
 
 ### Deep depth: `inspect-deep`
 
-Beads tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "deep"` run the deep inspector instead. The question is broader: **was it done correctly?** The deep sub-run examines architecture, edge cases, safety invariants, and whether the change is robust enough for downstream beads to rely on.
+Tasks tagged `metadata.requiresInspection: true` with `metadata.inspectionDepth: "deep"` run the deep inspector instead. The question is broader: **was it done correctly?** The deep sub-run examines architecture, edge cases, safety invariants, and whether the change is robust enough for downstream tasks to rely on.
 
 The work role does not choose models for these gates. The selected `pan inspect` command controls the sub-role: `pan inspect` resolves through `resolveModel('work', 'inspect')`, and `pan inspect --deep` resolves through `resolveModel('work', 'inspect-deep')`.
 
@@ -139,7 +139,7 @@ The work role does not choose models for these gates. The selected `pan inspect`
 
 Summaries lead with anomalies and deviations — never bury them after the wins.
 
-When all beads are closed and the tree is clean:
+When all tasks are closed and the tree is clean:
 
 ```bash
 npm test
@@ -147,8 +147,8 @@ git push -u origin "$(git branch --show-current)"
 pan done <ISSUE-ID> -c "<terse summary>"
 ```
 
-The final push is a verification pass; every bead commit was already pushed before its
-bead was closed. Work agents push only their feature branch. Never push to `origin/main` or merge into
+The final push is a verification pass; every item commit was already pushed before its
+item was closed. Work agents push only their feature branch. Never push to `origin/main` or merge into
 `main`; landing is the review pipeline's job via `pan done`, and the pre-push guard
 mechanically rejects agent code pushes to main.
 
@@ -173,4 +173,4 @@ The four push-back shapes that require this signal: **self-abort** (the work can
 - Never delete `.jsonl` Claude session files.
 - Never send destructive HTTP requests speculatively.
 - Never approve, deny, dismiss, or answer permission prompts with `tmux send-keys`, `tmux paste-buffer`, `sendKeys`, `sendKeysAsync`, or any other session-input mechanism.
-- Do not self-review in place of the pipeline; Jidoka only checks the bead before handoff.
+- Do not self-review in place of the pipeline; Jidoka only checks the item before handoff.

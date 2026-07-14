@@ -852,8 +852,8 @@ describe('IssueCard', () => {
 
   it('does not render Board card launch controls after planning completes', () => {
     renderIssueCard({
-      issue: createMockIssue({ status: 'Todo', hasPlan: true, hasBeads: true }),
-      planningState: { hasPlan: true, hasBeads: true, planningComplete: true },
+      issue: createMockIssue({ status: 'Todo', hasPlan: true, hasTasks: true }),
+      planningState: { hasPlan: true, hasTasks: true, planningComplete: true },
     });
 
     expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
@@ -911,23 +911,23 @@ describe('IssueCard', () => {
     expect(onPlan).not.toHaveBeenCalled();
   });
 
-  it('renders Beads N/M progress row when beadCounts is present', () => {
+  it('renders Tasks N/M progress row when taskCounts is present', () => {
     renderIssueCard({
-      issue: createMockIssue({ beadCounts: { completed: 7, total: 12 } }),
+      issue: createMockIssue({ taskCounts: { completed: 7, total: 12 } }),
     });
 
-    expect(screen.getByText('Beads 7/12')).toBeInTheDocument();
-    const beadProgress = screen.getByTestId('issue-card-TEST-123').querySelector('[data-component="bead-progress"]');
-    expect(beadProgress).toBeInTheDocument();
-    expect(beadProgress).toHaveAttribute('data-progress', '7');
+    expect(screen.getByText('Tasks 7/12')).toBeInTheDocument();
+    const taskProgress = screen.getByTestId('issue-card-TEST-123').querySelector('[data-component="task-progress"]');
+    expect(taskProgress).toBeInTheDocument();
+    expect(taskProgress).toHaveAttribute('data-progress', '7');
   });
 
-  it('hides bead progress row when beadCounts is null', () => {
+  it('hides task progress row when taskCounts is null', () => {
     renderIssueCard({
-      issue: createMockIssue({ beadCounts: null }),
+      issue: createMockIssue({ taskCounts: null }),
     });
 
-    expect(screen.queryByText(/Beads \d+\/\d+/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Tasks \d+\/\d+/)).not.toBeInTheDocument();
   });
 
   it('renders agent foot with name, sub, runtime and avatar for active agent', () => {
@@ -1303,15 +1303,15 @@ describe('FeatureCard', () => {
     expect(screen.getByText('See Plan')).toBeDefined();
   });
 
-  it('renders Tasks button when feature has beads', () => {
-    const feature = createMockFeature({ hasBeads: true });
+  it('renders Tasks button when feature has tasks', () => {
+    const feature = createMockFeature({ hasTasks: true });
     render(
       <FeatureCard
         feature={feature}
         childCount={2}
         isExpanded={false}
         onToggle={vi.fn()}
-        onViewBeads={vi.fn()}
+        onViewTasks={vi.fn()}
       />
     );
     expect(screen.getByTestId('action-tasks-F123')).toBeDefined();
@@ -1362,20 +1362,20 @@ describe('FeatureCard', () => {
     expect(onPlan).toHaveBeenCalled();
   });
 
-  it('calls onViewBeads when Tasks button is clicked', () => {
-    const onViewBeads = vi.fn();
-    const feature = createMockFeature({ hasBeads: true });
+  it('calls onViewTasks when Tasks button is clicked', () => {
+    const onViewTasks = vi.fn();
+    const feature = createMockFeature({ hasTasks: true });
     render(
       <FeatureCard
         feature={feature}
         childCount={2}
         isExpanded={false}
         onToggle={vi.fn()}
-        onViewBeads={onViewBeads}
+        onViewTasks={onViewTasks}
       />
     );
     fireEvent.click(screen.getByTestId('action-tasks-F123'));
-    expect(onViewBeads).toHaveBeenCalled();
+    expect(onViewTasks).toHaveBeenCalled();
   });
 
   it('applies selection ring when isSelected is true', () => {

@@ -26,7 +26,6 @@ import {
 import type { ReviewStatus } from '../review-status.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type {
-  ContinueBeadsMapping,
   ContinueDecision,
   ContinueFeedbackEntry,
   ContinueHazard,
@@ -61,19 +60,17 @@ interface ContinueFile {
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
   resumePoint?: ContinueResumePoint | null;
-  beadsMapping?: ContinueBeadsMapping;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   agentModel?: string;
   scopeDrift?: ScopeDriftRecord;
 }
 
-function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'beadsMapping' | 'sessionHistory' | 'feedback' | 'scopeDrift'> {
+function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisions' | 'hazards' | 'resumePoint' | 'sessionHistory' | 'feedback' | 'scopeDrift'> {
   return {
     decisions: raw?.decisions,
     hazards: raw?.hazards,
     resumePoint: raw?.resumePoint,
-    beadsMapping: raw?.beadsMapping,
     sessionHistory: raw?.sessionHistory,
     feedback: raw?.feedback ?? [],
     scopeDrift: raw?.scopeDrift,

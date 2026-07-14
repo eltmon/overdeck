@@ -68,15 +68,15 @@ describe('readManifest / writeManifest', () => {
   it('round-trips a manifest', () => {
     const manifestPath = join(TEST_DIR, '.overdeck-manifest.json');
     const manifest = createEmptyManifest();
-    setManifestEntry(manifest, 'skills/beads/SKILL.md', 'sha256:abc123', 'overdeck');
+    setManifestEntry(manifest, 'skills/tasks/SKILL.md', 'sha256:abc123', 'overdeck');
 
     writeManifestSync(manifestPath, manifest);
     const loaded = readManifestSync(manifestPath);
 
     expect(loaded.version).toBe(1);
     expect(loaded.managed_by).toBe('overdeck');
-    expect(loaded.installed['skills/beads/SKILL.md'].hash).toBe('sha256:abc123');
-    expect(loaded.installed['skills/beads/SKILL.md'].source).toBe('overdeck');
+    expect(loaded.installed['skills/tasks/SKILL.md'].hash).toBe('sha256:abc123');
+    expect(loaded.installed['skills/tasks/SKILL.md'].source).toBe('overdeck');
   });
 
   it('returns empty manifest for nonexistent file', () => {
@@ -191,9 +191,9 @@ describe('compareFileToManifest', () => {
 describe('collectSourceFiles', () => {
   it('collects files recursively with prefix', () => {
     const skillsDir = join(TEST_DIR, 'skills');
-    mkdirSync(join(skillsDir, 'beads'), { recursive: true });
+    mkdirSync(join(skillsDir, 'tasks'), { recursive: true });
     mkdirSync(join(skillsDir, 'pan-help'), { recursive: true });
-    writeFileSync(join(skillsDir, 'beads', 'SKILL.md'), 'beads skill');
+    writeFileSync(join(skillsDir, 'tasks', 'SKILL.md'), 'tasks skill');
     writeFileSync(join(skillsDir, 'pan-help', 'SKILL.md'), 'help skill');
     writeFileSync(join(skillsDir, 'pan-help', 'README.md'), 'readme');
 
@@ -201,7 +201,7 @@ describe('collectSourceFiles', () => {
     const paths = files.map(f => f.relativePath).sort();
 
     expect(paths).toEqual([
-      'skills/beads/SKILL.md',
+      'skills/tasks/SKILL.md',
       'skills/pan-help/README.md',
       'skills/pan-help/SKILL.md',
     ]);
@@ -226,16 +226,16 @@ describe('collectSourceFiles', () => {
 describe('buildManifestFromDirectory', () => {
   it('builds manifest from directory with multiple categories', () => {
     // Set up a mock cache directory
-    mkdirSync(join(TEST_DIR, 'skills', 'beads'), { recursive: true });
+    mkdirSync(join(TEST_DIR, 'skills', 'tasks'), { recursive: true });
     mkdirSync(join(TEST_DIR, 'agents'), { recursive: true });
-    writeFileSync(join(TEST_DIR, 'skills', 'beads', 'SKILL.md'), 'beads content');
+    writeFileSync(join(TEST_DIR, 'skills', 'tasks', 'SKILL.md'), 'tasks content');
     writeFileSync(join(TEST_DIR, 'agents', 'code-reviewer.md'), 'reviewer content');
 
     const manifest = buildManifestFromDirectory(TEST_DIR, ['skills', 'agents'], 'overdeck');
 
-    expect(manifest.installed['skills/beads/SKILL.md']).toBeDefined();
-    expect(manifest.installed['skills/beads/SKILL.md'].source).toBe('overdeck');
-    expect(manifest.installed['skills/beads/SKILL.md'].hash).toMatch(/^sha256:/);
+    expect(manifest.installed['skills/tasks/SKILL.md']).toBeDefined();
+    expect(manifest.installed['skills/tasks/SKILL.md'].source).toBe('overdeck');
+    expect(manifest.installed['skills/tasks/SKILL.md'].hash).toMatch(/^sha256:/);
 
     expect(manifest.installed['agents/code-reviewer.md']).toBeDefined();
     expect(manifest.installed['agents/code-reviewer.md'].source).toBe('overdeck');

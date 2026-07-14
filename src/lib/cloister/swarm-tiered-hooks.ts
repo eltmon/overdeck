@@ -136,8 +136,8 @@ export async function fireTieredCommitHooks(
         workspace: workspacePath,
         issueId,
         sha,
-        beadTitle: item.title,
-        beadId: item.id,
+        itemTitle: item.title,
+        itemId: item.id,
         tiers: listeners,
         feedConfig: tiered.feed,
       });
@@ -164,7 +164,7 @@ export async function fireTieredCommitHooks(
         issueId,
         item,
         sha,
-        beadId: item.id,
+        itemId: item.id,
         prdMarkdown,
       });
       actions.push(`[tiered] supervisor review dispatched for ${issueId} item ${item.id} (subscribe=${supervisor.subscribe})`);

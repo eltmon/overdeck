@@ -31,7 +31,7 @@ Continue with destructive migration? [y/N]
 
   it('detects planning finalized sessions waiting for Done only for planning agents', () => {
     const pane = `
-Wrote vBRIEF and beads.
+Wrote vBRIEF and tasks.
 Planning finalized — click Done in the dashboard to hand off to the implementation agent.
 `
 

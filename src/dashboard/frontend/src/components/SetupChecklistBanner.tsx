@@ -10,7 +10,7 @@ import { toast } from 'sonner';
  * no install flavor bundles. GET /api/prerequisites reports what the SERVER
  * sees on PATH — exactly what spawned sessions will see. The banner appears
  * only while a REQUIRED tool is missing; the expanded checklist also lists
- * optional integrations (gh, beads, Docker, Codex) with copyable install
+ * optional integrations (gh, tasks, Docker, Codex) with copyable install
  * commands. Overdeck never runs the installs itself — system packages need
  * sudo/user consent.
  */

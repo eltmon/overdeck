@@ -272,12 +272,6 @@ async function archiveWorkspaceArtifactsImpl(
     details.push('Archived workspace prd.md')
   }
 
-  const beadsDir = join(workspacePath, '.beads')
-  if (existsSync(beadsDir)) {
-    await cp(beadsDir, join(archiveDir, '.beads'), { recursive: true })
-    details.push('Archived .beads/')
-  }
-
   details.push(`Archived to ${archiveDir}`);
   return stepOk(step, details);
 }

@@ -20,7 +20,7 @@ This means:
 
 This means:
 - If a test should verify behavior, don't manually verify it — fix the test and run it.
-- If an API endpoint should create beads, don't run `bd init` manually — fix the endpoint.
+- If an API endpoint should create tasks, don't run `bd init` manually — fix the endpoint.
 - If Playwright MCP crashes, don't fall back to `curl` — investigate why it crashed and fix it.
 - If a label should be removed by the merge flow, don't run `gh issue edit` — fix the merge flow.
 - If the dashboard should show the right status, don't tell the user to refresh — fix the data pipeline.
@@ -113,8 +113,8 @@ Overdeck's issue pipeline is expressed as four spawned **roles** plus a server-s
 
 | Role | Purpose | Instruction source |
 | --- | --- | --- |
-| `plan` | Discover requirements and produce vBRIEF/beads artifacts | `roles/plan.md` |
-| `work` | Implement one bead at a time in the workspace | `roles/work.md` |
+| `plan` | Discover requirements and produce vBRIEF/tasks artifacts | `roles/plan.md` |
+| `work` | Implement one task at a time in the workspace | `roles/work.md` |
 | `review` | Synthesize code review and transition approved/blocked work | `roles/review.md` |
 | `test` | Run automated verification and required browser UAT | `roles/test.md` |
 
@@ -148,8 +148,8 @@ See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, s
 
 `pan start <id>` is the single paved-road entry point: it takes an issue from whatever state it is in to running work.
 
-- **No plan exists** → `pan start` auto-plans (non-interactive), materializes beads, and starts the work agent when planning finalizes.
-- **Plan exists** → `pan start` spawns the work agent from the existing vBRIEF and beads.
+- **No plan exists** → `pan start` auto-plans (non-interactive), materializes tasks, and starts the work agent when planning finalizes.
+- **Plan exists** → `pan start` spawns the work agent from the existing vBRIEF and tasks.
 - **Already running** → `pan start` exits 0 with a no-op message and guidance on messaging/attaching the agent.
 
 Planning depth is one optional dial:
@@ -158,7 +158,7 @@ Planning depth is one optional dial:
 pan start PAN-1071                    # default: config planning.default_mode, or auto if unset
 pan start PAN-1071 --plan interactive # Q&A planning session first, then work on approval
 pan start PAN-1071 --plan auto        # non-interactive planning, then work (same as default)
-pan start PAN-1071 --plan skip        # synthesize a minimal vBRIEF and beads, then work
+pan start PAN-1071 --plan skip        # synthesize a minimal vBRIEF and tasks, then work
 ```
 
 `planning.default_mode` in `~/.overdeck/config.yaml` sets the default for unplanned issues:
@@ -399,17 +399,17 @@ and `parseGitHubRepos()` in `src/lib/tracker-utils.ts`. Resolution order:
 When adding a new project to `projects.yaml`, either set `linear_team` explicitly or
 ensure the project key (uppercased, hyphens removed) matches the issue prefix you want.
 
-## Beads Enforcement
+## tasks Enforcement
 
-Work agents cannot start without beads tasks in the workspace. The start-agent endpoint
-returns 422 if the canonical Dolt resolver reports no issue beads. Planning must create beads via
+Work agents cannot start without tasks tasks in the workspace. The start-agent endpoint
+returns 422 if the canonical Dolt resolver reports no issue tasks. Planning must create tasks via
 `bd create` before handing off to implementation.
 
-The verification gate also blocks completion while the issue has open beads: `runVerificationForIssue`
-calls `checkOpenBeadsPromise` after the vBRIEF acceptance-criteria check, and a non-empty result (or a
-timeout, which is unknown-not-zero per PAN-1812) produces `failedCheck: 'open-beads'`. Finally,
-merge-time and close-out sweeps remove remaining open beads from terminal issues so that a closed
-issue never carries open beads.
+The verification gate also blocks completion while the issue has open tasks: `runVerificationForIssue`
+calls `checkOpentasksPromise` after the vBRIEF acceptance-criteria check, and a non-empty result (or a
+timeout, which is unknown-not-zero per PAN-1812) produces `failedCheck: 'open-tasks'`. Finally,
+merge-time and close-out sweeps remove remaining open tasks from terminal issues so that a closed
+issue never carries open tasks.
 ## postMergeLifecycle Idempotency (enforced by a test, not by this note)
 
 `postMergeLifecycle` must run **at most once per merge**. If it can re-trigger
@@ -466,7 +466,7 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 2. **Agent state directories** — `~/.overdeck/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
    - `.overdeck/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
-   - `.beads/` — all task tracking beads
+   - `.beads/` — all task tracking tasks
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
@@ -598,51 +598,3 @@ For a migrated project, link the canonical PRD as
 for projects without a valid migration completion marker.
 
 The issue body should then contain a tight summary (vision, motivation, design goals, key capabilities, phases) -- NOT a full copy of the PRD. The PRD is the source of truth for data models, architecture, code samples, and implementation details. Duplicating that content into the issue creates drift.
-
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:7510c1e2 -->
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
-```
-
-### Rules
-
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
-
-**Architecture in one line:** issues live in a local Dolt DB; sync uses `refs/dolt/data` on your git remote; `.beads/issues.jsonl` is a passive export. See https://github.com/gastownhall/beads/blob/main/docs/SYNC_CONCEPTS.md for details and anti-patterns.
-
-## Session Completion
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-<!-- END BEADS INTEGRATION -->

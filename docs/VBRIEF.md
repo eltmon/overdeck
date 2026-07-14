@@ -2,6 +2,14 @@
 
 Overdeck uses [xBRIEF](https://github.com/deftai/xBRIEF) for machine-readable work plans with a unified `.pan/` directory model (PAN-967).
 
+## Task state and concurrency
+
+The vBRIEF checklist is the task source of truth. Durable runtime state lives in the issue record's `tasks` block: each item can carry a claim owner, claim timestamp, and completion state, while `readWorkspacePlan()` overlays those states onto the checked-in plan.
+
+Agents use the smallest loop: `pan task next`, `pan task claim <item-id>`, implement and push the change, then `pan task done <item-id>`. Every mutation goes through the task write door, which holds the shared filesystem lock and applies a sequence check before updating the record. Two agents may race to claim an item; exactly one claim succeeds, and the loser rereads the plan and selects the next dispatchable item. Stale claims are surfaced by patrol rather than silently reassigned.
+
+Existing `.vBRIEF tasks/` directories are unused legacy data. Overdeck does not read, migrate, or delete them.
+
 ## xBRIEF v0.8
 
 Upstream renamed the specification repository to `deftai/xBRIEF` on 2026-06-26, then released xBRIEF v0.8 on 2026-06-30. Overdeck keeps this file name and internal `vBRIEFInfo` TypeScript field for compatibility, but supports the renamed on-disk envelope.
@@ -28,7 +36,7 @@ The item status enum includes `failed` in addition to `draft`, `proposed`, `appr
 
 ### Directory Structure
 
-All Overdeck orchestration state lives under `.pan/` — a single dot-directory at the project root (same convention as `.git/`, `.github/`, `.beads/`).
+All Overdeck orchestration state lives under `.pan/` — a single dot-directory at the project root (same convention as `.git/`, `.github/`, `.vBRIEF tasks/`).
 
 #### On main (project root):
 
@@ -129,9 +137,9 @@ There is no workspace-local copy of the spec. Work agents read the canonical spe
 | `.overdeck/continue.json` in a workspace | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
 | `.overdeck/sessions.jsonl` in a workspace | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
 | `.overdeck/feedback/*.md` in a workspace | Pipeline only | Agent (injected into prompt) | None — single writer |
-| Beads (`.beads/`) | Each agent via `bd update` | Pipeline, dashboard | Serialized by Dolt mutex |
+| tasks (`.vBRIEF tasks/`) | Each agent via `pan task update` | Pipeline, dashboard | Serialized by Dolt mutex |
 
-For N parallel agents on N different issues: each has its own feature branch with its own `.pan/` directory. Zero cross-agent contention. Beads writes serialize through the Dolt mutex but target different bead IDs.
+For N parallel agents on N different issues: each has its own feature branch with its own `.pan/` directory. Zero cross-agent contention. tasks writes serialize through the Dolt mutex but target different task IDs.
 
 ---
 
@@ -168,12 +176,12 @@ The continue file is the machine-readable operational state for in-progress work
   ],
   "resumePoint": {
     "description": "Implement the WebSocket reconnection logic in ws-rpc.ts",
-    "beadId": "ws-reconnect",
+    "taskId": "ws-reconnect",
     "filesToRead": ["src/dashboard/server/ws-rpc.ts"]
   },
-  "beadsMapping": {
-    "ws-reconnect": ["bead-42"],
-    "ws-reconnect.ac1": ["bead-42"]
+  "tasksMapping": {
+    "ws-reconnect": ["task-42"],
+    "ws-reconnect.ac1": ["task-42"]
   },
   "agentModel": "claude-opus-4-6",
   "sessionHistory": [
@@ -360,7 +368,7 @@ Edge semantics:
 - `invalidates` — `from` invalidates assumptions made by `to`
 - `suggests` — `from` gives guidance to `to`
 
-Only `blocks` edges are used for critical path computation and bead scheduling (`bd ready`).
+Only `blocks` edges are used for critical path computation and task scheduling (`pan task next`).
 
 ### Overdeck Extensions (via `metadata`)
 
@@ -369,10 +377,10 @@ The vBRIEF spec supports arbitrary `metadata` on items and child items. Overdeck
 | Field | Location | Description |
 |-------|----------|-------------|
 | `metadata.difficulty` | items | `trivial`, `simple`, `medium`, `complex`, `expert` — used for model routing |
-| `metadata.issueLabel` | items | Issue ID for beads label filtering (e.g., `"pan-436"`) |
-| `metadata.requiresInspection` | items | Boolean decision for whether a bead must pass the work.inspect gate before downstream work proceeds |
+| `metadata.issueLabel` | items | Issue ID for tasks label filtering (e.g., `"pan-436"`) |
+| `metadata.requiresInspection` | items | Boolean decision for whether a task must pass the work.inspect gate before downstream work proceeds |
 | `metadata.inspectionDepth` | items | `"fast"` or `"deep"` review depth when `requiresInspection` is true |
-| `metadata.foundationFor` | items | Downstream bead IDs that depend on this inspection-gated item |
+| `metadata.foundationFor` | items | Downstream task IDs that depend on this inspection-gated item |
 | `metadata.traces` | items | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) satisfied by this item |
 | `metadata.kind` | child items | `"acceptance_criterion"` — marks a child item as an AC for the verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |
@@ -420,7 +428,7 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 2. **Planning agent** converts the PRD into a vBRIEF spec during the discovery session. Creates `plan.vbrief.json` in the workspace `.pan/` directory.
 3. **`complete-planning`** promotes the vBRIEF to `specs/` on `overdeck-state` with an issue-keyed filename and sets `plan.status` to `proposed`.
 4. **`pan start`** updates `plan.status` to `active` on main. Work agents read the spec from main via `findPlan()`.
-5. **Work agent** works through beads in DAG dependency order (`bd ready -l <issue>`). Item/subItem status updates are written to workspace `continue.json`'s `statusOverrides` map. `readWorkspacePlan()` returns a merged view with current statuses.
+5. **Work agent** works through tasks in DAG dependency order (`pan task next -l <issue>`). Item/subItem status updates are written to workspace `continue.json`'s `statusOverrides` map. `readWorkspacePlan()` returns a merged view with current statuses.
 6. **Verification gate** checks all child items with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
 7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `specs/` on `overdeck-state`.
 8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and vBRIEF viewer (List/DAG/Raw JSON tabs).

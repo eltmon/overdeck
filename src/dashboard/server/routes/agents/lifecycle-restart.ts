@@ -391,7 +391,7 @@ export const postAgentRestartRoute = HttpRouter.add(
 //                                       'completeWorkReset' issue action)
 //
 // Refuses (409) if a live tmux session is alive — same gate as reset-session.
-// Workspace, vBRIEF, beads, .pan/continue.json, .pan/feedback/, the branch,
+// Workspace, vBRIEF, tasks, .pan/continue.json, .pan/feedback/, the branch,
 // and the commit history are all left untouched. The new agent (whether
 // auto-spawned or manually started) reads .pan/continue.json + branch state
 // to pick up where the prior run left off.
@@ -590,7 +590,7 @@ export const postAgentsRestartAllRoute = HttpRouter.add(
 
 // ─── Route: POST /api/agents/:id/reset-session ─────────────────────────────
 // Clears saved Claude session tracking so the next start creates a fresh session.
-// Workspace, beads, and git state are preserved. JSONL files kept for cost history.
+// Workspace, tasks, and git state are preserved. JSONL files kept for cost history.
 
 export const postAgentResetSessionRoute = HttpRouter.add(
   'POST',

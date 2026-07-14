@@ -26,7 +26,6 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ReviewMode } from '../config-yaml.js';
 import type {
-  ContinueBeadsMapping,
   ContinueDecision,
   ContinueFeedbackEntry,
   ContinueHazard,
@@ -183,7 +182,7 @@ export interface PanIssuePipelineRecord {
  * Single durable record per issue. Contains the superset of data previously
  * scattered across project continue, workspace continue, and state.json:
  *
- *   - decisions / hazards / resumePoint / beadsMapping / sessionHistory /
+ *   - decisions / hazards / resumePoint / sessionHistory /
  *     feedback (from continues)
  *   - statusOverrides (from workspace continue)
  *   - harness / model (from state.json)
@@ -210,7 +209,6 @@ export interface PanIssueRecord {
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
   resumePoint?: ContinueResumePoint | null;
-  beadsMapping?: ContinueBeadsMapping;
   statusOverrides?: Record<string, string>;
   tasks?: PanIssueTasksRecord;
   sessionHistory?: ContinueSessionEntry[];
@@ -735,7 +733,6 @@ export interface RecordContinueView {
   decisions: ContinueDecision[];
   hazards: ContinueHazard[];
   resumePoint: ContinueResumePoint | null;
-  beadsMapping: ContinueBeadsMapping;
   sessionHistory: ContinueSessionEntry[];
   feedback: ContinueFeedbackEntry[];
   scopeDrift?: ScopeDriftRecord;
@@ -751,7 +748,6 @@ export function readRecordContinueViewSync(
     decisions: record.decisions ?? [],
     hazards: record.hazards ?? [],
     resumePoint: record.resumePoint ?? null,
-    beadsMapping: record.beadsMapping ?? {},
     sessionHistory: record.sessionHistory ?? [],
     feedback: record.feedback ?? [],
     scopeDrift: record.scopeDrift,
@@ -942,36 +938,6 @@ export async function writeRecordResumePoint(
 ): Promise<void> {
   const record = await ensureIssueRecord(project, issueId);
   record.resumePoint = resumePoint;
-  const recordPath = writeIssueRecordSync(project, issueId, record);
-  if (opts.autoCommit !== false) {
-    queueIssueRecordCommit(project, issueId, recordPath);
-  }
-}
-
-/** Write beadsMapping into the per-issue record (sync). */
-export function writeRecordBeadsMappingSync(
-  project: ProjectConfig,
-  issueId: string,
-  beadsMapping: ContinueBeadsMapping,
-  opts: WriteStatusOverrideOptions = {},
-): void {
-  const record = ensureIssueRecordSync(project, issueId);
-  record.beadsMapping = beadsMapping;
-  const recordPath = writeIssueRecordSync(project, issueId, record);
-  if (opts.autoCommit !== false) {
-    queueIssueRecordCommit(project, issueId, recordPath);
-  }
-}
-
-/** Write beadsMapping into the per-issue record (async). */
-export async function writeRecordBeadsMapping(
-  project: ProjectConfig,
-  issueId: string,
-  beadsMapping: ContinueBeadsMapping,
-  opts: WriteStatusOverrideOptions = {},
-): Promise<void> {
-  const record = await ensureIssueRecord(project, issueId);
-  record.beadsMapping = beadsMapping;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   if (opts.autoCommit !== false) {
     queueIssueRecordCommit(project, issueId, recordPath);

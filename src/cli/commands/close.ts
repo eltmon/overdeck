@@ -70,7 +70,7 @@ export interface GitHubCloseState {
  * Read the raw close state of a GitHub issue, including its close reason.
  *
  * This is the same `gh issue view` door used by closeOutCommand; it is exported
- * so other CLI commands (e.g. `pan beads sweep`) can look up tracker state
+ * so other CLI commands (e.g. `pan task sweep`) can look up tracker state
  * without reaching past the tracker door.
  */
 export async function readGitHubCloseState(owner: string, repo: string, number: number): Promise<GitHubCloseState> {

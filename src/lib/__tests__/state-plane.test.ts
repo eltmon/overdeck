@@ -13,7 +13,7 @@ import {
 } from '../state-plane.js';
 
 describe('STATE_BRANCH_PATHS', () => {
-  it('enumerates exactly the ten flat overdeck-state root directories', () => {
+  it('enumerates exactly the nine flat overdeck-state root directories', () => {
     expect(STATE_BRANCH_PATHS).toEqual([
       'records/',
       'continues/',
@@ -24,7 +24,6 @@ describe('STATE_BRANCH_PATHS', () => {
       'feedback/',
       'backlog/',
       'notes/',
-      '.beads/',
     ]);
   });
 
@@ -77,9 +76,9 @@ describe('isStatePlaneOnlyDiff', () => {
 
   it('returns true when the diff touches only state-plane paths', async () => {
     mkdirSync(join(root, '.pan', 'records'), { recursive: true });
-    mkdirSync(join(root, '.beads'), { recursive: true });
+    mkdirSync(join(root, '.tasks'), { recursive: true });
     writeFileSync(join(root, '.pan', 'records', 'pan-2375.json'), '{}\n');
-    writeFileSync(join(root, '.beads', 'issues.jsonl'), '{"id":"PAN-2375"}\n');
+    writeFileSync(join(root, '.tasks', 'issues.jsonl'), '{"id":"PAN-2375"}\n');
     const tip = commitAll(root, 'state only');
 
     await expect(isStatePlaneOnlyDiff(base, tip, root)).resolves.toBe(true);

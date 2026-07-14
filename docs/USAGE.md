@@ -46,7 +46,7 @@ npm install -g @overdeck/core && pan install && pan up
    ```
 
    This will:
-   - Install dependencies (ttyd, beads)
+   - Install dependencies (ttyd, tasks)
    - Set up Traefik for local HTTPS
    - Generate SSL certificates (if mkcert is installed)
    - Create `~/.overdeck/` directory structure
@@ -56,12 +56,12 @@ npm install -g @overdeck/core && pan install && pan up
    pan sync
    ```
 
-4. **Initialize beads task tracking** (once per project):
+4. **Initialize tasks task tracking** (once per project):
    ```bash
    cd /path/to/your-project
-   bd init --prefix <project-name>
+   pan task init --prefix <project-name>
    ```
-   For example: `bd init --prefix overdeck`
+   For example: `pan task init --prefix overdeck`
 
    This creates the Dolt database that agents use for task tracking. Without it, agents
    can't start even if planning succeeds. `pan sync` will attempt this automatically for
@@ -90,7 +90,7 @@ npm install -g @overdeck/core && pan install && pan up
 
 - **mkcert** - For HTTPS certificates (recommended)
 - **Linear API key** - For issue tracking integration
-- **Beads CLI (`bd`)** - For persistent task tracking (auto-installed, upgrade with `pan admin beads upgrade`). Requires `bd init --prefix <project-name>` once per project root after installation.
+- **tasks CLI (`pan task`)** - For persistent task tracking (auto-installed, upgrade with `pan admin tasks upgrade`). Requires `pan task init --prefix <project-name>` once per project root after installation.
 - **Google Stitch MCP** - For AI-powered UI design integration
 
 ### Platform Support
@@ -420,7 +420,7 @@ pan workspace create PAN-45
 └── feature-pan-123/
     ├── .planning/          # Planning state
     │   ├── STATE.md        # Current implementation state
-    │   ├── beads.json      # Task tracking
+    │   ├── tasks.json      # Task tracking
     │   └── decisions.log   # Planning decisions
     ├── src/                # Code (git worktree)
     ├── docker-compose.yml  # Optional Docker services

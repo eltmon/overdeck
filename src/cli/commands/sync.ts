@@ -34,8 +34,6 @@ import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
 import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
-import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
-import { ensureProjectBeadsBootstrap } from '../../lib/beads/bootstrap.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
 import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
 
@@ -403,9 +401,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hookRegistrationSpinner.info('Claude Code hooks already registered');
   }
 
-  // Ensure beads database exists for each registered project (first-time setup guard).
-  // bd install puts the binary in PATH, but bd init must be run once per project to
-  // create the Dolt database. Without it, workspace beads creation silently fails.
   const projects = listProjectsSync();
   for (const { key, config } of projects) {
     if (!existsSync(config.path)) continue;
@@ -417,24 +412,8 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       migrationSpinner.warn(formatAutomaticStateMigrationBlock(migration));
     }
   }
-  if (projects.length > 0 && checkCommand('bd')) {
-    for (const { config } of projects) {
-      if (!existsSync(config.path)) continue;
-      const mainBeadsDir = join(config.path, '.beads');
-      if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
-      const bdRoot = resolveStateReadHomeSync(config).root;
-      const beadsSpinner = ora(`Synchronizing beads database for ${config.name}...`).start();
-      try {
-        await ensureProjectBeadsBootstrap(config.path, bdRoot);
-        beadsSpinner.succeed(`Beads database synchronized for ${config.name}`);
-      } catch (error) {
-        beadsSpinner.warn(`Beads synchronization is unavailable for ${config.name}: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
-  }
 
-
-  // Check jq availability (required by statusline, beads, specialists)
+  // Check jq availability (required by statusline and specialists)
   if (!checkCommand('jq')) {
     console.log(chalk.yellow('\n  ⚠ jq not found — statusline and other features need it'));
     console.log(chalk.dim('    Install: apt install jq / brew install jq\n'));
@@ -599,25 +578,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       gitHooksSpinner.succeed(`Installed git hooks in ${projectsUpdated} project(s)`);
     } else {
       gitHooksSpinner.info('Git hooks already up to date');
-    }
-  }
-
-  // Ensure beads database exists for each registered project (first-time setup guard).
-  // bd install puts the binary in PATH, but bd init must be run once per project to
-  // create the Dolt database. Without it, workspace beads creation silently fails.
-  if (projects.length > 0 && checkCommand('bd')) {
-    for (const { config } of projects) {
-      if (!existsSync(config.path)) continue;
-      const mainBeadsDir = join(config.path, '.beads');
-      if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
-      const bdRoot = resolveStateReadHomeSync(config).root;
-      const beadsSpinner = ora(`Synchronizing beads database for ${config.name}...`).start();
-      try {
-        await ensureProjectBeadsBootstrap(config.path, bdRoot);
-        beadsSpinner.succeed(`Beads database synchronized for ${config.name}`);
-      } catch (error) {
-        beadsSpinner.warn(`Beads synchronization is unavailable for ${config.name}: ${error instanceof Error ? error.message : String(error)}`);
-      }
     }
   }
 

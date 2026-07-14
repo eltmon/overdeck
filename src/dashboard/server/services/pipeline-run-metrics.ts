@@ -41,7 +41,7 @@ export interface VerificationAttemptMetrics {
 export interface PipelineRunStatsSample {
   issueId: string;
   metrics: PipelineRunMetrics;
-  beadsCount?: number;
+  tasksCount?: number;
   planItemsCount?: number;
 }
 

@@ -77,7 +77,7 @@
   align-items: start;
 }
 
-/* Tree | main | beads rail (PAN-1991 item #1). The cockpit pane is ~1000-1040px
+/* Tree | main | tasks rail (PAN-1991 item #1). The cockpit pane is ~1000-1040px
  * in the common Command-Deck layout, so the three-column threshold sits well
  * below that — otherwise the rail (the third grid child) wraps under the tree
  * instead of sitting on the right. Narrower panes (<840px, e.g. a split) drop to

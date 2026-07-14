@@ -30,6 +30,45 @@ export interface ACCompletionResult {
   incomplete: AcceptanceCriterion[];
 }
 
+export interface ItemACStatus {
+  itemId: string;
+  itemTitle: string;
+  completed: number;
+  pending: number;
+  total: number;
+  criteria: AcceptanceCriterion[];
+}
+
+export interface VBriefACStatus {
+  allCompleted: boolean;
+  items: ItemACStatus[];
+  totalCompleted: number;
+  totalPending: number;
+  totalCount: number;
+}
+
+export function getVBriefACStatusSync(workspacePath: string): VBriefACStatus | null {
+  const doc = readWorkspacePlanSync(workspacePath);
+  if (!doc) return null;
+  const allCriteria = extractACFromDocument(doc);
+  if (allCriteria.length === 0) return null;
+  const itemMap = new Map<string, ItemACStatus>();
+  for (const ac of allCriteria) {
+    const item = itemMap.get(ac.itemId) ?? {
+      itemId: ac.itemId, itemTitle: ac.itemTitle, completed: 0, pending: 0, total: 0, criteria: [],
+    };
+    item.total++;
+    item.criteria.push(ac);
+    if (ac.status === 'completed' || ac.status === 'cancelled') item.completed++;
+    else item.pending++;
+    itemMap.set(ac.itemId, item);
+  }
+  const items = [...itemMap.values()];
+  const totalCompleted = items.reduce((sum, item) => sum + item.completed, 0);
+  const totalPending = items.reduce((sum, item) => sum + item.pending, 0);
+  return { allCompleted: totalPending === 0, items, totalCompleted, totalPending, totalCount: totalCompleted + totalPending };
+}
+
 /**
  * Extract all acceptance criteria from a vBRIEF plan.
  *

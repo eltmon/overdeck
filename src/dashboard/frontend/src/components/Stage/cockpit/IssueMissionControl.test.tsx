@@ -75,7 +75,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       primary: all.slice(0, 2),
       secondary: all.slice(2, 4),
       overflow: all.slice(4),
-      state: { hasPlan: true, hasBeads: true },
+      state: { hasPlan: true, hasTasks: true },
       activeDialog: null,
     }
   },
@@ -89,7 +89,7 @@ vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div>
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({ BeadsTab: () => <div>Beads tab</div> }))
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({ TasksTab: () => <div>Tasks tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div>Costs tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab', () => ({ DiscussionsTab: () => <div>Discussions tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/MarkdownTab', () => ({ MarkdownTab: ({ body }: { body?: string }) => <div>{body ?? 'Markdown tab'}</div> }))
@@ -105,7 +105,7 @@ vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
 vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div>Agents lane</div> }))
-vi.mock('./BeadsRail', () => ({ BeadsRail: () => <div>Beads rail</div> }))
+vi.mock('./TasksRail', () => ({ TasksRail: () => <div>Tasks rail</div> }))
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 

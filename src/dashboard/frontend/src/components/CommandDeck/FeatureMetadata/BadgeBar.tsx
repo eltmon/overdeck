@@ -19,7 +19,7 @@ interface PlanningData {
 interface BadgeBarProps {
   issueId: string;
   source?: string;
-  onOpenBeads?: () => void;
+  onOpenTasks?: () => void;
 }
 
 async function fetchPlanning(issueId: string): Promise<PlanningData> {
@@ -28,7 +28,7 @@ async function fetchPlanning(issueId: string): Promise<PlanningData> {
   return res.json();
 }
 
-export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
+export function BadgeBar({ issueId, source, onOpenTasks }: BadgeBarProps) {
   const [showModal, setShowModal] = useState<{ title: string; content: string } | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -127,8 +127,8 @@ export function BadgeBar({ issueId, source, onOpenBeads }: BadgeBarProps) {
         {/* Tasks badge */}
         <button
           className={styles.badge}
-          onClick={onOpenBeads}
-          title="View beads tasks"
+          onClick={onOpenTasks}
+          title="View tasks tasks"
         >
           <ListTodo size={12} />
           Tasks

@@ -305,7 +305,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/issues/:id/close-out',                      kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("closed","close-out")' },
   { surface: 'POST /api/issues/bulk-close-out',                     kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance ×N' },
   { surface: 'POST /api/issues/:issueId/close',                     kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("closed")' },
-  { surface: 'POST /api/issues/:id/beads/:beadId/inspect',          kind: 'http', disposition: 'RELOCATE',    door: 'Agents (work.inspect)' },
+  { surface: 'POST /api/issues/:id/beads/:itemId/inspect',          kind: 'http', disposition: 'RELOCATE',    door: 'Agents (work.inspect)' },
   { surface: 'POST /api/issues/:id/generate-tasks',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("working") fallback path' },
 
   // ── metrics.ts ────────────────────────────────────────────────────────────

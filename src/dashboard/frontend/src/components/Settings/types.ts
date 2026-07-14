@@ -165,7 +165,7 @@ export interface TieredExecutionConfig {
     model: ModelId;
     harness: Harness;
     difficulties: VBriefDifficulty[];
-    /** PAN-2391: weighted entries this tier spreads beads across. When
+    /** PAN-2391: weighted entries this tier spreads tasks across. When
      * present, model/harness above are the max-weight representative. */
     distribution?: Array<{ model: ModelId; harness: Harness; weight: number }>;
   }>;

@@ -43,7 +43,7 @@ const CHECKPOINT_AUTHOR_EMAIL = 'overdeck@users.noreply.github.com'
 export function checkpointStateExclusions(): string[] {
   return [
     '.overdeck',
-    ...STATE_BRANCH_PATHS.map((path) => path === '.beads/' ? '.beads' : `.pan/${path.slice(0, -1)}`),
+    ...STATE_BRANCH_PATHS.map((path) => `.pan/${path.slice(0, -1)}`),
     '.pan/continue.json',
     '.pan/spec.vbrief.json',
   ]

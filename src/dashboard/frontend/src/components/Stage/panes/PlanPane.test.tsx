@@ -10,9 +10,9 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/VBriefTab', () => ({
     <div data-testid="vbrieftab" data-issue={issueId} />
   ),
 }))
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({
-  BeadsTab: ({ issueId }: { issueId: string }) => (
-    <div data-testid="beadstab" data-issue={issueId} />
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({
+  TasksTab: ({ issueId }: { issueId: string }) => (
+    <div data-testid="taskstab" data-issue={issueId} />
   ),
 }))
 
@@ -23,13 +23,13 @@ describe('PlanPane', () => {
   it('renders VBriefTab for the workspace issue by default', () => {
     render(<PlanPane pane={pane} ctx={ctx} />)
     expect(screen.getByTestId('vbrieftab')).toHaveAttribute('data-issue', 'PAN-1549')
-    expect(screen.queryByTestId('beadstab')).toBeNull()
+    expect(screen.queryByTestId('taskstab')).toBeNull()
   })
 
-  it('toggles to BeadsTab', () => {
+  it('toggles to TasksTab', () => {
     render(<PlanPane pane={pane} ctx={ctx} />)
-    fireEvent.click(screen.getByRole('tab', { name: 'Beads' }))
-    expect(screen.getByTestId('beadstab')).toHaveAttribute('data-issue', 'PAN-1549')
+    fireEvent.click(screen.getByRole('tab', { name: 'Tasks' }))
+    expect(screen.getByTestId('taskstab')).toHaveAttribute('data-issue', 'PAN-1549')
     expect(screen.queryByTestId('vbrieftab')).toBeNull()
   })
 })

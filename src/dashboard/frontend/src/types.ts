@@ -42,10 +42,10 @@ export interface Issue {
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
   // Planning-state (embedded from /api/issues via filesystem checks)
   hasPlan?: boolean;
-  hasBeads?: boolean;
+  hasTasks?: boolean;
   planningComplete?: boolean;
   workspacePath?: string;
-  beadCounts?: { completed: number; total: number } | null;
+  taskCounts?: { completed: number; total: number } | null;
 }
 
 export interface GitStatus {

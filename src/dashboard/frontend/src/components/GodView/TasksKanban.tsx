@@ -1,21 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 
-interface BeadsTask {
+interface TasksTask {
   id: string;
   title: string;
   status: 'open' | 'in_progress' | 'closed';
 }
 
-interface BeadsKanbanProps {
+interface TasksKanbanProps {
   agentId: string;
   workspace?: string;
 }
 
-export function BeadsKanban({ agentId }: BeadsKanbanProps) {
+export function TasksKanban({ agentId }: TasksKanbanProps) {
   const { data } = useQuery({
-    queryKey: ['beads', agentId],
+    queryKey: ['tasks', agentId],
     queryFn: async () => {
-      // Beads tasks come from the canonical Dolt-backed dashboard API.
+      // Tasks tasks come from the canonical Dolt-backed dashboard API.
       // We'll fetch via agent timeline as a proxy
       const res = await fetch(`/api/agents/${agentId}/activity?limit=50`);
       if (!res.ok) return null;
@@ -26,10 +26,10 @@ export function BeadsKanban({ agentId }: BeadsKanbanProps) {
   });
 
   // Parse activity for task-related events
-  const tasks: BeadsTask[] = [];
+  const tasks: TasksTask[] = [];
   if (data?.activity) {
     for (const event of data.activity) {
-      if (event.type === 'task_started' || event.type === 'task_completed' || event.message?.includes('bead')) {
+      if (event.type === 'task_started' || event.type === 'task_completed' || event.message?.includes('task')) {
         tasks.push({
           id: event.id || Math.random().toString(),
           title: event.message || 'Task',

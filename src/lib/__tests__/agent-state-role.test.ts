@@ -26,7 +26,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../workspace/rebuild-stack.js');
-    vi.doUnmock('../beads-query.js');
+    vi.doUnmock('../tasks-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
@@ -371,7 +371,7 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
@@ -428,7 +428,7 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
@@ -479,7 +479,7 @@ describe('AgentState role persistence', () => {
       capturePane: vi.fn(() => Effect.succeed('Claude Code')),
       setOption: vi.fn(() => Effect.void),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,

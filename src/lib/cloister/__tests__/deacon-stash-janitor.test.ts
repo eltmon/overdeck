@@ -730,7 +730,7 @@ describe('checkInspectAgentTimeouts', () => {
     vi.useRealTimers();
   });
 
-  it('marks a timed-out inspecting bead as error, kills the inspect session, and tells the parent exactly once', async () => {
+  it('marks a timed-out inspecting task as error, kills the inspect session, and tells the parent exactly once', async () => {
     vi.mocked((await import('../../review-status.js')).loadReviewStatuses)
       .mockReturnValueOnce({
         'PAN-1616': {
@@ -739,7 +739,7 @@ describe('checkInspectAgentTimeouts', () => {
           testStatus: 'pending',
           inspectStatus: 'inspecting',
           inspectStartedAt: '2026-06-05T12:00:00.000Z',
-          inspectBeadId: 'workspace-sposy',
+          inspectTaskId: 'workspace-sposy',
           updatedAt: '2026-06-05T12:00:00.000Z',
           readyForMerge: false,
         },
@@ -751,7 +751,7 @@ describe('checkInspectAgentTimeouts', () => {
           testStatus: 'pending',
           inspectStatus: 'error',
           inspectStartedAt: '2026-06-05T12:00:00.000Z',
-          inspectBeadId: 'workspace-sposy',
+          inspectTaskId: 'workspace-sposy',
           updatedAt: '2026-06-05T12:12:01.000Z',
           readyForMerge: false,
         },
@@ -762,7 +762,7 @@ describe('checkInspectAgentTimeouts', () => {
     const second = await checkInspectAgentTimeouts();
 
     expect(first).toEqual([
-      'Inspection watchdog tripped for PAN-1616 bead workspace-sposy: timed out after 12m (limit 12m)',
+      'Inspection watchdog tripped for PAN-1616 task workspace-sposy: timed out after 12m (limit 12m)',
     ]);
     expect(second).toEqual([]);
     expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
@@ -775,12 +775,12 @@ describe('checkInspectAgentTimeouts', () => {
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-1616',
-      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
+      expect.stringContaining('INSPECTION ERROR for task workspace-sposy'),
       'deacon:inspect-watchdog',
     );
   });
 
-  it('marks an inspecting bead as error when its inspect session has disappeared', async () => {
+  it('marks an inspecting task as error when its inspect session has disappeared', async () => {
     vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
       'PAN-1616': {
         issueId: 'PAN-1616',
@@ -788,7 +788,7 @@ describe('checkInspectAgentTimeouts', () => {
         testStatus: 'pending',
         inspectStatus: 'inspecting',
         inspectStartedAt: '2026-06-05T12:11:30.000Z',
-        inspectBeadId: 'workspace-sposy',
+        inspectTaskId: 'workspace-sposy',
         updatedAt: '2026-06-05T12:11:30.000Z',
         readyForMerge: false,
       },
@@ -802,7 +802,7 @@ describe('checkInspectAgentTimeouts', () => {
     expect(mockKillSessionAsync).not.toHaveBeenCalled();
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-1616',
-      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
+      expect.stringContaining('INSPECTION ERROR for task workspace-sposy'),
       'deacon:inspect-watchdog',
     );
   });

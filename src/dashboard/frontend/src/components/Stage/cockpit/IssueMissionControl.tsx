@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useQuery } from '@tanstack/react-query'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
-import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
+import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
@@ -30,7 +30,7 @@ import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
-import { BeadsRail } from './BeadsRail'
+import { TasksRail } from './TasksRail'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
@@ -67,13 +67,13 @@ type MissionTab =
   | 'conversation' // tool — relocates to a pane in #10
   | 'files'        // tool — #10
   | 'terminal'     // tool — #10
-  | 'beads'        // not a visible tab; reachable from the rail's "open full"
+  | 'tasks'        // not a visible tab; reachable from the rail's "open full"
 
 type PipelinePhaseKey = 'plan' | 'work' | 'review' | 'test' | 'ci' | 'ship' | 'merge'
 
 type IssueTreeContext = 'issue'
 
-// PAN-2398: status lives in StatusNarrative; beads = rail; tools = panes.
+// PAN-2398: status lives in StatusNarrative; tasks = rail; tools = panes.
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
   { id: 'code', label: 'Code' },
@@ -444,7 +444,7 @@ function IssueTreeLane({
     sessions,
     resourceSources: [
       ...(actions.state.hasPlan ? ['vbrief' as const] : []),
-      ...(actions.state.hasBeads ? ['beads' as const] : []),
+      ...(actions.state.hasTasks ? ['tasks' as const] : []),
       'workspace' as const,
     ],
     resourceDetails: {
@@ -454,11 +454,11 @@ function IssueTreeLane({
       tmuxSessionCount: sessions.length,
       prs: [],
       hasVbrief: actions.state.hasPlan,
-      hasBeads: actions.state.hasBeads,
+      hasTasks: actions.state.hasTasks,
       dockerContainerCount: 0,
       conversations: [],
     },
-  }), [actions.state.hasBeads, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
+  }), [actions.state.hasTasks, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
 
   const feature = projectFeature.data ?? fallbackFeature
   const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
@@ -716,7 +716,7 @@ function deriveNow(rs: ReviewStatusData | undefined, active: { type: string; mod
 }
 
 /** Lean Overview "Now" panel (PAN-1991 #9) — only what the header gates, the
- * Agents lane, and the beads rail don't already show: what's happening, the next
+ * Agents lane, and the tasks rail don't already show: what's happening, the next
  * action, the diff size, and the last few status events. No status grid. */
 function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void }) {
   const review = useReviewStatusQuery(issueId)
@@ -990,10 +990,10 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'conversation' && <ConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} />}
             {activeTab === 'files' && <OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} />}
             {activeTab === 'terminal' && <OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} />}
-            {activeTab === 'beads' && <BeadsTab issueId={issueId} />}
+            {activeTab === 'tasks' && <TasksTab issueId={issueId} />}
           </div>
         </main>
-        <BeadsRail issueId={issueId} onOpenFull={() => selectTab('beads')} />
+        <TasksRail issueId={issueId} onOpenFull={() => selectTab('tasks')} />
       </div>
     </div>
   )

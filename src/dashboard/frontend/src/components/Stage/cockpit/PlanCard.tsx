@@ -6,15 +6,15 @@ import {
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { CockpitCard } from './CockpitCard'
 
-interface BeadTask {
+interface TaskTask {
   id: string
   name?: string
   title?: string
   status: 'open' | 'closed'
 }
-interface BeadsResponse {
+interface TasksResponse {
   issueId: string
-  tasks: BeadTask[]
+  tasks: TaskTask[]
 }
 
 function tieredChipLabel(effective: boolean, source: string): string {
@@ -23,9 +23,9 @@ function tieredChipLabel(effective: boolean, source: string): string {
 }
 
 /**
- * PlanCard — the plan at a glance: acceptance-criteria progress + the beads
- * list (sourced from the authoritative /api/issues/:id/beads endpoint, shared
- * with the Beads dig tab's cache). The full Plan DAG is deliberately NOT mounted
+ * PlanCard — the plan at a glance: acceptance-criteria progress + the tasks
+ * list (sourced from the authoritative /api/issues/:id/tasks endpoint, shared
+ * with the Tasks dig tab's cache). The full Plan DAG is deliberately NOT mounted
  * here — it lives in the vBRIEF dig tab. (Command Deck remodel S3.)
  */
 export function PlanCard({ issueId }: { issueId: string }) {
@@ -51,16 +51,16 @@ export function PlanCard({ issueId }: { issueId: string }) {
     },
   })
 
-  const beadsQuery = useQuery<BeadsResponse>({
-    queryKey: ['beads', issueId],
+  const tasksQuery = useQuery<TasksResponse>({
+    queryKey: ['tasks', issueId],
     queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/beads`)
-      if (!res.ok) throw new Error('Failed to fetch beads')
-      return res.json() as Promise<BeadsResponse>
+      const res = await fetch(`/api/issues/${issueId}/tasks`)
+      if (!res.ok) throw new Error('Failed to fetch tasks')
+      return res.json() as Promise<TasksResponse>
     },
     refetchInterval: 30_000,
   })
-  const tasks = beadsQuery.data?.tasks ?? []
+  const tasks = tasksQuery.data?.tasks ?? []
   const closed = tasks.filter((t) => t.status === 'closed').length
   const shown = tasks.slice(0, 8)
   const rest = tasks.length - shown.length
@@ -71,7 +71,7 @@ export function PlanCard({ issueId }: { issueId: string }) {
       title="Plan"
       right={
         <span className="text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
-          {tasks.length > 0 && <>{closed}/{tasks.length} beads</>}
+          {tasks.length > 0 && <>{closed}/{tasks.length} tasks</>}
           {ac && ac.total > 0 && <> · {ac.completed}/{ac.total} AC</>}
         </span>
       }
@@ -113,7 +113,7 @@ export function PlanCard({ issueId }: { issueId: string }) {
 
       {tasks.length === 0 ? (
         <div className="text-[12px] text-muted-foreground">
-          {beadsQuery.isLoading ? 'Loading…' : 'No beads yet.'}
+          {tasksQuery.isLoading ? 'Loading…' : 'No tasks yet.'}
         </div>
       ) : (
         <div className="flex flex-col gap-1">
@@ -133,7 +133,7 @@ export function PlanCard({ issueId }: { issueId: string }) {
               </div>
             )
           })}
-          {rest > 0 && <div className="pl-6 text-[11px] text-muted-foreground">+ {rest} more beads</div>}
+          {rest > 0 && <div className="pl-6 text-[11px] text-muted-foreground">+ {rest} more tasks</div>}
         </div>
       )}
     </CockpitCard>

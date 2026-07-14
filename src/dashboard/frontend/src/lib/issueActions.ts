@@ -37,7 +37,7 @@ export type IssueActionKey =
   | 'resumeSession'
   | 'syncMain'
   | 'rebuildAndStart'
-  | 'inspectBead'
+  | 'inspectTask'
   | 'reopen'
   | 'closeOut'
   | 'wipe'
@@ -46,7 +46,7 @@ export type IssueActionKey =
   | 'resetIssue'
   | 'viewPr'
   | 'cancel'
-  | 'beads'
+  | 'tasks'
   | 'inference'
   | 'discussions'
   | 'transcripts'
@@ -80,7 +80,7 @@ export interface IssueActionState {
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists' | 'path' | 'mrUrl'> | null;
   hasPlan: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   hasInference?: boolean;
   hasTranscripts?: boolean;
   hasDiscussions?: boolean;
@@ -88,7 +88,7 @@ export interface IssueActionState {
   isMerged?: boolean;
   hasPr?: boolean;
   prUrl?: string | null;
-  selectedBeadId?: string | null;
+  selectedTaskId?: string | null;
   hasPendingInput?: boolean;
 }
 
@@ -139,7 +139,7 @@ const hasWorkspace = (state: IssueActionState) => state.workspace?.exists === tr
 const hasLiveAgent = (state: IssueActionState) => !!state.agent && !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(state.agent.status);
 const hasStoppedAgent = (state: IssueActionState) => !hasLiveAgent(state);
 const hasResumableSession = (state: IssueActionState) => hasStoppedAgent(state) && state.lifecycle?.canResumeSession === true;
-const canInspectBead = (state: IssueActionState) => state.hasBeads || !!state.selectedBeadId;
+const canInspectTask = (state: IssueActionState) => state.hasTasks || !!state.selectedTaskId;
 const isPaused = (state: IssueActionState) => state.agent?.paused === true;
 const isTroubled = (state: IssueActionState) => state.agent?.troubled === true;
 const canonicalState = (state: IssueActionState) => normalizeCanonicalState(state.issueCanonicalState);
@@ -154,7 +154,7 @@ const isDoneOrCanceled = (state: IssueActionState) => {
 const isMerged = (state: IssueActionState) => state.isMerged === true || state.reviewStatus?.mergeStatus === 'merged';
 const canPlan = (state: IssueActionState) => hasStoppedAgent(state) && !state.hasPlan && !isMerged(state) && !isDoneOrCanceled(state);
 const canFinalizePlanning = (state: IssueActionState) => state.hasPlan && state.agent?.role === 'plan' && hasStoppedAgent(state) && !isMerged(state);
-const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && state.hasBeads && !isMerged(state) && !isDoneOrCanceled(state);
+const canStartAgent = (state: IssueActionState) => hasStoppedAgent(state) && state.hasPlan && state.hasTasks && !isMerged(state) && !isDoneOrCanceled(state);
 // Rebuild & start: the recovery path for the `stack-unhealthy` spawn block.
 // Available wherever a normal start is viable AND a workspace exists (rebuild
 // operates on the workspace's Docker stack). Mirrors `canStartAgent` so it is a
@@ -235,7 +235,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'resumeSession', label: 'Resume session', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'dialog', group: 'agent' },
   { key: 'syncMain', label: 'Sync main', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'safe', group: 'workspace' },
   { key: 'rebuildAndStart', label: 'Rebuild & start', panVerb: 'workspace rebuild && start', endpoint: '/api/workspaces/:id/rebuild-and-start', enabledWhen: canRebuildAndStart, phasePrimary: [], kind: 'safe', group: 'workspace' },
-  { key: 'inspectBead', label: 'Inspect bead', panVerb: 'inspect --bead', endpoint: '/api/issues/:id/beads/:beadId/inspect', enabledWhen: canInspectBead, phasePrimary: [], kind: 'dialog', group: 'review' },
+  { key: 'inspectTask', label: 'Inspect task', panVerb: 'inspect --task', endpoint: '/api/issues/:id/tasks/:taskId/inspect', enabledWhen: canInspectTask, phasePrimary: [], kind: 'dialog', group: 'review' },
   { key: 'reopen', label: 'Reopen', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'safe', group: 'danger' },
   { key: 'closeOut', label: 'Close out', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'destructive', group: 'danger' },
   { key: 'wipe', label: 'Wipe', panVerb: 'wipe', endpoint: '/api/issues/:id/deep-wipe', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
@@ -244,7 +244,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'resetIssue', label: 'Reset issue', panVerb: null, endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'viewPr', label: 'View PR', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
   { key: 'cancel', label: 'Cancel issue', panVerb: null, endpoint: '/api/issues/:id/cancel', enabledWhen: canCancelIssue, phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'beads', label: 'Beads', panVerb: null, endpoint: '/api/issues/:id/beads', enabledWhen: (state) => state.hasBeads || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },
+  { key: 'tasks', label: 'Tasks', panVerb: null, endpoint: '/api/issues/:id/tasks', enabledWhen: (state) => state.hasTasks || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'inference', label: 'Inference', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasInference === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'discussions', label: 'Discussions', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasDiscussions === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
   { key: 'transcripts', label: 'Transcripts', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasTranscripts === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },

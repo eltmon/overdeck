@@ -15,8 +15,8 @@ Durable portable state is committed through domain writers to the orphan
   verdicts, ownership, and close-out.
 - `review/`, `test/`, and `feedback/` — durable specialist artifacts.
 - `backlog/` and `notes/` — sequencing and preserved operator notes.
-- `.beads/` — derived beads recovery exports and cutover metadata only. The
-  canonical beads database is Dolt history transported separately on
+- `.vBRIEF tasks/` — derived tasks recovery exports and cutover metadata only. The
+  canonical tasks database is Dolt history transported separately on
   `refs/dolt/data`; no Dolt database bytes live on `overdeck-state`.
 
 The per-issue record under `records/` is also the permanent home for swarm
@@ -30,13 +30,13 @@ completion is never silently lost to a stale workspace-local copy.
 `migration-complete.json` at the remote branch tip proves cutover. `pan sync`,
 dashboard coordinator startup, and work startup reconcile every registered
 project automatically before pipeline writes are allowed. The migrator carries
-both tracked and untracked legacy `.pan/` and `.beads/` payloads forward, then
+both tracked and untracked legacy `.pan/` and `.vBRIEF tasks/` payloads forward, then
 removes them from `main` with an ordinary commit. Afterward, legacy paths are
 fallback reads only and their recreation trips Doctor/Deacon diagnostics.
 
 For polyrepo projects, `pan_records.repo` designates the infra/state-host
 sub-repository. `resolveInfraRepo()` places `overdeck-state` on that repository,
-not on the project root; migration can still read legacy `.pan/` and `.beads/`
+not on the project root; migration can still read legacy `.pan/` and `.vBRIEF tasks/`
 from a non-Git project root during cutover.
 
 ## Code-owned context and workspace runtime
@@ -44,13 +44,13 @@ from a non-Git project root during cutover.
 Project context is reviewed with code on `main` at
 `<projectRoot>/.overdeck/context/`; `.pan/context/` remains a read fallback.
 Workspace-local runtime files use `<workspace>/.overdeck/` and are gitignored.
-Workspace beads resolve the permanent database through an actively maintained
-`.beads/redirect`.
+Workspace tasks resolve the permanent database through an actively maintained
+`.vBRIEF tasks/redirect`.
 
 The one physical local Dolt home is
-`${OVERDECK_HOME}/state/<project>/.beads/`. It is a disposable working copy of
-`refs/dolt/data`, synchronized through the beads read/write doors. Agents mutate
-through `pan beads …`; `issues.jsonl` is derived-only.
+`${OVERDECK_HOME}/state/<project>/.vBRIEF tasks/`. It is a disposable working copy of
+`refs/dolt/data`, synchronized through the tasks read/write doors. Agents mutate
+through `pan task …`; `issues.jsonl` is derived-only.
 
 ## Runtime plane — local SQLite
 

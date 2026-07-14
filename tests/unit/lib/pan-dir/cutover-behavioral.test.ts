@@ -21,7 +21,7 @@ import {
   readRecordContinueViewSync,
   writeAgentHarnessModelSync,
   writeIssueRecordSync,
-  writeRecordBeadsMappingSync,
+  writeRecordTasksMappingSync,
   writeRecordDecisionsSync,
   writeRecordHazardsSync,
   writeRecordResumePointSync,
@@ -51,7 +51,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
         decisions: [],
         hazards: [],
         resumePoint: null,
-        beadsMapping: {},
+        tasksMapping: {},
         statusOverrides: {},
         sessionHistory: [],
         feedback: [],
@@ -79,7 +79,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -100,35 +100,35 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
-      writeRecordResumePointSync(project, ISSUE_ID, { description: 'Next: bead-2', beadId: 'bead-2' });
+      writeRecordResumePointSync(project, ISSUE_ID, { description: 'Next: task-2', taskId: 'task-2' });
 
       const rec = readIssueRecordSync(project, ISSUE_ID);
-      expect(rec?.resumePoint?.beadId).toBe('bead-2');
+      expect(rec?.resumePoint?.taskId).toBe('task-2');
       expect(existsSync(join(workspace, PAN_DIR, CONTINUE_FILENAME))).toBe(false);
     } finally {
       rmSync(workspace, { recursive: true, force: true });
     }
   });
 
-  it('writes beadsMapping through record writer without touching continue files', () => {
+  it('writes tasksMapping through record writer without touching continue files', () => {
     const workspace = makeTmpWorkspace();
     try {
       const project = getProjectConfigFromWorkspacePath(workspace);
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
-      writeRecordBeadsMappingSync(project, ISSUE_ID, { 'item-1': ['bead-1', 'bead-2'] });
+      writeRecordTasksMappingSync(project, ISSUE_ID, { 'item-1': ['task-1', 'task-2'] });
 
       const rec = readIssueRecordSync(project, ISSUE_ID);
-      expect(rec?.beadsMapping['item-1']).toEqual(['bead-1', 'bead-2']);
+      expect(rec?.tasksMapping['item-1']).toEqual(['task-1', 'task-2']);
       expect(existsSync(join(workspace, PAN_DIR, CONTINUE_FILENAME))).toBe(false);
     } finally {
       rmSync(workspace, { recursive: true, force: true });
@@ -142,7 +142,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -163,7 +163,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -185,7 +185,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -209,7 +209,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -242,8 +242,8 @@ describe('PAN-1919: cross-machine resume — record is the sole source of truth'
         model: 'claude-opus-4-7',
         decisions: [{ id: 'D1', summary: 'Use record writer', recordedAt: now }],
         hazards: [],
-        resumePoint: { description: 'Resume at bead-3', beadId: 'bead-3' },
-        beadsMapping: {},
+        resumePoint: { description: 'Resume at task-3', taskId: 'task-3' },
+        tasksMapping: {},
         statusOverrides: { 'item-1': 'completed', 'item-2': 'in-progress' },
         sessionHistory: [],
         feedback: [],
@@ -279,7 +279,7 @@ describe('PAN-1919: cross-machine resume — record is the sole source of truth'
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
         harness: 'pi', model: 'kimi-k2.7-code',
-        decisions: [], hazards: [], resumePoint: null, beadsMapping: {},
+        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 

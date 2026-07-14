@@ -18,10 +18,11 @@ For every item:
 2. `pan task claim <issue-id> <item-id>` — claim it
 3. Implement only that item
 4. `git add` + `git commit` — one item = one commit
-5. Update `.pan/continue.json` (`resumePoint`, decisions, hazards, sessionHistory)
-6. `pan task done <issue-id> <item-id> --reason "…"`
-7. Wait for inspection result delivered via `pan tell`
-8. `INSPECTION PASSED` → next item. `INSPECTION BLOCKED` → fix, recommit, and re-request inspection
+5. `git push -u origin "$(git branch --show-current)"` — make the commit durable before changing task state
+6. Update `.pan/continue.json` (`resumePoint`, decisions, hazards, sessionHistory)
+7. `pan task done <issue-id> <item-id> --reason "…"`
+8. Wait for the item inspection result delivered via `pan tell`
+9. `INSPECTION PASSED` → next item. `INSPECTION BLOCKED` → fix, recommit, push, and re-request inspection with `pan inspect <issue-id> --item <item-id>`
 
 Never batch multiple items into a single commit because inspection needs a scoped diff.
 

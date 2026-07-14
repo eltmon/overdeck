@@ -114,7 +114,7 @@ function mockSpawnDependencies(): void {
   vi.doMock('../workspace/stack-health.js', () => ({
     getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: null })),
   }));
-  vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+  vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
   vi.doMock('../activity-logger.js', () => ({
     emitActivityEntrySync: vi.fn(),
     emitActivityTtsSync: vi.fn(),
@@ -198,7 +198,7 @@ afterEach(() => {
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
-  vi.doUnmock('../beads-query.js');
+  vi.doUnmock('../tasks-query.js');
   vi.doUnmock('../activity-logger.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');
@@ -525,10 +525,10 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(sessionOptions.env.OVERDECK_FLYWHEEL_AGENT_ROLE).toBeUndefined();
   });
 
-  it('spawns a knowledge role as a specialist live session and skips work beads/verification gates', async () => {
+  it('spawns a knowledge role as a specialist live session and skips work tasks/verification gates', async () => {
     writeSupervisorArtifact();
     const { spawnRun } = await import('../agents.js');
-    const { assertIssueHasBeads } = await import('../beads-query.js');
+    const { assertIssueHasTasks } = await import('../tasks-query.js');
 
     const state = await spawnRun('PAN-2468', 'knowledge', {
       workspace,
@@ -543,7 +543,7 @@ describe('spawnAgent PTY supervisor wiring', () => {
       expect.stringContaining('launcher.sh'),
       expect.any(Object),
     );
-    expect(assertIssueHasBeads).not.toHaveBeenCalled();
+    expect(assertIssueHasTasks).not.toHaveBeenCalled();
   });
 
   it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {

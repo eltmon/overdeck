@@ -10,7 +10,7 @@ import { getOverdeckHome } from './paths.js';
 
 const execFileAsync = promisify(execFile);
 const BACKUP_RE = /(?:\.backup-[^/]*|\.bak|\.orig)$/i;
-const TREE_EXCLUSIONS = ['.beads/', '.pan/continues/', 'graphify-out/'];
+const TREE_EXCLUSIONS = ['.pan/continues/', 'graphify-out/'];
 
 export interface HygieneOptions {
   root: string;

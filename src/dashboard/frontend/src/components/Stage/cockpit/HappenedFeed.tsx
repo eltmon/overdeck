@@ -1,6 +1,6 @@
 /**
  * PAN-2398 — "What just happened": the cockpit's plain-language feed.
- * Sentences a non-technical reader understands, with bead progress badges.
+ * Sentences a non-technical reader understands, with task progress badges.
  * v1 derives from the issue's activity sections (session starts/finishes) and
  * the plan's task counts; it deepens to true domain-event sourcing later
  * without changing this surface.

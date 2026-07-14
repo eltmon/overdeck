@@ -14,7 +14,7 @@ afterEach(() => {
 describe('PAN-2640 classify-lookups no-loss audit', () => {
   it('requires every compiled caller to supply the bulk presence snapshot', () => {
     expectTypeOf(buildClassifyLookups).parameter(1).toMatchTypeOf<{
-      issuesWithBeads: ReadonlySet<string>;
+      issuesWithTasks: ReadonlySet<string>;
       labels?: (id: string) => readonly string[];
     }>();
   });
@@ -25,8 +25,8 @@ describe('PAN-2640 classify-lookups no-loss audit', () => {
     mkdirSync(join(root, '.pan', 'specs'), { recursive: true });
     writeFileSync(join(root, '.pan', 'specs', '1-PAN-2640-plan.json'), '{}');
 
-    const absent = buildClassifyLookups(root, { issuesWithBeads: new Set() });
-    const present = buildClassifyLookups(root, { issuesWithBeads: new Set(['PAN-2640']) });
+    const absent = buildClassifyLookups(root, { issuesWithTasks: new Set() });
+    const present = buildClassifyLookups(root, { issuesWithTasks: new Set(['PAN-2640']) });
 
     expect(absent.isPlanned('PAN-2640')).toBe(false);
     expect(present.isPlanned('PAN-2640')).toBe(true);

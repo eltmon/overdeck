@@ -23,7 +23,6 @@ export const PREREQ_REGISTRY = {
   spawnAgent: ["tmux"],
   openInteractiveTerminal: ["ttyd"],
   enableHttps: ["mkcert", "docker", "traefik"],
-  enableBeads: ["bd"],
   runClaudeCodeHooks: ["jq"],
   useClaudeCodeRoutedAgents: [],
   useOxAgents: ["ox"],
@@ -37,7 +36,6 @@ export const INSTALLABLE_TOOLS: readonly PrereqTool[] = [
   "tmux",
   "ttyd",
   "mkcert",
-  "bd",
   "jq",
   "ox",
 ];
@@ -104,8 +102,6 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
         return await installTtyd();
       case "mkcert":
         return await installMkcert();
-      case "bd":
-        return await installBeads();
       case "jq":
         return await installJq();
       case "ox":
@@ -129,8 +125,7 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
 /**
  * Boot-time host-tool guarantee for `pan up`. tmux is fatal — no agent or
  * conversation session runs without it, so a failed install exits the process.
- * bd (beads) is best-effort — only the work pipeline needs it, so a failed
- * install warns and boot continues. Already-present tools are silent no-ops.
+ * Optional integrations are best-effort. Already-present tools are silent no-ops.
  */
 export async function ensureHostTools(): Promise<void> {
   const tools: Array<{ tool: PrereqTool; label: string; fatal: boolean; manual: string }> = [
@@ -139,13 +134,6 @@ export async function ensureHostTools(): Promise<void> {
       label: "tmux",
       fatal: true,
       manual: "brew install tmux (macOS) or sudo apt-get install tmux (Linux)",
-    },
-    {
-      tool: "bd",
-      label: "beads (bd)",
-      fatal: false,
-      manual:
-        "brew install gastownhall/beads/bd (macOS) or run the beads install script (Linux) — the work pipeline needs it.",
     },
     {
       tool: "jq",
@@ -239,34 +227,6 @@ async function installMkcert(): Promise<InstallResult> {
     tool: "mkcert",
     success: true,
     message: `mkcert installed to ${mkcertPath} and CA set up`,
-  };
-}
-
-async function installBeads(): Promise<InstallResult> {
-  const plat = await Effect.runPromise(detectPlatform());
-  if (plat === "darwin") {
-    try {
-      await execAsync("brew install gastownhall/beads/bd", {
-        timeout: 120000,
-      });
-      return {
-        tool: "bd",
-        success: true,
-        message: "beads installed via Homebrew",
-      };
-    } catch {
-      // fall through to curl script
-    }
-  }
-
-  await execAsync(
-    "curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash",
-    { timeout: 120000 }
-  );
-  return {
-    tool: "bd",
-    success: true,
-    message: "beads installed via install script",
   };
 }
 

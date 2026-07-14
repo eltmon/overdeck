@@ -28,7 +28,7 @@ describe('hygiene finding logic', () => {
   });
 
   it('filters generated state while retaining source changes and backups', () => {
-    expect(parseGitStatus(' M src/a.ts\n?? .beads/issues.jsonl\n?? notes.orig\n')).toEqual({
+    expect(parseGitStatus(' M src/a.ts\n?? .tasks/issues.jsonl\n?? notes.orig\n')).toEqual({
       files: ['src/a.ts', 'notes.orig'], backups: ['notes.orig'],
     });
   });

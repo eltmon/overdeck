@@ -6,7 +6,7 @@ import { Rnd } from 'react-rnd';
 import { useDashboardStore } from '../lib/store';
 import { Issue } from '../types';
 import { XTerminal } from './XTerminal';
-import { BeadsTasksPanel } from './BeadsTasksPanel';
+import { TasksPanel } from './TasksPanel';
 import { useConfirm } from './DialogProvider';
 import { PlanSetupScreen, type SetupProgressEvent } from './PlanSetupScreen';
 import { canUsePickerHarness, ModelHarnessPicker, type Harness, type HarnessPolicyDecisions, type ModelGroup } from './shared/ModelPicker';
@@ -334,21 +334,21 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
 
   // Planning state — drives the "tasks need generation" callout in the footer.
   // Polled while the planning step is open so the callout vanishes the moment
-  // beads exist (whether the agent ran pan plan finalize or the user clicked
+  // tasks exist (whether the agent ran pan plan finalize or the user clicked
   // Generate Tasks here).
   const planningStateQuery = useQuery({
     queryKey: ['planning-state', issue.identifier],
     queryFn: async () => {
       const res = await fetch(`/api/issues/${issue.identifier}/planning-state`);
       if (!res.ok) throw new Error('Failed to fetch planning state');
-      return res.json() as Promise<{ hasPlan: boolean; hasBeads: boolean; beadsCount: number }>;
+      return res.json() as Promise<{ hasPlan: boolean; hasTasks: boolean; tasksCount: number }>;
     },
     enabled: step === 'planning',
     refetchInterval: step === 'planning' ? 4000 : false,
   });
   const planningHasPlan = planningStateQuery.data?.hasPlan ?? false;
-  const planningHasBeads = planningStateQuery.data?.hasBeads ?? false;
-  const tasksNeedGeneration = planningHasPlan && !planningHasBeads;
+  const planningHasTasks = planningStateQuery.data?.hasTasks ?? false;
+  const tasksNeedGeneration = planningHasPlan && !planningHasTasks;
 
   const generateTasksMutation = useMutation({
     mutationFn: async () => {
@@ -362,7 +362,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: ['planning-state', issue.identifier] });
       await statusQuery.refetch();
-      toast.success(`Generated ${data.count} bead${data.count === 1 ? '' : 's'} from the vBRIEF plan.`);
+      toast.success(`Generated ${data.count} task${data.count === 1 ? '' : 's'} from the vBRIEF plan.`);
     },
     onError: (err: Error) => {
       toast.error(`Generate tasks failed: ${err.message}`);
@@ -392,12 +392,12 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
       }
       const completeData = await completeRes.json().catch(() => ({}));
 
-      return { ...stopData, beadsWarning: completeData.beadsWarning ?? null };
+      return { ...stopData, tasksWarning: completeData.tasksWarning ?? null };
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['issues'] });
-      if (data?.beadsWarning) {
-        toast.warning(data.beadsWarning, { duration: 10000 });
+      if (data?.tasksWarning) {
+        toast.warning(data.tasksWarning, { duration: 10000 });
       }
       onTerminalReleased?.();
       onComplete();
@@ -950,7 +950,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                   <div className="flex-1 bg-black relative overflow-hidden" style={{ minHeight: '400px' }}>
                     {showTasksPanel ? (
                       <div className="h-full overflow-auto bg-card">
-                        <BeadsTasksPanel issueId={issue.identifier} />
+                        <TasksPanel issueId={issue.identifier} />
                       </div>
                     ) : (
                       <>
@@ -980,7 +980,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     )}
                   </div>
 
-                  {/* Tasks-needed callout — shown when a vBRIEF plan exists but no beads were created.
+                  {/* Tasks-needed callout — shown when a vBRIEF plan exists but no tasks were created.
                       Planning isn't truly "done" until tasks exist; this surfaces the action
                       directly in the planning dialog instead of forcing the user to find the
                       Generate Tasks chip on the kanban card. */}
@@ -990,7 +990,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-warning-foreground">Tasks not yet generated</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          A vBRIEF plan exists but no beads have been created. Generate tasks to finish planning so the Done button unlocks.
+                          A vBRIEF plan exists but no tasks have been created. Generate tasks to finish planning so the Done button unlocks.
                         </p>
                       </div>
                       <button
@@ -1100,7 +1100,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
           </div>
         </Rnd>
 
-      {/* BeadsDialog removed — Tasks panel is now inline (PAN-417) */}
+      {/* TasksDialog removed — Tasks panel is now inline (PAN-417) */}
     </div>
   );
 }

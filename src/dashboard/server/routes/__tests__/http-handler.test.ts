@@ -10,7 +10,7 @@ type HttpServerResponse = HttpServerResponseModule.HttpServerResponse;
 import {
   AgentAlreadyRunning,
   AgentStartError,
-  BeadsNotInitialized,
+  TasksNotInitialized,
   IssueNotFound,
   PlanEmpty,
   RateLimited,
@@ -74,9 +74,9 @@ describe('httpHandler', () => {
     expect(status).toBe(409);
   });
 
-  it('maps BeadsNotInitialized to 422', async () => {
-    const effect = Effect.fail(new BeadsNotInitialized({ workspace: '/tmp/ws' }));
-    const { status } = await runRoute(effect as Effect.Effect<HttpServerResponse, BeadsNotInitialized, never>);
+  it('maps TasksNotInitialized to 422', async () => {
+    const effect = Effect.fail(new TasksNotInitialized({ workspace: '/tmp/ws' }));
+    const { status } = await runRoute(effect as Effect.Effect<HttpServerResponse, TasksNotInitialized, never>);
     expect(status).toBe(422);
   });
 

@@ -32,7 +32,7 @@ describe('PlanCard tiered execution control', () => {
   beforeEach(() => {
     queryMocks.workspacePlanQuery.data = { plan: { metadata: {}, tieredExecution: { effective: false, source: 'global', override: null } } }
     global.fetch = vi.fn(async (url, opts) => {
-      if (String(url) === '/api/issues/PAN-2378/beads') {
+      if (String(url) === '/api/issues/PAN-2378/tasks') {
         return Response.json({ issueId: 'PAN-2378', tasks: [] })
       }
       if (String(url) === '/api/workspaces/PAN-2378/tiered-execution' && opts?.method === 'PATCH') {

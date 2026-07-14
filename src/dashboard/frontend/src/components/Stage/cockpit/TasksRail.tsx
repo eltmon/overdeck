@@ -1,21 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
-import styles from './beadsRail.module.css'
+import styles from './tasksRail.module.css'
 
 /**
- * BeadsRail — the persistent at-a-glance progress column for the issue cockpit
- * (PAN-1991 item #1). Beads moved out of the tab strip into a vertical rail:
+ * TasksRail — the persistent at-a-glance progress column for the issue cockpit
+ * (PAN-1991 item #1). Tasks moved out of the tab strip into a vertical rail:
  * completed ✓ → working-now (in_progress, blue) → upcoming. All data comes from
- * the existing `/api/issues/:id/beads` endpoint (same query key as
- * BeadsTasksPanel, so the cache is shared and there is no extra fetch).
+ * the existing `/api/issues/:id/tasks` endpoint (same query key as
+ * TasksPanel, so the cache is shared and there is no extra fetch).
  *
- * The full list/graph (DAG) + per-bead detail is preserved: `onOpenFull` opens
- * the existing Beads panel in the main area. The rail is the glance; that is the
+ * The full list/graph (DAG) + per-task detail is preserved: `onOpenFull` opens
+ * the existing Tasks panel in the main area. The rail is the glance; that is the
  * drill-down.
  */
 
-interface BeadTask {
+interface TaskTask {
   id: string
   name?: string
   title?: string
@@ -29,10 +29,10 @@ interface BeadTask {
   closedAt?: string
 }
 
-interface BeadsResponse {
+interface TasksResponse {
   issueId: string
   workspacePath: string
-  tasks: BeadTask[]
+  tasks: TaskTask[]
   lastSyncedAt: string | null
   freshnessAgeMs: number | null
   stale: boolean
@@ -52,9 +52,9 @@ function difficultyOf(labels: string[]): string | null {
   return null
 }
 
-const beadTitle = (bead: BeadTask): string => bead.title || bead.name || bead.id
+const taskTitle = (task: TaskTask): string => task.title || task.name || task.id
 
-/** How many earlier completed beads to keep collapsed behind the "show N" toggle. */
+/** How many earlier completed tasks to keep collapsed behind the "show N" toggle. */
 const COMPLETED_PREVIEW = 3
 
 function DifficultyBadge({ labels }: { labels: string[] }) {
@@ -66,26 +66,26 @@ function DifficultyBadge({ labels }: { labels: string[] }) {
 function BlockedNote({ blockedBy }: { blockedBy: string[] }) {
   if (!blockedBy?.length) return null
   return (
-    <div className={styles.blocked}>⤷ blocked by {blockedBy.length} upstream bead{blockedBy.length === 1 ? '' : 's'}</div>
+    <div className={styles.blocked}>⤷ blocked by {blockedBy.length} upstream task{blockedBy.length === 1 ? '' : 's'}</div>
   )
 }
 
-export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull: () => void }) {
+export function TasksRail({ issueId, onOpenFull }: { issueId: string; onOpenFull: () => void }) {
   const queryClient = useQueryClient()
   const [showAllCompleted, setShowAllCompleted] = useState(false)
-  const { data, isLoading, refetch, isRefetching } = useQuery<BeadsResponse>({
-    queryKey: ['beads', issueId],
+  const { data, isLoading, refetch, isRefetching } = useQuery<TasksResponse>({
+    queryKey: ['tasks', issueId],
     queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/beads`)
-      if (!res.ok) throw new Error('Failed to fetch beads')
-      return res.json() as Promise<BeadsResponse>
+      const res = await fetch(`/api/issues/${issueId}/tasks`)
+      if (!res.ok) throw new Error('Failed to fetch tasks')
+      return res.json() as Promise<TasksResponse>
     },
     refetchInterval: 10_000,
   })
   useEffect(() => {
-    const invalidate = () => { void queryClient.invalidateQueries({ queryKey: ['beads', issueId] }) }
-    window.addEventListener('overdeck:beads-freshness', invalidate)
-    return () => window.removeEventListener('overdeck:beads-freshness', invalidate)
+    const invalidate = () => { void queryClient.invalidateQueries({ queryKey: ['tasks', issueId] }) }
+    window.addEventListener('overdeck:tasks-freshness', invalidate)
+    return () => window.removeEventListener('overdeck:tasks-freshness', invalidate)
   }, [issueId, queryClient])
 
   const tasks = data?.tasks ?? []
@@ -101,9 +101,9 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
   const now = new Date()
 
   return (
-    <aside className={styles.rail} aria-label="Beads progress">
+    <aside className={styles.rail} aria-label="Tasks progress">
       <div className={styles.header}>
-        <span className={styles.title}>Beads</span>
+        <span className={styles.title}>Tasks</span>
         <span className={data?.stale ? styles.stale : styles.freshness} title={data?.syncError ?? undefined}>
           {data?.stale
             ? 'stale'
@@ -123,8 +123,8 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
           ) : (
             <span className={styles.muted}>—</span>
           )}
-          <button type="button" className={styles.iconBtn} title="Open full beads / graph view" onClick={onOpenFull} aria-label="Open full beads view">⌥</button>
-          <button type="button" className={styles.iconBtn} title="Refresh" onClick={() => refetch()} aria-label="Refresh beads" disabled={isRefetching}>⟳</button>
+          <button type="button" className={styles.iconBtn} title="Open full tasks / graph view" onClick={onOpenFull} aria-label="Open full tasks view">⌥</button>
+          <button type="button" className={styles.iconBtn} title="Refresh" onClick={() => refetch()} aria-label="Refresh tasks" disabled={isRefetching}>⟳</button>
         </div>
       </div>
 
@@ -141,11 +141,11 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
         </div>
       )}
 
-      {isLoading && <div className={styles.empty}>Loading beads…</div>}
+      {isLoading && <div className={styles.empty}>Loading tasks…</div>}
 
       {!isLoading && total === 0 && (
         <div className={styles.empty}>
-          No beads yet.
+          No tasks yet.
           <div className={styles.muted}>Planning hasn&rsquo;t created tasks for this issue.</div>
         </div>
       )}
@@ -161,11 +161,11 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
                     ↑ show {hiddenCompleted} earlier completed
                   </button>
                 )}
-                {completedShown.map((bead) => (
-                  <button type="button" key={bead.id} className={`${styles.bead} ${styles.beadDone}`} onClick={onOpenFull} title={beadTitle(bead)}>
+                {completedShown.map((task) => (
+                  <button type="button" key={task.id} className={`${styles.task} ${styles.taskDone}`} onClick={onOpenFull} title={taskTitle(task)}>
                     <span className={styles.node}>✓</span>
-                    <span className={styles.beadTitle}>{beadTitle(bead)}</span>
-                    <span className={styles.meta}><DifficultyBadge labels={bead.labels} /></span>
+                    <span className={styles.taskTitle}>{taskTitle(task)}</span>
+                    <span className={styles.meta}><DifficultyBadge labels={task.labels} /></span>
                   </button>
                 ))}
               </div>
@@ -176,15 +176,15 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
             <>
               <div className={`${styles.groupHeader} ${styles.groupHeaderActive}`}>working now</div>
               <div className={styles.spine}>
-                {working.map((bead) => (
-                  <button type="button" key={bead.id} className={`${styles.bead} ${styles.beadActive}`} onClick={onOpenFull} title={beadTitle(bead)}>
+                {working.map((task) => (
+                  <button type="button" key={task.id} className={`${styles.task} ${styles.taskActive}`} onClick={onOpenFull} title={taskTitle(task)}>
                     <span className={styles.node}><span className={styles.pulse} /></span>
                     <span className={styles.workingTag}><span className={styles.pulse} /> in progress</span>
-                    <span className={styles.beadTitle}>{beadTitle(bead)}</span>
-                    {bead.startedAt && (
-                      <span className={styles.agentLine}>started {formatRelativeTime(bead.startedAt, now)}</span>
+                    <span className={styles.taskTitle}>{taskTitle(task)}</span>
+                    {task.startedAt && (
+                      <span className={styles.agentLine}>started {formatRelativeTime(task.startedAt, now)}</span>
                     )}
-                    <span className={styles.meta}><DifficultyBadge labels={bead.labels} /></span>
+                    <span className={styles.meta}><DifficultyBadge labels={task.labels} /></span>
                   </button>
                 ))}
               </div>
@@ -195,12 +195,12 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
             <>
               <div className={styles.groupHeader}>{upcoming.length} upcoming</div>
               <div className={styles.spine}>
-                {upcoming.map((bead) => (
-                  <button type="button" key={bead.id} className={`${styles.bead} ${styles.beadOpen}`} onClick={onOpenFull} title={beadTitle(bead)}>
+                {upcoming.map((task) => (
+                  <button type="button" key={task.id} className={`${styles.task} ${styles.taskOpen}`} onClick={onOpenFull} title={taskTitle(task)}>
                     <span className={styles.node} />
-                    <span className={styles.beadTitle}>{beadTitle(bead)}</span>
-                    <span className={styles.meta}><DifficultyBadge labels={bead.labels} /></span>
-                    <BlockedNote blockedBy={bead.blockedBy} />
+                    <span className={styles.taskTitle}>{taskTitle(task)}</span>
+                    <span className={styles.meta}><DifficultyBadge labels={task.labels} /></span>
+                    <BlockedNote blockedBy={task.blockedBy} />
                   </button>
                 ))}
               </div>
@@ -208,7 +208,7 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
           )}
 
           {done.length === total && total > 0 && (
-            <div className={styles.allDone}>✓ All planned beads complete</div>
+            <div className={styles.allDone}>✓ All planned tasks complete</div>
           )}
         </div>
       )}

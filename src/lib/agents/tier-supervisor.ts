@@ -96,10 +96,10 @@ export function shouldSupervise(
  * is stable across the live commit feed, replay re-delivery (tier-replay),
  * and tests.
  */
-function sampleFraction(beadId: string): number {
+function sampleFraction(itemId: string): number {
   let hash = 0x811c9dc5;
-  for (let i = 0; i < beadId.length; i++) {
-    hash ^= beadId.charCodeAt(i);
+  for (let i = 0; i < itemId.length; i++) {
+    hash ^= itemId.charCodeAt(i);
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0) / 0x1_0000_0000;
@@ -172,9 +172,9 @@ const execFileAsync = promisify(execFile);
 /** One commit-review event as delivered to the standing supervisor. */
 export interface SupervisorReviewEvent {
   issueId: string;
-  /** Beads-tracker id the verdict must reference ("Bead <beadId> ..."). */
-  beadId: string;
-  beadTitle: string;
+  /** Beads-tracker id the verdict must reference ("Item <itemId> ..."). */
+  itemId: string;
+  itemTitle: string;
   /** Full commit sha being reviewed. */
   sha: string;
   /** Output of `git show <sha>` for the commit. */
@@ -189,7 +189,7 @@ export interface SupervisorReviewEvent {
 
 export interface SupervisorVerdict {
   /** Bead id parsed from the inspect-status notes prefix. */
-  beadId: string;
+  itemId: string;
   /** Supervisor ack clears prior blocking findings; failed/blocked records one. */
   status: 'passed' | 'ack' | 'failed' | 'blocked';
 }
@@ -204,7 +204,7 @@ export interface DeliverCommitForReviewOptions {
   item: VBriefItem;
   sha: string;
   /** Beads id for the verdict prefix; defaults to the vBRIEF item id. */
-  beadId?: string;
+  itemId?: string;
   /**
    * PRD draft markdown to source traced FR text from. When omitted and the
    * item has metadata.traces, callers should pass the result of
@@ -241,13 +241,13 @@ export function shouldHaltDispatch(
 ): boolean {
   const latestByBead = new Map<string, SupervisorVerdict>();
   for (const verdict of verdicts) {
-    latestByBead.set(verdict.beadId, verdict);
+    latestByBead.set(verdict.itemId, verdict);
   }
 
   const unresolvedBlockedBeads = new Set<string>();
-  for (const [beadId, verdict] of latestByBead) {
+  for (const [itemId, verdict] of latestByBead) {
     if (verdict.status === 'failed' || verdict.status === 'blocked') {
-      unresolvedBlockedBeads.add(beadId);
+      unresolvedBlockedBeads.add(itemId);
     }
   }
 
@@ -368,7 +368,7 @@ You are the standing supervisor for ${event.issueId}. Review this commit against
 ## Bead under review
 
 - Issue: ${event.issueId}
-- Bead: ${event.beadId} — ${event.beadTitle}
+- Bead: ${event.itemId} — ${event.itemTitle}
 - Commit: ${event.sha}
 
 ## Acceptance criteria
@@ -383,14 +383,14 @@ ${event.diff}
 
 ## Verdict (REQUIRED — post exactly one)
 
-Land your verdict on the existing inspect-status surface. Your notes MUST begin with "Bead ${event.beadId}" — the server extracts the bead id from that prefix.
+Land your verdict on the existing inspect-status surface. Your notes MUST begin with "Item ${event.itemId}" — the server extracts the bead id from that prefix.
 
 If the diff satisfies the acceptance criteria, post an ack (this persists inspectStatus and saves the bead checkpoint):
 
 \`\`\`bash
 curl -X POST ${event.apiUrl}/api/specialists/done \\
   -H "Content-Type: application/json" \\
-  -d '{"specialist":"inspect","issueId":"${event.issueId}","status":"passed","notes":"Bead ${event.beadId} ack: <one-line summary>"}'
+  -d '{"specialist":"inspect","issueId":"${event.issueId}","status":"passed","notes":"Item ${event.itemId} ack: <one-line summary>"}'
 \`\`\`
 
 If any acceptance criterion is not met, post a blocking finding with specific, actionable violations ([file:line] + what is wrong):
@@ -398,7 +398,7 @@ If any acceptance criterion is not met, post a blocking finding with specific, a
 \`\`\`bash
 curl -X POST ${event.apiUrl}/api/specialists/done \\
   -H "Content-Type: application/json" \\
-  -d '{"specialist":"inspect","issueId":"${event.issueId}","status":"failed","notes":"Bead ${event.beadId} BLOCKED: <specific violations and required fixes>"}'
+  -d '{"specialist":"inspect","issueId":"${event.issueId}","status":"failed","notes":"Item ${event.itemId} BLOCKED: <specific violations and required fixes>"}'
 \`\`\`
 
 Rules:
@@ -436,8 +436,8 @@ export async function deliverCommitForReview(options: DeliverCommitForReviewOpti
 
   const message = buildSupervisorReviewMessage({
     issueId: options.issueId,
-    beadId: options.beadId ?? options.item.id,
-    beadTitle: options.item.title,
+    itemId: options.itemId ?? options.item.id,
+    itemTitle: options.item.title,
     sha: options.sha,
     diff,
     acceptanceCriteria: extractAcceptanceCriteria(options.item),

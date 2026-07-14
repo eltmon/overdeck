@@ -34,7 +34,7 @@ describe('role definitions', () => {
     expect(body).toContain('drafts/<ISSUE-ID>.md` on `overdeck-state`');
     expect(body).toContain('AskUserQuestion');
     expect(body).toContain('vBRIEF plan');
-    expect(body).toContain('Beads');
+    expect(body).toContain('task checklist');
     expect(body).toContain('pan plan finalize');
     expect(body).not.toContain('pan plan finalize <ISSUE-ID>');
     expect(body).toContain('Stop after `pan plan finalize` returns');
@@ -53,11 +53,11 @@ describe('role definitions', () => {
       effort: 'high',
     });
     expect(frontmatter.model).toBeUndefined();
-    expect(body).toContain('## Per-Bead Workflow');
+    expect(body).toContain('## Per-Task Workflow');
     expect(body).toContain('metadata.requiresInspection === true');
     expect(body).toContain('inspectionDepth: "deep"');
-    expect(body).toContain('pan inspect <ISSUE-ID> --bead <bead-id>');
-    expect(body).toContain('pan inspect --deep');
+    expect(body).toContain('pan inspect <ISSUE-ID> --item <item-id>');
+    expect(body).toContain('--deep');
     expect(body).toContain("resolveModel('work', 'inspect')");
     expect(body).toContain("resolveModel('work', 'inspect-deep')");
     expect(body).toContain('one undifferentiated mode');
@@ -102,7 +102,7 @@ describe('role definitions', () => {
     expect(body).toContain('INSPECTION PASSED');
     expect(body).toContain('INSPECTION BLOCKED');
     expect(body).toContain('{{issueId}}');
-    expect(body).toContain('{{beadId}}');
+    expect(body).toContain('{{itemId}}');
 
     const dispatcher = readRepoFile('src/lib/cloister/inspect-agent.ts');
     expect(dispatcher).toContain("baseCommand: 'claude'");

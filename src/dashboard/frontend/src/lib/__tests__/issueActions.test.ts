@@ -29,7 +29,7 @@ const prdActionKeys: readonly IssueActionKey[] = [
   'recoverAgent',
   'resumeSession',
   'syncMain',
-  'inspectBead',
+  'inspectTask',
   'reopen',
   'closeOut',
   'wipe',
@@ -41,7 +41,7 @@ const prdActionKeys: readonly IssueActionKey[] = [
 
 const preservedActionKeys: readonly IssueActionKey[] = [
   'cancel',
-  'beads',
+  'tasks',
   'inference',
   'discussions',
   'transcripts',
@@ -63,7 +63,7 @@ const baseState: IssueActionState = {
   lifecycle: null,
   workspace: { exists: true, path: '/tmp/workspace' },
   hasPlan: false,
-  hasBeads: false,
+  hasTasks: false,
   issueCanonicalState: 'todo',
   isMerged: false,
 };
@@ -115,7 +115,7 @@ describe('ISSUE_ACTIONS', () => {
     const enabled = keys(getEnabledActions({
       ...baseState,
       hasPlan: true,
-      hasBeads: true,
+      hasTasks: true,
       hasInference: true,
       hasDiscussions: true,
       hasTranscripts: true,
@@ -123,7 +123,7 @@ describe('ISSUE_ACTIONS', () => {
       lifecycle: { canResumeSession: true },
     }));
 
-    expect(enabled).toContain('beads');
+    expect(enabled).toContain('tasks');
     expect(enabled).toContain('inference');
     expect(enabled).toContain('discussions');
     expect(enabled).toContain('transcripts');
@@ -203,15 +203,15 @@ describe('ISSUE_ACTIONS', () => {
     const canStart: IssueActionState = {
       ...baseState,
       hasPlan: true,
-      hasBeads: true,
+      hasTasks: true,
       agent: { status: 'stopped', role: 'work' },
     };
     expect(action('rebuildAndStart').enabledWhen(canStart)).toBe(true);
     // rebuild operates on the workspace's Docker stack → requires a workspace
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, workspace: { exists: false, path: undefined } })).toBe(false);
-    // mirrors canStartAgent: needs plan + beads, a stopped agent, not merged
+    // mirrors canStartAgent: needs plan + tasks, a stopped agent, not merged
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasPlan: false })).toBe(false);
-    expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasBeads: false })).toBe(false);
+    expect(action('rebuildAndStart').enabledWhen({ ...canStart, hasTasks: false })).toBe(false);
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, agent: { status: 'running', role: 'work' } })).toBe(false);
     expect(action('rebuildAndStart').enabledWhen({ ...canStart, isMerged: true })).toBe(false);
   });

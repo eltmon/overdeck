@@ -641,7 +641,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                   <tr className="text-[var(--color-fg-muted)]">
                     <th className="text-right px-3 py-2 font-medium w-8 cursor-help" title="Pickup rank — lower means the Flywheel works it sooner">#</th>
                     <th className="text-left px-2 py-2 font-medium w-6 cursor-help" title="Importance — red = critical, orange = high, gray = medium, dim = low">●</th>
-                    <th className="text-left px-2 py-2 font-medium w-28 cursor-help" title="Issue ID. Markers: ▶ in pipeline · ⚠ needs refinement · P has PRD · ✓ planned (spec + beads)">Issue</th>
+                    <th className="text-left px-2 py-2 font-medium w-28 cursor-help" title="Issue ID. Markers: ▶ in pipeline · ⚠ needs refinement · P has PRD · ✓ planned (spec + tasks)">Issue</th>
                     <th className="text-center px-2 py-2 font-medium w-16 cursor-help" title="Tier band by rank: Now · Next · Later · Someday">Tier</th>
                     <th className="text-left px-2 py-2 font-medium cursor-help" title="One-line rationale for this ranking (from the sequencer)">Why</th>
                     <th className="text-center px-2 py-2 font-medium w-14 cursor-help" title="Estimated effort: XS / S / M / L / XL">Size</th>

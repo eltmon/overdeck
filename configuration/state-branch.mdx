@@ -6,7 +6,7 @@ description: Where Overdeck keeps pipeline state — the overdeck-state branch, 
 # The State Branch
 
 Overdeck records everything durable about your pipeline — plans, per-issue
-records, review verdicts, PRD drafts, the beads task database — in git, so it
+records, review verdicts, PRD drafts, the tasks task database — in git, so it
 survives reinstalls and travels between machines. That state lives on a
 dedicated branch called **`overdeck-state`**, not on `main`.
 
@@ -42,7 +42,7 @@ completely:
 | `backlog/` | The prioritized issue sequence |
 | `notes/` | Operator notes and briefs |
 | `review/`, `test/`, `feedback/` | Pipeline artifacts |
-| `.beads/` | The beads task database (JSONL export) |
+| `.vBRIEF tasks/` | The tasks task database (JSONL export) |
 | `migration-complete.json` | The marker that tells Overdeck this project uses the state branch |
 
 A PRD is browsable at
@@ -73,7 +73,7 @@ This mirrors the convention tools like Cargo use: `~/.cargo/` for the machine,
 ## What happens when you clone
 
 **A plain `git clone` checks out code only.** Your working directory contains
-`main`'s files — no `records/`, no `.beads/`. Git does download the state
+`main`'s files — no `records/`, no `.vBRIEF tasks/`. Git does download the state
 branch's history into `.git/` (that is how the state reaches new machines),
 but none of it appears on disk unless you check the branch out.
 
@@ -107,7 +107,7 @@ Overdeck also enforces the separation mechanically:
 Overdeck migrates every registered project automatically during `pan sync` and
 before the dashboard starts its pipeline coordinator. Commands that start work
 also enforce the same gate, so an incomplete migration cannot create fresh
-legacy `.pan/` or `.beads/` state. If a safety prerequisite blocks automation,
+legacy `.pan/` or `.vBRIEF tasks/` state. If a safety prerequisite blocks automation,
 Overdeck reports the exact reason and leaves both branches untouched.
 
 The administrative command remains available for previewing or resuming a
@@ -128,7 +128,7 @@ layout. The command is resumable: run it again after a failure and it
 continues where it stopped.
 
 The migration includes tracked and untracked permanent-state artifacts. If an
-agent already committed `.pan/` or `.beads/` on `main`, the cutover uses ordinary
+agent already committed `.pan/` or `.vBRIEF tasks/` on `main`, the cutover uses ordinary
 forward commits to copy those files onto `overdeck-state` and remove them from
 `main`; it never rewrites published history.
 
@@ -156,14 +156,14 @@ pan_records:
 
 In this example, the `infra` repository hosts `overdeck-state` and its remote
 stores the durable pipeline state. Migration reads the existing `.pan/` and
-`.beads/` directories from the project root, publishes them to the state-host
+`.vBRIEF tasks/` directories from the project root, publishes them to the state-host
 repo's orphan branch, and removes the legacy root copies. The host repo's
 `main` branch remains unchanged. GitHub and GitLab host remotes use the same
 migration flow.
 
 ## What changes day to day
 
-Almost nothing, by design. Plans finalize, records update, and beads tasks
+Almost nothing, by design. Plans finalize, records update, and tasks tasks
 flow exactly as before — Overdeck resolves every read and write to the state
 worktree automatically. The visible differences:
 
@@ -172,7 +172,7 @@ worktree automatically. The visible differences:
 - State pushes no longer trigger your CI.
 - PRD links in issues point at `blob/overdeck-state/drafts/...` instead of
   in-repo `.pan/` paths.
-- Running `bd` against the project's task database means running it in the
+- Running `pan task` against the project's task database means running it in the
   state worktree (Overdeck does this for you; for manual inspection, `cd
   ~/.overdeck/state/<project>` first).
 

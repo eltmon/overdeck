@@ -15,15 +15,15 @@ function clone(remote: string, target: string): void {
   run(join(target, '..'), 'git', ['clone', '-q', remote, target]);
   git(target, 'config', 'user.name', 'Cross Machine Test');
   git(target, 'config', 'user.email', 'cross-machine@example.com');
-  git(target, 'config', 'beads.role', 'maintainer');
+  git(target, 'config', 'tasks.role', 'maintainer');
 }
 
-describe('Dolt cross-machine beads authority', () => {
+describe('Dolt cross-machine tasks authority', () => {
   const roots: string[] = [];
   afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 
   it('bootstraps clones, transports closes, and converges divergent different-row writes', () => {
-    const root = mkdtempSync(join(tmpdir(), 'beads-cross-machine-'));
+    const root = mkdtempSync(join(tmpdir(), 'tasks-cross-machine-'));
     roots.push(root);
     const remote = join(root, 'origin.git');
     const a = join(root, 'a');
@@ -39,7 +39,7 @@ describe('Dolt cross-machine beads authority', () => {
     git(a, 'push', '-q', '-u', 'origin', 'HEAD:main');
     git(remote, 'symbolic-ref', 'HEAD', 'refs/heads/main');
     bd(a, 'init', '--prefix', 'xmc', '--skip-agents', '--skip-hooks');
-    git(a, 'config', 'beads.role', 'maintainer');
+    git(a, 'config', 'tasks.role', 'maintainer');
     bd(a, 'dolt', 'remote', 'add', 'origin', `file://${remote}`);
 
     const ids = Array.from({ length: 5 }, (_, index) => bd(a, 'create', `PAN-1 task ${index + 1}`, '-l', 'pan-1', '--silent'));

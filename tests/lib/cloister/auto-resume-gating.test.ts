@@ -338,7 +338,7 @@ describe('auto-resume gates', () => {
       buildWorkAgentPrompt: vi.fn().mockResolvedValue('prompt'),
       getTrackerContext: vi.fn().mockResolvedValue(null),
       readPlanningContext: vi.fn().mockReturnValue(null),
-      readBeadsTasks: vi.fn().mockResolvedValue([]),
+      readTasksTasks: vi.fn().mockResolvedValue([]),
     }));
     vi.doMock('../../../src/lib/prd-draft.js', () => ({
       hasPRDDraft: vi.fn(() => Effect.succeed(false)),
@@ -901,8 +901,8 @@ describe('auto-resume gates', () => {
       }
       return {} as ReturnType<typeof assertCanStartFresh>;
     });
-    mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads'), { recursive: true });
-    writeFileSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+    mkdirSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.tasks'), { recursive: true });
+    writeFileSync(join(projectRoot, 'workspaces', 'feature-pan-1141', '.tasks', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
     writeMinimalPlan(join(projectRoot, 'workspaces', 'feature-pan-1141'), 'PAN-1141');
     agents.saveAgentStateSync({
       id: agentId,
@@ -939,8 +939,8 @@ describe('auto-resume gates', () => {
     try {
       const { agents, issueCommand } = await loadStartCommand();
       const workspace = join(projectRoot, 'workspaces', 'feature-pan-1141');
-      mkdirSync(join(workspace, '.beads'), { recursive: true });
-      writeFileSync(join(workspace, '.beads', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
+      mkdirSync(join(workspace, '.tasks'), { recursive: true });
+      writeFileSync(join(workspace, '.tasks', 'issues.jsonl'), '{"id":"PAN-1141","labels":["pan-1141"]}\n');
       writeMinimalPlan(workspace, 'PAN-1141');
 
       const startedAt = Date.now();
