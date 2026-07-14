@@ -39,21 +39,26 @@ import {
 } from '../../../../src/lib/cloister/deacon-swarm-record.js';
 import { getIssueRecordPathForWorkspace } from '../../../../src/lib/pan-dir/record.js';
 import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
+import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
 
 function readRecord(workspacePath: string, issueId: string): PanIssueRecord {
   const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   return JSON.parse(readFileSync(path, 'utf-8')) as PanIssueRecord;
 }
 
+let remote: string;
+
 describe('PAN-2372 WI-3 writeSwarmSlotCompletion (FR-4)', () => {
   let workspacePath: string;
 
   beforeEach(() => {
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-completion-'));
+    remote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
   });
 
   it('persists the marker keyed by String(slotIndex) with the required shape (AC1)', async () => {
@@ -145,10 +150,12 @@ describe('PAN-2372 WI-3 clearSwarmSlotCompletion (FR-6)', () => {
 
   beforeEach(() => {
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-completion-clear-'));
+    remote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
   });
 
   it('removes only the targeted slot key and leaves siblings intact', async () => {
@@ -182,10 +189,12 @@ describe('PAN-2372 WI-3 persistAndVerifySwarmSlotCompletion (FR-4, FR-5)', () =>
 
   beforeEach(() => {
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-completion-verify-'));
+    remote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
   });
 
   it('returns true and the marker is observable on the real record door', async () => {

@@ -318,12 +318,13 @@ async function collectSessionTreeNodes(
   const centralStatus = getReviewStatusSync(issueId.toUpperCase());
 
   // Lint node (PAN-2665): the verification quality-gate run, shown between
-  // Work and Review (TYPE_PRIORITY orders it client-side). Shares the builder
-  // with the activity route; the tree payload never carries transcripts.
+  // Work and Review (TYPE_PRIORITY orders it client-side). Unlike agent nodes
+  // this one has no JSONL/tmux backing, so SessionPanel renders its transcript
+  // — include it here (bounded: gate table + ≤2KB tail per failing gate).
   const lintSection = buildLintSessionNode({
     workspacePath,
     issueLower,
-    includeTranscripts: false,
+    includeTranscripts: true,
     centralStatus: centralStatus ?? null,
   });
   if (lintSection) {

@@ -23,8 +23,6 @@ const mockRunRelease = vi.hoisted(() =>
 );
 
 // ── Track cleanup side effects ────────────────────────────────────────────────
-const mockCompactTasks = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: false, details: ['compacted'] })));
-const mockSweepOrphanedTasks = vi.hoisted(() => vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }));
 const mockCleanupMergedLabels = vi.hoisted(() => vi.fn(() => Effect.succeed({ success: true, skipped: true, details: ['skipped'] })));
 const mockSetAgentPaused = vi.hoisted(() => vi.fn(() => Effect.succeed(null)));
 const mockCreateResetMarker = vi.hoisted(() => vi.fn(async (input: unknown) => ({ id: 'reset-1', ...(input as Record<string, unknown>) })));
@@ -166,14 +164,6 @@ vi.mock('../../../../src/lib/activity-log.js', () => ({
   logActivity: vi.fn(),
 }));
 
-vi.mock('../../../../src/lib/lifecycle/compact-tasks.js', () => ({
-  compactTasks: mockCompactTasks,
-}));
-
-vi.mock('../../../../src/lib/lifecycle/orphaned-tasks-sweep.js', () => ({
-  sweepOrphanedTasks: mockSweepOrphanedTasks,
-}));
-
 vi.mock('../../../../src/lib/lifecycle/label-cleanup.js', () => ({
   cleanupMergedLabels: mockCleanupMergedLabels,
 }));
@@ -224,7 +214,7 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     if (releaseResolve) releaseResolve();
   });
 
-  it('runs task compaction while the release engine is still pending', async () => {
+  it('runs post-merge cleanup while the release engine is still pending', async () => {
     const lifecyclePromise = postMergeLifecycle(ISSUE_ID, PROJECT_PATH, SOURCE_BRANCH, { skipDeploy: true });
 
     // Wait for the release engine to have started but NOT resolve it yet.
@@ -233,13 +223,10 @@ describe('postMergeLifecycle — release trigger does not block cleanup', () => 
     // this assertion is about ordering, not wall-clock performance.
     await vi.waitFor(() => expect(releaseStarted).toBe(true), { timeout: 10_000 });
 
-    // Cleanup must have proceeded before release resolves.
-    expect(mockCompactTasks).toHaveBeenCalled();
-    expect(mockSweepOrphanedTasks).toHaveBeenCalledWith({
-      tasksCwd: PROJECT_PATH,
-      issueId: ISSUE_ID,
-      reason: 'issue merged; remaining open tasks swept',
-    });
+    // Cleanup must have proceeded before release resolves. Task compaction and
+    // the orphaned-task sweep were retired with beads (PAN-2648); the surviving
+    // cleanup steps are label cleanup, agent pausing, and the reset marker.
+    expect(mockCleanupMergedLabels).toHaveBeenCalled();
     expect(mockSetAgentPaused).toHaveBeenCalled();
     expect(mockCreateResetMarker).toHaveBeenCalled();
 
