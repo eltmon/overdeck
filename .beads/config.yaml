@@ -52,7 +52,8 @@
 # - github.org
 # - github.repo
 export.git-add: false
-sync:
-    remote: "git+ssh://git@github.com/eltmon/overdeck.git"
+# sync.remote disabled — PAN-2613 bootstrap clone-into-existing wedge; overdeck-state is the canonical plane
+# sync:
+#     remote: "git+ssh://git@github.com/eltmon/overdeck.git"
 
 # sync.remote: "git+ssh://git@github.com/eltmon/overdeck.git"
