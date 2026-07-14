@@ -328,7 +328,7 @@
     "recordedAt": "2026-07-14T21:12:12.074Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T21:35:03.086Z",
+  "updated": "2026-07-14T22:10:22.122Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -525,8 +525,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "pending-work-spawn",
   "statusOverrides": {
     "docs-appserver": "completed",
     "docs-appserver.ac1": "completed",
