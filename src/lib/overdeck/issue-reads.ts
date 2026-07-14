@@ -211,7 +211,19 @@ export function getIssueTasks(id: string) {
     const record = projectPath ? readIssueRecordSync({ name: resolvedProject?.projectName ?? id, path: projectPath }, id) : null;
     const blockers = new Map<string, string[]>();
     for (const edge of doc.plan.edges) if (edge.type === 'blocks') blockers.set(edge.to, [...(blockers.get(edge.to) ?? []), edge.from]);
-    const tasks = doc.plan.items.map((item) => ({ ...item, blockedBy: blockers.get(item.id) ?? [], claim: record?.tasks?.claims[item.id] }));
+    // The dashboard task views (TasksRail/TasksPanel) contract is
+    // labels: string[]. xBRIEF items carry difficulty in metadata, not labels,
+    // and raw items may serialize labels as null — normalize here at the read
+    // door so no consumer iterates a null.
+    const tasks = doc.plan.items.map((item) => {
+      const rawLabels = (item as { labels?: unknown }).labels;
+      const labels = Array.isArray(rawLabels)
+        ? rawLabels.filter((l): l is string => typeof l === 'string')
+        : item.metadata?.difficulty
+          ? [`difficulty:${item.metadata.difficulty}`]
+          : [];
+      return { ...item, labels, blockedBy: blockers.get(item.id) ?? [], claim: record?.tasks?.claims[item.id] };
+    });
 
     // Suppress unused variable warning — remoteVmName available for callers if needed
     void remoteVmName;

@@ -222,6 +222,7 @@ __pycache__/
 .overdeck/spec.vbrief.json
 .overdeck/sessions.jsonl
 .overdeck/pipeline-verdict.json
+.overdeck/verification-latest.json
 .overdeck/feedback/
 .overdeck/review/
 .overdeck/test/

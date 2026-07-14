@@ -17,6 +17,7 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
+import { writeVerificationArtifact } from './verification-artifact.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
@@ -503,6 +504,15 @@ async function runVerificationForIssuePromise(
         console.warn(`[${logPrefix}] Could not trigger stack rebuild for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
       return { outcome: 'failed', failedCheck: failedGate.name, cycleCount: currentCycles, maxCycles: VERIFICATION_MAX_CYCLES };
+    }
+
+    // Durable per-workspace record of this gate run, surfaced by the issue
+    // tree's Lint node. Infra-unavailable runs return above and never
+    // overwrite the last real result.
+    try {
+      writeVerificationArtifact(workspacePath, issueId, gateResults);
+    } catch (artifactErr: any) {
+      console.warn(`[${logPrefix}] Could not write verification artifact for ${issueId}: ${artifactErr.message}`);
     }
 
     if (failedGate) {

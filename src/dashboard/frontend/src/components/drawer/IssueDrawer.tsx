@@ -21,6 +21,7 @@ import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
 import { VBriefViewer } from '../vbrief/VBriefViewer';
 import type { VBriefDocument } from '../vbrief/types';
 import { PanOpenInPicker } from '../PanOpenInPicker';
+import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 
 const ACTIVITY_PHASE_DOT_CLASSES = {
@@ -291,6 +292,7 @@ export function IssueDrawer() {
             {drawer.tab === 'overview' ? (
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
                 <PhaseTimeline />
+                {drawer.issueId && <UatEnvironmentPanel issueId={drawer.issueId} />}
                 <DrawerPickupSection issueId={drawer.issueId} />
                 <DrawerSwarmPolicy issueId={drawer.issueId} />
                 <DrawerWorkspaceSection issueId={drawer.issueId} />

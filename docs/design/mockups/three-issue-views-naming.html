@@ -122,6 +122,10 @@
     <div class="sec"><span class="sectag t-blue">B · Lifecycle Band</span>
       <div class="band"><div class="on">Triaged<br>07/08</div><div class="on">Planned<br>07/08</div><div class="on">Implemented</div><div>Reviewed</div><div>Shipping</div><div>Merged</div></div>
     </div>
+    <div class="sec"><span class="sectag t-blue">B1 · UAT environment <span style="color:var(--faint);font-weight:400">(added 2026-07-14 · FR-10)</span></span>
+      <div class="mono" style="display:flex;align-items:center;gap:6px;border:1px solid rgba(59,130,246,.5);background:rgba(59,130,246,.12);border-radius:6px;padding:3px 7px;font-size:8.5px">feature-min-865.myn.localhost <span style="margin-left:auto">↗</span></div>
+      <div style="font-size:8px;color:var(--muted);margin-top:4px">● api Up 2h · ● fe Up 2h · ● postgres Up 2h · ● redis Up 2h · <span style="color:var(--faint)">API ↗</span></div>
+    </div>
     <div class="sec"><span class="sectag t-blue">C · Plan &amp; Release panel</span>
       <div style="font-size:8.5px;color:var(--faint)">PLAN → RELEASE · OPERATOR</div>
       <div class="btnrow"><span class="btn p">Plan (Auto)</span><span class="btn">⚑ Plan (Interactive)</span></div>
@@ -190,6 +194,10 @@
       </div>
       <div style="font-size:8px;color:var(--faint)">commit stream — every member reads every change · planning · fable-5</div>
     </div>
+    <div class="sec" style="margin-left:8px;border-left:2px solid var(--violet)"><span class="sectag t-violet">L0.5 · Overview tab → UAT environment (UatEnvironmentPanel) <span style="color:var(--faint);font-weight:400">(added 2026-07-14 · FR-10)</span></span>
+      <div class="mono" style="display:flex;align-items:center;gap:6px;border:1px solid rgba(139,92,246,.5);background:rgba(139,92,246,.12);border-radius:6px;padding:3px 7px;font-size:8.5px">feature-pan-1491.overdeck.localhost <span style="margin-left:auto">↗</span></div>
+      <div style="font-size:8px;color:var(--muted);margin-top:3px">clickable feature URL + container stack (UatStackStatus, density full) — never gated on stack health</div>
+    </div>
     <div class="sec" style="margin-left:8px;border-left:2px solid var(--violet)"><span class="sectag t-violet">L1 · Overview tab → "What just happened" (HappenedFeed)</span>
       <div style="display:flex;justify-content:space-between;font-size:9px"><b>What just happened</b><span style="color:var(--faint)">1 OF 3 DONE</span></div>
       <div style="font-size:8.5px;color:var(--muted);margin-top:3px">8:58 specialist started shipping · 5:56 fable-5 finished the plan</div>
@@ -257,6 +265,7 @@
       <tr><td><span class="nm">Plan Map (DAG)</span></td><td class="desc">Task graph, "the plan as a map"</td><td class="no">— (Plan tab)</td><td class="yes">M ✓</td><td class="no">—</td></tr>
       <tr><td><span class="nm">Detail Tabs</span></td><td class="desc">Overview/Code/PRD/Costs/… content tabs</td><td class="yes">A ✓ (8 tabs)</td><td class="yes">L ✓ (10 tabs)</td><td class="no">—</td></tr>
       <tr><td><span class="nm">Resource chips</span></td><td class="desc">workspace/branch/vBRIEF/beads/stack</td><td class="no">— (Workspace line)</td><td class="no">— (Stack drawer N)</td><td class="yes">R ✓</td></tr>
+      <tr><td><span class="nm">UAT environment</span></td><td class="desc">clickable feature URL + container stack (UatEnvironmentPanel, FR-10 · 2026-07-14)</td><td class="yes">B1 ✓</td><td class="yes">L0.5 ✓</td><td class="yes">UatStackTreeGroup ✓</td></tr>
       <tr><td><span class="nm">Session context actions</span></td><td class="desc">stop/pause/restart/wipe per agent</td><td class="no">~</td><td class="no">—</td><td class="yes">S ✓</td></tr>
       <tr><td><span class="nm">Activity feed</span></td><td class="desc">Recent events for the issue</td><td class="yes">H · Live Activity</td><td class="yes">O · Awareness</td><td class="no">—</td></tr>
       <tr><td><span class="nm">Status Narrative</span></td><td class="desc">Plain-English "what's happening" line</td><td class="no">—</td><td class="yes">I ✓</td><td class="no">—</td></tr>
@@ -287,6 +296,7 @@
         <li><b>DrawerTabs</b> — Overview·Plan·Beads·Conversation·Terminal·Activity·Files·Artifacts</li>
         <li><b>DrawerPickupSection / PickupGateControls</b> — Plan→Release, Ready/Blocks-main/Park (PAN-2059)</li>
         <li><b>DrawerWorkspaceSection</b> — workspace path + open-in picker</li>
+        <li><b>UatEnvironmentPanel</b> — feature-URL link + container stack, top of Overview (FR-10 · shipped 2026-07-14)</li>
         <li class="lovecell"><b>★ DrawerActiveAgent</b> — live output stream + "Tell this agent"/Resume</li>
         <li><b>DrawerPausedBanner</b> — paused/needs-you banner</li>
         <li><b>DrawerVerificationGates</b> — typecheck/lint/test/uat cards</li>
@@ -311,6 +321,7 @@
         <li><b>StackDrawer</b> (left, collapsed) — containers, PRs, git ahead/behind, actions</li>
         <li><b>Tabs</b>: Overview·Code·PRD/Plan·Timeline·Discussion·Costs·Artifacts·Ship·Conversation·Files·Terminal</li>
         <li>Overview → <b>CrewStage</b> ("The crew" avatars + spend-glow + commit stream)</li>
+        <li>Overview → <b>UatEnvironmentPanel</b> — feature-URL link + container stack (FR-10 · shipped 2026-07-14)</li>
         <li>Overview → <b>HappenedFeed</b> ("What just happened")</li>
         <li>Overview → <b>PlanMapCard</b> ("the plan, as a map" DAG)</li>
         <li>Overview → <b>IssueBlockerSpotlight</b> (when blocked)</li>
