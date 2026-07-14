@@ -9,18 +9,12 @@ jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
-      # Check the bundle out into its own subdir so the code-repo checkout below
-      # is NOT scanned as OKF concepts by validate.py (which globs *.md).
       - uses: actions/checkout@v4
-        with:
-          path: bundle
-      - uses: actions/checkout@v4
-        with:
-          repository: eltmon/overdeck
-          path: code-repo
       - uses: actions/setup-python@v5
         with:
           python-version: "3.x"
       - run: python3 -m pip install PyYAML
-      - run: python3 ./code-repo/sync-sources/skills/okf/scripts/validate.py --bundle ./bundle --strict
-      - run: python3 ./code-repo/sync-sources/skills/okf/scripts/diff_lint.py --base ./bundle --head ./bundle
+      # Scripts are vendored into the bundle (.okf/scripts) so conformance runs
+      # with only Python 3 + PyYAML — no external repo checkout.
+      - run: python3 .okf/scripts/validate.py --bundle . --strict
+      - run: python3 .okf/scripts/diff_lint.py --base . --head .

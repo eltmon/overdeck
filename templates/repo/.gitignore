@@ -1,3 +1,5 @@
 .okf-index/
 embeddings/*.local.okfe.jsonl
 *.tmp
+__pycache__/
+*.pyc
