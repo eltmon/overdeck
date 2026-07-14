@@ -144,15 +144,7 @@
       "timestamp": "2026-07-07T03:52:03.325Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-07T03:44:42Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2207 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (54920ms):\n\n                    ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝\n ❯ openFlywheelStatsPage tests/integration/flywheel-substrate-smoke.test.ts:250:28\n    248|   if (!address || typeof address === 'string') throw new Error('Vite s…\n    249|\n    250|   browser = await chromium.launch({ headless: true });\n       |                            ^\n    251|   context = await browser.newContext();\n    252|   page = await context.newPage();\n ❯ tests/integration/flywheel-substrate-smoke.test.ts:381:5\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯\n\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > resumes Codex conversations through the real route with codex resume\n FAIL  |root| tests/playwright/conversation-supervisor-uat.test.ts > conversation supervisor Playwright UAT > delivers through real conversation routes and keeps plain forks off Channels MCP\nError: browserType.launch: Executable doesn't exist at /home/eltmon/.cache/ms-playwright/chromium_headless_shell-1223/chrome-headless-shell-linux64/chrome-headless-shell\n╔════════════════════════════════════════════════════════════╗\n║ Looks like Playwright was just installed or updated.       ║\n║ Please run the following command to download new browsers: ║\n║                                                            ║\n║     npx playwright install                                 ║\n║                                                            ║\n║ <3 Playwright Team                                         ║\n╚════════════════════════════════════════════════════════════╝\n ❯ tests/playwright/conversation-supervisor-uat.test.ts:402:28\n    400|   resetDatabase();\n    401|   await startRealConversationRoutes();\n    402|   browser = await chromium.launch();\n       |                            ^\n    403|   context = await browser.newContext();\n    404|   page = await context.newPage();\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2207 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2207 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".pan/drafts/PAN-2207.md",
@@ -180,18 +172,21 @@
     "recordedAt": "2026-07-06T18:49:52.519Z"
   },
   "created": "2026-07-06T16:43:28.780Z",
-  "updated": "2026-07-07T03:52:08.441Z",
+  "updated": "2026-07-14T16:00:06.154Z",
   "pipeline": {
     "issueId": "PAN-2207",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T03:52:08.040Z",
+    "updatedAt": "2026-07-14T16:00:04.257Z",
+    "reviewNotes": "Review role spawn failed: Workspace for PAN-2207 does not exist at /home/eltmon/Projects/overdeck/workspaces/feature-pan-2207 — refusing to spawn review. A missing workspace would land the agent in $HOME at the folder-trust prompt. Recreate the workspace ('pan workspace rebuild PAN-2207') before retrying.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2425",
     "lastVerifiedCommit": "a503ddcd26d36251ac9ff67e32d3c03ee6e00572",
     "reviewRequestedAt": "2026-07-06T18:51:15.117Z",
+    "reviewSpawnedAt": "2026-07-14T16:00:04.216Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".pan/drafts/PAN-2207.md",
@@ -223,11 +218,25 @@
     "usage": {
       "byStage": {
         "codex": {
-          "unknown": {
-            "input": 3950057,
-            "output": 13960,
-            "cacheRead": 3515264,
+          "openai/codex-auto-review": {
+            "input": 1809688,
+            "output": 3401,
+            "cacheRead": 1668096,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.5": {
+            "input": 17267171,
+            "output": 40829,
+            "cacheRead": 15283072,
+            "cacheWrite": 0
+          }
+        },
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 379,
+            "output": 2117,
+            "cacheRead": 5631160,
+            "cacheWrite": 3489
           }
         },
         "memory-extraction": {
@@ -254,11 +263,19 @@
             "cacheWrite": 584
           }
         },
+        "review": {
+          "unknown": {
+            "input": 5223649,
+            "output": 15942,
+            "cacheRead": 4622720,
+            "cacheWrite": 0
+          }
+        },
         "test": {
           "custom/kimi-k2.7-code": {
-            "input": 478607,
-            "output": 14277,
-            "cacheRead": 3257344,
+            "input": 1090954,
+            "output": 27976,
+            "cacheRead": 6065664,
             "cacheWrite": 0
           }
         },
@@ -270,19 +287,31 @@
             "cacheWrite": 0
           },
           "unknown": {
-            "input": 11271742,
-            "output": 21612,
-            "cacheRead": 10146816,
+            "input": 13282881,
+            "output": 27212,
+            "cacheRead": 11945344,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
-        "unknown": {
-          "input": 15221799,
-          "output": 35572,
-          "cacheRead": 13662080,
+        "openai/codex-auto-review": {
+          "input": 1809688,
+          "output": 3401,
+          "cacheRead": 1668096,
           "cacheWrite": 0
+        },
+        "openai/gpt-5.5": {
+          "input": 17267171,
+          "output": 40829,
+          "cacheRead": 15283072,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 379,
+          "output": 2117,
+          "cacheRead": 5631160,
+          "cacheWrite": 3489
         },
         "cliproxy/gpt-5.4-mini": {
           "input": 49137,
@@ -296,16 +325,22 @@
           "cacheRead": 4427449,
           "cacheWrite": 154865
         },
+        "unknown": {
+          "input": 18506530,
+          "output": 43154,
+          "cacheRead": 16568064,
+          "cacheWrite": 0
+        },
         "custom/kimi-k2.7-code": {
-          "input": 1968343,
-          "output": 158236,
-          "cacheRead": 94825728,
+          "input": 2580690,
+          "output": 171935,
+          "cacheRead": 97634048,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 39.213694000000004,
-        "pricingAsOf": "2026-07-07T03:52:08.387Z"
+        "usd": 68.122604,
+        "pricingAsOf": "2026-07-14T16:00:06.096Z"
       }
     },
     "merges": [
