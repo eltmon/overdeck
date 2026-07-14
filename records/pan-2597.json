@@ -250,17 +250,17 @@
     "recordedAt": "2026-07-14T16:47:08.176Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T17:47:38.140Z",
+  "updated": "2026-07-14T18:37:17.352Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T17:47:38.064Z",
+    "updatedAt": "2026-07-14T18:37:17.309Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at test (310619ms):\n\n⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\nError: Failed to commit PAN-2372 state: not a git repo\n ❯ updateIssueRecord src/lib/pan-dir/record-update.ts:61:13\n     59|     }\n     60|     if (!flushed.committed && !['no diff', 'no pending'].includes(flus…\n     61|       throw new Error(`Failed to commit ${normalizedIssueId} state: ${…\n       |             ^\n     62|     }\n     63|   }\n ❯ writeSwarmSlotCompletion src/lib/cloister/deacon-swarm-record.ts:58:3\n\nThis error originated in \"tests/unit/lib/cloister/swarm-failed-slot.test.ts\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\nThe latest test that might've caused the error is \"removes swarm.slotCompletions[slotIndex] when a slot is archived/superseded, preserving siblings\". It might mean one of the following:\n- The error was thrown, while Vitest was running this test.\n- If the error occurred after the test had been completed, this was the last documented test before it was thrown.\n\n⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\nError: Failed to commit PAN-2372 state: not a git repo\n ❯ updateIssueRecord src/lib/pan-dir/record-update.ts:61:13\n     59|     }\n     60|     if (!flushed.committed && !['no diff', 'no pending'].includes(flus…\n     61|       throw new Error(`Failed to commit ${normalizedIssueId} state: ${…\n       |             ^\n     62|     }\n     63|   }\n ❯ writeSwarmSlotCompletion src/lib/cloister/deacon-swarm-record.ts:58:3\n\nThis error originated in \"tests/unit/lib/cloister/swarm-failed-slot.test.ts\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\nThe latest test that might've caused the error is \"removes swarm.slotCompletions[slotIndex] when a slot is archived/superseded, preserving siblings\". It might mean one of the following:\n- The error was thrown, while Vitest was running this test.\n- If the error occurred after the test had been completed, this was the last documented test before it was thrown.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
@@ -382,10 +382,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 24,
-            "output": 6183,
-            "cacheRead": 2144705,
-            "cacheWrite": 13420
+            "input": 26,
+            "output": 6396,
+            "cacheRead": 2629584,
+            "cacheWrite": 14181
           }
         },
         "plan": {
@@ -425,10 +425,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 18470,
-          "output": 60789,
-          "cacheRead": 6987630,
-          "cacheWrite": 311239
+          "input": 18472,
+          "output": 61002,
+          "cacheRead": 7472509,
+          "cacheWrite": 312000
         },
         "anthropic/claude-sonnet-5": {
           "input": 14217,
@@ -438,8 +438,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 92.64484,
-        "pricingAsOf": "2026-07-14T17:47:38.127Z"
+        "usd": 93.149902,
+        "pricingAsOf": "2026-07-14T18:37:17.350Z"
       }
     },
     "merges": [
