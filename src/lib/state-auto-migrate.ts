@@ -1,4 +1,4 @@
-import type { ProjectConfig } from './projects.js';
+import { listProjectsSync, type ProjectConfig, type ResolvedProject } from './projects.js';
 import {
   clearStateMigrationCache,
   ensureStateWorktree,
@@ -89,4 +89,18 @@ export function formatAutomaticStateMigrationBlock(result: Extract<AutomaticStat
   return `State migration for ${result.projectKey} is blocked: ${result.reason} `
     + 'Overdeck will not start pipeline work because that would write permanent state into the legacy project checkout. '
     + `Resolve the stated prerequisite, then run "pan sync"; do not commit project-root .pan/ or .beads/ files.`;
+}
+
+export async function requireAutomaticStateMigration(resolved: ResolvedProject): Promise<void> {
+  let projectEntry: { key: string; config: ProjectConfig } | undefined;
+  try {
+    projectEntry = listProjectsSync().find(({ key, config }) =>
+      key === resolved.projectKey || config.name === resolved.projectName || config.path === resolved.projectPath);
+  } catch {
+    // Embedded callers may expose only the issue projection; production
+    // polyrepo metadata comes from the registered project entry above.
+  }
+  projectEntry ??= { key: resolved.projectKey, config: { name: resolved.projectName, path: resolved.projectPath } };
+  const result = await ensureAutomaticStateMigration(projectEntry.key, projectEntry.config);
+  if (result.status === 'blocked') throw new Error(formatAutomaticStateMigrationBlock(result));
 }

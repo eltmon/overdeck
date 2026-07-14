@@ -4,8 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 
 vi.mock('../../../lib/state-auto-migrate.js', () => ({
-  ensureAutomaticStateMigration: vi.fn(async (projectKey: string) => ({ status: 'ready', projectKey, worktree: 'healthy' })),
-  formatAutomaticStateMigrationBlock: vi.fn(),
+  requireAutomaticStateMigration: vi.fn(),
 }));
 
 const lifecycleMocks = vi.hoisted(() => ({

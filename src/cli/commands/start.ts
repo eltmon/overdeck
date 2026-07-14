@@ -14,7 +14,7 @@ import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js
 import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
-import { resolveProjectFromIssueSync, hasProjectsSync, listProjectsSync, ProjectConfig } from '../../lib/projects.js';
+import { resolveProjectFromIssueSync, hasProjectsSync } from '../../lib/projects.js';
 import { hasPRDDraft, getPRDDraftPathSync } from '../../lib/prd-draft.js';
 import { isGitHubIssueSync, resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { Effect } from 'effect';
@@ -91,20 +91,13 @@ import {
   loadWorkspaceMetadataSync,
   findRemoteWorkspaceMetadataSync,
 } from '../../lib/remote/workspace-metadata.js';
-import {
-  spawnRemoteAgent,
-  isRemoteAgentRunning,
-  createFlyProviderFromConfig,
-  checkRemoteSpendCap,
-} from '../../lib/remote/index.js';
-import { isRemoteAvailable } from '../../lib/remote/index.js';
+import { spawnRemoteAgent, isRemoteAgentRunning, createFlyProviderFromConfig, checkRemoteSpendCap, isRemoteAvailable } from '../../lib/remote/index.js';
 import type { RemoteWorkspaceMetadata } from '../../lib/remote/interface.js';
 import type { SpawnRemoteAgentOptions } from '../../lib/remote/remote-agents.js';
-import { assertCanStartFreshSync } from '../../lib/work-agent-lifecycle.js';
-import { getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
+import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../lib/work-agent-lifecycle.js';
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
-import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
+import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
 
 interface IssueOptions {
   model: string;
@@ -946,22 +939,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const resolved = resolveProjectFromIssueSync(id);
     if (resolved) {
       spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
-      let projectEntry: { key: string; config: ProjectConfig } | undefined;
-      try {
-        projectEntry = listProjectsSync().find(({ key, config }) =>
-          key === resolved.projectKey || config.name === resolved.projectName || config.path === resolved.projectPath);
-      } catch {
-        // Narrow test/embedded project registries may expose only the resolved
-        // issue projection. The single-repo fallback retains the state gate;
-        // production polyrepo metadata comes from listProjectsSync above.
-      }
-      projectEntry ??= { key: resolved.projectKey, config: { name: resolved.projectName, path: resolved.projectPath } };
       spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
-      const migration = await ensureAutomaticStateMigration(projectEntry.key, projectEntry.config);
-      if (migration.status === 'blocked') {
-        spinner.fail(formatAutomaticStateMigrationBlock(migration));
-        process.exit(1);
-      }
+      await requireAutomaticStateMigration(resolved);
     }
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
