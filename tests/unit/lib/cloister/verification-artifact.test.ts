@@ -65,6 +65,15 @@ describe('verification artifact', () => {
     expect(readVerificationArtifact(workspace)?.outcome).toBe('passed');
   });
 
+  it('marks an in-progress run as running with the current gate (PAN-2665 live view)', () => {
+    writeVerificationArtifact(workspace, 'PAN-5', [gate({ name: 'typecheck' })], { currentGate: 'lint' });
+
+    const read = readVerificationArtifact(workspace);
+    expect(read).toMatchObject({ outcome: 'running', currentGate: 'lint' });
+    expect(read?.failedCheck).toBeUndefined();
+    expect(read?.gates.map((g) => g.name)).toEqual(['typecheck']);
+  });
+
   it('returns null for a missing or corrupt artifact', () => {
     expect(readVerificationArtifact(workspace)).toBeNull();
 

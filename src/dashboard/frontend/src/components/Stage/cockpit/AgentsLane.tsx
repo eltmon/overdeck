@@ -54,7 +54,7 @@ function sessionLabel(session: SessionNode): string {
     case 'knowledge': return 'Knowledge'
     case 'work': return 'Work'
     case 'strike': return 'Strike'
-    case 'lint': return 'Lint'
+    case 'lint': return 'Test/Lint'
     case 'review': return 'Review'
     case 'reviewer': return session.role ? cap(session.role) : 'Reviewer'
     case 'test': return 'Test'

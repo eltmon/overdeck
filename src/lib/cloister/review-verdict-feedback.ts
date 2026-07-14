@@ -141,7 +141,9 @@ async function deliverReviewVerdictFeedbackPromise(
       });
       if ('agentId' in target) {
         try {
-          await messageAgent(target.agentId, message);
+          // PAN-2668: a blocked/failed review verdict owes rework — re-drive a
+          // stopped-by-user agent with a completed handoff instead of queueing.
+          await messageAgent(target.agentId, message, 'internal', { owesRework: true });
           agentMessageSent = true;
         } catch (err) {
           // PAN-2228: a resolved-but-unreachable target is a real delivery failure,

@@ -149,7 +149,9 @@ async function deliverVerificationFeedback(
 ): Promise<void> {
   const target = await resolveIssueFeedbackTarget(issueId);
   if ('agentId' in target) {
-    await messageAgent(target.agentId, message);
+    // PAN-2668: verification feedback owes rework — a stopped-by-user agent
+    // with a completed handoff is re-driven, not silently queued mail.
+    await messageAgent(target.agentId, message, 'internal', { owesRework: true });
     console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
     return;
   }
@@ -475,11 +477,27 @@ async function runVerificationForIssuePromise(
       console.log(`[${logPrefix}] Polyrepo workspace — per-repo dependencies managed by quality gates`);
     }
 
+    // PAN-2665: write the artifact incrementally so the dashboard's Test/Lint
+    // node shows gates completing live. Every write is best-effort — a failed
+    // artifact write must never fail verification itself.
+    const liveGateResults: import('./validation.js').QualityGateResult[] = [];
+    const writeLiveArtifact = (currentGate?: string) => {
+      try {
+        writeVerificationArtifact(workspacePath, issueId, liveGateResults, { currentGate });
+      } catch { /* best-effort */ }
+    };
+    writeLiveArtifact();
+
     const gateResults = await Effect.runPromise(runQualityGates(gates, workspacePath, 'pre_push', {
       isRemote: workspaceInfo.isRemote,
       vmName: workspaceInfo.vmName,
       placeholders,
       ...(options.onGateLog ? { onLog: options.onGateLog } : {}),
+      onGateStart: (name) => writeLiveArtifact(name),
+      onGateResult: (result) => {
+        liveGateResults.push(result);
+        writeLiveArtifact();
+      },
     }));
 
     const failedGate = gateResults.find(r => !r.passed && r.required !== false);
@@ -488,6 +506,11 @@ async function runVerificationForIssuePromise(
     // failure — it must not consume a verification attempt or pause the agent.
     // Trigger stack recovery and leave verification pending for the next cycle.
     if (failedGate?.infraUnavailable) {
+      // Finalize the live artifact so the Test/Lint node doesn't stay stuck at
+      // "running" — the infra gate's error explains what could not run.
+      try {
+        writeVerificationArtifact(workspacePath, issueId, gateResults);
+      } catch { /* best-effort */ }
       console.warn(`[${logPrefix}] Gate "${failedGate.name}" could not run for ${issueId}: ${failedGate.error} — triggering workspace stack rebuild, attempt NOT counted (${currentCycles}/${VERIFICATION_MAX_CYCLES} used)`);
       setReviewStatusSync(issueId, {
         verificationStatus: 'pending',
@@ -506,9 +529,8 @@ async function runVerificationForIssuePromise(
       return { outcome: 'failed', failedCheck: failedGate.name, cycleCount: currentCycles, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    // Durable per-workspace record of this gate run, surfaced by the issue
-    // tree's Lint node. Infra-unavailable runs return above and never
-    // overwrite the last real result.
+    // Durable terminal record of this gate run, surfaced by the issue tree's
+    // Test/Lint node (replaces the incremental 'running' writes above).
     try {
       writeVerificationArtifact(workspacePath, issueId, gateResults);
     } catch (artifactErr: any) {

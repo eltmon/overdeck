@@ -26,7 +26,9 @@ export interface VerificationGateRecord {
 export interface VerificationArtifact {
   issueId: string;
   ranAt: string;
-  outcome: 'passed' | 'failed';
+  outcome: 'running' | 'passed' | 'failed';
+  /** Gate currently executing — only present while outcome is 'running'. */
+  currentGate?: string;
   failedCheck?: string;
   gates: VerificationGateRecord[];
 }
@@ -41,13 +43,16 @@ export function writeVerificationArtifact(
   workspacePath: string,
   issueId: string,
   gateResults: QualityGateResult[],
+  progress?: { currentGate?: string },
 ): VerificationArtifact {
   const failed = gateResults.find((r) => !r.passed && r.required !== false);
+  const running = progress !== undefined;
   const artifact: VerificationArtifact = {
     issueId,
     ranAt: new Date().toISOString(),
-    outcome: failed ? 'failed' : 'passed',
-    ...(failed ? { failedCheck: failed.name } : {}),
+    outcome: running ? 'running' : failed ? 'failed' : 'passed',
+    ...(running && progress.currentGate ? { currentGate: progress.currentGate } : {}),
+    ...(!running && failed ? { failedCheck: failed.name } : {}),
     gates: gateResults.map((r) => ({
       name: r.name,
       passed: r.passed,

@@ -12,6 +12,7 @@ import { useDashboardStore, selectPendingPermissionAgentIds } from '../../../lib
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
+import { VerificationGatesPanel } from './VerificationGatesPanel';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useConversationUiState } from '../../../hooks/useConversationUiState';
 import styles from '../styles/command-deck.module.css';
@@ -379,7 +380,14 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
 
       {/* View content */}
       <div className={styles.sessionPanelContent}>
-        {view === 'conversation' && (
+        {view === 'conversation' && session.type === 'lint' ? (
+          // Test/Lint gate node (PAN-2665): no JSONL/tmux backing — render the
+          // live-polling gate view instead of a conversation.
+          <VerificationGatesPanel
+            issueId={(issueId ?? session.sessionId.replace(/^lint-/, '')).toUpperCase()}
+            fallbackTranscript={session.transcript}
+          />
+        ) : view === 'conversation' && (
           hasJsonl && synthesizedConversation ? (
             <ConversationPanel
               conversation={synthesizedConversation}

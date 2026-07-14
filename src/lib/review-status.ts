@@ -798,7 +798,7 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     const target = await resolveIssueFeedbackTarget(issueId);
     if ('agentId' in target) {
       const { messageAgent } = await import('./agents.js');
-      await messageAgent(target.agentId, message);
+      await messageAgent(target.agentId, message, 'internal', { owesRework: true });
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
     } else {
       await surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
