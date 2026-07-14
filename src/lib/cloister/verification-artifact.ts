@@ -29,6 +29,8 @@ export interface VerificationArtifact {
   outcome: 'running' | 'passed' | 'failed';
   /** Gate currently executing — only present while outcome is 'running'. */
   currentGate?: string;
+  /** Rolling tail of the running gate's stdout/stderr (ANSI-stripped). */
+  currentGateOutput?: string;
   failedCheck?: string;
   gates: VerificationGateRecord[];
 }
@@ -43,7 +45,7 @@ export function writeVerificationArtifact(
   workspacePath: string,
   issueId: string,
   gateResults: QualityGateResult[],
-  progress?: { currentGate?: string },
+  progress?: { currentGate?: string; currentGateOutput?: string },
 ): VerificationArtifact {
   const failed = gateResults.find((r) => !r.passed && r.required !== false);
   const running = progress !== undefined;
@@ -52,6 +54,7 @@ export function writeVerificationArtifact(
     ranAt: new Date().toISOString(),
     outcome: running ? 'running' : failed ? 'failed' : 'passed',
     ...(running && progress.currentGate ? { currentGate: progress.currentGate } : {}),
+    ...(running && progress.currentGateOutput ? { currentGateOutput: progress.currentGateOutput } : {}),
     ...(!running && failed ? { failedCheck: failed.name } : {}),
     gates: gateResults.map((r) => ({
       name: r.name,
