@@ -133,7 +133,7 @@ export async function swarmCommand(
   // dispatchNextWave with an EMPTY reconcile result and raced the Deacon
   // (PAN-2214). Re-running the command is idempotent: already-dispatched
   // work is reconciled, not re-spawned.
-  const actions = await deps.coordinateSwarmSlots({ issueId: issue });
+  const actions = await deps.coordinateSwarmSlots({ issueId: issue, manual: true });
 
   if (actions.length === 0) {
     deps.console.log(chalk.yellow(`No swarm slots dispatched for ${issue}.`));

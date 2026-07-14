@@ -308,6 +308,16 @@ export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hol
   registerProjectSync(key, updated);
 }
 
+export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
+  const config = getProjectSync(key);
+  if (!config) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...config };
+  const hotspots = config.swarm?.hotspots;
+  if (value === null && !hotspots?.length) delete updated.swarm;
+  else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
+  registerProjectSync(key, updated);
+}
+
 /**
  * Remove a project from the registry
  */

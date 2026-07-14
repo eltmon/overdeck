@@ -195,6 +195,7 @@ export interface TieredExecutionConfig {
 }
 
 export interface SettingsConfig {
+  swarm?: { mode: 'off' | 'auto' | 'always'; maxSlots: number; autoAdvance: boolean };
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
   models: ModelsConfig;

@@ -66,6 +66,12 @@ function DrawerActivityPanel() {
   );
 }
 
+function DrawerSwarmPolicy({ issueId }: { issueId: string }) {
+  const { data, refetch } = useQuery({ queryKey: ['issue-swarm-policy', issueId], queryFn: async () => (await fetch(`/api/issues/${encodeURIComponent(issueId)}/swarm-policy`)).json() as Promise<{ configured: { mode?: string } | null; resolved: { mode: string; source: { mode: string } } }> });
+  const save = async (mode: string) => { const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/swarm-policy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: mode ? { mode } : null }) }); if (!res.ok) return toast.error('Could not save swarm policy'); await refetch(); toast.success('Swarm policy saved'); };
+  return <section className="rounded-[var(--radius)] border border-border p-4"><div className="flex items-center justify-between gap-4"><div><h3 className="text-sm font-semibold">Swarming</h3><p className="text-xs text-muted-foreground">Effective: {data?.resolved?.mode ?? 'off'} · {data?.resolved?.source?.mode ?? 'default'}</p></div><select aria-label="Issue swarm policy" className="rounded-md border border-input bg-background px-2 py-1.5 text-xs" value={data?.configured?.mode ?? ''} onChange={e => void save(e.target.value)}><option value="">Inherit project</option><option value="off">Off</option><option value="auto">Auto</option><option value="always">Always</option></select></div><p className="mt-2 text-xs text-muted-foreground">Applies to future dispatches; running swarms are unchanged.</p></section>;
+}
+
 function DrawerPlanPanel({ issueId }: { issueId: string }) {
   const { data, isLoading, isError } = useQuery<VBriefDocument | null>({
     queryKey: ['drawer-vbrief-plan', issueId],
@@ -286,6 +292,7 @@ export function IssueDrawer() {
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
                 <PhaseTimeline />
                 <DrawerPickupSection issueId={drawer.issueId} />
+                <DrawerSwarmPolicy issueId={drawer.issueId} />
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <DrawerActiveAgent />
                 <DrawerVerificationGates />

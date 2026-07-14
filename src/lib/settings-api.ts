@@ -117,6 +117,7 @@ function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | und
 }
 
 export interface ApiSettingsConfig {
+  swarm?: { mode: 'off' | 'auto' | 'always'; maxSlots: number; autoAdvance: boolean };
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
   models: {
@@ -673,6 +674,7 @@ export function loadSettingsApi(): ApiSettingsConfig {
   };
 
   return {
+    swarm: config.swarm,
     workhorses: seededWorkhorses(config),
     roles: seededRoles(config),
     models: {
@@ -776,6 +778,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.contents = parseDocument('{}\n').contents;
   }
   const config = pruneUndefined(yamlConfig);
+  doc.setIn(['swarm'], config.swarm ?? { mode: 'off', maxSlots: 3, autoAdvance: true });
 
   doc.setIn(['workhorses'], config.workhorses ?? {});
   doc.setIn(['roles'], config.roles ?? {});
@@ -859,6 +862,7 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
 
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
+    swarm: settings.swarm,
     workhorses: settings.workhorses,
     roles: normalizeRolesConfig(settings.roles),
     models: {

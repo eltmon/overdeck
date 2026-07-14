@@ -14,7 +14,9 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
-import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync } from '../../../lib/projects.js';
+import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync } from '../../../lib/projects.js';
+import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
+import { readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
@@ -664,6 +666,34 @@ const postProjectAutoMergeDefaultRoute = HttpRouter.add(
   })),
 );
 
+const getProjectSwarmPolicyRoute = HttpRouter.add('GET', '/api/projects/:projectKey/swarm-policy', httpHandler(Effect.gen(function* () {
+  const key = (yield* HttpRouter.params)['projectKey'] ?? '';
+  const config = getProjectSync(key);
+  if (!config) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+  return jsonResponse({ configured: config.swarm ? { mode: config.swarm.mode, maxSlots: config.swarm.maxSlots, autoAdvance: config.swarm.autoAdvance } : null });
+})));
+const postProjectSwarmPolicyRoute = HttpRouter.add('POST', '/api/projects/:projectKey/swarm-policy', httpHandler(Effect.gen(function* () {
+  const key = (yield* HttpRouter.params)['projectKey'] ?? '';
+  if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+  const body = (yield* readProjectJsonBody) as { value?: { mode?: unknown; maxSlots?: unknown; autoAdvance?: unknown } | null };
+  if (body.value !== null && body.value?.mode !== undefined && !['off', 'auto', 'always'].includes(String(body.value.mode))) return jsonResponse({ error: 'invalid swarm mode' }, { status: 400 });
+  setProjectSwarmPolicySync(key, body.value as any); return jsonResponse({ configured: body.value ?? null });
+})));
+const getIssueSwarmPolicyRoute = HttpRouter.add('GET', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
+  const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  return jsonResponse({ configured: readIssueRecordSync(project, issueId)?.swarm?.policy ?? null, resolved: resolveSwarmPolicy(issueId) });
+})));
+const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase(); const body = (yield* readProjectJsonBody) as { value?: any };
+  const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  const record = readIssueRecordSync(project, issueId); if (!record) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
+  writeIssueRecordSync(project, issueId, { ...record, swarm: { ...record.swarm, policy: body.value ?? undefined } });
+  return jsonResponse({ configured: body.value ?? null, resolved: resolveSwarmPolicy(issueId) });
+})));
+
 // ─── Home-boundary guard (shared by POST /api/projects and GET /api/fs/list-dirs) ──
 
 async function buildHomeGuard(): Promise<(p: string) => boolean> {
@@ -840,6 +870,10 @@ export const projectsRouteLayer = Layer.mergeAll(
   getProjectReleaseStatusRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
+  getProjectSwarmPolicyRoute,
+  postProjectSwarmPolicyRoute,
+  getIssueSwarmPolicyRoute,
+  postIssueSwarmPolicyRoute,
   postProjectsRoute,
 );
 

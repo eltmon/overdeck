@@ -36,6 +36,7 @@ import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swa
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
+import { resolveSwarmPolicy } from '../swarm-policy.js';
 import type { SwarmInferCompletionMode } from './config.js';
 import {
   countRunningSwarmSlotsForIssue,
@@ -91,6 +92,8 @@ export interface FailedMergeBlock {
 
 export interface CoordinateSwarmSlotsOptions {
   issueId?: string;
+  /** Explicit `pan swarm` bypasses the automatic-selection policy. */
+  manual?: boolean;
 }
 
 export interface CoordinateSwarmSlotsDeps {
@@ -349,11 +352,14 @@ export async function coordinateSwarmSlots(
         : spec.document;
 
       const readiness = analyzeSwarmReadiness(doc);
+      const policy = resolveSwarmPolicy(issueId);
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
       // Eligibility gates dispatch only; active swarms still need merge/gc/endgame passes.
       const swarmInProgress = Object.entries(overrides ?? {})
         .some(([key, value]) => !key.includes('.') && value === 'completed');
-      const dispatchEligible = readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
+      const policyAllowsDispatch = opts.manual || policy.mode !== 'off' || swarmInProgress;
+      const dispatchEligible = policyAllowsDispatch && readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
+      if (!policyAllowsDispatch) actions.push(`[swarm] ${issueId}: automatic swarming off (${policy.source.mode}) — single-agent execution remains selected`);
       if (dispatchEligible) {
         actions.push(`[swarm] considered ${issueId}: swarm eligible`);
       }
