@@ -73,8 +73,6 @@ import {
   writeRecordHazards,
   writeRecordResumePointSync,
   writeRecordResumePoint,
-  writeRecordTasksMappingSync,
-  writeRecordTasksMapping,
 } from '../record.js';
 
 describe('buildIssueRecord', () => {
@@ -105,7 +103,6 @@ describe('buildIssueRecord', () => {
         resumePoint: { description: 'resume here', taskId: 'infra-record-writer' },
         sessionHistory: [{ reason: 'work', note: 'did stuff', timestamp: '2026-01-01T00:00:00.000Z' }],
         agentModel: 'claude-opus-4-8',
-        tasksMapping: { 'item-1': ['task-a'] },
       }),
     );
 
@@ -115,7 +112,6 @@ describe('buildIssueRecord', () => {
     expect(record.decisions).toHaveLength(1);
     expect(record.hazards).toHaveLength(1);
     expect(record.resumePoint).toEqual({ description: 'resume here', taskId: 'infra-record-writer' });
-    expect(record.tasksMapping).toEqual({ 'item-1': ['task-a'] });
     expect(record.sessionHistory).toHaveLength(1);
     expect(record.feedback).toEqual([]);
     expect(record).not.toHaveProperty('continue');
@@ -520,7 +516,6 @@ describe('readRecordContinueViewSync (PAN-1919)', () => {
       decisions: [{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01' }],
       hazards: [{ id: 'H1', summary: 'big change', mitigation: 'audit' }],
       resumePoint: { description: 'resume here', taskId: 'task-abc' },
-      tasksMapping: { 'item-1': ['task-a'] },
       sessionHistory: [{ reason: 'work', note: 'did stuff', timestamp: '2026-01-01T00:00:00.000Z' }],
       feedback: [{ seq: 1, specialist: 'review-agent', outcome: 'approved', timestamp: '2026-01-01T00:00:00.000Z', markdownBody: 'lgtm' }],
       pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
@@ -532,7 +527,6 @@ describe('readRecordContinueViewSync (PAN-1919)', () => {
     expect(view?.decisions).toEqual([{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01' }]);
     expect(view?.hazards).toEqual([{ id: 'H1', summary: 'big change', mitigation: 'audit' }]);
     expect(view?.resumePoint).toEqual({ description: 'resume here', taskId: 'task-abc' });
-    expect(view?.tasksMapping).toEqual({ 'item-1': ['task-a'] });
     expect(view?.sessionHistory).toHaveLength(1);
     expect(view?.feedback).toHaveLength(1);
   });
@@ -550,7 +544,6 @@ describe('readRecordContinueViewSync (PAN-1919)', () => {
     expect(view?.decisions).toEqual([]);
     expect(view?.hazards).toEqual([]);
     expect(view?.resumePoint).toBeNull();
-    expect(view?.tasksMapping).toEqual({});
     expect(view?.sessionHistory).toEqual([]);
     expect(view?.feedback).toEqual([]);
   });
@@ -708,52 +701,6 @@ describe('writeRecordResumePoint / writeRecordResumePointSync (PAN-1919)', () =>
 
     const record = readIssueRecordSync(project, 'PAN-1919');
     expect(record?.resumePoint).toEqual(resumePoint);
-    expect(mockQueueAutoCommit).toHaveBeenCalled();
-  });
-});
-
-describe('writeRecordTasksMapping / writeRecordTasksMappingSync (PAN-1919)', () => {
-  let tmp: string;
-
-  beforeEach(() => {
-    tmp = mkdtempSync(join(tmpdir(), 'pan-records-tasks-'));
-    mockQueueAutoCommit.mockClear();
-  });
-
-  afterEach(() => {
-    rmSync(tmp, { recursive: true, force: true });
-  });
-
-  function makeProject(): ProjectConfig {
-    return { name: 'Test', path: tmp };
-  }
-
-  it('sync: persists tasksMapping and leaves other fields intact', () => {
-    const project = makeProject();
-    writeIssueRecordSync(project, 'PAN-1919', {
-      issueId: 'PAN-1919',
-      schemaVersion: 2,
-      decisions: [{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }],
-      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
-      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
-    });
-
-    const tasksMapping = { 'item-1': ['task-a', 'task-b'], 'item-2': ['task-c'] };
-    writeRecordTasksMappingSync(project, 'PAN-1919', tasksMapping);
-
-    const record = readIssueRecordSync(project, 'PAN-1919');
-    expect(record?.tasksMapping).toEqual(tasksMapping);
-    expect(record?.decisions).toEqual([{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }]);
-    expect(mockQueueAutoCommit).toHaveBeenCalled();
-  });
-
-  it('async: persists tasksMapping and queues commit', async () => {
-    const project = makeProject();
-    const tasksMapping = { 'async-item': ['task-x'] };
-    await writeRecordTasksMapping(project, 'PAN-1919', tasksMapping);
-
-    const record = readIssueRecordSync(project, 'PAN-1919');
-    expect(record?.tasksMapping).toEqual(tasksMapping);
     expect(mockQueueAutoCommit).toHaveBeenCalled();
   });
 });
