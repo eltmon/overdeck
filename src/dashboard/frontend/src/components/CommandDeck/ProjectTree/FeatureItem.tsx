@@ -3,7 +3,7 @@ import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
   ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
-  BookText, Bug, Container, Radio, Workflow,
+  BookText, Bug, Container, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
@@ -1015,6 +1015,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     [visibleSessions],
   );
 
+  const issueConversations = feature.resourceDetails?.conversations ?? [];
+  const hasConversations = issueConversations.length > 0;
+  const hasExpandableChildren = hasVisibleSessions || hasConversations;
+
   const workSession = feature.sessions?.find((s) => s.type === 'work');
   const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
@@ -1108,7 +1112,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         data-issue-id={feature.issueId}
       >
         <div className={styles.featureItemRow}>
-          {hasVisibleSessions ? (
+          {hasExpandableChildren ? (
             <button
               className={styles.featureItemCaret}
               onClick={handleToggleExpanded}
@@ -1260,7 +1264,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       {expanded && (
         <ShipDoorTreeRow issueId={feature.issueId} onSelect={() => onSelect?.()} />
       )}
-      {expanded && hasVisibleSessions && (
+      {expanded && hasExpandableChildren && (
         <div className={styles.sessionList}>
           {(() => {
             const reviewerChildren = visibleSessions.filter(s => s.type === 'reviewer');
@@ -1271,7 +1275,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
             return (
               <>
-                {sortedNonReviewers.map(session => {
+                {hasVisibleSessions && sortedNonReviewers.map(session => {
                   if (session.type === 'review') {
                     return (
                       <ReviewGroup
@@ -1313,6 +1317,20 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     />
                   );
                 })}
+                {hasConversations && issueConversations.map(conv => (
+                  <a
+                    key={`conv-${conv.id}`}
+                    href={`/conv/${conv.id}`}
+                    className={styles.sessionNode}
+                    data-testid={`conversation-${conv.id}`}
+                    title={conv.title ?? conv.name}
+                  >
+                    <MessageSquare size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>{conv.title || 'Conversation'}</span>
+                    <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{conv.status}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted-foreground)', fontVariantNumeric: 'tabular-nums' }}>#{conv.id}</span>
+                  </a>
+                ))}
               </>
             );
           })()}

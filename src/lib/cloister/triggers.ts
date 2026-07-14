@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfigSync } from './config.js';
-import { createBeadsResolver } from '../beads/resolver.js';
+import { readBeadsForIssueCached } from '../beads/presence.js';
 
 /** Single-flight prevents concurrent dashboard polls from duplicating the canonical read. */
 const taskCompletionInflight = new Map<string, Promise<TriggerDetection>>();
@@ -261,7 +261,9 @@ function detectTestFailure(workspace: string): {
     }
 
     try {
-      const result = await createBeadsResolver(workspace).getBeadsForIssue(issueId);
+      // Cached bulk snapshot (10s TTL): this trigger runs on every health sweep
+      // per agent — per-issue bd processes here kept the bd lock hot (PAN-2640).
+      const result = await readBeadsForIssueCached(workspace, issueId);
       if (!result.ok) throw result.error;
       const tasks = result.value.filter((task) => task.status === 'closed');
       const implementTask = tasks.find((t: any) =>

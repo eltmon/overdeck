@@ -2690,3 +2690,202 @@ stale (written 2026-07-08); re-verified all order-book items against live GitHub
   SUGGEST next cut (v0.45.x patch, fixes-only). Operator tags, never me.
 - NEXT: report release readiness to operator + decide A9 spec re-promotion; then B9=PAN-2149
   (decompose cloister/service.ts) with PRD re-verify vs current main.
+
+## RUN-63 tick 1 (2026-07-13 ~14:15 local) — DRAIN phase 1. Main GREEN; merged PAN-2611; restarted 2 stalled review convoys
+
+**Config:** scope=all-tracked, minAgents=2, maxAgents=20, auto_pickup_backlog=false, require_uat_before_merge=false.
+Boot gate resume=off (I am the re-drive). Active agents 6/20 at tick start.
+
+- **MAIN GREEN.** HEAD 9352c87 (the RUN-63 brief doc commit) CI = success. Not a strike situation.
+- **DRAIN WIN #1: PAN-2611 MERGED** (PR #2624 squash → main `6ebbbe5d`, 14:13:35Z). Was fully green
+  (test 9m0s + review passed + overdeck/test verification gate) + CLEAN/MERGEABLE but auto-merge
+  never scheduled it (scheduler backlog is all STALE Jun29–Jul8 rate-limit/dirty failures — ignore).
+  Direct `gh pr merge 2624 --squash --delete-branch` (all required checks green → no admin bypass).
+  Deacon will run postMergeLifecycle → verifying-on-main; close out next tick after verify.
+- **REVIEW-SYNTHESIS WEDGE (root blocker for the drain).** PAN-2596 + PAN-2602 work agents idle
+  ~2–2.75h (lastActivity 11:20 / 12:01; tmux-alive but frozen at prompt). Their review convoy
+  sub-agents ALL wrote reports (`• Done.`, e.g. `.pan/review/agent-pan-2596-review-7cf60996/security.md`)
+  but the SYNTHESIS→verdict→readyForMerge step never landed — convoys dispatched 08:00, ~6h before
+  the 23m-ago server restart (pid 365722), so synthesis was lost across restart. Deacon log shows NO
+  synthesis attempts for either. This is the PAN-1864 deterministic synthesis wedge.
+  **Recovery applied:** `pan review restart PAN-2602` + `PAN-2596` → both "Convoy review resumed
+  (session preserved)". VERIFY NEXT TICK the verdicts actually land; if they re-wedge, it's a live
+  substrate bug (synthesis not landing post-restart) to root-cause + file/strike, NOT re-restart.
+- **NOTE — the stale-pane trap avoided:** 2596/2602 panes showed "MUST READ .overdeck/feedback/
+  002-verification-gate-failed.md" but that dir is EMPTY (mtime 07:20/07:58) = feedback was written,
+  consumed, and cleared normally at ~07:xx; the panes are OLD renders. NOT a missing-feedback bug.
+  Path note: workspaces use `.overdeck/feedback/` (post-rebrand); `.pan/feedback/` no longer exists.
+- **Healthy / leave alone:** PAN-2229 (last Lane A order-book item) actively committing+pushing+
+  linting (state.json read "starting" is stale — TRUST THE PANE: commit 6ffc3ea7f2 pushed). PAN-2616
+  running (`pan start` says already-running; deacon `checkOrphanedCompletions` recovered it — PR open,
+  review being dispatched). PAN-2607 swarm slot-3 done, waiting on Deacon swarm verify/merge of
+  `a7e2edb18f` (1/3 slots in use, no hold) — leave.
+- **NEEDS ACTION NEXT TICK:** **PAN-1232** — merge conflict in `src/dashboard/server/routes/backlog.ts`
+  (the backlog-sequence-pinning churn) + red GitHub `test` check on PR #2604; test agent done 8.6h ago
+  (kimi, idle). Deacon says "review/test passed" but CI is red + dirty → needs `pan sync-main 1232`
+  (resync if additive) else restart. It's the only current merge-blocker (`pan flywheel merge-blockers`).
+- **Swarm/review cohort to shepherd to verdict:** PAN-2598, PAN-2568, PAN-2564 (close-out), PAN-1520,
+  PAN-1491 (v1.0-required), PAN-1234, PAN-2597 — all "review=pending" per deacon (agents idle/gone).
+- **Out of scope, do NOT touch (NO new intake):** stray planning agents planning-pan-2499 (Fable5,
+  stuck at finalize on bd-lock — known 90s-abort pattern, self-resolves) and planning-pan-2633 — both
+  operator-started, not in drain inventory; leave. Old ~24-day Boot --no-resume zombies (agent-pan-1969,
+  agent-pan-1970-review-*) — leave, not in inventory.
+- **NOT committing this tick doc** (RUN-62 lesson: doc-only commits × flaky suite = red-main noise;
+  just landed a merge commit + green main — don't stack a doc commit). State durable on disk.
+- NEXT TICK: (1) verify 2596/2602 synthesis landed post-restart; (2) PAN-1232 sync-main-or-restart;
+  (3) close out PAN-2611 + PAN-2564; (4) shepherd swarm/review cohort verdicts; (5) re-check main green.
+
+- **PHASE 3 PREP (operator update 2026-07-13 ~14:30) — do NOT act until after operator cuts the release.**
+  PAN-2377 PRD is ALREADY AUTHORED at `drafts/pan-2377.md` on `overdeck-state` (commit aa52bf12cc),
+  with a normative mockup at `docs/design/order-book-page-mockup.html` on main. When Phase 3 begins
+  (drain done + release cut by operator), dispatch straight from that PRD — **do NOT re-author it**:
+  `pan plan PAN-2377 --auto` → `pan start PAN-2377` → shepherd to merged+closed-out. Phases 1–2
+  unchanged: keep draining, NOTHING new into the pipeline until PAN-2377 (the single allowed Phase-3
+  dispatch). A13/B10–B13 stay ON HOLD until after PAN-2377 lands.
+
+## RUN-63 tick 2 (2026-07-13 ~10:45 local / 14:45Z) — PAN-2611 CLOSED OUT; PAN-1232 re-driven; found + worked-around the codex-resume token-revoke bug
+
+- **PAN-2611 fully CLOSED OUT** ✅ (`pan close --force`: worktree removed, GitHub #2611 closed +
+  closed-out label, 9 agent-state dirs pruned, vBRIEF→completed, review cleared, 3333 beads validated).
+  First issue FULLY drained (merged+closed-out). Its merge commit `6ebbbe5d` went CI-green on main.
+- **Main HEAD `3feb6414`** = a conversation's doc commit (my tick-1 FLYWHEEL-STATE snapshot + the
+  PAN-2377 order-book mockup `3501aafe`). Confirms the operator's conv committed my state doc "to
+  unblock rebase" — so I don't need to commit FLYWHEEL-STATE myself; the conv handles it. CI in_progress
+  (doc-only, will pass).
+- **PAN-1232 re-driven FRESH** (`pan start PAN-1232 --fresh`, kimi work agent). Branch was 105-ahead/
+  9-behind main with a mechanical conflict (`DrawerActiveAgent.tsx` + `backlog.ts` sequence-pinning) +
+  red CI `test` on PR #2604. 105 commits = large feature → resync-and-fix, NOT restart-from-scratch.
+  `pan start` (non-fresh) refused ("resumable session; use pan resume or --fresh"); `pan resume` is
+  forbidden by role → used `--fresh`. Fresh agent will sync-main, resolve conflict, fix the failing
+  test, re-submit. Only current merge-blocker.
+- **SUBSTRATE BUG FOUND — codex-resume replays a rotated-out (revoked) refresh token (needs filing+fix).**
+  Symptom: 2596/2602 review convoys (gpt-5.5/codex) sat idle; every codex TUI session — even freshly
+  restarted — shows `⚠ MCP startup incomplete (failed: codex_apps)` + `■ access token could not be
+  refreshed because your refresh token was revoked` + `status:401`, and never executes its kickoff.
+  BUT host auth is VALID (`codex login status` = logged in; access token refreshed 13:49Z, exp Jul-23)
+  and **`codex exec` works fine** (replied OK). MECHANISM: review agents run as `codex resume
+  <session-id>` TUI procs; `pan review restart` does "session preserved" = resumes the PRE-EXISTING
+  session, which baked in the refresh token that was ROTATED/REVOKED when `~/.codex/auth.json`
+  refreshed at 13:49Z. Resumed sessions replay the dead token → 401; only a genuine FRESH spawn reads
+  the current token. This will recur for EVERY codex review whose session predates a token refresh.
+  Likely fix site: `src/lib/runtimes/codex.ts` resume path — start fresh (or re-read auth) instead of
+  blind `codex resume` across a token rotation. **FILE + STRIKE next tick** (root-cause the resume path).
+- **WORKAROUND applied to drain 2596/2602 NOW:** `pan review abort <id>` (kill stuck codex reviewers)
+  → `pan review restart <id> --model claude-sonnet-5`. The --model override forces a genuine fresh
+  SPAWN (can't resume a codex session into a claude model) on the claude-code harness — bypasses the
+  codex-resume bug. Verified: agent-pan-2596-review (Sonnet 5) is correctly "Standing by — waiting for
+  all 4 reviewer signals". Both 2596 (PR #2634) + 2602 now re-reviewing on sonnet. This is an
+  EMERGENCY model override justified by the codex outage — NOT routine; the real fix is the resume path.
+- **LESSON:** tick-1 I `pan review restart`-ed 2596/2602 (session-preserved) — that resumed the
+  token-dead codex sessions, so it couldn't have worked; the original 08:00 convoy's written reports
+  were mooted anyway because their synthesis parent was the same token-dead codex. Escalation
+  (restart→abort+restart→--model claude) was needed, but next time: on a stalled codex review, check
+  codex session-auth (resume-vs-token-rotation) BEFORE re-restarting the same broken path.
+- **Still draining, healthy:** PAN-2229 (work, running 4m), PAN-2616 (work, running), PAN-2607 (swarm
+  slot-3 awaiting Deacon merge). NO new intake.
+- NEXT TICK: (1) verify 2596/2602 sonnet reviews reach verdict→merge; (2) PAN-1232 fresh agent progress
+  (conflict+test fixed?); (3) FILE + strike the codex-resume token-revoke substrate bug; (4) close out
+  PAN-2564 + shepherd cohort (2598/2568/1520/1491/1234/2597 — note these are also codex-review-routed,
+  may hit the SAME resume bug → may need --model claude too); (5) re-check main green.
+
+## RUN-63 tick 3 (2026-07-13 ~11:10 local / 15:10Z) — codex bug FILED (PAN-2639); PAN-2229 re-driven; PAN-2602 frozen-zombie parked; PAN-2564 not closeable (unmerged WI-8)
+
+- **Main GREEN** (3feb6414 success). No merge-blockers. Nothing `--ready` yet.
+- **Codex-resume bug FILED = [PAN-2639]** (bug + substrate-improvement). Full diagnosis/repro/fix-site in
+  the issue. Did NOT strike it: not blocks-main, main green, and the `--model claude-sonnet-5` workaround
+  keeps the drain moving → filing only respects Phase-1 no-new-intake. Fix after drain/release.
+- **PAN-2596** review still `reviewing` on sonnet (active) — leave. **PAN-2602** review came back
+  `blocked` on sonnet with **3 REAL blocking findings** (synthesis.md; the demoted set incl. the
+  closeOut Effect.promise-vs-tryPromise bead-sweep note worth its own follow-up). Sonnet reroute WORKED
+  (proves PAN-2639 workaround); the block is legit.
+- **PAN-2602 work agent = FROZEN ZOMBIE, cannot re-drive (parked for operator).** agent-pan-2602 is a
+  claude session, status=running but lastActivity **189min stale**, idle at prompt holding
+  `001-review-agent-changes-requested.md` + `002-verification-gate-failed.md` feedback it never
+  processed ($78 burned). `pan start` refuses ("already running") even with `--fresh`; `pan
+  resume/tell/kill` are role-forbidden; and reconcileAgentLiveness won't mark an alive-but-hung session
+  stopped → it will NOT self-recover. **This is a real flywheel gap: Boot --no-resume + frozen-alive
+  work agent = un-recoverable with the flywheel's allowed toolset.** Operator can `pan kill PAN-2602`
+  then I `pan start --fresh` next tick. SURFACED.
+- **PAN-2229 re-driven FRESH** (`pan start --fresh`, 6 beads). It was in-review but verification FAILED
+  at the test gate on its own flywheel rail test ("orchestrators dispatch work; they do not author
+  reports"). Fresh agent to fix. NOTE it carries `needs-handoff` (TENET-10, flywheel machinery) — watch
+  that the fix doesn't just weaken the rail test; if it's genuinely a doctrine judgment call, surface
+  rather than let a cheap agent gut the guard.
+- **PAN-2564 NOT closeable** — `pan close --force` refused: 2 unmerged commits on the LOCAL feature
+  branch (no remote branch, no PR): `cd002d15 feat(beads): config standardization doctor (WI-8)` +
+  a slot-3 merge. So WI-8 (a swarm slot's work) never reached main. PAN-2564 is still a draining SWARM,
+  not a close-out. NEEDS: slot-3 WI-8 pushed → PR → review → merge, THEN close out. Deferred (deep).
+- **PAN-1232** fresh kimi work agent active (5min) resolving conflict + failing test — leave.
+- **CONTEXT/HANDOVER:** this orchestrator session is getting deep (~80%). If next tick pushes past ~85%,
+  hand over to a fresh RUN-63 flywheel run before grinding.
+- NEXT TICK: (1) PAN-2602 — if operator killed it, `pan start --fresh` to fix the 3 blocking findings;
+  else re-surface; (2) verify PAN-2596 sonnet review verdict + PAN-2229 re-drive + PAN-1232 progress;
+  (3) PAN-2564 slot-3 WI-8 → review→merge; (4) shepherd cohort (watch for codex-resume 401 → --model
+  claude); (5) main green. Consider handover if context >85%.
+
+## RUN-63 tick 3.5 (2026-07-13 ~11:33 local / 15:33Z) — no-resume gate STRUCTURALLY BLOCKS review-convoy respawn (2nd drain blocker); recommend lifting no-resume
+
+- **PAN-2596 review convoy CANNOT be respawned by the flywheel.** The sonnet review-supervisor
+  (agent-pan-2596-review-66452d51) reported: all 4 sub-role reviewers + supervisor are registered
+  `stopped, Gate: Boot --no-resume`, NO tmux sessions, discovery-ready no-op'd as "already launched";
+  supervisor can't synthesize with zero reviewer input and can't self-spawn the convoy. I tried
+  `pan review reset --session` + `pan review restart --model claude-sonnet-5` (and earlier abort+restart):
+  each only re-creates the supervisor session ("resumed session preserved") and spawns **0 of 4**
+  sub-reviewers (verified: `tmux ls | grep 2596-review-(security|correctness|performance|requirements)`
+  = 0). No `pan review` verb forces the sub-reviewer spawn under Boot --no-resume.
+- **ROOT: Boot `--no-resume` gates review-convoy sub-agent (re)spawn.** This is the SECOND way the
+  no-resume gate structurally blocks the drain (first: frozen-alive PAN-2602 work agent un-recoverable,
+  tick 3). The brief set resume=off on the premise "YOU are the re-drive via pan start" — but pan start
+  covers only stopped ISSUE work agents; it does NOT cover (a) frozen-alive work agents (pan start
+  refuses "already running") nor (b) review-convoy sub-reviewer respawn (no verb triggers it under
+  no-resume). So the flywheel canNOT re-drive these two classes, and they wedge the drain.
+- **RECOMMENDATION SURFACED TO OPERATOR:** lift no-resume (restart dashboard WITHOUT `--no-resume`) so
+  the deacon resumes/ spawns review convoys + recovers stopped agents itself — trading the sole-re-drive
+  posture for a self-healing pipeline during the drain. Cost: deacon may auto-resume the ~24-day stale
+  zombies (agent-pan-1969/1970-*) → triage those after. Alternative: per-issue no-resume bypass (no
+  known verb). This is the operator's config call (they set no-resume); I did NOT change it.
+- **CONTEXT ~85% → HANDOVER POINT.** Stopped thrashing 2596 (5th attempt). Recommend: operator decides
+  no-resume; then a FRESH RUN-63 flywheel run continues the drain with clean context. Open blockers for
+  the next run: PAN-2602 (needs operator `pan kill` then `pan start --fresh`), PAN-2596 convoy respawn
+  (needs no-resume lift or bypass), PAN-2639 (codex-resume, fix after drain), PAN-2564 (WI-8 unmerged),
+  PAN-1232/2229 (fresh agents in flight). Drained so far: PAN-2611 (merged+closed).
+
+## RUN-63 HANDOVER (2026-07-13 ~11:57 local / 15:57Z) — this orchestrator at ~85% ctx; fresh run to continue
+
+**Why handover:** context exhausted (~85%+), and the environment just materially changed (below) — a
+fresh-context RUN-63 run should continue the drain rather than have me grind. Loop stopped this session.
+
+**Environment change (good):** the PAN-2596 review convoy RESPAWNED — 4 sub-reviewer tmux sessions
+(security/correctness/performance/requirements) are now alive; running-agent count jumped 24→31. Strong
+signal the operator LIFTED `--no-resume` (or the deacon respawned the convoy). This clears the tick-3.5
+blocker: convoys now (re)spawn and the deacon can recover stopped agents itself → more self-healing.
+Main GREEN (3feb6414).
+
+**State for the fresh run (verify all — it moves):**
+- DRAINED: PAN-2611 (merged+closed-out). ✓
+- In-flight, self-progressing: PAN-1232 (fresh kimi, PR #2604 — was 36min-stale at 11:35, CHECK
+  frozen-vs-long-test first thing), PAN-2229 (fresh, fixing its own flywheel rail test — WATCH TENET-10,
+  don't let it weaken the guard), PAN-2607 (swarm slot-3 awaiting merge), PAN-2616.
+- PAN-2596: convoy respawned on sonnet — let it reach verdict; if it lands, drive review→test→merge.
+- PAN-2602: review BLOCKED (3 real findings) + work agent was a frozen zombie. If no-resume lifted, the
+  deacon may have recovered it; else operator `pan kill PAN-2602` → `pan start --fresh`. Verify its state.
+- PAN-2564: NOT closeable — WI-8 (slot-3 "config standardization doctor") unmerged to main (local-only,
+  no PR). Drive push→PR→review→merge, THEN `pan close`.
+- Cohort still in-review: PAN-2598/2568/1520/1491/1234/2597 — shepherd to verdict; any codex review
+  stuck on 401 = PAN-2639 → `pan review abort <id>` + `pan review restart <id> --model claude-sonnet-5`.
+- SUBSTRATE FILED: PAN-2639 (codex-resume token-revoke) — do NOT strike during drain; fix after release.
+- Two flywheel-gap findings recorded (tick 3 + 3.5): frozen-alive work agents and convoy sub-reviewer
+  respawn are un-re-drivable under --no-resume — moot if no-resume stays lifted.
+- Phase 2 (release readiness) not yet reached; Phase 3 (PAN-2377) PRD pre-authored at
+  drafts/pan-2377.md — do NOT re-author; dispatch only after operator cuts the release.
+- NO new intake; do not touch stray planning-pan-2499/2633.
+
+**PAN-2607 unblock (post-handover, 15:59Z):** operator flagged slot-3 (a7e2edb18f, AC2 fix, only delta
+vs already-merged base, gates green) unmerged ~7h. VERIFIED: slot-3 unmerged; integration branch
+feature/pan-2607 NOT on origin (local to integration workspace); review-supervisor has NO tmux session
+(stopped); `overdeck-feature-pan-2607-server-1` had exited (130) 5h ago; Deacon coordinating but stalled.
+ACTION: `docker start overdeck-feature-pan-2607-server-1` → now Up. With no-resume lifted, the Deacon
+should re-dispatch agent-pan-2607-review-supervisor + complete the slot-3 merge on next patrol.
+FRESH RUN: verify PAN-2607 advances (slot-3 merged into feature/pan-2607 → integration review → merge to
+main); if still stuck after a few patrols, escalate `pan swarm recover PAN-2607 3` (retry) or check
+server-1 didn't crash-loop again (exit 130 may recur).

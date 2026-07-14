@@ -18,6 +18,9 @@
  *   GET  /api/deacon/logs
  *   POST /api/deacon/patrol
  *   GET  /api/version
+ *   GET  /api/update/status
+ *   POST /api/update/check
+ *   POST /api/update/install
  *   GET  /api/registered-projects
  *   GET  /api/confirmations
  *   POST /api/confirmations/:id/respond
@@ -47,6 +50,7 @@ import { deaconRouteLayer } from './misc/deacon.js';
 import { planningRouteLayer } from './misc/planning.js';
 import { tldrRouteLayer } from './misc/tldr.js';
 import { metaRouteLayer } from './misc/meta.js';
+import { updatesRouteLayer } from './misc/updates.js';
 
 export { readPackageVersion } from './misc/shared.js';
 
@@ -59,6 +63,7 @@ export const miscRouteLayer = Layer.mergeAll(
   planningRouteLayer,
   tldrRouteLayer,
   metaRouteLayer,
+  updatesRouteLayer,
 );
 
 export default miscRouteLayer;

@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -56,6 +56,25 @@ interface PrereqResult {
   passed: boolean;
   message: string;
   fix?: string;
+}
+
+type BdMetricsRunner = (
+  file: string,
+  args: string[],
+  options: { stdio: 'pipe'; timeout: number },
+) => unknown;
+
+/**
+ * Disable bd's process-per-command anonymous telemetry. This is machine-wide
+ * bd configuration and does not read or mutate any project's beads store.
+ */
+export function disableBdMetricsSync(run: BdMetricsRunner = execFileSync): boolean {
+  try {
+    run('bd', ['metrics', 'off'], { stdio: 'pipe', timeout: 10_000 });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Effect.runSync(detectPlatform()) is now in src/lib/platform.ts
@@ -473,6 +492,14 @@ async function installCommand(options: InstallOptions): Promise<void> {
     } catch (error) {
       spinner.warn('beads version check or upgrade failed - install manually: curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash');
     }
+    }
+  }
+
+  if (!options.skipBeads && checkCommand('bd')) {
+    if (disableBdMetricsSync()) {
+      spinner.info('beads anonymous usage metrics disabled; bd commands will not fork telemetry child processes');
+    } else {
+      spinner.warn('beads anonymous usage metrics could not be disabled; run `bd metrics off` to prevent a telemetry child process per bd command');
     }
   }
 

@@ -30,3 +30,46 @@ other machines.
 
 `.beads/issues.jsonl` is a validated `--all` recovery export only. Do not read it
 as current task state or edit/merge its lines.
+
+## `pan beads sweep`
+
+Sweep orphaned open beads on issues that are already closed on the tracker. This
+is useful for backfills and for cleaning up after bypass merges that did not run
+the normal merge-time sweep.
+
+```bash
+pan beads sweep --all-closed              # enumerate closed issues with orphaned beads
+pan beads sweep --all-closed --dry-run    # preview would-close counts without mutating
+pan beads sweep PAN-1234 PAN-1235         # sweep specific issue IDs
+pan beads sweep PAN-1234 --reason "custom reason"
+```
+
+`--all-closed` groups beads by issue label, checks the tracker state for each
+candidate through the same GitHub issue-view door used by `pan close`, and sweeps
+only closed issues. Open issues with orphaned beads are listed separately so they
+can be routed back into the pipeline.
+
+The default close reason derives from the GitHub close state:
+
+| Close state | Default reason |
+| --- | --- |
+| completed | `issue closed (completed); orphaned bead swept` |
+| not_planned | `issue closed (not planned); bead cancelled` |
+
+## Handoff issue association
+
+`pan handoff` can associate a spawned conversation with an explicit issue:
+
+```bash
+pan handoff --issue PAN-1234 self "investigate the failing test"
+```
+
+The issue association is resolved with the following precedence:
+
+1. **Explicit `--issue`** — used exactly as given.
+2. **Parent conversation issue** — inherited from the conversation that starts the handoff.
+3. **Current git branch issue** — parsed from a feature branch such as `feature/pan-1234`.
+4. **None** — the handoff runs without an issue association.
+
+This precedence lets an operator override the branch or parent context when
+spawning a targeted investigation.

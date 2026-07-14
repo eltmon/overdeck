@@ -28,6 +28,7 @@ vi.mock('lucide-react', async (importOriginal) => {
     Container: () => <svg data-testid="container" />,
     Radio: () => <svg data-testid="radio" />,
     Workflow: () => <svg data-testid="workflow" />,
+    MessageSquare: () => <svg data-testid="message-square" />,
   };
 });
 
@@ -152,6 +153,7 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
       hasBeads: false,
       dockerContainerCount: 0,
       dockerContainerNames: [],
+      conversations: [],
     },
     ...overrides,
   };
@@ -919,6 +921,7 @@ describe('FeatureItem', () => {
             hasVbrief: false,
             hasBeads: false,
             dockerContainerCount: 2,
+            conversations: [],
           },
           sessions: [
             makeSession({ sessionId: 'agent-pan-821', type: 'work', status: 'stopped', presence: 'inactive' }),
@@ -971,6 +974,7 @@ describe('FeatureItem', () => {
             hasVbrief: false,
             hasBeads: false,
             dockerContainerCount: 2,
+            conversations: [],
           },
           sessions: [
             makeSession({ sessionId: 'agent-pan-821', type: 'work', status: 'stopped', presence: 'inactive' }),
@@ -1105,7 +1109,7 @@ describe('FeatureItem', () => {
 
   it('shows cleanup affordances for orphaned resources', () => {
     const onCleanupOrphanedResources = vi.fn();
-    renderFeature(
+    const { container } = renderFeature(
       <FeatureItem
         feature={makeFeature({
           issueId: 'PAN-777',
@@ -1121,6 +1125,7 @@ describe('FeatureItem', () => {
             hasVbrief: false,
             hasBeads: false,
             dockerContainerCount: 0,
+            conversations: [],
           },
         })}
         isSelected={false}
@@ -1129,8 +1134,80 @@ describe('FeatureItem', () => {
       />,
     );
 
-    fireEvent.mouseEnter(screen.getByTitle('workspace: allocated').parentElement!);
-    fireEvent.click(screen.getByRole('button', { name: 'Cleanup' }));
+    const strip = container.querySelector('.featureResourceStrip');
+    expect(strip).toBeTruthy();
+    if (strip) fireEvent.mouseEnter(strip);
+
+    const cleanupButton = screen.getByTitle('Clean up orphaned workspace resources');
+    fireEvent.click(cleanupButton);
+
+    expect(onCleanupOrphanedResources).toHaveBeenCalledTimes(1);
     expect(onCleanupOrphanedResources).toHaveBeenCalledWith('PAN-777');
+  });
+
+  it('renders issue-linked conversations as child rows with links to /conv/<id>', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [],
+          resourceSources: ['conversation'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasVbrief: false,
+            hasBeads: false,
+            dockerContainerCount: 0,
+            conversations: [
+              { id: 42, name: 'conv-pan-821', title: 'My conv', status: 'active' },
+              { id: 43, name: 'conv-pan-821-2', title: null, status: 'ended' },
+            ],
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    const activeLink = screen.getByTestId('conversation-42');
+    expect(activeLink).toHaveAttribute('href', '/conv/42');
+    expect(activeLink).toHaveTextContent('My conv');
+
+    const endedLink = screen.getByTestId('conversation-43');
+    expect(endedLink).toHaveAttribute('href', '/conv/43');
+    expect(endedLink).toHaveTextContent('Conversation');
+  });
+
+  it('shows the expand caret for an issue with conversations but no sessions', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          stateLabel: 'Done',
+          sessions: [],
+          resourceSources: ['conversation'],
+          resourceDetails: {
+            hasWorkspace: false,
+            localBranchCount: 0,
+            remoteBranchCount: 0,
+            tmuxSessionCount: 0,
+            prs: [],
+            hasVbrief: false,
+            hasBeads: false,
+            dockerContainerCount: 0,
+            conversations: [{ id: 7, name: 'conv-pan-821', title: 'Only conv', status: 'active' }],
+          },
+        })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.queryByTestId('conversation-7')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sessions' }));
+    const link = screen.getByTestId('conversation-7');
+    expect(link).toHaveAttribute('href', '/conv/7');
+    expect(link).toHaveTextContent('Only conv');
   });
 });

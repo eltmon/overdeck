@@ -11,7 +11,7 @@ import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
-import { createBeadsResolver } from '../beads/resolver.js';
+import { readIssuesWithBeads } from '../beads/presence.js';
 import type { VBriefDocument } from '../vbrief/types.js';
 import {
   getFlywheelActiveRunId,
@@ -164,11 +164,14 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const predictedConflictSignals = computePredictedConflictSignals(declaredFootprints, {
             hotspots: getProjectSwarmHotspots(findProjectByPathSync(projectRoot)),
           });
+          // One bulk presence read for every candidate below. The old shape —
+          // getBeadsForIssueSync per sequence candidate — spawned a ~2s Dolt
+          // process per issue and blocked the deacon's event loop for minutes.
+          const beadsPresence = await readIssuesWithBeads(projectRoot);
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
-            // ready = spec AND beads exist in the workspace
-            const beads = createBeadsResolver(join(workspacesDir, `feature-${id.toLowerCase()}`)).getBeadsForIssueSync(id);
-            if (issuesWithSpecs.has(id) && beads.ok && beads.value.length > 0) {
+            // ready = spec AND beads exist (presence unknown → optimistic, like the backlog routes)
+            if (issuesWithSpecs.has(id) && (beadsPresence.known ? beadsPresence.set.has(id) : true)) {
               return true;
             }
             return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
@@ -325,7 +328,12 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
     if (existsSync(seqPath)) {
       const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
       if (parsed.ok) {
-        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
+        // issuesWithBeads MUST be passed: without it buildClassifyLookups falls
+        // back to one sync ~2s bd spawn per workspace dir, blocking the deacon
+        // event loop ~2s × ~45 dirs. Presence unknown → empty set (cohort is
+        // best-effort; misclassifying planned-ness beats a minute-long stall).
+        const beadsPresence = await readIssuesWithBeads(workspace);
+        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace, { issuesWithBeads: beadsPresence.set }), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
       }
     }
   } catch { /* cohort snapshot is best-effort */ }

@@ -17,7 +17,7 @@ import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { loadCloisterConfig } from './config.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
-import { createBeadsResolver } from '../beads/resolver.js';
+import { readBeadsForIssueCached } from '../beads/presence.js';
 
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
 const execAsync = promisify(exec);
@@ -139,8 +139,10 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
 
 async function countBeadsForIssue(projectPath: string, issueId: string): Promise<number | null> {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const result = await createBeadsResolver(existsSync(workspacePath) ? workspacePath : projectPath).countBeadsForIssue(issueId);
-  return result.ok ? result.value : null;
+  // Cached bulk snapshot (10s TTL) — patrol-scoped count; per-issue bd
+  // processes here contributed to the post-PAN-2564 process storm (PAN-2640).
+  const result = await readBeadsForIssueCached(existsSync(workspacePath) ? workspacePath : projectPath, issueId);
+  return result.ok ? result.value.length : null;
 }
 
 async function defaultGetAgentState(agentId: string): Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null> {

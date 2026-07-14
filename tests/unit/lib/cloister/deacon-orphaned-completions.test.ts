@@ -42,14 +42,19 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock('../../../../src/lib/beads-query.js', async () => {
-  const actual = await vi.importActual<typeof import('../../../../src/lib/beads-query.js')>('../../../../src/lib/beads-query.js');
-  const { Effect } = await import('effect');
+vi.mock('../../../../src/lib/beads/presence.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../../src/lib/beads/presence.js')>('../../../../src/lib/beads/presence.js');
   return {
     ...actual,
-    queryBeadsForIssue: vi.fn((workspacePath: string, issueId: string) =>
-      Effect.succeed(mockQueryBeadsForIssue(workspacePath, issueId))
-    ),
+    // The recovery patrol reads beads through the cached bulk-snapshot door
+    // (PAN-2640). Translate the fixtures' {beads, transientFailure} shape to
+    // the door's BeadsReadResult at that boundary, bypassing the cache.
+    readBeadsForIssueCached: vi.fn(async (workspacePath: string, issueId: string) => {
+      const result = mockQueryBeadsForIssue(workspacePath, issueId);
+      return result.transientFailure
+        ? { ok: false, reason: 'transient bd failure', transient: true, error: result.transientFailure }
+        : { ok: true, value: result.beads };
+    }),
   };
 });
 

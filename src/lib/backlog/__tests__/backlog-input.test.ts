@@ -9,8 +9,25 @@ vi.mock('../../review-status.js', () => ({
 }));
 
 vi.mock('../../beads/resolver.js', () => ({
-  createBeadsResolver: (workspacePath: string) => ({
-    issueHasBeads: async () => ({ ok: true, value: existsSync(join(workspacePath, '.beads', 'issues.jsonl')) }),
+  // collectOpenBacklog now derives presence from ONE bulk read at the project
+  // root (readIssuesWithBeads). Synthesize one labeled bead per fixture
+  // workspace that has .beads/issues.jsonl — same semantics as the old
+  // per-workspace issueHasBeads mock.
+  createBeadsResolver: (projectRoot: string) => ({
+    getAllBeads: async () => {
+      const { readdirSync } = await import('node:fs');
+      const workspacesDir = join(projectRoot, 'workspaces');
+      const beads: Array<{ labels: string[] }> = [];
+      if (existsSync(workspacesDir)) {
+        for (const dir of readdirSync(workspacesDir)) {
+          const m = /^feature-([a-z]+-\d+)$/i.exec(dir);
+          if (m && existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) {
+            beads.push({ labels: [m[1]!.toLowerCase()] });
+          }
+        }
+      }
+      return { ok: true, value: beads };
+    },
   }),
 }));
 

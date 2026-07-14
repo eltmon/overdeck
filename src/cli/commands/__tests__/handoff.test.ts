@@ -95,4 +95,92 @@ describe('handoffCommand', () => {
       handoffAuthorModel: undefined,
     });
   });
+
+  it('validates and forwards --issue to the fork server', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', ['continue'], { issue: 'PAN-9004' });
+
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalledWith(
+      'source-conv',
+      expect.objectContaining({ issueId: 'PAN-9004', focus: 'continue' }),
+    );
+  });
+
+  it('rejects an invalid --issue and does not fork', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await expect(handoffCommand('123', [], { issue: 'not-an-issue' })).rejects.toThrow('process.exit');
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Invalid --issue: not-an-issue. Expected an issue ID like PAN-123.');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(forkMocks.forkConversationViaServer).not.toHaveBeenCalled();
+  });
+
+  it('prints the issue association returned by the fork server', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      issueId: 'PAN-9005',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', [], {});
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Issue: PAN-9005');
+  });
+
+  it('annotates an explicit --issue in the handoff output', async () => {
+    conversationMocks.getConversationById.mockReturnValue({
+      id: 123,
+      name: 'source-conv',
+      title: 'Source conversation',
+      cwd: '/workspace',
+      claudeSessionId: 'session-id',
+    });
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 789,
+      name: 'new-conv',
+      tmuxSession: 'conv-new',
+      issueId: 'PAN-9004',
+      sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('123', [], { issue: 'PAN-9004' });
+
+    const output = logSpy.mock.calls.map((call) => call.join(' ')).join('\n');
+    expect(output).toContain('Issue: PAN-9004 (from --issue)');
+  });
 });

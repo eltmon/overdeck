@@ -11,11 +11,18 @@ import { tmpdir } from 'os';
 vi.setConfig({ testTimeout: 30_000 });
 
 // Use vi.hoisted to avoid initialization order issues
-const { mockExecAsync, mockClearReviewStatus, mockResetPostMergeState, mockMarkRecordPipelineClosedOutSync } = vi.hoisted(() => ({
+const {
+  mockExecAsync,
+  mockClearReviewStatus,
+  mockResetPostMergeState,
+  mockMarkRecordPipelineClosedOutSync,
+  mockSweepOrphanedBeads,
+} = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
   mockResetPostMergeState: vi.fn(),
   mockMarkRecordPipelineClosedOutSync: vi.fn(),
+  mockSweepOrphanedBeads: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
 }));
 
 vi.mock('child_process', () => ({
@@ -71,6 +78,10 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
     markRecordPipelineClosedOutSync: mockMarkRecordPipelineClosedOutSync,
   };
 });
+
+vi.mock('../../../../src/lib/lifecycle/orphaned-beads-sweep.js', () => ({
+  sweepOrphanedBeads: mockSweepOrphanedBeads,
+}));
 
 vi.mock('../../../../src/lib/cloister/merge-agent.js', () => ({
   resetPostMergeState: mockResetPostMergeState,
@@ -566,6 +577,52 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--add-label "closed-out"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "verifying-on-main"'))).toBe(true);
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
+    });
+
+    it('sweeps orphaned beads after vBRIEF completion and before teardown', async () => {
+      mockSweepOrphanedBeads.mockResolvedValueOnce({ ok: true, closedIds: ['bead-1', 'bead-2'], skipped: 1 });
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      const vbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      const sweepIdx = result.steps.findIndex(s => s.step === 'close-out:sweep-orphaned-beads');
+      const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
+      expect(vbriefIdx).toBeGreaterThanOrEqual(0);
+      expect(sweepIdx).toBeGreaterThanOrEqual(0);
+      expect(teardownIdx).toBeGreaterThanOrEqual(0);
+      expect(vbriefIdx).toBeLessThan(sweepIdx);
+      expect(sweepIdx).toBeLessThan(teardownIdx);
+      expect(result.steps[sweepIdx]?.success).toBe(true);
+      expect(result.steps[sweepIdx]?.details?.[0]).toContain('2 orphaned bead(s)');
+    });
+
+    it('uses the cancelled reason when opts.reason indicates not-planned/cancelled close', async () => {
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      await closeOut(ctx, { tracker: successfulTracker(), reason: 'not planned' });
+      expect(mockSweepOrphanedBeads).toHaveBeenLastCalledWith(
+        expect.objectContaining({ reason: 'issue closed (not planned); bead cancelled' }),
+      );
+    });
+
+    it('uses the completed reason by default', async () => {
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      await closeOut(ctx, { tracker: successfulTracker() });
+      expect(mockSweepOrphanedBeads).toHaveBeenLastCalledWith(
+        expect.objectContaining({ reason: 'issue closed (completed); orphaned bead swept' }),
+      );
+    });
+
+    it('continues close-out when the bead sweep fails', async () => {
+      mockSweepOrphanedBeads.mockResolvedValueOnce({ ok: false, closedIds: [], skipped: 0, error: 'beads read timed out' });
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.success).toBe(true);
+      const sweepStep = result.steps.find(s => s.step === 'close-out:sweep-orphaned-beads');
+      expect(sweepStep?.success).toBe(true);
+      expect(sweepStep?.skipped).toBe(true);
+      expect(sweepStep?.details?.[0]).toContain('Bead sweep failed (non-fatal)');
+      expect(sweepStep?.details?.[0]).toContain('beads read timed out');
     });
   });
 

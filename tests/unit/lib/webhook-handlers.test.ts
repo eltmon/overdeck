@@ -96,9 +96,10 @@ function makePayload(overrides: Partial<WebhookPayload> = {}): WebhookPayload {
 }
 
 describe('issueIdFromBranch', () => {
-  it('parses feature and strike issue refs only', () => {
+  it('parses feature, strike, and bypass issue refs', () => {
     expect(issueIdFromBranch('feature/pan-123')).toBe('PAN-123');
     expect(issueIdFromBranch('strike/pan-123')).toBe('PAN-123');
+    expect(issueIdFromBranch('bypass/pan-2564')).toBe('PAN-2564');
     expect(issueIdFromBranch('main')).toBeNull();
     expect(issueIdFromBranch('uat/pan-slate-0625')).toBeNull();
   });

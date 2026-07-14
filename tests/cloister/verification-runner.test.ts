@@ -24,6 +24,7 @@ const {
   getVBriefACStatusSyncMock,
   resolveIssueFeedbackTargetMock,
   surfaceIssueFeedbackNeedsYouMock,
+  checkOpenBeadsPromiseMock,
 } = vi.hoisted(() => ({
   execMock: vi.fn<[string, any?], Promise<{ stdout: string; stderr: string }>>()
     .mockResolvedValue({ stdout: 'Already up to date\n', stderr: '' }),
@@ -40,6 +41,7 @@ const {
   getVBriefACStatusSyncMock: vi.fn().mockReturnValue({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] }),
   resolveIssueFeedbackTargetMock: vi.fn(),
   surfaceIssueFeedbackNeedsYouMock: vi.fn(),
+  checkOpenBeadsPromiseMock: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('child_process', () => {
@@ -119,6 +121,10 @@ vi.mock('fs', async (importOriginal) => {
 vi.mock('../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: vi.fn().mockReturnValue(Effect.succeed({ allCompleted: true, totalPending: 0, totalCount: 0, items: [] })),
   getVBriefACStatusSync: getVBriefACStatusSyncMock,
+}));
+
+vi.mock('../../src/lib/work/done-preflight.js', () => ({
+  checkOpenBeadsPromise: checkOpenBeadsPromiseMock,
 }));
 
 // Import under test after mocks
@@ -512,6 +518,108 @@ describe('runVerificationForIssue', () => {
         'state_derived_verification_hold',
         expect.any(Object),
       );
+    });
+  });
+
+  describe('open-beads gate', () => {
+    beforeEach(() => {
+      runQualityGatesMock.mockReturnValue(Effect.succeed(makePassedResults()));
+      getVBriefACStatusSyncMock.mockReturnValue({
+        allCompleted: true,
+        totalPending: 0,
+        totalCount: 0,
+        items: [],
+      });
+    });
+
+    it('fails verification with failedCheck open-beads and names the bead ids', async () => {
+      checkOpenBeadsPromiseMock.mockResolvedValue([
+        '  Open beads (2):',
+        '    - bead-1 First open bead',
+        '    - bead-2 Second open bead',
+      ]);
+
+      const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(result).toMatchObject({
+        outcome: 'failed',
+        failedCheck: 'open-beads',
+        cycleCount: 1,
+      });
+      expect(setReviewStatusMock).toHaveBeenCalledWith(
+        issueId,
+        expect.objectContaining({
+          verificationStatus: 'failed',
+          verificationNotes: expect.stringContaining('Open beads check FAILED'),
+          verificationCycleCount: 1,
+        }),
+      );
+      expect(writeFeedbackFileMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          issueId,
+          workspacePath,
+          specialist: 'verification-gate',
+          outcome: 'failed',
+          summary: expect.stringContaining('2 open bead(s) remain'),
+          markdownBody: expect.stringContaining('bead-1'),
+        })
+      );
+      expect(messageAgentMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.stringContaining('Failed check: open-beads'),
+      );
+    });
+
+    it('fails closed when the beads read times out', async () => {
+      checkOpenBeadsPromiseMock.mockResolvedValue([
+        '  Open beads check timed out after 10s — cannot verify whether open beads exist; retry or resolve bead store lock contention',
+      ]);
+
+      const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(result).toMatchObject({
+        outcome: 'failed',
+        failedCheck: 'open-beads',
+      });
+    });
+
+    it('passes when there are zero open beads', async () => {
+      checkOpenBeadsPromiseMock.mockResolvedValue([]);
+
+      const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(result.outcome).toBe('passed');
+      expect(setReviewStatusMock).toHaveBeenCalledWith(
+        issueId,
+        expect.objectContaining({ verificationStatus: 'passed' }),
+      );
+    });
+
+    it('escalates to needs-you on the third consecutive open-beads failure', async () => {
+      checkOpenBeadsPromiseMock.mockResolvedValue([
+        '  Open beads (1):',
+        '    - bead-1 Stuck open bead',
+      ]);
+      getReviewStatusMock.mockReturnValue({ verificationCycleCount: VERIFICATION_MAX_CYCLES - 1 });
+
+      const result = await Effect.runPromise(runVerificationForIssue(issueId, workspacePath, workspaceInfo, 'test'));
+
+      expect(result).toMatchObject({
+        outcome: 'failed',
+        failedCheck: 'open-beads',
+        cycleCount: VERIFICATION_MAX_CYCLES,
+      });
+      expect(markWorkspaceStuckMock).toHaveBeenCalledWith(
+        issueId,
+        'verification_stuck',
+        expect.objectContaining({ failedCheck: 'open-beads' }),
+      );
+      expect(setAgentPausedMock).toHaveBeenCalledWith(
+        `agent-${issueId.toLowerCase()}`,
+        expect.stringContaining('needs-you: verification stuck'),
+        true,
+      );
+      expect(stopAgentMock).toHaveBeenCalledWith(`agent-${issueId.toLowerCase()}`);
     });
   });
 

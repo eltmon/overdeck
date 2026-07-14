@@ -50,23 +50,24 @@ vi.mock('../../tracker-utils.js', () => ({
   resolveGitHubIssueSync: trackerUtilsMocks.resolveGitHubIssueSync,
 }));
 
-vi.mock('../../beads/resolver.js', () => ({
-  createBeadsResolver: (workspacePath: string) => ({
-    countBeadsForIssue: async (issueId: string) => {
-      try {
-        const fs = await import('node:fs/promises');
-        let beadsPath = join(workspacePath, '.beads', 'issues.jsonl');
-        if (!existsSync(beadsPath)) {
-          const redirect = (await fs.readFile(join(workspacePath, '.beads', 'redirect'), 'utf8')).trim();
-          beadsPath = join(workspacePath, redirect, 'issues.jsonl');
-        }
-        const raw = await fs.readFile(beadsPath, 'utf8');
-        const value = raw.split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((bead) =>
-          bead.labels?.some((label: string) => label.toLowerCase() === issueId.toLowerCase())).length;
-        return { ok: true, value };
-      } catch { return { ok: true, value: 0 }; }
-    },
-  }),
+vi.mock('../../beads/presence.js', () => ({
+  // The reconciler counts beads through the cached bulk-snapshot door
+  // (PAN-2640); mock that boundary so the JSONL fixtures (including
+  // redirect-backed stores) keep driving the tests without any caching.
+  readBeadsForIssueCached: async (workspacePath: string, issueId: string) => {
+    try {
+      const fs = await import('node:fs/promises');
+      let beadsPath = join(workspacePath, '.beads', 'issues.jsonl');
+      if (!existsSync(beadsPath)) {
+        const redirect = (await fs.readFile(join(workspacePath, '.beads', 'redirect'), 'utf8')).trim();
+        beadsPath = join(workspacePath, redirect, 'issues.jsonl');
+      }
+      const raw = await fs.readFile(beadsPath, 'utf8');
+      const value = raw.split('\n').filter(Boolean).map((line) => JSON.parse(line)).filter((bead) =>
+        bead.labels?.some((label: string) => label.toLowerCase() === issueId.toLowerCase()));
+      return { ok: true, value };
+    } catch { return { ok: true, value: [] }; }
+  },
 }));
 
 import {
