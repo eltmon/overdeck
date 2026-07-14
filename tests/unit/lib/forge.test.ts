@@ -132,12 +132,44 @@ describe('forge adapters', () => {
       expect.stringContaining('glab mr create --source-branch feature/min-632 --target-branch qa'),
       expect.objectContaining({ cwd: '/tmp/repo' })
     );
+    expect(execMock).toHaveBeenCalledWith(
+      expect.stringContaining('glab mr list --source-branch feature/min-632 --output json'),
+      expect.objectContaining({ cwd: '/tmp/repo' })
+    );
     expect(result).toMatchObject({
       forge: 'gitlab',
       created: true,
       url: 'https://gitlab.example.com/group/repo/-/merge_requests/7',
       id: '7',
     });
+  });
+
+  it('reuses an existing GitLab merge request after a duplicate-create conflict', async () => {
+    execMock
+      .mockResolvedValueOnce({ stdout: '[]', stderr: '' })
+      .mockRejectedValueOnce(new Error(
+        '409 {message: [Another open merge request already exists for this source branch: !71]}',
+      ))
+      .mockResolvedValueOnce({
+        stdout: '[{"iid":71,"web_url":"https://gitlab.com/eltmon/mind-your-now/-/merge_requests/71"}]',
+        stderr: '',
+      });
+
+    const result = await getForgeAdapter('gitlab').createReviewArtifact({
+      title: 'MIN-865',
+      body: 'Body',
+      sourceBranch: 'feature/min-865',
+      targetBranch: 'main',
+      cwd: '/tmp/repo',
+    });
+
+    expect(result).toEqual({
+      forge: 'gitlab',
+      created: false,
+      url: 'https://gitlab.com/eltmon/mind-your-now/-/merge_requests/71',
+      id: '71',
+    });
+    expect(execMock).toHaveBeenCalledTimes(3);
   });
 
   it('uses GitHub App REST to find an existing GitHub artifact when configured', async () => {
