@@ -132,9 +132,22 @@
       "timestamp": "2026-07-14T16:47:08.882Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-14T16:48Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-14T16:48:31.879Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-14T16:48:31Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-2597 (attempt 1/3):\n\nFailed check: lint\n\nVerification FAILED at lint (44122ms):\n\n32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m                                     \u001b[2m 69.20 kB\u001b[22m \u001b[2m│ gzip:  19.07 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcodex-app-server-host.d.ts\u001b[22m\u001b[39m                     \u001b[2m  2.71 kB\u001b[22m \u001b[2m│ gzip:   0.95 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  1.21 kB\u001b[22m \u001b[2m│ gzip:   0.56 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 389 files, total: 11.82 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3525ms\u001b[39m\n\n> @overdeck/core@0.45.16 lint:skills\n> bash scripts/lint-skills.sh\n\nskill CLI lint passed\n\n> @overdeck/core@0.45.16 lint:prompts\n> bash scripts/lint-prompts.sh\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/merge-agent.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (59%)\n  - tsdown:deps (38%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-2597 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-2597 -m \"Fixed lint\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nDo NOT stop between steps. Do NOT stop after pushing. Do NOT stop until `pan review request` has completed successfully."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/circular-deps-baseline.txt",
@@ -237,18 +250,18 @@
     "recordedAt": "2026-07-14T16:47:08.176Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T16:47:09.887Z",
+  "updated": "2026-07-14T16:48:32.041Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T16:47:09.796Z",
-    "reviewNotes": "Review reset by deacon: no active review session after 346min",
+    "updatedAt": "2026-07-14T16:48:31.962Z",
+    "reviewNotes": "Verification failed at lint",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
@@ -425,7 +438,7 @@
       },
       "costAtCloseOut": {
         "usd": 90.316005,
-        "pricingAsOf": "2026-07-14T16:47:09.864Z"
+        "pricingAsOf": "2026-07-14T16:48:32.024Z"
       }
     },
     "merges": [
