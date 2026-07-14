@@ -7,10 +7,6 @@ import { dirname, join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-<<<<<<< HEAD
-import { saveAgentStateSync, determineModel, getProviderAuthMode, getAgentState, clearAgentPausedSync, clearAgentTroubledSync } from '../../../../lib/agents.js';
-import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
-=======
 import {
   saveAgentStateSync,
   determineModel,
@@ -18,8 +14,10 @@ import {
   getAgentState,
   clearAgentPaused,
   clearAgentTroubled,
+  clearAgentPausedSync,
+  clearAgentTroubledSync,
 } from '../../../../lib/agents.js';
->>>>>>> feature/pan-2499-slot-2
+import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
 import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
@@ -289,17 +287,6 @@ export const postAgentsRoute = HttpRouter.add(
 
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
-<<<<<<< HEAD
-    // PAN-2499 WI-9a: clearGates lets an operator "clear-and-start" a gated
-    // agent from the dashboard — clearing the paused/troubled gate through the
-    // SAME door functions `pan unpause`/`pan untroubled` use, then proceeding to
-    // spawn. Operator-origin is established by validateOrigin above (this route
-    // is the trusted dashboard surface; the Deacon spawns internally, not via
-    // HTTP) plus the explicit clearGates:true opt-in. Without clearGates a gated
-    // agent is refused with the gate reason — never a silent no-op.
-    const clearGates = (body as any).clearGates === true;
-    const startGateBlock = evaluateAgentStartGate(agentSessionName, yield* getAgentState(agentSessionName));
-=======
     const clearGates = originCheck.ok && (body as any).clearGates === true;
     const startGateBlock = yield* resolveStartAgentGateForRoute({
       agentSessionName,
@@ -307,7 +294,6 @@ export const postAgentsRoute = HttpRouter.add(
       clearGates,
       originOk: originCheck.ok,
     });
->>>>>>> feature/pan-2499-slot-2
     if (startGateBlock) {
       if (!clearGates) {
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_gate', {

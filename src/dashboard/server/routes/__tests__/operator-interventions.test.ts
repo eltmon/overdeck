@@ -3,11 +3,7 @@ import { Context, Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../../services/domain-services.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
-<<<<<<< HEAD
 import { ReadModelService, type ReadModelServiceShape } from '../../read-model.js';
-=======
-import { ReadModelService } from '../../read-model.js';
->>>>>>> feature/pan-2499-slot-2
 
 const fsMocks = vi.hoisted(() => ({
   appendFile: vi.fn(),
@@ -21,13 +17,10 @@ const agentMocks = vi.hoisted(() => ({
   saveAgentRuntimeState: vi.fn(),
   restartAgent: vi.fn(),
   messageAgent: vi.fn(),
-<<<<<<< HEAD
   clearAgentPausedSync: vi.fn(),
   clearAgentTroubledSync: vi.fn(),
-=======
   clearAgentPaused: vi.fn(),
   clearAgentTroubled: vi.fn(),
->>>>>>> feature/pan-2499-slot-2
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -120,13 +113,10 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
     restartAgent: agentMocks.restartAgent,
     messageAgent: agentMocks.messageAgent,
-<<<<<<< HEAD
     clearAgentPausedSync: agentMocks.clearAgentPausedSync,
     clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
-=======
     clearAgentPaused: agentMocks.clearAgentPaused,
     clearAgentTroubled: agentMocks.clearAgentTroubled,
->>>>>>> feature/pan-2499-slot-2
   };
 });
 
@@ -272,11 +262,7 @@ async function runRoute(layer: Layer.Layer<HttpRouter.HttpRouter, never, EventSt
     Effect.scoped(
       Effect.flatMap(HttpRouter.toHttpEffect(layer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
-<<<<<<< HEAD
-      ).pipe(Effect.provide(routeServicesLayer(appendedEvents))),
-=======
       ).pipe(Effect.provide(routeTestLayerFor(appendedEvents))),
->>>>>>> feature/pan-2499-slot-2
     ),
   );
   return { response, appendedEvents };
@@ -312,13 +298,10 @@ describe('operator.intervention dashboard routes', () => {
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
     agentMocks.restartAgent.mockResolvedValue({ success: true });
     agentMocks.messageAgent.mockResolvedValue(undefined);
-<<<<<<< HEAD
     agentMocks.clearAgentPausedSync.mockReturnValue(true);
     agentMocks.clearAgentTroubledSync.mockReturnValue(true);
-=======
     agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed({ ...agentState, paused: false }));
     agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed({ ...agentState, troubled: false, consecutiveFailures: 0 }));
->>>>>>> feature/pan-2499-slot-2
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
     tmuxMocks.killSession.mockReturnValue(Effect.succeed(undefined));
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
