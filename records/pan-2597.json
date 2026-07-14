@@ -157,6 +157,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-14T20:49:04.781Z"
+    },
+    {
+      "timestamp": "2026-07-14T20:52:48.491Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -289,19 +294,18 @@
     "recordedAt": "2026-07-14T20:52:46.512Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T20:52:46.514Z",
+  "updated": "2026-07-14T20:52:48.647Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T20:49:04.641Z",
+    "updatedAt": "2026-07-14T20:52:48.584Z",
     "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Verification FAILED at test (343182ms):\n\n^\n    149|     });\n    150|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[100/197]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/agent-spawner.test.ts > AgentSpawner Effect service > startWork > wraps spawnAgent errors as AgentStartError\n FAIL  |root| src/dashboard/server/services/__tests__/agent-spawner.test.ts > AgentSpawner Effect service > startWork > wraps spawnAgent errors as AgentStartError\nAssertionError: expected '[vitest] No \"findProjectByPathSync\" e…' to contain 'tmux session conflict'\n\n- Expected\n+ Received\n\n- tmux session conflict\n+ [vitest] No \"findProjectByPathSync\" export is defined on the \"../../../../lib/projects.js\" mock. Did you forget to return it from \"vi.mock\"?\n+ If you need to partially mock a module, you can use \"importOriginal\" helper inside:\n+\n\n ❯ src/dashboard/server/services/__tests__/agent-spawner.test.ts:163:36\n    161|       const err = await runProgramFail(program);\n    162|       expect((err as any)._tag).toBe('AgentStartError');\n    163|       expect((err as any).message).toContain('tmux session conflict');\n       |                                    ^\n    164|     });\n    165|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[101/197]⎯\n\n FAIL  |root| src/dashboard/server/services/__tests__/agent-spawner.unit.test.ts > AgentSpawner — integration > startWork > fails with AgentAlreadyRunning when agent status is running\n FAIL  |root| src/dashboard/server/services/__tests__/agent-spawner.unit.test.ts > AgentSpawner — integration > startWork > fails with AgentAlreadyRunning when agent status is running\nAssertionError: expected 'AgentStartError' to be 'AgentAlreadyRunning' // Object.is equality\n\nExpected: \"AgentAlreadyRunning\"\nReceived: \"AgentStartError\"\n\n ❯ src/dashboard/server/services/__tests__/agent-spawner.unit.test.ts:143:33\n    141|\n    142|       const err = await runProgramFail(program);\n    143|       expect((err as any)._tag).toBe('AgentAlreadyRunning');\n       |                                 ^\n    144|     });\n    145|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[102/197]⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
@@ -407,9 +411,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 106021843,
-            "output": 269651,
-            "cacheRead": 102045312,
+            "input": 106161463,
+            "output": 270236,
+            "cacheRead": 102119296,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -421,10 +425,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 163,
-            "output": 46464,
-            "cacheRead": 42215339,
-            "cacheWrite": 77230
+            "input": 169,
+            "output": 47508,
+            "cacheRead": 44286268,
+            "cacheWrite": 79822
           }
         },
         "plan": {
@@ -452,9 +456,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 106021843,
-          "output": 269651,
-          "cacheRead": 102045312,
+          "input": 106161463,
+          "output": 270236,
+          "cacheRead": 102119296,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -464,10 +468,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 18609,
-          "output": 101070,
-          "cacheRead": 47058264,
-          "cacheWrite": 375049
+          "input": 18615,
+          "output": 102114,
+          "cacheRead": 49129193,
+          "cacheWrite": 377641
         },
         "anthropic/claude-sonnet-5": {
           "input": 14217,
@@ -477,8 +481,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 140.388234,
-        "pricingAsOf": "2026-07-14T20:49:04.714Z"
+        "usd": 142.926546,
+        "pricingAsOf": "2026-07-14T20:52:48.644Z"
       }
     },
     "merges": [
