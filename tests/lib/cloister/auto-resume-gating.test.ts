@@ -126,7 +126,7 @@ describe('auto-resume gates', () => {
           references: [],
           tags: [],
           narratives: { Problem: '', Proposal: '', NonGoals: '' },
-          items: [],
+          items: [{ id: 'test-item', title: 'Test item', status: 'pending' }],
           edges: [],
         },
       }),
@@ -328,6 +328,9 @@ describe('auto-resume gates', () => {
       listProjects: vi.fn().mockReturnValue(projects),
       listProjectsSync: vi.fn().mockReturnValue(projects),
       findProjectByPathSync: vi.fn(() => projects[0].config),
+    }));
+    vi.doMock('../../../src/lib/state-auto-migrate.js', () => ({
+      requireAutomaticStateMigration: vi.fn().mockResolvedValue(undefined),
     }));
     vi.doMock('../../../src/lib/work-agent-lifecycle.js', () => ({
       assertCanStartFresh: vi.fn(),

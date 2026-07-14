@@ -739,7 +739,7 @@ describe('checkInspectAgentTimeouts', () => {
           testStatus: 'pending',
           inspectStatus: 'inspecting',
           inspectStartedAt: '2026-06-05T12:00:00.000Z',
-          inspectTaskId: 'workspace-sposy',
+          inspectBeadId: 'workspace-sposy',
           updatedAt: '2026-06-05T12:00:00.000Z',
           readyForMerge: false,
         },
@@ -751,7 +751,7 @@ describe('checkInspectAgentTimeouts', () => {
           testStatus: 'pending',
           inspectStatus: 'error',
           inspectStartedAt: '2026-06-05T12:00:00.000Z',
-          inspectTaskId: 'workspace-sposy',
+          inspectBeadId: 'workspace-sposy',
           updatedAt: '2026-06-05T12:12:01.000Z',
           readyForMerge: false,
         },
@@ -762,7 +762,7 @@ describe('checkInspectAgentTimeouts', () => {
     const second = await checkInspectAgentTimeouts();
 
     expect(first).toEqual([
-      'Inspection watchdog tripped for PAN-1616 task workspace-sposy: timed out after 12m (limit 12m)',
+      'Inspection watchdog tripped for PAN-1616 bead workspace-sposy: timed out after 12m (limit 12m)',
     ]);
     expect(second).toEqual([]);
     expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
@@ -775,7 +775,7 @@ describe('checkInspectAgentTimeouts', () => {
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-1616',
-      expect.stringContaining('INSPECTION ERROR for task workspace-sposy'),
+      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
       'deacon:inspect-watchdog',
     );
   });
@@ -788,7 +788,7 @@ describe('checkInspectAgentTimeouts', () => {
         testStatus: 'pending',
         inspectStatus: 'inspecting',
         inspectStartedAt: '2026-06-05T12:11:30.000Z',
-        inspectTaskId: 'workspace-sposy',
+          inspectBeadId: 'workspace-sposy',
         updatedAt: '2026-06-05T12:11:30.000Z',
         readyForMerge: false,
       },
@@ -802,7 +802,7 @@ describe('checkInspectAgentTimeouts', () => {
     expect(mockKillSessionAsync).not.toHaveBeenCalled();
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-1616',
-      expect.stringContaining('INSPECTION ERROR for task workspace-sposy'),
+      expect.stringContaining('INSPECTION ERROR for bead workspace-sposy'),
       'deacon:inspect-watchdog',
     );
   });

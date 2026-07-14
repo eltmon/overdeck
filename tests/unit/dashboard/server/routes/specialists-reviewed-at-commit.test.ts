@@ -316,7 +316,7 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     mockTreeShaByCommit.set('oldsha1', 'oldtree');
     mockTreeShaByCommit.set('newsha99', 'newtree');
     mockParentShaByCommit.set('newsha99', 'oldsha1');
-    mockDiffNameOnlyStdout = '.pan/records/pan-905.json\n.pan/test/result.json\n.tasks/issues.jsonl\n';
+    mockDiffNameOnlyStdout = '.pan/records/pan-905.json\n.pan/test/result.json\n';
 
     const actions = await checkPostReviewCommits();
 
@@ -343,7 +343,7 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     mockParentShaByCommit.set('stateonly2', 'stateonly1');
     mockParentShaByCommit.set('stateonly1', 'codesha1');
     mockDiffNameOnlyByRange.set('stateonly1..stateonly2', '.pan/records/pan-906.json\n');
-    mockDiffNameOnlyByRange.set('codesha1..stateonly1', '.tasks/issues.jsonl\n');
+    mockDiffNameOnlyByRange.set('codesha1..stateonly1', '.pan/records/pan-906.json\n');
     mockDiffNameOnlyByRange.set('codesha1..stateonly2', 'src/lib/cloister/deacon.ts\n');
 
     const actions = await checkPostReviewCommits();
