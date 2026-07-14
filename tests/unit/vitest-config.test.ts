@@ -40,7 +40,6 @@ describe('vitest.config.ts flake policy', () => {
 
     expect(config.test.retry).toBe(1);
     expect(config.test.exclude).toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(config.test.exclude).toContain('src/lib/vbrief/__tests__/create-tasks.test.ts');
     expect(config.test.maxWorkers).toBe(2);
   });
 
@@ -53,7 +52,6 @@ describe('vitest.config.ts flake policy', () => {
 
     expect(config.test.retry).toBe(1);
     expect(config.test.exclude).toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(config.test.exclude).toContain('src/lib/vbrief/__tests__/create-tasks.test.ts');
     expect(config.test.maxWorkers).toBe(4);
   });
 
