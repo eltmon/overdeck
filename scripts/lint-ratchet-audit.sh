@@ -27,7 +27,7 @@ declare -A seen_commits
 
 baseline_at() {
   local rev="$1"
-  { git show "$rev:$BASELINE" 2>/dev/null || true; } | awk 'NF >= 2 { print $1, $2 }' | sort -k2
+  { git show "$rev:$BASELINE" 2>/dev/null || true; } | awk '$1 ~ /^[0-9]+$/ && NF >= 2 { print $1, $2 }' | sort -k2
 }
 
 allowlist_at() {
