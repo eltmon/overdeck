@@ -85,6 +85,45 @@ export async function autoCommitWorkspaceChangesBeforeSync(
   projectPath: string,
 ): Promise<{ success: boolean; committed: boolean; reason?: string }> {
   try {
+    for (const operationHead of ['MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD']) {
+      try {
+        await execAsync(`git rev-parse -q --verify ${operationHead}`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+        });
+        return {
+          success: false,
+          committed: false,
+          reason: `Refusing to auto-commit while ${operationHead} exists; finish or abort the in-progress Git operation first`,
+        };
+      } catch { /* ref absent — continue */ }
+    }
+
+    try {
+      const { stdout: conflictMarkers } = await execAsync(
+        "git grep -n -I -E '^(<<<<<<<( |$)|=======$|>>>>>>>( |$))' -- .",
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      if (conflictMarkers.trim()) {
+        const files = [...new Set(conflictMarkers.trim().split('\n').map((line) => line.split(':', 1)[0]))];
+        return {
+          success: false,
+          committed: false,
+          reason: `Refusing to auto-commit conflict markers in: ${files.join(', ')}`,
+        };
+      }
+    } catch (error: any) {
+      // git grep exits 1 when it finds no matches. Any other failure means the
+      // safety scan itself was inconclusive, so fail closed.
+      if (error?.code !== 1) {
+        return {
+          success: false,
+          committed: false,
+          reason: `Failed to scan for conflict markers: ${error.message}`,
+        };
+      }
+    }
+
     const { stdout: statusOut } = await execAsync('git status --porcelain', {
       cwd: projectPath,
       encoding: 'utf-8',
