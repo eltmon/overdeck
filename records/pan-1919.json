@@ -78,7 +78,7 @@
   ],
   "feedback": [],
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-07-14T00:05:50.206Z",
+  "updated": "2026-07-14T00:17:50.751Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "passed",
@@ -317,6 +317,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-12T14:45:42.558Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-14T00:05:50.175Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-14T00:17:50.751Z"
     }
   ]
 }
