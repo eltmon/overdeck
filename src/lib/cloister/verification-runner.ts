@@ -481,9 +481,15 @@ async function runVerificationForIssuePromise(
     // node shows gates completing live. Every write is best-effort — a failed
     // artifact write must never fail verification itself.
     const liveGateResults: import('./validation.js').QualityGateResult[] = [];
-    const writeLiveArtifact = (currentGate?: string) => {
+    let liveGateName: string | undefined;
+    let liveGateTail = '';
+    let lastTailWriteMs = 0;
+    const writeLiveArtifact = () => {
       try {
-        writeVerificationArtifact(workspacePath, issueId, liveGateResults, { currentGate });
+        writeVerificationArtifact(workspacePath, issueId, liveGateResults, {
+          currentGate: liveGateName,
+          currentGateOutput: liveGateTail || undefined,
+        });
       } catch { /* best-effort */ }
     };
     writeLiveArtifact();
@@ -493,9 +499,26 @@ async function runVerificationForIssuePromise(
       vmName: workspaceInfo.vmName,
       placeholders,
       ...(options.onGateLog ? { onLog: options.onGateLog } : {}),
-      onGateStart: (name) => writeLiveArtifact(name),
+      onGateStart: (name) => {
+        liveGateName = name;
+        liveGateTail = '';
+        writeLiveArtifact();
+      },
+      onGateOutput: (_name, chunk) => {
+        // Rolling ANSI-stripped tail, flushed at most once per second so the
+        // Test/Lint panel streams the running gate without hammering the disk.
+        // eslint-disable-next-line no-control-regex
+        liveGateTail = (liveGateTail + chunk.replace(/\u001b\[[0-9;]*[A-Za-z]/g, '')).slice(-4000);
+        const now = Date.now();
+        if (now - lastTailWriteMs >= 1000) {
+          lastTailWriteMs = now;
+          writeLiveArtifact();
+        }
+      },
       onGateResult: (result) => {
         liveGateResults.push(result);
+        liveGateName = undefined;
+        liveGateTail = '';
         writeLiveArtifact();
       },
     }));

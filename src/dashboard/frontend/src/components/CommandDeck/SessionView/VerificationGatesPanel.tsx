@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CircleCheck, CircleX, Loader2, Circle } from 'lucide-react';
 import styles from '../styles/command-deck.module.css';
@@ -26,6 +27,7 @@ interface VerificationResponse {
     ranAt: string;
     outcome: 'running' | 'passed' | 'failed';
     currentGate?: string;
+    currentGateOutput?: string;
     failedCheck?: string;
     gates: GateRecord[];
   } | null;
@@ -33,6 +35,29 @@ interface VerificationResponse {
 
 function isLive(data: VerificationResponse | undefined): boolean {
   return data?.verificationStatus === 'running' || data?.artifact?.outcome === 'running';
+}
+
+/** Live tail of the running gate's output, pinned to the bottom. */
+function RunningGateTail({ text }: { text: string }) {
+  const ref = useRef<HTMLPreElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+  }, [text]);
+  return (
+    <pre ref={ref} style={{
+      whiteSpace: 'pre-wrap',
+      fontFamily: 'var(--font-mono, monospace)',
+      fontSize: 11,
+      lineHeight: 1.5,
+      color: 'var(--muted-foreground)',
+      background: 'var(--muted)',
+      borderRadius: 'var(--radius)',
+      padding: 10,
+      marginTop: 8,
+      maxHeight: 260,
+      overflowY: 'auto',
+    }}>{text}</pre>
+  );
 }
 
 export function VerificationGatesPanel({ issueId, fallbackTranscript }: { issueId: string; fallbackTranscript?: string }) {
@@ -101,6 +126,9 @@ export function VerificationGatesPanel({ issueId, fallbackTranscript }: { issueI
             <span>{artifact.currentGate}</span>
             <span style={{ color: 'var(--muted-foreground)' }}>running…</span>
           </div>
+        )}
+        {live && artifact.currentGate && artifact.currentGateOutput && (
+          <RunningGateTail text={artifact.currentGateOutput} />
         )}
         {live && !artifact.currentGate && artifact.gates.length === 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>

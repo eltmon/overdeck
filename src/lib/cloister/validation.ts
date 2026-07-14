@@ -333,6 +333,9 @@ export interface QualityGateRunOptions {
    *  incrementally and the dashboard's Test/Lint node can render gates live. */
   onGateStart?: (name: string) => void;
   onGateResult?: (result: QualityGateResult) => void;
+  /** PAN-2665: raw stdout/stderr chunks from the RUNNING gate, streamed as
+   *  they arrive so the Test/Lint panel can show a live output tail. */
+  onGateOutput?: (name: string, chunk: string) => void;
 }
 
 /**
@@ -495,12 +498,19 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         // When running in container, don't set host cwd (irrelevant)
         const useHostCwd = !isRemote && !(gate.container && gate.container_name);
         const env = buildQualityGateEnv(gate.env);
-        const { stdout, stderr } = await execAsync(resolvedCommand, {
+        const execPromise = execAsync(resolvedCommand, {
           cwd: useHostCwd ? cwd : undefined,
           env,
           maxBuffer: 10 * 1024 * 1024, // 10MB
           timeout: 20 * 60 * 1000, // 20 minute timeout per gate (PAN-1989: a near-total rename makes `vitest --changed` select ~the whole suite — 715 root + 166 frontend test files — which exceeds 10 min)
         });
+        // PAN-2665: tee the child's output to the live-progress sink without
+        // altering the buffered result promisify(exec) collects.
+        if (opts.onGateOutput) {
+          execPromise.child.stdout?.on('data', (chunk) => opts.onGateOutput!(name, String(chunk)));
+          execPromise.child.stderr?.on('data', (chunk) => opts.onGateOutput!(name, String(chunk)));
+        }
+        const { stdout, stderr } = await execPromise;
         passedGate = true;
         passOutput = (stdout + stderr).slice(-2000); // keep last 2KB
         break;
