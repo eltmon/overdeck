@@ -9,12 +9,24 @@ import {
   queueIssueRecordCommit,
   readIssueRecordSync,
   writeIssueRecordSync,
+  getProjectConfigFromWorkspacePath,
+  resolveProjectForIssue,
   type PanIssueRecord,
 } from './record.js';
 
 export interface UpdateIssueRecordOptions {
   writerId?: string;
   autoCommit?: boolean;
+}
+
+export function updateIssueRecordForWorkspace(
+  workspacePath: string,
+  issueId: string,
+  mutator: IssueRecordMutator,
+  options: UpdateIssueRecordOptions = {},
+): Promise<PanIssueRecord> {
+  const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+  return updateIssueRecord(project, issueId, mutator, options);
 }
 
 export type IssueRecordMutator = (record: PanIssueRecord) => PanIssueRecord | void | Promise<PanIssueRecord | void>;

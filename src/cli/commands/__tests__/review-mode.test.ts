@@ -28,8 +28,8 @@ describe('reviewModeCommand', () => {
     rmSync(workspacePath, { recursive: true, force: true });
   });
 
-  it("persists reviewMode='full' through the per-issue record write door", () => {
-    reviewModeCommand('pan-1982', 'full');
+  it("persists reviewMode='full' through the per-issue record write door", async () => {
+    await reviewModeCommand('pan-1982', 'full');
 
     const recordPath = join(workspacePath, '.pan', 'records', 'pan-1982.json');
     const record = JSON.parse(readFileSync(recordPath, 'utf-8')) as { issueId: string; reviewMode?: string };
@@ -38,8 +38,8 @@ describe('reviewModeCommand', () => {
     expect(record.reviewMode).toBe('full');
   });
 
-  it('rejects invalid review modes before writing a record', () => {
-    expect(() => reviewModeCommand('PAN-1982', 'bogus')).toThrow('process.exit');
+  it('rejects invalid review modes before writing a record', async () => {
+    await expect(reviewModeCommand('PAN-1982', 'bogus')).rejects.toThrow('process.exit');
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('review mode must be quick, full, or none'));

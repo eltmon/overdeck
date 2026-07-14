@@ -17,7 +17,8 @@ import { httpHandler } from './http-handler.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync } from '../../../lib/projects.js';
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
-import { readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
+import { readIssueRecordSync } from '../../../lib/pan-dir/record.js';
+import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
@@ -696,7 +697,7 @@ const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/s
   const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
   if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
   const record = readIssueRecordSync(project, issueId); if (!record) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
-  writeIssueRecordSync(project, issueId, { ...record, swarm: { ...record.swarm, policy: body.value ?? undefined } });
+  yield* Effect.promise(() => updateIssueRecord(project, issueId, (current) => ({ ...current, swarm: { ...current.swarm, policy: body.value ?? undefined } })));
   return jsonResponse({ configured: body.value ?? null, resolved: resolveSwarmPolicy(issueId) });
 })));
 

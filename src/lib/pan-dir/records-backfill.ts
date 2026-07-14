@@ -22,13 +22,11 @@ import {
 } from '../projects.js';
 import {
   buildIssueRecord,
-  getIssueRecordPath,
-  queueIssueRecordCommit,
   readIssueRecord,
-  writeIssueRecordSync,
   type PanIssueRecord,
 } from './records.js';
-import { withIssueRecordLock } from './record-lock.js';
+import { getIssueRecordBasePath } from './record.js';
+import { updateIssueRecord } from './record-update.js';
 import { flushAutoCommits } from './auto-commit.js';
 import { Effect } from 'effect';
 
@@ -156,7 +154,7 @@ async function backfillIssue(
       return { action: 'failed', reason: 'infra repo is not a git checkout' };
     }
 
-    return await withIssueRecordLock(issueId, async () => {
+    return await (async () => {
       const existing = await readIssueRecord(project, issueId);
       const reviewStatus = getAllReviewStatusesFromDb()[issueId.toUpperCase()] ?? null;
       const record = await buildIssueRecord(project, issueId, { reviewStatus });
@@ -165,14 +163,14 @@ async function backfillIssue(
         return { action: 'skipped', reason: 'record unchanged' };
       }
 
-      const recordPath = writeIssueRecordSync(project, issueId, record);
-      const commitRoot = queueIssueRecordCommit(project, issueId, recordPath);
+      await updateIssueRecord(project, issueId, () => record);
+      const commitRoot = getIssueRecordBasePath(project, issueId);
       const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
       if (flushed.pushed === false) {
         throw new Error(flushed.reason ?? `record for ${issueId} was committed but not pushed`);
       }
       return { action: 'written' };
-    });
+    })();
   } catch (err) {
     return { action: 'failed', reason: (err as Error).message };
   }

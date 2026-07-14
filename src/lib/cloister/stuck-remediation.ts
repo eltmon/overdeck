@@ -142,7 +142,7 @@ async function evaluateWedgedReworkAgent(
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, transitionAction(3, issueId, idleMinutes, 'rework-wedge-troubled'));
-    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return true;
   }
 
@@ -201,9 +201,9 @@ function logAction(actions: string[], action: string): void {
   logDeaconEventSync(action);
 }
 
-function surfaceStuckNeedsYou(agent: AgentState, issueId: string, generation: string, actions: string[]): void {
+async function surfaceStuckNeedsYou(agent: AgentState, issueId: string, generation: string, actions: string[]): Promise<void> {
   if (!agent.workspace) return;
-  const failure = recordRecoveryFailure(agent.workspace, issueId, 'stuck-remediation', generation, 1);
+  const failure = await recordRecoveryFailure(agent.workspace, issueId, 'stuck-remediation', generation, 1);
   if (failure.emitNeedsYou) logAction(actions, `[deacon] needs-you ${issueId}: stuck remediation exhausted`);
 }
 
@@ -267,7 +267,7 @@ async function evaluateAgent(
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, `${agentId} provider-terminal: ${terminalProviderError.summary}`);
-    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return;
   }
 
@@ -275,7 +275,7 @@ async function evaluateAgent(
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, transitionAction(3, issueId, idleMinutes, 'marked-troubled'));
-    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return;
   }
 

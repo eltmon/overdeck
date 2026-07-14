@@ -154,7 +154,8 @@ import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, res
 import { tryYieldForAdvancingDispatch } from './preemption.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
-import { readIssueRecordSync, ensureIssueRecordSync, writeIssueRecordSync } from '../pan-dir/record.js';
+import { readIssueRecordSync } from '../pan-dir/record.js';
+import { updateIssueRecord } from '../pan-dir/record-update.js';
 import { readBeadsForIssueCached } from '../beads/presence.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
@@ -192,6 +193,7 @@ import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
 import { pruneTerminalStoppedAgents } from './agent-gc.js';
 import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
+import { patrolStaleTaskClaims } from './stale-task-claims.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
@@ -1197,10 +1199,8 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         setReviewStatusSync(issueId, { reviewRequestedAt: now, prUrl });
         // Serialize with setReviewStatusSync's fire-and-forget journal rebuild so
         // the panDoneRecoveredAt tombstone is written after (and on top of) it.
-        await withIssueRecordLock(issueId, async () => {
-          const nextRecord = ensureIssueRecordSync(project, issueId);
+        await updateIssueRecord(project, issueId, (nextRecord) => {
           nextRecord.pipeline.panDoneRecoveredAt = now;
-          writeIssueRecordSync(project, issueId, nextRecord);
         });
 
         const action = `checkOrphanedCompletions: recovered ${issueId} (PR open but review never dispatched)`;
@@ -1924,7 +1924,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       const autoRequeueCount = status.autoRequeueCount || 0;
       if (autoRequeueCount >= 25) {
         console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/25 requeues used)`);
-        const trip = recordDeadEndNeedsYou(key, 'dead-end-rebuild', status.updatedAt ?? 'rework', `Dead-end recovery needs-you: ${key} exhausted 25 requeues`);
+        const trip = await recordDeadEndNeedsYou(key, 'dead-end-rebuild', status.updatedAt ?? 'rework', `Dead-end recovery needs-you: ${key} exhausted 25 requeues`);
         if (trip) actions.push(trip);
         continue;
       }
@@ -1968,7 +1968,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           const gateDecision = decideAgentAutonomousRedrive(agentState ?? {}, getAgentDir(agentSessionName), true);
           if (gateDecision.decision === 'defer') {
             console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) re-drive deferred — ${gateDecision.reason}`);
-            const trip = gateDecision.needsYou && recordDeadEndNeedsYou(issueId, 'operator-stopped-rework', status.updatedAt ?? statusType, `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`);
+            const trip = gateDecision.needsYou && await recordDeadEndNeedsYou(issueId, 'operator-stopped-rework', status.updatedAt ?? statusType, `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`);
             if (trip) actions.push(trip);
           } else {
             if (gateDecision.gateDecision.clearStoppedByUser && agentState) { delete agentState.stoppedByUser; saveAgentStateSync(agentState); }
@@ -2754,6 +2754,10 @@ export async function runPatrol(): Promise<PatrolResult> {
   hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
+
+  const staleClaimActions = await patrolStaleTaskClaims();
+  actions.push(...staleClaimActions);
+  for (const a of staleClaimActions) addLog('action', a, state.patrolCycle);
 
   const stuckRemediationActions = await checkStuckAgentRemediation();
   actions.push(...stuckRemediationActions);

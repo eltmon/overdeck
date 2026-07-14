@@ -217,13 +217,13 @@ describe('deacon-swarm next-wave dispatch', () => {
 
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenNthCalledWith(
       1,
-      '/repo/workspaces/feature-pan-2203/.pan/spec.vbrief.json',
+      'PAN-2203',
       { type: 'claim', itemId: 'wi-a', writerId: 'deacon-swarm' },
       '/repo/workspaces/feature-pan-2203',
     );
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenNthCalledWith(
       2,
-      '/repo/workspaces/feature-pan-2203/.pan/spec.vbrief.json',
+      'PAN-2203',
       {
         type: 'unblock',
         itemId: 'wi-a',
