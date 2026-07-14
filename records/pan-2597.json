@@ -328,23 +328,19 @@
     "recordedAt": "2026-07-14T21:12:12.074Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T22:10:22.122Z",
+  "updated": "2026-07-14T22:10:48.883Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T21:35:02.275Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (391381ms):\n\n.test.ts:187:30\n    185|     expect(result.agentMessageSent).toBe(true);\n    186|     expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2…\n    187|     expect(mockMessageAgent).toHaveBeenCalledWith(\n       |                              ^\n    188|       'agent-pan-2203-slot-1',\n    189|       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[84/167]⎯\n\n FAIL  |root| tests/unit/lib/pan-dir/cutover-behavioral.test.ts > PAN-1919: behavioral no-loss — all fields land in record, not continue > writes tasksMapping through record writer without touching continue files\n FAIL  |root| tests/unit/lib/pan-dir/cutover-behavioral.test.ts > PAN-1919: behavioral no-loss — all fields land in record, not continue > writes tasksMapping through record writer without touching continue files\nTypeError: writeRecordTasksMappingSync is not a function\n ❯ tests/unit/lib/pan-dir/cutover-behavioral.test.ts:128:7\n    126|       });\n    127|\n    128|       writeRecordTasksMappingSync(project, ISSUE_ID, { 'item-1': ['tas…\n       |       ^\n    129|\n    130|       const rec = readIssueRecordSync(project, ISSUE_ID);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[85/167]⎯\n\n FAIL  |root| tests/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > no-loss audit: every review_status column is accounted for\n FAIL  |root| tests/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > no-loss audit: every review_status column is accounted for\nAssertionError: expected [ 'inspect_bead_id' ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"inspect_bead_id\",\n+ ]\n\n ❯ tests/unit/lib/pan-dir/verdict-restore.test.ts:378:30\n    376|     const unknownColumns = [...accountedFor].filter((col) => !actual.h…\n    377|\n    378|     expect(missingFromAudit).toEqual([]);\n       |                              ^\n    379|     expect(unknownColumns).toEqual([]);\n    380|     expect(actual.size).toBe(accountedFor.size);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[86/167]⎯\n\n",
+    "updatedAt": "2026-07-14T22:10:48.798Z",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
-    "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
-    "reviewSpawnedAt": "2026-07-12T23:31:15.331Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/services/codex-conversation-parser.ts",
@@ -440,15 +436,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 19278414,
-            "output": 18917,
-            "cacheRead": 18085504,
+            "input": 19575047,
+            "output": 19987,
+            "cacheRead": 18320512,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 119122575,
-            "output": 297435,
-            "cacheRead": 114497920,
+            "input": 123653018,
+            "output": 309229,
+            "cacheRead": 118834048,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -485,15 +481,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 19278414,
-          "output": 18917,
-          "cacheRead": 18085504,
+          "input": 19575047,
+          "output": 19987,
+          "cacheRead": 18320512,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 119122575,
-          "output": 297435,
-          "cacheRead": 114497920,
+          "input": 123653018,
+          "output": 309229,
+          "cacheRead": 118834048,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -516,8 +512,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 152.844268,
-        "pricingAsOf": "2026-07-14T21:35:02.348Z"
+        "usd": 156.337727,
+        "pricingAsOf": "2026-07-14T22:10:48.880Z"
       }
     },
     "merges": [
@@ -525,8 +521,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "pending-work-spawn",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "docs-appserver": "completed",
     "docs-appserver.ac1": "completed",
