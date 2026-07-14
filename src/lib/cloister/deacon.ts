@@ -193,7 +193,6 @@ import { reconcileClosedIssueAgents } from './closed-issue-reaper.js';
 import { reconcilePipelineLabelsPatrol } from './label-reconciler.js';
 import { pruneTerminalStoppedAgents } from './agent-gc.js';
 import { shouldRunRecoveryJanitor } from './patrol-cadence.js';
-import { patrolStaleTaskClaims } from './stale-task-claims.js';
 import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { reconcileOrphanProposedSpecs, spawnWorkAgentThroughAgentsEndpoint, triggerRebuildAndStart } from './orphan-proposed-reconciler.js';
 import { reconcileTestStatusFromGreenCiWithDeps } from './test-status-green-ci-reconciler.js';
@@ -2755,10 +2754,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
-  const staleClaimActions = await patrolStaleTaskClaims();
-  actions.push(...staleClaimActions);
-  for (const a of staleClaimActions) addLog('action', a, state.patrolCycle);
-
+  for (const a of await (await import('./stale-task-claims.js')).patrolStaleTaskClaims()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   const stuckRemediationActions = await checkStuckAgentRemediation();
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
