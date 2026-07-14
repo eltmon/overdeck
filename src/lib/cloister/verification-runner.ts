@@ -19,6 +19,7 @@ import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '..
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
+import { isVerificationWorkerActive, runSupervisedVerification } from './verification-worker-supervisor.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
@@ -136,13 +137,10 @@ async function escalateVerificationStuck(
 }
 
 /**
- * PAN-2669: boot reconciliation for interrupted verifications. A dashboard
- * restart kills the process that owns an in-flight verification, leaving
- * `verificationStatus: 'running'` (and a running-outcome artifact) that
- * nothing will ever complete — the issue wedges. Called once at boot: any
- * 'running' status is reset to 'pending' (the deacon re-drives it), and the
- * workspace artifact is finalized so the Test/Lint node shows the
- * interruption instead of spinning forever.
+ * Boot reconciliation for interrupted verifications. Live supervised workers
+ * survive dashboard restarts and retain ownership of their running status.
+ * A running status without a live worker is orphaned, so reset it to pending
+ * and finalize the artifact rather than leaving the issue wedged forever.
  */
 export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliation'): number {
   let reset = 0;
@@ -150,9 +148,13 @@ export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliati
     const statuses = readReviewStatusMap() ?? {};
     for (const [issueId, status] of Object.entries(statuses)) {
       if ((status as { verificationStatus?: string }).verificationStatus !== 'running') continue;
+      if (isVerificationWorkerActive(issueId)) {
+        console.log(`[${logPrefix}] preserved live supervised verification for ${issueId}`);
+        continue;
+      }
       setReviewStatusSync(issueId, {
         verificationStatus: 'pending',
-        verificationNotes: 'Verification was interrupted by a dashboard restart; it re-runs on the next cycle (PAN-2669).',
+        verificationNotes: 'The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.',
       });
       reset += 1;
       try {
@@ -175,9 +177,9 @@ export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliati
               name: artifact.currentGate ?? 'interrupted',
               passed: false,
               required: true,
-              output: 'Verification was interrupted by a dashboard restart before this gate finished (PAN-2669).',
+              output: 'The supervised verification worker stopped unexpectedly before this gate finished.',
               durationMs: 0,
-              error: 'interrupted by dashboard restart',
+              error: 'supervised verification worker stopped unexpectedly',
             },
           ]);
         }
@@ -890,6 +892,18 @@ async function runVerificationForIssuePromise(
  * so the Effect error channel stays empty.
  */
 export function runVerificationForIssue(
+  issueId: string,
+  workspacePath: string,
+  workspaceInfo: WorkspaceInfo,
+  logPrefix: string,
+  options: VerificationRunnerOptions = {},
+): Effect.Effect<VerificationRunnerOutcome> {
+  return process.env.OVERDECK_VERIFICATION_WORKER === '1'
+    ? runVerificationForIssueInProcess(issueId, workspacePath, workspaceInfo, logPrefix, options)
+    : Effect.promise(() => runSupervisedVerification(issueId, workspacePath, workspaceInfo, logPrefix, options));
+}
+
+export function runVerificationForIssueInProcess(
   issueId: string,
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,

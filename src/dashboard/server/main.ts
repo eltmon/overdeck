@@ -569,8 +569,9 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopRestartAnnouncer();
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
   try {
-    // PAN-2669: reap in-flight quality-gate process trees (request-review runs
-    // verification in THIS process) so restarts never orphan vitest children.
+    // Reap only quality-gate trees owned by this dashboard process. Normal
+    // verification runs in a detached supervised worker, whose process-local
+    // registry is intentionally outside this shutdown boundary.
     const { killAllGateProcessGroups } = await import('../../lib/cloister/validation.js');
     const reaped = killAllGateProcessGroups();
     if (reaped > 0) console.log(`[overdeck] reaped ${reaped} in-flight gate process group(s)`);
@@ -661,14 +662,11 @@ if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
 }
 
 try {
-  // PAN-2669: an in-flight verification dies with the process that owned it;
-  // reset stale 'running' statuses so the pipeline re-drives instead of
-  // wedging on a run nothing will ever finish. Runs unconditionally — the
-  // wedge exists whether or not Cloister auto-starts (request-review
-  // verifications run in this process).
+  // Preserve running statuses backed by a live supervised worker. Reset only
+  // orphaned runs whose worker died without recording a terminal result.
   const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
   const interrupted = reconcileInterruptedVerifications();
-  if (interrupted > 0) console.log(`[overdeck] reset ${interrupted} verification(s) interrupted by the previous shutdown (PAN-2669)`);
+  if (interrupted > 0) console.log(`[overdeck] recovered ${interrupted} orphaned verification worker(s)`);
 } catch (err) {
   console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
 }
