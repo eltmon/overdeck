@@ -6,6 +6,7 @@ import { Effect } from 'effect';
 
 import type { TaskTotals } from './resource-discovery-signals.js';
 import { isWithinRecencyDate, isWithinRecencyMs } from './resource-discovery-signals.js';
+import { getTasksRollupService } from './tasks-rollup-singleton.js';
 
 import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
@@ -744,6 +745,25 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     for (const issue of issueMap.values()) {
       issue.readyForMerge = readyForMergeFlags.get(issue.issueId) ?? false;
     }
+  }
+
+  // PAN-2602: task rollups give a second signal for issues that have task work
+  // in flight even when the tracker label is stale or missing. Load the cached
+  // rollup state once per discovery pass and attach totals to each issue.
+  const tasksRollupService = getTasksRollupService();
+  const projectKeyByName = new Map<string, string>();
+  for (const project of projects) {
+    projectKeyByName.set(project.config.name ?? project.key, project.key);
+  }
+  const getIssueTaskTotals = (issue: MutableResourceIssue): TaskTotals | null => {
+    const projectKey = projectKeyByName.get(issue.projectName);
+    if (!projectKey) return null;
+    const state = tasksRollupService.getProjectRollups(projectKey);
+    if (!state) return null;
+    return state.rollups.get(issue.issueId.toLowerCase()) ?? null;
+  };
+  for (const issue of issueMap.values()) {
+    issue.taskTotals = getIssueTaskTotals(issue);
   }
 
   // PRD acceptance (PAN-862): the tree shows ONLY issues with real in-flight work.
