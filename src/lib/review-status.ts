@@ -798,8 +798,6 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     const target = await resolveIssueFeedbackTarget(issueId);
     if ('agentId' in target) {
       const { messageAgent } = await import('./agents.js');
-      // PAN-2668: test-gate failure owes rework — re-drive a stopped-by-user
-      // agent with a completed handoff instead of queueing mail.
       await messageAgent(target.agentId, message, 'internal', { owesRework: true });
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
     } else {
