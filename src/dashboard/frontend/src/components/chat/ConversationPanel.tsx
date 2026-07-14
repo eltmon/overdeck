@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useDashboardStore } from '../../lib/store';
 import { useTheme } from '../../hooks/useTheme';
 import { useConversationUiState } from '../../hooks/useConversationUiState';
+import { markTerminalClick, useNeedsTerminalAutoSwitch, type ViewMode } from './useNeedsTerminalAutoSwitch';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Circle, Copy, Check, Loader2, Pencil, Terminal, FileCode, Search, Globe, Wrench, Zap, Folder, GitBranchPlus, GitFork, CheckCircle2, AlertCircle, Archive, Sparkles, Info, RefreshCw, FileText, FileX, ExternalLink, RotateCcw, ArrowRight, MoreVertical, Star, Share2, Download, Square } from 'lucide-react';
 import { toast } from 'sonner';
@@ -68,7 +69,7 @@ const PHASE_ICONS = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type ViewMode = 'conversation' | 'terminal';
+export type { ViewMode } from './useNeedsTerminalAutoSwitch';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -536,15 +537,7 @@ export function ConversationPanel({
   }, [messagesData, conversation.title, conversation.name]);
 
   const handleViewMode = useCallback((mode: ViewMode) => {
-    if (mode === 'terminal') {
-      const w = window as unknown as { __panTerminalClickAt?: number };
-      w.__panTerminalClickAt = performance.now();
-      try {
-        if (localStorage.getItem('OVERDECK_TERMINAL_PROFILE') === '1') {
-          console.log(`[xterm-click] conv=${conversation.name} t=${w.__panTerminalClickAt.toFixed(1)}`);
-        }
-      } catch { /* ignore */ }
-    }
+    if (mode === 'terminal') markTerminalClick(conversation.name);
     onViewModeChange?.(mode);
   }, [onViewModeChange, conversation.name]);
 
@@ -608,6 +601,7 @@ export function ConversationPanel({
   // terminal mode, do not mount xterm beside the diff; that opens/reopens the PTY
   // and looks like a reconnect loop when the user only asked to inspect a diff.
   const effectiveViewMode = diffOpen ? 'conversation' : viewMode;
+  useNeedsTerminalAutoSwitch(!!conversation.needsTerminal && showTerminal, viewMode, onViewModeChange);
 
   const isForkingHeader = !!conversation.forkStatus && conversation.forkStatus !== 'failed';
   const isForkFailedHeader = conversation.forkStatus === 'failed';

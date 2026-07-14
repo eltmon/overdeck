@@ -85,6 +85,9 @@ export interface Conversation {
   /** True when this conversation had activity but its transcript file no longer
    *  exists on disk — its history was lost (e.g. 2026-07-05 conv-* dir cleanup). */
   transcriptMissing?: boolean;
+  /** True when the live session is parked on a boot-blocking TUI screen (Claude
+   *  first-run onboarding, trust dialog) that only the terminal can answer. */
+  needsTerminal?: boolean;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
