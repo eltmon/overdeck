@@ -62,7 +62,7 @@ export interface SlashCommand {
   category?: string;
 }
 
-const SLASH_COMMANDS: SlashCommand[] = [
+export const SLASH_COMMANDS: SlashCommand[] = [
   // ─── AI CLI Commands ─────────────────────────────────────────────────────────
   {
     id: 'model',
@@ -117,6 +117,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-sync-main', label: 'pan sync-main', description: 'Sync latest main into feature branch', insert: 'pan sync-main ', category: 'Lifecycle' },
   { id: 'pan-done', label: 'pan done', description: 'Mark agent work complete', insert: 'pan done ', category: 'Lifecycle' },
   { id: 'pan-reopen', label: 'pan reopen', description: 'Reopen a completed issue', insert: 'pan reopen ', category: 'Lifecycle' },
+  { id: 'pan-reset-to-planned', label: 'pan reset-to-planned', description: 'Return an issue to post-planning while preserving its workspace and branch', insert: 'pan reset-to-planned ', category: 'Lifecycle' },
   { id: 'pan-wipe', label: 'pan wipe', description: 'Deep wipe: completely reset all state', insert: 'pan wipe ', category: 'Lifecycle' },
   { id: 'pan-close', label: 'pan close', description: 'Close out a completed issue', insert: 'pan close ', category: 'Lifecycle' },
   { id: 'pan-plan', label: 'pan plan', description: 'Create execution plan before spawning', insert: 'pan plan ', category: 'Lifecycle' },

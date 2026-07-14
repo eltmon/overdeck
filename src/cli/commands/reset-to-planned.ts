@@ -13,6 +13,7 @@ import { resetPipelineVerdictsForWorkStartSync } from '../../lib/review-status.j
 import { dequeueMerge } from '../../lib/overdeck/merge.js';
 import { resetPostMergeState } from '../../lib/cloister/merge-agent.js';
 import { IssueLifecycle, IssueLifecycleWithClientLive } from '../../dashboard/server/services/issue-lifecycle.js';
+import { initTrackerConfigCache } from '../../dashboard/server/services/tracker-config.js';
 import { resolveProjectForIssue } from '../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
 import { clearTaskProgress } from '../../lib/pan-dir/reset-task-progress.js';
@@ -35,6 +36,12 @@ export async function resetToPlannedCommand(id: string, options: ResetToPlannedO
   const workspace = join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
   if (!existsSync(workspace)) throw new Error(`Workspace not found: ${workspace}`);
   if (!findPlanSync(workspace)) throw new Error(`${issueId} has no finalized plan; refusing to manufacture a post-planning state`);
+
+  // IssueLifecycle is shared with the dashboard, whose boot path normally
+  // initializes tracker credentials. Standalone CLI commands must do that
+  // before making any local mutations so a missing startup cache cannot leave
+  // this reset half-applied.
+  await initTrackerConfigCache();
 
   const agents = listRunningAgentsSync().filter((agent) => agent.issueId.toUpperCase() === issueId.toUpperCase());
   console.log(chalk.bold(`${options.dryRun ? 'Would reset' : 'Resetting'} ${issueId} to post-planning`));
