@@ -21,7 +21,7 @@ def relative_link(from_dir: Path, target: Path) -> str:
 
 def listing_for_directory(bundle_root: Path, directory: Path) -> str:
     lines: list[str] = []
-    child_dirs = sorted(path for path in directory.iterdir() if path.is_dir() and path.name != ".okf-index")
+    child_dirs = sorted(path for path in directory.iterdir() if path.is_dir() and path.name not in {".okf-index", ".git"})
     child_concepts = sorted(path for path in directory.glob("*.md") if path.name not in {"index.md", "log.md"})
 
     for child in child_dirs:
