@@ -306,7 +306,7 @@
     "recordedAt": "2026-07-14T21:12:12.074Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T21:12:13.492Z",
+  "updated": "2026-07-14T21:12:13.531Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -316,33 +316,19 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T21:12:13.372Z",
+    "updatedAt": "2026-07-14T21:12:13.463Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (433843ms):\n\n    |                                           ^\n     60|     expect(count).toBe(0);\n     61|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[91/181]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > stages workspace planning artifacts without force-adding .pan\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > stages workspace planning artifacts without force-adding .pan\nAssertionError: expected [ [ 'add', '.pan/' ], …(1) ] to deeply equal [ [ 'add', '.pan/' ], …(2) ]\n\n- Expected\n+ Received\n\n@@ -3,12 +3,8 @@\n      \"add\",\n      \".pan/\",\n    ],\n    [\n      \"add\",\n-     \".tasks/\",\n-   ],\n-   [\n-     \"add\",\n      \".gitignore\",\n    ],\n  ]\n\n ❯ src/dashboard/server/routes/__tests__/complete-planning.test.ts:142:22\n    140|\n    141|     const commands = completePlanningWorkspaceGitAddCommands(workspace…\n    142|     expect(commands).toEqual([\n       |                      ^\n    143|       ['add', '.pan/'],\n    144|       ['add', '.tasks/'],\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[92/181]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > promotes a first-run workspace draft and materializes one task per plan item\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > promotes a first-run workspace draft and materializes one task per plan item\nAssertionError: expected undefined to be 2 // Object.is equality\n\n- Expected:\n2\n\n+ Received:\nundefined\n\n ❯ src/dashboard/server/routes/__tests__/complete-planning.test.ts:203:30\n    201|     expect(result.proposed.filename).toMatch(/^\\d{4}-\\d{2}-\\d{2}-PAN-1…\n    202|     expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs…\n    203|     expect(result.taskCount).toBe(2);\n       |                              ^\n    204|\n    205|     const promoted = JSON.parse(readFileSync(result.proposed.path, 'ut…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[93/181]⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
-    "reviewRequestedAt": "2026-07-14T21:12:13.371Z",
+    "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
     "reviewSpawnedAt": "2026-07-12T23:31:15.331Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
-        "scripts/circular-deps-baseline.txt",
-        "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
-        "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
-        "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
-        "src/dashboard/server/routes/http-handler.ts",
-        "src/dashboard/server/services/__tests__/agent-spawner.test.ts",
-        "src/dashboard/server/services/__tests__/agent-spawner.unit.test.ts",
         "src/dashboard/server/services/codex-conversation-parser.ts",
-        "src/dashboard/server/services/typed-errors.ts",
         "src/lib/config-yaml/defaults.ts",
         "src/lib/config-yaml/merge.ts",
-        "src/lib/config-yaml/roles.ts",
         "src/lib/config-yaml/schema.ts",
-        "src/lib/runtimes/tmux-cli.ts",
-        "src/lib/state-plane.ts",
-        "sync-sources/hooks/record-cost-event.js",
-        "tests/playwright/conversation-supervisor-uat.test.ts",
-        "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts"
+        "sync-sources/hooks/record-cost-event.js"
       ],
       "declaredScopeUntouched": [
         "docs/ROLES.md",
@@ -395,15 +381,7 @@
         "docs/AGENT-STATE-PLANES.md",
         "docs/CODEX-APP-SERVER-PROTOCOL.md",
         "packages/contracts/src/harness-behavior.ts",
-        "scripts/circular-deps-baseline.txt",
-        "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
-        "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
-        "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
-        "src/dashboard/server/routes/http-handler.ts",
-        "src/dashboard/server/services/__tests__/agent-spawner.test.ts",
-        "src/dashboard/server/services/__tests__/agent-spawner.unit.test.ts",
         "src/dashboard/server/services/codex-conversation-parser.ts",
-        "src/dashboard/server/services/typed-errors.ts",
         "src/lib/__tests__/launcher-generator.test.ts",
         "src/lib/agents/__tests__/delivery.test.ts",
         "src/lib/agents/__tests__/resume.test.ts",
@@ -420,7 +398,6 @@
         "src/lib/codex/app-server-manager.ts",
         "src/lib/config-yaml/defaults.ts",
         "src/lib/config-yaml/merge.ts",
-        "src/lib/config-yaml/roles.ts",
         "src/lib/config-yaml/schema.ts",
         "src/lib/cost-parsers/codex-parser.ts",
         "src/lib/launcher-generator.ts",
@@ -429,14 +406,10 @@
         "src/lib/overdeck/conversation-runtime.ts",
         "src/lib/runtimes/behavior.ts",
         "src/lib/runtimes/codex.ts",
-        "src/lib/runtimes/tmux-cli.ts",
-        "src/lib/state-plane.ts",
         "sync-sources/hooks/record-cost-event.js",
-        "tests/playwright/conversation-supervisor-uat.test.ts",
-        "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
         "tsdown.config.ts"
       ],
-      "recordedAt": "2026-07-14T21:12:12.074Z"
+      "recordedAt": "2026-07-12T19:53:15.419Z"
     }
   },
   "closeOut": {
@@ -521,7 +494,7 @@
       },
       "costAtCloseOut": {
         "usd": 147.271771,
-        "pricingAsOf": "2026-07-14T21:12:13.457Z"
+        "pricingAsOf": "2026-07-14T21:12:13.528Z"
       }
     },
     "merges": [
