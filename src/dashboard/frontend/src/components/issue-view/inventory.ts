@@ -1,4 +1,5 @@
 /**
+<<<<<<< HEAD
  * Issue View no-loss inventory — FR-0 surface-lock (PAN-2499).
  *
  * Source of truth: the "Complete component inventory — the no-loss checklist"
@@ -121,4 +122,62 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   // and IssueHeader.tsx; it is the +1 surface the mockup checklist names
   // alongside the 14/16/13 per-view counts.
   { section: 'ReviewPolicyControl', view: 'cockpit', home: 'src/dashboard/frontend/src/components/ReviewPolicyControl.tsx' },
+=======
+ * Issue-view no-loss inventory (PAN-2499).
+ *
+ * The FR-0 surface-lock gate asserts that every named section in this manifest
+ * appears as a `data-section` attribute on at least one rendered element across
+ * the three issue-view densities. Add a section here BEFORE rendering it.
+ */
+
+export const AGENT_ROW_SECTIONS = [
+  'agent-row-caret',
+  'agent-row-icon',
+  'agent-row-label',
+  'agent-row-model',
+  'agent-row-status',
+  'agent-row-duration',
+  'agent-row-cost',
+  'agent-row-verdict',
+  'agent-row-context-menu',
+  'agent-row-paused-reason',
+] as const;
+
+export type AgentRowSection = (typeof AGENT_ROW_SECTIONS)[number];
+
+export const SHIP_PROGRESS_SECTIONS = [
+  'ship-progress-full',
+  'ship-progress-compact',
+  'ship-progress-steps',
+  'ship-progress-step',
+  'ship-progress-log',
+] as const;
+
+export type ShipProgressSection = (typeof SHIP_PROGRESS_SECTIONS)[number];
+
+export const VERIFICATION_GATES_SECTIONS = [
+  'verification-gates',
+  'verification-gate',
+] as const;
+
+export type VerificationGatesSection = (typeof VERIFICATION_GATES_SECTIONS)[number];
+
+export const ACTIVE_AGENT_PANEL_SECTIONS = [
+  'active-agent-panel',
+  'active-agent-panel-header',
+  'active-agent-panel-stream',
+  'active-agent-panel-stream-line',
+  'active-agent-panel-resume',
+  'active-agent-panel-tell',
+] as const;
+
+export type ActiveAgentPanelSection = (typeof ACTIVE_AGENT_PANEL_SECTIONS)[number];
+
+/** Full inventory of all issue-view sections that participate in the no-loss gate. */
+export const SECTION_INVENTORY: readonly string[] = [
+  ...AGENT_ROW_SECTIONS,
+  ...SHIP_PROGRESS_SECTIONS,
+  ...VERIFICATION_GATES_SECTIONS,
+  ...ACTIVE_AGENT_PANEL_SECTIONS,
+>>>>>>> feature/pan-2499-slot-2
 ];

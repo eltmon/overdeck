@@ -3,7 +3,11 @@
 1521 src/cli/commands/start.ts
 1449 src/cli/index.ts
 1012 src/dashboard/frontend/src/components/AwaitingMergePage.tsx
+<<<<<<< HEAD
 1392 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
+=======
+1356 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
+>>>>>>> feature/pan-2499-slot-2
 1540 src/dashboard/frontend/src/components/CommandDeck/index.tsx
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
 1536 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx

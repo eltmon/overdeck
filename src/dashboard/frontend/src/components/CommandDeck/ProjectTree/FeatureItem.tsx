@@ -8,7 +8,6 @@ import {
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
-import { SessionNode } from './SessionNode';
 import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
@@ -29,6 +28,9 @@ import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
+import { ShipProgress } from '../../issue-view/ShipProgress';
+import { deriveShip } from '../../issue-view/derivations';
+import { ExpandableSessionNode } from './ExpandableSessionNode';
 import styles from '../styles/command-deck.module.css';
 
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
@@ -922,33 +924,13 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
 };
 
 /**
- * PAN-2487 follow-up: the merge door runs server-side, so during an actual
- * merge (rebase → verify → merge) the tree showed nothing alive under the
- * issue. This virtual row appears only while the door is working and spins
- * with the current step; clicking focuses the issue (whose cockpit routes
- * ship phases to the Ship tab). Renders nothing otherwise — including for
- * issues that merely have an old ship-role session.
+ * PAN-2499 WI-3: compact rail row for the server-side merge door.
+ * Appears only while the door is working or terminal; clicking focuses the issue.
  */
-function ShipDoorTreeRow({ issueId, onSelect }: { issueId: string; onSelect: () => void }) {
+function CompactShipRow({ issueId, onClick }: { issueId: string; onClick: () => void }) {
   const { data } = useReviewStatusQuery(issueId);
-  const mergeStatus = data?.mergeStatus;
-  if (mergeStatus !== 'merging' && mergeStatus !== 'verifying') return null;
-  const step = (data as { mergeStep?: string } | undefined)?.mergeStep ?? mergeStatus;
-  return (
-    <div className={styles.sessionList}>
-      <button
-        type="button"
-        className={styles.sessionNode}
-        onClick={onSelect}
-        title="The merge door is working this issue — click to open its cockpit (Ship tab shows the live log)"
-        data-testid="ship-door-row"
-      >
-        <Loader2 size={12} className="animate-spin" style={{ color: 'var(--primary)', flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 500 }}>Ship</span>
-        <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{step}</span>
-      </button>
-    </div>
-  );
+  const ship = deriveShip(data);
+  return <ShipProgress ship={ship} compact onClick={onClick} />;
 }
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
@@ -1262,7 +1244,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
 
       {expanded && (
-        <ShipDoorTreeRow issueId={feature.issueId} onSelect={() => onSelect?.()} />
+        <CompactShipRow issueId={feature.issueId} onClick={() => onSelect?.()} />
       )}
       {expanded && hasExpandableChildren && (
         <div className={styles.sessionList}>
@@ -1298,7 +1280,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     );
                   }
                   return (
-                    <SessionNode
+                    <ExpandableSessionNode
                       key={session.sessionId}
                       session={session}
                       issueId={feature.issueId}

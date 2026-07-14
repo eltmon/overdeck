@@ -3,7 +3,11 @@ import { Context, Effect, Layer, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../../services/domain-services.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
+<<<<<<< HEAD
 import { ReadModelService, type ReadModelServiceShape } from '../../read-model.js';
+=======
+import { ReadModelService } from '../../read-model.js';
+>>>>>>> feature/pan-2499-slot-2
 
 const fsMocks = vi.hoisted(() => ({
   appendFile: vi.fn(),
@@ -17,8 +21,13 @@ const agentMocks = vi.hoisted(() => ({
   saveAgentRuntimeState: vi.fn(),
   restartAgent: vi.fn(),
   messageAgent: vi.fn(),
+<<<<<<< HEAD
   clearAgentPausedSync: vi.fn(),
   clearAgentTroubledSync: vi.fn(),
+=======
+  clearAgentPaused: vi.fn(),
+  clearAgentTroubled: vi.fn(),
+>>>>>>> feature/pan-2499-slot-2
 }));
 
 const tmuxMocks = vi.hoisted(() => ({
@@ -40,6 +49,32 @@ const trackerMocks = vi.hoisted(() => ({
   resolveGitHubIssueSync: vi.fn(),
   resolveTrackerTypeSync: vi.fn(),
 }));
+
+const operatorInterventionMocks = vi.hoisted(() => ({
+  appendOperatorInterventionEvent: vi.fn(() => Promise.resolve()),
+}));
+
+const sharedMocks = vi.hoisted(() => ({
+  getIssueDataService: vi.fn(() => ({
+    getIssues: vi.fn(() => []),
+    patchIssue: vi.fn(),
+    invalidateTracker: vi.fn(),
+  })),
+}));
+
+vi.mock('../../../../lib/operator-interventions.js', () => ({
+  appendOperatorInterventionEvent: operatorInterventionMocks.appendOperatorInterventionEvent,
+  operatorInterventionEvent: (input: any) => ({
+    type: 'operator.intervention',
+    timestamp: input.timestamp ?? new Date().toISOString(),
+    payload: { issueId: input.issueId, kind: input.kind, source: input.source },
+  }),
+}));
+
+vi.mock('../agents/shared.js', async (importActual) => {
+  const actual = await importActual<typeof import('../agents/shared.js')>();
+  return { ...actual, getIssueDataService: sharedMocks.getIssueDataService };
+});
 
 const issueServiceMock = vi.hoisted(() => ({
   getIssueSource: vi.fn(),
@@ -85,8 +120,13 @@ vi.mock('../../../../lib/agents.js', async (importOriginal) => {
     saveAgentRuntimeState: agentMocks.saveAgentRuntimeState,
     restartAgent: agentMocks.restartAgent,
     messageAgent: agentMocks.messageAgent,
+<<<<<<< HEAD
     clearAgentPausedSync: agentMocks.clearAgentPausedSync,
     clearAgentTroubledSync: agentMocks.clearAgentTroubledSync,
+=======
+    clearAgentPaused: agentMocks.clearAgentPaused,
+    clearAgentTroubled: agentMocks.clearAgentTroubled,
+>>>>>>> feature/pan-2499-slot-2
   };
 });
 
@@ -156,8 +196,8 @@ beforeAll(async () => {
   issuesRouteLayer = (await import('../issues.js')).issuesRouteLayer;
 }, 15_000);
 
-function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
-  return Layer.succeed(EventStoreService, {
+function routeTestLayerFor(appendedEvents: Record<string, unknown>[]) {
+  const eventStoreLayer = Layer.succeed(EventStoreService, {
     append: (event: Record<string, unknown>) => Effect.sync(() => {
       appendedEvents.push(event);
       return appendedEvents.length;
@@ -175,6 +215,20 @@ function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
     getLatestSequence: Effect.succeed(0),
     streamEvents: Stream.empty,
   });
+
+  const issueLifecycleLayer = Layer.succeed(IssueLifecycle, {
+    transitionTo: () => Effect.void,
+    addLabel: () => Effect.void,
+    removeLabel: () => Effect.void,
+    close: () => Effect.void,
+  });
+
+  const readModelLayer = Layer.succeed(ReadModelService, {
+    getSnapshot: Effect.succeed({ agents: [], issues: [], conversations: [], workspaces: [] }),
+    getIssueById: () => Effect.succeed(null),
+  } as any);
+
+  return eventStoreLayer.pipe(Layer.merge(issueLifecycleLayer), Layer.merge(readModelLayer));
 }
 
 // The spawn route (POST /api/agents) pulls IssueLifecycle and ReadModelService
@@ -218,7 +272,11 @@ async function runRoute(layer: Layer.Layer<HttpRouter.HttpRouter, never, EventSt
     Effect.scoped(
       Effect.flatMap(HttpRouter.toHttpEffect(layer), (app) =>
         Effect.provideService(app, HttpServerRequest.HttpServerRequest, request)
+<<<<<<< HEAD
       ).pipe(Effect.provide(routeServicesLayer(appendedEvents))),
+=======
+      ).pipe(Effect.provide(routeTestLayerFor(appendedEvents))),
+>>>>>>> feature/pan-2499-slot-2
     ),
   );
   return { response, appendedEvents };
@@ -254,8 +312,13 @@ describe('operator.intervention dashboard routes', () => {
     agentMocks.saveAgentRuntimeState.mockResolvedValue(undefined);
     agentMocks.restartAgent.mockResolvedValue({ success: true });
     agentMocks.messageAgent.mockResolvedValue(undefined);
+<<<<<<< HEAD
     agentMocks.clearAgentPausedSync.mockReturnValue(true);
     agentMocks.clearAgentTroubledSync.mockReturnValue(true);
+=======
+    agentMocks.clearAgentPaused.mockReturnValue(Effect.succeed({ ...agentState, paused: false }));
+    agentMocks.clearAgentTroubled.mockReturnValue(Effect.succeed({ ...agentState, troubled: false, consecutiveFailures: 0 }));
+>>>>>>> feature/pan-2499-slot-2
     tmuxMocks.sessionExists.mockReturnValue(Effect.succeed(false));
     tmuxMocks.killSession.mockReturnValue(Effect.succeed(undefined));
     lifecycleMocks.resetToTodo.mockReturnValue(Effect.succeed({ success: true, steps: [] }));
@@ -340,13 +403,63 @@ describe('operator.intervention dashboard routes', () => {
     });
   });
 
-  it('does not emit an intervention when the deep-wipe request is invalid', async () => {
-    const { response, appendedEvents } = await requestIssues('/api/issues/not-an-id/deep-wipe', {
-      body: JSON.stringify({ deleteWorkspace: false }),
+  it('refuses to start a paused agent from the dashboard without clearGates', async () => {
+    agentMocks.getAgentState.mockReturnValue(
+      Effect.succeed({ ...agentState, status: 'stopped', paused: true, pausedReason: 'manual inspection' }),
+    );
+
+    const { response } = await requestAgents('/api/agents', {
+      body: JSON.stringify({ issueId: 'PAN-1' }),
     });
 
-    expect(response.status).toBe(400);
-    expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
+    expect(response.status).toBe(409);
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
+    expect(operatorInterventionMocks.appendOperatorInterventionEvent).not.toHaveBeenCalled();
+  });
+
+  it('refuses to start a troubled agent from the dashboard without clearGates', async () => {
+    agentMocks.getAgentState.mockReturnValue(
+      Effect.succeed({ ...agentState, status: 'stopped', troubled: true, consecutiveFailures: 3 }),
+    );
+
+    const { response } = await requestAgents('/api/agents', {
+      body: JSON.stringify({ issueId: 'PAN-1' }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
+  });
+
+  it('honors clearGates by clearing a paused gate and emitting an operator intervention', async () => {
+    agentMocks.getAgentState
+      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped', paused: true, pausedReason: 'manual inspection' }))
+      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped' }));
+
+    const { response } = await requestAgents('/api/agents', {
+      body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
+    });
+
+    expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-1');
+    expect(operatorInterventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ issueId: 'PAN-1', kind: 'unpause', source: 'dashboard start-agent' }),
+    );
+    expect(response.status).not.toBe(409);
+  });
+
+  it('honors clearGates by clearing a troubled gate and emitting an operator intervention', async () => {
+    agentMocks.getAgentState
+      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped', troubled: true, consecutiveFailures: 3 }))
+      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped' }));
+
+    const { response } = await requestAgents('/api/agents', {
+      body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
+    });
+
+    expect(agentMocks.clearAgentTroubled).toHaveBeenCalledWith('agent-pan-1');
+    expect(operatorInterventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ issueId: 'PAN-1', kind: 'untroubled', source: 'dashboard start-agent' }),
+    );
+    expect(response.status).not.toBe(409);
   });
 
   // ── PAN-2499 WI-9a: clearGates on POST /api/agents ─────────────────────────
