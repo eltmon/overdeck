@@ -399,17 +399,16 @@ and `parseGitHubRepos()` in `src/lib/tracker-utils.ts`. Resolution order:
 When adding a new project to `projects.yaml`, either set `linear_team` explicitly or
 ensure the project key (uppercased, hyphens removed) matches the issue prefix you want.
 
-## tasks Enforcement
+## Task Enforcement
 
-Work agents cannot start without tasks tasks in the workspace. The start-agent endpoint
-returns 422 if the canonical Dolt resolver reports no issue tasks. Planning must create tasks via
-`bd create` before handing off to implementation.
+Work agents require a readable, implementation-ready vBRIEF. The start-agent endpoint returns 422
+when the plan is missing, unreadable, belongs to another issue, or contains no implementation items.
+Planning writes the vBRIEF checklist directly; it does not materialize an external task store.
 
-The verification gate also blocks completion while the issue has open tasks: `runVerificationForIssue`
-calls `checkOpentasksPromise` after the vBRIEF acceptance-criteria check, and a non-empty result (or a
-timeout, which is unknown-not-zero per PAN-1812) produces `failedCheck: 'open-tasks'`. Finally,
-merge-time and close-out sweeps remove remaining open tasks from terminal issues so that a closed
-issue never carries open tasks.
+Completion and verification are also gated by the vBRIEF checklist. `runVerificationForIssue()` in
+`src/lib/cloister/verification-runner.ts` calls `checkIncompletePlanItemsPromise()` and reports
+`failedCheck: 'incomplete-plan-items'` while any item or sub-item is not terminal. Agents update that
+checklist through `pan task`; there is no separate tracker to reconcile at merge or close-out.
 ## postMergeLifecycle Idempotency (enforced by a test, not by this note)
 
 `postMergeLifecycle` must run **at most once per merge**. If it can re-trigger

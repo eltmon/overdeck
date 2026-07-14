@@ -329,20 +329,12 @@ Yes. LLMs are good at producing structured JSON when given a schema and examples
 
 ---
 
-## Automatic tasks Conversion
+## Checklist Activation
 
-When the planning agent finishes and the vBRIEF is promoted to `vbrief/proposed/`, Cloister automatically converts the vBRIEF plan into tasks:
-
-1. **Read** `plan.vbrief.json` from the workspace
-2. **Topological sort** items using Kahn's algorithm on `blocks` edges
-3. **Create tasks** in dependency order via `pan task create` with:
-   - Title: `"{plan.id}: {item.title}"`
-   - Labels: `issueLabel,difficulty:X,phase-N`
-   - Description: Narrative Action + acceptance criteria
-   - Dependencies: `--deps "blocks:taskId1,blocks:taskId2"`
-4. **Start work agent** with tasks ready for implementation
-
-Implementation: `createtasksFromVBrief()` in `src/lib/vbrief/tasks.ts`.
+When planning finishes, Overdeck promotes the vBRIEF to `specs/` on `overdeck-state`.
+The plan items and their `blocks` edges are the task graph; planning does not convert
+them into another store. A work agent starts only after the plan is readable and has
+at least one implementation item.
 
 ## DAG Visualization
 
@@ -350,7 +342,7 @@ The dashboard visualizes the vBRIEF DAG using the dependency edges between items
 
 ## DAG-Aware Task Scheduling
 
-Work agents use `pan task next -l <issue>` to find unblocked tasks — tasks whose dependencies are all closed. This ensures work proceeds in dependency order without manual scheduling. The DAG structure from vBRIEF edges is preserved in tasks dependencies during the automatic conversion.
+Work agents use `pan task next <issue>` to find the next dispatchable checklist item whose blockers are terminal. This keeps work in dependency order without duplicating the vBRIEF graph in another store.
 
 ## AC-Driven Specialist Pipeline
 

@@ -137,9 +137,9 @@ There is no workspace-local copy of the spec. Work agents read the canonical spe
 | `.overdeck/continue.json` in a workspace | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
 | `.overdeck/sessions.jsonl` in a workspace | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
 | `.overdeck/feedback/*.md` in a workspace | Pipeline only | Agent (injected into prompt) | None — single writer |
-| tasks (`.vBRIEF tasks/`) | Each agent via `pan task update` | Pipeline, dashboard | Serialized by Dolt mutex |
+| Task state (issue record `tasks` block) | Each agent via `pan task` | Pipeline, dashboard | Serialized by the shared task-state lock |
 
-For N parallel agents on N different issues: each has its own feature branch with its own `.pan/` directory. Zero cross-agent contention. tasks writes serialize through the Dolt mutex but target different task IDs.
+For N parallel agents on N different issues, each has its own feature branch and workspace. Task mutations use the shared task-state lock but update different issue records.
 
 ---
 
@@ -428,7 +428,7 @@ Manual lifecycle transition overrides for vBRIEFs. All commands resolve the proj
 2. **Planning agent** converts the PRD into a vBRIEF spec during the discovery session. Creates `plan.vbrief.json` in the workspace `.pan/` directory.
 3. **`complete-planning`** promotes the vBRIEF to `specs/` on `overdeck-state` with an issue-keyed filename and sets `plan.status` to `proposed`.
 4. **`pan start`** updates `plan.status` to `active` on main. Work agents read the spec from main via `findPlan()`.
-5. **Work agent** works through tasks in DAG dependency order (`pan task next -l <issue>`). Item/subItem status updates are written to workspace `continue.json`'s `statusOverrides` map. `readWorkspacePlan()` returns a merged view with current statuses.
+5. **Work agent** works through tasks in DAG dependency order (`pan task next <issue>`). Item/subItem status updates are written through the task state door. `readWorkspacePlan()` returns a merged view with current statuses.
 6. **Verification gate** checks all child items with `metadata.kind: "acceptance_criterion"` are `completed` before allowing review.
 7. **`postMergeLifecycle`** updates `plan.status` to `completed` in `specs/` on `overdeck-state`.
 8. **Dashboard** renders the plan via the Directive Flow (DAG visualization) and vBRIEF viewer (List/DAG/Raw JSON tabs).
