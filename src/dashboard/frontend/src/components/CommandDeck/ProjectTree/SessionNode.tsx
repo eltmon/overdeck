@@ -271,7 +271,7 @@ function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | 
     case 'ship': return 'Ship';
     case 'merge': return 'Merge';
     case 'test': return 'Test';
-    case 'lint': return 'Lint';
+    case 'lint': return 'Test/Lint';
     case 'review': return 'Review';
     case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
     case 'work': return 'Work';

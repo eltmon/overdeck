@@ -265,6 +265,38 @@ const getIssueShipLogRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/issues/:id/verification ─────────────────────────────────
+// PAN-2665: the Test/Lint tree node's live view — the per-workspace
+// verification artifact (written incrementally while gates run) plus the
+// review-status verificationStatus, polled by the panel while running.
+const getIssueVerificationRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/verification',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueIdSync(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    return yield* Effect.promise(async () => {
+      const { readVerificationArtifact } = await import('../../../lib/cloister/verification-artifact.js');
+      const { getReviewStatusSync } = await import('../../../lib/review-status.js');
+      const { join } = await import('node:path');
+      const resolved = resolveProjectFromIssueSync(id);
+      const workspacePath = resolved
+        ? join(resolved.projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
+        : null;
+      const artifact = workspacePath ? readVerificationArtifact(workspacePath) : null;
+      const rs = getReviewStatusSync(id.toUpperCase());
+      return jsonResponse({
+        issueId: id.toUpperCase(),
+        verificationStatus: rs?.verificationStatus ?? null,
+        artifact,
+      });
+    });
+  })),
+);
+
 // ─── Route: POST /api/issues/:issueId/close ──────────────────────────────────
 
 const postIssueCloseRoute = HttpRouter.add(
@@ -831,6 +863,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
   getIssueAnalyzeRoute,
   getIssueShipLogRoute,
+  getIssueVerificationRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,
   postIssueAbortPlanningRoute,

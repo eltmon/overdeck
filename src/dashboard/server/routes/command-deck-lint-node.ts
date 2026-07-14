@@ -34,7 +34,7 @@ export function buildLintSessionNode(options: {
   const verificationStatus = centralStatus?.verificationStatus;
   if (!artifact && (!verificationStatus || verificationStatus === 'skipped')) return null;
 
-  const isRunning = verificationStatus === 'running';
+  const isRunning = verificationStatus === 'running' || artifact?.outcome === 'running';
   const status = isRunning
     ? 'running'
     : artifact
@@ -46,23 +46,30 @@ export function buildLintSessionNode(options: {
           : 'running';
 
   const transcriptParts: string[] = [];
-  if (isRunning) transcriptParts.push('QUALITY GATES RUNNING...');
   if (artifact) {
-    if (!isRunning) transcriptParts.push(`QUALITY GATES ${artifact.outcome.toUpperCase()}`);
-    transcriptParts.push(`Last run: ${artifact.ranAt}`, '');
+    transcriptParts.push(
+      isRunning ? 'QUALITY GATES RUNNING...' : `QUALITY GATES ${artifact.outcome.toUpperCase()}`,
+      `Last run: ${artifact.ranAt}`,
+      '',
+    );
     for (const gate of artifact.gates) {
       const mark = gate.passed ? '✓' : '✗';
       const secs = (gate.durationMs / 1000).toFixed(1);
       transcriptParts.push(`${mark} ${gate.name} (${secs}s)${gate.passed ? '' : ' FAILED'}`);
+    }
+    if (isRunning && artifact.currentGate) {
+      transcriptParts.push(`▶ ${artifact.currentGate} running…`);
     }
     for (const gate of artifact.gates) {
       if (!gate.passed && (gate.output || gate.error)) {
         transcriptParts.push('', `--- ${gate.name} output ---`, (gate.output || gate.error || '').trim());
       }
     }
+  } else if (isRunning) {
+    transcriptParts.push('QUALITY GATES RUNNING...');
   } else if (centralStatus?.verificationNotes) {
     transcriptParts.push(centralStatus.verificationNotes);
-  } else if (!isRunning) {
+  } else {
     // No artifact yet (verification last ran before the artifact writer
     // shipped) — show the status rather than an empty panel.
     transcriptParts.push(
