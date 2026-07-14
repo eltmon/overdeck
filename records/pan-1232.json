@@ -826,11 +826,31 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-14T08:16:10.959Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-14T08:16:15.266Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-14T08:16:15.267Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-14T08:16:15.268Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-14T08:16:15.269Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-14T08:16:10.960Z",
+  "updated": "2026-07-14T08:16:15.270Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
@@ -911,7 +931,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
