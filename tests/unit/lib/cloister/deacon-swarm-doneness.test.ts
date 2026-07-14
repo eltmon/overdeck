@@ -38,6 +38,8 @@ vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
 
 vi.mock('../../../../src/lib/swarm-policy.js', () => ({
   resolveSwarmPolicy: () => ({ mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global' } }),
+  resolveAutomaticSwarmPolicy: () => ({ policy: { mode: 'auto', source: { mode: 'global' } }, enabled: true }),
+  resolveSwarmMaxSlots: (_issueId: string, configured: number) => configured,
 }));
 
 let tempRoot: string;

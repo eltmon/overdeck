@@ -58,7 +58,7 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
-import { resetToPlannedCommand } from './commands/reset-to-planned.js';
+import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
 import { untroubledCommand } from './commands/untroubled.js';
@@ -449,30 +449,17 @@ planCmd
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
-// Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .action(tellCommand);
-
 program
   .command('kill <id>')
+  .alias('stop')
   .description('Stop running agent (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
-
-program
-  .command('stop <id>')
-  .description('Stop every agent for an issue; preserve its workspace, branch, plan, beads, and commits')
-  .option('--force', 'Force stop without confirmation')
-  .action(killCommand);
-
-program
-  .command('reset-to-planned <id>')
-  .description('Return a finalized issue to post-planning without deleting its workspace, plan, beads, commits, or branch')
-  .option('--dry-run', 'Show the exact reset without changing state')
-  .action(resetToPlannedCommand);
-
+registerResetToPlannedCommand(program);
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')

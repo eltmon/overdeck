@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { existsSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { Effect } from 'effect';
@@ -9,11 +10,18 @@ import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { findPlanSync } from '../../lib/vbrief/io.js';
 import { resetPipelineVerdictsForWorkStartSync } from '../../lib/review-status.js';
-import { removeMerge } from '../../lib/database/merge-queue-db.js';
+import { dequeueMerge } from '../../lib/overdeck/merge.js';
 import { resetPostMergeState } from '../../lib/cloister/merge-agent.js';
 import { IssueLifecycle, IssueLifecycleWithClientLive } from '../../dashboard/server/services/issue-lifecycle.js';
 
 export interface ResetToPlannedOptions { dryRun?: boolean }
+
+export function registerResetToPlannedCommand(program: Command): void {
+  program.command('reset-to-planned <id>')
+    .description('Return a finalized issue to post-planning without deleting its workspace, plan, beads, commits, or branch')
+    .option('--dry-run', 'Show the exact reset without changing state')
+    .action(resetToPlannedCommand);
+}
 
 export async function resetToPlannedCommand(id: string, options: ResetToPlannedOptions = {}): Promise<void> {
   const issueId = resolveBareNumericIdSync(id);
@@ -43,7 +51,7 @@ export async function resetToPlannedCommand(id: string, options: ResetToPlannedO
   }
 
   resetPipelineVerdictsForWorkStartSync(issueId, { force: true });
-  removeMerge(issueId);
+  dequeueMerge(project.projectKey, issueId);
   resetPostMergeState(issueId);
 
   await Effect.runPromise(

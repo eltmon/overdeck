@@ -14,9 +14,11 @@ Each project has one local Dolt home at
 `.beads/redirect` to share it. `pan sync` configures the project remote and runs
 `bd bootstrap` to hydrate or adopt a newer remote schema.
 
-Use `pan beads claim|update|close|create|dep|delete` for mutations. Direct
-mutating `bd` commands are rejected in agent environments. Read-only commands
-such as `bd list`, `bd show`, and `bd ready` remain available.
+Use `pan beads list [ISSUE]`, `pan beads ready [ISSUE]`, and
+`pan beads show <BEAD>` for reads. Use
+`pan beads claim|update|close|create|dep|delete` for mutations. Direct `bd`
+commands are rejected in agent environments, so every read reports resolver
+failures as stale instead of misreading them as an empty result.
 
 The dashboard synchronizes in the background. The Beads rail displays its last
 successful sync and marks results stale when pulling or schema inspection fails.

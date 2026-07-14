@@ -834,8 +834,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
   kind: TerminalApiErrorKind;
   summary: string;
 }> = [
-  // Order matters: more specific quota/usage messages first so we surface the
-  // most actionable summary even when both a 403 and a quota line are present.
+  // Specific quota messages precede generic status codes to preserve the actionable diagnosis.
   { re: /usage limit for this billing cycle/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted (billing cycle limit reached)' },
   { re: /reached your usage limit/i,           kind: 'quota_exhausted', summary: 'Provider quota exhausted (usage limit reached)' },
   { re: /(?:^|[^a-z])quota[^a-z].{0,40}(?:exceeded|exhausted|reached)/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted' },
@@ -844,8 +843,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
   { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
   { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
   { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
-  { re: /API Error:\s*402\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (402 account or membership required)' },
-  { re: /unable to verify your membership benefits/i, kind: 'permission_denied', summary: 'Provider could not verify membership benefits' },
+  { re: /API Error:\s*402\b|unable to verify your membership benefits/i, kind: 'permission_denied', summary: 'Provider rejected request (402 account or membership required)' },
   { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
   { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
 ];

@@ -9,7 +9,8 @@ import { exec, execFile } from 'child_process';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
-import { clearAgentPausedSync, getAgentStateSync, listRunningAgentsSync, spawnAgent } from '../../lib/agents.js';
+import { clearAgentPausedSync, getAgentStateSync, spawnAgent } from '../../lib/agents.js';
+import { describeConflictingWorkAgents } from '../../lib/work-agent-conflicts.js';
 import { ROLE_EFFORTS, resolveModel as resolveRoleModel, loadConfigSync as loadYamlConfig, type RoleEffort } from '../../lib/config-yaml.js';
 import { getModelEffortLevelsSync } from '../../lib/model-capabilities.js';
 import { syncMainIntoWorkspace } from '../../lib/cloister/merge-agent.js';
@@ -932,35 +933,19 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exitCode = 0;
     return;
   }
-
-  const conflictingWorkAgents = listRunningAgentsSync().filter((agent) =>
-    agent.tmuxActive
-    && agent.role === 'work'
-    && agent.issueId.toUpperCase() === id.toUpperCase()
-    && agent.id !== agentId
-  );
-  if (conflictingWorkAgents.length > 0) {
-    process.stderr.write(chalk.red(`Cannot start ${id}: other work sessions are still live.\n`));
-    for (const agent of conflictingWorkAgents) {
-      process.stderr.write(chalk.red(`  ${agent.id} (${agent.workspace})\n`));
-    }
-    process.stderr.write(chalk.red(`Run 'pan stop ${id}' to stop every issue session, then retry.\n`));
+  const conflict = describeConflictingWorkAgents(id, agentId);
+  if (conflict) {
+    process.stderr.write(chalk.red(conflict));
     process.exit(1);
   }
-
   const spinner = ora(`Preparing workspace for ${id}...`).start();
-
   try {
-
-    // Determine workspace location preference
     const locationPreference = determineWorkspaceLocation(options);
-
     // Log project resolution info
     const resolved = resolveProjectFromIssueSync(id);
     if (resolved) {
       spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
     }
-
     // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 

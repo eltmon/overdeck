@@ -284,7 +284,7 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
       <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
         Applies to this project's issues that have no explicit per-issue auto-merge setting.
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3"><span className="text-[13px] text-foreground">Automatic swarming</span><select aria-label="Project swarm policy" className="rounded-md border border-input bg-background px-2 py-1.5 text-xs" value={swarmData?.configured?.mode ?? ''} onChange={e => swarmMutation.mutate((e.target.value || null) as any)}><option value="">Inherit global</option><option value="off">Off</option><option value="auto">Auto</option><option value="always">Always</option></select><span className="text-[11px] text-muted-foreground">Future dispatches only</span></div>
+      <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3"><span className="text-[13px] text-foreground">Automatic swarming</span><select aria-label="Project swarm policy" className="rounded-md border border-input bg-background px-2 py-1.5 text-xs" value={swarmData?.configured?.mode ?? ''} onChange={e => { const value = e.target.value; swarmMutation.mutate(value === 'off' || value === 'auto' || value === 'always' ? value : null); }}><option value="">Inherit global</option><option value="off">Off</option><option value="auto">Auto</option><option value="always">Always</option></select><span className="text-[11px] text-muted-foreground">Future dispatches only</span></div>
     </div>
   );
 }

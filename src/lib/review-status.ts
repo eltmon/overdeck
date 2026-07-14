@@ -603,11 +603,9 @@ export function setReviewStatusSync(
 
   return updated;
 }
-
 export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: { force?: boolean } = {}): ReviewStatus | null {
   const status = getReviewStatusSync(issueId);
   if (!status) return null;
-
   const isPending =
     status.reviewStatus === 'pending' &&
     status.testStatus === 'pending' &&
@@ -647,11 +645,8 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: 
     recoveryStartedAt: undefined,
     reviewedAtCommit: undefined,
     lastVerifiedCommit: undefined,
-    reviewRequestedAt: undefined,
-    reviewSpawnedAt: undefined,
-    conflictResolutionDispatchedAt: undefined,
-    blockerReasons: undefined,
-    reviewerVerdicts: undefined,
+    reviewRequestedAt: undefined, reviewSpawnedAt: undefined,
+    conflictResolutionDispatchedAt: undefined, blockerReasons: undefined, reviewerVerdicts: undefined,
   });
 }
 

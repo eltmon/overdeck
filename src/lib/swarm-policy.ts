@@ -32,3 +32,12 @@ export function resolveSwarmPolicy(issueId?: string, cli: SwarmPolicyLayer = {})
   const issue = project ? readIssueRecordSync(project, issueId)?.swarm?.policy : undefined;
   return resolveSwarmPolicyLayers(global, project?.swarm, issue, cli);
 }
+
+export function resolveAutomaticSwarmPolicy(issueId: string, manual = false, inProgress = false) {
+  const policy = resolveSwarmPolicy(issueId);
+  return { policy, enabled: manual || (policy.mode !== 'off' && (policy.autoAdvance || !inProgress)) };
+}
+
+export function resolveSwarmMaxSlots(issueId: string, configured: number): number {
+  return Math.min(Math.max(1, Math.floor(configured)), Math.max(1, Math.floor(resolveSwarmPolicy(issueId).maxSlots)));
+}

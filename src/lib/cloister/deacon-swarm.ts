@@ -36,7 +36,7 @@ import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swa
 import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
-import { resolveSwarmPolicy } from '../swarm-policy.js';
+import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-policy.js';
 import type { SwarmInferCompletionMode } from './config.js';
 import {
   countRunningSwarmSlotsForIssue,
@@ -338,36 +338,28 @@ export async function coordinateSwarmSlots(
         .join(', ');
       actions.push(`[swarm] blocked slots for ${issueId}: ${slots} — other slots continue; run \`pan swarm recover ${issueId} <slot>\``);
     }
-
     try {
       const spec = await Effect.runPromise(findSpecByIssue(workspace.projectPath, issueId));
       if (!spec) continue;
       const planStatus = spec.document.plan.status;
       if (planStatus === 'completed' || planStatus === 'cancelled') continue;
-
-      // Coordinate against the merged plan view; slot done-ness lives in statusOverrides.
       const overrides = (deps.readStatusOverrides ?? defaultReadStatusOverrides)(workspace.workspacePath, issueId);
       const doc = overrides && Object.keys(overrides).length > 0
         ? applyStatusOverrides(spec.document, overrides)
         : spec.document;
-
       const readiness = analyzeSwarmReadiness(doc);
-      const policy = resolveSwarmPolicy(issueId);
-      if (!opts.manual && policy.mode === 'off') {
+      const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
+      const swarmInProgress = Object.entries(overrides ?? {})
+        .some(([key, value]) => !key.includes('.') && value === 'completed');
+      const { policy, enabled } = resolveAutomaticSwarmPolicy(issueId, opts.manual, swarmInProgress);
+      if (!enabled) {
         actions.push(`[swarm] ${issueId}: swarming off (${policy.source.mode}) — no automatic dispatch, recovery, merge, or cleanup; use an explicit swarm command or stop the legacy sessions`);
         continue;
       }
-      const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
-      // Eligibility gates dispatch only; active swarms still need merge/gc/endgame passes.
-      const swarmInProgress = Object.entries(overrides ?? {})
-        .some(([key, value]) => !key.includes('.') && value === 'completed');
-      const policyAllowsDispatch = opts.manual || (policy.mode !== 'off' && (policy.autoAdvance || !swarmInProgress));
-      const dispatchEligible = policyAllowsDispatch && readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
-      if (!policyAllowsDispatch) actions.push(`[swarm] ${issueId}: automatic swarming off (${policy.source.mode}) — single-agent execution remains selected`);
+      const dispatchEligible = enabled && readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
       if (dispatchEligible) {
         actions.push(`[swarm] considered ${issueId}: swarm eligible`);
       }
-
       const reconciled = await deps.reconcileSlotState(issueId, workspace.workspacePath, doc);
       if (!dispatchEligible) {
         const hasSlotState = reconciled.merged.length > 0 || reconciled.inFlight.length > 0
@@ -504,7 +496,6 @@ export async function classifyInFlightSlots(
           classified.push(inferred);
           continue;
         }
-
         classified.push({
           ...slot,
           lifecycle: 'stalled',
@@ -513,7 +504,6 @@ export async function classifyInFlightSlots(
         });
         continue;
       }
-
       classified.push({ ...slot, lifecycle: 'running' });
       continue;
     }
@@ -916,10 +906,7 @@ export async function dispatchNextWave(
   const actions: string[] = [];
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
   const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
-  const configuredMaxSlotIndex = Math.min(
-    Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)())),
-    Math.max(1, Math.floor(resolveSwarmPolicy(issueId).maxSlots)),
-  );
+  const configuredMaxSlotIndex = resolveSwarmMaxSlots(issueId, (deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)());
   const occupiedSlotIndexes = new Set([
     ...blockedSlotIndexes, // PAN-2364: blocked slots count as occupied so other slots cannot collide with them
     ...reconciled.inFlight.map(slot => slot.slotIndex),

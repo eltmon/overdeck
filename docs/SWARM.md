@@ -2,6 +2,12 @@
 
 Swarm v2 runs one work agent per vBRIEF item when the plan DAG, file scope, and global capacity allow safe parallel work. It is coordinated by Deacon, not by a durable sidecar runtime file.
 
+When resolved swarm mode is `off`, Deacon performs no automatic slot dispatch,
+recovery, merge, or cleanup. Existing slots are preserved but do not advance,
+and `pan start` refuses to launch a primary work agent while any slot is live.
+Use `pan stop <id>` to preserve the work and stop every issue session before
+returning to single-agent execution.
+
 The shipped operator entry point is:
 
 ```bash

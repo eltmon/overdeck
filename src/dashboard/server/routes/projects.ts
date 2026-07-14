@@ -16,6 +16,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { httpHandler } from './http-handler.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync } from '../../../lib/projects.js';
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
+import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
 import { readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -677,7 +678,12 @@ const postProjectSwarmPolicyRoute = HttpRouter.add('POST', '/api/projects/:proje
   if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
   const body = (yield* readProjectJsonBody) as { value?: { mode?: unknown; maxSlots?: unknown; autoAdvance?: unknown } | null };
   if (body.value !== null && body.value?.mode !== undefined && !['off', 'auto', 'always'].includes(String(body.value.mode))) return jsonResponse({ error: 'invalid swarm mode' }, { status: 400 });
-  setProjectSwarmPolicySync(key, body.value as any); return jsonResponse({ configured: body.value ?? null });
+  const value = body.value === null ? null : {
+    ...(body.value?.mode !== undefined ? { mode: String(body.value.mode) as SwarmPolicyLayer['mode'] } : {}),
+    ...(typeof body.value?.maxSlots === 'number' ? { maxSlots: body.value.maxSlots } : {}),
+    ...(typeof body.value?.autoAdvance === 'boolean' ? { autoAdvance: body.value.autoAdvance } : {}),
+  };
+  setProjectSwarmPolicySync(key, value); return jsonResponse({ configured: value });
 })));
 const getIssueSwarmPolicyRoute = HttpRouter.add('GET', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
   const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
@@ -686,7 +692,7 @@ const getIssueSwarmPolicyRoute = HttpRouter.add('GET', '/api/issues/:issueId/swa
   return jsonResponse({ configured: readIssueRecordSync(project, issueId)?.swarm?.policy ?? null, resolved: resolveSwarmPolicy(issueId) });
 })));
 const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
-  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase(); const body = (yield* readProjectJsonBody) as { value?: any };
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase(); const body = (yield* readProjectJsonBody) as { value?: SwarmPolicyLayer | null };
   const resolved = resolveProjectFromIssueSync(issueId); const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
   if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
   const record = readIssueRecordSync(project, issueId); if (!record) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });

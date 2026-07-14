@@ -97,7 +97,7 @@ Your workspace is at /workspace (a full clone of the repo, checked out on your f
 - `/workspace/.pan/records/{{ISSUE_ID_LOWER}}.json` — per-issue record: decisions, hazards, resumePoint, sessionHistory from planning. Do NOT read `.pan/continue.json` (retired).
 - `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.vbrief.json` — the canonical vBRIEF plan, committed on main. READ-ONLY: never edit a spec file.
 - `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
-- Beads tasks are read from canonical Dolt state (`bd ready -l {{ISSUE_ID_LOWER}}`, `bd show <id>`). `issues.jsonl` is a derived recovery export, not live state.
+- Beads tasks are read from canonical Dolt state (`pan beads ready {{ISSUE_ID}}`, `pan beads show <id>`). `issues.jsonl` is a derived recovery export, not live state.
 
 Start by reading the per-issue record (if present) and the spec to understand the plan, then begin implementation.
 If neither exists, check the issue tracker for requirements.
@@ -198,12 +198,12 @@ Tasks created during planning (check the per-issue record `sessionHistory` for w
 
 Follow the per-bead workflow in the mandatory section below.
 
-**IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
+**IMPORTANT:** Always pass `{{ISSUE_ID}}` to `pan beads ready` and `pan beads list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
 label filter you will see irrelevant beads from other workspaces.
 
 **NEVER use these wrong commands (agents frequently hallucinate them):**
-- `bd list --issue {{ISSUE_ID}}` — the `--issue` flag does NOT exist. Use `bd list -l {{ISSUE_ID_LOWER}}` or `bd list --title-contains "{{ISSUE_ID}}"`
+- `pan beads list {{ISSUE_ID}}` — list this issue's beads through the canonical resolver
 - `bd claim <bead-id>` — this command does NOT exist. Use `pan beads claim <bead-id>`
 - `bd start <bead-id>` — this command does NOT exist. Use `pan beads update <bead-id> --status in_progress`
 
@@ -213,7 +213,7 @@ the per-issue record (`statusOverrides`) — the layer the verification gate act
 Never hand-edit `.pan/spec.vbrief.json` or any file under `.pan/specs/` — specs are
 immutable after planning (PAN-1124). If verification reports incomplete acceptance
 criteria, the cause is an unclosed bead (or a bead whose title no longer matches its plan
-item): run `bd list -l {{ISSUE_ID_LOWER}}` and close everything that is done.
+item): run `pan beads list {{ISSUE_ID}}` and close everything that is done.
 {{/BEADS_TASKS}}
 
 {{#STITCH_DESIGNS}}
@@ -299,7 +299,7 @@ If you batch multiple beads into one commit, the inspector cannot verify them in
 and your work will be rejected.
 
 **Workflow for EVERY bead:**
-1. `bd ready -l {{ISSUE_ID_LOWER}}` — find the next unblocked bead for THIS issue
+1. `pan beads ready {{ISSUE_ID}}` — find the next unblocked bead for THIS issue
 2. `pan beads claim <bead-id>` — claim it
 3. Implement ONLY that bead's work
 4. `git add` specific files and `git commit` — one bead = one commit. Before committing,
@@ -315,12 +315,12 @@ and your work will be rejected.
 9. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
 10. On `INSPECTION BLOCKED`: fix with a new commit, push it, `pan beads close` again, then re-run the same inspection. On `INSPECTION ERROR`: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
 
-**IMPORTANT:** Always use `-l {{ISSUE_ID_LOWER}}` with `bd ready` and `bd list` to scope
+**IMPORTANT:** Always pass `{{ISSUE_ID}}` to `pan beads ready` and `pan beads list` to scope
 to this issue's beads. The shared database contains beads from ALL issues — without the
 label filter you will see irrelevant beads from other workspaces.
 
 **NEVER use these wrong commands (agents frequently hallucinate them):**
-- `bd list --issue {{ISSUE_ID}}` — the `--issue` flag does NOT exist. Use `bd list -l {{ISSUE_ID_LOWER}}` or `bd list --title-contains "{{ISSUE_ID}}"`
+- `pan beads list {{ISSUE_ID}}` — list this issue's beads through the canonical resolver
 - `bd claim <bead-id>` — this command does NOT exist. Use `pan beads claim <bead-id>`
 - `bd start <bead-id>` — this command does NOT exist. Use `pan beads update <bead-id> --status in_progress`
 
@@ -346,7 +346,7 @@ Remote agents still follow their final completion contract (last push plus the
 per-issue record automatically — `pan beads close` writes bead status; `pan done` writes session
 history. You do NOT need to edit the record directly.
 
-**To recover from a crash:** check `bd list -l {{ISSUE_ID_LOWER}}` to see which beads are
+**To recover from a crash:** check `pan beads list {{ISSUE_ID}}` to see which beads are
 closed, then review the "Per-Issue Record" block at the top of this message for decisions
 and hazards context. The bead list + spec give you full position without any manual record
 writes.
@@ -367,7 +367,7 @@ writes.
 - Poll or `curl` the specialist API in a loop — the pipeline is event-driven, not polling-based
 - Use `sleep` to wait for reviews, tests, or any external process
 - **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between beads.
-- **End your turn with a multi-paragraph "what I just did" summary and idle.** Summaries cost tokens and stall the pipeline. Close the bead with `pan beads close --reason="…"`, then immediately call `bd ready -l {{ISSUE_ID_LOWER}}` and start the next one in the same turn.
+- **End your turn with a multi-paragraph "what I just did" summary and idle.** Summaries cost tokens and stall the pipeline. Close the bead with `pan beads close --reason="…"`, then immediately call `pan beads ready {{ISSUE_ID}}` and start the next one in the same turn.
 - If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in a `pan tell` message and in your commit body.
 
 **ALWAYS do this instead:**

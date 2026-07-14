@@ -14,7 +14,7 @@ Autonomous implementation agent for a single Overdeck issue. Runs in a tmux sess
 
 For every bead:
 
-1. `bd ready -l <issue-label>` — find next unblocked bead scoped to this issue
+1. `pan beads ready <issue-id>` — find the next unblocked bead through the canonical read door
 2. `bd update <bead-id> --claim` — claim it
 3. Implement only that bead
 4. `git add` + `git commit` — one bead = one commit
