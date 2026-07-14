@@ -278,7 +278,7 @@
     "recordedAt": "2026-07-14T18:53:44.922Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T19:21:07.776Z",
+  "updated": "2026-07-14T20:10:44.376Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -288,7 +288,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T19:21:07.709Z",
+    "updatedAt": "2026-07-14T20:10:44.328Z",
     "reviewNotes": "Verification failed at lint",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
@@ -409,10 +409,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 101,
-            "output": 28462,
-            "cacheRead": 21832871,
-            "cacheWrite": 48457
+            "input": 150,
+            "output": 43156,
+            "cacheRead": 37672998,
+            "cacheWrite": 72058
           }
         },
         "plan": {
@@ -452,10 +452,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 18547,
-          "output": 83068,
-          "cacheRead": 26675796,
-          "cacheWrite": 346276
+          "input": 18596,
+          "output": 97762,
+          "cacheRead": 42515923,
+          "cacheWrite": 369877
         },
         "anthropic/claude-sonnet-5": {
           "input": 14217,
@@ -465,8 +465,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 118.745379,
-        "pricingAsOf": "2026-07-14T19:21:07.763Z"
+        "usd": 135.615712,
+        "pricingAsOf": "2026-07-14T20:10:44.363Z"
       }
     },
     "merges": [
