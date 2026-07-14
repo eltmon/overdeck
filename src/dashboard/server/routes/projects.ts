@@ -32,6 +32,7 @@ import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
 import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
+import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
 import { getAgentDir, getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
@@ -315,6 +316,23 @@ async function collectSessionTreeNodes(
   }
 
   const centralStatus = getReviewStatusSync(issueId.toUpperCase());
+
+  // Lint node (PAN-2665): the verification quality-gate run, shown between
+  // Work and Review (TYPE_PRIORITY orders it client-side). Shares the builder
+  // with the activity route; the tree payload never carries transcripts.
+  const lintSection = buildLintSessionNode({
+    workspacePath,
+    issueLower,
+    includeTranscripts: false,
+    centralStatus: centralStatus ?? null,
+  });
+  if (lintSection) {
+    sections.push({
+      ...lintSection,
+      status: normalizeAgentStatus(lintSection.status),
+    });
+  }
+
   if (centralStatus?.history && centralStatus.history.length > 0) {
     const reviewEntries = centralStatus.history.filter((entry) => entry.type === 'review');
     const latestReview = reviewEntries[reviewEntries.length - 1];
