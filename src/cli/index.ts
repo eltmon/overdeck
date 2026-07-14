@@ -126,6 +126,7 @@ import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
 import { registerSwarmCommands } from './commands/swarm.js';
+import { createTaskCommand } from './commands/task.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -623,6 +624,7 @@ registerInstallCommand(program);
 
 // Register inspect command (pan inspect <issueId> --bead <beadId>)
 registerInspectCommand(program);
+program.addCommand(createTaskCommand());
 
 // Register caveman commands (pan caveman-compress)
 registerCavemanCommands(program);

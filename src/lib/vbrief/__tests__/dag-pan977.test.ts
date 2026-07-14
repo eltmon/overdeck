@@ -418,16 +418,18 @@ describe('persisted task authority', () => {
     expect(done.plan.items[0]!.subItems?.[0]?.status).toBe('completed');
   });
 
-  it('exposes next/show/block via task command API and validates issue traceability', () => {
+  it('exposes next/show/block and records progress without mutating the spec', () => {
     const doc = makeDoc([{ id: 'task-a' }], []);
     doc.plan.id = 'PAN-977';
     doc.plan.sequence = 1;
-    writeDoc(doc);
+    const planPath = writeDoc(doc);
+    const immutableSpec = readFileSync(planPath, 'utf-8');
 
     expect((runTaskCommand('next', { issueId: 'PAN-977', workspacePath: dir }) as VBriefItem[]).map(i => i.id)).toEqual(['task-a']);
     expect((runTaskCommand('show', { issueId: 'PAN-977', workspacePath: dir, itemId: 'task-a' }) as VBriefItem).id).toBe('task-a');
     runTaskCommand('block', { issueId: 'PAN-977', workspacePath: dir, itemId: 'task-a', expectedSequence: 1, writerId: 'writer-1' });
     expect((runTaskCommand('next', { issueId: 'PAN-977', workspacePath: dir }) as VBriefItem[])).toHaveLength(0);
+    expect(readFileSync(planPath, 'utf-8')).toBe(immutableSpec);
   });
 
   it('rejects invalid runtime task commands without mutating the plan', () => {

@@ -191,18 +191,30 @@ export function runTaskCommand(command: TaskCommand, options: TaskCommandOptions
     return item;
   }
 
-  // Mutations write to the canonical spec on main (PAN-1124) AND to the
-  // per-issue record statusOverrides so canonical readers see the change.
-  const planPath = findPlanSync(options.workspacePath);
-  if (!planPath) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
-  const doc = readPlanFile(planPath);
+  // The spec is immutable after planning. Runtime progress lives only in the
+  // per-issue record and is overlaid by readWorkspacePlanSync().
+  const doc = readWorkspacePlanSync(options.workspacePath);
+  if (!doc) throw new Error(`vBRIEF plan not found for workspace: ${options.workspacePath}`);
   validatePlanIssue(doc, options.issueId);
   if (!options.itemId) throw new Error(`${command} requires itemId`);
-  return applyTaskOperationToPlanFile(planPath, {
+  const result = applyTaskOperation(doc, {
     type: command,
     itemId: options.itemId,
     expectedSequence: options.expectedSequence,
     reason: options.reason,
-    writerId: options.writerId ?? `pan-task-${process.pid}`,
-  }, options.workspacePath);
+  });
+
+  const project = resolveProjectForIssue(options.issueId)
+    ?? getProjectConfigFromWorkspacePath(options.workspacePath);
+  const overrides: Record<string, string> = { [result.item.id]: result.item.status };
+  for (const subItem of subItemsOf(result.item)) {
+    const original = doc.plan.items
+      .find(item => item.id === result.item.id);
+    const originalSubItem = original ? subItemsOf(original).find(sub => sub.id === subItem.id) : undefined;
+    if (subItem.status !== originalSubItem?.status) {
+      overrides[`${result.item.id}.${subItem.id}`] = subItem.status;
+    }
+  }
+  writeStatusOverridesSync(project, options.issueId, overrides);
+  return result;
 }
