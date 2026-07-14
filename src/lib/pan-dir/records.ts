@@ -303,8 +303,8 @@ export async function updateIssueRecordForIssue(
     const project = getProjectSync(resolved.projectKey);
     if (!project) return false;
 
-    await updateIssueRecord(project, issueId, async (fresh) => {
-      const record = await buildIssueRecord(project, issueId, { reviewStatus });
+    const record = await buildIssueRecord(project, issueId, { reviewStatus });
+    await updateIssueRecord(project, issueId, (fresh) => {
       // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
       // anything written to the record during that window would be erased by this
       // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
