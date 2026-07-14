@@ -274,7 +274,7 @@
     }
   ],
   "created": "2026-07-12T22:50:33.242Z",
-  "updated": "2026-07-14T00:05:50.251Z",
+  "updated": "2026-07-14T00:17:50.751Z",
   "pipeline": {
     "issueId": "PAN-2610",
     "reviewStatus": "failed",
@@ -345,5 +345,15 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5"
+  "model": "gpt-5.5",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-2610",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-14T00:05:50.214Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-14T00:17:50.751Z"
+    }
+  ]
 }
