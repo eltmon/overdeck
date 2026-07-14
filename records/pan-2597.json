@@ -294,7 +294,7 @@
     "recordedAt": "2026-07-14T20:52:46.512Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T20:53:05.397Z",
+  "updated": "2026-07-14T20:58:25.793Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -304,7 +304,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T20:53:05.344Z",
+    "updatedAt": "2026-07-14T20:58:25.722Z",
     "reviewNotes": "Verification failed at lint",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
@@ -405,15 +405,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 18288689,
-            "output": 16610,
-            "cacheRead": 17262720,
+            "input": 18387507,
+            "output": 17045,
+            "cacheRead": 17335040,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 106161463,
-            "output": 270236,
-            "cacheRead": 102119296,
+            "input": 108112082,
+            "output": 275958,
+            "cacheRead": 104025472,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -450,15 +450,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 18288689,
-          "output": 16610,
-          "cacheRead": 17262720,
+          "input": 18387507,
+          "output": 17045,
+          "cacheRead": 17335040,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 106161463,
-          "output": 270236,
-          "cacheRead": 102119296,
+          "input": 108112082,
+          "output": 275958,
+          "cacheRead": 104025472,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -481,8 +481,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 142.926546,
-        "pricingAsOf": "2026-07-14T20:53:05.392Z"
+        "usd": 144.273509,
+        "pricingAsOf": "2026-07-14T20:58:25.789Z"
       }
     },
     "merges": [
