@@ -142,7 +142,7 @@ export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
   issueId: string;
-}): Promise<{ proposed: { path: string; filename: string }; beadCount: number; beadsWarning: string | null }> {
+}): Promise<{ proposed: { path: string; filename: string }; taskCount: number; taskWarning: string | null }> {
   const { projectPath, workspacePath, issueId } = options;
   const issueLower = issueId.toLowerCase();
   const upperIssueId = issueId.toUpperCase();
@@ -183,7 +183,7 @@ export async function completePlanningArtifacts(options: {
 
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
   if (planItemCount === 0) throw new Error(`The vBRIEF for ${upperIssueId} contains no implementation items.`);
-  return { proposed, beadCount: planItemCount, beadsWarning: null };
+  return { proposed, taskCount: planItemCount, taskWarning: null };
 }
 
 export function completePlanningFilesToStage(projectPath: string, proposedFilename: string, migrated = false): string[] {
@@ -513,7 +513,7 @@ export async function completePlanningForIssue(options: {
     }
 
     // Git operations: write planning marker, commit, push (complex nested async — kept as async block)
-    const { pushed: gitPushed, beadsWarning } = await (async (): Promise<{ pushed: boolean; beadsWarning: string | null }> => {
+    const { pushed: gitPushed, taskWarning } = await (async (): Promise<{ pushed: boolean; taskWarning: string | null }> => {
       if (!projectPath) {
         throw new Error(`Cannot complete planning for ${id}: project path could not be resolved`);
       }
@@ -521,9 +521,9 @@ export async function completePlanningForIssue(options: {
       const gitRoot = workspacePath;
       const upperIssueId = id.toUpperCase();
       const artifacts = await completePlanningArtifacts({ projectPath, workspacePath, issueId: id });
-      const { proposed, beadCount, beadsWarning } = artifacts;
+      const { proposed, taskCount, taskWarning } = artifacts;
       console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
-      console.log(`[complete-planning] Materialized ${beadCount} beads for ${upperIssueId}`);
+      console.log(`[complete-planning] Finalized ${taskCount} vBRIEF tasks for ${upperIssueId}`);
 
       const project = findProjectByPathSync(projectPath);
       const migrated = project ? await isStateMigrated(project) : false;
@@ -588,9 +588,9 @@ export async function completePlanningForIssue(options: {
           const pushChild = spawn('git', ['push'], { cwd: gitRoot, detached: true, stdio: 'ignore' });
           pushChild.unref();
         }
-        return { pushed: true, beadsWarning };
+        return { pushed: true, taskWarning };
       } catch {
-        return { pushed: false, beadsWarning };
+        return { pushed: false, taskWarning };
       }
     })();
 
@@ -699,7 +699,7 @@ export async function completePlanningForIssue(options: {
       issueId: id,
       newState,
       gitPushed,
-      ...(beadsWarning ? { beadsWarning } : {}),
+      ...(taskWarning ? { taskWarning } : {}),
       ...(autoSpawnResult ?? {}),
       message: autoSpawnResult?.workAgentSpawned
         ? 'Planning complete and work agent spawn requested'
