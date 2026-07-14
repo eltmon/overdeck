@@ -79,6 +79,7 @@ pan-subagent-creator
 pan-swarm
 pan-sync
 pan-sync-main
+pan-task
 pan-tell
 pan-test-config
 pan-tldr
