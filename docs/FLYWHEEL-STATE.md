@@ -2889,3 +2889,83 @@ should re-dispatch agent-pan-2607-review-supervisor + complete the slot-3 merge 
 FRESH RUN: verify PAN-2607 advances (slot-3 merged into feature/pan-2607 → integration review → merge to
 main); if still stuck after a few patrols, escalate `pan swarm recover PAN-2607 3` (retry) or check
 server-1 didn't crash-loop again (exit 130 may recur).
+
+## RUN-63 tick 4 (2026-07-13 ~15:33 local / 19:33Z) — UAT batch uat/pan-slate-0713 PROMOTED; 4 members merged+CLOSED OUT
+
+- Operator promoted UAT batch `uat/pan-slate-0713` → main `469f5b26` (real merge commits, ancestry
+  preserved → close-out verify-merged passes). Members: PAN-2229, PAN-2596, PAN-2602, PAN-2616.
+- **ALL 4 CLOSED OUT** ✅ (`pan close --force` each). Run total drained: PAN-2611 + these 4 = 5 merged+closed.
+- **Re-derived activePipeline from live source of truth, EXCLUDED the 4 merged.** Current ready set +
+  uat-candidate = EMPTY (0 review+test-passed members) → NO clean UAT batch to assemble this tick (correct
+  result, not a failure; did NOT reuse stale pre-promote set). Main CI in_progress on 469f5b26 — watch green.
+- **PAN-1232 progressed** — fresh agent resolved conflict+failing test; now in review+test (agent-pan-1232-
+  review/-test live). Drive to verdict→merge.
+- PAN-2607 slot-3 still unmerged (integration server-1 restarted tick-3.5; deacon should complete) —
+  escalate `pan swarm recover PAN-2607 3` if stuck. PAN-2564 WI-8 still unmerged. In-review cohort:
+  PAN-1491/2598/2568/2597/1234/1520/2619.
+- Orphan note: agent-pan-2602-slot-2/-3 tmux sessions linger post-close-out (harmless).
+- Context ~88% — fresh RUN-63 run should own subsequent ticks. Re-armed per operator.
+
+## RUN-63 tick 5 (2026-07-13 ~15:47 local / 19:47Z) — RED MAIN found (P0) → filed PAN-2643 + struck; strike healthy
+
+- **RED MAIN (P0).** main CI `test` job RED — deterministic, 3 consecutive commits (619fad0c @18:57,
+  726b89b1, 469f5b26) → PRE-DATES the UAT promotion (not caused by it). lint/build/guard/smoke all GREEN.
+- **Single failing test** (1 failed / 1014 passed): `src/dashboard/server/routes/__tests__/
+  auto-promote-chain.integration.test.ts` > "spawns a work agent when the reconciler finds a planted
+  orphan proposed spec with matching beads" → `TypeError: (0, __vite_ssr_import_0__.cre…) instead of
+  resolving` at :445/:433. A `create*` import resolving to undefined (rename/removed/moved export).
+- **FILED [PAN-2643] (blocks-main) + `pan strike PAN-2643`.** Strike = strike-pan-2643, codex/gpt-5.5,
+  branch strike/pan-2643 (NO --model/--harness override — provider default). VERIFIED HEALTHY: fresh
+  codex spawn read valid auth (NOT hit by PAN-2639 resume bug — fresh spawn ≠ resume), ran vitest,
+  tracing `create*` in orphan-proposed-reconciler.ts / planning-promotion.ts. Correct investigation.
+- **STRIKE OWNERSHIP:** whoever spawns owns the merge. I'm at ~88% ctx → the FRESH run/next tick MUST
+  shepherd PAN-2643 to merge: on strike readiness, review strike/pan-2643 diff, run gates (typecheck/
+  lint/test), `gh pr create` + `gh pr merge --squash` (NEVER admin-bypass while main red — but THIS
+  strike fixes the red, so merge it once its own CI is green), then `pan done PAN-2643 --strike`.
+- **DO NOT --admin-merge anything else while main is RED.** Red main empties the merge gate. PAN-1232
+  and cohort merges must WAIT until PAN-2643 lands and main goes green.
+- NEXT TICK (top priority): shepherd PAN-2643 strike → green main. Then resume normal drain
+  (PAN-1232, PAN-2607 slot-3, PAN-2564 WI-8, cohort). Re-check main green after strike merges.
+
+## RUN-63 tick 6 (2026-07-13 ~16:14 local / 20:14Z) — PAN-2643 strike fix MERGED; main CI re-running (should go green)
+
+- **STRIKE SUCCEEDED.** strike-pan-2643 (gpt-5.5) root-caused it correctly: the beads-resolver MOCK in
+  `auto-promote-chain.integration.test.ts` was missing `getAllBeads()` — the orphan proposed reconciler
+  now uses the cached bulk-read path, so the mock returned undefined → the `create*`/vite-ssr TypeError.
+  Fix = 6-line mock addition matching the existing `countBeadsForIssue` idiom (NOT weakening the test).
+  Reviewed the diff (1 file, +6); strike ran typecheck+lint+test green locally.
+- **MERGED to main** = `2872a010` (PR #2644, squash). Enabled `gh pr merge --squash --auto` — no
+  required-check branch protection so it merged immediately (acceptable: trivial deterministic verified
+  fix for red main). Main CI on 2872a010 = **in_progress** → should go GREEN (fix resolves the only failure).
+- **`pan done PAN-2643 --strike` REFUSED** — squash-merge breaks `git merge-base --is-ancestor
+  strike/pan-2643 origin/main` (squash = new commit, no ancestry). Fix IS on main. DEFER PAN-2643
+  close-out to next tick AFTER CI confirms green; if `pan close --force` also squash-refuses, `gh issue
+  close 2643` with the 2872a010 ref (squash-blind close gate = PAN-2260 territory).
+- **MERGE FREEZE still on** until CI green on 2872a010. Then resume drain.
+- NEXT TICK: (1) verify `gh run list --branch main` GREEN on 2872a010; (2) close PAN-2643; (3) resume
+  drain — PAN-1232 review→merge, PAN-2607 slot-3 (deacon merged? else `pan swarm recover PAN-2607 3`),
+  PAN-2564 WI-8, cohort; (4) re-assemble UAT batch from review+test-passed members. Context ~90% →
+  strongly prefer a FRESH run owns this.
+
+## RUN-63 tick 7 (2026-07-13 ~16:28 local / 20:28Z) — MAIN GREEN restored; PAN-2643 closed; HANDOVER (this session ~92% ctx)
+
+- **RED-MAIN P0 FULLY RESOLVED.** main CI = GREEN on `2872a010` (the PAN-2643 strike fix). Merge freeze LIFTED.
+- **PAN-2643 CLOSED OUT** ✅ — `pan close --force` succeeded; verify-merged handled the squash-merge
+  ("Branch already cleaned up (squash-merged)") → squash-blind close gate (PAN-2260) confirmed working.
+- **RUN-63 TOTAL DRAINED: 6** — PAN-2611, PAN-2229, PAN-2596, PAN-2602, PAN-2616, PAN-2643(strike).
+- **HANDOVER — loop STOPPED this session (~92% ctx).** A fresh RUN-63 run must own the remaining drain.
+  OPEN WORK for the fresh run (all verifiable; main is GREEN now so merges are unfrozen):
+  - PAN-1232 (PR #2604) — in review+test; drive verdict → merge → close.
+  - PAN-2607 — slot-3 (a7e2edb18f) still unmerged last checked; server-1 was restarted (tick 3.5).
+    Verify deacon completed slot-merge + supervisor review; if stuck `pan swarm recover PAN-2607 3`.
+  - PAN-2564 — WI-8 (slot-3 "config standardization doctor") unmerged to main; push→PR→review→merge→close.
+  - In-review cohort PAN-1491/2598/2568/2597/1234/1520/2619 — shepherd to verdict; codex review stuck
+    on 401 = PAN-2639 → `pan review abort <id>` + `pan review restart <id> --model claude-sonnet-5`.
+  - UAT batch: re-derive ONLY from currently review+test-passed members (empty as of tick 4); assemble
+    + report readiness when non-empty.
+  - Substrate PAN-2639 (codex-resume token-revoke) — FILED; fix AFTER drain/release, do NOT strike now.
+  - Phase 2 (release readiness) once drain quiesces → report to operator, who cuts the release.
+  - Phase 3 PAN-2377 — PRD pre-authored at drafts/pan-2377.md; dispatch ONLY after operator cuts release.
+  - NO new intake (auto_pickup_backlog=false); don't touch stray planning-pan-2499/2633.
+  - Flywheel-gap findings (ticks 3/3.5): frozen-alive work agents + convoy sub-reviewer respawn were
+    un-re-drivable under --no-resume — moot if no-resume stays lifted (it was, ~15:30).
