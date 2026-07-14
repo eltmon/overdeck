@@ -353,11 +353,15 @@ export async function coordinateSwarmSlots(
 
       const readiness = analyzeSwarmReadiness(doc);
       const policy = resolveSwarmPolicy(issueId);
+      if (!opts.manual && policy.mode === 'off') {
+        actions.push(`[swarm] ${issueId}: swarming off (${policy.source.mode}) — no automatic dispatch, recovery, merge, or cleanup; use an explicit swarm command or stop the legacy sessions`);
+        continue;
+      }
       const slotEligibleCount = readiness.items.filter(item => item.slotEligible).length;
       // Eligibility gates dispatch only; active swarms still need merge/gc/endgame passes.
       const swarmInProgress = Object.entries(overrides ?? {})
         .some(([key, value]) => !key.includes('.') && value === 'completed');
-      const policyAllowsDispatch = opts.manual || ((policy.mode !== 'off' || swarmInProgress) && (policy.autoAdvance || !swarmInProgress));
+      const policyAllowsDispatch = opts.manual || (policy.mode !== 'off' && (policy.autoAdvance || !swarmInProgress));
       const dispatchEligible = policyAllowsDispatch && readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
       if (!policyAllowsDispatch) actions.push(`[swarm] ${issueId}: automatic swarming off (${policy.source.mode}) — single-agent execution remains selected`);
       if (dispatchEligible) {

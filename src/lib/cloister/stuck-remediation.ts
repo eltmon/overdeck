@@ -10,7 +10,7 @@ import {
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
-import { sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
+import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
 import { getAgentEffectiveLastActivityMs, isAgentIdleForNudge } from './agent-idle.js';
 import { describeAgentDeath } from './agent-death.js';
@@ -261,6 +261,15 @@ async function evaluateAgent(
   const idleMinutes = Math.floor((now - lastActivityMs) / 60_000);
   const lastStage = stuckState?.lastStage ?? 0;
   const firstStuck = firstStuckAt(lastActivity, stuckState);
+
+  const terminalProviderError = detectTerminalApiErrorSync(capturePaneSync(agentId, 80));
+  if (terminalProviderError) {
+    markAgentTroubled(agentId);
+    writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
+    logAction(actions, `${agentId} provider-terminal: ${terminalProviderError.summary}`);
+    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    return;
+  }
 
   if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
     markAgentTroubled(agentId);

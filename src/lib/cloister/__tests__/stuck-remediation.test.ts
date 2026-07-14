@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   pauseFlywheel: vi.fn(),
   resumeFlywheel: vi.fn(),
   listPaneValuesSync: vi.fn(),
+  capturePaneSync: vi.fn(() => ''),
+  detectTerminalApiErrorSync: vi.fn(() => null),
   killSessionSync: vi.fn(),
   getNoResumeMode: vi.fn(),
   getFlywheelActiveRunId: vi.fn(),
@@ -54,6 +56,8 @@ vi.mock('../../tmux.js', () => ({
   sessionExistsSync: mocks.sessionExistsSync,
   listPaneValuesSync: mocks.listPaneValuesSync,
   killSessionSync: mocks.killSessionSync,
+  capturePaneSync: mocks.capturePaneSync,
+  detectTerminalApiErrorSync: mocks.detectTerminalApiErrorSync,
 }));
 
 vi.mock('../config.js', () => ({
@@ -189,6 +193,8 @@ describe('checkStuckAgentRemediation', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     mocks.loadCloisterConfigSync.mockReturnValue(DEFAULT_CONFIG);
+    mocks.capturePaneSync.mockReturnValue('');
+    mocks.detectTerminalApiErrorSync.mockReturnValue(null);
     mocks.listRunningAgentsSync.mockReturnValue([agent()]);
     mocks.sessionExistsSync.mockReturnValue(true);
     mocks.getReviewStatusSync.mockReturnValue(null);
@@ -247,6 +253,22 @@ describe('checkStuckAgentRemediation', () => {
       firstStuckAt: lastActivity(25),
     });
     expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(expectedAction);
+  });
+
+  it('parks a terminal provider failure without sending another nudge', async () => {
+    mocks.capturePaneSync.mockReturnValue("API Error: 402 We're unable to verify your membership benefits");
+    mocks.detectTerminalApiErrorSync.mockReturnValue({
+      kind: 'permission_denied',
+      summary: 'Provider rejected request (402 account or membership required)',
+      raw: 'API Error: 402',
+    });
+
+    const actions = await checkStuckAgentRemediation({ now: NOW });
+
+    expect(actions).toContain('agent-pan-1415 provider-terminal: Provider rejected request (402 account or membership required)');
+    expect(mocks.markAgentTroubled).toHaveBeenCalledWith('agent-pan-1415');
+    expect(mocks.messageAgent).not.toHaveBeenCalled();
+    expect(mocks.resumeAgent).not.toHaveBeenCalled();
   });
 
   it('fires stage 2 for a 50-minute idle agent with prior stage 1 state', async () => {

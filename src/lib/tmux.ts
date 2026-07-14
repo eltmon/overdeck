@@ -844,6 +844,8 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
   { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
   { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
   { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
+  { re: /API Error:\s*402\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (402 account or membership required)' },
+  { re: /unable to verify your membership benefits/i, kind: 'permission_denied', summary: 'Provider could not verify membership benefits' },
   { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
   { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
 ];

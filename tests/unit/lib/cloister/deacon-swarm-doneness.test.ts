@@ -36,6 +36,10 @@ vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
   spawnReviewRoleForIssue: mocks.spawnReviewRoleForIssue,
 }));
 
+vi.mock('../../../../src/lib/swarm-policy.js', () => ({
+  resolveSwarmPolicy: () => ({ mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global' } }),
+}));
+
 let tempRoot: string;
 
 beforeEach(async () => {
