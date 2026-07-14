@@ -31,7 +31,6 @@ import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
 import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 

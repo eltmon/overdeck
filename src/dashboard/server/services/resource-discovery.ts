@@ -649,9 +649,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   await Promise.all(projects.map(async (project) => {
     const projectPath = project.config.path;
     const workspacesDir = join(projectPath, 'workspaces');
-    // ONE bulk tasks read per project per refresh. Per-workspace issueHasTasks
-    // here used to fire ~45 concurrent ~2s Dolt processes every 30s TTL, all
-    // contending on the global bd process lock (spawn gates queued behind it).
+    // ONE bulk tasks read per project per refresh, rather than a per-workspace
+    // read each 30s TTL — the bulk shape keeps refreshes cheap as the workspace
+    // count grows.
     const [workspaceEntries, branches] = await Promise.all([
       readdir(workspacesDir, { withFileTypes: true }).catch(() => []),
       loadProjectBranches(projectPath),

@@ -15,8 +15,8 @@ export function TasksKanban({ agentId }: TasksKanbanProps) {
   const { data } = useQuery({
     queryKey: ['tasks', agentId],
     queryFn: async () => {
-      // Tasks tasks come from the canonical Dolt-backed dashboard API.
-      // We'll fetch via agent timeline as a proxy
+      // Task state derives from the vBRIEF checklist; fetch via the agent
+      // activity timeline as a proxy here.
       const res = await fetch(`/api/agents/${agentId}/activity?limit=50`);
       if (!res.ok) return null;
       return res.json();

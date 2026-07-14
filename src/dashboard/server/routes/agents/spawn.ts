@@ -81,21 +81,6 @@ export function spawnGuardrailResourcesHint(hint?: string): string {
   return hint ? `${hint} ${resourcesHint}` : resourcesHint;
 }
 
-/**
- * Count materialized tasks for an issue by shelling out to `bd list`.
- *
- * Returns 0 on ANY bd failure — non-zero exit (e.g. bd refusing with "Linear
- * data has never been pulled"), an unparseable JSON body, or the 10s timeout.
- * The caller treats 0 as "no tasks yet" and falls through to auto-recovery
- * (createTasksFromVBrief) and, failing that, a clean 422 `tasks_required`.
- *
- * The failure is folded into the success channel with `Effect.matchCause`. A
- * bare `try/catch` around `yield* withBdMutex(...)` does NOT work: withBdMutex
- * converts the child-process rejection into an Effect error-channel failure
- * (via its internal `Effect.tryPromise`), which short-circuits the fiber and is
- * invisible to a JS `try/catch`. Before this helper, that escaped as an
- * unhandled 500 on POST /api/agents instead of the designed 422.
- */
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
 export const postAgentsRoute = HttpRouter.add(

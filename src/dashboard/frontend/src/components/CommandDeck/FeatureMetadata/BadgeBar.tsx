@@ -128,7 +128,7 @@ export function BadgeBar({ issueId, source, onOpenTasks }: BadgeBarProps) {
         <button
           className={styles.badge}
           onClick={onOpenTasks}
-          title="View tasks tasks"
+          title="View tasks"
         >
           <ListTodo size={12} />
           Tasks
