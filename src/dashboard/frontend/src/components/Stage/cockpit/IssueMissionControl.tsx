@@ -19,6 +19,7 @@ import {
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
+import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
@@ -779,6 +780,7 @@ function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }:
   return (
     <div className="space-y-3.5">
       {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
+      <UatEnvironmentPanel issueId={issueId} />
       <HappenedFeed issueId={issueId} />
       <PlanMapCard issueId={issueId} />
       <IssueBlockerSpotlight issueId={issueId} />
