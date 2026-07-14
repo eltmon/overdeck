@@ -60,7 +60,14 @@ type AlertFn = ReturnType<typeof useAlert>;
 
 function activeAgentForIssue(agents: Agent[], issueId: string) {
   const issueAgents = agents.filter((agent) => agent.issueId?.toLowerCase() === issueId.toLowerCase());
-  return issueAgents.find((agent) => !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status)) ?? issueAgents[0];
+  const live = issueAgents.find((agent) => !['stopped', 'failed', 'dead', 'error', 'stuck'].includes(agent.status));
+  if (live) return live;
+  // All stopped: prefer the canonical WORK agent (agent-<issue>) over whichever
+  // stopped specialist happens to sort first — issueAgents[0] was routinely the
+  // planning agent, so agent actions (resume/reset session) evaluated against
+  // an agent that never has a resumable session (2026-07-14, MIN-865).
+  const workAgentId = `agent-${issueId.toLowerCase()}`;
+  return issueAgents.find((agent) => agent.id?.toLowerCase() === workAgentId) ?? issueAgents[0];
 }
 
 async function responseError(response: Response, fallback: string) {
