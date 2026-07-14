@@ -216,7 +216,7 @@
     "outsideDeclaredScope": [
       "scripts/circular-deps-baseline.txt",
       "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
-      "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+      "src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts",
       "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
       "src/dashboard/server/routes/http-handler.ts",
       "src/dashboard/server/services/__tests__/agent-spawner.test.ts",
@@ -227,11 +227,16 @@
       "src/lib/config-yaml/merge.ts",
       "src/lib/config-yaml/roles.ts",
       "src/lib/config-yaml/schema.ts",
+      "src/lib/pan-dir/__tests__/records.test.ts",
       "src/lib/runtimes/tmux-cli.ts",
       "src/lib/state-plane.ts",
       "sync-sources/hooks/record-cost-event.js",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
       "tests/playwright/conversation-supervisor-uat.test.ts",
-      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts"
+      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/pan-dir/cutover-behavioral.test.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts"
     ],
     "declaredScopeUntouched": [
       "docs/ROLES.md",
@@ -286,7 +291,7 @@
       "packages/contracts/src/harness-behavior.ts",
       "scripts/circular-deps-baseline.txt",
       "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
-      "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+      "src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts",
       "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
       "src/dashboard/server/routes/http-handler.ts",
       "src/dashboard/server/services/__tests__/agent-spawner.test.ts",
@@ -316,19 +321,24 @@
       "src/lib/overdeck/__tests__/conversation-delivery.test.ts",
       "src/lib/overdeck/conversation-delivery.ts",
       "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/pan-dir/__tests__/records.test.ts",
       "src/lib/runtimes/behavior.ts",
       "src/lib/runtimes/codex.ts",
       "src/lib/runtimes/tmux-cli.ts",
       "src/lib/state-plane.ts",
       "sync-sources/hooks/record-cost-event.js",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
       "tests/playwright/conversation-supervisor-uat.test.ts",
       "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
+      "tests/unit/lib/pan-dir/cutover-behavioral.test.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts",
       "tsdown.config.ts"
     ],
-    "recordedAt": "2026-07-14T21:12:12.074Z"
+    "recordedAt": "2026-07-14T22:38:30.578Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T22:38:24.969Z",
+  "updated": "2026-07-14T22:38:30.581Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
