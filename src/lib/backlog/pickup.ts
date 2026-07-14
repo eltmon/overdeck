@@ -12,7 +12,7 @@
  *
  * Vocabulary (operator-confirmed 2026-06-21):
  *  - Ready      — operator marked it workable (Definition of Ready): `ready` label / Linear Todo. Entry gate.
- *  - Planned    — has a vBRIEF spec + beads. Derived. Distinct from Ready.
+ *  - Planned    — has a finalized vBRIEF with implementation tasks. Derived. Distinct from Ready.
  *  - released   — operator reviewed the plan and released it for pickup (`released` label, PAN-2059). Required for auto-pickup.
  *  - objection  — AI raised a written "held for review" objection in place of planning (`objection` label, PAN-2059). Halts pickup until override/park.
  *  - parked     — deferred pending human design/discussion (`parked` label; legacy `needs-design`/`needs-discussion`).
@@ -40,7 +40,7 @@ export type PickupGate = 'auto' | 'promote' | 'vetoed';
 export interface PipelineState {
   /** Definition of Ready met — operator signalled it may enter the pipeline. */
   ready: boolean;
-  /** Has a vBRIEF spec + beads (worked-out enough to start). */
+  /** Has a finalized vBRIEF with implementation tasks (worked-out enough to start). */
   planned: boolean;
   /** Deferred pending human design/discussion. */
   parked: boolean;
@@ -63,7 +63,7 @@ export interface PipelineState {
 export interface ClassifyLookups {
   /** GitHub/Linear labels for an issue (case-insensitive match). */
   labels: (issueId: string) => readonly string[];
-  /** True when the issue has a vBRIEF spec AND beads. */
+  /** True when the issue has a finalized vBRIEF with implementation tasks. */
   isPlanned: (issueId: string) => boolean;
   /** True when the issue has active work/review/test. */
   isInPipeline: (issueId: string) => boolean;

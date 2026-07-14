@@ -82,10 +82,10 @@ pan plan finalize
 What it does:
 
 1. Reads `.pan/spec.vbrief.json` from the current workspace (walks up if needed).
-2. Materializes each `plan.items[]` entry into a corresponding bead, respecting declared dependencies.
+2. Validates the tasks already stored in `plan.items[]`, including their declared dependencies.
 3. Flips the spec's `plan.status` from `draft` to `proposed`.
 4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
-5. Returns a summary of vBRIEF tasks created and promotion status, or JSON with `--json`.
+5. Returns a summary of finalized vBRIEF tasks and promotion status, or JSON with `--json`.
 
 Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs vBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
 

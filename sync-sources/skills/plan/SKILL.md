@@ -171,13 +171,13 @@ Create `.pan/continue.json` with COMPLETE planning context:
 
 1. **Acceptance criteria MUST be subItems, NEVER top-level items.** Each AC is nested under its parent task/requirement as a `subItems` entry. Top-level items with `kind: "acceptance_criterion"` will fail vBRIEF Studio validation.
 
-2. **Hierarchical IDs required.** SubItem IDs must use dot-notation from the parent: `parent-id.ac-name`. Example: `work-prompt-ac.injects-ac-per-bead`. The parent prefix is mandatory.
+2. **Hierarchical IDs required.** SubItem IDs must use dot-notation from the parent: `parent-id.ac-name`. Example: `work-prompt-ac.injects-ac-per-task`. The parent prefix is mandatory.
 
 3. **Only actionable tasks are top-level items.** Requirements, tasks, and architectural decisions go in `items[]`. Acceptance criteria go in `subItems[]` under their parent.
 
 4. **Every task SHOULD have at least one acceptance criterion** in `subItems` to define "done."
 
-**Bead sizing guidance:**
+**Task sizing guidance:**
 - Each item should be completable in one focused session
 - Include exact file paths and function names in the Action field
 - Set `edges` to capture blocking relationships between items
@@ -193,9 +193,9 @@ pan plan finalize
 
 **Cloister hand-off:** When `pan plan finalize` runs, it automatically:
 1. Reads `.pan/spec.vbrief.json` from the workspace
-2. Calls `createvBRIEF tasksFromVBrief()` to convert vBRIEF items into vBRIEF tasks
+2. Validates the vBRIEF tasks already stored in `plan.items[]`
 3. Preserves dependency relationships from `edges` (blocking order)
-4. Includes acceptance criteria in bead descriptions
+4. Includes acceptance criteria in task descriptions
 5. Marks `plan.status` as `proposed` so the dashboard shows Done
 
 

@@ -16,7 +16,7 @@ allowed-tools:
 
 A live tmux session ≠ a working agent, and **a changed pane ≠ real progress** (an agent can
 churn on duplicate notifications, re-ask the same question, or loop). The only reliable check
-is to **READ each agent's actual recent output and judge: is it advancing toward its bead/goal,
+is to **READ each agent's actual recent output and judge: is it advancing toward its task/goal,
 done, or stalled/errored — and if stalled, WHY (root cause)?** A hash-diff is a coarse liveness
 hint at best; it is NOT the method.
 
@@ -37,19 +37,19 @@ done
 ```
 
 Then **actually read** each block and assess it — do not skim for a spinner. Ask: *what is this
-agent's last real action, and is it moving its bead forward?*
+agent's last real action, and is it moving its task forward?*
 
 ## Step 2 — assess & bucket (by CONTENT, not by hash)
 
 | What the output shows | Assessment | Action |
 | --- | --- | --- |
-| tool calls / edits / `Working (…)` advancing its bead | **progressing** | none |
+| tool calls / edits / `Working (…)` advancing its task | **progressing** | none |
 | `pan done … completed`, `Slot N work complete`, review "passed/blocked" verdict signaled | **done** | let it flow; if verdict blocked, its work agent should be fixing findings |
 | `Pane is dead (status …)` / `token_revoked` / `refresh token was revoked` | **dead** | one stale agent, not fleet-wide — confirm codex fleet with `codex login status` + `codex doctor` (gpt-5.5 and the gpt-5.6 family = **codex** harness, auth `~/.codex/auth.json`, NOT ohmypi); then kill/restart the dead one |
 | `OVERDECK_SPECIALIST_RESULT: review-agent failed` **but** a verdict was produced | **FALSE failure** — verify in `overdeck.db` `review_status` (NOT stale `panopticon.db`) before believing it | fix the signal (substrate), don't re-dispatch blindly |
 | POST error e.g. `Effect.catchAll is not a function`, `Project not found for PAN-x`, `Dashboard POST failed` | **substrate bug** blocking status/verdict recording (verdict artifact may be journaled for recovery) | file + root-fix the endpoint/resolver |
 | looping on `Deacon: container … crashed and was auto-restarted (attempt 1/5)` duplicates | **container crash-loop and/or duplicate-notification spam** distracting the agent | root-cause the crashing workspace container + the notification dedup |
-| reads a kickoff for a **different** issue (e.g. "cede PAN-2203 planning") | **cross-wired kickoff** — wrong brief delivered; agent stops or does wrong work | root-cause the kickoff/message misdelivery; the agent's real bead is stalled |
+| reads a kickoff for a **different** issue (e.g. "cede PAN-2203 planning") | **cross-wired kickoff** — wrong brief delivered; agent stops or does wrong work | root-cause the kickoff/message misdelivery; the agent's real task is stalled |
 | `Waiting on … approval` / broken gate (0-byte smoke result, ratchet rejects unrelated commit) | **stalled on broken tooling/gate** | root-cause the gate; don't hand-wave it |
 | idle placeholder (`Implement {feature}`, `Explain this codebase`) with no recent real action | **idle** — done or wedged; read more history (`-S -40`) to tell which | if wedged, root-cause |
 

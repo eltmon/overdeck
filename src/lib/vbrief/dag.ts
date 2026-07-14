@@ -580,7 +580,7 @@ function cloneDoc(doc: VBriefDocument): VBriefDocument {
 
 /**
  * Apply a Overdeck-native task operation to the vBRIEF itself. This is the
- * single mutation authority for swarm task status: Beads can mirror state during
+ * single mutation authority for swarm task status: legacy stores can mirror state during
  * migration, but the plan document wins and receives the sequence bump.
  */
 export function applyTaskOperation(doc: VBriefDocument, operation: TaskOperation): TaskOperationResult {
@@ -667,7 +667,7 @@ export function actionableDoc(doc: VBriefDocument): VBriefDocument {
   };
 }
 
-/** vBRIEF-first task graph view. Beads are intentionally not consulted here. */
+/** Canonical vBRIEF task graph view; no secondary task store is consulted here. */
 export function getTaskGraphView(doc: VBriefDocument, mergedItemIds: Set<string> = new Set()): TaskGraphView {
   const filtered = actionableDoc(doc);
   return {
