@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-14T05:55:41.315Z",
+  "updated": "2026-07-14T05:58:35.119Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -80,8 +80,8 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "glm-5.2",
   "statusOverrides": {
     "no-loss-manifest": "completed",
     "issue-view-model": "running",
