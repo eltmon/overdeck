@@ -8,14 +8,8 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  saveAgentStateSync,
-  determineModel,
-  getProviderAuthMode,
-  getAgentState,
-  clearAgentPaused,
-  clearAgentTroubled,
-  clearAgentPausedSync,
-  clearAgentTroubledSync,
+  saveAgentStateSync, determineModel, getProviderAuthMode, getAgentState,
+  clearAgentPaused, clearAgentTroubled, clearAgentPausedSync, clearAgentTroubledSync,
 } from '../../../../lib/agents.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
