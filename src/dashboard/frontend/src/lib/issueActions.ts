@@ -44,6 +44,7 @@ export type IssueActionKey =
   | 'destroyWorkspace'
   | 'open'
   | 'resetIssue'
+  | 'resetToPlanned'
   | 'viewPr'
   | 'cancel'
   | 'tasks'
@@ -242,6 +243,7 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'destroyWorkspace', label: 'Destroy workspace', panVerb: 'destroy', endpoint: '/api/issues/:id/cleanup-workspace', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'open', label: 'Open', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'safe', group: 'navigation' },
   { key: 'resetIssue', label: 'Reset issue', panVerb: null, endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'resetToPlanned', label: 'Reset to planned', panVerb: 'reset-to-planned', endpoint: '/api/issues/:id/reset-to-planned', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'work' },
   { key: 'viewPr', label: 'View PR', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
   { key: 'cancel', label: 'Cancel issue', panVerb: null, endpoint: '/api/issues/:id/cancel', enabledWhen: canCancelIssue, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'tasks', label: 'Tasks', panVerb: null, endpoint: '/api/issues/:id/tasks', enabledWhen: (state) => state.hasTasks || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },

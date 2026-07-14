@@ -201,6 +201,26 @@ describe('IssueActionMenu', () => {
     });
   });
 
+  it('runs the safe post-planning reset through its distinct endpoint', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-resetToPlanned'));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('preserves the workspace, branch, commits');
+
+    const confirmButton = screen.getByRole('button', { name: 'Reset to planned' });
+    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset to planned' } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/issues/PAN-1/reset-to-planned',
+      expect.objectContaining({ method: 'POST' }),
+    ));
+  });
+
   it('renders disabled actions with a tooltip reason', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="inline" />);
 

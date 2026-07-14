@@ -38,6 +38,7 @@ const legacyCommandDeckIssueActions = [
   { legacyKey: 'restartAgent', registryKey: 'restartAgent', surfaceText: 'Restart agent' },
   { legacyKey: 'restartFromPlan', registryKey: 'restartFromPlan', surfaceText: 'Restart from plan' },
   { legacyKey: 'resetIssue', registryKey: 'resetIssue', surfaceText: 'Reset issue' },
+  { legacyKey: 'resetToPlanned', registryKey: 'resetToPlanned', surfaceText: 'Reset to planned' },
   { legacyKey: 'cancel', registryKey: 'cancel', surfaceText: 'Cancel Issue' },
 ] as const satisfies readonly { legacyKey: string; registryKey: IssueActionKey | null; surfaceText: string; note?: string }[];
 

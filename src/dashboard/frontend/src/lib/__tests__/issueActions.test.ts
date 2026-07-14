@@ -36,6 +36,7 @@ const prdActionKeys: readonly IssueActionKey[] = [
   'destroyWorkspace',
   'open',
   'resetIssue',
+  'resetToPlanned',
   'viewPr',
 ];
 
@@ -138,6 +139,7 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('recoverReview').panVerb).toBe('review reset');
     expect(action('stopAgent').panVerb).toBe('kill');
     expect(action('resetIssue').panVerb).toBeNull();
+    expect(action('resetToPlanned').panVerb).toBe('reset-to-planned');
     expect(action('restartFromPlan').panVerb).toBeNull();
     expect(action('restartAgent').panVerb).toBeNull();
     expect(action('completeWorkReset').panVerb).toBeNull();
@@ -161,6 +163,7 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('closeOut').kind).toBe('destructive');
     expect(action('wipe').kind).toBe('destructive');
     expect(action('resetIssue').kind).toBe('destructive');
+    expect(action('resetToPlanned').kind).toBe('destructive');
     expect(action('cancel').kind).toBe('destructive');
   });
 

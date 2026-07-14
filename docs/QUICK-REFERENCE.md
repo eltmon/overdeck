@@ -47,6 +47,8 @@ Act on an issue. `<id>` is the universal object.
 | `pan reopen <id>` | Re-open for rework (resets specialist state) |
 | `pan wipe <id>` | **Destructive.** Canonical reset-to-Todo for an issue. Confirms. |
 
+The issue menu's **Reset to planned** action runs the same preserving command. Its red **Reset issue** action is different and destructive: it deletes the workspace and branch, clears planning state, and returns the issue to Todo.
+
 ## 2. Observation
 
 See what's happening — in aggregate and for specific issues.

@@ -13,6 +13,7 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/complete-planning
  *   POST /api/issues/:id/abort
  *   POST /api/issues/:id/reset
+ *   POST /api/issues/:id/reset-to-planned
  *   POST /api/issues/:id/cancel
  *   POST /api/issues/:id/reopen
  *   POST /api/issues/:id/move-status
@@ -383,6 +384,24 @@ const postIssueResetRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     return yield* resetIssueTransition({ id, body, eventStore });
+  })),
+);
+
+const postIssueResetToPlannedRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/reset-to-planned',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueIdSync(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    try {
+      const { stdout } = yield* Effect.promise(() => execFileAsync('pan', ['reset-to-planned', id], { encoding: 'utf8' }));
+      invalidateAgentsCache();
+      return jsonResponse({ success: true, message: stdout.trim() });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: message }, { status: 500 });
+    }
   })),
 );
 
@@ -818,6 +837,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueCompletePlanningRoute,
   postIssueAbortRoute,
   postIssueResetRoute,
+  postIssueResetToPlannedRoute,
   postIssueCancelRoute,
   postIssueReopenRoute,
   postIssueRestartFromPlanRoute,
