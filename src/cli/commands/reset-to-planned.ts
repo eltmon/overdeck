@@ -17,6 +17,7 @@ import { initTrackerConfigCache } from '../../dashboard/server/services/tracker-
 import { resolveProjectForIssue } from '../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
 import { clearTaskProgress } from '../../lib/pan-dir/reset-task-progress.js';
+import { removeAgentSync } from '../../lib/overdeck/agents.js';
 
 export interface ResetToPlannedOptions { dryRun?: boolean }
 
@@ -59,6 +60,8 @@ export async function resetToPlannedCommand(id: string, options: ResetToPlannedO
     const path = join(getAgentDir(primaryAgentId), marker);
     if (existsSync(path)) unlinkSync(path);
   }
+  for (const agent of agents) removeAgentSync(agent.id);
+  removeAgentSync(primaryAgentId);
 
   resetPipelineVerdictsForWorkStartSync(issueId, { force: true });
   const recordProject = resolveProjectForIssue(issueId);
