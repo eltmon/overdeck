@@ -104,6 +104,8 @@ describe('deliverReviewVerdictFeedback', () => {
     expect(mockMessageAgent).toHaveBeenCalledWith(
       'agent-pan-1059',
       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md'),
+      'internal',
+      expect.objectContaining({ owesRework: true }),
     );
   });
 });
