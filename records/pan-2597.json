@@ -250,18 +250,19 @@
     "recordedAt": "2026-07-14T16:47:08.176Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T17:40:28.420Z",
+  "updated": "2026-07-14T17:47:38.140Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T17:40:28.375Z",
+    "updatedAt": "2026-07-14T17:47:38.064Z",
     "reviewNotes": "Verification failed at lint",
+    "verificationNotes": "Verification FAILED at test (310619ms):\n\n⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\nError: Failed to commit PAN-2372 state: not a git repo\n ❯ updateIssueRecord src/lib/pan-dir/record-update.ts:61:13\n     59|     }\n     60|     if (!flushed.committed && !['no diff', 'no pending'].includes(flus…\n     61|       throw new Error(`Failed to commit ${normalizedIssueId} state: ${…\n       |             ^\n     62|     }\n     63|   }\n ❯ writeSwarmSlotCompletion src/lib/cloister/deacon-swarm-record.ts:58:3\n\nThis error originated in \"tests/unit/lib/cloister/swarm-failed-slot.test.ts\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\nThe latest test that might've caused the error is \"removes swarm.slotCompletions[slotIndex] when a slot is archived/superseded, preserving siblings\". It might mean one of the following:\n- The error was thrown, while Vitest was running this test.\n- If the error occurred after the test had been completed, this was the last documented test before it was thrown.\n\n⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯\nError: Failed to commit PAN-2372 state: not a git repo\n ❯ updateIssueRecord src/lib/pan-dir/record-update.ts:61:13\n     59|     }\n     60|     if (!flushed.committed && !['no diff', 'no pending'].includes(flus…\n     61|       throw new Error(`Failed to commit ${normalizedIssueId} state: ${…\n       |             ^\n     62|     }\n     63|   }\n ❯ writeSwarmSlotCompletion src/lib/cloister/deacon-swarm-record.ts:58:3\n\nThis error originated in \"tests/unit/lib/cloister/swarm-failed-slot.test.ts\" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.\nThe latest test that might've caused the error is \"removes swarm.slotCompletions[slotIndex] when a slot is archived/superseded, preserving siblings\". It might mean one of the following:\n- The error was thrown, while Vitest was running this test.\n- If the error occurred after the test had been completed, this was the last documented test before it was thrown.\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
@@ -438,7 +439,7 @@
       },
       "costAtCloseOut": {
         "usd": 92.64484,
-        "pricingAsOf": "2026-07-14T17:40:28.415Z"
+        "pricingAsOf": "2026-07-14T17:47:38.127Z"
       }
     },
     "merges": [
