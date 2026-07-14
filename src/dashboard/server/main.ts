@@ -660,6 +660,19 @@ if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
   console.log('[overdeck] Auto-merge executor started');
 }
 
+try {
+  // PAN-2669: an in-flight verification dies with the process that owned it;
+  // reset stale 'running' statuses so the pipeline re-drives instead of
+  // wedging on a run nothing will ever finish. Runs unconditionally — the
+  // wedge exists whether or not Cloister auto-starts (request-review
+  // verifications run in this process).
+  const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
+  const interrupted = reconcileInterruptedVerifications();
+  if (interrupted > 0) console.log(`[overdeck] reset ${interrupted} verification(s) interrupted by the previous shutdown (PAN-2669)`);
+} catch (err) {
+  console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
+}
+
 if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
@@ -682,16 +695,6 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
     const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
     if (reconciliation.decision !== 'pending') {
       void applyBootReconciliationDecision();
-    }
-    try {
-      // PAN-2669: an in-flight verification dies with the process that owned
-      // it; reset stale 'running' statuses so the pipeline re-drives instead
-      // of wedging on a run nothing will ever finish.
-      const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
-      const interrupted = reconcileInterruptedVerifications();
-      if (interrupted > 0) console.log(`[overdeck] reset ${interrupted} verification(s) interrupted by the previous shutdown (PAN-2669)`);
-    } catch (err) {
-      console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
     }
     startDeaconChild().catch((err) => {
       console.error('[overdeck] Cloister auto-start failed:', err);
