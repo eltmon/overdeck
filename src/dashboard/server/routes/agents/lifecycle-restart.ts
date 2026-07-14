@@ -787,6 +787,7 @@ async function resolveCurrentStaffing(agentId: string, agentState: any, issueId:
     const staffing = resolveStaffing(workItem, {
       planMetadata: plan.plan.metadata,
       spawnKey: `work:${issueId.toLowerCase()}`,
+      issueId,
       config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
     });
 

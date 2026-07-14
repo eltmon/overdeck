@@ -205,6 +205,8 @@ export interface PanIssueRecord {
   reReviewScope?: 'all' | 'changed' | 'blockers';
   /** Per-issue tiered execution override; beats plan-metadata and global config. */
   tieredExecutionOverride?: 'on' | 'off';
+  /** PAN-2674: per-issue work-model override; beats tier table and roles.work. */
+  workModel?: string;
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
