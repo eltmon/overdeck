@@ -37,7 +37,7 @@ Act on an issue. `<id>` is the universal object.
 | `pan resume <id>` | Resume from saved Claude session |
 | `pan recover <id>` | Recover a crashed or stopped agent |
 | `pan stop <id>` | Stop every issue agent while preserving workspace, branch, plan, beads, and commits (`pan kill` remains the older alias) |
-| `pan reset-to-planned <id> [--dry-run]` | Clear execution and specialist state while preserving finalized planning and code; leaves `pan start` as the next action |
+| `pan reset-to-planned <id> [--dry-run]` | Clear task progress, claims, execution, and specialist state while preserving finalized planning and code; leaves `pan start` as the next action |
 | `pan sync-main <id>` | Merge latest `main` into the workspace branch |
 | `pan swarm <id>` | Per-item DAG dispatch across plan items (slot-per-item). See [SWARM.md](./SWARM.md). `--dry-run`, `--max-slots`, `--auto-advance`, `--host`, `--task <next\|show\|claim\|done\|block\|unblock\|cancel>` |
 | `pan done <id>` | Mark work complete → tracker "In Review". Agent stays on standby for UAT tweaks via `pan tell`. |

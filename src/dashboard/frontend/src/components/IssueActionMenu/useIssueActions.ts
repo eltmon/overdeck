@@ -216,7 +216,7 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'resetIssue':
       return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and vBRIEF state, and moves the issue back to Todo.`;
     case 'resetToPlanned':
-      return `Reset ${issueId} to planned?\n\nThis stops issue agents and clears saved sessions, completion markers, pipeline verdicts, retries, and merge-queue state. It preserves the workspace, branch, commits, finalized vBRIEF, and task progress, returns the issue to open + planned, and does not start an agent.`;
+      return `Reset ${issueId} to planned?\n\nThis stops issue agents and clears task progress and claims, saved sessions, completion markers, pipeline verdicts, retries, and merge-queue state. It preserves the workspace, branch, commits, and finalized vBRIEF, returns the issue to open + planned, and does not start an agent.`;
     case 'cancel':
       return `Cancel ${issueId}?\n\nThis cancels the issue and wipes the workspace state for the abandoned run.`;
     case 'resetSession':

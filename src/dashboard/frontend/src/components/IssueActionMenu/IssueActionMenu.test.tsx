@@ -209,7 +209,7 @@ describe('IssueActionMenu', () => {
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
     fireEvent.click(screen.getByTestId('issue-action-resetToPlanned'));
-    expect(screen.getByRole('alertdialog')).toHaveTextContent('preserves the workspace, branch, commits');
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('clears task progress and claims');
 
     const confirmButton = screen.getByRole('button', { name: 'Reset to planned' });
     fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset to planned' } });

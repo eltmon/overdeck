@@ -13,12 +13,15 @@ import { resetPipelineVerdictsForWorkStartSync } from '../../lib/review-status.j
 import { dequeueMerge } from '../../lib/overdeck/merge.js';
 import { resetPostMergeState } from '../../lib/cloister/merge-agent.js';
 import { IssueLifecycle, IssueLifecycleWithClientLive } from '../../dashboard/server/services/issue-lifecycle.js';
+import { resolveProjectForIssue } from '../../lib/pan-dir/record.js';
+import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
+import { clearTaskProgress } from '../../lib/pan-dir/reset-task-progress.js';
 
 export interface ResetToPlannedOptions { dryRun?: boolean }
 
 export function registerResetToPlannedCommand(program: Command): void {
   program.command('reset-to-planned <id>')
-    .description('Return a finalized issue to post-planning without deleting its workspace, plan, beads, commits, or branch')
+    .description('Return a finalized issue to post-planning without deleting its workspace, plan, commits, or branch')
     .option('--dry-run', 'Show the exact reset without changing state')
     .action(resetToPlannedCommand);
 }
@@ -37,8 +40,8 @@ export async function resetToPlannedCommand(id: string, options: ResetToPlannedO
   console.log(chalk.bold(`${options.dryRun ? 'Would reset' : 'Resetting'} ${issueId} to post-planning`));
   console.log(`  workspace: ${workspace}`);
   console.log(`  live sessions: ${agents.filter((agent) => agent.tmuxActive).map((agent) => agent.id).join(', ') || 'none'}`);
-  console.log('  preserved: branch, commits, workspace, active plan, beads');
-  console.log('  cleared: work/swarm/specialist sessions, saved work session, verdicts, retries, merge queue');
+  console.log('  preserved: branch, commits, workspace, finalized plan');
+  console.log('  cleared: task progress and claims, work/swarm/specialist sessions, saved work session, verdicts, retries, merge queue');
   if (options.dryRun) return;
 
   await killCommand(issueId, { force: true });
@@ -51,6 +54,9 @@ export async function resetToPlannedCommand(id: string, options: ResetToPlannedO
   }
 
   resetPipelineVerdictsForWorkStartSync(issueId, { force: true });
+  const recordProject = resolveProjectForIssue(issueId);
+  if (!recordProject) throw new Error(`Could not resolve canonical record project for ${issueId}`);
+  await updateIssueRecord(recordProject, issueId, clearTaskProgress);
   dequeueMerge(project.projectKey, issueId);
   resetPostMergeState(issueId);
 
