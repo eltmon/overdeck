@@ -528,7 +528,6 @@ export interface ContextLayerSyncResult {
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
   firstInjections: ContextFirstInjection[];
-  /** Legacy bd-generated policy blocks removed from registered projects. */
   legacyBeadsCleanups: LegacyBeadsCleanup[];
   errors: string[];
 }
