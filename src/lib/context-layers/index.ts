@@ -56,6 +56,7 @@ export {
   REGION_BEGIN,
   REGION_END,
   applyManagedRegion,
+  stripBeadsManagedRegion,
   hasManagedRegion,
   userContentOutsideRegion,
   renderGlobalLayer,

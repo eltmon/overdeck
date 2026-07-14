@@ -28,6 +28,7 @@ const BEADS_REGION = /<!-- BEGIN BEADS INTEGRATION\b[\s\S]*?<!-- END BEADS INTEG
  * Its marker makes the ownership unambiguous; hand-authored content remains.
  */
 export function stripBeadsManagedRegion(existing: string): string {
+  if (!existing.includes('<!-- BEGIN BEADS INTEGRATION')) return existing;
   return existing.replace(BEADS_REGION, '').replace(/\n{3,}/g, '\n\n').trimEnd();
 }
 

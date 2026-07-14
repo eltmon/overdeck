@@ -165,6 +165,10 @@ export async function contextSyncCommand(): Promise<void> {
   for (const name of result.projectsWritten) {
     console.log(chalk.green(`✓ Rendered project layer → ${name}/CLAUDE.md`));
   }
+  for (const cleanup of result.legacyBeadsCleanups) {
+    console.log(chalk.green(`✓ Removed legacy generated Beads references → ${cleanup.file}`));
+    console.log(chalk.dim(`  Backup: ${cleanup.backupPath}`));
+  }
   for (const err of result.errors) {
     console.log(chalk.red(`  ✗ ${err}`));
   }

@@ -336,6 +336,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (ctx.projectsWritten.length > 0) {
     ctxParts.push(`${ctx.projectsWritten.length} project file(s)`);
   }
+  if (ctx.legacyBeadsCleanups.length > 0) {
+    ctxParts.push(`${ctx.legacyBeadsCleanups.length} legacy Beads reference file(s) cleaned`);
+  }
   if (ctx.errors.length > 0) {
     ctxSpinner.warn(`Context layers rendered with ${ctx.errors.length} error(s)`);
     for (const e of ctx.errors) console.log(chalk.red(`  ✗ ${e}`));
@@ -343,6 +346,11 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     ctxSpinner.succeed(`Context layers rendered: ${ctxParts.join(', ')}`);
   } else {
     ctxSpinner.info('Context layers already up to date');
+  }
+
+  for (const cleanup of ctx.legacyBeadsCleanups) {
+    console.log(chalk.green(`  ✓ Removed legacy generated Beads references: ${cleanup.file}`));
+    console.log(chalk.dim(`    Backup: ${cleanup.backupPath}`));
   }
 
   // One-time notice: a managed region was added to a file that already had
