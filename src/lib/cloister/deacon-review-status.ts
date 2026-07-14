@@ -234,6 +234,21 @@ function latestHistoryByType(
   return undefined;
 }
 
+export function completedReviewSnapshotAfterCoordinatorExit(
+  status: Pick<ReviewStatus, 'history'>,
+): Partial<ReviewStatus> | null {
+  const review = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
+  if (review?.status !== 'passed') return null;
+  const test = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
+  return {
+    reviewStatus: 'passed',
+    reviewNotes: review.notes,
+    ...(test ? { testStatus: test.status as ReviewStatus['testStatus'], testNotes: test.notes } : {}),
+    reviewRetryCount: 0,
+    recoveryStartedAt: undefined,
+  };
+}
+
 async function isReviewAgentActiveForIssue(issueId: string): Promise<boolean> {
   // PAN-1048 R5: role-primitive review/test runs (agent-<id>-review, agent-<id>-test).
   try {
@@ -342,6 +357,22 @@ export async function handleReviewCoordinatorDied(
 
   if (await isIssueClosed(issueId)) {
     logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped — issue closed`);
+    return actions;
+  }
+
+  const completedSnapshot = completedReviewSnapshotAfterCoordinatorExit(status);
+  if (completedSnapshot) {
+    setReviewStatusSync(issueId, completedSnapshot);
+    actions.push(`Restored completed review for ${issueId} after coordinator exit; no re-dispatch`);
+    return actions;
+  }
+
+  if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
+    markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
+      reviewRetryCount: status.reviewRetryCount ?? 0,
+      recoveryStartedAt: status.recoveryStartedAt,
+    });
+    actions.push(`Review recovery stopped for ${issueId} after ${status.reviewRetryCount} retries`);
     return actions;
   }
 

@@ -479,6 +479,49 @@ export function registerBeadsCommands(program: Command): void {
   const beads = program.command('beads').description('Beads issue tracker management');
   registerBeadsReconcileCommand(beads);
 
+  const printRead = (records: BeadRecord[], json: boolean): void => {
+    if (json) {
+      console.log(JSON.stringify(records, null, 2));
+      return;
+    }
+    if (records.length === 0) {
+      console.log(chalk.dim('No beads found.'));
+      return;
+    }
+    for (const bead of records) console.log(`${bead.id}\t${bead.status}\t${bead.title}`);
+  };
+
+  beads.command('list [issueId]')
+    .description('Read beads through the canonical resolver')
+    .option('--json', 'Output JSON')
+    .action(async (issueId: string | undefined, options: { json?: boolean }) => {
+      const resolver = createBeadsResolver(process.cwd());
+      const result = issueId ? await resolver.getBeadsForIssue(issueId) : await resolver.getAllBeads();
+      if (!result.ok) throw new Error(result.reason);
+      printRead(result.value, options.json === true);
+    });
+
+  beads.command('ready [issueId]')
+    .description('Read ready beads through the canonical resolver')
+    .option('--json', 'Output JSON')
+    .action(async (issueId: string | undefined, options: { json?: boolean }) => {
+      const result = await createBeadsResolver(process.cwd()).getReadyBeads();
+      if (!result.ok) throw new Error(result.reason);
+      const records = issueId
+        ? result.value.filter((bead) => bead.labels.some((label) => label.toLowerCase() === issueId.toLowerCase()))
+        : result.value;
+      printRead(records, options.json === true);
+    });
+
+  beads.command('show <beadId>')
+    .description('Read one bead through the canonical resolver')
+    .option('--json', 'Output JSON')
+    .action(async (beadId: string, options: { json?: boolean }) => {
+      const result = await createBeadsResolver(process.cwd()).getBeadById(beadId);
+      if (!result.ok) throw new Error(result.reason);
+      printRead(result.value ? [result.value] : [], options.json === true);
+    });
+
   const mutate = async <T>(reason: string, fn: (bd: BdMutationClient) => Promise<T>): Promise<T> => {
     const result = await runMutationBatch({ project: { workspacePath: process.cwd() }, reason }, fn);
     if (!result.ok) throw new Error(formatMutationBatchFailure(result));
