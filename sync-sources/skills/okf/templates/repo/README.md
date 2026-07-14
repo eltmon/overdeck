@@ -14,5 +14,5 @@ Use the code repository's `/okf` skill commands to author, sync, validate, embed
 ## Local Checks
 
 ```bash
-python3 ../code-repo/skills/okf/scripts/validate.py --bundle . --strict
+python3 ../code-repo/sync-sources/skills/okf/scripts/validate.py --bundle . --strict
 ```

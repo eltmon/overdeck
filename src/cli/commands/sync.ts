@@ -24,6 +24,7 @@ import {
   isStartupSyncNeededSync,
   writeSyncManifestSync,
 } from '../../lib/sync.js';
+import { executeAgentSkillsSync, planAgentSkillsSync } from '../../lib/harness-skill-sync.js';
 import { SYNC_TARGET, SYNC_SOURCES, isDevMode } from '../../lib/paths.js';
 import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -136,6 +137,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
           `${chalk.yellow(`${count('conflict')} user-modified (skipped)`)}`,
       );
     }
+    console.log('');
+
+    console.log(chalk.cyan('~/.agents/skills/ (Codex + Pi + Oh My Pi):'));
+    const agentSkillPlan = planAgentSkillsSync();
+    const agentCount = (s: string) => agentSkillPlan.filter((i) => i.status === s).length;
+    console.log(
+      `  ${chalk.green(`${agentCount('new')} new`)}, ` +
+        `${chalk.blue(`${agentCount('symlink')} update`)}, ` +
+        `${chalk.dim(`${agentCount('exists')} unchanged or user-owned`)}, ` +
+        `${chalk.yellow(`${agentCount('conflict')} user-modified (skipped)`)}`,
+    );
     console.log('');
 
     // Context layers → CLAUDE.md managed regions
@@ -267,10 +279,15 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (cacheResult.rules.copied > 0) cacheParts.push(`${cacheResult.rules.copied} rules`);
   cacheSpinner.succeed(`Cache refreshed: ${cacheParts.length > 0 ? cacheParts.join(', ') : 'up to date'}`);
 
-  // Distribute bundled skills + agents into the user's Claude Code home.
-  const spinner = ora('Distributing skills and agents to ~/.claude/...').start();
+  // Distribute bundled skills + agents to Claude and native skill bundles to
+  // the Agent Skills standard home used by Codex, Pi, and Oh My Pi.
+  const spinner = ora('Distributing skills across agent harnesses...').start();
   const result = time('execute-sync', () => executeSyncSync({ force: options.force, diff: options.diff }));
+  const agentSkillsResult = time('execute-agent-skills-sync', () =>
+    executeAgentSkillsSync({ force: options.force, diff: options.diff }),
+  );
   const totalSynced = result.created.length + result.updated.length + result.adopted.length;
+  const totalAgentSkillsSynced = agentSkillsResult.created.length + agentSkillsResult.updated.length;
   const adoptionSummary = result.adopted.length > 0
     ? `, ${result.adopted.length} adopted (legacy pre-manifest installs)`
     : '';
@@ -295,19 +312,19 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  if (result.conflicts.length > 0 && !options.force) {
-    spinner.warn(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary}, ${result.conflicts.length} user-modified (skipped)`);
+  if (result.conflicts.length + agentSkillsResult.conflicts.length > 0 && !options.force) {
+    spinner.warn(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}, ${result.conflicts.length + agentSkillsResult.conflicts.length} user-modified (skipped)`);
     console.log('');
     console.log(chalk.yellow('Modified since Overdeck installed:'));
-    for (const name of result.conflicts) {
+    for (const name of [...result.conflicts, ...agentSkillsResult.conflicts.map((name) => `~/.agents/skills/${name}`)]) {
       console.log(chalk.dim(`  - ${name}`));
     }
     console.log('');
     console.log(chalk.dim('Use --force to overwrite, --diff to see changes.'));
-  } else if (result.skipped.length > 0) {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary} (${result.skipped.length} unchanged or user-owned)`);
+  } else if (result.skipped.length + agentSkillsResult.skipped.length > 0) {
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary} (${result.skipped.length + agentSkillsResult.skipped.length} unchanged or user-owned)`);
   } else {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary}`);
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}`);
   }
 
   // Render the layered context into harness CLAUDE.md files (PAN-1201).

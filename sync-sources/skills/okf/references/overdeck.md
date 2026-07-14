@@ -34,8 +34,8 @@ The fallback path must still create validating concepts and must not require `pa
 Retro writes to a knowledge-repo branch and opens a PR. It does not push directly to the default branch. Before opening the PR, run:
 
 ```bash
-python3 skills/okf/scripts/reindex.py --bundle <bundle> --log-entry "<entry>"
-python3 skills/okf/scripts/validate.py --bundle <bundle> --strict
+python3 <okf-skill-dir>/scripts/reindex.py --bundle <bundle> --log-entry "<entry>"
+python3 <okf-skill-dir>/scripts/validate.py --bundle <bundle> --strict
 ```
 
 If validation fails, fix the bundle first.

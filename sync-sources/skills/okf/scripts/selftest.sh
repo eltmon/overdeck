@@ -670,9 +670,9 @@ fi
 printf 'ok - okf_common.py imports only stdlib and yaml\n'
 
 if grep -RInE 'from +(overdeck|pan)|import +(overdeck|pan)|require\(["'\''](overdeck|pan)' "$ROOT" --include='*.py' --include='*.js' --include='*.ts' --include='*.sh'; then
-  printf 'not ok - no Overdeck code dependency under skills/okf\n' >&2
+  printf 'not ok - no Overdeck code dependency under the OKF skill directory\n' >&2
   exit 1
 fi
-printf 'ok - no Overdeck code dependency under skills/okf\n'
+printf 'ok - no Overdeck code dependency under the OKF skill directory\n'
 
 printf 'ok - okf scaffold selftest complete\n'

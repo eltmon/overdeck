@@ -140,7 +140,7 @@ Capture knowledge after implementation.
 
 Return compact prompt context.
 
-- Resolve the bundle, then run `python3 skills/okf/scripts/search.py "<query>" --bundle <bundle> --format prompt --budget <tokens>`.
+- Resolve this skill's installation directory from the loaded `SKILL.md`, then run `python3 <okf-skill-dir>/scripts/search.py "<query>" --bundle <bundle> --format prompt --budget <tokens>`. Never assume the caller's repository contains `skills/okf`.
 - Rank by hybrid BM25 + vector search when indexes and shards exist.
 - Fall back to BM25-only, then index-guided reading.
 - Respect the token budget.

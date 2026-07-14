@@ -19,7 +19,7 @@ Standalone Claude Code users can copy-install it:
 
 ```bash
 mkdir -p ~/.claude/skills
-cp -R skills/okf ~/.claude/skills/okf
+cp -R sync-sources/skills/okf ~/.claude/skills/okf
 ```
 
 The copied skill remains portable. Its core scripts do not import Overdeck and require only git, gh, Python 3, and PyYAML for non-embedding workflows.

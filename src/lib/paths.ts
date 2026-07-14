@@ -49,8 +49,10 @@ export const CERTS_DIR = join(OVERDECK_HOME, 'certs');
 export const CONFIG_FILE = join(CONFIG_DIR, 'config.toml');
 export const SETTINGS_FILE = join(CONFIG_DIR, 'settings.json');
 
-// AI tool directory (Claude Code is the sole supported runtime)
+// Harness skill homes. Claude Code still uses its vendor-specific directory;
+// Codex, Pi, and Oh My Pi discover the Agent Skills standard directory.
 export const CLAUDE_DIR = join(homedir(), '.claude');
+export const AGENT_SKILLS_DIR = join(homedir(), '.agents', 'skills');
 
 // Legacy runtime directories (kept for symlink cleanup migration)
 export const LEGACY_RUNTIME_DIRS = {

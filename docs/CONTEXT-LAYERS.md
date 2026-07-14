@@ -117,8 +117,7 @@ like `CLAUDE.md`. A project with no `project.md` gets neither file touched.
   context, hooks, agents, or skills, the dashboard shows a **Sync now** banner;
   the button runs `pan sync` on the host and disappears only after the manifest
   matches the installed package;
-- distributes Overdeck's bundled skills → `~/.claude/skills/` and agent
-  definitions → `~/.claude/agents/`, with manifest-based conflict resolution
+- distributes Overdeck's bundled skills → `~/.claude/skills/` for Claude Code and `~/.agents/skills/` for Codex, Pi, and Oh My Pi; agent definitions go to `~/.claude/agents/`, with manifest-based conflict resolution
   (a file you modified is left alone; an unmodified one is updated);
 - folds the bundled **engineering rules** into the global CLAUDE.md region.
 

@@ -1,6 +1,6 @@
 ---
 name: pan-sync
-description: "pan sync — sync skills and agents from devroot to ~/.claude/"
+description: "pan sync — distribute skills and agents to every supported Overdeck harness"
 triggers:
   - pan sync
   - sync skills
@@ -16,7 +16,7 @@ allowed-tools:
 
 ## Overview
 
-This skill guides you through syncing Overdeck skills to AI coding assistants. The sync process creates symlinks from `~/.overdeck/skills/` to each tool's skill directory and copies workspace CLAUDE.md files to `~/.opencode/cl-aude-md/`.
+This skill guides you through syncing Overdeck skills to its supported agent harnesses. The sync process copies complete, manifest-managed skill bundles from `~/.overdeck/skills/` into each native discovery directory.
 
 ## Auto-Sync
 
@@ -31,13 +31,10 @@ run `pan sync` manually. Manual sync is useful when:
 ## How Sync Works
 
 ```
-~/.overdeck/skills/          (Overdeck skills - source)
-        ↓ pan sync (creates symlinks)
-~/.claude/skills/              (Claude Code)
-~/.codex/skills/               (Codex)
-~/.cursor/skills/              (Cursor)
-~/.gemini/skills/              (Gemini CLI)
-~/.opencode/skills/            (OpenCode)
+~/.overdeck/skills/          (Overdeck skills cache)
+        ↓ pan sync (manifest-managed copies)
+~/.claude/skills/            (Claude Code)
+~/.agents/skills/            (Codex, Pi, Oh My Pi)
 
 ~/.overdeck/workspaces/       (Workspace directories)
         ↓ pan sync (copies CLAUDE.md)
@@ -49,11 +46,11 @@ run `pan sync` manually. Manual sync is useful when:
 ```
 
 **Key points:**
-- Skills are symlinked, not copied
-- Changes to source immediately reflect in all tools
-- Project-specific skills in `{project}/.claude/skills/` are NOT touched
-- Conflicts are detected and reported
-- CLAUDE.md files are copied from `~/.overdeck/workspaces/` to `~/.opencode/cl-aude-md/`
+- Skill bundles are copied recursively, including their scripts, references, and templates.
+- Manifest ownership lets `pan sync` update Overdeck-managed files without overwriting user-owned skills.
+- Claude Code discovers `~/.claude/skills/`; Codex, Pi, and Oh My Pi discover the shared Agent Skills standard directory at `~/.agents/skills/`.
+- New harness sessions see changes after `pan sync`; already-running sessions keep the skill catalog loaded at launch.
+- Invocation syntax belongs to the harness: Claude uses `/skill-name`, while Codex uses `$skill-name` or natural-language skill selection.
 
 ## Commands
 
@@ -84,7 +81,7 @@ pan sync
 
 Output:
 ```
-✓ Synced 24 items to claude, codex, cursor, gemini
+✓ Synced 24 Claude items and 24 shared skill files
 ```
 
 Manual `pan sync` always runs a full sync, even when startup sync would skip.
@@ -123,27 +120,16 @@ Creates a backup without syncing.
 
 ## Sync Targets
 
-Configure which tools to sync to in `~/.overdeck/config.toml`:
+Bundled skills always reach every supported Overdeck agent harness; this is not an opt-in target list.
 
-```toml
-[sync]
-targets = ["claude", "codex", "cursor", "gemini"]
-backup_before_sync = true
-```
-
-### Available Targets
-
-| Target | Directory | Tool |
-|--------|-----------|------|
-| `claude` | `~/.claude/skills/` | Claude Code, Cursor |
-| `codex` | `~/.codex/skills/` | OpenAI Codex |
-| `cursor` | `~/.cursor/skills/` | Cursor (alternative) |
-| `gemini` | `~/.gemini/skills/` | Google Gemini CLI |
-| `opencode` | `~/.opencode/skills/` | OpenCode |
+| Discovery contract | Directory | Harnesses |
+|---|---|---|
+| Claude Code | `~/.claude/skills/` | Claude Code |
+| Agent Skills standard | `~/.agents/skills/` | Codex, Pi, Oh My Pi |
 
 ## Conflict Handling
 
-A conflict occurs when a skill with the same name exists in the target directory but isn't a Overdeck symlink.
+A conflict occurs when an Overdeck-managed skill file was modified after installation. A pre-existing skill that Overdeck does not own is preserved.
 
 ### Detecting Conflicts
 
@@ -185,7 +171,7 @@ pan sync --dry-run
 pan sync
 
 # 4. Verify in your AI tool
-# Skills should now appear with /skill-name
+# Claude: /skill-name; Codex: $skill-name
 ```
 
 ### After Adding Custom Skills
