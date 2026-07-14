@@ -60,8 +60,16 @@ export function buildLintSessionNode(options: {
         transcriptParts.push('', `--- ${gate.name} output ---`, (gate.output || gate.error || '').trim());
       }
     }
-  } else if (verificationStatus === 'failed' && centralStatus?.verificationNotes) {
+  } else if (centralStatus?.verificationNotes) {
     transcriptParts.push(centralStatus.verificationNotes);
+  } else if (!isRunning) {
+    // No artifact yet (verification last ran before the artifact writer
+    // shipped) — show the status rather than an empty panel.
+    transcriptParts.push(
+      `QUALITY GATES ${String(verificationStatus ?? 'unknown').toUpperCase()}`,
+      '',
+      'No gate details recorded for the last run. Details are captured from the next verification run onward.',
+    );
   }
 
   const gateDurationMs = artifact
