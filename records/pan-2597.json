@@ -177,6 +177,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-14T21:23:23.009Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-14T21:35Z] verification-gate → FAILED — seq 11",
+      "timestamp": "2026-07-14T21:35:02.986Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-14T21:35:03.086Z"
     }
   ],
   "feedback": [
@@ -193,6 +203,13 @@
       "outcome": "failed",
       "timestamp": "2026-07-14T18:44:46Z",
       "markdownBody": "VERIFICATION STUCK for PAN-2597 (attempt 3/3):\n\nFailed check: test\n\nVerification FAILED at test (327907ms):\n\n|     expect(actions.filter((a) => a.includes('PAN-906'))).toHaveLength(…\n       |                                                          ^\n    352|\n    353|     const after = getReviewStatusSync('PAN-906');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[87/173]⎯\n\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with recent partial task completion\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with recent partial task completion\nAssertionError: expected [] to deeply equal [ 'PAN-9004' ]\n\n- Expected\n+ Received\n\n- [\n-   \"PAN-9004\",\n- ]\n+ []\n\n ❯ tests/unit/dashboard/server/services/resource-discovery.test.ts:602:54\n    600|     const discovered = await discoverResourceAllocatedIssues();\n    601|\n    602|     expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-900…\n       |                                                      ^\n    603|     expect(discovered[0]?.taskTotals).toEqual({\n    604|       total: 3,\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[88/173]⎯\n\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with in-progress tasks\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with in-progress tasks\nAssertionError: expected [] to deeply equal [ 'PAN-9004' ]\n\n- Expected\n+ Received\n\n- [\n-   \"PAN-9004\",\n- ]\n+ []\n\n ❯ tests/unit/dashboard/server/services/resource-discovery.test.ts:638:54\n    636|     const discovered = await discoverResourceAllocatedIssues();\n    637|\n    638|     expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-900…\n       |                                                      ^\n    639|     expect(discovered[0]?.taskTotals?.inProgress).toBe(1);\n    640|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[89/173]⎯\n\n\n\n## NEEDS-YOU: Verification stuck\n\nThis was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.\n\nAn operator needs to inspect PAN-2597, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically."
+    },
+    {
+      "seq": 11,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-14T21:35:02Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-2597 (attempt 2/3):\n\nFailed check: test\n\nVerification FAILED at test (391381ms):\n\n.test.ts:187:30\n    185|     expect(result.agentMessageSent).toBe(true);\n    186|     expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2…\n    187|     expect(mockMessageAgent).toHaveBeenCalledWith(\n       |                              ^\n    188|       'agent-pan-2203-slot-1',\n    189|       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[84/167]⎯\n\n FAIL  |root| tests/unit/lib/pan-dir/cutover-behavioral.test.ts > PAN-1919: behavioral no-loss — all fields land in record, not continue > writes tasksMapping through record writer without touching continue files\n FAIL  |root| tests/unit/lib/pan-dir/cutover-behavioral.test.ts > PAN-1919: behavioral no-loss — all fields land in record, not continue > writes tasksMapping through record writer without touching continue files\nTypeError: writeRecordTasksMappingSync is not a function\n ❯ tests/unit/lib/pan-dir/cutover-behavioral.test.ts:128:7\n    126|       });\n    127|\n    128|       writeRecordTasksMappingSync(project, ISSUE_ID, { 'item-1': ['tas…\n       |       ^\n    129|\n    130|       const rec = readIssueRecordSync(project, ISSUE_ID);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[85/167]⎯\n\n FAIL  |root| tests/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > no-loss audit: every review_status column is accounted for\n FAIL  |root| tests/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > no-loss audit: every review_status column is accounted for\nAssertionError: expected [ 'inspect_bead_id' ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"inspect_bead_id\",\n+ ]\n\n ❯ tests/unit/lib/pan-dir/verdict-restore.test.ts:378:30\n    376|     const unknownColumns = [...accountedFor].filter((col) => !actual.h…\n    377|\n    378|     expect(missingFromAudit).toEqual([]);\n       |                              ^\n    379|     expect(unknownColumns).toEqual([]);\n    380|     expect(actual.size).toBe(accountedFor.size);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[86/167]⎯\n\n\n\n## NEEDS-YOU: Verification stuck\n\nThis was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.\n\nAn operator needs to inspect PAN-2597, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically."
     }
   ],
   "scopeDrift": {
@@ -311,7 +328,7 @@
     "recordedAt": "2026-07-14T21:12:12.074Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T21:34:52.445Z",
+  "updated": "2026-07-14T21:35:03.086Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -321,9 +338,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T21:34:52.179Z",
+    "updatedAt": "2026-07-14T21:35:02.275Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+    "verificationNotes": "Verification FAILED at test (391381ms):\n\n.test.ts:187:30\n    185|     expect(result.agentMessageSent).toBe(true);\n    186|     expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-2…\n    187|     expect(mockMessageAgent).toHaveBeenCalledWith(\n       |                              ^\n    188|       'agent-pan-2203-slot-1',\n    189|       expect.stringContaining('MUST READ: /tmp/workspace/.pan/feedback…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[84/167]⎯\n\n FAIL  |root| tests/unit/lib/pan-dir/cutover-behavioral.test.ts > PAN-1919: behavioral no-loss — all fields land in record, not continue > writes tasksMapping through record writer without touching continue files\n FAIL  |root| tests/unit/lib/pan-dir/cutover-behavioral.test.ts > PAN-1919: behavioral no-loss — all fields land in record, not continue > writes tasksMapping through record writer without touching continue files\nTypeError: writeRecordTasksMappingSync is not a function\n ❯ tests/unit/lib/pan-dir/cutover-behavioral.test.ts:128:7\n    126|       });\n    127|\n    128|       writeRecordTasksMappingSync(project, ISSUE_ID, { 'item-1': ['tas…\n       |       ^\n    129|\n    130|       const rec = readIssueRecordSync(project, ISSUE_ID);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[85/167]⎯\n\n FAIL  |root| tests/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > no-loss audit: every review_status column is accounted for\n FAIL  |root| tests/unit/lib/pan-dir/verdict-restore.test.ts > restoreReviewStatusFromRecords > no-loss audit: every review_status column is accounted for\nAssertionError: expected [ 'inspect_bead_id' ] to deeply equal []\n\n- Expected\n+ Received\n\n- []\n+ [\n+   \"inspect_bead_id\",\n+ ]\n\n ❯ tests/unit/lib/pan-dir/verdict-restore.test.ts:378:30\n    376|     const unknownColumns = [...accountedFor].filter((col) => !actual.h…\n    377|\n    378|     expect(missingFromAudit).toEqual([]);\n       |                              ^\n    379|     expect(unknownColumns).toEqual([]);\n    380|     expect(actual.size).toBe(accountedFor.size);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[86/167]⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
@@ -500,7 +517,7 @@
       },
       "costAtCloseOut": {
         "usd": 152.844268,
-        "pricingAsOf": "2026-07-14T21:34:52.333Z"
+        "pricingAsOf": "2026-07-14T21:35:02.348Z"
       }
     },
     "merges": [
