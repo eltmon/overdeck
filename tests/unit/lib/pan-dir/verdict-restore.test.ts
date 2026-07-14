@@ -367,7 +367,7 @@ describe('restoreReviewStatusFromRecords', () => {
       'review_retry_count',
       'recovery_started_at',
       'inspect_started_at',
-      'inspect_task_id',
+      'inspect_bead_id',
     ]);
 
     const accountedFor = new Set([...primaryKey, ...durable, ...derived, ...ephemeralDefaults]);
