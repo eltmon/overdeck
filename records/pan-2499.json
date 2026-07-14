@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-14T05:58:35.119Z",
+  "updated": "2026-07-14T15:34:00.766Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -21,12 +21,26 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T18:00:43.901Z",
+    "updatedAt": "2026-07-14T15:34:00.714Z",
     "inspectNotes": "Bead no-loss-manifest ack: inventory.ts enumerates all 44 sections (Console 14 + Cockpit 16 + Rail 13 + ReviewPolicyControl) with home paths; issue-view-no-loss.test.ts hardcodes the same section list independently and asserts existsSync on every home path; npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts passes 5/5."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 81323,
+            "output": 404,
+            "cacheRead": 56448,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 1093949,
+            "output": 3279,
+            "cacheRead": 1006848,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 25971,
@@ -37,22 +51,34 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16803,
-            "output": 2199,
-            "cacheRead": 712270,
-            "cacheWrite": 97952
+            "input": 16805,
+            "output": 2699,
+            "cacheRead": 837725,
+            "cacheWrite": 100324
           }
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2430255,
-            "output": 454814,
-            "cacheRead": 151826944,
+            "input": 3398495,
+            "output": 485497,
+            "cacheRead": 168108032,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 81323,
+          "output": 404,
+          "cacheRead": 56448,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1093949,
+          "output": 3279,
+          "cacheRead": 1006848,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 25971,
           "output": 55437,
@@ -60,21 +86,21 @@
           "cacheWrite": 404469
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16803,
-          "output": 2199,
-          "cacheRead": 712270,
-          "cacheWrite": 97952
+          "input": 16805,
+          "output": 2699,
+          "cacheRead": 837725,
+          "cacheWrite": 100324
         },
         "custom/kimi-k2.7-code": {
-          "input": 2430255,
-          "output": 454814,
-          "cacheRead": 151826944,
+          "input": 3398495,
+          "output": 485497,
+          "cacheRead": 168108032,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 47.719328,
-        "pricingAsOf": "2026-07-13T18:00:43.965Z"
+        "usd": 52.928608,
+        "pricingAsOf": "2026-07-14T15:34:00.749Z"
       }
     },
     "merges": [],
@@ -82,14 +108,7 @@
   },
   "harness": "claude-code",
   "model": "glm-5.2",
-  "statusOverrides": {
-    "no-loss-manifest": "completed",
-    "issue-view-model": "running",
-    "no-loss-manifest.no-loss-manifest.ac1": "completed",
-    "no-loss-manifest.no-loss-manifest.ac2": "completed",
-    "no-loss-manifest.no-loss-manifest.ac3": "completed",
-    "clear-gates-server": "running"
-  },
+  "statusOverrides": {},
   "swarm": {
     "slotAssignments": [
       {
@@ -112,5 +131,10 @@
         "completedAt": "2026-07-13T20:07:43.353Z"
       }
     }
+  },
+  "tasks": {
+    "sequence": 0,
+    "claims": {},
+    "claimHistory": []
   }
 }
