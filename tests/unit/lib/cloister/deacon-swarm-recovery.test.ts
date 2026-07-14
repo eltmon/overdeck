@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -149,6 +150,7 @@ function recoveryDeps(): Pick<
 }
 
 let workspacePath: string;
+let recordRemote: string | null = null;
 
 async function recordConflict(): Promise<void> {
   await mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], mergeDeps());
@@ -159,10 +161,13 @@ describe('deacon-swarm failed-merge recovery', () => {
     resetSwarmLoopSafetyForTests();
     if (workspacePath) rmSync(workspacePath, { recursive: true, force: true });
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-recovery-'));
+    recordRemote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    if (workspacePath) rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(recordRemote);
+    recordRemote = null;
+    if (workspacePath) await cleanupGitRecordRoot(workspacePath);
   });
 
   it('records failed-merge and blocks auto-advance until recovery runs', async () => {

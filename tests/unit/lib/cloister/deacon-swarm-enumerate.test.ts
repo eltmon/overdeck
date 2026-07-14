@@ -9,6 +9,14 @@ const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
 }));
 
+// Swarm policy defaults to OFF (1ebb3234da); enumeration tests assert
+// eligibility lines, so pin the policy to enabled (doneness-test pattern).
+vi.mock(import('../../../../src/lib/swarm-policy.js'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  resolveSwarmPolicy: () => ({ mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global', maxSlots: 'global', autoAdvance: 'global' } }),
+  resolveAutomaticSwarmPolicy: () => ({ policy: { mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global', maxSlots: 'global', autoAdvance: 'global' } }, enabled: true }),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: (projectPath: string) =>
