@@ -377,7 +377,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
         {session.deliveryMethod !== undefined && (
           <DeliveryMethodToggle sessionId={session.sessionId} deliveryMethod={session.deliveryMethod} />
         )}
-        {issueId && session.type === 'work' && session.status !== 'running' && (
+        {issueId && session.type === 'work' && (
           <SessionResumeButton issueId={issueId} />
         )}
       </div>
