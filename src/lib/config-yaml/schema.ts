@@ -419,7 +419,16 @@ export interface IssuesConfig {
 /**
  * Complete configuration structure (YAML schema)
  */
+export type SwarmMode = 'off' | 'auto' | 'always';
+export interface SwarmPolicyConfig {
+  mode: SwarmMode;
+  maxSlots: number;
+  autoAdvance: boolean;
+}
+
 export interface YamlConfig {
+  /** Automatic swarm-selection policy. */
+  swarm?: Partial<SwarmPolicyConfig>;
   /** Model configuration */
   models?: {
     /** Provider enable/disable and API keys */
@@ -690,6 +699,8 @@ export interface NormalizedShadowConfig {
  * Normalized configuration (after loading and merging)
  */
 export interface NormalizedConfig {
+  /** Automatic swarm-selection policy. Off is the safe built-in default. */
+  swarm: SwarmPolicyConfig;
   /** tmux runtime configuration */
   tmux: {
     configMode: TmuxConfigMode;

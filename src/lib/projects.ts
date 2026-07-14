@@ -96,6 +96,9 @@ export interface SpecialistConfig {
 export interface SwarmConfig {
   /** File paths/globs that are intentionally high-churn and ignored for overlap scheduling. */
   hotspots?: string[];
+  mode?: 'off' | 'auto' | 'always';
+  maxSlots?: number;
+  autoAdvance?: boolean;
 }
 
 export interface ReleaseComponentConfig {

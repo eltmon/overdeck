@@ -36,6 +36,7 @@ export const DEFAULT_DOCS_TRIGGER_REGEXES = [
 ];
 
 export const DEFAULT_CONFIG: NormalizedConfig = {
+  swarm: { mode: 'off', maxSlots: 3, autoAdvance: true },
   tmux: {
     configMode: 'managed',
   },

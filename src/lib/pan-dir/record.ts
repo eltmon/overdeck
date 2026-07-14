@@ -101,6 +101,12 @@ export interface PanIssueSwarmSlotCompletion {
 }
 
 export interface PanIssueSwarmRecord {
+  /** Per-issue policy overrides; unset fields inherit from project/global. */
+  policy?: {
+    mode?: 'off' | 'auto' | 'always';
+    maxSlots?: number;
+    autoAdvance?: boolean;
+  };
   finalizedAt?: string;
   /**
    * @deprecated Read for migration only; new blocks live in `failedMergeBlocks`
