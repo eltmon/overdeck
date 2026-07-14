@@ -21,15 +21,16 @@
   ],
   "feedback": [],
   "created": "2026-06-29T04:13:04.890Z",
-  "updated": "2026-07-06T12:54:47.219Z",
+  "updated": "2026-07-14T16:00:01.847Z",
   "pipeline": {
     "issueId": "PAN-2152",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-03T03:12:11.453Z",
+    "updatedAt": "2026-07-14T16:00:01.717Z",
     "reviewNotes": "No blocking findings; workspace command extraction is behavior-preserving",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2161",
@@ -38,6 +39,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 135,
+            "output": 2433,
+            "cacheRead": 368501,
+            "cacheWrite": 168764
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
             "input": 22928,
@@ -56,22 +65,22 @@
         }
       },
       "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 32120,
+          "output": 89411,
+          "cacheRead": 9247521,
+          "cacheWrite": 489760
+        },
         "cliproxy/gpt-5.4-mini": {
           "input": 22928,
           "output": 668,
           "cacheRead": 0,
           "cacheWrite": 0
-        },
-        "anthropic/claude-opus-4-8": {
-          "input": 31985,
-          "output": 86978,
-          "cacheRead": 8879020,
-          "cacheWrite": 320996
         }
       },
       "costAtCloseOut": {
-        "usd": 8.780116,
-        "pricingAsOf": "2026-07-03T03:12:11.492Z"
+        "usd": 10.080641,
+        "pricingAsOf": "2026-07-14T16:00:01.790Z"
       }
     },
     "merges": [
