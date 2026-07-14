@@ -9,8 +9,7 @@
  *
  * This module exposes a serialized write-through commit primitive that pan-dir
  * writers call after they update a file. Commits are:
- *   - scheduled immediately by default so every state update reaches git + origin
- *   - optionally fixed-window coalesced when OVERDECK_STATE_FLUSH_WINDOW_MS is set
+ *   - scheduled on the next event-loop turn so every state update reaches git + origin
  *   - serialized within a process so the git index is never contested
  *   - best-effort for synchronous callers: failures are logged and reported by flushes
  *   - main-only: feature branches have their own commit cadence owned by agents
@@ -37,16 +36,7 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 0;
-const STATE_FLUSH_WINDOW_MS = parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
 const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
-
-function parseStateFlushWindowMs(value: string | undefined): number {
-  if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-  return parsed;
-}
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -185,10 +175,9 @@ function isGitError(value: unknown): value is GitError {
 }
 
 /**
- * Queue an auto-commit for one or more files. Returns immediately; by default
- * the serialized commit starts on the next timer turn. An explicit positive
- * OVERDECK_STATE_FLUSH_WINDOW_MS retains fixed-window coalescing for operators
- * who knowingly trade durability latency for fewer commits.
+ * Queue an auto-commit for one or more files. Returns immediately; the
+ * serialized commit-and-push starts on the next timer turn. Callers whose
+ * success depends on remote durability must also await flushAutoCommits().
  *
  * PAN-1908: `repoRoot` allows committing files to a different git checkout
  * than the project root (e.g., a declared infra repo for per-issue permanent
@@ -231,7 +220,7 @@ export function queueAutoCommit(opts: {
   pending.set(projectRoot, {
     paths: new Set(paths),
     subjects: [subject],
-    timer: setTimeout(() => void flushInner(projectRoot), STATE_FLUSH_WINDOW_MS),
+    timer: setTimeout(() => void flushInner(projectRoot), 0),
     repoRoot,
     expectedBranch,
   });
@@ -448,9 +437,6 @@ function maybePushStateCommit(
   gitRoot: string,
   branch: string,
 ): Effect.Effect<PushResult | null, never> {
-  if (process.env.OVERDECK_STATE_AUTOPUSH === '0') {
-    return Effect.succeed(null);
-  }
   return runGit(['remote', 'get-url', 'origin'], gitRoot).pipe(
     Effect.matchEffect({
       // Unit-test and local scratch repositories may intentionally have no

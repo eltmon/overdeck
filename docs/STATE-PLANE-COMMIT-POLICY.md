@@ -19,9 +19,9 @@ the legacy surface.
   immutable-spec conflict rejection, and append/deduplicate for append-only data.
 - The paths-only auto-commit queue stages concrete writer results on
   `overdeck-state`; it never rebases or replays a mutation it cannot understand.
-- Each queued result is committed and pushed on the next timer turn by default;
-  there is no shipped batching delay. `OVERDECK_STATE_FLUSH_WINDOW_MS` is an
-  explicit operator override that trades durability latency for fewer commits.
+- Each queued result is committed and pushed on the next event-loop turn. There
+  is no batching delay or switch that disables automatic pushes; a configured
+  `origin` makes commit-and-push part of the canonical write operation.
   A failed origin push is logged and returned as `pushed: false`, never reported
   as fully durable success.
 - Spec lifecycle transitions are stricter: the transition does not return

@@ -1,7 +1,9 @@
 /** The single locked read-modify-write door for per-issue records. */
 import { hostname } from 'node:os';
+import { Effect } from 'effect';
 
 import type { ProjectConfig } from '../projects.js';
+import { flushAutoCommits } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
 import {
   ensureIssueRecordSync,
@@ -40,12 +42,25 @@ export async function updateIssueRecord(
   const normalizedIssueId = issueId.toUpperCase();
   const recordPath = getIssueRecordPath(project, normalizedIssueId);
   const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
-  return withRecordFsLock(project, normalizedIssueId, { writerId, recordPath }, async () => {
+  let commitRoot: string | null = null;
+  const record = await withRecordFsLock(project, normalizedIssueId, { writerId, recordPath }, async () => {
     const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
     const result = await mutator(current);
     const next = result ?? current;
     const path = writeIssueRecordSync(project, normalizedIssueId, next);
-    if (options.autoCommit !== false) queueIssueRecordCommit(project, normalizedIssueId, path);
+    if (options.autoCommit !== false) commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
     return readIssueRecordSync(project, normalizedIssueId) ?? next;
   });
+
+  if (commitRoot) {
+    const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
+    if (flushed.pushed === false) {
+      throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
+    }
+    if (!flushed.committed && !['no diff', 'no pending'].includes(flushed.reason ?? '')) {
+      throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? 'unknown commit failure'}`);
+    }
+  }
+
+  return record;
 }

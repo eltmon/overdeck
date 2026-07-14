@@ -350,29 +350,22 @@ describe('auto-commit', () => {
     }),
   );
 
-  it.effect('skips push when OVERDECK_STATE_AUTOPUSH is disabled', () =>
+  it.effect('always pushes when origin is configured', () =>
     Effect.gen(function* () {
       const remoteTmp = setBareOrigin(tmp);
-      const previous = process.env.OVERDECK_STATE_AUTOPUSH;
       try {
-        process.env.OVERDECK_STATE_AUTOPUSH = '0';
         mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
         const path = join(tmp, '.pan', 'records', 'pan-2375.json');
         writeFileSync(path, '{"issue":"PAN-2375"}');
         const beforeRemote = exec(tmp, 'git rev-parse origin/main');
 
-        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local only' });
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): automatic push' });
         const result = yield* flushAutoCommits(tmp);
 
-        expect(result.committed).toBe(true);
-        expect(exec(tmp, 'git rev-parse origin/main')).toBe(beforeRemote);
-        expect(exec(tmp, 'git rev-parse HEAD')).not.toBe(beforeRemote);
+        expect(result).toEqual({ committed: true, pushed: true });
+        expect(exec(tmp, 'git rev-parse origin/main')).not.toBe(beforeRemote);
+        expect(exec(tmp, 'git rev-parse HEAD')).toBe(exec(tmp, 'git rev-parse origin/main'));
       } finally {
-        if (previous === undefined) {
-          delete process.env.OVERDECK_STATE_AUTOPUSH;
-        } else {
-          process.env.OVERDECK_STATE_AUTOPUSH = previous;
-        }
         rmSync(remoteTmp, { recursive: true, force: true });
       }
     }),
