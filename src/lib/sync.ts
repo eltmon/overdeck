@@ -22,8 +22,9 @@ import {
   renderGlobalLayer,
   renderProjectLayer,
   applyManagedRegion,
-  stripBeadsManagedRegion,
   hasManagedRegion,
+  cleanLegacyBeadsTargetSync,
+  type LegacyBeadsCleanup,
   piGlobalContextFile,
   codexGlobalContextFile,
 } from './context-layers/index.js';
@@ -510,12 +511,8 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   return result;
 }
 
-/** A target file whose pre-existing hand-authored content was backed up the
- *  first time `pan sync` injected a managed region into it. */
 export interface ContextFirstInjection {
-  /** The target file (e.g. ~/.claude/CLAUDE.md, <root>/AGENTS.md). */
   file: string;
-  /** Where the pre-existing content was snapshotted before injection. */
   backupPath: string;
 }
 
@@ -530,30 +527,10 @@ export interface ContextLayerSyncResult {
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
-  /** Files where a managed region was injected into pre-existing content for
-   *  the first time this run (each backed up first). */
   firstInjections: ContextFirstInjection[];
   /** Legacy bd-generated policy blocks removed from registered projects. */
-  legacyBeadsCleanups: ContextFirstInjection[];
+  legacyBeadsCleanups: LegacyBeadsCleanup[];
   errors: string[];
-}
-
-/** Remove only bd's explicitly marked generated policy block from a file. */
-function cleanLegacyBeadsTargetSync(
-  targetFile: string,
-  result: ContextLayerSyncResult,
-  backupTimestamp: string,
-): boolean {
-  if (!existsSync(targetFile)) return false;
-  const existing = readFileSync(targetFile, 'utf-8');
-  const cleaned = stripBeadsManagedRegion(existing);
-  if (cleaned === existing) return false;
-
-  const backupPath = backupFileSync(targetFile, backupTimestamp);
-  if (!backupPath) throw new Error(`Could not back up ${targetFile} before removing legacy Beads references`);
-  writeFileSync(targetFile, cleaned.length > 0 ? `${cleaned}\n` : '', 'utf-8');
-  result.legacyBeadsCleanups.push({ file: targetFile, backupPath });
-  return true;
 }
 
 /**
@@ -646,16 +623,15 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
 
-  // Remove legacy bd-generated policy blocks from every registered project,
-  // even when it has no Overdeck project context layer. Beads itself remains
-  // installed; only the stale repository-level agent instructions are removed.
-  // Then render project layers into CLAUDE.md and AGENTS.md where configured.
+  // Clean stale agent instructions in every project; Beads itself remains installed.
   for (const { config } of listProjectsSync()) {
     if (!existsSync(config.path)) continue;
     try {
       let wrote = false;
-      wrote = cleanLegacyBeadsTargetSync(join(config.path, 'CLAUDE.md'), result, backupTimestamp) || wrote;
-      wrote = cleanLegacyBeadsTargetSync(join(config.path, 'AGENTS.md'), result, backupTimestamp) || wrote;
+      for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+        const cleanup = cleanLegacyBeadsTargetSync(join(config.path, name), backupTimestamp);
+        if (cleanup) result.legacyBeadsCleanups.push(cleanup);
+      }
       const claudeManaged = renderProjectLayer(config.path, 'claude-code');
       const piManaged = renderProjectLayer(config.path, 'ohmypi');
       if (claudeManaged) {
