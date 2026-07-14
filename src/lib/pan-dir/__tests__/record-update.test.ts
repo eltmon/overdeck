@@ -3,10 +3,12 @@ import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { Effect } from 'effect';
 
 import type { ProjectConfig } from '../../projects.js';
 import { writeIssueRecordSync, type PanIssueRecord } from '../record.js';
 import { updateIssueRecord } from '../record-update.js';
+import { flushAutoCommits } from '../auto-commit.js';
 
 const ISSUE_ID = 'DURABLE-1';
 
@@ -20,7 +22,7 @@ describe('updateIssueRecord durability', () => {
   let project: ProjectConfig;
   const originalHome = process.env.OVERDECK_HOME;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     root = mkdtempSync(join(tmpdir(), 'pan-record-update-'));
     remote = mkdtempSync(join(tmpdir(), 'pan-record-update-origin-'));
     process.env.OVERDECK_HOME = join(root, 'overdeck-home');
@@ -45,6 +47,7 @@ describe('updateIssueRecord durability', () => {
     git(root, 'commit', '-q', '-m', 'seed state');
     git(root, 'branch', '-M', 'main');
     git(root, 'push', '-q', '-u', 'origin', 'main');
+    await Effect.runPromise(flushAutoCommits(root));
   });
 
   afterEach(() => {
