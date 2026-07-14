@@ -81,6 +81,7 @@ import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
 import { reviewModeCommand, reviewScopeCommand } from './commands/review-mode.js';
+import { staffingCommand } from './commands/staffing.js';
 // PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
 // via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
 // spawned by the review role through `pan review spawn-reviewer`.
@@ -357,17 +358,16 @@ review
   .command('abort <id>')
   .description('Kill all running reviewer sessions and leave the worker idle')
   .action(abortReviewCommand);
-
 review
   .command('mode <id> <mode>')
   .description('Set per-issue review mode (quick, full, or none)')
   .action(reviewModeCommand);
-
 review
   .command('scope <id> <scope>')
   .description('Set per-issue re-review scope (all, changed, or blockers) — which convoy reviewers re-run (PAN-1874)')
   .action(reviewScopeCommand);
 
+program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
 review
   .command('restart <id>')
   .description('Kill running reviewers and dispatch fresh review pipeline')

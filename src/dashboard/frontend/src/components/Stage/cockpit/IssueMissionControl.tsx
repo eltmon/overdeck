@@ -22,7 +22,7 @@ import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
-import { ReviewPolicyControl } from '../../ReviewPolicyControl'
+import { IssuePolicyStrip } from '../../IssuePolicyStrip'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import type { PaneType } from '../../../lib/panesStore'
@@ -765,7 +765,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               {/* PAN-1874: per-issue review mode / re-review scope override (same
                   control as the session-view IssueHeader; PAN-2499's unified view
                   inventories it once). */}
-              <ReviewPolicyControl issueId={issueId} />
+              <IssuePolicyStrip issueId={issueId} />
               <MergeCta issueId={issueId} rs={review.data} />
               <IssueActionMegaMenu issueId={issueId} />
             </div>

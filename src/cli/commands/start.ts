@@ -742,9 +742,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentStateSync(agentId);
-  const issueWorkModel = options.model ? undefined : resolveIssueWorkModel(id.toUpperCase());
-  const spawnModel = resolveSpawnModel(options.model ?? issueWorkModel, options.fresh, existingAgentState?.model);
-
+  const spawnModel = resolveSpawnModel(options.model ?? resolveIssueWorkModel(id.toUpperCase()), options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.
