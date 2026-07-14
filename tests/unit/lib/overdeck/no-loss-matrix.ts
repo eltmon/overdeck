@@ -678,4 +678,49 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   // Pre-existing routes discovered during PAN-1866 audit (were missing from matrix)
   { surface: 'POST /api/agents/:id/restart-fresh',         kind: 'http', disposition: 'WRITE',      door: 'agents route wipes work-agent state and re-spawns on new harness/model; deliberate operator override for harness switch' },
   { surface: 'POST /api/review/:issueId/purge',            kind: 'http', disposition: 'WRITE',      door: 'workspaces route purges all review agents for an issue and resets review status' },
+  { surface: 'GET /api/projects/:projectKey/swarm-policy', kind: 'http', disposition: 'READ',       door: 'Project config resolver reads the configured project-level swarm policy' },
+  { surface: 'POST /api/projects/:projectKey/swarm-policy', kind: 'http', disposition: 'WRITE',     door: 'Project config writer sets the project-level swarm policy' },
+  { surface: 'GET /api/issues/:issueId/swarm-policy',      kind: 'http', disposition: 'READ',       door: 'Issue record resolver reads and resolves the issue-level swarm policy' },
+  { surface: 'POST /api/issues/:issueId/swarm-policy',     kind: 'http', disposition: 'WRITE',      door: 'Issue record writer sets the issue-level swarm policy' },
+];
+
+/** PAN-2648 Beads-removal surface lock. */
+export type BeadsRemovalDisposition = 'RETAIN_AS_TASK' | 'DELETE';
+
+export interface BeadsRemovalMatrixEntry {
+  surface: string;
+  disposition: BeadsRemovalDisposition;
+  /** Concrete replacement for retained behavior, or the reason for deletion. */
+  target: string;
+}
+
+export const BEADS_REMOVAL_NO_LOSS_MATRIX: BeadsRemovalMatrixEntry[] = [
+  { surface: 'bd ready / Beads ready query', disposition: 'RETAIN_AS_TASK', target: 'pan task next; getDispatchableItems()' },
+  { surface: 'pan beads claim', disposition: 'RETAIN_AS_TASK', target: 'pan task claim with ownership and transition guards' },
+  { surface: 'pan beads close', disposition: 'RETAIN_AS_TASK', target: 'pan task done, restricted to the claim owner' },
+  { surface: 'pan beads update --status blocked/in_progress/open', disposition: 'RETAIN_AS_TASK', target: 'pan task block/claim/unblock' },
+  { surface: 'bd update --claim atomic claim semantics', disposition: 'RETAIN_AS_TASK', target: 'Record fs-lock, task transition matrix, and owned claims' },
+  { surface: 'pan beads create/delete/dep', disposition: 'DELETE', target: 'Planning owns immutable checklist structure' },
+  { surface: 'pan beads sweep/compact/stats/upgrade/doctor/reconcile', disposition: 'DELETE', target: 'The Beads runtime store is removed' },
+  { surface: 'Per-bead commit/push invariant', disposition: 'RETAIN_AS_TASK', target: 'One pushed commit per vBRIEF item' },
+  { surface: 'Conditional per-bead inspection', disposition: 'RETAIN_AS_TASK', target: 'Item metadata and pan inspect --item' },
+  { surface: 'Work prompt task list', disposition: 'RETAIN_AS_TASK', target: 'Merged vBRIEF items and active slice' },
+  { surface: 'Crash recovery position', disposition: 'RETAIN_AS_TASK', target: 'Merged statuses, owned claims, record resume hazards, and stale-claim patrol' },
+  { surface: 'Start has-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Readable implementation-ready vBRIEF gate' },
+  { surface: 'pan done open-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Non-terminal vBRIEF item and acceptance-criteria gate' },
+  { surface: 'Idle open-beads nudge', disposition: 'RETAIN_AS_TASK', target: 'getDispatchableItems() result' },
+  { surface: 'Stuck-remediation ready-beads gate', disposition: 'RETAIN_AS_TASK', target: 'Merged-vBRIEF readiness' },
+  { surface: 'Orphaned completion all-beads-closed gate', disposition: 'RETAIN_AS_TASK', target: 'All vBRIEF checklist items terminal' },
+  { surface: 'Backlog/flywheel issuesWithBeads readiness', disposition: 'RETAIN_AS_TASK', target: 'Planned or implementation-ready spec presence' },
+  { surface: 'Dashboard /beads list', disposition: 'RETAIN_AS_TASK', target: '/tasks backed by the merged vBRIEF' },
+  { surface: 'Beads rail/tab/dialog/kanban', disposition: 'RETAIN_AS_TASK', target: 'Tasks UX backed by vBRIEF data' },
+  { surface: 'Beads rollup/freshness/sync services and events', disposition: 'DELETE', target: 'The local merged vBRIEF view needs no freshness layer' },
+  { surface: 'Resource hasBeads, beadTotals, beadsPath', disposition: 'RETAIN_AS_TASK', target: 'hasTasks and taskTotals; the path/source signal is deleted' },
+  { surface: 'Install/prerequisite bd checks', disposition: 'DELETE', target: 'The bd executable is no longer a prerequisite' },
+  { surface: 'Workspace .beads/redirect creation/copy', disposition: 'DELETE', target: 'The Beads canonical-home redirect is no longer used' },
+  { surface: 'State migration Beads cutover marker/layout checks', disposition: 'DELETE', target: 'The Beads state layout is no longer used' },
+  { surface: 'Teardown export, restore, auto-commit, remote sync', disposition: 'DELETE', target: 'There is no derived Beads state to synchronize' },
+  { surface: 'Beads skills, rules, and AGENTS template section', disposition: 'DELETE', target: 'The task loop moves to work-agent instructions' },
+  { surface: 'docs/BEADS.md and configuration/beads.mdx', disposition: 'DELETE', target: 'vBRIEF and task documentation replaces live Beads documentation' },
+  { surface: 'record.beadsMapping field', disposition: 'DELETE', target: 'New records omit it; readers tolerate the legacy field' },
 ];
