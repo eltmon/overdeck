@@ -92,10 +92,6 @@ let mockDiffNameOnlyStdout = '';
 
 const mockResolveProject = vi.fn();
 vi.mock('../../../../../src/lib/projects.js', () => ({
-  getProjectSync: vi.fn(() => ({ name: 'overdeck', path: '/fake/project' })),
-  listProjectsSync: vi.fn(() => [
-    { key: 'overdeck', config: { name: 'overdeck', path: '/fake/project', issue_prefix: 'PAN' } },
-  ]),
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProject(...args),
   resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProject(...args),
 }));
@@ -156,7 +152,7 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
-  listRunningAgentsSync: vi.fn().mockReturnValue([]),
+  listRunningAgentsSync: vi.fn().mockResolvedValue([]),
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: vi.fn().mockReturnValue(null),
   getAgentStateSync: vi.fn().mockReturnValue(null),

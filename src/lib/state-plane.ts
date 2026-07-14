@@ -32,7 +32,6 @@ export const STATE_PLANE_PATHS = [
   '.pan/test/',
   '.pan/review/',
   '.pan/feedback/',
-  '.tasks/',
 ] as const;
 
 export type StatePlanePath = typeof STATE_PLANE_PATHS[number];
