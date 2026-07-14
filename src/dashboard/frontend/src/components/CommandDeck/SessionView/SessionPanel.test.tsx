@@ -54,6 +54,12 @@ vi.mock('../RoundCard', () => ({
   ),
 }));
 
+vi.mock('./SessionResumeButton', () => ({
+  SessionResumeButton: ({ issueId }: { issueId: string }) => (
+    <div data-testid="session-resume-button">{issueId}</div>
+  ),
+}));
+
 function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
   return {
     type: 'work',
@@ -82,6 +88,11 @@ describe('SessionPanel', () => {
     render(<SessionPanel session={makeSession()} />);
     expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByText('Terminal')).toBeInTheDocument();
+  });
+
+  it('mounts the canonical resume action even when session status is stale-running', () => {
+    render(<SessionPanel issueId="MIN-865" session={makeSession({ status: 'running', presence: 'ended' })} />);
+    expect(screen.getByTestId('session-resume-button')).toHaveTextContent('MIN-865');
   });
 
   it('defaults to conversation view', () => {
