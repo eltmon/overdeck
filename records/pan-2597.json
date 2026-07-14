@@ -299,7 +299,7 @@
     "recordedAt": "2026-07-14T20:52:46.512Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T21:04:02.251Z",
+  "updated": "2026-07-14T21:09:11.390Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -309,9 +309,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T21:04:01.896Z",
+    "updatedAt": "2026-07-14T21:09:11.276Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (491423ms):\n\ns');\n       |        ^\n    227|\n    228|     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSyn…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[94/185]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > does not write a proposed spec when task materialization reports failure\nAssertionError: promise resolved \"{ proposed: { …(2) }, …(2) }\" instead of rejecting\n\n- Expected\n+ Received\n\n- Error {\n-   \"message\": \"rejected promise\",\n+ {\n+   \"beadCount\": 2,\n+   \"beadsWarning\": null,\n+   \"proposed\": {\n+     \"filename\": \"2026-07-14-PAN-1145-first-run-promotion.vbrief.json\",\n+     \"path\": \"/tmp/complete-planning-Wrf3S3/.pan/specs/2026-07-14-PAN-1145-first-run-promotion.vbrief.json\",\n+   },\n  }\n\n ❯ src/dashboard/server/routes/__tests__/complete-planning.test.ts:247:8\n    245|         taskIds: new Map(),\n    246|       }),\n    247|     })).rejects.toThrow('bd daemon unavailable');\n       |        ^\n    248|\n    249|     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSyn…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[95/185]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > does not write a proposed spec when task materialization reports failure\nAssertionError: promise resolved \"{ proposed: { …(2) }, …(2) }\" instead of rejecting\n\n- Expected\n+ Received\n\n- Error {\n-   \"message\": \"rejected promise\",\n+ {\n+   \"beadCount\": 2,\n+   \"beadsWarning\": null,\n+   \"proposed\": {\n+     \"filename\": \"2026-07-14-PAN-1145-first-run-promotion.vbrief.json\",\n+     \"path\": \"/tmp/complete-planning-0BCWo7/.pan/specs/2026-07-14-PAN-1145-first-run-promotion.vbrief.json\",\n+   },\n  }\n\n ❯ src/dashboard/server/routes/__tests__/complete-planning.test.ts:247:8\n    245|         taskIds: new Map(),\n    246|       }),\n    247|     })).rejects.toThrow('bd daemon unavailable');\n       |        ^\n    248|\n    249|     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSyn…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[96/185]⎯\n\n",
+    "verificationNotes": "Verification FAILED at test (433843ms):\n\n    |                                           ^\n     60|     expect(count).toBe(0);\n     61|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[91/181]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > stages workspace planning artifacts without force-adding .pan\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > stages workspace planning artifacts without force-adding .pan\nAssertionError: expected [ [ 'add', '.pan/' ], …(1) ] to deeply equal [ [ 'add', '.pan/' ], …(2) ]\n\n- Expected\n+ Received\n\n@@ -3,12 +3,8 @@\n      \"add\",\n      \".pan/\",\n    ],\n    [\n      \"add\",\n-     \".tasks/\",\n-   ],\n-   [\n-     \"add\",\n      \".gitignore\",\n    ],\n  ]\n\n ❯ src/dashboard/server/routes/__tests__/complete-planning.test.ts:142:22\n    140|\n    141|     const commands = completePlanningWorkspaceGitAddCommands(workspace…\n    142|     expect(commands).toEqual([\n       |                      ^\n    143|       ['add', '.pan/'],\n    144|       ['add', '.tasks/'],\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[92/181]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > promotes a first-run workspace draft and materializes one task per plan item\n FAIL  |root| src/dashboard/server/routes/__tests__/complete-planning.test.ts > completePlanningArtifacts > promotes a first-run workspace draft and materializes one task per plan item\nAssertionError: expected undefined to be 2 // Object.is equality\n\n- Expected:\n2\n\n+ Received:\nundefined\n\n ❯ src/dashboard/server/routes/__tests__/complete-planning.test.ts:203:30\n    201|     expect(result.proposed.filename).toMatch(/^\\d{4}-\\d{2}-\\d{2}-PAN-1…\n    202|     expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs…\n    203|     expect(result.taskCount).toBe(2);\n       |                              ^\n    204|\n    205|     const promoted = JSON.parse(readFileSync(result.proposed.path, 'ut…\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[93/181]⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
@@ -411,15 +411,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 18575361,
-            "output": 17326,
-            "cacheRead": 17515136,
+            "input": 18657369,
+            "output": 17462,
+            "cacheRead": 17594240,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 109149409,
-            "output": 277645,
-            "cacheRead": 105051904,
+            "input": 110630977,
+            "output": 279586,
+            "cacheRead": 106424192,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -456,15 +456,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 18575361,
-          "output": 17326,
-          "cacheRead": 17515136,
+          "input": 18657369,
+          "output": 17462,
+          "cacheRead": 17594240,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 109149409,
-          "output": 277645,
-          "cacheRead": 105051904,
+          "input": 110630977,
+          "output": 279586,
+          "cacheRead": 106424192,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -487,8 +487,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 144.89181,
-        "pricingAsOf": "2026-07-14T21:04:02.036Z"
+        "usd": 146.182584,
+        "pricingAsOf": "2026-07-14T21:09:11.352Z"
       }
     },
     "merges": [
