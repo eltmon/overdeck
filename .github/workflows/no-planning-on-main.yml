@@ -1,7 +1,7 @@
 # Reject any push to main that introduces .planning/ files.
 #
 # .planning/ is workspace-local scratch (STATE.md, feedback/, plan.vbrief.json,
-# beads, etc.) tracked on feature branches so the dashboard and agents can read
+# vBRIEF task state, etc.) tracked on feature branches so the dashboard and agents can read
 # it during the workspace lifecycle. It must NEVER land on main — when it does,
 # `pan sync-main` propagates one workspace's STATE.md into every other active
 # workspace, cross-contaminating their planning context (#888).

@@ -86,7 +86,7 @@ The implementation matches the spec and no constraints are violated.
 Be **SPECIFIC** about what's wrong. The agent needs actionable feedback, not vague concerns.
 
 **Bad:** "The implementation doesn't match the spec."
-**Good:** "KaiaRuntime.ts line 17 imports from contexts/ChatContext.tsx — the bead specifies building directly on ChatService.ts (services/ChatService.ts). This creates a dependency on the ChatProvider state machine that the PRD explicitly prohibits (Section 10.1: 'NO adapter wrapping ChatProvider's state into assistant-ui')."
+**Good:** "KaiaRuntime.ts line 17 imports from contexts/ChatContext.tsx — the task specifies building directly on ChatService.ts (services/ChatService.ts). This creates a dependency on the ChatProvider state machine that the PRD explicitly prohibits (Section 10.1: 'NO adapter wrapping ChatProvider's state into assistant-ui')."
 
 ## Signal Completion (CRITICAL)
 

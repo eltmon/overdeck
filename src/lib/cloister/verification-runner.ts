@@ -732,7 +732,7 @@ async function runVerificationForIssuePromise(
 
       const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with \`pan task close\` — the canonical writer publishes the close and AC statuses sync automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
+        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed task with \`pan task close\` — the canonical writer publishes the close and AC statuses sync automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
 
       try {
         const fileResult = await Effect.runPromise(writeFeedbackFile({
@@ -796,7 +796,7 @@ async function runVerificationForIssuePromise(
           }, logPrefix);
         }
       } catch (feedbackErr: any) {
-        console.error(`[${logPrefix}] Failed to write open-beads verification feedback for ${issueId}:`, feedbackErr);
+        console.error(`[${logPrefix}] Failed to write open-task verification feedback for ${issueId}:`, feedbackErr);
       }
 
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
@@ -804,7 +804,7 @@ async function runVerificationForIssuePromise(
 
     // PAN-2179: reject a plan-only / zombie changeset before it can reach
     // review/merge. A work agent that never got its kickoff (or did nothing)
-    // leaves a branch whose only changes are pipeline artifacts (.pan/vbrief/beads);
+    // leaves a branch whose only changes are pipeline artifacts (.pan/vBRIEF task state);
     // lint/test/build and the AC gate all pass trivially on no code, so without
     // this guard the empty "completion" silently advances. Bounce it back.
     try {
@@ -815,7 +815,7 @@ async function runVerificationForIssuePromise(
       if (changesetHasNoContent(changedOut.split('\n'))) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'empty-changeset';
-        const summary = `Branch has no implementation — only pipeline artifacts (.pan/vbrief/beads) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
+        const summary = `Branch has no implementation — only pipeline artifacts (.pan/vBRIEF task state) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
         setReviewStatusSync(issueId, {
           reviewStatus: 'pending',
           verificationStatus: 'failed',
@@ -829,7 +829,7 @@ async function runVerificationForIssuePromise(
         try {
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
-            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/vbrief/beads changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
+            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/vBRIEF task state changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
             changedBase,

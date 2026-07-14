@@ -172,7 +172,7 @@ describe('completePlanningArtifacts', () => {
     ]);
   });
 
-  it('promotes a first-run workspace draft and reports one bead per plan item', async () => {
+  it('promotes a first-run workspace draft and reports one vBRIEF task per plan item', async () => {
     const issueId = 'PAN-1143';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -188,7 +188,7 @@ describe('completePlanningArtifacts', () => {
     expect(specFiles).toEqual([result.proposed.filename]);
     expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.vbrief\.json$/);
     expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs', result.proposed.filename));
-    expect(result.beadCount).toBe(2);
+    expect(result.taskCount).toBe(2);
 
     const promoted = JSON.parse(readFileSync(result.proposed.path, 'utf-8'));
     expect(promoted.status).toBe('proposed');

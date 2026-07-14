@@ -5,7 +5,7 @@ description: >
   launching the interactive planning agent. Use when the work is well-understood
   and the agent can author the plan from the issue body and codebase alone.
   Also use when you ARE the work agent and need to self-plan before implementing.
-  Covers the full xBRIEF v0.8 schema, continue.json format, bead sizing rules,
+  Covers the full xBRIEF v0.8 schema, continue.json format, task sizing rules,
   inspection gates, and the `pan plan finalize` handoff command.
 triggers:
   - write vbrief
@@ -197,9 +197,9 @@ This atomically:
 
 ---
 
-## Bead sizing rules
+## Task sizing rules
 
-Default to **many small vBRIEF tasks** over a few large ones. A well-sized bead:
+Default to **many small vBRIEF tasks** over a few large ones. A well-sized task:
 
 - Has one focused change (if you need "and" in the title, it's two vBRIEF tasks)
 - Is independently reviewable from its diff alone
@@ -207,11 +207,11 @@ Default to **many small vBRIEF tasks** over a few large ones. A well-sized bead:
 - Has a testable acceptance criterion
 
 **Heuristics:**
-- One renamed command = one bead
-- One moved file = one bead (unless mechanically identical batch → sub-items under one bead)
-- One new API endpoint = one bead
-- One schema migration = one bead
-- One doc update = one bead (or one per logical cluster, not "update all docs")
+- One renamed command = one task
+- One moved file = one task (unless mechanically identical batch → sub-items under one task)
+- One new API endpoint = one task
+- One schema migration = one task
+- One doc update = one task (or one per logical cluster, not "update all docs")
 
 When in doubt, split. Too-small vBRIEF tasks: mild overhead. Too-large vBRIEF tasks: reviewers can't reason about them, agents deliver partial results, and the inspection gate can't verify mid-implementation.
 
@@ -237,7 +237,7 @@ Edge types: `blocks` (hard), `informs` (soft/advisory), `invalidates`, `suggests
 
 Set `requiresInspection: true` **only** when a wrong implementation would cascade into downstream vBRIEF tasks before the verification gate catches it:
 
-- **Foundation for downstream vBRIEF tasks** — subsequent vBRIEF tasks depend on this bead's interfaces, types, or module boundaries
+- **Foundation for downstream vBRIEF tasks** — subsequent vBRIEF tasks depend on this task's interfaces, types, or module boundaries
 - **Architectural decision crystallizing in code** — naming a public API, choosing a library boundary, picking an event shape
 - **Spec ambiguity risk** — the description is broad enough that two very different diffs could both look "done"
 - **Security/auth surface** — defects here propagate into later vBRIEF tasks assuming the security posture
@@ -245,11 +245,11 @@ Set `requiresInspection: true` **only** when a wrong implementation would cascad
 
 Set `requiresInspection: false` for:
 - Mechanical changes (flag flip, rename, single-file tweak)
-- Leaf vBRIEF tasks (no downstream bead depends on their internals)
+- Leaf vBRIEF tasks (no downstream task depends on their internals)
 - Tests, docs, comment-only updates
 - Wrongs that surface immediately at typecheck/lint
 
-When `requiresInspection: true`, you **must** also set `metadata.foundationFor: ["<bead-id>", ...]` listing the downstream vBRIEF tasks that would need to be redone if this one were wrong. An empty `foundationFor` on an inspection bead is a planning error — flip it back to `false`.
+When `requiresInspection: true`, you **must** also set `metadata.foundationFor: ["<task-id>", ...]` listing the downstream vBRIEF tasks that would need to be redone if this one were wrong. An empty `foundationFor` on an inspection task is a planning error — flip it back to `false`.
 
 Most plans have 0–2 inspection vBRIEF tasks. More than 3 suggests the vBRIEF tasks are too large.
 

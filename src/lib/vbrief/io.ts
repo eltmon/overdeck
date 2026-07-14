@@ -326,7 +326,7 @@ export function recordTierPromotion(
  * PAN-2401: overlay the per-issue record's statusOverrides onto an
  * already-loaded plan document. The single overlay door for read paths that
  * resolve the spec themselves (e.g. the /plan API route) — without this, a
- * merged bead reads 'pending' forever in every display.
+ * merged task reads 'pending' forever in every display.
  */
 export function mergeRecordStatusOverrides(doc: VBriefDocument, workspacePath: string): VBriefDocument {
   const overrides = readStatusOverridesSync(workspacePath);
@@ -369,7 +369,7 @@ export function isPlanningProposed(workspacePath: string, planningDir?: string):
 
 
 /**
- * Check whether planning has finished for this workspace — i.e., beads have
+ * Check whether planning has finished for this workspace — i.e., tasks have
  * been generated and the agent can (or already did) start work.
  *
  * Returns true when `plan.status` is any of: 'proposed', 'approved', 'pending',

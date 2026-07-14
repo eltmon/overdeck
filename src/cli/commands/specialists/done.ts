@@ -160,7 +160,7 @@ export async function doneCommand(
       if (options.notes) update.inspectNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Inspection passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent can proceed to next bead'));
+        console.log(chalk.dim('  Agent can proceed to the next vBRIEF task'));
       } else {
         console.log(chalk.yellow(`✗ Inspection blocked for ${normalizedIssueId}`));
         console.log(chalk.dim('  Agent must fix issues and re-request inspection'));
