@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   addOverdeckHookIfMissing,
@@ -10,6 +10,17 @@ import {
   setupHooksCommand,
   type ClaudeSettings,
 } from '../setup/hooks.js';
+
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFileSync: vi.fn((command: string, args?: readonly string[], options?: unknown) => {
+      if (command === 'jq') return Buffer.from('jq-1.7');
+      return actual.execFileSync(command, args, options as never);
+    }),
+  };
+});
 
 describe('setup hooks', () => {
   const originalHome = process.env.HOME;

@@ -165,11 +165,7 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           });
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
-            // ready = spec AND beads exist in the workspace
-            if (issuesWithSpecs.has(id) &&
-                existsSync(join(workspacesDir, `feature-${id.toLowerCase()}`, '.beads', 'issues.jsonl'))) {
-              return true;
-            }
+            if (issuesWithSpecs.has(id)) return true;
             return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
           };
           const isInPipeline = (issueId: string): boolean =>

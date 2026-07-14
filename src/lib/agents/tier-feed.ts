@@ -31,10 +31,10 @@ export interface BroadcastCommitOptions {
   /** The landed commit to broadcast. */
   sha: string;
   /** Title of the bead the commit implements, shown in the feed header. */
-  beadTitle: string;
+  itemTitle: string;
   /** Id of the bead the commit implements, required for call-out corroboration. */
-  beadId?: string;
-  /** Commit subject used by feed.exclude_subjects. Defaults to beadTitle for legacy callers. */
+  itemId?: string;
+  /** Commit subject used by feed.exclude_subjects. Defaults to itemTitle for legacy callers. */
   commitSubject?: string;
   /** The standing tier agents to deliver to — every one of them hears it. */
   tiers: Array<Pick<StandingTierAgent, 'tierName' | 'agentId'>>;
@@ -69,7 +69,7 @@ export interface RenderCommitFeedDiffDeps {
 export interface CommitFeedCalloutContext {
   apiUrl: string;
   issueId: string;
-  beadId: string;
+  itemId: string;
   tierName: string;
   agentId: string;
 }
@@ -121,18 +121,18 @@ export function resolveFeedApiUrl(env: NodeJS.ProcessEnv = process.env): string 
 
 /**
  * Compose the ingestion-only feed message for one commit. Deterministic over
- * (sha, beadTitle, diff) so replay reconstructs byte-identical messages.
+ * (sha, itemTitle, diff) so replay reconstructs byte-identical messages.
  */
 export function composeCommitFeedMessage(
   sha: string,
-  beadTitle: string,
+  itemTitle: string,
   diff: string,
   callout?: CommitFeedCalloutContext,
 ): string {
   const lines = [
     `# Commit feed (ingestion-only): ${sha}`,
     '',
-    `Bead: ${beadTitle}`,
+    `Bead: ${itemTitle}`,
     '',
   ];
 
@@ -140,7 +140,7 @@ export function composeCommitFeedMessage(
     const body = JSON.stringify({
       issueId: callout.issueId,
       sha,
-      beadId: callout.beadId,
+      itemId: callout.itemId,
       tierName: callout.tierName,
       agentId: callout.agentId,
       claim: '<one sentence: what is wrong and where>',
@@ -180,7 +180,7 @@ export function composeCommitFeedMessage(
  */
 export async function broadcastCommit(options: BroadcastCommitOptions): Promise<BroadcastDelivery[]> {
   const feedConfig = options.feedConfig ?? DEFAULT_FEED_CONFIG;
-  const subject = options.commitSubject ?? options.beadTitle;
+  const subject = options.commitSubject ?? options.itemTitle;
   if (shouldSkipFeedSubject(subject, feedConfig)) return [];
 
   const renderDiff = options.renderDiff
@@ -192,18 +192,18 @@ export async function broadcastCommit(options: BroadcastCommitOptions): Promise<
   const now = options.now ?? (() => new Date());
 
   const diff = await renderDiff(options.workspace, options.sha, feedConfig);
-  const baseMessage = composeCommitFeedMessage(options.sha, options.beadTitle, diff);
+  const baseMessage = composeCommitFeedMessage(options.sha, options.itemTitle, diff);
   const baseTokenCount = estimateFeedDeliveryTokens(baseMessage);
-  const includeCallout = feedConfig.callouts !== 'off' && options.issueId !== undefined && options.beadId !== undefined;
+  const includeCallout = feedConfig.callouts !== 'off' && options.issueId !== undefined && options.itemId !== undefined;
   const apiUrl = options.apiUrl ?? resolveFeedApiUrl();
 
   const deliveries: BroadcastDelivery[] = [];
   for (const tier of options.tiers) {
     const message = includeCallout
-      ? composeCommitFeedMessage(options.sha, options.beadTitle, diff, {
+      ? composeCommitFeedMessage(options.sha, options.itemTitle, diff, {
         apiUrl,
         issueId: options.issueId!,
-        beadId: options.beadId!,
+        itemId: options.itemId!,
         tierName: tier.tierName,
         agentId: tier.agentId,
       })
@@ -223,7 +223,7 @@ export async function broadcastCommit(options: BroadcastCommitOptions): Promise<
       ts: now().toISOString(),
       issueId: options.issueId,
       sha: options.sha,
-      beadTitle: options.beadTitle,
+      itemTitle: options.itemTitle,
       tierName: tier.tierName,
       agentId: tier.agentId,
       tokenCount,

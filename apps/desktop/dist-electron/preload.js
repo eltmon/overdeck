@@ -23,7 +23,11 @@ const IPC = {
 	GET_DESKTOP_SETTINGS: "pan:get-desktop-settings",
 	UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
 	NOTIFY: "pan:notify",
-	RESTART_DASHBOARD: "pan:restart-dashboard"
+	RESTART_DASHBOARD: "pan:restart-dashboard",
+	GET_UPDATE_STATUS: "pan:get-update-status",
+	CHECK_FOR_UPDATES: "pan:check-for-updates",
+	DOWNLOAD_UPDATE: "pan:download-update",
+	QUIT_AND_INSTALL: "pan:quit-and-install"
 };
 electron.contextBridge.exposeInMainWorld("overdeckBridge", {
 	isDesktopApp: () => true,
@@ -53,7 +57,18 @@ electron.contextBridge.exposeInMainWorld("overdeckBridge", {
 	getDesktopSettings: () => electron.ipcRenderer.invoke(IPC.GET_DESKTOP_SETTINGS),
 	updateDesktopSetting: (key, value) => electron.ipcRenderer.invoke(IPC.UPDATE_DESKTOP_SETTING, key, value),
 	notify: (eventType, title, body) => electron.ipcRenderer.invoke(IPC.NOTIFY, eventType, title, body),
-	restartDashboard: () => electron.ipcRenderer.invoke(IPC.RESTART_DASHBOARD)
+	restartDashboard: () => electron.ipcRenderer.invoke(IPC.RESTART_DASHBOARD),
+	getUpdateStatus: () => electron.ipcRenderer.invoke(IPC.GET_UPDATE_STATUS),
+	checkForUpdates: () => electron.ipcRenderer.invoke(IPC.CHECK_FOR_UPDATES),
+	downloadUpdate: () => electron.ipcRenderer.invoke(IPC.DOWNLOAD_UPDATE),
+	quitAndInstall: () => {
+		electron.ipcRenderer.send(IPC.QUIT_AND_INSTALL);
+	},
+	onUpdateStatus: (listener) => {
+		const wrapped = (_event, status) => listener(status);
+		electron.ipcRenderer.on("update-status", wrapped);
+		return () => electron.ipcRenderer.removeListener("update-status", wrapped);
+	}
 });
 //#endregion
 

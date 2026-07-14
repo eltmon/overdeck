@@ -33,6 +33,19 @@ export const SystemHeartbeatEvent = Schema.Struct({
 })
 export type SystemHeartbeatEvent = typeof SystemHeartbeatEvent.Type
 
+/** The canonical local Dolt head advanced after a background remote pull. */
+export const BeadsFreshnessChangedEvent = Schema.Struct({
+  type: Schema.Literal("beads.freshness_changed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    projectKey: Schema.String,
+    localHead: Schema.String,
+    lastSyncedAt: Schema.String,
+  }),
+})
+export type BeadsFreshnessChangedEvent = typeof BeadsFreshnessChangedEvent.Type
+
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
 /** Replaces socket.io `agents:changed` (event: 'started') */
@@ -189,6 +202,12 @@ export const AgentEnrichmentChangedEvent = Schema.Struct({
           description: Schema.optional(Schema.String),
         })),
       })),
+    })),
+    // PAN-1520 (FR-1) — pending ExitPlanMode plan payload for the approval modal.
+    pendingProposedPlan: Schema.optional(Schema.Struct({
+      toolUseId: Schema.String,
+      askedAt: Schema.String,
+      plan: Schema.String,
     })),
     resolution: Schema.optional(AgentResolution),
     resolutionCount: Schema.optional(Schema.Number),
@@ -1155,6 +1174,7 @@ export type EmbedProgressEvent = typeof EmbedProgressEvent.Type
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
 export const DomainEvent = Schema.Union([
   SystemHeartbeatEvent,
+  BeadsFreshnessChangedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,

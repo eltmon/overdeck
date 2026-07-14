@@ -20,7 +20,7 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   'Restart agent': 'restartAgent',
   'Restart from plan': 'restartFromPlan',
   'Reset issue': 'resetIssue',
-  Beads: 'beads',
+  Tasks: 'tasks',
   Transcripts: 'transcripts',
   Discussions: 'discussions',
   Upload: 'upload',
@@ -30,7 +30,7 @@ const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
   'Status review': 'statusReview',
   'Copy settings': 'copySettings',
   Open: 'open',
-  'Inspect bead': 'inspectBead',
+  'Inspect task': 'inspectTask',
   Untroubled: 'untroubled',
 };
 

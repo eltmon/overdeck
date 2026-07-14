@@ -3,10 +3,9 @@ import { Effect } from 'effect';
 import { execSync } from 'child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
-import { rmSync as unlink } from 'fs';
+import { dirname, join } from 'path';
 import { vi } from 'vitest';
-import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, queueBeadsAutoCommit } from '../auto-commit.js';
+import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
 
 function exec(root: string, command: string): string {
   return execSync(command, { cwd: root, encoding: 'utf-8' }).trim();
@@ -104,24 +103,21 @@ describe('auto-commit', () => {
     }),
   );
 
-  it('flushes at the first queue window instead of resetting on later writes', async () => {
+  it('flushes queued state on the next timer turn by default', async () => {
     vi.useFakeTimers();
     try {
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
       const p1 = join(tmp, '.pan', 'continues', 'pan-2375-a.vbrief.json');
-      const p2 = join(tmp, '.pan', 'continues', 'pan-2375-b.vbrief.json');
       writeFileSync(p1, '{"issue":"PAN-2375-A"}');
-      writeFileSync(p2, '{"issue":"PAN-2375-B"}');
 
-      queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): first window write' });
-      await vi.advanceTimersByTimeAsync(9 * 60 * 1_000);
-      queueAutoCommit({ projectRoot: tmp, paths: [p2], subject: 'chore(state): second window write' });
-      await vi.advanceTimersByTimeAsync(60 * 1_000);
+      queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): immediate write-through' });
+      expect(execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' })).not.toContain('immediate write-through');
+      await vi.advanceTimersByTimeAsync(0);
       vi.useRealTimers();
 
       for (let attempt = 0; attempt < 20; attempt += 1) {
         const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
-        if (log.includes('chore(state): batch update 2 pan/beads file(s)')) {
+        if (log.includes('chore(state): immediate write-through')) {
           expect(log.split('\n').filter(Boolean).length).toBe(2);
           return;
         }
@@ -129,7 +125,7 @@ describe('auto-commit', () => {
       }
 
       const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
-      expect(log).toContain('chore(state): batch update 2 pan/beads file(s)');
+      expect(log).toContain('chore(state): immediate write-through');
     } finally {
       vi.useRealTimers();
     }
@@ -354,29 +350,22 @@ describe('auto-commit', () => {
     }),
   );
 
-  it.effect('skips push when OVERDECK_STATE_AUTOPUSH is disabled', () =>
+  it.effect('always pushes when origin is configured', () =>
     Effect.gen(function* () {
       const remoteTmp = setBareOrigin(tmp);
-      const previous = process.env.OVERDECK_STATE_AUTOPUSH;
       try {
-        process.env.OVERDECK_STATE_AUTOPUSH = '0';
         mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
         const path = join(tmp, '.pan', 'records', 'pan-2375.json');
         writeFileSync(path, '{"issue":"PAN-2375"}');
         const beforeRemote = exec(tmp, 'git rev-parse origin/main');
 
-        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): local only' });
+        queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): automatic push' });
         const result = yield* flushAutoCommits(tmp);
 
-        expect(result.committed).toBe(true);
-        expect(exec(tmp, 'git rev-parse origin/main')).toBe(beforeRemote);
-        expect(exec(tmp, 'git rev-parse HEAD')).not.toBe(beforeRemote);
+        expect(result).toEqual({ committed: true, pushed: true });
+        expect(exec(tmp, 'git rev-parse origin/main')).not.toBe(beforeRemote);
+        expect(exec(tmp, 'git rev-parse HEAD')).toBe(exec(tmp, 'git rev-parse origin/main'));
       } finally {
-        if (previous === undefined) {
-          delete process.env.OVERDECK_STATE_AUTOPUSH;
-        } else {
-          process.env.OVERDECK_STATE_AUTOPUSH = previous;
-        }
         rmSync(remoteTmp, { recursive: true, force: true });
       }
     }),
@@ -395,7 +384,8 @@ describe('auto-commit', () => {
         queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): push failure' });
         const result = yield* flushAutoCommits(tmp);
 
-        expect(result.committed).toBe(true);
+        expect(result).toMatchObject({ committed: true, pushed: false });
+        expect(result.reason).toContain('push failed');
         expect(warn.mock.calls.some((call) => String(call[0]).includes('push failed'))).toBe(true);
       } finally {
         warn.mockRestore();
@@ -499,7 +489,7 @@ describe('auto-commit', () => {
         writeFileSync(path, '{}\n');
 
         queueAutoCommit({ projectRoot: tmp, repoRoot: stateTmp, paths: [path], subject: 'chore(state): state branch' });
-        expect(yield* flushAutoCommits(tmp)).toEqual({ committed: true });
+        expect(yield* flushAutoCommits(tmp)).toEqual({ committed: true, pushed: true });
         expect(exec(stateTmp, 'git branch --show-current')).toBe('overdeck-state');
 
         execSync('git branch -M wrong-state', { cwd: stateTmp });
@@ -551,7 +541,10 @@ describe('auto-commit', () => {
         queueAutoCommit({ projectRoot: otherTmp, paths: [secondPath], subject: 'chore(state): second root' });
 
         const results = yield* flushAllPendingAutoCommits();
-        expect(results).toEqual([{ committed: true }, { committed: true }]);
+        expect(results).toEqual([
+          { committed: true, pushed: true },
+          { committed: true, pushed: true },
+        ]);
 
         const firstLog = execSync('git log --oneline -1', { cwd: tmp, encoding: 'utf-8' });
         const secondLog = execSync('git log --oneline -1', { cwd: otherTmp, encoding: 'utf-8' });
@@ -562,80 +555,31 @@ describe('auto-commit', () => {
       }
     }),
   );
-});
 
-describe('queueBeadsAutoCommit (PAN-1441)', () => {
-  let tmp: string;
-
-  beforeEach(() => {
-    tmp = mkdtempSync(join(tmpdir(), 'pan-beads-autocommit-'));
-    execSync('git init -q', { cwd: tmp });
-    execSync('git config user.email t@e.t', { cwd: tmp });
-    execSync('git config user.name "Test"', { cwd: tmp });
-    execSync('git config commit.gpgsign false', { cwd: tmp });
-    writeFileSync(join(tmp, 'README.md'), 'seed');
-    execSync('git add README.md', { cwd: tmp });
-    execSync('git commit -q -m "init"', { cwd: tmp });
-    execSync('git branch -M main', { cwd: tmp });
-    execSync('git remote add origin .', { cwd: tmp });
-  });
-
-  afterEach(() => {
-    rmSync(tmp, { recursive: true, force: true });
-  });
-
-  it.effect('commits drifted beads export files on main', () =>
+  it.effect('reconciles only pending spec and record drift from the primary worktree', () =>
     Effect.gen(function* () {
-      mkdirSync(join(tmp, '.beads'), { recursive: true });
-      writeFileSync(join(tmp, '.beads', 'issues.jsonl'), '{"id":"PAN-1"}\n');
-      writeFileSync(join(tmp, '.beads', 'export-state.json'), '{"issues":1}');
+      const spec = join(tmp, '.pan', 'specs', 'PAN-2516.vbrief.json');
+      const record = join(tmp, '.pan', 'records', 'pan-2516.json');
+      const source = join(tmp, 'src', 'operator-change.ts');
+      mkdirSync(dirname(spec), { recursive: true });
+      mkdirSync(dirname(record), { recursive: true });
+      mkdirSync(dirname(source), { recursive: true });
+      writeFileSync(spec, '{"status":"completed"}\n');
+      writeFileSync(record, '{"issueId":"PAN-2516"}\n');
+      writeFileSync(source, 'leave me alone\n');
 
-      queueBeadsAutoCommit(tmp);
-      const result = yield* flushAutoCommits(tmp);
-
+      const result = yield* reconcileStatePlaneDrift(tmp);
       expect(result.committed).toBe(true);
-      const show = execSync('git show --stat --oneline HEAD', { cwd: tmp, encoding: 'utf-8' });
-      expect(show).toContain('chore(beads): sync beads state on main');
-      expect(show).toContain('.beads/issues.jsonl');
-      expect(show).toContain('.beads/export-state.json');
-    }),
-  );
-
-  it.effect('skips a deleted issues.jsonl so it never propagates an empty-DB deletion (PAN-1158)', () =>
-    Effect.gen(function* () {
-      mkdirSync(join(tmp, '.beads'), { recursive: true });
-      writeFileSync(join(tmp, '.beads', 'issues.jsonl'), '{"id":"PAN-1"}\n');
-      writeFileSync(join(tmp, '.beads', 'export-state.json'), '{"issues":1}');
-      execSync('git add .beads/', { cwd: tmp });
-      execSync('git commit -q -m "seed beads"', { cwd: tmp });
-
-      // issues.jsonl transiently disappears; export-state changes.
-      unlink(join(tmp, '.beads', 'issues.jsonl'), { force: true });
-      writeFileSync(join(tmp, '.beads', 'export-state.json'), '{"issues":0}');
-
-      queueBeadsAutoCommit(tmp);
-      const result = yield* flushAutoCommits(tmp);
-
-      expect(result.committed).toBe(true);
-      // The commit touched export-state only; the issues.jsonl deletion was NOT staged.
-      const show = execSync('git show --stat --oneline HEAD', { cwd: tmp, encoding: 'utf-8' });
-      expect(show).toContain('.beads/export-state.json');
-      expect(show).not.toContain('.beads/issues.jsonl');
-      // issues.jsonl is still tracked at HEAD (deletion not propagated).
-      const tracked = execSync('git ls-files .beads/issues.jsonl', { cwd: tmp, encoding: 'utf-8' });
-      expect(tracked.trim()).toBe('.beads/issues.jsonl');
-    }),
-  );
-
-  it.effect('no-ops when no beads files exist', () =>
-    Effect.gen(function* () {
-      queueBeadsAutoCommit(tmp);
-      const result = yield* flushAutoCommits(tmp);
-      expect(result.committed).toBe(false);
-      expect(result.reason).toBe('no pending');
+      const committed = execSync('git show --name-only --format= HEAD', { cwd: tmp, encoding: 'utf-8' });
+      expect(committed).toContain('.pan/specs/PAN-2516.vbrief.json');
+      expect(committed).toContain('.pan/records/pan-2516.json');
+      expect(committed).not.toContain('src/operator-change.ts');
+      expect(execSync('git status --short -- .pan/specs .pan/records', { cwd: tmp, encoding: 'utf-8' })).toBe('');
+      expect(execSync('git status --short -- src/operator-change.ts', { cwd: tmp, encoding: 'utf-8' })).toContain('??');
     }),
   );
 });
+
 
 describe('deriveProjectRoot', () => {
   it('extracts project root from a .pan/specs/ path', () => {
@@ -646,9 +590,6 @@ describe('deriveProjectRoot', () => {
     expect(deriveProjectRoot('/work/myproj/.pan/continues/pan-1.vbrief.json')).toBe('/work/myproj');
   });
 
-  it('extracts project root from a .beads/ path', () => {
-    expect(deriveProjectRoot('/work/myproj/.beads/issues.jsonl')).toBe('/work/myproj');
-  });
 
   it('returns null for unrelated paths', () => {
     expect(deriveProjectRoot('/work/myproj/src/lib/foo.ts')).toBeNull();

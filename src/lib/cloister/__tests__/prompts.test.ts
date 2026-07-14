@@ -180,15 +180,15 @@ requires:
 name: scratch
 description: section context
 optional:
-  - BEADS
+  - TASKS
 ---
-{{#BEADS}}Beads:
-{{BEADS}}{{/BEADS}}`
+{{#TASKS}}Tasks:
+{{TASKS}}{{/TASKS}}`
         );
-        const out = yield* renderPrompt({ name: SCRATCH, vars: { BEADS: '- bead-1\n- bead-2' } });
-        expect(out).toContain('Beads:');
-        expect(out).toContain('- bead-1');
-        expect(out).toContain('- bead-2');
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { TASKS: '- task-1\n- task-2' } });
+        expect(out).toContain('Tasks:');
+        expect(out).toContain('- task-1');
+        expect(out).toContain('- task-2');
       })
     );
 
@@ -199,13 +199,13 @@ optional:
 name: scratch
 description: empty section
 optional:
-  - BEADS
+  - TASKS
 ---
 before
-{{#BEADS}}should not appear{{/BEADS}}
+{{#TASKS}}should not appear{{/TASKS}}
 after`
         );
-        const out = yield* renderPrompt({ name: SCRATCH, vars: { BEADS: '' } });
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { TASKS: '' } });
         expect(out).not.toContain('should not appear');
         expect(out).toContain('before');
         expect(out).toContain('after');
@@ -219,9 +219,9 @@ after`
 name: scratch
 description: undefined section
 optional:
-  - BEADS
+  - TASKS
 ---
-{{#BEADS}}hidden{{/BEADS}}done`
+{{#TASKS}}hidden{{/TASKS}}done`
         );
         const out = yield* renderPrompt({ name: SCRATCH, vars: {} });
         expect(out).toBe('done');
@@ -397,7 +397,7 @@ optional:
       Effect.gen(function* () {
         const baseVars = {
           ISSUE_ID: 'PAN-611',
-          INSTRUCTIONS_BLOCK: 'Continue the bead.',
+          INSTRUCTIONS_BLOCK: 'Continue the task.',
         };
         const enabled = yield* renderPrompt({
           name: 'resume-work',
@@ -501,7 +501,6 @@ optional:
             LOCAL: true,
             REMOTE: false,
             PROJECT_ROOT: '/project',
-            BEADS_TASKS: '',
             STITCH_DESIGNS: '',
             POLYREPO_CONTEXT: '',
             PENDING_FEEDBACK: '',
@@ -516,7 +515,7 @@ optional:
       })
     );
 
-    it.effect('renders per-bead push instruction only in REMOTE work prompt', () =>
+    it.effect('renders per-task push instruction for local and remote work prompts', () =>
       Effect.gen(function* () {
         const baseVars = {
           ISSUE_ID: 'PAN-611',
@@ -524,7 +523,6 @@ optional:
           BRANCH_NAME: 'feature/pan-611',
           WORKSPACE_PATH: '/workspace',
           PROJECT_ROOT: '/project',
-          BEADS_TASKS: '',
           STITCH_DESIGNS: '',
           POLYREPO_CONTEXT: '',
           PENDING_FEEDBACK: '',
@@ -540,11 +538,12 @@ optional:
           vars: { ...baseVars, LOCAL: true, REMOTE: false },
         });
 
-        expect(remote).toContain('push the feature branch to origin after every bead commit');
-        expect(remote).toContain('git push origin $(git branch --show-current)');
+        expect(remote).toContain('Every completed');
+        expect(remote).toContain('git push -u origin "$(git branch --show-current)"');
         expect(remote).toContain('REMOTE_DONE');
-        expect(local).not.toContain('push the feature branch to origin after every bead commit');
-        expect(local).not.toContain('### Remote durability');
+        expect(local).toContain('Every completed');
+        expect(local).toContain('git push -u origin "$(git branch --show-current)"');
+        expect(local).not.toContain('REMOTE_DONE');
       })
     );
   });

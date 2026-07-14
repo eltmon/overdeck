@@ -77,18 +77,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
           }
         }
 
+        // issuesWithTasks precomputed above in generator scope.
         const workspacesDir = join(projectRoot, 'workspaces');
-        const issuesWithBeads = new Set<string>();
-        if (existsSync(workspacesDir)) {
-          for (const dir of readdirSync(workspacesDir)) {
-            const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
-            if (match) {
-              if (existsSync(join(workspacesDir, dir, '.beads', 'issues.jsonl'))) {
-                issuesWithBeads.add(match[1]!.toUpperCase());
-              }
-            }
-          }
-        }
 
         // Join issue titles from the in-memory read-model issue service so the
         // detail panel can show the title (the sequence cache stores only the id).
@@ -106,6 +96,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
 
         // Per-issue pipeline state from the shared classifier (single source of truth)
         // so the editor drawer can read/toggle ready / parked / vetoed / blocks-main.
+        // issuesWithTasks passed in: without it the lookup builder blocks the
+        // event loop with per-workspace process calls.
         const lookups = buildClassifyLookups(projectRoot);
 
         const nodes = cachedNodes.map((r) => {
@@ -115,7 +107,7 @@ const getBacklogSequenceRoute = HttpRouter.add(
             (reviewStatus !== null && reviewStatus.reviewStatus !== 'pending') ||
             existsSync(join(workspacesDir, `feature-${r.issueId.toLowerCase()}`));
           const hasPrd = prdFiles.has(issueUpper);
-          const ready = specIssues.has(issueUpper) && issuesWithBeads.has(issueUpper);
+          const ready = specIssues.has(issueUpper);
           const state = classifyIssue({ issue: r.issueId, gate: r.gate } as unknown as Parameters<typeof classifyIssue>[0], lookups);
           return {
             issueId: r.issueId,

@@ -1,7 +1,7 @@
 /**
  * Lifecycle workflows — Compose atomic operations into complete workflows.
  *
- * approve()  — Post-merge: archive + close + teardown + compact-beads
+ * approve()  — Post-merge: archive + close + teardown
  * close()    — Simple close: close-issue + teardown
  * closeOut() — Full ceremony: verify-merged + archive + teardown + close + label + clear-status
  * deepWipe() — Destructive: teardown(deleteBranches) + delete agent state + reset issue
@@ -26,7 +26,6 @@ import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
-import { compactBeads } from './compact-beads.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
@@ -95,12 +94,6 @@ export function approve(
     // 3. Teardown workspace (delete branches — merge is complete)
     const teardownSteps = yield* teardownWorkspace(ctx, { deleteBranches: true });
     allSteps.push(...teardownSteps);
-
-    // 4. Compact beads (non-blocking — failure doesn't affect workflow success)
-    if (!opts.skipBeadsCompaction) {
-      const beadsResult = yield* compactBeads(ctx);
-      allSteps.push(beadsResult);
-    }
 
     // 5. Clear review status
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);
@@ -190,7 +183,7 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start);
     }
 
-    // 4+5. Teardown workspace + agent state
+    // 5+6. Teardown workspace + agent state
     const closeOutConfig = (yield* Effect.promise(() => Effect.runPromise(loadCloisterConfig()))).close_out;
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace: closeOutConfig?.remove_workspace ?? false,
@@ -299,7 +292,6 @@ function destructiveResetWorkflow(
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace,
       deleteBranches,
-      clearBeads: true,
       workspaceConfig: opts.workspaceConfig,
       projectName: opts.projectName,
     });
@@ -633,7 +625,7 @@ async function verifySquashMergedPrByBranch(
     }
 
     // PAN-2406 / state-plane policy rule 3: commits after the merged head that
-    // touch ONLY state-plane paths (.pan/, .beads/) are pipeline exhaust —
+    // touch ONLY legacy state-plane paths under .pan/ are pipeline exhaust —
     // e.g. 'chore: record merge status' — and must not block close-out.
     try {
       const { stdout: deltaRaw } = await execAsync(
@@ -642,7 +634,7 @@ async function verifySquashMergedPrByBranch(
       );
       let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
       let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
-        f.startsWith('.pan/') || f.startsWith('.beads/'));
+        f.startsWith('.pan/'));
       if (!statePlaneOnly) {
         // Branch may have merged main INTO itself after the PR merged — the
         // two-dot delta then contains main's own files. Judge only changes
@@ -654,12 +646,12 @@ async function verifySquashMergedPrByBranch(
         );
         deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
         statePlaneOnly = deltaFiles.every((f) =>
-          f.startsWith('.pan/') || f.startsWith('.beads/'));
+          f.startsWith('.pan/'));
       }
       if (statePlaneOnly) {
         const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
         return stepOk(step, [
-          `${prLabel} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan/.beads) — accepted per state-plane policy`,
+          `${prLabel} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan) — accepted per state-plane policy`,
         ]);
       }
     } catch { /* diff failure falls through to the strict rejection below */ }

@@ -15,18 +15,18 @@ import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
 import type { ContinueState } from '../vbrief/continue-state.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
-import { withBdMutex } from '../bd-mutex.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 
 const execAsync = promisify(exec);
 
 /**
  * Beads task snapshot for handoff
  */
-export interface BeadsTask {
+export interface HandoffTask {
   id: string;
   title: string;
   description?: string;
-  status: 'open' | 'in_progress' | 'closed';
+  status: string;
   priority: number;
   labels?: string[];
   complexity?: ComplexityLevel;
@@ -56,10 +56,10 @@ export interface HandoffContext {
   uncommittedFiles?: string[];
   lastCommit?: string;
 
-  // Beads state
-  activeBeadsTasks?: BeadsTask[];
-  remainingTasks?: BeadsTask[];
-  completedTasks?: BeadsTask[];
+  // Task state
+  activeTasks?: HandoffTask[];
+  remainingTasks?: HandoffTask[];
+  completedTasks?: HandoffTask[];
 
   // AI summaries
   whatWasDone?: string;
@@ -99,8 +99,7 @@ export interface HandoffContext {
   // Capture git state
   await captureGitState(context, agentState.workspace);
 
-  // Capture beads tasks
-  await captureBeadsTasks(context, agentState.issueId);
+  captureTasks(context, agentState.workspace);
 
   return context;
 }
@@ -167,25 +166,23 @@ async function captureGitState(context: HandoffContext, workspace: string): Prom
 }
 
 /**
- * Capture beads tasks state
+ * Capture merged vBRIEF task state.
  */
-async function captureBeadsTasks(context: HandoffContext, issueId: string): Promise<void> {
+function captureTasks(context: HandoffContext, workspace: string): void {
   try {
-    // List all tasks with this issue's label
-    const label = issueId.toLowerCase();
-    const { stdout: output } = await execAsync(`bd list --json -l ${label}`, {
-      encoding: 'utf-8',
-    });
-
-    const tasks: BeadsTask[] = JSON.parse(output);
-
-    // Categorize tasks
-    context.activeBeadsTasks = tasks.filter(t => t.status === 'in_progress');
-    context.remainingTasks = tasks.filter(t => t.status === 'open');
-    context.completedTasks = tasks.filter(t => t.status === 'closed');
+    const plan = readWorkspacePlanSync(workspace);
+    const tasks: HandoffTask[] = (plan?.plan.items ?? []).map((item) => ({
+      id: item.id,
+      title: item.title,
+      status: item.status,
+      priority: typeof item.priority === 'number' ? item.priority : 0,
+    }));
+    context.activeTasks = tasks.filter((task) => task.status === 'running');
+    context.remainingTasks = tasks.filter((task) => !['completed', 'cancelled'].includes(task.status));
+    context.completedTasks = tasks.filter((task) => task.status === 'completed');
   } catch (error) {
-    console.error('Error capturing beads tasks:', error);
-    context.activeBeadsTasks = [];
+    console.error('Error capturing tasks:', error);
+    context.activeTasks = [];
     context.remainingTasks = [];
     context.completedTasks = [];
   }
@@ -228,7 +225,7 @@ export function serializeHandoffContext(context: HandoffContext): string {
     lines.push('');
   }
 
-  // Beads tasks
+  // Tasks
   if (context.completedTasks && context.completedTasks.length > 0) {
     lines.push('## Completed Tasks');
     lines.push('');
@@ -238,10 +235,10 @@ export function serializeHandoffContext(context: HandoffContext): string {
     lines.push('');
   }
 
-  if (context.activeBeadsTasks && context.activeBeadsTasks.length > 0) {
+  if (context.activeTasks && context.activeTasks.length > 0) {
     lines.push('## Active Tasks');
     lines.push('');
-    context.activeBeadsTasks.forEach(task => {
+    context.activeTasks.forEach(task => {
       lines.push(`- [ ] ${task.title} (${task.id}) - IN PROGRESS`);
     });
     lines.push('');

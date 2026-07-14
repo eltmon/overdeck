@@ -1,9 +1,7 @@
-import { Effect } from 'effect';
 import chalk from 'chalk';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
-import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeVBriefDocument } from '../../lib/vbrief/io.js';
 import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
@@ -93,7 +91,7 @@ interface PromotePlanningResult {
   workAgentSkipReason: string | null;
 }
 
-type AutoPromotePhase = 'createBeads' | 'completePlanning' | 'terminal';
+type AutoPromotePhase = 'completePlanning' | 'terminal';
 type AutoPromotePhaseStatus = 'start' | 'success' | 'failure' | 'skipped';
 
 function emitAutoPromotePhase(
@@ -206,7 +204,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   if (!options.json) {
     console.log(chalk.dim(`workspace: ${workspacePath}`));
-    console.log(chalk.dim('finalizing vBRIEF and creating beads…'));
+    console.log(chalk.dim('finalizing vBRIEF checklist…'));
   }
 
   const planDoc = readPlanSync(planPath);
@@ -249,32 +247,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     for (const line of readinessReport) console.error(chalk.dim(line));
   }
 
-  emitAutoPromotePhase(issueId, 'createBeads', 'start', 'creating beads from finalized vBRIEF', { workspacePath });
-  // Pass the exact plan being finalized: on a re-plan, the main-side canonical
-  // spec still has the OLD content until promotion, so resolving main-first
-  // here would materialize beads from the superseded plan.
-  const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath, { planPath }));
   const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
-
-  if (!result.success || result.created.length === 0) {
-    const errors = result.errors.length > 0 ? result.errors : ['Beads creation produced no tasks'];
-    emitAutoPromotePhase(issueId, 'createBeads', 'failure', errors.join('; '), {
-      workspacePath,
-      createdCount: result.created.length,
-    });
-    emitAutoPromotePhase(issueId, 'terminal', 'failure', 'beads creation failed', { workspacePath });
-    if (options.json) {
-      console.log(JSON.stringify({ success: false, created: result.created, errors }));
-    } else {
-      console.error(chalk.red('✗ Beads creation failed:'));
-      for (const e of errors) console.error(chalk.red('  ' + e));
-    }
-    process.exit(2);
-  }
-  emitAutoPromotePhase(issueId, 'createBeads', 'success', 'beads created', {
-    workspacePath,
-    createdCount: result.created.length,
-  });
 
   // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
   // vBRIEF only after beads creation succeeds. Atomic temp+rename.
@@ -334,8 +307,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   if (options.json) {
     console.log(JSON.stringify({
       success: promoted || noPromote,
-      created: result.created,
-      count: result.created.length,
+      count: planDoc.plan.items.length,
       canonicalFilename,
       planStatus: 'proposed',
       promoted,
@@ -347,8 +319,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       ...(workAgentSkipReason ? { workAgentSkipReason } : {}),
     }));
   } else {
-    console.log(chalk.green(`✓ Created ${result.created.length} beads task${result.created.length === 1 ? '' : 's'}`));
-    for (const id of result.created) console.log(chalk.dim('  • ' + id));
+    console.log(chalk.green(`✓ Finalized ${planDoc.plan.items.length} checklist item${planDoc.plan.items.length === 1 ? '' : 's'}`));
     console.log(chalk.green(`✓ Set plan.status=proposed (canonical: ${canonicalFilename})`));
     console.log('');
     if (noPromote) {

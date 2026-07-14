@@ -15,10 +15,10 @@ against the agent workspace. Any gate that fails prints diagnostics and aborts
 the command. Use `--force` to bypass **all** gates (not recommended for routine
 use). Use `--test-waived` to bypass only gate 4.
 
-### 1. Open beads
+### 1. Open vBRIEF tasks
 
-`pan done` checks the workspace beads database for any open beads scoped to the
-issue. Open beads mean unfinished tasks, so the command aborts until they are
+`pan done` checks the workspace vBRIEF tasks database for any open vBRIEF tasks scoped to the
+issue. Open vBRIEF tasks mean unfinished tasks, so the command aborts until they are
 closed or cancelled.
 
 ### 2. Uncommitted changes

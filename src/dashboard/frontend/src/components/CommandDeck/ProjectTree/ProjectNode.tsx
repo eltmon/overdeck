@@ -5,7 +5,7 @@ import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './Fea
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
 
 export interface ProjectFeatureResourceDetails {
   hasWorkspace: boolean;
@@ -19,16 +19,20 @@ export interface ProjectFeatureResourceDetails {
     isDraft: boolean;
   }>;
   hasVbrief: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   dockerContainerCount: number;
   /** PAN-1523: actual HEAD of the agent's workspace, or null when workspace is missing. */
   actualBranch?: string | null;
   /** PAN-1523: true when workspace HEAD differs from expected feature/<id> branch. */
   branchDrifted?: boolean;
+  /** PAN-2602: true when a feature/* or bypass/* branch for the issue has unmerged commits not on main. */
+  branchAheadOfMain?: boolean;
   /** PAN-1523: true when workspace path is configured but missing on disk. */
   workspaceMissing?: boolean;
   /** PAN-1676: remote (fly.io) work agent for this issue, when one is active. */
   remoteAgent?: { vmName: string; status: string; model: string; startedAt: string } | null;
+  /** Non-archived conversations explicitly linked to this issue (PAN-2602). */
+  conversations: Array<{ id: number; name: string; title: string | null; status: string }>;
 }
 
 export interface ProjectFeatureResourceIdentifiers {
@@ -67,6 +71,8 @@ export interface ProjectFeature {
   sessions?: readonly SessionNode[];
   resourceSources?: ResourceSource[];
   resourceDetails?: ProjectFeatureResourceDetails;
+  /** PAN-2602: per-issue task rollup totals from the cached bulk rollup. */
+  taskTotals?: { total: number; closed: number; inProgress: number; lastUpdated: string | null } | null;
 }
 
 interface ProjectNodeProps {

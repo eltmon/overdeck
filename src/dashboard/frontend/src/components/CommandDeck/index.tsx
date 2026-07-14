@@ -11,7 +11,7 @@ import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
 import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
-import { BeadsDialog } from '../BeadsDialog';
+import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
@@ -190,7 +190,7 @@ export function CommandDeck({
     setAwarenessCollapsed(collapsed);
     try { localStorage.setItem('overdeck.ui.awarenessCollapsed', String(collapsed)); } catch { /* ignore */ }
   }, []);
-  const [showBeads, setShowBeads] = useState(false);
+  const [showTasks, setShowTasks] = useState(false);
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null);
   const [convsCollapsed, setConvsCollapsed] = useState(() => {
     try { return localStorage.getItem(CONVS_COLLAPSED_KEY) === 'true'; } catch { return false; }
@@ -814,8 +814,8 @@ export function CommandDeck({
         const confirmTitle = isDestructiveReview
           ? 'Restart review with new harness/model'
           : 'Restart work agent with new harness/model';
-        const reviewMessage = `This will delete the review agent's state for ${issueId} (sessions, activity, logs) and start a fresh review run with the chosen harness/model.\n\nThe workspace, vBRIEF, beads, and commit history are kept. The review will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model or force-restarting the review.`;
-        const workMessage = `This will delete the work agent's state for ${issueId} (sessions, activity, logs) and start a fresh ${harness ?? currentHarness ?? ''} + ${model ?? currentModel ?? ''} agent.\n\nThe workspace, vBRIEF, beads, and commit history are kept. The new agent will read .pan/continue.json and the branch to continue. The agent will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model.`;
+        const reviewMessage = `This will delete the review agent's state for ${issueId} (sessions, activity, logs) and start a fresh review run with the chosen harness/model.\n\nThe workspace, vBRIEF, tasks, and commit history are kept. The review will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model or force-restarting the review.`;
+        const workMessage = `This will delete the work agent's state for ${issueId} (sessions, activity, logs) and start a fresh ${harness ?? currentHarness ?? ''} + ${model ?? currentModel ?? ''} agent.\n\nThe workspace, vBRIEF, tasks, and commit history are kept. The new agent will read .pan/continue.json and the branch to continue. The agent will have to re-research the diff from scratch — this is a deliberate cost of switching harness/model.`;
         const confirmed = await confirm({
           title: confirmTitle,
           message: isDestructiveReview ? reviewMessage : workMessage,
@@ -1515,12 +1515,12 @@ export function CommandDeck({
         )}
       </div>
 
-      {/* Beads Dialog */}
-      {showBeads && selectedFeature && (
-        <BeadsDialog
+      {/* Tasks Dialog */}
+      {showTasks && selectedFeature && (
+        <TasksDialog
           issueId={selectedFeature}
-          isOpen={showBeads}
-          onClose={() => setShowBeads(false)}
+          isOpen={showTasks}
+          onClose={() => setShowTasks(false)}
         />
       )}
 

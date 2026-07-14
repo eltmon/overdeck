@@ -51,7 +51,7 @@ optional:
 pan plan finalize
 ```
 
-This converts your `.pan/spec.vbrief.json` into beads tasks, marks the spec `plan.status = "proposed"`, promotes the canonical spec to main's `.pan/specs/`, transitions the issue to Planned, and terminates this planning session. Do NOT run `bd create` yourself — `pan plan finalize` does it deterministically from the vBRIEF.
+This marks your `.pan/spec.vbrief.json` as `plan.status = "proposed"`, promotes the canonical spec to main's `.pan/specs/`, transitions the issue to Planned, and terminates this planning session. The vBRIEF `items[]` array is the executable task checklist.
 
 `pan plan finalize` is your final action — the pipeline terminates this session after it succeeds; no dashboard "Done" click is needed. What happens next is not your decision: if this planning run was launched with `--auto-start` (autonomous orchestrators), the work agent starts automatically; otherwise the issue waits in Planned until a human runs `pan start <id>` or clicks Start Agent. Never try to start the work agent yourself. (The dashboard Done button remains the manual handoff path for `--no-promote` runs.)
 
@@ -283,7 +283,7 @@ When discovery is complete:
 3. Run `pan plan finalize` from the workspace root. This creates beads tasks from your vBRIEF and sets `plan.status` to `proposed`.
 4. Summarize the plan and STOP
 
-**DO NOT run `bd create` commands directly.** `pan plan finalize` is the only sanctioned way to materialize beads from a workspace vBRIEF plan — it's deterministic and idempotent.
+**Do not create a parallel task store.** `pan plan finalize` promotes the workspace vBRIEF plan, and the task door records claims and status overlays against its items.
 
 ### vBRIEF Plan Format (REQUIRED)
 
@@ -399,7 +399,6 @@ The continue file is a **structured replacement for STATE.md**. It lives at `.pa
     { "id": "H1", "summary": "<risk/edge case>", "mitigation": "<how to handle it>" }
   ],
   "resumePoint": null,
-  "beadsMapping": {},
   "agentModel": "{{MODEL_AUTHOR}}",
   "sessionHistory": [
     { "timestamp": "<ISO 8601 timestamp>", "reason": "planning", "note": "Initial planning session", "agentModel": "{{MODEL_AUTHOR}}" }
@@ -413,7 +412,6 @@ The continue file is a **structured replacement for STATE.md**. It lives at `.pa
 - `decisions` — every architectural or scope decision you make goes here. Future agents (work, review, merge) read these.
 - `hazards` — risks, edge cases, and gotchas the work agent should watch for.
 - `resumePoint` — leave as `null` during planning; the work agent will populate it.
-- `beadsMapping` — leave as `{}`; `pan plan finalize` populates it when creating beads.
 - `sessionHistory` — start with one entry for this planning session.
 
 **Remember:** Be a thinking partner, not an interviewer. Ask questions that help clarify.

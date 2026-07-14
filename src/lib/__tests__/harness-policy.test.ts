@@ -30,6 +30,19 @@ describe('canUseHarness', () => {
     expect(decision.reason!.toLowerCase()).toContain('anthropic')
   })
 
+  it('AC(PAN-2528): ohmypi + Anthropic + subscription reason names the Claude Code subscription Terms of Service', () => {
+    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('Terms of Service')
+  })
+
+  it('AC(PAN-2528): the ohmypi subscription-block reason still tells the user how to proceed', () => {
+    const decision = canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'subscription')
+    const reason = decision.reason!.toLowerCase()
+    expect(reason).toContain('api-key')
+    expect(reason).toContain('non-anthropic')
+  })
+
   it('allows ohmypi + Anthropic + api-key', () => {
     expect(canUseHarnessSync('ohmypi', MODEL_BY_PROVIDER.anthropic, 'api-key')).toEqual({ allowed: true })
   })

@@ -20,7 +20,7 @@ const CRITERION_EXPLANATIONS: Record<keyof FlywheelStatsCriteria, string> = {
   c3_passRate: 'Pipeline pass success rate after counting only review or test failures tied to substrate bugs discovered on the same issue within 24 hours.',
   c4_mttr: 'Median and p95 time from substrate bug filing to fix merge for bugs filed in the selected window.',
   c5_intervention: 'Operator intervention events divided by completed pipeline runs in the selected window.',
-  c6_timeConsistency: 'For simple, medium, and complex bead-count buckets, compares p95 completed-run duration to the median duration.',
+  c6_timeConsistency: 'For simple, medium, and complex task-count buckets, compares p95 completed-run duration to the median duration.',
   c7_flake: 'Substrate-attributable review or test failures that pass one cycle and fail the next with the same head SHA.',
 };
 

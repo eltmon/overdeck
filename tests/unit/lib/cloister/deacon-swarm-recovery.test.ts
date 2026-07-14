@@ -30,6 +30,7 @@ import { requeueFailedSwarmSlots } from '../../../../src/lib/cloister/swarm-fail
 import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
 
 beforeEach(() => {
+  mocks.listProjectsSync.mockReturnValue([]);
   mocks.resolveProjectFromIssueSync.mockReturnValue(null);
 });
 
@@ -187,7 +188,7 @@ describe('deacon-swarm failed-merge recovery', () => {
       ]);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      join(workspacePath, '.pan', 'spec.vbrief.json'),
+      'PAN-2203',
       {
         type: 'unblock',
         itemId: 'wi-a',
@@ -220,7 +221,7 @@ describe('deacon-swarm failed-merge recovery', () => {
       .resolves.toEqual(['[swarm] dropped failed-merge slot 1 (item wi-a) for PAN-2203']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      join(workspacePath, '.pan', 'spec.vbrief.json'),
+      'PAN-2203',
       {
         type: 'done',
         itemId: 'wi-a',
@@ -245,15 +246,15 @@ describe('deacon-swarm failed-merge recovery', () => {
   });
 
   it('PAN-2364: recover drop on slot 3 marks only that item done and leaves slot 1 block intact', async () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
     const fakeDeps = recoveryDeps();
 
     await expect(recoverFailedMergeSlot('PAN-2203', workspacePath, 3, doc(item('wi-c', 'blocked')), 'drop', fakeDeps))
       .resolves.toEqual(['[swarm] dropped failed-merge slot 3 (item wi-c) for PAN-2203']);
 
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      join(workspacePath, '.pan', 'spec.vbrief.json'),
+      'PAN-2203',
       {
         type: 'done',
         itemId: 'wi-c',
@@ -271,8 +272,8 @@ describe('deacon-swarm failed-merge recovery', () => {
   });
 
   it('PAN-2364: recover handoff updates only the targeted slot block note and leaves others untouched', async () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
     const fakeDeps = recoveryDeps();
 
     await recoverFailedMergeSlot('PAN-2203', workspacePath, 1, doc(), 'handoff', fakeDeps);
@@ -286,9 +287,9 @@ describe('deacon-swarm failed-merge recovery', () => {
     }));
   });
 
-  it('stores and returns multiple per-slot blocks independently', () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+  it('stores and returns multiple per-slot blocks independently', async () => {
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
 
     const blocks = getFailedMergeBlocks('PAN-2203', workspacePath);
     expect(blocks).toHaveLength(2);
@@ -297,7 +298,7 @@ describe('deacon-swarm failed-merge recovery', () => {
     expect(getFailedMergeBlock('PAN-2203', 3, workspacePath)?.itemId).toBe('wi-c');
   });
 
-  it('folds a legacy singular block into the per-slot map on first write and clears the singular field', () => {
+  it('folds a legacy singular block into the per-slot map on first write and clears the singular field', async () => {
     writeIssueRecordForWorkspaceSync(workspacePath, 'PAN-2203', {
       issueId: 'PAN-2203',
       schemaVersion: 2,
@@ -325,7 +326,7 @@ describe('deacon-swarm failed-merge recovery', () => {
       expect.objectContaining({ slotIndex: 2, itemId: 'wi-legacy' }),
     ]);
 
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
 
     const record = JSON.parse(readFileSync(join(workspacePath, '.pan', 'records', 'pan-2203.json'), 'utf-8'));
     expect(record.swarm.failedMergeBlock).toBeUndefined();
@@ -335,11 +336,11 @@ describe('deacon-swarm failed-merge recovery', () => {
     }));
   });
 
-  it('clearFailedMergeBlock removes only the targeted slot', () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
+  it('clearFailedMergeBlock removes only the targeted slot', async () => {
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-c', slotIndex: 3, note: 'slot 3 conflict' }, workspacePath);
 
-    clearFailedMergeBlock('PAN-2203', 1, workspacePath);
+    await clearFailedMergeBlock('PAN-2203', 1, workspacePath);
 
     expect(getFailedMergeBlock('PAN-2203', 1, workspacePath)).toBeUndefined();
     expect(getFailedMergeBlock('PAN-2203', 3, workspacePath)).toEqual(expect.objectContaining({
@@ -351,8 +352,8 @@ describe('deacon-swarm failed-merge recovery', () => {
     ]);
   });
 
-  it('durable blocks survive resetSwarmLoopSafetyForTests clearing the in-memory map', () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
+  it('durable blocks survive resetSwarmLoopSafetyForTests clearing the in-memory map', async () => {
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'slot 1 conflict' }, workspacePath);
 
     resetSwarmLoopSafetyForTests();
 
@@ -366,7 +367,7 @@ describe('deacon-swarm failed-merge recovery', () => {
   });
 
   it('PAN-2364: mergeReadySlots skips a blocked ready-to-merge slot every pass', async () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-b', slotIndex: 2, note: 'slot 2 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-b', slotIndex: 2, note: 'slot 2 conflict' }, workspacePath);
     const fakeDeps = mergeDeps();
 
     await expect(mergeReadySlots(
@@ -384,7 +385,7 @@ describe('deacon-swarm failed-merge recovery', () => {
   });
 
   it('PAN-2364: requeueFailedSwarmSlots skips a blocked failed slot without archiving', async () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-b', slotIndex: 2, note: 'slot 2 conflict' }, workspacePath);
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-b', slotIndex: 2, note: 'slot 2 conflict' }, workspacePath);
     const fakeDeps = {
       ...recoveryDeps(),
       runGitCommand: vi.fn(async () => undefined),

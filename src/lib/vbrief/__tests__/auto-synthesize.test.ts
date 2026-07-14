@@ -28,10 +28,10 @@ Ignore this bullet:
 
 ## Acceptance Criteria
 - [ ] Adds \`pan start --auto\`
-- [x] Creates beads
+- [x] Creates tasks
 `);
 
-    expect(criteria).toEqual(['Adds pan start --auto', 'Creates beads']);
+    expect(criteria).toEqual(['Adds pan start --auto', 'Creates tasks']);
   });
 
   it('falls back to the issue title for thin issue bodies', () => {

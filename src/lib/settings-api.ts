@@ -108,7 +108,6 @@ function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | und
   const errors: string[] = [];
   validateApiTtsConfigFields(tts, errors);
   if (errors.length > 0) throw new Error(errors.join('; '));
-
   return Object.fromEntries(
     API_TTS_KEYS
       .filter((key) => tts[key] !== undefined)
@@ -117,6 +116,7 @@ function sanitizeApiTtsConfig(tts: ApiTtsConfig | undefined): ApiTtsConfig | und
 }
 
 export interface ApiSettingsConfig {
+  swarm?: { mode: 'off' | 'auto' | 'always'; maxSlots: number; autoAdvance: boolean };
   workhorses?: WorkhorsesConfig;
   roles?: RolesConfig;
   models: {
@@ -671,8 +671,8 @@ export function loadSettingsApi(): ApiSettingsConfig {
     sidebarRefreshIntervalMs: 10_000,
     workerConcurrency: 4,
   };
-
   return {
+    swarm: config.swarm,
     workhorses: seededWorkhorses(config),
     roles: seededRoles(config),
     models: {
@@ -776,7 +776,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     doc.contents = parseDocument('{}\n').contents;
   }
   const config = pruneUndefined(yamlConfig);
-
+  doc.setIn(['swarm'], config.swarm ?? { mode: 'off', maxSlots: 3, autoAdvance: true });
   doc.setIn(['workhorses'], config.workhorses ?? {});
   doc.setIn(['roles'], config.roles ?? {});
   doc.setIn(['models', 'providers'], config.models?.providers ?? {});
@@ -856,9 +856,9 @@ function providerConfigForSave(
 
 async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
-
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
+    swarm: settings.swarm,
     workhorses: settings.workhorses,
     roles: normalizeRolesConfig(settings.roles),
     models: {

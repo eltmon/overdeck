@@ -76,9 +76,9 @@ const WORKSPACE = '/projects/myapp/workspaces/feature-pan-1';
 describe('AgentSpawner Effect service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: workspace exists, beads exist, no running agent
+    // Default: workspace exists, tasks exist, no running agent
     mockExistsSync.mockImplementation((path: string) => {
-      if (path.includes('.beads')) return true;
+      if (path.includes('.tasks')) return true;
       return true; // workspace exists
     });
     mockGetAgentState.mockReturnValue(Effect.succeed(null));
@@ -117,9 +117,9 @@ describe('AgentSpawner Effect service', () => {
       expect((err as any)._tag).toBe('WorkspaceNotFound');
     });
 
-    it('fails with BeadsNotInitialized when .beads dir is missing', async () => {
+    it('fails with TasksNotInitialized when .tasks dir is missing', async () => {
       mockExistsSync.mockImplementation((path: string) => {
-        if (path.includes('.beads')) return false;
+        if (path.includes('.tasks')) return false;
         return true; // workspace exists
       });
 
@@ -131,7 +131,7 @@ describe('AgentSpawner Effect service', () => {
       }).pipe(Effect.provide(AgentSpawnerLive));
 
       const err = await runProgramFail(program);
-      expect((err as any)._tag).toBe('BeadsNotInitialized');
+      expect((err as any)._tag).toBe('TasksNotInitialized');
     });
 
     it('fails with AgentAlreadyRunning when agent status is running', async () => {

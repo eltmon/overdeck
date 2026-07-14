@@ -11,7 +11,7 @@
  */
 
 import { existsSync } from 'fs';
-import { appendFile, readFile, rm, writeFile } from 'fs/promises';
+import { readFile, rm } from 'fs/promises';
 import { join, basename, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
@@ -234,138 +234,6 @@ async function killOrphanedProcessesImpl(workspacePath: string): Promise<StepRes
     return stepOk(step, [`Killed ${hostPids.length} orphaned process(es)`]);
   } catch {
     return stepSkipped(step, ['Orphaned process cleanup failed (non-fatal)']);
-  }
-}
-
-/**
- * Sync workspace beads to the project-root beads database before workspace deletion.
- */
-function syncWorkspaceBeads(
-  projectPath: string,
-  workspacePath: string,
-  issueLower: string,
-): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => syncWorkspaceBeadsImpl(projectPath, workspacePath, issueLower),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepFailed('teardown:sync-beads', `Failed to sync workspace beads: ${(err as Error).message}`)),
-    ),
-  );
-}
-
-async function syncWorkspaceBeadsImpl(
-  projectPath: string,
-  workspacePath: string,
-  issueLower: string,
-): Promise<StepResult> {
-  const step = 'teardown:sync-beads';
-  const workspaceBeadsDir = join(workspacePath, '.beads');
-
-  if (!existsSync(workspaceBeadsDir)) {
-    return stepSkipped(step, ['No .beads directory in workspace']);
-  }
-
-  try {
-    // Export workspace beads to JSONL
-    // 120s: bd export cold-starts a dolt server per workspace .beads and can
-    // block on the global bd lock; a timeout kill bypasses `|| true` and
-    // aborts the whole close-out ceremony (observed at 15s, 14/32 closes).
-    await execAsync(
-      'bd export --output .beads/issues-export.jsonl 2>&1 || true',
-      { cwd: workspacePath, encoding: 'utf-8', timeout: 120000 }
-    );
-
-    const exportPath = join(workspacePath, '.beads', 'issues-export.jsonl');
-    if (!existsSync(exportPath)) {
-      await execAsync('bd export --output .beads/issues.jsonl 2>&1 || true', { cwd: workspacePath, encoding: 'utf-8', timeout: 120000 });
-    }
-
-    // Import workspace beads into project-root database
-    // Use bd import if available, otherwise copy JSONL entries
-    try {
-      await execAsync(
-        `bd import "${join(workspacePath, '.beads', 'issues.jsonl')}" 2>&1 || true`,
-        { cwd: projectPath, encoding: 'utf-8', timeout: 120000 }
-      );
-      return stepOk(step, [`Synced workspace beads to project root for ${issueLower}`]);
-    } catch {
-      // bd import may not exist — try manual JSONL merge
-      const wsJsonl = join(workspacePath, '.beads', 'issues.jsonl');
-      const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
-
-      if (existsSync(wsJsonl) && existsSync(projJsonl)) {
-        const wsContent = await readFile(wsJsonl, 'utf-8');
-        const issuePattern = issueLower.replace('-', '[-_]');
-        const relevantLines = wsContent.split('\n').filter(
-          line => line.trim() && new RegExp(issuePattern, 'i').test(line)
-        );
-        if (relevantLines.length > 0) {
-          await appendFile(projJsonl, '\n' + relevantLines.join('\n'));
-          return stepOk(step, [`Appended ${relevantLines.length} beads entries for ${issueLower} to project JSONL`]);
-        }
-      }
-      return stepSkipped(step, ['No beads to sync or import not available']);
-    }
-  } catch (err) {
-    return stepFailed(step, `Failed to sync workspace beads: ${(err as Error).message}`);
-  }
-}
-
-/**
- * Clear beads for this issue from the project-root .beads/issues.jsonl.
- */
-function clearProjectBeads(
-  projectPath: string,
-  issueLower: string,
-): Effect.Effect<StepResult> {
-  return Effect.tryPromise({
-    try: () => clearProjectBeadsImpl(projectPath, issueLower),
-    catch: (err) => err,
-  }).pipe(
-    Effect.catch((err) =>
-      Effect.succeed(stepFailed('teardown:clear-beads', `Failed to clear beads: ${(err as Error).message}`)),
-    ),
-  );
-}
-
-async function clearProjectBeadsImpl(
-  projectPath: string,
-  issueLower: string,
-): Promise<StepResult> {
-  const step = 'teardown:clear-beads';
-  const projJsonl = join(projectPath, '.beads', 'issues.jsonl');
-
-  if (!existsSync(projJsonl)) {
-    return stepSkipped(step, ['No .beads/issues.jsonl in project root']);
-  }
-
-  try {
-    const content = await readFile(projJsonl, 'utf-8');
-    const lines = content.split('\n');
-    const issueUpper = issueLower.toUpperCase();
-    const before = lines.length;
-    // Remove lines that reference this issue (by ID in the title or issue field)
-    const filtered = lines.filter(line => {
-      if (!line.trim()) return true; // keep blank lines
-      try {
-        const entry = JSON.parse(line);
-        const title = (entry.title || '').toUpperCase();
-        const issue = (entry.issue || '').toUpperCase();
-        return !title.includes(issueUpper) && issue !== issueUpper;
-      } catch {
-        return true; // keep unparseable lines
-      }
-    });
-    const removed = before - filtered.length;
-    if (removed > 0) {
-      await writeFile(projJsonl, filtered.join('\n'));
-      return stepOk(step, [`Removed ${removed} beads entries for ${issueLower} from project JSONL`]);
-    }
-    return stepSkipped(step, [`No beads entries found for ${issueLower}`]);
-  } catch (err) {
-    return stepFailed(step, `Failed to clear beads: ${(err as Error).message}`);
   }
 }
 
@@ -834,13 +702,6 @@ export function teardownWorkspace(
       // 5b. Kill orphaned host processes (Vite, node) that survive Docker teardown
       if (shouldDeleteWorkspace) {
         results.push(yield* killOrphanedProcesses(workspacePath));
-      }
-
-      // 6. Beads lifecycle: sync or clear depending on context (PAN-412)
-      if (opts.clearBeads) {
-        results.push(yield* clearProjectBeads(ctx.projectPath, issueLower));
-      } else if (shouldDeleteWorkspace) {
-        results.push(yield* syncWorkspaceBeads(ctx.projectPath, workspacePath, issueLower));
       }
 
       // 7-8: Project-specific cleanup (tunnel, Hume)

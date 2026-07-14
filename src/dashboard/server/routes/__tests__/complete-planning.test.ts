@@ -66,19 +66,19 @@ function makeDoc(issueId: string): VBriefDocument {
         },
         {
           id: 'item-2',
-          title: 'Create beads',
+          title: 'Create tasks',
           status: 'pending',
-          narrative: { Action: 'Materialize one bead task for each finalized plan item' },
+          narrative: { Action: 'Materialize one task task for each finalized plan item' },
           metadata: {
             requiresInspection: false,
-            files_scope: ['.beads/issues.jsonl'],
+            files_scope: ['.tasks/issues.jsonl'],
             files_scope_confidence: 'high',
             readiness: 'ready',
           },
           subItems: [
             {
               id: 'item-2.ac1',
-              title: 'The bead materializer creates one task per item',
+              title: 'The task materializer creates one task per item',
               status: 'pending',
               metadata: { kind: 'acceptance_criterion' },
             },
@@ -126,7 +126,7 @@ describe('completePlanningArtifacts', () => {
     const { workspacePath } = makeProject(issueId);
     mkdirSync(join(workspacePath, '.pan', 'drafts'), { recursive: true });
     mkdirSync(join(workspacePath, '.pan', 'specs'), { recursive: true });
-    mkdirSync(join(workspacePath, '.beads'), { recursive: true });
+    mkdirSync(join(workspacePath, '.tasks'), { recursive: true });
     writeFileSync(join(workspacePath, '.gitignore'), [
       '.pan/continue.json',
       '.pan/spec.vbrief.json',
@@ -136,12 +136,12 @@ describe('completePlanningArtifacts', () => {
     writeFileSync(join(workspacePath, '.pan', 'specs', 'PAN-1931.vbrief.json'), '{}\n');
     writeFileSync(join(workspacePath, '.pan', 'continue.json'), '{}\n');
     writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), '{}\n');
-    writeFileSync(join(workspacePath, '.beads', 'issues.jsonl'), '{}\n');
+    writeFileSync(join(workspacePath, '.tasks', 'issues.jsonl'), '{}\n');
 
     const commands = completePlanningWorkspaceGitAddCommands(workspacePath);
     expect(commands).toEqual([
       ['add', '.pan/'],
-      ['add', '.beads/'],
+      ['add', '.tasks/'],
       ['add', '.gitignore'],
     ]);
     expect(commands.flat()).not.toContain('-f');
@@ -150,7 +150,7 @@ describe('completePlanningArtifacts', () => {
   it('does not stage workspace state paths after state migration', () => {
     const { workspacePath } = makeProject('PAN-2541');
     mkdirSync(join(workspacePath, '.pan'), { recursive: true });
-    mkdirSync(join(workspacePath, '.beads'), { recursive: true });
+    mkdirSync(join(workspacePath, '.tasks'), { recursive: true });
     writeFileSync(join(workspacePath, '.gitignore'), '.overdeck/\n');
     expect(completePlanningWorkspaceGitAddCommands(workspacePath, true)).toEqual([
       ['add', '.gitignore'],
@@ -175,7 +175,7 @@ describe('completePlanningArtifacts', () => {
     ]);
   });
 
-  it('promotes a first-run workspace draft and materializes one bead per plan item', async () => {
+  it('promotes a first-run workspace draft and materializes one task per plan item', async () => {
     const issueId = 'PAN-1143';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -185,13 +185,13 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: async (path) => {
+      createTasks: async (path) => {
         expect(path).toBe(workspacePath);
         return {
           success: true,
-          created: ['PAN-1143: Promote spec', 'PAN-1143: Create beads'],
+          created: ['PAN-1143: Promote spec', 'PAN-1143: Create tasks'],
           errors: [],
-          beadIds: new Map(),
+          taskIds: new Map(),
         };
       },
     });
@@ -200,14 +200,14 @@ describe('completePlanningArtifacts', () => {
     expect(specFiles).toEqual([result.proposed.filename]);
     expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.vbrief\.json$/);
     expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs', result.proposed.filename));
-    expect(result.beadCount).toBe(2);
+    expect(result.taskCount).toBe(2);
 
     const promoted = JSON.parse(readFileSync(result.proposed.path, 'utf-8'));
     expect(promoted.status).toBe('proposed');
     expect(promoted.plan.status).toBe('proposed');
   });
 
-  it('does not write a proposed spec when bead materialization does not match the plan item count', async () => {
+  it('does not write a proposed spec when task materialization does not match the plan item count', async () => {
     const issueId = 'PAN-1144';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -217,18 +217,18 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: async () => ({
+      createTasks: async () => ({
         success: true,
         created: ['PAN-1144: Promote spec'],
         errors: [],
-        beadIds: new Map(),
+        taskIds: new Map(),
       }),
-    })).rejects.toThrow('created 1 beads for 2 plan items');
+    })).rejects.toThrow('created 1 tasks for 2 plan items');
 
     expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
-  it('does not write a proposed spec when bead materialization reports failure', async () => {
+  it('does not write a proposed spec when task materialization reports failure', async () => {
     const issueId = 'PAN-1145';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -238,11 +238,11 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: async () => ({
+      createTasks: async () => ({
         success: false,
-        created: ['PAN-1145: Promote spec', 'PAN-1145: Create beads'],
+        created: ['PAN-1145: Promote spec', 'PAN-1145: Create tasks'],
         errors: ['bd daemon unavailable'],
-        beadIds: new Map(),
+        taskIds: new Map(),
       }),
     })).rejects.toThrow('bd daemon unavailable');
 
@@ -274,8 +274,8 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createBeads: async () => {
-        throw new Error('createBeads should not run');
+      createTasks: async () => {
+        throw new Error('createTasks should not run');
       },
     })).rejects.toMatchObject({
       name: 'PlanQualityLintError',

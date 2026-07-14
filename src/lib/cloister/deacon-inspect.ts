@@ -11,9 +11,9 @@ import { killSession, sessionExists } from '../tmux.js';
  */
 export const INSPECT_TIMEOUT_MS = 12 * 60_000;
 
-function inspectSessionName(issueId: string, beadId: string): string {
+function inspectSessionName(issueId: string, itemId: string): string {
   const issueLower = issueId.toLowerCase();
-  const beadSlug = beadId.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 24);
+  const beadSlug = itemId.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 24);
   return `inspect-${issueLower}-${beadSlug}`;
 }
 
@@ -30,12 +30,12 @@ export async function checkInspectAgentTimeouts(now = new Date()): Promise<strin
     if (status.inspectStatus !== 'inspecting') continue;
 
     const issueId = rawIssueId.toUpperCase();
-    const beadId = status.inspectBeadId;
+    const itemId = status.inspectBeadId;
     const startedMs = status.inspectStartedAt ? Date.parse(status.inspectStartedAt) : NaN;
     const hasStartedAt = Number.isFinite(startedMs);
     const elapsedMs = hasStartedAt ? nowMs - startedMs : Number.POSITIVE_INFINITY;
     const timedOut = elapsedMs > INSPECT_TIMEOUT_MS;
-    const sessionName = beadId ? inspectSessionName(issueId, beadId) : undefined;
+    const sessionName = itemId ? inspectSessionName(issueId, itemId) : undefined;
     const sessionAlive = sessionName
       ? await Effect.runPromise(sessionExists(sessionName)).catch(() => false)
       : false;
@@ -48,7 +48,7 @@ export async function checkInspectAgentTimeouts(now = new Date()): Promise<strin
       : timedOut
         ? `timed out after ${formatInspectElapsed(elapsedMs)} (limit ${formatInspectElapsed(INSPECT_TIMEOUT_MS)})`
         : `tmux session ${sessionName} exited before producing a verdict`;
-    const effectiveBeadId = beadId ?? 'unknown';
+    const effectiveBeadId = itemId ?? 'unknown';
     const notes = `Inspection error for bead ${effectiveBeadId}: ${reason}. No verdict was produced.`;
     const verdict = `INSPECTION ERROR for bead ${effectiveBeadId}: inspection could not complete (${reason}) — no verdict was produced. Treat as infrastructure failure: do not silently proceed.`;
 

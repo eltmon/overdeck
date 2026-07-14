@@ -8,6 +8,7 @@ import type { RoundMarker } from '../../chat/MessagesTimeline';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
 import { AwaitingInputIndicator } from '../../AwaitingInputIndicator';
+import { useDashboardStore, selectPendingPermissionAgentIds } from '../../../lib/store';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
@@ -215,6 +216,10 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   // agent and matches the standalone conversation view's key for the same
   // session. (PAN-XXXX)
   const { hideToolCalls, toggleHideToolCalls } = useConversationUiState(session.sessionId);
+  // PAN-1520 (FR-6) — permission requests live in a separate store slice from
+  // the server-computed session.awaitingInput; merge via the shared selector.
+  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
+  const hasPendingPermission = pendingPermissionAgentIds.has(session.sessionId);
   const [view, setView] = useState<PanelView>(() => {
     const stored = readView(session.sessionId);
     // Default review sessions without JSONL to summary tab; with JSONL default
@@ -319,8 +324,10 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
     <div className={styles.sessionPanel}>
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
-        {session.awaitingInput && (
-          <AwaitingInputIndicator kinds={['askUserQuestion']} />
+        {(session.awaitingInput || hasPendingPermission) && (
+          <AwaitingInputIndicator
+            kinds={hasPendingPermission ? ['permissionRequest'] : ['askUserQuestion']}
+          />
         )}
         <SessionPanelBranchChip sessionId={session.sessionId} />
         <div className={styles.sessionPanelToggle}>

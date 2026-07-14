@@ -124,7 +124,12 @@ vi.mock('../../../lib/cloister/inspect-checkpoints.js', () => ({
 }));
 
 vi.mock('../../../lib/vbrief/io.js', () => ({
-  readWorkspacePlanSync: vi.fn(() => null),
+  readWorkspacePlanSync: vi.fn(() => ({
+    plan: {
+      id: 'PAN-9999',
+      items: [{ id: 'workspace-abc' }],
+    },
+  })),
 }));
 
 vi.mock('../../../lib/tracker-utils.js', () => ({
@@ -325,7 +330,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
   it('resolves bare numeric input before pan inspect resolves the project', async () => {
     const { inspectCommand } = await import('../inspect.js');
 
-    await inspectCommand('9999', { bead: 'workspace-abc' });
+    await inspectCommand('9999', { item: 'workspace-abc' });
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');

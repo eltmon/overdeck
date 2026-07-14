@@ -218,8 +218,8 @@ describe('moveVBriefFilesOnly', () => {
   });
 });
 
-describe('moveVBrief (with git staging)', () => {
-  it('moves and stages with git add', async () => {
+describe('moveVBrief (with durable git write-through)', () => {
+  it('moves and commits through the canonical state writer', async () => {
     initGitRepo(TEST_DIR);
     ensureVBriefDirsSync(TEST_DIR);
     const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
@@ -235,9 +235,11 @@ describe('moveVBrief (with git staging)', () => {
     const result = await Effect.runPromise(moveVBrief(TEST_DIR, 'PAN-1', 'active'));
     expect(existsSync(result.toPath)).toBe(true);
 
-    // Check git index reflects the migration to canonical .pan/specs storage
+    // The move is committed atomically; no staged residue remains.
     const status = execSync('git status --porcelain', { cwd: TEST_DIR, encoding: 'utf-8' });
-    expect(status).toMatch(/\.pan\/specs\//);
+    expect(status).toBe('');
+    expect(execSync('git show --name-only --format= HEAD', { cwd: TEST_DIR, encoding: 'utf-8' }))
+      .toContain('.pan/specs/');
   });
 
   it('throws when issue has no vBRIEF', async () => {

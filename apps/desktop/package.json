@@ -1,6 +1,6 @@
 {
   "name": "@overdeck/desktop",
-  "version": "0.45.13",
+  "version": "0.45.16",
   "description": "Overdeck Command Deck — AI agent monitoring desktop app",
   "publishConfig": {
     "access": "public"
@@ -35,9 +35,9 @@
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --configLoader runner --passWithNoTests",
-    "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never",
-    "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg --arm64 --publish never",
-    "dist:win": "node scripts/prepare-server-resources.mjs && electron-builder --win nsis --publish never",
+    "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never && node scripts/stamp-update-manifests.mjs",
+    "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg zip --arm64 --publish never && node scripts/stamp-update-manifests.mjs",
+    "dist:win": "node scripts/prepare-server-resources.mjs && electron-builder --win nsis --publish never && node scripts/stamp-update-manifests.mjs",
     "postinstall": "electron-rebuild -f -w node-pty 2>/dev/null; exit 0"
   },
   "dependencies": {
@@ -58,6 +58,7 @@
   "build": {
     "appId": "com.overdeck.app",
     "productName": "Overdeck",
+    "generateUpdatesFilesForAllChannels": true,
     "publish": {
       "provider": "github",
       "owner": "eltmon",

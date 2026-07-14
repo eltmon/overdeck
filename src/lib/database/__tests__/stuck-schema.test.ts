@@ -56,7 +56,7 @@ describe('stuck state (PAN-653)', { timeout: 30_000 }, () => {
       inspectStatus: 'error',
       inspectNotes: 'Inspection timed out',
       inspectStartedAt: '2026-06-05T19:00:00.000Z',
-      inspectBeadId: 'workspace-sposy',
+      inspectTaskId: 'workspace-sposy',
       updatedAt: new Date().toISOString(),
       readyForMerge: false,
     });
@@ -64,7 +64,7 @@ describe('stuck state (PAN-653)', { timeout: 30_000 }, () => {
     const row = getReviewStatusFromDbSync('pan-1616');
     expect(row?.inspectStatus).toBe('error');
     expect(row?.inspectStartedAt).toBe('2026-06-05T19:00:00.000Z');
-    expect(row?.inspectBeadId).toBe('workspace-sposy');
+    expect(row?.inspectTaskId).toBe('workspace-sposy');
     // PAN-1988: free-text *_notes are journal-only and intentionally NOT cached
     // in the DB, so they do not round-trip through the door.
     expect(row?.inspectNotes).toBeUndefined();

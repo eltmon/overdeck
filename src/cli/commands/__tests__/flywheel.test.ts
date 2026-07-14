@@ -1,11 +1,12 @@
 import { Effect } from 'effect';
 import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { promisify } from 'node:util';
 import { Readable } from 'node:stream';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { fileURLToPath } from 'node:url';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { Command } from 'commander';
 import type { FlywheelStats, FlywheelStatus } from '@overdeck/contracts';
 import { getFlywheelRunDir, readFlywheelLaunchMetadata, subscribeLatestFlywheelStatus, writeFlywheelLaunchMetadata, writeLatestFlywheelStatus } from '../../../dashboard/server/services/flywheel-run-state.js';
@@ -231,6 +232,23 @@ describe('formatFlywheelStateReport', () => {
 
     expect(report).toContain('## Suggestions\n\nNo suggestions emitted this run.');
   });
+});
+
+// PAN-2658 regression guard: this suite exercises code that runs `git commit`
+// on docs/FLYWHEEL-STATE.md in its cwd. A missing cwd once fell back to
+// process.cwd() and committed into the real repository (main commit
+// 3647150337). Fail loudly if any test in this file moves the real repo HEAD.
+const realRepoRoot = dirname(dirname(dirname(dirname(dirname(fileURLToPath(import.meta.url))))));
+let realRepoHeadBefore: string | null = null;
+
+beforeAll(async () => {
+  realRepoHeadBefore = await git(realRepoRoot, ['rev-parse', 'HEAD']).catch(() => null);
+});
+
+afterAll(async () => {
+  if (!realRepoHeadBefore) return;
+  const headAfter = await git(realRepoRoot, ['rev-parse', 'HEAD']).catch(() => null);
+  expect(headAfter, 'flywheel tests must never create commits in the real repository (PAN-2658)').toBe(realRepoHeadBefore);
 });
 
 describe('flywheel CLI commands', () => {
@@ -821,7 +839,7 @@ describe('flywheel CLI commands', () => {
     flywheelLifecycleMocks.sessionExists = true;
     await writeLatestFlywheelStatus(validStatus);
 
-    await flywheelStopCommand();
+    await flywheelStopCommand({ cwd: repoDir });
 
     expect(flywheelLifecycleMocks.stoppedAgents).toContain('flywheel-orchestrator');
     const runReport = await readFile(join(tempDir, 'flywheel', 'runs', 'RUN-1', 'report.md'), 'utf8');
@@ -832,7 +850,7 @@ describe('flywheel CLI commands', () => {
   });
 
   it('treats stop with nothing active as an idempotent notice', async () => {
-    await flywheelStopCommand();
+    await flywheelStopCommand({ cwd: tempDir });
 
     expect(flywheelLifecycleMocks.stoppedAgents).toEqual([]);
     expect(logSpy).toHaveBeenCalledWith('No flywheel run is active and nothing is left to report.');

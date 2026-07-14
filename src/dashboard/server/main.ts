@@ -68,6 +68,8 @@ import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { getAgentSessionsSync } from '../../lib/tmux.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
+import { listProjectsSync } from '../../lib/projects.js';
+import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
 
 declare const Bun: unknown;
 
@@ -565,7 +567,7 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTranscriptPoller();
   stopCostReconcileService();
   stopRestartAnnouncer();
-  await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err));
+  await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
   await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
@@ -653,16 +655,32 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
-  const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
-  if (reconciliation.decision !== 'pending') {
-    void applyBootReconciliationDecision();
+  const blockedProjects: string[] = [];
+  for (const { key, config } of listProjectsSync()) {
+    if (!existsSync(config.path)) continue;
+    const migration = await ensureAutomaticStateMigration(key, config);
+    if (migration.status === 'blocked') {
+      const message = formatAutomaticStateMigrationBlock(migration);
+      blockedProjects.push(key);
+      console.error(`[state-migration] ${message}`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'error', message });
+    }
   }
-  startDeaconChild().catch((err) => {
-    console.error('[overdeck] Cloister auto-start failed:', err);
-    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
-  });
-  console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  if (blockedProjects.length > 0) {
+    console.error(`[overdeck] Cloister auto-start blocked: permanent state is unavailable for ${blockedProjects.join(', ')}`);
+    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start blocked because permanent state migration is incomplete for: ${blockedProjects.join(', ')}` });
+  } else {
+    const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
+    if (reconciliation.decision !== 'pending') {
+      void applyBootReconciliationDecision();
+    }
+    startDeaconChild().catch((err) => {
+      console.error('[overdeck] Cloister auto-start failed:', err);
+      emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
+    });
+    console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
+    emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  }
 }
 
 /**

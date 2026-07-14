@@ -178,6 +178,10 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
   // answered or dismissed item disappears from here too, not just the modal.
   const answeredToolUseIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
   const dismissedSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
+  // PAN-1520 (FR-5/FR-7) — plan-approval marks are tracked separately so a
+  // dismissed AUQ never hides a pending plan on the same subject.
+  const resolvedPlanToolUseIds = useAskUserQuestionUiStore((s) => s.resolvedPlanToolUseIds);
+  const dismissedPlanSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedPlanSubjectIds);
 
   // Resolve a friendly title per issue id so the entry reads like a human label
   // (e.g. the issue title) rather than the raw id. PAN-1520.
@@ -214,19 +218,28 @@ function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?:
     }> = [];
     for (const subject of scoped) {
       const toolUseId = subject.pendingAskUserQuestion?.toolUseId;
-      if (toolUseId && answeredToolUseIds.has(toolUseId)) continue;
-      if (dismissedSubjectIds.has(subject.agentId)) continue;
+      const planToolUseId = subject.pendingProposedPlan?.toolUseId;
+      const auqResolved = !toolUseId || answeredToolUseIds.has(toolUseId) || dismissedSubjectIds.has(subject.agentId);
+      const planResolved = !planToolUseId || resolvedPlanToolUseIds.has(planToolUseId) || dismissedPlanSubjectIds.has(subject.agentId);
+      // Keep the row while ANY of its surfaces is still unresolved. A subject
+      // whose only kinds carry no payload (sessionResume, rateLimit,
+      // permissionRequest) uses the AUQ dismissal like before.
+      const hasPayload = Boolean(toolUseId || planToolUseId);
+      if (hasPayload ? (auqResolved && planResolved) : dismissedSubjectIds.has(subject.agentId)) continue;
       const q = subject.pendingAskUserQuestion;
       const count = q?.questions?.length ?? 0;
-      const detail = q?.questions?.[0]?.question ?? describePendingInput(subject.kinds);
+      const detail =
+        (!auqResolved ? q?.questions?.[0]?.question : undefined) ??
+        (!planResolved && planToolUseId ? 'Plan awaiting your approval — click to review' : undefined) ??
+        describePendingInput(subject.kinds);
       const label = (subject.issueId && titleByIssueId.get(subject.issueId)) || subject.issueId || subject.agentId;
-      const dedupKey = toolUseId ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
+      const dedupKey = (!auqResolved ? toolUseId : undefined) ?? (!planResolved ? planToolUseId : undefined) ?? `${subject.issueId ?? subject.agentId}::${label}::${detail}`;
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
       out.push({ key: dedupKey, agentId: subject.agentId, label, detail, count, title: describePendingInput(subject.kinds) });
     }
     return out;
-  }, [scoped, answeredToolUseIds, dismissedSubjectIds, titleByIssueId]);
+  }, [scoped, answeredToolUseIds, dismissedSubjectIds, resolvedPlanToolUseIds, dismissedPlanSubjectIds, titleByIssueId]);
 
   // Keep the section mounted while any raw subject exists so AnimatePresence can
   // animate the last answered/dismissed card out before the box collapses.

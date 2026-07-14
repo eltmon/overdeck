@@ -49,7 +49,13 @@ if declare -f pan_resolve_agent_id >/dev/null && pan_resolve_agent_id; then
   fi
 fi
 
-REASON='Your question has been surfaced to the operator in the Overdeck dashboard, where they answer it directly. Restate the question and its options to the operator as a short plain-text message and wait for their reply (it arrives as a normal user message).'
+# The literal "(PAN-1520)" marker is LOAD-BEARING: scanPendingInputsPromise
+# (src/lib/agent-enrichment.ts, ASK_USER_QUESTION_HOOK_DENY_MARKER) keys on it
+# to keep the question PENDING after this deny. A deny reason without the
+# marker is treated as a real operator answer — the dashboard modal,
+# notification, and needs-you entry never fire (this exact regression shipped
+# in a rewording and silently killed AUQ detection until 2026-07-13).
+REASON='Your question has been surfaced to the operator in the Overdeck dashboard, where they answer it directly. Restate the question and its options to the operator as a short plain-text message and wait for their reply (it arrives as a normal user message). (PAN-1520)'
 
 CONTEXT=$(echo "$INPUT" | jq -r '
   def fmt_option:

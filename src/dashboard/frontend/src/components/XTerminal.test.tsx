@@ -30,11 +30,15 @@ vi.mock('@xterm/xterm', () => ({
       (this.constructor as typeof this.constructor & { instances: unknown[] }).instances.push(this);
     }
     wheelHandler: ((event: WheelEvent) => boolean) | null = null;
+    keyEventHandler: ((event: KeyboardEvent) => boolean) | null = null;
     onData(): { dispose(): void } { return { dispose() {} }; }
     onSelectionChange(): { dispose(): void } { return { dispose() {} }; }
     onResize(): { dispose(): void } { return { dispose() {} }; }
     attachCustomWheelEventHandler = vi.fn((handler: (event: WheelEvent) => boolean) => {
       this.wheelHandler = handler;
+    });
+    attachCustomKeyEventHandler = vi.fn((handler: (event: KeyboardEvent) => boolean) => {
+      this.keyEventHandler = handler;
     });
     getSelection(): string { return ''; }
     hasSelection(): boolean { return false; }
@@ -169,6 +173,15 @@ describe('XTerminal', () => {
     await waitFor(() => {
       expect(screen.getByTitle('Terminal settings')).toBeInTheDocument();
     });
+  });
+
+  it('allows the terminal frame to shrink inside constrained flex layouts (PAN-2619)', () => {
+    const { container } = render(<XTerminal sessionName="test-session" />);
+    const frame = container.firstElementChild;
+    const terminalSurface = container.querySelector('.absolute.inset-2');
+
+    expect(frame).toHaveClass('min-w-0', 'min-h-0', 'overflow-hidden');
+    expect(terminalSurface).not.toHaveStyle({ padding: '8px' });
   });
 
   it('loads auto-copy setting from localStorage', async () => {
@@ -325,7 +338,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-0') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
     expect(terminalSurface).toBeTruthy();
 
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
@@ -349,7 +362,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-0') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
     fireEvent.click(await screen.findByText('Paste'));
 
@@ -380,6 +393,80 @@ describe('XTerminal', () => {
     expect(result).toBe(true);
     expect(preventDefault).toHaveBeenCalled();
     expect(stopPropagation).toHaveBeenCalled();
+  });
+
+  it('lets plain Ctrl+V fall through to the native browser paste on non-Mac', async () => {
+    // Earlier tests stub getItem with a persistent return value; pin the
+    // "nothing stored" default explicitly.
+    vi.mocked(localStorageMock.getItem).mockReturnValue(null);
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ keyEventHandler: ((event: KeyboardEvent) => boolean) | null }> }).instances[0];
+    expect(term.keyEventHandler).toBeTruthy();
+
+    // Plain Ctrl+V keydown: xterm must skip it (return false) so the browser's
+    // trusted `paste` event reaches xterm's helper textarea.
+    const ctrlV = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlV)).toBe(false);
+
+    // Ctrl+Shift+V and other keys keep xterm's default handling.
+    const ctrlShiftV = new KeyboardEvent('keydown', { key: 'V', ctrlKey: true, shiftKey: true });
+    expect(term.keyEventHandler!(ctrlShiftV)).toBe(true);
+    const plainV = new KeyboardEvent('keydown', { key: 'v' });
+    expect(term.keyEventHandler!(plainV)).toBe(true);
+    const ctrlC = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlC)).toBe(true);
+    // keyup for the same combo must not be swallowed either.
+    const ctrlVUp = new KeyboardEvent('keyup', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlVUp)).toBe(true);
+  });
+
+  it('sends Ctrl+V to the terminal when the Ctrl+V-pastes setting is off', async () => {
+    // Stored 'false' → vim-friendly mode: xterm keeps its default handling
+    // (literal ^V to the pty) and paste falls back to Ctrl+Shift+V.
+    vi.mocked(localStorageMock.getItem).mockReturnValue('false');
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ keyEventHandler: ((event: KeyboardEvent) => boolean) | null }> }).instances[0];
+    expect(term.keyEventHandler).toBeTruthy();
+
+    const ctrlV = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlV)).toBe(true);
+  });
+
+  it('toggling the Ctrl+V-pastes setting takes effect without recreating the terminal', async () => {
+    const user = userEvent.setup();
+    vi.mocked(localStorageMock.getItem).mockReturnValue(null);
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ keyEventHandler: ((event: KeyboardEvent) => boolean) | null }> }).instances[0];
+    const ctrlV = new KeyboardEvent('keydown', { key: 'v', ctrlKey: true });
+    expect(term.keyEventHandler!(ctrlV)).toBe(false);
+
+    await user.click(screen.getByTitle('Terminal settings'));
+    await user.click(screen.getByLabelText('Ctrl+V pastes clipboard'));
+
+    expect(localStorageMock.setItem).toHaveBeenCalledWith(
+      'overdeck.terminal.ctrlVPaste',
+      'false'
+    );
+    // Same handler instance (terminal not recreated) now lets Ctrl+V through.
+    expect(term.keyEventHandler!(ctrlV)).toBe(true);
   });
 });
 

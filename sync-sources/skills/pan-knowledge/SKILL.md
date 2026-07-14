@@ -49,7 +49,7 @@ The agent runs a sequence of `/okf` commands depending on the flags you pass:
 
 The command first tries to ensure `mnemos` is available on `PATH` (installing it
 on demand if necessary) and ingest the resolved bundle. If mnemos is unavailable,
-it falls back to the built-in OKF search scripts under `skills/okf/scripts/`.
+it resolves the installed `okf` skill and falls back to its bundled `scripts/` directory.
 
 ## When to Use
 

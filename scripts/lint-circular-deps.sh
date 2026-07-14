@@ -50,8 +50,7 @@ current=$(mktemp)
 "$MADGE" --circular --json --extensions ts,tsx \
   --exclude '\/(__tests__|__mocks__)\/|\.(test|spec)\.(ts|tsx)$|\.d\.ts$' \
   src/ 2>/dev/null > "$current_raw" || true
-node "$CANON" < "$current_raw" > "$current"
-sort -o "$current" "$current"
+node "$CANON" < "$current_raw" | LC_ALL=C sort -u > "$current"
 rm -f "$current_raw"
 
 # Regen mode: rewrite the baseline from the current cycle list.
@@ -72,7 +71,7 @@ fi
 
 # Load baseline into a sorted file for comparison.
 baseline=$(mktemp)
-sort "$BASELINE" > "$baseline"
+LC_ALL=C sort -u "$BASELINE" > "$baseline"
 
 # Update mode: only drop cycles that no longer exist; never add new ones.
 if [[ "$MODE" == "update" ]]; then
@@ -89,7 +88,7 @@ if [[ "$MODE" == "update" ]]; then
     fi
   done < "$baseline"
 
-  sort "$tmp" > "$BASELINE"
+  LC_ALL=C sort -u "$tmp" > "$BASELINE"
   rm -f "$tmp" "$current" "$baseline"
   echo "✓ circular-deps baseline updated: $dropped dropped, $unchanged unchanged"
   exit 0
@@ -97,8 +96,8 @@ fi
 
 # Check mode: detect new cycles (in current but not baseline) and stale cycles
 # (in baseline but not current).
-new_cycles=$(comm -23 "$current" "$baseline" || true)
-stale_cycles=$(comm -13 "$current" "$baseline" || true)
+new_cycles=$(LC_ALL=C comm -23 "$current" "$baseline" || true)
+stale_cycles=$(LC_ALL=C comm -13 "$current" "$baseline" || true)
 
 fail=0
 if [[ -n "$new_cycles" ]]; then

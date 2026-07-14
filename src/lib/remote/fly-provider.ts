@@ -564,45 +564,6 @@ export class FlyProvider implements RemoteProvider {
     return { claude, github };
   }
 
-  /** Install beads CLI (bd) on a remote VM */
-  async installBeads(vmName: string): Promise<boolean> {
-    // Check if already installed
-    const check = await this.sshImpl(vmName, 'which bd 2>/dev/null');
-    if (check.exitCode === 0 && check.stdout.trim()) return true;
-
-    // Canonical install script (same source as the host prereqs registry).
-    // Running as root it lands in /usr/local/bin, which stays on PATH even
-    // under the Machines exec HOME=/ quirk.
-    const result = await this.sshImpl(
-      vmName,
-      'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash 2>&1'
-    );
-    if (result.exitCode !== 0) return false;
-    const verify = await this.sshImpl(vmName, 'which bd 2>/dev/null');
-    return verify.exitCode === 0 && verify.stdout.trim().length > 0;
-  }
-
-  /** Initialize beads in a workspace on a remote VM */
-  async initBeads(vmName: string, workspacePath: string = '/workspace'): Promise<boolean> {
-    // The cloned .beads/config.yaml carries the repo's sync.remote (an SSH
-    // git URL). VMs are keyless — bd init tries to clone that remote and
-    // fails before creating the local DB. Disable it: the host owns beads
-    // sync; the VM's DB is a local working copy seeded from issues.jsonl.
-    await this.sshImpl(
-      vmName,
-      `cd ${workspacePath} && [ -f .beads/config.yaml ] && sed -i 's|^sync.remote:|# vm-local (keyless): sync.remote:|' .beads/config.yaml || true`
-    );
-    // --from-jsonl seeds the DB from the synced issues.jsonl; the default
-    // init imports from git history, which fetches the beads remote and
-    // fails on keyless VMs (and its failed clone destroys .beads working
-    // files, including the just-synced issues.jsonl).
-    const result = await this.sshImpl(
-      vmName,
-      `cd ${workspacePath} && (bd init --prefix PAN --from-jsonl --non-interactive 2>&1 || bd init --from-jsonl --non-interactive 2>&1)`
-    );
-    return result.exitCode === 0;
-  }
-
   /** Configure Claude Code on a VM for autonomous operation */
   async configureClaudeCode(vmName: string): Promise<void> {
     await this.sshImpl(vmName, 'mkdir -p ~/.claude');
@@ -668,48 +629,6 @@ with open(path, "w") as f:
       }
     } catch {
       // Non-fatal: skills are optional
-    }
-  }
-
-  /** Sync beads from remote VM to git: exports JSONL, commits, and pushes */
-  async syncBeadsToGit(
-    vmName: string,
-    workspacePath: string = '/workspace',
-    commitMessage?: string
-  ): Promise<boolean> {
-    const msg = commitMessage ?? 'chore: sync beads from remote';
-
-    // Export beads to JSONL
-    const exportResult = await this.sshImpl(
-      vmName,
-      `cd ${workspacePath} && bd export --output .beads/issues.jsonl 2>&1`
-    );
-    if (exportResult.exitCode !== 0) {
-      return false;
-    }
-
-    // Commit and push
-    const gitResult = await this.sshImpl(
-      vmName,
-      `cd ${workspacePath} && git add .beads/ && git diff --cached --quiet || (git commit -m ${JSON.stringify(msg)} && git push origin HEAD) 2>&1`
-    );
-    return gitResult.exitCode === 0;
-  }
-
-  /** Query beads on a remote VM via bd search */
-  async queryBeads(
-    vmName: string,
-    searchTerm: string,
-    workspacePath: string = '/workspace'
-  ): Promise<unknown[]> {
-    const result = await this.sshImpl(
-      vmName,
-      `cd ${workspacePath} && bd search ${JSON.stringify(searchTerm)} --json 2>/dev/null || echo '[]'`
-    );
-    try {
-      return JSON.parse(result.stdout.trim() || '[]');
-    } catch {
-      return [];
     }
   }
 

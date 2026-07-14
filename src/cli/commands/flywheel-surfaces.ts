@@ -97,7 +97,9 @@ export async function backlogForecastCommand(opts: { n?: string } = {}): Promise
   }
   const nodes = parsed.doc.nodes;
   const labelsByNumber = await fetchOpenIssueLabels();
-  const lk = buildClassifyLookups(projectRoot, { labels: (id) => labelsByNumber.get(id.replace(/^[A-Za-z]+-/, '')) ?? [] });
+  const lk = buildClassifyLookups(projectRoot, {
+    labels: (id) => labelsByNumber.get(id.replace(/^[A-Za-z]+-/, '')) ?? [],
+  });
   const autoPickupBacklog = isFlywheelAutoPickupBacklog();
   const inFlight = nodes
     .map((x) => ({ issue: x.issue, rank: x.rank, state: classifyIssue(x, lk) }))

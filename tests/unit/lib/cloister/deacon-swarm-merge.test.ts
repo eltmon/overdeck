@@ -91,7 +91,7 @@ describe('deacon-swarm ready-slot merge', () => {
       expect.objectContaining({ id: 'wi-1' }),
     );
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      join(workspacePath, '.pan', 'spec.vbrief.json'),
+      'PAN-2203',
       { type: 'done', itemId: 'wi-1', writerId: 'deacon-swarm' },
       workspacePath,
     );
@@ -163,10 +163,10 @@ describe('PAN-2372 WI-4 merge clears the durable slot-completion marker (FR-6, A
     const fakeDeps = deps({ merged: true, conflicts: false });
     // Seed a durable marker for the slot about to merge, plus a sibling marker
     // that must survive (only the merged slot's marker is cleared).
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
       slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-2203-slot-1', completedAt: '2026-07-01T00:00:00.000Z',
     });
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
       slotIndex: 2, itemId: 'wi-2', agentId: 'agent-pan-2203-slot-2', completedAt: '2026-07-01T00:00:00.000Z',
     });
 

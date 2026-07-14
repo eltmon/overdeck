@@ -11,7 +11,7 @@
  *
  * Empty case: "No PR yet for feature/<id>". Error case: surface gh error inline.
  *
- * Backend lands in pan-9yn5 (this bead). Polls every 30s — same cadence as costs.
+ * Backend lands in pan-9yn5 (this task). Polls every 30s — same cadence as costs.
  */
 
 import { useMemo, useRef } from 'react';

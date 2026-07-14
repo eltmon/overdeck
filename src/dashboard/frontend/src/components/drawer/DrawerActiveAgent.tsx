@@ -4,7 +4,7 @@ import { getHarness } from '@overdeck/contracts';
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
 import { isAgentProblemStatus } from '../../lib/pipeline-state';
 import { isAwaitingInput } from '../../lib/pendingInput';
-import { useDashboardStore, selectAgentOutput } from '../../lib/store';
+import { useDashboardStore, selectAgentOutput, selectPendingPermissionAgentIds } from '../../lib/store';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
 import { AgentTellForm } from '../AgentTellForm';
 import type { Agent } from '../../types';
@@ -30,11 +30,11 @@ function stuckHours(agent: Agent, now: Date) {
   return Math.max(0, Math.floor((now.getTime() - sinceTime) / 3_600_000));
 }
 
-function verbBadgeForAgent(agent: Agent): VerbBadgeProps {
+function verbBadgeForAgent(agent: Agent, pendingPermissionAgentIds?: ReadonlySet<string>): VerbBadgeProps {
   if (isAgentProblemStatus(agent.status) || agent.troubled) {
     return { variant: 'STUCK · Nh', hours: stuckHours(agent, new Date()), className: 'text-[9px]' };
   }
-  if (isAwaitingInput(agent)) return { variant: 'INPUT', className: 'text-[9px]' };
+  if (isAwaitingInput(agent, pendingPermissionAgentIds)) return { variant: 'INPUT', className: 'text-[9px]' };
   if (agent.status === 'stopped') return { variant: 'STOPPED', className: 'text-[9px]' };
   if (agent.role === 'plan') return { variant: 'PLANNING', className: 'text-[9px]' };
   if (agent.role === 'review' || agent.role === 'test') return { variant: 'REVIEW RUNNING', className: 'text-[9px]' };
@@ -76,6 +76,7 @@ function formatSpend(cost: number | undefined) {
 export default function DrawerActiveAgent() {
   const { agents } = useDrawerData();
   const activeAgent = agents.find(isActiveAgent) ?? null;
+  const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
   const agentOutput = useDashboardStore(
     activeAgent ? selectAgentOutput(activeAgent.id) : () => [],
   );
@@ -167,7 +168,7 @@ export default function DrawerActiveAgent() {
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-[8px]">
             <h3 className="truncate font-mono text-[13px] font-semibold leading-none text-foreground">{activeAgent.id}</h3>
-            <VerbBadge {...verbBadgeForAgent(activeAgent)} />
+            <VerbBadge {...verbBadgeForAgent(activeAgent, pendingPermissionAgentIds)} />
           </div>
           <div className="mt-[6px] text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
             {activeAgent.status === 'stopped' ? 'Stopped Agent — send a message to resume' : 'Active Agent'}

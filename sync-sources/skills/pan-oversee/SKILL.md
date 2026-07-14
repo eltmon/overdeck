@@ -27,7 +27,7 @@ Supervise an agent working on an issue through the **entire lifecycle**:
 `spawn/resume → work → completion → review → feedback loop → test → merge-ready`
 
 This is NOT passive monitoring. You are actively:
-- **Watching for bugs at every stage** — dashboard rendering, agent spawning, workspace creation, beads lifecycle, specialist handoffs, status transitions, terminal output, API responses
+- **Watching for bugs at every stage** — dashboard rendering, agent spawning, workspace creation, vBRIEF tasks lifecycle, specialist handoffs, status transitions, terminal output, API responses
 - **Documenting everything** — no bug is too small. If something flickers, logs a warning, shows stale data, or doesn't match expected state, that's a finding
 - **Fixing infrastructure bugs** when they block progress, then continuing the test
 - **Filing or updating GitHub issues** (PAN-XXX) for every bug found
@@ -344,7 +344,7 @@ When you find a bug in the Overdeck infrastructure:
 Be thorough. All of these are findings worth logging:
 - Dashboard shows wrong status, stale data, or flickers
 - Agent state file says one thing, dashboard shows another
-- Beads not created, duplicated, or disappearing
+- vBRIEF tasks not created, duplicated, or disappearing
 - Specialist doesn't wake up or takes too long
 - Terminal output garbled or missing
 - API returns unexpected response

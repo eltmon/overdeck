@@ -21,7 +21,6 @@ import * as NodePath from '@effect/platform-node/NodePath';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
-import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveStateReadHomeSync, shouldCommitLegacyWorkspaceArtifacts } from '../../lib/state-read-home.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
@@ -32,10 +31,10 @@ import {
   readIssueRecordSync,
   readRecordContinueViewSync,
   resolveProjectForIssue,
-  writeIssueRecordSync,
   writeRecordDecisionsSync,
   writeRecordScopeDriftSync,
 } from '../../lib/pan-dir/record.js';
+import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
 import type { MergeSet } from '../../lib/merge-set.js';
 import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
 import { compileGlob } from '../../lib/vbrief/dag.js';
@@ -445,7 +444,7 @@ export async function completeSlotWork(issueId: string, slot: SlotCompletionCont
   // derives item completion from this marker.
   const { persistAndVerifySwarmSlotCompletion } = await import('../../lib/cloister/deacon-swarm-record.js');
   const workspacePath = slot.workspacePath ?? process.cwd();
-  const persisted = persistAndVerifySwarmSlotCompletion(workspacePath, issueId, {
+  const persisted = await persistAndVerifySwarmSlotCompletion(workspacePath, issueId, {
     slotIndex: slot.slotIndex,
     itemId: slot.slotItemId,
     agentId: slot.agentId,
@@ -601,11 +600,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
   // PAN-2207: clear stale deacon recovery tombstone before pre-flight.
   try {
     const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
-    const record = readIssueRecordSync(project, issueId);
-    if (record?.pipeline?.panDoneRecoveredAt) {
+    await updateIssueRecord(project, issueId, (record) => {
+      if (!record.pipeline.panDoneRecoveredAt) return;
       const { panDoneRecoveredAt: _, ...pipeline } = record.pipeline;
-      writeIssueRecordSync(project, issueId, { ...record, pipeline });
-    }
+      return { ...record, pipeline };
+    });
   } catch (e: any) {
     console.warn(`[pan done] Failed to clear recovery tombstone (non-fatal): ${e?.message ?? e}`);
   }
@@ -917,7 +916,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       scopeDrift,
     });
 
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
     spinner.succeed(`Work complete: ${issueId}`);
     emitActivityEntrySync({
@@ -1049,9 +1047,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
     }
 
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
   } catch (error: any) {
     spinner.fail(error.message);

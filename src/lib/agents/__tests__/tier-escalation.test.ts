@@ -20,9 +20,9 @@ function config(overrides: Partial<ValidatedEscalationConfig> = {}): ValidatedEs
   };
 }
 
-function bead(difficulty: VBriefDifficulty): VBriefItem {
+function task(difficulty: VBriefDifficulty): VBriefItem {
   return {
-    id: 'bead-a',
+    id: 'task-a',
     title: 'Escalate me',
     status: 'running',
     metadata: { difficulty },
@@ -32,14 +32,14 @@ function bead(difficulty: VBriefDifficulty): VBriefItem {
 describe('decideEscalation', () => {
   it('retries while attempts at the current tier remain, then promotes exactly one difficulty step', () => {
     const first = decideEscalation(
-      { kind: 'verification-failed', beadId: 'bead-a', detail: 'typecheck failed' },
-      bead('simple'),
+      { kind: 'verification-failed', taskId: 'task-a', detail: 'typecheck failed' },
+      task('simple'),
       config({ retries_at_tier: 2 }),
       {},
     );
     const exhausted = decideEscalation(
-      { kind: 'verification-failed', beadId: 'bead-a', detail: 'typecheck failed', attemptsAtCurrentTier: 2 },
-      bead('simple'),
+      { kind: 'verification-failed', taskId: 'task-a', detail: 'typecheck failed', attemptsAtCurrentTier: 2 },
+      task('simple'),
       config({ retries_at_tier: 2 }),
       {},
     );
@@ -55,11 +55,11 @@ describe('decideEscalation', () => {
 
   it('blocks when max promotions are already reached', () => {
     const decision = decideEscalation(
-      { kind: 'supervisor-blocked', beadId: 'bead-a', sha: 'abcdef123456', attemptsAtCurrentTier: 2 },
-      bead('simple'),
+      { kind: 'supervisor-blocked', taskId: 'task-a', sha: 'abcdef123456', attemptsAtCurrentTier: 2 },
+      task('simple'),
       config({ max_promotions: 1 }),
       {
-        'bead-a': {
+        'task-a': {
           effectiveDifficulty: 'medium',
           promotions: 1,
           history: [{ at: '2026-07-02T00:00:00.000Z', from: 'simple', to: 'medium', reason: 'test' }],
@@ -69,49 +69,49 @@ describe('decideEscalation', () => {
 
     expect(decision).toEqual({
       action: 'block',
-      reason: 'max promotions reached for bead-a at medium',
+      reason: 'max promotions reached for task-a at medium',
     });
   });
 
   it('blocks promotion when max_promotions is zero', () => {
     const decision = decideEscalation(
-      { kind: 'verification-failed', beadId: 'bead-a', detail: 'typecheck failed', attemptsAtCurrentTier: 1 },
-      bead('simple'),
+      { kind: 'verification-failed', taskId: 'task-a', detail: 'typecheck failed', attemptsAtCurrentTier: 1 },
+      task('simple'),
       config({ retries_at_tier: 1, max_promotions: 0 }),
       {},
     );
 
     expect(decision).toEqual({
       action: 'block',
-      reason: 'max promotions reached for bead-a at simple',
+      reason: 'max promotions reached for task-a at simple',
     });
   });
 
-  it('blocks expert beads because the ladder has no higher difficulty', () => {
+  it('blocks expert tasks because the ladder has no higher difficulty', () => {
     const decision = decideEscalation(
-      { kind: 'floundering', beadId: 'bead-a', dispatchedAt: '2026-07-02T10:00:00.000Z', now: '2026-07-02T11:00:00.000Z' },
-      bead('expert'),
+      { kind: 'floundering', taskId: 'task-a', dispatchedAt: '2026-07-02T10:00:00.000Z', now: '2026-07-02T11:00:00.000Z' },
+      task('expert'),
       config(),
       {},
     );
 
     expect(decision).toEqual({
       action: 'block',
-      reason: 'expert bead bead-a cannot promote beyond expert',
+      reason: 'expert task task-a cannot promote beyond expert',
     });
   });
 
   it('is deterministic for identical inputs', () => {
     const trigger: EscalationTrigger = {
       kind: 'supervisor-blocked',
-      beadId: 'bead-a',
+      taskId: 'task-a',
       sha: 'abcdef123456',
       attemptsAtCurrentTier: 3,
     };
-    const item = bead('medium');
+    const item = task('medium');
     const escalation = config({ retries_at_tier: 1, max_promotions: 3 });
     const overrides = {
-      'bead-a': {
+      'task-a': {
         effectiveDifficulty: 'medium' as const,
         promotions: 1,
         history: [{ at: '2026-07-02T00:00:00.000Z', from: 'simple' as const, to: 'medium' as const, reason: 'test' }],
@@ -135,7 +135,7 @@ describe('decideEscalation', () => {
 
   it('exports foreman seams for verification failure and floundering triggers', () => {
     expect(decideVerificationFailureEscalation({
-      bead: bead('simple'),
+      task: task('simple'),
       config: config({ retries_at_tier: 0 }),
       overrides: {},
       detail: 'gate failed',
@@ -147,7 +147,7 @@ describe('decideEscalation', () => {
     });
 
     expect(decideFlounderingEscalation({
-      bead: bead('medium'),
+      task: task('medium'),
       config: config({ retries_at_tier: 0, flounder_budget_minutes: { medium: 30 } }),
       overrides: {},
       dispatchedAt: '2026-07-02T10:00:00.000Z',
@@ -160,7 +160,7 @@ describe('decideEscalation', () => {
     });
 
     expect(decideFlounderingEscalation({
-      bead: bead('medium'),
+      task: task('medium'),
       config: config({ flounder_budget_minutes: {} }),
       overrides: {},
       dispatchedAt: '2026-07-02T10:00:00.000Z',

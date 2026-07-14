@@ -15,7 +15,7 @@ vi.mock('../hooks/useTheme', () => ({
   useTheme: () => ({ theme: 'dark', toggleTheme: vi.fn() }),
 }));
 
-function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; status: string }>; experimentalFeatures?: boolean } = {}) {
+function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; status: string }>; experimentalFeatures?: boolean; onOpenUpdater?: () => void } = {}) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -45,7 +45,7 @@ function renderSidebar(options: { activeTab?: Tab; runs?: Array<{ id: string; st
 
   const { container } = render(
     <QueryClientProvider client={client}>
-      <Sidebar activeTab={options.activeTab ?? 'pipeline'} onTabChange={onTabChange} onSearchOpen={onSearchOpen} />
+      <Sidebar activeTab={options.activeTab ?? 'pipeline'} onTabChange={onTabChange} onSearchOpen={onSearchOpen} onOpenUpdater={options.onOpenUpdater} />
     </QueryClientProvider>,
   );
 
@@ -103,6 +103,16 @@ describe('Sidebar navigation', () => {
     const logo = screen.getByTitle('Go to Home');
     fireEvent.click(logo);
     expect(onTabChange).toHaveBeenCalledWith('home');
+  });
+
+  it('makes the version a separate, descriptive updater action', async () => {
+    const onOpenUpdater = vi.fn();
+    renderSidebar({ onOpenUpdater });
+
+    const version = await screen.findByRole('button', { name: 'Overdeck version 0.5.0. Click to check for updates.' });
+    expect(version).toHaveAttribute('title', 'Click to update Overdeck to the latest version');
+    fireEvent.click(version);
+    expect(onOpenUpdater).toHaveBeenCalledOnce();
   });
 
   it('keeps collapsed-mode icons clickable', () => {

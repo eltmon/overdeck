@@ -24,6 +24,7 @@ import {
   isStartupSyncNeededSync,
   writeSyncManifestSync,
 } from '../../lib/sync.js';
+import { executeAgentSkillsSync, planAgentSkillsSync } from '../../lib/harness-skill-sync.js';
 import { SYNC_TARGET, SYNC_SOURCES, isDevMode } from '../../lib/paths.js';
 import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -33,7 +34,8 @@ import { migrateOverdeckToPanSync } from '../../lib/workspace-manager.js';
 import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-tool-sync.js';
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
-import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
+import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
+import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -133,6 +135,17 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
           `${chalk.yellow(`${count('conflict')} user-modified (skipped)`)}`,
       );
     }
+    console.log('');
+
+    console.log(chalk.cyan('~/.agents/skills/ (Codex + Pi + Oh My Pi):'));
+    const agentSkillPlan = planAgentSkillsSync();
+    const agentCount = (s: string) => agentSkillPlan.filter((i) => i.status === s).length;
+    console.log(
+      `  ${chalk.green(`${agentCount('new')} new`)}, ` +
+        `${chalk.blue(`${agentCount('symlink')} update`)}, ` +
+        `${chalk.dim(`${agentCount('exists')} unchanged or user-owned`)}, ` +
+        `${chalk.yellow(`${agentCount('conflict')} user-modified (skipped)`)}`,
+    );
     console.log('');
 
     // Context layers → CLAUDE.md managed regions
@@ -264,10 +277,15 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (cacheResult.rules.copied > 0) cacheParts.push(`${cacheResult.rules.copied} rules`);
   cacheSpinner.succeed(`Cache refreshed: ${cacheParts.length > 0 ? cacheParts.join(', ') : 'up to date'}`);
 
-  // Distribute bundled skills + agents into the user's Claude Code home.
-  const spinner = ora('Distributing skills and agents to ~/.claude/...').start();
+  // Distribute bundled skills + agents to Claude and native skill bundles to
+  // the Agent Skills standard home used by Codex, Pi, and Oh My Pi.
+  const spinner = ora('Distributing skills across agent harnesses...').start();
   const result = time('execute-sync', () => executeSyncSync({ force: options.force, diff: options.diff }));
+  const agentSkillsResult = time('execute-agent-skills-sync', () =>
+    executeAgentSkillsSync({ force: options.force, diff: options.diff }),
+  );
   const totalSynced = result.created.length + result.updated.length + result.adopted.length;
+  const totalAgentSkillsSynced = agentSkillsResult.created.length + agentSkillsResult.updated.length;
   const adoptionSummary = result.adopted.length > 0
     ? `, ${result.adopted.length} adopted (legacy pre-manifest installs)`
     : '';
@@ -292,19 +310,19 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  if (result.conflicts.length > 0 && !options.force) {
-    spinner.warn(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary}, ${result.conflicts.length} user-modified (skipped)`);
+  if (result.conflicts.length + agentSkillsResult.conflicts.length > 0 && !options.force) {
+    spinner.warn(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}, ${result.conflicts.length + agentSkillsResult.conflicts.length} user-modified (skipped)`);
     console.log('');
     console.log(chalk.yellow('Modified since Overdeck installed:'));
-    for (const name of result.conflicts) {
+    for (const name of [...result.conflicts, ...agentSkillsResult.conflicts.map((name) => `~/.agents/skills/${name}`)]) {
       console.log(chalk.dim(`  - ${name}`));
     }
     console.log('');
     console.log(chalk.dim('Use --force to overwrite, --diff to see changes.'));
-  } else if (result.skipped.length > 0) {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary} (${result.skipped.length} unchanged or user-owned)`);
+  } else if (result.skipped.length + agentSkillsResult.skipped.length > 0) {
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary} (${result.skipped.length + agentSkillsResult.skipped.length} unchanged or user-owned)`);
   } else {
-    spinner.succeed(`Synced ${totalSynced} items to ~/.claude/${adoptionSummary}`);
+    spinner.succeed(`Synced ${totalSynced} Claude items and ${totalAgentSkillsSynced} shared skill files${adoptionSummary}`);
   }
 
   // Render the layered context into harness CLAUDE.md files (PAN-1201).
@@ -316,6 +334,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   if (ctx.projectsWritten.length > 0) {
     ctxParts.push(`${ctx.projectsWritten.length} project file(s)`);
   }
+  if (ctx.legacyBeadsCleanups.length > 0) {
+    ctxParts.push(`${ctx.legacyBeadsCleanups.length} legacy Beads reference file(s) cleaned`);
+  }
   if (ctx.errors.length > 0) {
     ctxSpinner.warn(`Context layers rendered with ${ctx.errors.length} error(s)`);
     for (const e of ctx.errors) console.log(chalk.red(`  ✗ ${e}`));
@@ -323,6 +344,11 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     ctxSpinner.succeed(`Context layers rendered: ${ctxParts.join(', ')}`);
   } else {
     ctxSpinner.info('Context layers already up to date');
+  }
+
+  for (const cleanup of ctx.legacyBeadsCleanups) {
+    console.log(chalk.green(`  ✓ Removed legacy generated Beads references: ${cleanup.file}`));
+    console.log(chalk.dim(`    Backup: ${cleanup.backupPath}`));
   }
 
   // One-time notice: a managed region was added to a file that already had
@@ -362,38 +388,32 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hooksSpinner.info('No hooks to sync');
   }
 
-  // Ensure beads database exists for each registered project (first-time setup guard).
-  // bd install puts the binary in PATH, but bd init must be run once per project to
-  // create the Dolt database. Without it, workspace beads creation silently fails.
+  // Registration is as important as copying the scripts. Repair the complete
+  // global hook table on every explicit sync so upgrades cannot leave an old
+  // heartbeat hook present while SessionStart is still missing.
+  const hookRegistrationSpinner = ora('Registering Claude Code hooks...').start();
+  const hookProvision = await timeAsync('register-claude-hooks', () => provisionClaudeHooks());
+  if (!hookProvision.ok) {
+    hookRegistrationSpinner.warn(`Claude Code hooks unavailable: ${hookProvision.reason}`);
+  } else if (hookProvision.changed) {
+    hookRegistrationSpinner.succeed(`Registered ${hookProvision.registered.length} Claude Code hook(s)`);
+  } else {
+    hookRegistrationSpinner.info('Claude Code hooks already registered');
+  }
+
   const projects = listProjectsSync();
-  if (projects.length > 0 && checkCommand('bd')) {
-    for (const { key, config } of projects) {
-      if (!existsSync(config.path)) continue;
-      const mainBeadsDir = join(config.path, '.beads');
-      if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
-      const bdRoot = resolveStateReadHomeSync(config).root;
-      // Test connectivity. If the database is missing, auto-init.
-      try {
-        execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
-      } catch (e: any) {
-        const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
-        if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-          const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
-          try {
-            const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd -C ${JSON.stringify(bdRoot)} init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
-            try { execSync('git config beads.role contributor', { cwd: config.path, stdio: 'pipe' }); } catch { /* non-fatal */ }
-            beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
-          } catch {
-            beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);
-          }
-        }
-      }
+  for (const { key, config } of projects) {
+    if (!existsSync(config.path)) continue;
+    const migrationSpinner = ora(`Reconciling permanent state for ${config.name}...`).start();
+    const migration = await ensureAutomaticStateMigration(key, config);
+    if (migration.status === 'ready') {
+      migrationSpinner.succeed(`Permanent state ready for ${config.name}`);
+    } else {
+      migrationSpinner.warn(formatAutomaticStateMigrationBlock(migration));
     }
   }
 
-
-  // Check jq availability (required by statusline, beads, specialists)
+  // Check jq availability (required by statusline and specialists)
   if (!checkCommand('jq')) {
     console.log(chalk.yellow('\n  ⚠ jq not found — statusline and other features need it'));
     console.log(chalk.dim('    Install: apt install jq / brew install jq\n'));
@@ -558,34 +578,6 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       gitHooksSpinner.succeed(`Installed git hooks in ${projectsUpdated} project(s)`);
     } else {
       gitHooksSpinner.info('Git hooks already up to date');
-    }
-  }
-
-  // Ensure beads database exists for each registered project (first-time setup guard).
-  // bd install puts the binary in PATH, but bd init must be run once per project to
-  // create the Dolt database. Without it, workspace beads creation silently fails.
-  if (projects.length > 0 && checkCommand('bd')) {
-    for (const { key, config } of projects) {
-      if (!existsSync(config.path)) continue;
-      const mainBeadsDir = join(config.path, '.beads');
-      if (!existsSync(mainBeadsDir)) continue; // Project hasn't used beads yet — skip
-      const bdRoot = resolveStateReadHomeSync(config).root;
-      // Test connectivity. If the database is missing, auto-init.
-      try {
-        execSync(`bd -C ${JSON.stringify(bdRoot)} list --json --limit 0 2>&1`, { cwd: config.path, stdio: 'pipe', timeout: 8000 });
-      } catch (e: any) {
-        const msg = String(e?.stdout ?? e?.stderr ?? e?.message ?? '');
-        if (msg.includes('database') && (msg.includes('not found') || msg.includes('not exist') || msg.includes('defaulting'))) {
-          const beadsSpinner = ora(`Initializing beads database for ${config.name}...`).start();
-          try {
-            const prefix = (key || config.name).toLowerCase().replace(/[^a-z0-9-]/g, '-');
-            execSync(`bd -C ${JSON.stringify(bdRoot)} init --prefix ${prefix}`, { cwd: config.path, stdio: 'pipe', timeout: 20000 });
-            beadsSpinner.succeed(`Beads database initialized for ${config.name} (prefix: ${prefix})`);
-          } catch {
-            beadsSpinner.warn(`Could not auto-initialize beads for ${config.name} — run: cd ${config.path} && bd init`);
-          }
-        }
-      }
     }
   }
 

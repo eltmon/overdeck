@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -7,8 +7,6 @@ import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
-import { assertIssueHasBeads, BeadsMissingError } from '../beads-query.js';
-import { BdTransientFailure } from '../bd-process-lock.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isTldrEnabledSync, loadConfigSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from '../overdeck/conversations.js';
@@ -78,9 +76,9 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-
+import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
+import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 const execAsync = promisify(exec);
-
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
   const modelSpawnKey = `${role}:${issueId}`;
@@ -125,7 +123,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   }
 
   const flywheelEnv = resolveFlywheelSpawnEnv(role, options.flywheelRunId);
-
   const agentId = options.agentId ?? runAgentId(issueId, role, options.subRole);
   if (await Effect.runPromise(sessionExists(agentId))) {
     // PAN-2579 (warm-by-default lifecycle): advancing-role sessions are no longer
@@ -159,7 +156,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   }
 
   await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
-
   initHookSync(agentId);
 
   const resolvedHarness: RuntimeName = await resolveHarness({
@@ -167,6 +163,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     role,
     model: selectedModel,
   });
+  await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
 
   if (
     getProviderForModelSync(selectedModel).name === 'openai'
@@ -231,8 +228,6 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
       await Effect.runPromise(saveAgentState(state));
     }
   }
-
-  checkAndSetupHooks();
 
   const provider = getProviderForModelSync(selectedModel as ModelId);
   if (provider.authType === 'credential-file') {
@@ -464,29 +459,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Initialize hook for this agent (FPP support)
   initHookSync(agentId);
 
-  // Strike agents bypass the normal pipeline (no plan/beads/review/test) —
-  // see roles/strike.md. The beads gate is the only thing we skip; everything
-  // else (workspace health, supervisor wiring, launcher) is identical.
-  if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined) {
-    // Use a short lock timeout when spawning from HTTP handlers so dashboard
-    // requests fail fast to the JSONL fallback instead of blocking behind CLI
-    // processes that hold the cross-process bd lock. The CLI `pan start` path
-    // already performs a long-timeout live query before reaching spawnAgent.
-    try {
-      await Effect.runPromise(
-        assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 500 }),
-      );
-    } catch (error) {
-      if (error instanceof BeadsMissingError && error.transientFailure !== undefined) {
-        const attempts = error.transientFailure instanceof BdTransientFailure
-          ? ` after ${error.transientFailure.attempts} attempts`
-          : '';
-        throw new Error(
-          `Beads database was temporarily locked while checking ${options.issueId}${attempts}; re-run shortly.`
-        );
-      }
-      throw error;
-    }
+  if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined && !readWorkspacePlanSync(options.workspace)) {
+    throw new Error(`The required vBRIEF checklist for ${options.issueId} is missing or unreadable. Run planning before spawning a work agent.`);
   }
 
   // Determine model based on role configuration
@@ -521,7 +495,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role,
     model: selectedModel,
   });
-
+  await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   // Create state
   const state: AgentState = {
     id: agentId,
@@ -535,6 +509,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     startedAt: new Date().toISOString(),
     costSoFar: 0,
     hostOverride: options.allowHost || undefined,
+    sessionId: createFreshSessionIdentity(agentId, resolvedHarness),
   };
 
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
@@ -645,9 +620,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
 
-  // Auto-setup hooks if not configured
-  checkAndSetupHooks();
-
   // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal).
   // Gated by the operator TLDR toggle: when disabled, the daemon is not started
   // and the agent (whose prompt reports TLDR_AVAILABLE=false) degrades to direct
@@ -697,12 +669,14 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     useSupervisor: supervisorLaunch.useSupervisor,
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
+    sessionId: state.sessionId,
     extraEnvExports: flywheelEnvExports(flywheelEnv),
     effort: options.effort,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
   await writeLauncherScriptAtomic(launcherScript, launcherContent);
+  if (state.sessionId) logLauncherSessionPinned(agentId, state.sessionId, launcherScript);
   const claudeCmd = `bash ${launcherScript}`;
   console.log(`[claude-invoke] purpose=work-agent | model=${state.model} | source=agents.ts:spawnAgent | session=${agentId} | command="${claudeCmd}"`);
 
@@ -747,6 +721,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }));
   await saveAgentRuntimeState(agentId, {
+    claudeSessionId: state.sessionId,
     sessionModel: selectedModel,
     sessionHarness: resolvedHarness,
   });
@@ -937,52 +912,8 @@ function escapeRegExp(value: string): string {
 }
 
 /**
- * Check if Overdeck hooks are configured, and auto-setup if not
+ * Write task cache for heartbeat hook to use
  */
-function checkAndSetupHooks(): void {
-  const settingsPath = join(homedir(), '.claude', 'settings.json');
-  const hookPath = join(homedir(), '.overdeck', 'bin', 'heartbeat-hook');
-
-  // Check if settings.json exists and has heartbeat hook configured
-  if (existsSync(settingsPath)) {
-    try {
-      const settingsContent = readFileSync(settingsPath, 'utf-8');
-      const settings = JSON.parse(settingsContent);
-      const postToolUse = settings?.hooks?.PostToolUse || [];
-
-      const hookConfigured = postToolUse.some((hookConfig: any) =>
-        hookConfig.hooks?.some((hook: any) =>
-          hook.command === hookPath ||
-          hook.command?.includes('overdeck') ||
-          hook.command?.includes('heartbeat-hook')
-        )
-      );
-
-      if (hookConfigured) {
-        return; // Already configured
-      }
-    } catch {
-      // Ignore errors, will attempt setup
-    }
-  }
-
-  // Hooks not configured - run setup silently
-  try {
-    console.log('Configuring Overdeck heartbeat hooks...');
-    // Note: This runs during spawn which is now async, so we can use execAsync
-    // But this is called from a sync context in checkAndSetupHooks, so we use fire-and-forget
-    exec('pan admin hooks install', (error: Error | null) => {
-      if (error) {
-        console.warn('⚠ Failed to auto-configure hooks. Run `pan admin hooks install` manually.');
-      } else {
-        console.log('✓ Heartbeat hooks configured');
-      }
-    });
-  } catch (error) {
-    console.warn('⚠ Failed to auto-configure hooks. Run `pan admin hooks install` manually.');
-  }
-}
-
 function writeTaskCache(agentId: string, issueId: string): void {
   const cacheDir = join(getAgentDir(agentId));
   mkdirSync(cacheDir, { recursive: true });

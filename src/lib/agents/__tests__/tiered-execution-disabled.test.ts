@@ -139,14 +139,14 @@ describe('tiered execution enabled with v2 knobs at defaults', () => {
 
   it('keeps feed deliveries byte-identical to the baseline when callouts are off by default', async () => {
     const config = enabledWithDefaultKnobs();
-    const baseline = composeCommitFeedMessage('abc123', 'my bead', 'commit abc123\n+added\n');
+    const baseline = composeCommitFeedMessage('abc123', 'my task', 'commit abc123\n+added\n');
     const deliveries: string[] = [];
 
     await broadcastCommit({
       workspace: '/ws',
       issueId: 'PAN-1',
       sha: 'abc123',
-      beadTitle: 'my bead',
+      taskTitle: 'my task',
       tiers: [{ tierName: 'cheap', agentId: 'agent-pan-1-slot-1' }],
       feedConfig: config.feed,
       gitShow: async () => 'commit abc123\n+added\n',
@@ -183,16 +183,16 @@ describe('tiered execution enabled with v2 knobs at defaults', () => {
       base: 'main',
       tierName: 'standard',
       slotIndex: 7,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
       feedConfig: config.feed,
       reroute: {
         doc: {
           vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00.000Z' },
-          plan: { id: 'pan-1', title: 'plan', status: 'running', items: [item({ difficulty: 'expert' }, 'bead-a')] },
+          plan: { id: 'pan-1', title: 'plan', status: 'running', items: [item({ difficulty: 'expert' }, 'task-a')] },
         },
         config,
         tierOverrides: {
-          'bead-a': {
+          'task-a': {
             effectiveDifficulty: 'expert',
             promotions: 1,
             history: [{ at: '2026-07-02T00:00:00.000Z', from: 'medium', to: 'expert', reason: 'ignored while off' }],
@@ -206,14 +206,14 @@ describe('tiered execution enabled with v2 knobs at defaults', () => {
           deliveries.push(message);
           return { ok: true, path: 'tmux' };
         },
-        gitLog: async () => [{ sha: 'abc123', subject: 'bead-a' }],
+        gitLog: async () => [{ sha: 'abc123', subject: 'task-a' }],
         gitShow: async () => 'commit abc123\n+added\n',
       },
     });
 
     expect(replay.agent.id).toBe('agent-pan-1-slot-7');
-    expect(spawnCalls).toEqual([{ slotIndex: 7, slotItemId: 'bead-a', prompt: undefined }]);
-    expect(deliveries).toEqual([composeCommitFeedMessage('abc123', 'bead-a', 'commit abc123\n+added\n')]);
+    expect(spawnCalls).toEqual([{ slotIndex: 7, slotItemId: 'task-a', prompt: undefined }]);
+    expect(deliveries).toEqual([composeCommitFeedMessage('abc123', 'task-a', 'commit abc123\n+added\n')]);
   });
 
   it('routes by difficulty when by_kind is absent, even for judgment-deliverable kinds', () => {

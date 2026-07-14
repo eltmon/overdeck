@@ -58,6 +58,7 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
+import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
 import { untroubledCommand } from './commands/untroubled.js';
@@ -117,14 +118,14 @@ import { registerReleaseCommands } from './commands/release.js';
 import { registerRolloutCommands } from './commands/rollout.js';
 import { isNoResumeCliOptionEnabled } from '../lib/cloister/no-resume-mode.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates } from '../lib/boot-gates.js';
-import { resourcesCommand } from './commands/resources.js';
+import { registerResourceCommands } from './commands/resources.js';
 import { devCommand } from './commands/dev.js';
 import { registerScopeCommands } from './commands/scope.js';
 import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
-import { registerSwarmCommands } from './commands/swarm.js';
+import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -434,7 +435,7 @@ const planCmd = program
 
 planCmd
   .command('finalize')
-  .description('Materialize plan into beads, mark the workspace spec as proposed, and promote to main')
+  .description('Mark the workspace plan as proposed and promote it to canonical state')
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
@@ -444,22 +445,21 @@ planCmd
 
 planCmd
   .command('done <id>')
-  .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .description('Complete planning — promote the vBRIEF and transition the issue to Planned')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
-// Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .action(tellCommand);
-
 program
   .command('kill <id>')
+  .alias('stop')
   .description('Stop running agent (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
-
+registerResetToPlannedCommand(program);
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')
@@ -490,6 +490,7 @@ program
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--issue <id>', 'Issue ID to associate with the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
   .option('--author-harness <harness>', 'Ignored: author harness is provider-default-only (PAN-1984)')
@@ -577,7 +578,7 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
-  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
+  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
@@ -593,7 +594,7 @@ program
   .option('--dry-run', 'Print what would happen without spawning')
   .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
 configureKnowledgeCommand(program);
-registerSwarmCommands(program);
+registerSwarmCommands(program); registerTaskCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
 registerTtsCommands(program);
@@ -620,7 +621,7 @@ registerOhmypiAuthCommands(program);
 // Register install command
 registerInstallCommand(program);
 
-// Register inspect command (pan inspect <issueId> --bead <beadId>)
+// Register inspect command (pan inspect <issueId> --item <itemId>)
 registerInspectCommand(program);
 
 // Register caveman commands (pan caveman-compress)
@@ -725,20 +726,12 @@ program
     // server from even spawning, and the dashboard does not depend on synced
     // content to boot. Deferring it shaves that ~22s off time-to-available.
 
-    // Ensure tmux is installed — required for all agent/conversation sessions
+    // Ensure host tools every agent/conversation session needs are installed:
+    // tmux is fatal if missing; the work
+    // pipeline needs it). See ensureHostTools in the prereq registry.
     {
-      const { isToolInstalled, installTool } = await import('../lib/prereqs/registry.js');
-      if (!(await isToolInstalled('tmux'))) {
-        console.log(chalk.yellow('  tmux is required but not found. Installing...'));
-        const result = await installTool('tmux');
-        if (result.success) {
-          console.log(chalk.green(`  ✓ ${result.message}`));
-        } else {
-          console.error(chalk.red(`  ✗ Failed to install tmux: ${result.message}`));
-          console.error(chalk.dim('  Install manually: brew install tmux (macOS) or sudo apt-get install tmux (Linux)'));
-          process.exit(1);
-        }
-      }
+      const { ensureHostTools } = await import('../lib/prereqs/registry.js');
+      await ensureHostTools();
     }
 
     // Flush stale provider env vars from the tmux server's global environment.
@@ -1369,12 +1362,7 @@ program
   .option('--strict', 'Exit non-zero if any optional dependency is missing (e.g. Pi binary)')
   .action((options) => doctorCommand(options));
 
-// Resources command
-program
-  .command('resources')
-  .description('Show RAM usage by agents, conversations, and system processes')
-  .option('--json', 'Output as JSON')
-  .action(resourcesCommand);
+registerResourceCommands(program);
 
 // Update command
 program

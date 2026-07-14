@@ -306,14 +306,7 @@ with open(path, "w") as f:
     spinner.text = 'Copying skills to remote VM...';
     await fly.copySkillsToVm(vmName);
 
-    // Step 5: Install beads CLI on remote VM
-    spinner.text = 'Installing beads CLI...';
-    const bdInstalled = await fly.installBeads(vmName);
-    if (bdInstalled) {
-      await fly.initBeads(vmName, '~/workspace');
-    }
-
-    // Step 6: Save workspace metadata
+    // Step 5: Save workspace metadata
     const metadata: RemoteWorkspaceMetadata = {
       id: normalizedId,
       issue: issueId.toUpperCase(),

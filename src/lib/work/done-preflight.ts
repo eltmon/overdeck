@@ -1,316 +1,80 @@
-import { existsSync, readdirSync } from 'fs';
-import { readFile } from 'fs/promises';
-import { join, resolve } from 'path';
-import { exec, execFile } from 'child_process';
-import { promisify } from 'util';
-import chalk from 'chalk';
+import { exec } from 'node:child_process';
+import { existsSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { promisify } from 'node:util';
+
 import { Effect } from 'effect';
+
 import { ProcessSpawnError } from '../errors.js';
 import { isStatePlaneOnlyStatus } from '../state-plane.js';
-import { getVBriefACStatusSync, syncBeadStatusToVBrief } from '../vbrief/beads.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { subItemsOf } from '../vbrief/types.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
+const terminal = new Set(['completed', 'cancelled']);
 
-const BD_LIST_TIMEOUT_MS = 10_000;
-
-type BeadRecord = Record<string, unknown>;
-
-function errorCode(error: unknown): unknown {
-  return error instanceof Error
-    ? (error as unknown as Record<string, unknown>).code
-    : undefined;
-}
-
-function isMissingCommand(error: unknown): boolean {
-  const code = errorCode(error);
-  return code === 'ENOENT' || code === 127;
-}
-
-function isTimeout(error: unknown): boolean {
-  if (!(error instanceof Error)) return false;
-  const record = error as unknown as Record<string, unknown>;
-  return record.killed === true ||
-    record.signal === 'SIGTERM' ||
-    record.signal === 'SIGKILL' ||
-    /timed out|timeout/i.test(error.message);
-}
-
-async function readIssueBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadRecord[] | null> {
-  // Workspaces share main's beads DB via `.beads/redirect`; the workspace-local
-  // issues.jsonl is a frozen snapshot from workspace-creation time and does NOT
-  // reflect bead closes made against the redirected DB. Follow the redirect so the
-  // completion gate reads the live bead ledger, not a stale snapshot (PAN-2195:
-  // a stale snapshot produced false "open beads" / "unchecked ACs" and blocked
-  // `pan done` for completed work after a replan).
-  const beadsDir = join(workspacePath, '.beads');
-  let jsonlPath = join(beadsDir, 'issues.jsonl');
-  const redirectPath = join(beadsDir, 'redirect');
-  if (existsSync(redirectPath)) {
-    const target = (await readFile(redirectPath, 'utf-8')).trim();
-    if (target) jsonlPath = join(resolve(workspacePath, target), 'issues.jsonl');
-  }
-  if (!existsSync(jsonlPath)) return null;
-
-  const label = issueId.toLowerCase();
-  return (await readFile(jsonlPath, 'utf-8'))
-    .split('\n')
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as BeadRecord)
-    .filter((bead) => {
-      const labelsMatch = Array.isArray(bead.labels) && bead.labels.map(String).includes(label);
-      const titleMatch = typeof bead.title === 'string' && bead.title.toLowerCase().includes(label);
-      return labelsMatch || titleMatch;
-    });
-}
-
-async function listBeadsByStatus(
-  workspacePath: string,
-  issueId: string,
-  status: 'open' | 'closed',
-  preloadedBeads?: BeadRecord[] | null,
-): Promise<string> {
-  if (preloadedBeads !== undefined && preloadedBeads !== null) {
-    return JSON.stringify(preloadedBeads.filter((bead) => bead.status === status));
-  }
-
-  // Prefer the workspace beads DB directly — it is authoritative for this issue
-  // and avoids the PAN-XXX label/title filtering pitfall (PAN-1812).
-  const jsonlBeads = await readIssueBeadsFromJsonl(workspacePath, issueId);
-  if (jsonlBeads !== null) {
-    return JSON.stringify(jsonlBeads.filter((bead) => bead.status === status));
-  }
-
-  try {
-    const { stdout } = await execFileAsync(
-      'bd',
-      ['list', '--status', status, '--title-contains', issueId.toLowerCase(), '--limit', '0', '--json'],
-      {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-        timeout: BD_LIST_TIMEOUT_MS,
-        killSignal: 'SIGKILL',
-      },
-    );
-    return stdout;
-  } catch (error) {
-    if (!isMissingCommand(error) && !isTimeout(error)) throw error;
-    throw error;
-  }
-}async function checkOpenBeadsPromise(workspacePath: string, issueId: string, preloadedBeads?: BeadRecord[] | null): Promise<string[]> {
-  let stdout: string;
-  try {
-    stdout = await listBeadsByStatus(workspacePath, issueId, 'open', preloadedBeads);
-  } catch (error: unknown) {
-    if (isMissingCommand(error)) return [];
-    if (isTimeout(error)) {
-      // PAN-1812: a timeout is unknown, not proof of zero open beads. Do not
-      // let the completion gate pass while the bead source of truth is unavailable.
-      return [`  Open beads check timed out after ${BD_LIST_TIMEOUT_MS / 1000}s — cannot verify whether open beads exist; retry or resolve bead store lock contention`];
+export function checkIncompletePlanItemsSync(workspacePath: string): string[] {
+  const doc = readWorkspacePlanSync(workspacePath);
+  if (!doc) return ['  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.'];
+  const incomplete = doc.plan.items.flatMap((item) => {
+    const lines: string[] = [];
+    if (!terminal.has(item.status)) lines.push(`    - ${item.id} ${item.title} (${item.status})`);
+    for (const child of subItemsOf(item)) {
+      if (!terminal.has(child.status)) lines.push(`    - ${item.id}.${child.id} ${child.title} (${child.status})`);
     }
-    return ['  Open beads check failed — run `bd list --status open` to diagnose'];
-  }
-
-  let beads: unknown;
-  try {
-    beads = JSON.parse(stdout);
-  } catch {
-    return ['  Open beads check produced invalid output — run `bd list --status open` to diagnose'];
-  }
-
-  if (!Array.isArray(beads) || beads.length === 0) return [];
-
-  const lines: string[] = [`  Open beads (${beads.length}):`];
-  for (const bead of beads as Array<Record<string, unknown>>) {
-    const id = String(bead.id ?? bead.beadId ?? '?');
-    const task = String(bead.task ?? bead.subject ?? bead.title ?? 'untitled');
-    lines.push(`    - ${id} ${task}`);
-  }
-  return lines;
+    return lines;
+  });
+  return incomplete.length === 0 ? [] : [`  Incomplete plan items (${incomplete.length}):`, ...incomplete];
 }
 
-function getNonStatePlaneStatusLines(porcelain: string): string[] {
-  return porcelain
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .filter(Boolean)
-    .filter((line) => !isStatePlaneOnlyStatus(line));
+export async function checkIncompletePlanItemsPromise(workspacePath: string, _issueId?: string): Promise<string[]> {
+  return checkIncompletePlanItemsSync(workspacePath);
+}
+
+function nonStateLines(porcelain: string): string[] {
+  return porcelain.split('\n').map((line) => line.trimEnd()).filter(Boolean).filter((line) => !isStatePlaneOnlyStatus(line));
 }
 
 async function checkUncommittedChangesPromise(workspacePath: string): Promise<string[]> {
-  const hasTopLevelGit = existsSync(join(workspacePath, '.git'));
-
-  if (hasTopLevelGit) {
-    // Monorepo — single git status check
+  if (existsSync(join(workspacePath, '.git'))) {
     try {
-      const { stdout } = await execAsync('git status --porcelain', { cwd: workspacePath });
-      const nonStatePlaneLines = getNonStatePlaneStatusLines(stdout);
-      if (nonStatePlaneLines.length === 0) return [];
-
-      const lines: string[] = ['  Uncommitted changes:'];
-      for (const line of nonStatePlaneLines) {
-        lines.push(`    ${line}`);
-      }
-      return lines;
-    } catch {
-      return [];
-    }
-  } else {
-    // Polyrepo — check each subdir that has a .git file/dir
-    const failures: string[] = [];
-    try {
-      const entries = readdirSync(workspacePath, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
-        const subPath = join(workspacePath, entry.name);
-        if (!existsSync(join(subPath, '.git'))) continue;
-
-        try {
-          const { stdout } = await execAsync('git status --porcelain', { cwd: subPath });
-          const nonStatePlaneLines = getNonStatePlaneStatusLines(stdout);
-          if (nonStatePlaneLines.length > 0) {
-            failures.push(`  Uncommitted changes in ${entry.name}/:`);
-            for (const line of nonStatePlaneLines) {
-              failures.push(`    ${line}`);
-            }
-          }
-        } catch {
-          // skip this sub-repo
-        }
-      }
-    } catch {
-      // can't read workspace dir — skip
-    }
-    return failures;
+      const lines = nonStateLines((await execAsync('git status --porcelain', { cwd: workspacePath })).stdout);
+      return lines.length === 0 ? [] : ['  Uncommitted changes:', ...lines.map((line) => `    ${line}`)];
+    } catch { return []; }
   }
-}
-
-/**
- * Check vBRIEF acceptance criteria completion status.
- *
- * Returns an array of failure lines (empty = pass or vBRIEF not available).
- * NOTE: Call syncBeadStatusToVBrief before this to ensure closed beads are reflected.
- */
-export function checkVBriefACStatusSync(workspacePath: string): string[] {
-  try {
-    const acStatus = getVBriefACStatusSync(workspacePath);
-    if (!acStatus || acStatus.allCompleted) return [];
-
-    const lines: string[] = [
-      `  Incomplete acceptance criteria (${acStatus.totalPending}/${acStatus.totalCount}):`,
-    ];
-    for (const item of acStatus.items) {
-      if (item.pending > 0) {
-        for (const ac of item.criteria) {
-          if (ac.status !== 'completed' && ac.status !== 'cancelled') {
-            lines.push(`    - [ ] ${ac.title} (${item.itemTitle})`);
-          }
-        }
-      }
-    }
-    return lines;
-  } catch {
-    // vBRIEF not available — skip check
-    return [];
-  }
-}async function runPreflightChecksPromise(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
   const failures: string[] = [];
-
-  // Check 1: Open beads
-  const beadFailures = await Effect.runPromise(checkOpenBeads(workspacePath, issueId));
-  failures.push(...beadFailures);
-
-  // Check 2: Uncommitted changes
-  const gitFailures = await Effect.runPromise(checkUncommittedChanges(workspacePath));
-  failures.push(...gitFailures);
-
-  // Sync closed beads to vBRIEF before AC check
   try {
-    const stdout = await listBeadsByStatus(workspacePath, issueId, 'closed');
-    const closedBeads = JSON.parse(stdout || '[]');
-    let synced = 0;
-    for (const bead of closedBeads) {
-      if (bead.id) {
-        const itemId = await Effect.runPromise(syncBeadStatusToVBrief(bead.id, workspacePath, 'completed', bead.title));
-        if (itemId) synced++;
-      }
+    for (const entry of readdirSync(workspacePath, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const path = join(workspacePath, entry.name);
+      if (!existsSync(join(path, '.git'))) continue;
+      try {
+        const lines = nonStateLines((await execAsync('git status --porcelain', { cwd: path })).stdout);
+        if (lines.length > 0) failures.push(`  Uncommitted changes in ${entry.name}/:`, ...lines.map((line) => `    ${line}`));
+      } catch { /* ignore unreadable sub-repositories */ }
     }
-    if (synced > 0) {
-      // eslint-disable-next-line no-console
-      console.log(chalk.dim(`  Synced ${synced} closed bead(s) to vBRIEF AC status`));
-    }
-  } catch {
-    // Non-fatal — sync failure shouldn't block completion check
-  }
-
-  // Check 3: vBRIEF AC status
-  const acFailures = checkVBriefACStatusSync(workspacePath);
-  failures.push(...acFailures);
-
-  // Check 4: Test-requirement gate (PAN-1501 / PAN-1454 pattern 8)
-  // Blocks pan done when the issue body asks for tests but the branch adds no
-  // new lines under *.test.ts / *.spec.ts / *.test.tsx / *.spec.tsx.
-  const testRequirementFailures = await Effect.runPromise(
-    runTestRequirementCheck(workspacePath, issueId, testWaived),
-  );
-  failures.push(...testRequirementFailures);
-
+  } catch { /* ignore unreadable workspace */ }
   return failures;
 }
 
-// ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
-// Additive Effect wrappers around the public preflight checks. Each variant
-// preserves the existing "soft-failure" semantics — the original functions
-// already swallow errors and return failure-line arrays, so the Effect
-// channel for these is effectively `never` for the bead / git checks. The
-// `runPreflightChecks` wrapper surfaces a `ProcessSpawnError` only if its
-// underlying `bd` invocation throws something the inner catch missed (which
-// today it does not, but we keep the typed channel for future hardening).
+async function runPreflightChecksPromise(workspacePath: string, issueId: string, testWaived?: string): Promise<string[]> {
+  return [
+    ...checkIncompletePlanItemsSync(workspacePath),
+    ...await checkUncommittedChangesPromise(workspacePath),
+    ...await Effect.runPromise(runTestRequirementCheck(workspacePath, issueId, testWaived)),
+  ];
+}
 
-const toPreflightProcessError = (
-  op: string,
-  cause: unknown,
-): ProcessSpawnError =>
-  new ProcessSpawnError({
-    command: 'done-preflight',
-    args: [op],
-    message: cause instanceof Error ? cause.message : String(cause),
-    cause,
-  });
+const processError = (op: string, cause: unknown) => new ProcessSpawnError({
+  command: 'done-preflight', args: [op], message: cause instanceof Error ? cause.message : String(cause), cause,
+});
 
-/** Check for open beads scoped to an issue (Effect variant). */
-export const checkOpenBeads = (
-  workspacePath: string,
-  issueId: string,
-): Effect.Effect<string[], ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => checkOpenBeadsPromise(workspacePath, issueId),
-    catch: (cause) => toPreflightProcessError('checkOpenBeads', cause),
-  });
+export const checkIncompletePlanItems = (workspacePath: string): Effect.Effect<string[]> =>
+  Effect.sync(() => checkIncompletePlanItemsSync(workspacePath));
 
-/** Check for uncommitted changes in a workspace (Effect variant). */
-export const checkUncommittedChanges = (
-  workspacePath: string,
-): Effect.Effect<string[], ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => checkUncommittedChangesPromise(workspacePath),
-    catch: (cause) => toPreflightProcessError('checkUncommittedChanges', cause),
-  });
+export const checkUncommittedChanges = (workspacePath: string): Effect.Effect<string[], ProcessSpawnError> =>
+  Effect.tryPromise({ try: () => checkUncommittedChangesPromise(workspacePath), catch: (cause) => processError('checkUncommittedChanges', cause) });
 
-/** Check vBRIEF acceptance-criteria status (Effect variant — pure, never fails). */
-export const checkVBriefACStatus = (
-  workspacePath: string,
-): Effect.Effect<string[]> =>
-  Effect.sync(() => checkVBriefACStatusSync(workspacePath));
-
-/** Run all `pan done` pre-flight checks (Effect variant). */
-export const runPreflightChecks = (
-  workspacePath: string,
-  issueId: string,
-  testWaived?: string,
-): Effect.Effect<string[], ProcessSpawnError> =>
-  Effect.tryPromise({
-    try: () => runPreflightChecksPromise(workspacePath, issueId, testWaived),
-    catch: (cause) => toPreflightProcessError('runPreflightChecks', cause),
-  });
+export const runPreflightChecks = (workspacePath: string, issueId: string, testWaived?: string): Effect.Effect<string[], ProcessSpawnError> =>
+  Effect.tryPromise({ try: () => runPreflightChecksPromise(workspacePath, issueId, testWaived), catch: (cause) => processError('runPreflightChecks', cause) });

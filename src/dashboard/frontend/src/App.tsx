@@ -5,6 +5,7 @@ import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
 import { AskUserQuestionDialog } from './components/AskUserQuestionDialog';
+import { PlanApprovalDialog } from './components/PlanApprovalDialog';
 import { EventRouter } from './components/EventRouter';
 import { SearchModal } from './components/search/SearchModal';
 import { CommandPalette, type ConversationPaletteOpenRequest } from './components/CommandPalette';
@@ -14,6 +15,7 @@ import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar'
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
+import { UpdateDialog } from './components/UpdateDialog';
 
 import { useCodexAutoRetry } from './hooks/useCodexAutoRetry';
 import { CostWarningStyles } from './components/shared/costWarning';
@@ -209,6 +211,7 @@ export default function App() {
 
   const [_planDialogIssueId, setPlanDialogIssueId] = useState<string | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isUpdateDialogOpen, setIsUpdateDialogOpen] = useState(false);
   // Issue prefix of the deck's selected project, reported by CommandDeck — scopes
   // the app-bar search to that project (PAN-1593).
   const [searchProjectPrefix, setSearchProjectPrefix] = useState<string | null>(null);
@@ -508,6 +511,11 @@ export default function App() {
     isAskUserQuestionSubmitting,
     handleSubmitAskUserQuestion,
     handleDismissAskUserQuestion,
+    currentPlanApprovalSubject,
+    isPlanActionSubmitting,
+    handleApprovePlan,
+    handleRequestPlanChanges,
+    handleDismissPlanApproval,
     currentConfirmation,
     handleConfirm,
     handleDeny,
@@ -555,6 +563,8 @@ export default function App() {
         const count = parseInt(parts[1] ?? '0', 10);
         const max = parseInt(parts[2] ?? '5', 10);
         showAutoStartNag(count, max);
+      } else if (action === 'open-updater') {
+        setIsUpdateDialogOpen(true);
       }
     });
     return unsub;
@@ -670,6 +680,7 @@ export default function App() {
         selectedProject={selectedProjectKey}
         onSelectProject={handleSelectProject}
         onNewProject={handleNewProject}
+        onOpenUpdater={() => setIsUpdateDialogOpen(true)}
       />
 
       {/* Main content area */}
@@ -736,6 +747,12 @@ export default function App() {
 
       <IssueDrawer />
 
+      <UpdateDialog
+        isOpen={isUpdateDialogOpen}
+        runningAgentCount={runningAgentCount}
+        onClose={() => setIsUpdateDialogOpen(false)}
+      />
+
       <ChannelPermissionDialog
         request={currentChannelPermissionRequest}
         issueId={currentChannelPermissionIssueId}
@@ -753,6 +770,17 @@ export default function App() {
         isSubmitting={isAskUserQuestionSubmitting}
         onSubmit={handleSubmitAskUserQuestion}
         onDismiss={handleDismissAskUserQuestion}
+      />
+
+      {/* PAN-1520 (FR-3) — plan-approval popup modal. Priority: permission
+          modal > AUQ dialog > plan dialog (extends the existing exclusion). */}
+      <PlanApprovalDialog
+        subject={currentPlanApprovalSubject}
+        isOpen={!!currentPlanApprovalSubject && !currentChannelPermissionRequest && !currentAskUserQuestionSubject}
+        isSubmitting={isPlanActionSubmitting}
+        onApprove={handleApprovePlan}
+        onRequestChanges={handleRequestPlanChanges}
+        onDismiss={handleDismissPlanApproval}
       />
 
       {/* Confirmation Dialog */}

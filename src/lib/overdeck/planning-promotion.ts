@@ -23,7 +23,6 @@ import { isStateMigrated } from '../state-home.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { killSession, sessionExists } from '../tmux.js';
-import type { CreateBeadsResult } from '../vbrief/beads.js';
 import { findPlan, findWorkspaceDraftPlan, readPlan } from '../vbrief/io.js';
 import { assertPlanQuality, PlanQualityLintError } from '../vbrief/quality-lint.js';
 import { flushAutoCommits } from '../pan-dir/auto-commit.js';
@@ -143,7 +142,6 @@ export async function completePlanningArtifacts(options: {
   projectPath: string;
   workspacePath: string;
   issueId: string;
-  createBeads?: (workspacePath: string) => Promise<CreateBeadsResult> | Effect.Effect<CreateBeadsResult, unknown>;
 }): Promise<{ proposed: { path: string; filename: string }; beadCount: number; beadsWarning: string | null }> {
   const { projectPath, workspacePath, issueId } = options;
   const issueLower = issueId.toLowerCase();
@@ -162,14 +160,8 @@ export async function completePlanningArtifacts(options: {
   }
   assertPlanQuality(workspaceDoc);
 
-  const createBeads = options.createBeads ?? (async (path: string) => {
-    const mod = await import('../vbrief/beads.js');
-    return (await Effect.runPromise(mod.createBeadsFromVBrief(path)));
-  });
-
   emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed vBRIEF spec', { projectPath });
   const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
-  const previousSpecContents = existingSpec ? await readFile(existingSpec.path, 'utf-8').catch(() => null) : null;
   let proposed: { path: string; filename: string };
   try {
     proposed = existingSpec
@@ -189,38 +181,9 @@ export async function completePlanningArtifacts(options: {
     throw error;
   }
 
-  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'start', 'materializing beads from proposed vBRIEF', { workspacePath });
-  const rawBeadsResult = createBeads(workspacePath);
-  const beadsResult = Effect.isEffect(rawBeadsResult)
-    ? await Effect.runPromise(rawBeadsResult)
-    : await rawBeadsResult;
-  const created = beadsResult.created ?? [];
-  const errors = beadsResult.errors ?? [];
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
-  if (planItemCount === 0 || !beadsResult.success || created.length !== planItemCount) {
-    if (existingSpec && previousSpecContents !== null) {
-      await writeFile(existingSpec.path, previousSpecContents, 'utf-8');
-    } else if (!existingSpec) {
-      await rm(proposed.path, { force: true });
-      await rm(dirname(proposed.path), { force: true }).catch(() => undefined);
-    }
-    const detail = errors.length > 0
-      ? errors.join('; ')
-      : `created ${created.length} beads for ${planItemCount} plan items`;
-    emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'failure', detail, {
-      workspacePath,
-      beadCount: created.length,
-      planItemCount,
-    });
-    throw new Error(`Failed to materialize beads for ${upperIssueId}: ${detail}`);
-  }
-  emitCompletePlanningPhase(upperIssueId, 'beadsMaterialize', 'success', 'beads materialized', {
-    workspacePath,
-    beadCount: created.length,
-    planItemCount,
-  });
-
-  return { proposed, beadCount: created.length, beadsWarning: null };
+  if (planItemCount === 0) throw new Error(`The vBRIEF for ${upperIssueId} contains no implementation items.`);
+  return { proposed, beadCount: planItemCount, beadsWarning: null };
 }
 
 export function completePlanningFilesToStage(projectPath: string, proposedFilename: string, migrated = false): string[] {
@@ -237,9 +200,6 @@ export function completePlanningWorkspaceGitAddCommands(gitRoot: string, migrate
   const commands: string[][] = [];
   if (!migrated && existsSync(join(gitRoot, '.pan'))) {
     commands.push(['add', '.pan/']);
-  }
-  if (!migrated && existsSync(join(gitRoot, '.beads'))) {
-    commands.push(['add', '.beads/']);
   }
   // PAN-2386: the polyrepo scaffold .gitignore is created during workspace setup
   // but the workspace may not be a git repo yet, leaving it untracked. Stage it

@@ -29,6 +29,63 @@ import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './is
 
 const execAsync = promisify(exec);
 
+// Planning/pipeline artifact paths ignored when deciding whether a branch
+// still holds unmerged CODE. `.pan/` is the current artifact home (PAN-967);
+// `.planning/` and `docs/prds/` are legacy; `.overdeck/` is workspace runtime.
+const ARTIFACT_PATH_PREFIXES = ['.pan/', '.planning/', 'docs/prds/', '.overdeck/'];
+const ARTIFACT_EXCLUSIONS = ARTIFACT_PATH_PREFIXES
+  .map((prefix) => `':!${prefix.slice(0, -1)}'`)
+  .join(' ');
+
+/**
+ * Squash-merge detection via the forge. A squash-merged branch is never an
+ * ancestor of main and its three-dot diff never empties (the pre-squash
+ * commits stay visible against the merge-base), so pure-git checks report it
+ * unmerged forever. The merged PR is the authoritative record: if a merged PR
+ * has this branch as head, its merge commit landed on main, and the branch has
+ * no post-merge code commits, the branch is merged. Returns false on any
+ * failure (no gh, GitLab remote, no PR) so callers fall through conservatively.
+ */
+async function isSquashMergedViaPr(
+  branchName: string,
+  tipRef: string,
+  projectPath: string,
+): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(
+      `gh pr list --head "${branchName}" --state merged --json headRefOid,mergeCommit --limit 1`,
+      { cwd: projectPath, encoding: 'utf-8', timeout: 15000 },
+    );
+    const prs = JSON.parse(stdout) as Array<{ headRefOid?: string; mergeCommit?: { oid?: string } }>;
+    const pr = prs[0];
+    if (!pr?.headRefOid || !pr.mergeCommit?.oid) return false;
+
+    // The PR's merge commit must actually be on main.
+    await execAsync(`git merge-base --is-ancestor ${pr.mergeCommit.oid} main`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+
+    const { stdout: tipSha } = await execAsync(`git rev-parse "${tipRef}"`, {
+      cwd: projectPath,
+      encoding: 'utf-8',
+    });
+    if (tipSha.trim() === pr.headRefOid) return true;
+
+    // Commits after the merged PR head: merged only if they touch artifacts alone.
+    const { stdout: filesOut } = await execAsync(
+      `git log ${pr.headRefOid}..${tipRef} --name-only --pretty=format:`,
+      { cwd: projectPath, encoding: 'utf-8' },
+    );
+    const files = filesOut.split('\n').map((line) => line.trim()).filter(Boolean);
+    return files.every((file) =>
+      ARTIFACT_PATH_PREFIXES.some((prefix) => file.startsWith(prefix)),
+    );
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Check if a feature branch has been merged into main.
  *
@@ -84,7 +141,7 @@ export async function isBranchMerged(
       // the code was squash-merged and only planning files remain on the branch.
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+          `git diff main...${branchName} -- ${ARTIFACT_EXCLUSIONS} 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
@@ -92,6 +149,14 @@ export async function isBranchMerged(
         }
       } catch {
         // diff failed — fall through to unmerged report
+      }
+
+      // The three-dot diff can never go empty for a squash-merged branch unless
+      // main was merged back into it afterwards — the pre-squash commits stay
+      // visible relative to the merge-base forever. Ask the forge: a merged PR
+      // whose head is this branch, with no post-merge code commits, IS merged.
+      if (await isSquashMergedViaPr(branchName, branchName, projectPath)) {
+        return { status: 'merged', message: `Merged PR found for ${branchName} (squash merge)` };
       }
 
       const { stdout: unmerged } = await execAsync(
@@ -124,7 +189,7 @@ export async function isBranchMerged(
       // Squash-merge detection for remote branch
       try {
         const { stdout: codeDiff } = await execAsync(
-          `git diff main...origin/${branchName} -- ':!.planning' ':!docs/prds' ':!.overdeck/prompts' 2>/dev/null || true`,
+          `git diff main...origin/${branchName} -- ${ARTIFACT_EXCLUSIONS} 2>/dev/null || true`,
           { cwd: projectPath, encoding: 'utf-8' },
         );
         if (!codeDiff.trim()) {
@@ -132,6 +197,10 @@ export async function isBranchMerged(
         }
       } catch {
         // diff failed — fall through
+      }
+
+      if (await isSquashMergedViaPr(branchName, `origin/${branchName}`, projectPath)) {
+        return { status: 'merged', message: `Merged PR found for ${branchName} (squash merge)` };
       }
 
       const { stdout: remoteUnmerged } = await execAsync(

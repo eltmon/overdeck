@@ -5,8 +5,8 @@ describe('groupCommitSubjects', () => {
   it('drops pipeline bookkeeping commits entirely', () => {
     const out = groupCommitSubjects([
       'chore(records): update PAN-1793 per-issue record',
-      'chore(state): batch update 3 pan/beads file(s)',
-      'chore(beads): sync beads state on main',
+      'chore(state): batch update 3 pan/tasks file(s)',
+      'chore(tasks): sync tasks state on main',
       'chore(state): update spec for PAN-1827 (status=completed)',
       'docs: run-16 ticks 6-7 state',
       'chore: reconcile local deacon record commits with origin',

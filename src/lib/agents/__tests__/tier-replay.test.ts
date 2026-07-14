@@ -62,13 +62,13 @@ function deps() {
   });
   const stop = vi.fn(async () => undefined);
   const gitLog = vi.fn(async () => [
-    { sha: '1111111111111111111111111111111111111111', subject: 'bead-a first commit' },
-    { sha: '2222222222222222222222222222222222222222', subject: 'bead-b second commit' },
+    { sha: '1111111111111111111111111111111111111111', subject: 'task-a first commit' },
+    { sha: '2222222222222222222222222222222222222222', subject: 'task-b second commit' },
   ]);
   const gitShow = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/file.ts b/file.ts\n+${sha}\n`);
   const renderDiff = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/file.ts b/file.ts\n+${sha}\n`);
   const listSlotOwnership = vi.fn(() => [
-    { slotIndex: 27, itemId: 'bead-a', agentId: 'agent-pan-1791-slot-27' },
+    { slotIndex: 27, itemId: 'task-a', agentId: 'agent-pan-1791-slot-27' },
   ]);
   return { spawn, deliver, stop, gitLog, gitShow, renderDiff, listSlotOwnership, deliveries };
 }
@@ -111,12 +111,12 @@ describe('tier replay', () => {
       base: 'main',
       tierName: 'standard',
       slotIndex: 27,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
     }, { deps: seams });
 
     expect(seams.spawn).toHaveBeenCalledWith('PAN-1791', 'work', {
       slotIndex: 27,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
       prompt: undefined,
     });
     expect(seams.gitLog).toHaveBeenCalledWith('/ws', 'main');
@@ -131,11 +131,11 @@ describe('tier replay', () => {
       'tier-replay:tier',
     ]);
     expect(seams.deliveries[0].message).toContain('Commit feed (ingestion-only): 1111111111111111111111111111111111111111');
-    expect(seams.deliveries[0].message).toContain('Bead: bead-a first commit');
+    expect(seams.deliveries[0].message).toContain('Task: task-a first commit');
     expect(seams.deliveries[1].message).toContain('Commit feed (ingestion-only): 2222222222222222222222222222222222222222');
   });
 
-  it('compacts only at a tier-run boundary when threshold is exceeded and never mid-bead', async () => {
+  it('compacts only at a tier-run boundary when threshold is exceeded and never mid-task', async () => {
     const seams = deps();
 
     expect(shouldReplayCompactAtTierRunBoundary({
@@ -152,7 +152,7 @@ describe('tier replay', () => {
     })).toBe(false);
     expect(shouldReplayCompactAtTierRunBoundary({
       atRunBoundary: true,
-      inFlightBead: { beadId: 'bead-a', tierName: 'standard', agentId: 'agent-pan-1791-slot-27' },
+      inFlightTask: { taskId: 'task-a', tierName: 'standard', agentId: 'agent-pan-1791-slot-27' },
       estimatedContextTokens: 90,
       modelContextWindow: 100,
       replayThreshold: 0.5,
@@ -167,7 +167,7 @@ describe('tier replay', () => {
         agentId: 'agent-pan-1791-slot-27',
         tierName: 'standard',
         slotIndex: 27,
-        slotItemId: 'bead-a',
+        slotItemId: 'task-a',
       },
       compaction: {
         atRunBoundary: true,
@@ -189,11 +189,11 @@ describe('tier replay', () => {
         agentId: 'agent-pan-1791-slot-27',
         tierName: 'standard',
         slotIndex: 27,
-        slotItemId: 'bead-a',
+        slotItemId: 'task-a',
       },
       compaction: {
         atRunBoundary: true,
-        inFlightBead: { beadId: 'bead-a', tierName: 'standard', agentId: 'agent-pan-1791-slot-27' },
+        inFlightTask: { taskId: 'task-a', tierName: 'standard', agentId: 'agent-pan-1791-slot-27' },
         estimatedContextTokens: 90,
         modelContextWindow: 100,
         replayThreshold: 0.5,
@@ -218,8 +218,8 @@ describe('tier replay', () => {
       base: 'main',
       supervisor,
       doc: doc([
-        item('bead-a', 'first commit', true),
-        item('bead-b', 'second commit', false),
+        item('task-a', 'first commit', true),
+        item('task-b', 'second commit', false),
       ]),
       apiUrl: 'http://example.test',
     }, { deps: seams });
@@ -236,12 +236,12 @@ describe('tier replay', () => {
     expect(seams.deliveries[0].agentId).toBe('agent-pan-1791-review-supervisor');
     expect(seams.deliveries[0].caller).toBe('tier-replay:supervisor');
     expect(seams.deliveries[0].message).toContain('SUPERVISOR REVIEW REQUEST');
-    expect(seams.deliveries[0].message).toContain('Bead: bead-a');
-    expect(seams.deliveries[0].message).not.toContain('bead-b acceptance');
+    expect(seams.deliveries[0].message).toContain('Task: task-a');
+    expect(seams.deliveries[0].message).not.toContain('task-b acceptance');
   });
 
   it('uses the same feed renderer and subject skip for live and replay messages', async () => {
-    const config = feedConfig({ callouts: 'notify', exclude_subjects: ['chore(beads):'] });
+    const config = feedConfig({ callouts: 'notify', exclude_subjects: ['chore(tasks):'] });
     const liveDeliveries: Array<{ message: string }> = [];
     const replaySeams = deps();
     const renderDiff = vi.fn(async (_workspace: string, sha: string) => `commit ${sha}\n\ndiff --git a/src/x.ts b/src/x.ts\n+${sha}\n`);
@@ -251,9 +251,9 @@ describe('tier replay', () => {
       issueId: 'PAN-1791',
       apiUrl: 'http://api.test',
       sha: '1111111111111111111111111111111111111111',
-      beadTitle: 'bead-a first commit',
-      beadId: 'bead-a',
-      commitSubject: 'bead-a first commit',
+      taskTitle: 'task-a first commit',
+      taskId: 'task-a',
+      commitSubject: 'task-a first commit',
       tiers: [{ tierName: 'standard', agentId: 'agent-pan-1791-slot-27' }],
       feedConfig: config,
       renderDiff,
@@ -265,8 +265,8 @@ describe('tier replay', () => {
     });
 
     replaySeams.gitLog.mockResolvedValue([
-      { sha: 'skip111111111111111111111111111111111111', subject: 'chore(beads): close bead' },
-      { sha: '1111111111111111111111111111111111111111', subject: 'bead-a first commit', beadId: 'bead-a' },
+      { sha: 'skip111111111111111111111111111111111111', subject: 'chore(tasks): close task' },
+      { sha: '1111111111111111111111111111111111111111', subject: 'task-a first commit', taskId: 'task-a' },
     ]);
     replaySeams.renderDiff = renderDiff;
 
@@ -277,7 +277,7 @@ describe('tier replay', () => {
       base: 'main',
       tierName: 'standard',
       slotIndex: 27,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
       apiUrl: 'http://api.test',
       feedConfig: config,
     }, { deps: replaySeams });
@@ -288,7 +288,7 @@ describe('tier replay', () => {
     expect(replaySeams.deliveries[0].message).toContain('http://api.test/api/tiered/callouts');
   });
 
-  it('suppresses replay call-out curls when real git log entries lack per-commit bead ids', async () => {
+  it('suppresses replay call-out curls when real git log entries lack per-commit task ids', async () => {
     const seams = deps();
 
     await replayCrashedStandingAgent({
@@ -320,9 +320,9 @@ describe('tier replay', () => {
       agentId: 'agent-pan-1791-slot-27',
       tierName: 'standard',
       slotIndex: 27,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
       reroute: {
-        doc: doc([tierItem('bead-a', 'simple')]),
+        doc: doc([tierItem('task-a', 'simple')]),
         config: tierConfig(),
       },
     };
@@ -369,9 +369,9 @@ describe('tier replay', () => {
       base: 'main',
       tierName: 'standard',
       slotIndex: 27,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
       reroute: {
-        doc: doc([tierItem('bead-a', 'medium')]),
+        doc: doc([tierItem('task-a', 'medium')]),
         config,
       },
     }, { deps: seams });
@@ -380,7 +380,7 @@ describe('tier replay', () => {
     expect(replay?.agent.harness).toBe('codex');
     expect(seams.spawn).toHaveBeenCalledWith('PAN-1791', 'work', {
       slotIndex: 27,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
       prompt: undefined,
       model: 'gpt-5.5',
       harness: 'codex',
@@ -396,9 +396,9 @@ describe('tier replay', () => {
       base: 'main',
       tierName: 'standard',
       slotIndex: 27,
-      slotItemId: 'bead-a',
+      slotItemId: 'task-a',
       reroute: {
-        doc: doc([tierItem('bead-a', 'simple')]),
+        doc: doc([tierItem('task-a', 'simple')]),
         config: tierConfig(),
       },
     };
@@ -412,7 +412,7 @@ describe('tier replay', () => {
       reroute: {
         ...target.reroute,
         tierOverrides: {
-          'bead-a': {
+          'task-a': {
             effectiveDifficulty: 'medium',
             promotions: 1,
             history: [{ at: '2026-07-02T00:00:00.000Z', from: 'simple', to: 'medium', reason: 'test' }],

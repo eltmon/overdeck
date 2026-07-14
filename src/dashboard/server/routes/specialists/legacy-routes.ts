@@ -7,11 +7,9 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeState, transitionIssueToInProgress } from '../../../../lib/agents.js';
-import { queryBeadById } from '../../../../lib/beads-query.js';
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
-import { syncBeadStatusToVBrief } from '../../../../lib/vbrief/beads.js';
 import { readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -304,9 +302,9 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       yield* Effect.promise(async () => {
         try {
           const { onInspectComplete } = await import('../../../../lib/cloister/inspect-agent.js');
-          // Extract beadId from notes (format: "Bead <beadId> matches spec...")
-          const beadMatch = notes?.match(/[Bb]ead\s+(\S+)/);
-          const beadId = beadMatch?.[1] || 'unknown';
+          // Extract taskId from notes (format: "Task <taskId> matches spec...")
+          const taskMatch = notes?.match(/[Bb]ead\s+(\S+)/);
+          const taskId = taskMatch?.[1] || 'unknown';
           // Resolve project to get workspace path
           const project = resolveProjectFromIssueSync(normalizedIssueId);
           if (project) {
@@ -316,45 +314,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              (await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath)));
+              (await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, taskId, 'passed', workspacePath)));
 
-              // Sync bead completion to vBRIEF plan
-              try {
-                const beadData = await Effect.runPromise(queryBeadById(workspacePath, beadId));
-                const updatedItemId = await Effect.runPromise(syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title));
-                if (updatedItemId) {
-                  // Check which tasks are now unblocked and wake the work agent
-                  try {
-                    const unblockedItems = getUnblockedItemsSync(workspacePath, updatedItemId);
-                    if (unblockedItems.length > 0) {
-                      console.log(
-                        `[auto-wake] ${normalizedIssueId}: items unblocked after "${updatedItemId}": ${unblockedItems.join(', ')}`,
-                      );
-                      const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-                      const doc = readWorkspacePlanSync(workspacePath);
-                      const unblockedTitles = unblockedItems
-                        .map((id) => {
-                          const it = doc?.plan.items.find((i) => i.id === id);
-                          return it ? `"${it.title}"` : `"${id}"`;
-                        })
-                        .join(', ');
-                      const wakeMsg = `DAG SCHEDULER: Task${unblockedItems.length > 1 ? 's' : ''} now unblocked after completing "${updatedItemId}": ${unblockedTitles}. Pick up the next available task.`;
-                      await messageAgent(workAgentId, wakeMsg).catch((err: unknown) => {
-                        const errMsg = err instanceof Error ? err.message : String(err);
-                        console.log(
-                          `[auto-wake] Could not wake ${workAgentId} (may not be running): ${errMsg}`,
-                        );
-                      });
-                    }
-                  } catch (wakeErr: unknown) {
-                    const errMsg = wakeErr instanceof Error ? wakeErr.message : String(wakeErr);
-                    console.warn(`[auto-wake] Failed to check unblocked items: ${errMsg}`);
-                  }
-                }
-              } catch (syncErr: unknown) {
-                const errMsg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-                console.warn(`[specialists/done] vBRIEF sync failed: ${errMsg}`);
-              }
             }
           }
         } catch (err) {

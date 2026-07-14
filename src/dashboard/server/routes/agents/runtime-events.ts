@@ -143,7 +143,7 @@ export const postAgentStuckRoute = HttpRouter.add(
 );
 
 function hasNegatedCompletionOutput(output: string): boolean {
-  return /\b(not|never|no|cannot|can't|blocked|waiting|needs input|not yet|isn't|aren't)\b.{0,48}\b(implementation complete|all beads closed|ready for review|work complete)\b/i.test(output);
+  return /\b(not|never|no|cannot|can't|blocked|waiting|needs input|not yet|isn't|aren't)\b.{0,48}\b(implementation complete|all tasks closed|ready for review|work complete)\b/i.test(output);
 }
 
 export const postAgentClassifyCompletionRoute = HttpRouter.add(
@@ -154,7 +154,7 @@ export const postAgentClassifyCompletionRoute = HttpRouter.add(
     const output = typeof body['output'] === 'string' ? body['output'] : '';
     const verdict = /blocked|needs input|waiting for|not ready for review/i.test(output) || hasNegatedCompletionOutput(output)
       ? 'STOPPED_FOR_INPUT'
-      : /Implementation complete|all beads closed|ready for review|work complete/i.test(output)
+      : /Implementation complete|all tasks closed|ready for review|work complete/i.test(output)
         ? 'FORGOT_COMPLETION'
         : 'UNCLEAR';
     return jsonResponse({ success: true, verdict });

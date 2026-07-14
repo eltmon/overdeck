@@ -75,7 +75,7 @@ describe('PiRuntime.spawnAgent precondition checks', () => {
     ).rejects.toThrow(/piExtensionPath/)
   })
 
-  // Full spawn flow with a 30s timeout is exercised by the e2e bead
+  // Full spawn flow with a 30s timeout is exercised by the e2e task
   // workspace-w1o0 (smoke test that drives a real Pi process through one
   // prompt). PiSpawnTimeout is a typed error class — verify it is exported
   // and constructible so consumers can `instanceof` against it.
@@ -322,7 +322,7 @@ describe('PiRuntime.spawnAgent resume via session.id (PAN-636 workspace-3119)', 
   })
 })
 
-describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 bead 8qco)', () => {
+describe('PiRuntime.killAgent escalation ladder + cleanup (PAN-636 task 8qco)', () => {
   let h: ReturnType<typeof withFakeHome>
   beforeEach(() => { h = withFakeHome() })
   afterEach(() => h.cleanup())

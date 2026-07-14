@@ -7,8 +7,10 @@ tree is flat: `records/`, `continues/`, `specs/`, `drafts/`, `review/`,
 
 The completion marker `migration-complete.json` at the tip of
 `origin/overdeck-state` is the only migration authority. A missing branch or
-an unmarked branch is legacy/in-progress; reads continue through the legacy
-`.pan/` fallback and writes remain on the legacy surface until cutover.
+an unmarked branch is legacy/in-progress. `pan sync`, dashboard coordinator
+startup, and work startup automatically attempt the cutover; pipeline startup
+is blocked if its no-loss gates cannot complete, so new writes do not extend
+the legacy surface.
 
 ## Write policy
 
@@ -17,10 +19,26 @@ an unmarked branch is legacy/in-progress; reads continue through the legacy
   immutable-spec conflict rejection, and append/deduplicate for append-only data.
 - The paths-only auto-commit queue stages concrete writer results on
   `overdeck-state`; it never rebases or replays a mutation it cannot understand.
+- Each queued result is committed and pushed on the next event-loop turn. There
+  is no batching delay or switch that disables automatic pushes; a configured
+  `origin` makes commit-and-push part of the canonical write operation.
+  A failed origin push is logged and returned as `pushed: false`, never reported
+  as fully durable success.
+- Spec lifecycle transitions are stricter: the transition does not return
+  success until its `plan.status` update has passed through the state writer's
+  commit-and-push flush. A configured origin that rejects the push fails the
+  transition instead of leaving an apparently successful local-only status.
+- Every Deacon patrol reconciles pre-existing dirty `specs/` and `records/`
+  paths through the same writer. It never stages source files or unrelated
+  operator changes.
 - Every state commit asserts that the dedicated worktree is on
   `overdeck-state`. A missing/wrong/dirty worktree is surfaced, never discarded.
 - `pan admin state migrate` owns a cross-process project lock. All write doors
   refuse visibly while it flushes, freezes, manifests, verifies, and cuts over.
+- Automatic migration is single-flight within a process and uses that same
+  cross-process lock. It overlays current tracked and untracked state onto the
+  state branch before verification, including pipeline artifacts an agent may
+  already have committed to `main`.
 - Code branches may delete legacy state during migration but may never add or
   modify state paths. `overdeck-state` may never contain source code.
 

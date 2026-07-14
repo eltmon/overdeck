@@ -29,7 +29,7 @@ export const ISSUE_SCOPED_PAN_VERBS = [
   'recover',
   'resume',
   'sync-main',
-  'inspect --bead',
+  'inspect --task',
   'reopen',
   'close',
   'wipe',
@@ -74,7 +74,7 @@ function issue(): Issue {
     updatedAt: '2026-05-23T00:00:00.000Z',
     project: { id: 'pan', name: 'Overdeck', color: '#fff' },
     hasPlan: true,
-    hasBeads: true,
+    hasTasks: true,
     workspacePath: '/tmp/feature-pan-1331',
   };
 }
@@ -113,7 +113,7 @@ function mockFetch() {
       return Response.json({ csrfToken: 'test-csrf-token' });
     }
     if (url.includes('/planning-state')) {
-      return Response.json({ hasPlan: true, hasBeads: true, beadsCount: 7, planningComplete: true });
+      return Response.json({ hasPlan: true, hasTasks: true, tasksCount: 7, planningComplete: true });
     }
     if (url.includes('/api/workspaces/')) {
       return Response.json({
@@ -195,7 +195,7 @@ describe('issue action CLI ↔ dashboard parity', () => {
     expect(clientOnlyActions.map((action) => action.key)).toEqual(expect.arrayContaining([
       'viewPr',
       'resetIssue',
-      'beads',
+      'tasks',
       'inference',
       'discussions',
       'transcripts',

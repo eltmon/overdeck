@@ -1,12 +1,12 @@
 /**
  * PAN-1791 supervisor-verdict-surface tests.
  *
- * ac3 — for each subscribed commit, the supervisor receives the bead's
+ * ac3 — for each subscribed commit, the supervisor receives the task's
  *       acceptance criteria alongside the diff (+ traced PRD FR text when
  *       metadata.traces is present).
  * ac1/ac2 message contract — the composed request targets ONLY the existing
  *       /api/specialists/done inspect surface (no new endpoint), requires
- *       the "Bead <beadId>" notes prefix the server parses, and restates
+ *       the "Task <taskId>" notes prefix the server parses, and restates
  *       that a blocking finding never changes tracker status.
  */
 
@@ -66,8 +66,8 @@ function makeItem(overrides: Partial<VBriefItem> = {}): VBriefItem {
 function makeEvent(overrides: Partial<SupervisorReviewEvent> = {}): SupervisorReviewEvent {
   return {
     issueId: 'PAN-9999',
-    beadId: 'pan-9999-3',
-    beadTitle: 'Wire the widget into the frobnicator',
+    taskId: 'pan-9999-3',
+    taskTitle: 'Wire the widget into the frobnicator',
     sha: 'abcdef0123456789',
     diff: 'diff --git a/src/widget.ts b/src/widget.ts\n+export const widget = 1;',
     acceptanceCriteria: [
@@ -105,7 +105,7 @@ function makeDag(): VBriefDocument {
 
 function verdict(overrides: Partial<SupervisorVerdict>): SupervisorVerdict {
   return {
-    beadId: 'foundation',
+    taskId: 'foundation',
     status: 'failed',
     ...overrides,
   };
@@ -137,7 +137,7 @@ describe('shouldHaltDispatch', () => {
   it('returns true when an unresolved blocking finding exists on a dependency (ac1)', () => {
     expect(
       shouldHaltDispatch(
-        [verdict({ beadId: 'foundation', status: 'failed' })],
+        [verdict({ taskId: 'foundation', status: 'failed' })],
         { id: 'dependent' },
         makeDag(),
       ),
@@ -148,8 +148,8 @@ describe('shouldHaltDispatch', () => {
     expect(
       shouldHaltDispatch(
         [
-          verdict({ beadId: 'foundation', status: 'failed' }),
-          verdict({ beadId: 'foundation', status: 'passed' }),
+          verdict({ taskId: 'foundation', status: 'failed' }),
+          verdict({ taskId: 'foundation', status: 'passed' }),
         ],
         { id: 'dependent' },
         makeDag(),
@@ -157,10 +157,10 @@ describe('shouldHaltDispatch', () => {
     ).toBe(false);
   });
 
-  it('permits unrelated dispatch when the blocked bead is not a dependency (ac3)', () => {
+  it('permits unrelated dispatch when the blocked task is not a dependency (ac3)', () => {
     expect(
       shouldHaltDispatch(
-        [verdict({ beadId: 'foundation', status: 'blocked' })],
+        [verdict({ taskId: 'foundation', status: 'blocked' })],
         { id: 'unrelated' },
         makeDag(),
       ),
@@ -170,7 +170,7 @@ describe('shouldHaltDispatch', () => {
   it('halts on transitive dependencies through blocks edges', () => {
     expect(
       shouldHaltDispatch(
-        [verdict({ beadId: 'foundation', status: 'failed' })],
+        [verdict({ taskId: 'foundation', status: 'failed' })],
         { id: 'leaf' },
         makeDag(),
       ),
@@ -238,11 +238,11 @@ describe('buildSupervisorReviewMessage', () => {
     expect(new Set(apiPaths)).toEqual(new Set(['/api/specialists/done']));
   });
 
-  it('requires the "Bead <beadId>" notes prefix the server extracts the bead id from', () => {
+  it('requires the "Task <taskId>" notes prefix the server extracts the task id from', () => {
     const message = buildSupervisorReviewMessage(makeEvent());
     // Both verdict payloads carry the prefix, and it satisfies the route's
     // extraction regex at specialists.ts (/[Bb]ead\s+(\S+)/).
-    const notesPrefixes = [...message.matchAll(/"notes":"(Bead \S+)/g)].map((m) => m[1]);
+    const notesPrefixes = [...message.matchAll(/"notes":"(Task \S+)/g)].map((m) => m[1]);
     expect(notesPrefixes).toHaveLength(2);
     for (const prefix of notesPrefixes) {
       expect(prefix.match(/[Bb]ead\s+(\S+)/)?.[1]).toBe('pan-9999-3');
@@ -281,7 +281,7 @@ describe('deliverCommitForReview', () => {
     expect(message).toContain('The widget renders inside the frobnicator panel');
     expect(message).toContain('Clicking the widget emits a frob event');
     expect(message).toContain('**FR-4 — Event-driven supervisor.**');
-    expect(message).toContain('Bead pan-9999-3');
+    expect(message).toContain('Task pan-9999-3');
   });
 
   it('omits FR text when the item has no metadata.traces', async () => {
@@ -304,7 +304,7 @@ describe('deliverCommitForReview', () => {
     expect(message).not.toContain('Traced requirements (PRD)');
   });
 
-  it('uses an explicit beadId over the vBRIEF item id when provided', async () => {
+  it('uses an explicit taskId over the vBRIEF item id when provided', async () => {
     const deliver = vi.fn().mockResolvedValue({ ok: true, path: 'tmux' });
     const getDiff = vi.fn().mockResolvedValue('+frob');
 
@@ -314,13 +314,13 @@ describe('deliverCommitForReview', () => {
       issueId: 'PAN-9999',
       item: makeItem(),
       sha: 'abcdef0123456789',
-      beadId: 'od-1234',
+      taskId: 'od-1234',
       apiUrl: 'http://localhost:3011',
       deps: { deliver, getDiff },
     });
 
     const [, message] = deliver.mock.calls[0];
-    expect(message).toContain('Bead od-1234');
-    expect(message).not.toContain('"notes":"Bead pan-9999-3');
+    expect(message).toContain('Task od-1234');
+    expect(message).not.toContain('"notes":"Task pan-9999-3');
   });
 });

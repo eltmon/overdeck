@@ -4,7 +4,8 @@ import { toast } from 'sonner';
 import type { ClaudeChannelPermissionBehavior } from '@overdeck/contracts';
 import type { ConfirmationRequest } from '../../components/ConfirmationDialog';
 import type { AskUserQuestionSubject } from '../../components/AskUserQuestionDialog';
-import { useDashboardStore, selectAgentsWithPendingAskUserQuestion, selectChannelPermissionRequests } from '../../lib/store';
+import type { PlanApprovalSubject } from '../../components/PlanApprovalDialog';
+import { useDashboardStore, selectAgentsWithPendingAskUserQuestion, selectAgentsWithPendingProposedPlan, selectChannelPermissionRequests } from '../../lib/store';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
 import { fetchWithTimeout } from '../../lib/apiFetch';
@@ -20,6 +21,8 @@ type ConvAskUserQuestionRow = {
   title?: string | null;
   issueId?: string | null;
   pendingAskUserQuestion?: AskUserQuestionSubject['pendingAskUserQuestion'];
+  // PAN-1520 (FR-2) — pending ExitPlanMode plan payload for conversation rows.
+  pendingProposedPlan?: PlanApprovalSubject['pendingProposedPlan'];
 };
 
 interface UsePendingInputDialogsArgs {
@@ -31,6 +34,16 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
   const queryClient = useQueryClient();
   const channelPermissionRequests = useDashboardStore(selectChannelPermissionRequests);
   const agentsWithAskUserQuestion = useDashboardStore(selectAgentsWithPendingAskUserQuestion);
+  const agentsWithProposedPlan = useDashboardStore(selectAgentsWithPendingProposedPlan);
+  const resolvedPlanToolUseIds = useAskUserQuestionUiStore((s) => s.resolvedPlanToolUseIds);
+  const dismissedPlanSubjectIds = useAskUserQuestionUiStore((s) => s.dismissedPlanSubjectIds);
+  const markPlanResolved = useAskUserQuestionUiStore((s) => s.markPlanResolved);
+  const unmarkPlanResolved = useAskUserQuestionUiStore((s) => s.unmarkPlanResolved);
+  const markPlanDismissed = useAskUserQuestionUiStore((s) => s.markPlanDismissed);
+  const undismissPlan = useAskUserQuestionUiStore((s) => s.undismissPlan);
+  const reconcilePlanResolved = useAskUserQuestionUiStore((s) => s.reconcilePlanResolved);
+  const reconcilePlanDismissed = useAskUserQuestionUiStore((s) => s.reconcilePlanDismissed);
+  const [focusedPlanSubjectId, setFocusedPlanSubjectId] = useState<string | null>(null);
   const optimisticallyAnsweredAskUserQuestionIds = useAskUserQuestionUiStore((s) => s.answeredToolUseIds);
   const dismissedAskUserQuestionAgentIds = useAskUserQuestionUiStore((s) => s.dismissedSubjectIds);
   const markAskUserQuestionAnswered = useAskUserQuestionUiStore((s) => s.markAnswered);
@@ -46,6 +59,9 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     useState<Set<string>>(new Set());
   const [focusedAskUserQuestionId, setFocusedAskUserQuestionId] = useState<string | null>(null);
   const [currentConfirmation, setCurrentConfirmation] = useState<ConfirmationRequest | null>(null);
+  // Latest pending-input feed rows, readable from the reopen effect without
+  // re-running it on every 4s poll (FR-5 routing needs the conv rows).
+  const convAskUserQuestionRowsRef = useRef<ConvAskUserQuestionRow[]>([]);
 
   useEffect(() => {
     if (!askUserQuestionReopenId) return;
@@ -58,6 +74,17 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     // resolved here; conversation subjects are tracked via a separate poll, so
     // never claim those are "no longer waiting".
     const knownAgent = agentEntry != null;
+    // PAN-1520 (FR-5) — route by what is actually pending: a planning
+    // notification must open the plan-approval dialog, not the AUQ modal.
+    // AUQ wins when both are somehow pending (it blocks the plan answer anyway).
+    const convRow = convAskUserQuestionRowsRef.current.find((c) => c.name === askUserQuestionReopenId);
+    const hasAuq = agentEntry?.pendingAskUserQuestion != null || convRow?.pendingAskUserQuestion != null;
+    const hasPlan = agentEntry?.pendingProposedPlan != null || convRow?.pendingProposedPlan != null;
+    if (!hasAuq && hasPlan) {
+      undismissPlan(askUserQuestionReopenId);
+      setFocusedPlanSubjectId(askUserQuestionReopenId);
+      return;
+    }
     // PAN-2487 follow-up: "still pending" must consider EVERY pending-input kind,
     // not only AskUserQuestion payloads. A pane-detected wait (rateLimit,
     // sessionResume) has no AUQ payload, so the old check told the operator
@@ -99,6 +126,46 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     refetchInterval: 4000,
     refetchIntervalInBackground: true,
   });
+  convAskUserQuestionRowsRef.current = convAskUserQuestionRows;
+
+  // PAN-1520 (FR-3) — plan-approval subjects across agents and conversations,
+  // mirroring the AUQ subject assembly below.
+  const planApprovalSubjects: Array<PlanApprovalSubject & { kind: 'agent' | 'conv'; askedAt: string }> = [
+    ...agentsWithProposedPlan.map((a) => ({
+      kind: 'agent' as const,
+      id: a.id,
+      issueId: a.issueId ?? null,
+      kindLabel: 'Agent',
+      title: a.issueId ? (issues.find((i) => i.id === a.issueId)?.title ?? null) : null,
+      pendingProposedPlan: a.pendingProposedPlan,
+      askedAt: a.pendingProposedPlan?.askedAt ?? '',
+    })),
+    ...convAskUserQuestionRows
+      .filter((c) => c.pendingProposedPlan)
+      .map((c) => ({
+        kind: 'conv' as const,
+        id: c.name,
+        issueId: c.issueId ?? null,
+        kindLabel: 'Conversation',
+        title: c.title ?? null,
+        pendingProposedPlan: c.pendingProposedPlan,
+        askedAt: c.pendingProposedPlan?.askedAt ?? '',
+      })),
+  ];
+  planApprovalSubjects.sort((a, b) => (a.askedAt === b.askedAt ? a.id.localeCompare(b.id) : a.askedAt.localeCompare(b.askedAt)));
+  const visiblePlanApprovalSubjects = planApprovalSubjects.filter((s) => {
+    const toolUseId = s.pendingProposedPlan?.toolUseId;
+    if (!toolUseId) return false;
+    if (resolvedPlanToolUseIds.has(toolUseId)) return false;
+    if (dismissedPlanSubjectIds.has(s.id)) return false;
+    return true;
+  });
+  const currentPlanApprovalSubject =
+    (focusedPlanSubjectId
+      ? visiblePlanApprovalSubjects.find((s) => s.id === focusedPlanSubjectId)
+      : undefined) ??
+    visiblePlanApprovalSubjects[0] ??
+    null;
 
   const askUserQuestionSubjects: Array<AskUserQuestionSubject & { kind: 'agent' | 'conv'; askedAt: string }> = [
     ...agentsWithAskUserQuestion.map((a) => ({
@@ -215,6 +282,22 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       announce(`conv::${c.name}::${toolUseId}`, c.name, `"${label}" is waiting on you`, body);
     }
 
+    // PAN-1520 (FR-5) — pending plans fire the same toast + desktop
+    // notification; clicking re-opens the PLAN dialog (the reopen effect
+    // routes by what's pending, so plan subjects land on PlanApprovalDialog).
+    for (const p of agentsWithProposedPlan) {
+      const toolUseId = p.pendingProposedPlan?.toolUseId;
+      if (!toolUseId) continue;
+      const label = (p.issueId ? issues.find((i) => i.id === p.issueId)?.title : undefined) ?? p.issueId ?? p.id;
+      announce(`agent-plan::${p.id}::${toolUseId}`, p.id, `${label} has a plan awaiting approval`, 'Review and approve the plan to start implementation.');
+    }
+    for (const c of convAskUserQuestionRows) {
+      const toolUseId = c.pendingProposedPlan?.toolUseId;
+      if (!toolUseId) continue;
+      const label = c.title ?? c.name;
+      announce(`conv-plan::${c.name}::${toolUseId}`, c.name, `"${label}" has a plan awaiting approval`, 'Review and approve the plan to start implementation.');
+    }
+
     const liveKeys = new Set<string>();
     for (const a of agentsWithAskUserQuestion) {
       const id = a.pendingAskUserQuestion?.toolUseId;
@@ -223,11 +306,17 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     for (const c of convAskUserQuestionRows) {
       const id = c.pendingAskUserQuestion?.toolUseId;
       if (id) liveKeys.add(`conv::${c.name}::${id}`);
+      const planId = c.pendingProposedPlan?.toolUseId;
+      if (planId) liveKeys.add(`conv-plan::${c.name}::${planId}`);
+    }
+    for (const p of agentsWithProposedPlan) {
+      const id = p.pendingProposedPlan?.toolUseId;
+      if (id) liveKeys.add(`agent-plan::${p.id}::${id}`);
     }
     for (const k of notifiedPendingInputRef.current) {
       if (!liveKeys.has(k)) notifiedPendingInputRef.current.delete(k);
     }
-  }, [agentsWithAskUserQuestion, convAskUserQuestionRows]);
+  }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convAskUserQuestionRows, issues]);
 
   const askUserQuestionAnswerMutation = useMutation({
     mutationFn: async ({ kind, id, answers, questions }: {
@@ -240,7 +329,10 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
         ? T extends { questions: infer Q } ? Q : never : never;
     }) => {
       if (kind === 'agent') {
-        const res = await fetch(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
+        // fetchWithTimeout everywhere in these mutations: a plain fetch that
+        // never resolves (e.g. server restart mid-request) leaves isPending
+        // stuck true and every dialog button disabled until a page refresh.
+        const res = await fetchWithTimeout(`/api/agents/${encodeURIComponent(id)}/answer-question`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ answers }),
@@ -259,7 +351,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
         lines.push(`Q: ${q}\nA: ${answers[i]}`);
       }
       const composed = `Operator answered the pending question${answers.length > 1 ? 's' : ''}:\n\n${lines.join('\n\n')}`;
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/message`, {
+      const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: composed }),
@@ -296,7 +388,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       label?: string;
       toolUseId?: string;
     }) => {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
+      const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ optionNumber, toolUseId }),
@@ -354,6 +446,80 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     markAskUserQuestionDismissed(currentAskUserQuestionSubject.id);
   }, [currentAskUserQuestionSubject, markAskUserQuestionDismissed]);
 
+  // PAN-1520 (FR-4) — deliver plan approve / request-changes. Agent subjects go
+  // through the agent-scoped route; conversations through the existing one.
+  const planActionMutation = useMutation({
+    mutationFn: async ({ kind, id, action, feedback }: {
+      kind: 'agent' | 'conv';
+      id: string;
+      label?: string;
+      action: 'approve-manual' | 'reject-feedback';
+      feedback?: string;
+      toolUseId?: string;
+    }) => {
+      const url = kind === 'agent'
+        ? `/api/agents/${encodeURIComponent(id)}/plan-action`
+        : `/api/conversations/${encodeURIComponent(id)}/plan-action`;
+      const res = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, feedback }),
+      });
+      if (!res.ok) {
+        let message = `Failed to deliver plan action (${res.status})`;
+        try { const body = await res.json() as { error?: string }; if (body?.error) message = body.error; } catch { /* ignore */ }
+        throw new Error(message);
+      }
+      return res.json();
+    },
+    onMutate: ({ toolUseId }) => {
+      if (toolUseId) markPlanResolved(toolUseId);
+      return { toolUseId };
+    },
+    onSuccess: (_data, variables) => {
+      toast.success(
+        variables.action === 'approve-manual'
+          ? `Plan approved for ${variables.label?.trim() || variables.id}`
+          : `Plan feedback sent to ${variables.label?.trim() || variables.id}`,
+      );
+    },
+    onError: (error: Error, _variables, context) => {
+      if (context?.toolUseId) unmarkPlanResolved(context.toolUseId);
+      toast.error(`Plan action failed: ${error.message}`);
+    },
+  });
+
+  const handleApprovePlan = useCallback(() => {
+    if (!currentPlanApprovalSubject) return;
+    const subject = currentPlanApprovalSubject;
+    planActionMutation.mutate({
+      kind: subject.kind,
+      id: subject.id,
+      label: subject.title?.trim() || subject.issueId || subject.id,
+      action: 'approve-manual',
+      toolUseId: subject.pendingProposedPlan?.toolUseId,
+    });
+  }, [currentPlanApprovalSubject, planActionMutation]);
+
+  const handleRequestPlanChanges = useCallback((feedback: string) => {
+    if (!currentPlanApprovalSubject) return;
+    const subject = currentPlanApprovalSubject;
+    planActionMutation.mutate({
+      kind: subject.kind,
+      id: subject.id,
+      label: subject.title?.trim() || subject.issueId || subject.id,
+      action: 'reject-feedback',
+      feedback,
+      toolUseId: subject.pendingProposedPlan?.toolUseId,
+    });
+  }, [currentPlanApprovalSubject, planActionMutation]);
+
+  const handleDismissPlanApproval = useCallback(() => {
+    if (!currentPlanApprovalSubject) return;
+    markPlanDismissed(currentPlanApprovalSubject.id);
+    setFocusedPlanSubjectId((prev) => (prev === currentPlanApprovalSubject.id ? null : prev));
+  }, [currentPlanApprovalSubject, markPlanDismissed]);
+
   useEffect(() => {
     const liveAgentToolUseIds = agentsWithAskUserQuestion
       .map((a) => a.pendingAskUserQuestion?.toolUseId)
@@ -369,7 +535,27 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     ]);
     reconcileDismissedAskUserQuestions(liveSubjectIds);
     setFocusedAskUserQuestionId((prev) => (prev && liveSubjectIds.has(prev) ? prev : null));
-  }, [agentsWithAskUserQuestion, convAskUserQuestionRows, reconcileAnsweredAskUserQuestions, reconcileDismissedAskUserQuestions]);
+
+    // PAN-1520 (FR-7) — plans resolved out-of-band (terminal approval writes a
+    // matching tool_result; session stop clears the enrichment payload) drop
+    // out of the live set, so the optimistic/dismissed marks are pruned and
+    // the modal + needs-you entry clear without operator action.
+    const livePlanToolUseIds = new Set<string>([
+      ...agentsWithProposedPlan
+        .map((a) => a.pendingProposedPlan?.toolUseId)
+        .filter((id): id is string => typeof id === 'string'),
+      ...convAskUserQuestionRows
+        .map((c) => c.pendingProposedPlan?.toolUseId)
+        .filter((id): id is string => typeof id === 'string'),
+    ]);
+    reconcilePlanResolved(livePlanToolUseIds);
+    const livePlanSubjectIds = new Set<string>([
+      ...agentsWithProposedPlan.map((a) => a.id),
+      ...convAskUserQuestionRows.filter((c) => c.pendingProposedPlan).map((c) => c.name),
+    ]);
+    reconcilePlanDismissed(livePlanSubjectIds);
+    setFocusedPlanSubjectId((prev) => (prev && livePlanSubjectIds.has(prev) ? prev : null));
+  }, [agentsWithAskUserQuestion, agentsWithProposedPlan, convAskUserQuestionRows, reconcileAnsweredAskUserQuestions, reconcileDismissedAskUserQuestions, reconcilePlanResolved, reconcilePlanDismissed]);
 
   const channelPermissionResponseMutation = useMutation({
     mutationFn: ({
@@ -461,6 +647,11 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
     isAskUserQuestionSubmitting: askUserQuestionAnswerMutation.isPending || codexApprovalMutation.isPending,
     handleSubmitAskUserQuestion,
     handleDismissAskUserQuestion,
+    currentPlanApprovalSubject,
+    isPlanActionSubmitting: planActionMutation.isPending,
+    handleApprovePlan,
+    handleRequestPlanChanges,
+    handleDismissPlanApproval,
     currentConfirmation,
     handleConfirm,
     handleDeny,

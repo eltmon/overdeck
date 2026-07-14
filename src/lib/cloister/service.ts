@@ -1,52 +1,29 @@
 /** Cloister service: core monitoring for all running agents. */
-import { createHash } from 'crypto';
-import type { AgentRuntimeSync, HealthState } from '../runtimes/types.js';
-import { isContextOverflowTail, CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
+import type { HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
-import type { AgentHealth, HealthSummary } from './health.js';
+import type { AgentHealth } from './health.js';
 import type { DomainEvent } from '@overdeck/contracts';
 import { loadCloisterConfigSync } from './config.js';
-import {
-  getAgentHealth,
-  getMultipleAgentHealth,
-  generateHealthSummary,
-  getAgentsToPoke,
-  getAgentsToKill,
-  getAgentsNeedingAttention,
-} from './health.js';
-import { writeHealthEvent, getLatestHealthEvent } from '../overdeck/health-events.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
-import { listRunningAgentsSync, getAgentStateSync, getAgentState, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
-import type { Role } from '../agents.js';
-import { resolveProjectFromIssueSync } from '../projects.js';
+import { listRunningAgentsSync, getAgentStateSync, getAgentRuntimeStateSync, saveAgentRuntimeState } from '../agents.js';
 import {
   isCloisterSpawnsPausedSync,
   setCloisterSpawnsPausedSync,
   setDeaconGloballyPaused,
   setFlywheelGloballyPaused,
 } from '../overdeck/control-settings.js';
-import { checkAllTriggers, type TriggerDetection } from './triggers.js';
-import { performHandoff, type HandoffResult } from './handoff.js';
-import { logHandoffEventSync, createHandoffEvent } from './handoff-logger.js';
-import {
-  checkAgentForViolations,
-  sendNudge,
-  resolveViolationSync,
-  hasExceededMaxNudges,
-  clearOldViolationsSync,
-  type FPPViolation,
-} from './fpp-violations.js';
-import { checkCostLimits, getCostSummary, type CostAlert } from './cost-monitor.js';
-import { reconcilePiCostEventsForRunningAgents } from './pi-cost-reconciler.js';
-import { checkAndRotateIfNeeded, type SessionRotationResult } from './session-rotation.js';
+import type { TriggerDetection } from './triggers.js';
+import type { HandoffResult } from './handoff.js';
+import type { FPPViolation } from './fpp-violations.js';
+import { getCostSummary, type CostAlert } from './cost-monitor.js';
+import type { SessionRotationResult } from './session-rotation.js';
 import {
   startDeacon,
   stopDeacon,
   isDeaconRunning,
   getDeaconStatus,
-  assessDeaconPatrolFreshness,
   getLastPatrolResult,
   getDeaconLogs,
   runPatrol,
@@ -54,22 +31,41 @@ import {
   type DeaconLogEntry,
 } from './deacon.js';
 import { OVERDECK_HOME } from '../paths.js';
-import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync, renameSync, statSync } from 'fs';
+import { existsSync, writeFileSync, unlinkSync, readFileSync, readdirSync } from 'fs';
 import { rm } from 'fs/promises';
 import { join } from 'path';
 import { AGENTS_DIR } from '../paths.js';
 import { loadReviewStatuses, setReviewStatusSync } from '../review-status.js';
-import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
-import { sessionExists, killSession } from '../tmux.js';
-import { exec } from 'node:child_process';
-import { promisify } from 'node:util';
+import { sessionExists } from '../tmux.js';
 import { Effect } from 'effect';
-
-const execAsync = promisify(exec);
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { isIssueClosed } from './issue-closed.js';
-import { shouldSkipDispatchAsMerged } from './merge-verification.js';
+import { handleCloisterDomainEvent, identifyOrphanedReviewingIssues, parseSpecialistAgentSession } from './service-reactive.js';
+import {
+  checkHandoffTriggers,
+  checkCostAlerts,
+  checkFPPViolations,
+  checkSpecialistRotations,
+  mapHeartbeatSource,
+  performHealthCheck,
+  recordHealthEvent,
+  type HealthEvent, type HealthHost,
+} from './service-health.js';
+import { checkCompletionMarkers, type CompletionHost } from './service-completion.js';
+import { checkForMassDeaths as checkForMassDeathsWithHost, handleAgentCrash as handleAgentCrashWithHost, killAgent as killAgentWithHost, pauseSpawns as pauseSpawnsWithHost, pokeAgent as pokeAgentWithHost, pokeAgentWithEscalation as pokeAgentWithEscalationWithHost, progressFingerprint as progressFingerprintWithHost, restartAgent as restartAgentWithHost, type CrashEvent, type CrashHost } from './service-crash.js';
+import { getAllAgentHealth as getAllAgentHealthWithHost, getServiceAgentHealth, getStatus as getStatusWithHost, type CloisterStatus, type StatusHost } from './service-status.js';
+import type { CloisterDomainEventLike } from './service-reactive.js';
 export { spawnFlywheel, pauseFlywheel, resumeFlywheel } from './flywheel.js';
+export {
+  handleCloisterDomainEvent,
+  identifyOrphanedReviewingIssues,
+  issueStateChangeFromDomainEvent,
+  onIssueStateChange,
+  parseSpecialistAgentSession,
+  stateToRole,
+} from './service-reactive.js';
+export type { CloisterDomainEventLike, ReactiveIssueState } from './service-reactive.js';
+export type { CloisterStatus } from './service-status.js';
+export { nonRestartableReason } from './service-crash.js';
 
 // State file for cross-process communication
 const CLOISTER_STATE_FILE = join(OVERDECK_HOME, 'cloister.state');
@@ -77,65 +73,6 @@ const LEGACY_SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 
 async function cleanupLegacySpecialistsDirectory(): Promise<void> {
   await rm(LEGACY_SPECIALISTS_DIR, { recursive: true, force: true });
-}
-
-/** Return issues orphaned in reviewStatus='reviewing' with no active reviewer. */
-export function identifyOrphanedReviewingIssues(
-  statuses: Record<string, { reviewStatus: string; history?: Array<{ type: string; status: string }> }>,
-  activeReviewIssues: Set<string>,
-): string[] {
-  const orphaned: string[] = [];
-  for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.reviewStatus !== 'reviewing') continue;
-    const hasPassedReview = status.history?.some(
-      (h) => h.type === 'review' && h.status === 'passed',
-    );
-    if (hasPassedReview) continue;
-    if (activeReviewIssues.has(issueId.toUpperCase())) continue;
-    orphaned.push(issueId);
-  }
-  return orphaned;
-}
-
-export function parseSpecialistAgentSession(name: string): {
-  projectKey: string;
-  specialistType: 'review-agent' | 'test-agent' | 'merge-agent';
-  issueId?: string;
-} | null {
-  const issueScoped = name.match(/^specialist-(.+)-([A-Z]+-\d+)-(review-agent|test-agent|merge-agent)$/);
-  if (issueScoped) {
-    return {
-      projectKey: issueScoped[1],
-      issueId: issueScoped[2],
-      specialistType: issueScoped[3] as 'review-agent' | 'test-agent' | 'merge-agent',
-    };
-  }
-
-  const legacy = name.match(/^specialist-(.+)-(review-agent|test-agent|merge-agent)$/);
-  if (legacy) {
-    return {
-      projectKey: legacy[1],
-      specialistType: legacy[2] as 'review-agent' | 'test-agent' | 'merge-agent',
-    };
-  }
-
-  return null;
-}
-
-export type ReactiveIssueState =
-  | 'todo'
-  | 'open'
-  | 'in_planning'
-  | 'in_progress'
-  | 'in_review'
-  | 'testing'
-  | 'shipping'
-  | 'closed'
-  | 'canceled';
-
-export interface CloisterDomainEventLike {
-  type: string;
-  payload?: unknown;
 }
 
 interface CloisterEventStore {
@@ -147,375 +84,6 @@ let cloisterEventStoreProvider: (() => CloisterEventStore) | null = null;
 
 export function setCloisterEventStoreProvider(provider: (() => CloisterEventStore) | null): void {
   cloisterEventStoreProvider = provider;
-}
-
-const ROLE_RUN_STATES: Record<ReactiveIssueState, Role | null> = {
-  todo: null,
-  open: null,
-  in_planning: 'plan',
-  in_progress: 'work',
-  in_review: 'review',
-  testing: 'test',
-  shipping: null,
-  closed: null,
-  canceled: null,
-};
-
-/**
- * Map issue lifecycle state to the role that should own that state.
- */
-export function stateToRole(state: string): Role | null {
-  const normalized = state.toLowerCase().replace(/[ -]/g, '_') as ReactiveIssueState;
-  return ROLE_RUN_STATES[normalized] ?? null;
-}
-
-function normalizeIssueId(issueId: string): string {
-  return issueId.trim().toUpperCase();
-}
-
-function roleFromAgentId(agentId: string, issueId: string): Role | null {
-  const base = `agent-${issueId.toLowerCase()}`;
-  if (agentId === base) return 'work';
-  const role = agentId.slice(base.length + 1);
-  return ['plan', 'review', 'test'].includes(role) ? role as Role : null;
-}
-
-/**
- * Grace window for `starting` states without a tmux session yet. The
- * start-planning route deliberately writes state.json BEFORE the lifecycle
- * transition (PAN-1048) so this guard can see the planner coming — but the
- * tmux session is only created after the transition. Treating any
- * starting-without-session as dead (the original S1 unstick heuristic)
- * re-opened the PAN-1048 race and spawned a duplicate `agent-<issue>-plan`
- * twin on EVERY `pan plan` (PAN-2159, 100% repro). A fresh `starting` state
- * is a startup in progress; only a stale one is a crashed spawn to unstick.
- */
-const STARTING_WITHOUT_SESSION_GRACE_MS = 120_000;
-
-function isFreshStarting(state: { startedAt?: string }): boolean {
-  const startedAt = Date.parse(state.startedAt ?? '');
-  return Number.isFinite(startedAt) && Date.now() - startedAt < STARTING_WITHOUT_SESSION_GRACE_MS;
-}
-
-async function activeRoleRunExists(issueId: string, role: Role, workspacePath?: string): Promise<boolean> {
-  const issueLower = issueId.toLowerCase();
-
-  // C1: For 'plan', also check the legacy planning-pan-X session format
-  // alongside the canonical agent-pan-X-plan format. The start-planning route
-  // writes to planning-pan-X while spawnRun uses agent-pan-X-plan.
-  if (role === 'plan') {
-    const legacyId = `planning-${issueLower}`;
-    const legacyState = await Effect.runPromise(getAgentState(legacyId));
-    if (legacyState?.role === 'plan' && legacyState.status !== 'stopped' && legacyState.status !== 'error') {
-      // S1 (age-aware): only a STALE 'starting' state with no live tmux
-      // session is a crashed spawn; a fresh one is mid-startup (PAN-2159).
-      if (legacyState.status === 'starting' && !(await Effect.runPromise(sessionExists(legacyId)))) {
-        return isFreshStarting(legacyState);
-      }
-      return true;
-    }
-  }
-
-  const candidateId = role === 'work'
-    ? `agent-${issueLower}`
-    : `agent-${issueLower}-${role}`;
-
-  const state = await Effect.runPromise(getAgentState(candidateId));
-  if (!state) return false;
-
-  const stateRole = state.role ?? roleFromAgentId(candidateId, issueId);
-
-  // S1 (age-aware): only a STALE 'starting' state with no live tmux session
-  // is a crashed spawn; a fresh one is mid-startup (PAN-2159).
-  if (stateRole === role && state.status === 'starting' && !(await Effect.runPromise(sessionExists(candidateId)))) {
-    return isFreshStarting(state);
-  }
-
-  const aliveByStatus = stateRole === role && state.status !== 'stopped' && state.status !== 'error';
-  if (!aliveByStatus) return false;
-
-  // Zombie detection: an agent that finished its work but never exited keeps
-  // status:'running' forever, which would block every future re-dispatch for
-  // this role (the ship/test stall bug). When we know the workspace and the
-  // run stamped a roleRunHead, compare it against the current workspace HEAD —
-  // a HEAD that has advanced past the marker means this session ran against
-  // stale code and must not be treated as the active run for the new HEAD.
-  if (workspacePath && state.roleRunHead) {
-    try {
-      const { stdout } = await execAsync('git rev-parse --short=8 HEAD', { cwd: workspacePath });
-      const currentHead = stdout.trim();
-      if (currentHead && currentHead !== state.roleRunHead) {
-        console.log(
-          `[cloister] ${issueId}: ${role} session ${candidateId} is stale `
-          + `(ran against ${state.roleRunHead}, HEAD is now ${currentHead}) — not active`,
-        );
-        return false;
-      }
-    } catch { /* non-fatal — fall through to the status-only result */ }
-  }
-
-  return true;
-}
-
-function buildReactiveRolePrompt(issueId: string, state: string, role: Role): string {
-  return `${role.toUpperCase()} TASK for ${issueId}:
-
-The issue lifecycle transitioned to ${state}. Run the ${role} role for this issue.
-
-Required steps:
-1. Work only in the workspace configured for ${issueId}.
-2. Read .pan/continue.json, .pan/spec.vbrief.json, project instructions, and issue context.
-3. Follow the boundaries and success criteria in roles/${role}.md exactly.
-4. Report the role-specific terminal status when done.`;
-}
-
-/**
- * Resolve the workspace path for an issue from agent state, then fall back
- * to the canonical `<projectPath>/workspaces/feature-<issueLower>` layout.
- * Mirrors the resolution used by startup recovery (service.ts:583-609) so
- * the reactive scheduler dispatches review/test wrappers with the same
- * workspace contract those wrappers receive on the manual code path.
- */
-async function resolveWorkspaceForIssue(issueId: string): Promise<string | null> {
-  const issueLower = issueId.toLowerCase();
-  const agentState = await Effect.runPromise(getAgentState(`agent-${issueLower}`));
-  if (agentState?.workspace) return agentState.workspace;
-  const resolved = resolveProjectFromIssueSync(issueId);
-  if (!resolved) return null;
-  return `${resolved.projectPath}/workspaces/feature-${issueLower}`;
-}async function onIssueStateChangePromise(issueId: string, newState: string): Promise<void> {
-  const normalizedIssueId = normalizeIssueId(issueId);
-  const role = stateToRole(newState);
-  if (!role) {
-    console.log(`[cloister] ${normalizedIssueId}: no role for issue state '${newState}'`);
-    return;
-  }
-
-  if (await isIssueClosed(normalizedIssueId)) {
-    const message = `${normalizedIssueId}: skipping ${role} dispatch — issue is closed`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    return;
-  }
-
-  // PAN-1746: a merged issue is terminal — never re-dispatch an advancing role
-  // for work that already landed. Boot reconciliation replays issue-state-change
-  // events on restart, and a long-merged issue still carrying its lifecycle
-  // state (e.g. `verifying-on-main`) would otherwise re-trigger a ship dispatch
-  // for a branch that merged weeks ago. Mirror the isIssueClosed gate above:
-  // mergeStatus='merged' is the same terminal signal closed-state is.
-  const { getReviewStatusSync } = await import('../review-status.js');
-  if (getReviewStatusSync(normalizedIssueId)?.mergeStatus === 'merged') {
-    const message = `${normalizedIssueId}: skipping ${role} dispatch — merge already landed (merge_status='merged' is terminal)`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    return;
-  }
-
-  // PAN-2420: GitHub-authoritative guard. Even when merge_status is not yet
-  // 'merged' (e.g. a permission failure left it as 'failed'), do not respawn
-  // advancing roles against a PR that GitHub already reports merged.
-  const mergedGuard = await shouldSkipDispatchAsMerged(normalizedIssueId);
-  if (mergedGuard.skip) {
-    const message = `${normalizedIssueId}: skipping ${role} dispatch — ${mergedGuard.reason}`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    return;
-  }
-
-  // Resolve the workspace up front so activeRoleRunExists can probe the
-  // workspace HEAD for stale-session (zombie) detection.
-  const workspace = await resolveWorkspaceForIssue(normalizedIssueId);
-
-  if (await activeRoleRunExists(normalizedIssueId, role, workspace ?? undefined)) {
-    const message = `${normalizedIssueId}: ${role} role already active; skipping lifecycle spawn`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    return;
-  }
-
-  // activeRoleRunExists returned false. If a tmux session for this role still
-  // physically exists, it's a zombie (agent finished work but never exited,
-  // and the workspace HEAD has since advanced). Kill it before re-dispatch so
-  // the fresh run gets a clean session name instead of colliding with the
-  // dead one.
-  const issueLower = normalizedIssueId.toLowerCase();
-  const roleSessionId = role === 'work' ? `agent-${issueLower}` : `agent-${issueLower}-${role}`;
-  if (await Effect.runPromise(sessionExists(roleSessionId))) {
-    const message = `${normalizedIssueId}: killing stale ${role} session ${roleSessionId} before re-dispatch`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-    try {
-      await Effect.runPromise(killSession(roleSessionId));
-    } catch (err) {
-      console.error(`[cloister] failed to kill stale session ${roleSessionId}:`, err instanceof Error ? err.message : String(err));
-    }
-  }
-
-  try {
-    if (role === 'review') {
-      if (!workspace) {
-        const failure = `${normalizedIssueId}: cannot dispatch review role — no workspace or project resolved`;
-        console.error(`[cloister] ${failure}`);
-        emitActivityEntrySync({ source: 'cloister', level: 'error', message: failure, issueId: normalizedIssueId });
-        return;
-      }
-      const branch = `feature/${normalizedIssueId.toLowerCase()}`;
-      const { spawnReviewRoleForIssue } = await import('./review-agent.js');
-      const result = await Effect.runPromise(spawnReviewRoleForIssue({ issueId: normalizedIssueId, workspace, branch }));
-      const message = `${normalizedIssueId}: review role dispatched from lifecycle state '${newState}' (${result.message})`;
-      console.log(`[cloister] ${message}`);
-      emitActivityEntrySync({ source: 'cloister', level: result.success ? 'info' : 'error', message, issueId: normalizedIssueId });
-      return;
-    }
-
-    if (role === 'test') {
-      const branch = `feature/${normalizedIssueId.toLowerCase()}`;
-      const { dispatchTestAgentAndNotify } = await import('./test-agent-queue.js');
-      await Effect.runPromise(dispatchTestAgentAndNotify(normalizedIssueId, workspace ?? undefined, branch));
-      const message = `${normalizedIssueId}: test role dispatched from lifecycle state '${newState}'`;
-      console.log(`[cloister] ${message}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-      return;
-    }
-
-    const { spawnRun } = await import('../agents.js');
-    const run = await spawnRun(normalizedIssueId, role, {
-      prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
-    });
-    const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
-    console.log(`[cloister] ${message}`);
-    emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('already running')) {
-      const skipMessage = `${normalizedIssueId}: ${role} role already running; skipping lifecycle spawn`;
-      console.log(`[cloister] ${skipMessage}`);
-      emitActivityEntrySync({ source: 'cloister', level: 'info', message: skipMessage, issueId: normalizedIssueId });
-      return;
-    }
-    console.error(`[cloister] Failed to start ${role} role for ${normalizedIssueId}:`, error);
-    emitActivityEntrySync({ source: 'cloister', level: 'error', message: `${normalizedIssueId}: failed to start ${role} role: ${message}`, issueId: normalizedIssueId });
-  }
-}
-
-function payloadRecord(event: CloisterDomainEventLike): Record<string, unknown> {
-  return event.payload && typeof event.payload === 'object' ? event.payload as Record<string, unknown> : {};
-}
-
-export function issueStateChangeFromDomainEvent(event: CloisterDomainEventLike): { issueId: string; state: string } | null {
-  const payload = payloadRecord(event);
-  const issueId = typeof payload.issueId === 'string' ? payload.issueId : null;
-  if (!issueId) return null;
-
-  switch (event.type) {
-    case 'issue.transitioned':
-      return typeof payload.state === 'string' ? { issueId, state: payload.state } : null;
-    case 'issue.statusChanged':
-      return typeof payload.canonicalStatus === 'string' ? { issueId, state: payload.canonicalStatus } : null;
-    case 'issue.closed':
-      return { issueId, state: 'closed' };
-    case 'agent.completed': {
-      // PAN-1048 review feedback 003: agent.completed is emitted by every
-      // role's lifecycle (work, review, test, ship). Map it to in_review only
-      // when the work role completes — letting other roles land here would
-      // ricochet back into review the moment a review or test role finished.
-      const role = typeof payload.role === 'string' ? payload.role : undefined;
-      if (role === undefined || role === 'work') {
-        return { issueId, state: 'in_review' };
-      }
-      return null;
-    }
-    case 'work.completed':
-      return { issueId, state: 'in_review' };
-    case 'review.approved':
-      return { issueId, state: 'testing' };
-    case 'test.passed':
-      return { issueId, state: 'shipping' };
-    default:
-      return null;
-  }
-}
-
-async function handleCloisterDomainEventPromise(event: CloisterDomainEventLike): Promise<void> {
-  // PAN-1908: reactive agent liveness — deacon handles agent.stopped and
-  // agent.heartbeat_dead events instead of scanning agent directories.
-  if (event.type === 'agent.stopped') {
-    const payload = event.payload as { agentId?: string } | undefined;
-    const agentId = payload?.agentId;
-    if (agentId) {
-      const { handleAgentStoppedEvent, handleAgentStoppedForOrphanReviewerSessions } = await import('./deacon.js');
-      const { handleAgentLifecycleEventForIdleStack } = await import('./idle-stack-reaper.js');
-      handleAgentLifecycleEventForIdleStack(agentId);
-      const slotMatch = /^agent-(.+)-slot-\d+$/.exec(agentId);
-      await Promise.all([
-        handleAgentStoppedEvent(agentId),
-        handleAgentStoppedForOrphanReviewerSessions(agentId),
-        slotMatch ? (await import('./deacon-swarm.js')).coordinateSwarmSlots({ issueId: slotMatch[1]!.toUpperCase() }) : Promise.resolve([]),
-      ]);
-    }
-    return;
-  }
-  if (event.type === 'agent.started') {
-    const agentId = (event.payload as { agentId?: string } | undefined)?.agentId;
-    if (agentId) (await import('./idle-stack-reaper.js')).handleAgentLifecycleEventForIdleStack(agentId);
-    return;
-  }
-  if (event.type === 'agent.heartbeat_dead') {
-    const payload = event.payload as { agentId?: string } | undefined;
-    const agentId = payload?.agentId;
-    if (agentId) {
-      const { handleAgentHeartbeatDeadEvent } = await import('./deacon.js');
-      await handleAgentHeartbeatDeadEvent(agentId, 'event');
-    }
-    return;
-  }
-
-  // PAN-1908: reactive review-status handlers — deacon handles review lifecycle
-  // events instead of scanning directories / the review-status DB.
-  if (event.type === 'review.coordinator.died') {
-    const payload = event.payload as { issueId?: string; sessionName?: string; reason?: string } | undefined;
-    const issueId = payload?.issueId;
-    if (issueId) {
-      const { handleReviewCoordinatorDied } = await import('./deacon.js');
-      await handleReviewCoordinatorDied(issueId, payload?.sessionName ?? '', payload?.reason ?? '');
-    }
-    return;
-  }
-  if (event.type === 'work.completed') {
-    const payload = event.payload as { issueId?: string } | undefined;
-    const issueId = payload?.issueId;
-    if (issueId) {
-      const { handleWorkCompleted } = await import('./deacon.js');
-      await handleWorkCompleted(issueId);
-    }
-    // Fall through to onIssueStateChange for in_review dispatch.
-  }
-
-  // PAN-1908: reactive reconcilers — deacon handles issue.statusChanged events
-  // for closed issues and proposed specs instead of patrol scans.
-  if (event.type === 'issue.statusChanged') {
-    const payload = event.payload as { issueId?: string; status?: string; canonicalStatus?: string } | undefined;
-    const issueId = payload?.issueId;
-    const canonicalStatus = payload?.canonicalStatus?.toLowerCase();
-    const status = payload?.status?.toLowerCase();
-    if (issueId) {
-      if (canonicalStatus === 'closed' || status === 'closed') {
-        const { handleIssueStatusChangedClosed } = await import('./closed-issue-reaper.js');
-        await handleIssueStatusChangedClosed(issueId);
-        return;
-      }
-      if (canonicalStatus === 'todo' || status === 'planned' || status === 'todo') {
-        const { handleOrphanProposedSpec } = await import('./orphan-proposed-reconciler.js');
-        await handleOrphanProposedSpec(issueId);
-        // Fall through to onIssueStateChange in case it drives role dispatch.
-      }
-    }
-  }
-
-  const change = issueStateChangeFromDomainEvent(event);
-  if (!change) return;
-  await Effect.runPromise(onIssueStateChange(change.issueId, change.state));
 }
 
 /**
@@ -567,21 +135,6 @@ export function readCloisterStateFile(): { running: boolean; pid?: number; start
 }
 
 /**
- * Cloister service status
- */
-export interface CloisterStatus {
-  running: boolean;
-  lastCheck: Date | null;
-  config: CloisterConfig;
-  summary: HealthSummary;
-  agentsNeedingAttention: string[];
-  patrol: ReturnType<typeof assessDeaconPatrolFreshness> & {
-    loopRunning: boolean;
-    patrolIntervalMs: number;
-  };
-}
-
-/**
  * Agent crash tracker for auto-restart
  */
 interface AgentCrashTracker {
@@ -626,38 +179,6 @@ export type CloisterEvent =
 export type CloisterEventListener = (event: CloisterEvent) => void;
 
 /**
- * One-shot convoy roles (PAN-1742). The review lenses + synthesis and the test
- * role are spawned fresh via `spawnRun` each cycle; they run once, write their
- * artifact, and exit. They never save a sessionId, so they cannot be resumed.
- */
-const ONE_SHOT_ROLES: ReadonlySet<string> = new Set(['review', 'test']);
-
-/**
- * Decide whether a vanished tmux session should be treated as a crash worth
- * auto-restarting (PAN-1742). Returns a human-readable reason to SKIP the
- * crash/restart machinery, or `null` when the agent is a genuine restart
- * candidate.
- *
- * Two cases are not crashes:
- *  - one-shot convoy roles, whose session-end is a normal completion; and
- *  - any agent without a saved session, which `restartAgent` cannot resume
- *    (it throws "No session ID found"), so counting a crash and scheduling a
- *    restart is pure noise.
- *
- * Pure and exported so the rule is unit-tested independent of the service's
- * private health-check plumbing.
- */
-export function nonRestartableReason(role: string, sessionId: string | undefined): string | null {
-  if (ONE_SHOT_ROLES.has(role)) {
-    return `(${role}) finished its one-shot run — completion, not a crash`;
-  }
-  if (!sessionId) {
-    return 'ended with no resumable session — not auto-restartable';
-  }
-  return null;
-}
-
-/**
  * Cloister Service
  *
  * Monitors agent health and performs auto-actions.
@@ -681,6 +202,7 @@ export class CloisterService {
   // ineffective-poke count. A poke that changes neither the workspace HEAD nor
   // the pane content did nothing; escalating beats poking forever.
   private pokeProgress: Map<string, { fingerprint: string; ineffective: number }> = new Map();
+  private activeCostAlertKeys: Set<string> = new Set(); // cost-alert dedupe — see checkCostAlerts
   private domainEventUnsubscribe: (() => void) | null = null;
   private eventStore: CloisterEventStore | null = null;
 
@@ -693,6 +215,75 @@ export class CloisterService {
 
   constructor(config?: CloisterConfig) {
     this.config = config || loadCloisterConfigSync();
+  }
+
+  private healthHost(): HealthHost {
+    const service = this;
+    return {
+      get previousRunningAgents() { return service.previousRunningAgents; },
+      set previousRunningAgents(value: Set<string>) { service.previousRunningAgents = value; },
+      get config() { return service.config; },
+      get healthCheckCount() { return service.healthCheckCount; },
+      set healthCheckCount(value: number) { service.healthCheckCount = value; },
+      get lastCheck() { return service.lastCheck; },
+      set lastCheck(value: Date | null) { service.lastCheck = value; },
+      get lastPokeTimestamps() { return service.lastPokeTimestamps; },
+      get pokeProgress() { return service.pokeProgress; },
+      get previousStates() { return service.previousStates; },
+      get activeCostAlertKeys() { return service.activeCostAlertKeys; },
+      handleAgentCrash: (agentId: string) => service.handleAgentCrash(agentId),
+      checkCompletionMarkers: () => service.checkCompletionMarkers(),
+      recordHealthEvent: (health: AgentHealth) => service.recordHealthEvent(health),
+      emit: (event: HealthEvent) => service.emit(event),
+      pokeAgent: (agentId: string) => service.pokeAgent(agentId),
+      killAgent: (agentId: string) => service.killAgent(agentId),
+      checkHandoffTriggers: (agentHealths: AgentHealth[]) => service.checkHandoffTriggers(agentHealths),
+      checkFPPViolations: (agentIds: string[]) => service.checkFPPViolations(agentIds),
+      checkCostAlerts: (agentIds: string[]) => service.checkCostAlerts(agentIds),
+      checkSpecialistRotations: () => service.checkSpecialistRotations(),
+      mapHeartbeatSource: (source: string) => service.mapHeartbeatSource(source),
+    };
+  }
+
+  private completionHost(): CompletionHost {
+    const service = this;
+    return {
+      get processedCompletions() { return service.processedCompletions; },
+      getDashboardApiUrl: () => service.getDashboardApiUrl(),
+    };
+  }
+
+  private crashHost(): CrashHost {
+    const service = this;
+    return {
+      get config() { return service.config; },
+      get crashTrackers() { return service.crashTrackers; },
+      get deathTimestamps() { return service.deathTimestamps; },
+      set deathTimestamps(value: Date[]) { service.deathTimestamps = value; },
+      get spawnsPaused() { return service.spawnsPaused; },
+      set spawnsPaused(value: boolean) { service.spawnsPaused = value; },
+      get pokeProgress() { return service.pokeProgress; },
+      get eventStore() { return service.eventStore; },
+      progressFingerprint: (agentId: string) => service.progressFingerprint(agentId),
+      pokeAgentWithEscalation: (agentId: string) => service.pokeAgentWithEscalation(agentId),
+      checkForMassDeaths: () => service.checkForMassDeaths(),
+      pauseSpawns: (reason: string) => service.pauseSpawns(reason),
+      emit: (event: CrashEvent) => service.emit(event),
+    };
+  }
+
+  private statusHost(): StatusHost {
+    const service = this;
+    return {
+      get statusCache() { return service._statusCache; },
+      set statusCache(value: CloisterStatus | null) { service._statusCache = value; },
+      get statusCacheAt() { return service._statusCacheAt; },
+      set statusCacheAt(value: number) { service._statusCacheAt = value; },
+      get statusCacheTtlMs() { return service.STATUS_CACHE_TTL_MS; },
+      get lastCheck() { return service.lastCheck; },
+      get config() { return service.config; },
+      isRunning: () => service.isRunning(),
+    };
   }
 
   private getDashboardApiUrl(): string {
@@ -1067,248 +658,12 @@ export class CloisterService {
    * Perform a health check on all running agents
    */
   private async performHealthCheck(): Promise<void> {
-    try {
-      const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
-      const agentIds = runningAgents.map((a) => a.id);
-      const currentRunningSet = new Set(agentIds);
-
-      // Detect crashed agents (were running before, not running now)
-      if (this.previousRunningAgents.size > 0 && this.config.auto_restart?.enabled) {
-        for (const previousAgentId of this.previousRunningAgents) {
-          if (!currentRunningSet.has(previousAgentId)) {
-            // Agent crashed!
-            await this.handleAgentCrash(previousAgentId);
-          }
-        }
-      }
-
-      // Update the set of running agents for next check
-      this.previousRunningAgents = currentRunningSet;
-
-      // Completion marker check runs regardless of active agents —
-      // completed agents won't have tmux sessions anymore
-      this.healthCheckCount++;
-      if (this.healthCheckCount % 4 === 0) {
-        void this.checkCompletionMarkers();
-      }
-
-      if (agentIds.length === 0) {
-        this.lastCheck = new Date();
-        return;
-      }
-
-      // Get health for all agents
-      const agentHealths: AgentHealth[] = [];
-
-      for (const agentId of agentIds) {
-        const runtime = getRuntimeForAgent(agentId);
-        if (runtime) {
-          const health = getAgentHealth(agentId, runtime);
-          agentHealths.push(health);
-
-          // Write health event to database
-          this.recordHealthEvent(health);
-        }
-      }
-
-      this.lastCheck = new Date();
-      this.emit({ type: 'health_check', agentHealths });
-
-      // Check for agents needing attention
-      const needsAttention = getAgentsNeedingAttention(agentHealths);
-
-      const pokeCooldownMs = this.config.auto_actions.poke_cooldown_ms ?? 30 * 60 * 1000;
-      const now = Date.now();
-
-      for (const health of needsAttention) {
-        // The sequencer is a long-lived singleton that is SUPPOSED to sit idle
-        // between ranking passes — "no progress in a while" is its normal resting
-        // state, not a stall. Never poke or kill it (it was spamming itself with
-        // "are you stuck?" nudges every cooldown). Health is still recorded above;
-        // only the attention/poke/kill action is skipped.
-        const idleAgentState = getAgentStateSync(health.agentId);
-        if (idleAgentState?.role === 'sequencer') continue;
-
-        // PAN-2581: warm-idle on a pipeline-owned issue is the intended state, not
-        // a stall — rationale on shouldSkipIdlePokeForAgent. Health stays recorded
-        // above; only the poke/idle-alive-pause action is skipped.
-        const { shouldSkipIdlePokeForAgent } = await import('./stuck-remediation.js');
-        if (shouldSkipIdlePokeForAgent(idleAgentState)) {
-          this.pokeProgress.delete(health.agentId);
-          continue;
-        }
-
-        const lastPoke = this.lastPokeTimestamps.get(health.agentId) ?? 0;
-        const cooledDown = (now - lastPoke) >= pokeCooldownMs;
-
-        if (health.state === 'warning') {
-          this.emit({ type: 'agent_warning', agentId: health.agentId, health });
-
-          // Auto-poke if configured and cooldown elapsed
-          if (this.config.auto_actions.poke_on_warning && cooledDown) {
-            this.pokeAgent(health.agentId);
-            this.lastPokeTimestamps.set(health.agentId, now);
-          }
-        } else if (health.state === 'stuck') {
-          this.emit({ type: 'agent_stuck', agentId: health.agentId, health });
-
-          // Auto-poke stuck agents if configured and cooldown elapsed
-          if ((this.config.auto_actions.poke_on_stuck ?? true) && cooledDown) {
-            this.pokeAgent(health.agentId);
-            this.lastPokeTimestamps.set(health.agentId, now);
-          }
-
-          // Auto-kill if configured (dangerous!)
-          if (this.config.auto_actions.kill_on_stuck) {
-            this.killAgent(health.agentId);
-          }
-        }
-      }
-
-      // Check for handoff triggers (Phase 4)
-      // Note: Intentionally not awaiting - runs in background
-      void this.checkHandoffTriggers(agentHealths);
-
-      // Check for FPP violations (Phase 6)
-      this.checkFPPViolations(agentIds);
-
-      await reconcilePiCostEventsForRunningAgents(runningAgents);
-
-      // Check cost limits (Phase 6)
-      this.checkCostAlerts(agentIds);
-
-      // Check for specialist session rotation needs (Phase 6)
-      // Only check periodically (every ~10 checks)
-      if (Math.random() < 0.1) {
-        void this.checkSpecialistRotations();
-      }
-
-      // Clean up old resolved violations (daily)
-      if (Math.random() < 0.01) {
-        // ~1% chance each check = roughly once per day
-        clearOldViolationsSync(24);
-      }
-    } catch (error) {
-      console.error('Cloister health check failed:', error);
-      this.emit({ type: 'error', error: error as Error });
-    }
+    return performHealthCheck(this.healthHost());
   }
 
   /** Fallback scan for completion markers when `pan done` did not reach the dashboard. */
   private async checkCompletionMarkers(): Promise<void> {
-    try {
-      if (!existsSync(AGENTS_DIR)) return;
-
-      const agentDirs = readdirSync(AGENTS_DIR, { withFileTypes: true })
-        .filter(d => d.isDirectory() && d.name.startsWith('agent-'));
-
-      for (const dir of agentDirs) {
-        const completedFile = join(AGENTS_DIR, dir.name, 'completed');
-        const processedFile = join(AGENTS_DIR, dir.name, 'completed.processed');
-
-        // Skip if no completion marker.
-        if (!existsSync(completedFile)) continue;
-
-        // A stale `.processed` from a prior round must not block a fresh completion.
-        if (existsSync(processedFile)) {
-          try {
-            const completedMtime = statSync(completedFile).mtimeMs;
-            const processedMtime = statSync(processedFile).mtimeMs;
-            if (completedMtime > processedMtime) {
-              try { unlinkSync(processedFile); } catch {}
-              this.processedCompletions.delete(dir.name);
-              console.log(`🔔 Cloister: Detected re-completion for ${dir.name} (completed newer than .processed) — clearing stale marker`);
-            } else {
-              continue;
-            }
-          } catch {
-            continue;
-          }
-        }
-
-        // Skip stale completion markers (older than 24h) — just mark as processed
-        try {
-          const content = JSON.parse(readFileSync(completedFile, 'utf-8'));
-          const ageMs = Date.now() - new Date(content.timestamp).getTime();
-          if (ageMs > 24 * 60 * 60 * 1000) {
-            console.log(`🔔 Cloister: Skipping stale completion marker for ${dir.name} (${Math.floor(ageMs / 3600000)}h old)`);
-            this.processedCompletions.set(dir.name, Infinity);
-            try { renameSync(completedFile, processedFile); } catch {}
-            continue;
-          }
-        } catch (parseErr) {
-          console.warn(`  ⚠ Cloister: Could not parse completion marker for ${dir.name}, skipping`);
-          continue;
-        }
-
-        // Check retry count; reset stale in-memory counters for fresh completions.
-        const retryCount = this.processedCompletions.get(dir.name) || 0;
-        if (retryCount === Infinity) {
-          this.processedCompletions.delete(dir.name);
-        } else if (retryCount >= 3) continue;
-
-        // Extract issue ID from agent dir name (e.g. "agent-pan-123" → "PAN-123")
-        const issueId = dir.name.replace('agent-', '').toUpperCase();
-
-        // Skip if `pan done` already triggered review.
-        const { getReviewStatusSync } = await import('../review-status.js');
-        const existingReview = getReviewStatusSync(issueId);
-        if (existingReview && ['reviewing', 'passed'].includes(existingReview.reviewStatus || '')) {
-          console.log(`🔔 Cloister: Completion marker for ${issueId} — review already ${existingReview.reviewStatus}, marking processed`);
-          try { renameSync(completedFile, processedFile); } catch {}
-          this.processedCompletions.set(dir.name, Infinity);
-          continue;
-        }
-
-        console.log(`🔔 Cloister: Found completion marker for ${issueId}, triggering review...${retryCount > 0 ? ` (retry ${retryCount}/3)` : ''}`);
-
-        try {
-          // Use fetch() so https dashboard URLs work.
-          const result = await (async (): Promise<{ success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean }> => {
-            const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 5000);
-            try {
-              const res = await fetch(`${this.getDashboardApiUrl()}/api/review/${issueId}/trigger`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({}),
-                signal: controller.signal,
-              });
-              clearTimeout(timer);
-              try {
-                return (await res.json()) as { success: boolean; error?: string; alreadyReviewed?: boolean; alreadyMerged?: boolean };
-              } catch {
-                return { success: false, error: `Invalid response (HTTP ${res.status})` };
-              }
-            } catch (e: any) {
-              clearTimeout(timer);
-              if (e?.name === 'AbortError') return { success: false, error: 'Timeout (5s)' };
-              return { success: false, error: e?.message || String(e) };
-            }
-          })();
-
-          if (result.success) {
-            console.log(`  ✓ Review triggered for ${issueId}`);
-            renameSync(completedFile, processedFile);
-            this.processedCompletions.set(dir.name, Infinity);
-          } else if (result.alreadyReviewed || result.alreadyMerged) {
-            // Terminal state — already handled, mark as processed
-            console.log(`  ✓ ${issueId} already ${result.alreadyMerged ? 'merged' : 'reviewed'}, marking processed`);
-            renameSync(completedFile, processedFile);
-            this.processedCompletions.set(dir.name, Infinity);
-          } else {
-            // Transient failure — increment retry count, will retry on next cycle
-            this.processedCompletions.set(dir.name, retryCount + 1);
-            console.log(`  ⚠ Review trigger failed for ${issueId}: ${result.error || 'unknown'} (will retry, ${2 - retryCount} attempts left)`);
-          }
-        } catch (err: any) {
-          this.processedCompletions.set(dir.name, retryCount + 1);
-          console.error(`  ✗ Failed to trigger review for ${issueId}: ${err.message} (will retry, ${2 - retryCount} attempts left)`);
-        }
-      }
-    } catch (error) {
-      // Non-fatal - just skip this check
-    }
+    return checkCompletionMarkers(this.completionHost());
   }
 
   /**
@@ -1323,90 +678,17 @@ export class CloisterService {
    * dead agent (PAN-1189 wedge sweep #12-13).
    */
   private pokeAgent(agentId: string): void {
-    // Fire-and-forget wrapper; the async body measures progress first.
-    void this.pokeAgentWithEscalation(agentId).catch((error) => {
-      console.error(`Failed to poke ${agentId}:`, error);
-    });
+    return pokeAgentWithHost(this.crashHost(), agentId);
   }
 
   /** PAN-2452: fingerprint of observable progress — workspace HEAD + pane tail.
    * Unchanged fingerprint across pokes = the poke did nothing. */
   private async progressFingerprint(agentId: string): Promise<string> {
-    const state = getAgentStateSync(agentId);
-    let head = '';
-    if (state?.workspace) {
-      try {
-        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: state.workspace, encoding: 'utf-8' });
-        head = stdout.trim();
-      } catch { /* workspace may be gone; pane still fingerprints */ }
-    }
-    let pane = '';
-    try {
-      const { stdout } = await execAsync(
-        `tmux -L overdeck capture-pane -t ${JSON.stringify(agentId)} -p -S -${CONTEXT_OVERFLOW_TAIL_LINES}`,
-        { encoding: 'utf-8' },
-      );
-      pane = stdout;
-    } catch { /* session may be gone */ }
-    const paneHash = createHash('sha1').update(pane).digest('hex').slice(0, 12);
-    return `${head}:${paneHash}`;
+    return progressFingerprintWithHost(this.crashHost(), agentId);
   }
 
   private async pokeAgentWithEscalation(agentId: string): Promise<void> {
-    const runtime = getRuntimeForAgent(agentId);
-    if (!runtime) {
-      throw new Error(`No runtime found for agent ${agentId}`);
-    }
-
-    const fingerprint = await this.progressFingerprint(agentId);
-    const prior = this.pokeProgress.get(agentId);
-    const ineffective = prior && prior.fingerprint === fingerprint ? prior.ineffective + 1 : 0;
-    this.pokeProgress.set(agentId, { fingerprint, ineffective });
-
-    // Tier 3 (5th no-progress poke): stop poking — surface to the operator.
-    if (ineffective >= 4) {
-      const { setAgentPausedSync } = await import('../agents/agent-state.js');
-      try {
-        setAgentPausedSync(agentId, `needs-you: idle-alive — no observable progress across ${ineffective + 1} pokes (idle-alive escalation)`);
-        this.emit({ type: 'agent_stuck', agentId, health: undefined as never });
-        console.log(`🛑 ${agentId} paused: idle-alive across ${ineffective + 1} pokes`);
-      } catch (pauseErr) {
-        console.error(`Failed to pause idle-alive ${agentId}:`, pauseErr);
-      }
-      return;
-    }
-
-    // Tier 2 (3rd no-progress poke): escalate — /compact on overflow, else a
-    // substantive reconstruct instruction instead of another "are you stuck?".
-    let pokeMessage =
-      'Hey, I noticed you haven\'t made progress in a while. Are you stuck? ' +
-      'If you need help or clarification, please ask. Otherwise, please continue with your work.';
-    if (ineffective >= 2) {
-      let tail = '';
-      try {
-        const { stdout } = await execAsync(
-          `tmux -L overdeck capture-pane -t ${JSON.stringify(agentId)} -p -S -${CONTEXT_OVERFLOW_TAIL_LINES}`,
-          { encoding: 'utf-8' },
-        );
-        tail = stdout;
-      } catch { /* fall through to reconstruct nudge */ }
-      if (isContextOverflowTail(tail)) {
-        pokeMessage = '/compact';
-        console.log(`🔔 ${agentId}: overflow tail detected — delivering /compact instead of a poke`);
-      } else {
-        pokeMessage =
-          'You appear active but have made no observable progress (no new commits, unchanged output) across multiple checks. '
-          + 'Do exactly one of: (1) work is done — commit, push, and run pan done; '
-          + '(2) blocked — state the blocker in one sentence and commit what you have as WIP; '
-          + '(3) lost context — re-read your bead (bd show), your latest .pan/feedback/ file, and git status, then resume. Act now.';
-      }
-    }
-
-    await Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).catch((sendErr) => {
-      console.error(`Failed to send poke to ${agentId}:`, sendErr);
-    });
-    this.emit({ type: 'poked_agent', agentId });
-    console.log(`🔔 Poked ${agentId}${ineffective > 0 ? ` (ineffective streak: ${ineffective})` : ''}`);
+    return pokeAgentWithEscalationWithHost(this.crashHost(), agentId);
   }
 
   /**
@@ -1417,185 +699,21 @@ export class CloisterService {
    * crash the dashboard from a deacon health-check timer callback.
    */
   private killAgent(agentId: string): void {
-    try {
-      const runtime = getRuntimeForAgent(agentId);
-      if (!runtime) {
-        throw new Error(`No runtime found for agent ${agentId}`);
-      }
-
-      Promise.resolve(runtime.killAgent(agentId)).catch((killErr) => {
-        console.error(`Failed to kill ${agentId}:`, killErr);
-      });
-      this.emit({ type: 'killed_agent', agentId });
-
-      console.log(`🔔 Killed ${agentId}`);
-    } catch (error) {
-      console.error(`Failed to kill ${agentId}:`, error);
-    }
+    return killAgentWithHost(this.crashHost(), agentId);
   }
 
   /**
    * Handle agent crash with auto-restart logic
    */
   private async handleAgentCrash(agentId: string): Promise<void> {
-    const config = this.config.auto_restart;
-    if (!config?.enabled) return;
-
-    // Check if agent was intentionally stopped or suspended (not a crash).
-    // Both state.json and runtime.json must be checked — stopAgent writes both,
-    // but a race between the CLI kill and this health check poll could see one
-    // but not the other if only one file is consulted.
-    const agentState = getAgentStateSync(agentId);
-    if (!agentState || agentState.status === 'stopped') {
-      console.log(`🔔 Agent ${agentId} was intentionally stopped, skipping restart`);
-      return;
-    }
-    const runtimeState = getAgentRuntimeStateSync(agentId);
-    if (runtimeState?.state === 'suspended') {
-      console.log(`🔔 Agent ${agentId} is suspended, skipping restart`);
-      return;
-    }
-    if (runtimeState?.state === 'stopped') {
-      console.log(`🔔 Agent ${agentId} runtime is stopped, skipping restart`);
-      return;
-    }
-
-    // PAN-1742: a vanished session is not always a crash. One-shot convoy roles
-    // complete-and-exit, and any agent with no saved session is structurally
-    // un-restartable. Either way, counting it as a crash pollutes the
-    // crash/troubled counters and schedules a doomed restart.
-    const skipReason = nonRestartableReason(agentState.role, agentState.sessionId);
-    if (skipReason) {
-      // PAN-2007: a one-shot review/test session that vanished BEFORE recording a
-      // terminal verdict died prematurely — e.g. before it could run
-      // `pan specialists done`. Masking that as a normal "one-shot completion" and
-      // skipping restart strands the issue at reviewStatus=reviewing forever (the
-      // exact PAN-1832 symptom). Recover it instead: resume so it can finish and
-      // signal. Only a terminal verdict (or a missing session) is a genuine
-      // non-restartable completion.
-      let recoverUnfinishedOneShot = false;
-      if (ONE_SHOT_ROLES.has(agentState.role) && agentState.sessionId && agentState.issueId) {
-        try {
-          const { getReviewStatusSync } = await import('../review-status.js');
-          const status = getReviewStatusSync(agentState.issueId);
-          const verdictTerminal = status
-            ? isRoleTerminal(agentState.role as AdvancingRole, {
-                reviewStatus: status.reviewStatus,
-                testStatus: status.testStatus,
-                readyForMerge: status.readyForMerge,
-                mergeStatus: status.mergeStatus,
-              })
-            : false;
-          recoverUnfinishedOneShot = !verdictTerminal;
-        } catch {
-          recoverUnfinishedOneShot = false;
-        }
-      }
-      if (!recoverUnfinishedOneShot) {
-        console.log(`🔔 Agent ${agentId} ${skipReason}; skipping restart`);
-        return;
-      }
-      console.log(`🔔 Agent ${agentId} (${agentState.role}) vanished before a terminal verdict — recovering instead of treating as a one-shot completion (PAN-2007)`);
-      // fall through to the restart/resume path below
-    }
-
-    // Record death timestamp for mass death detection
-    const now = new Date();
-    this.deathTimestamps.push(now);
-    this.checkForMassDeaths();
-
-    // Get or create crash tracker
-    let tracker = this.crashTrackers.get(agentId);
-    if (!tracker) {
-      tracker = {
-        agentId,
-        crashCount: 0,
-        lastCrash: now,
-        gaveUp: false,
-      };
-      this.crashTrackers.set(agentId, tracker);
-    }
-
-    // Skip if we've already given up on this agent
-    if (tracker.gaveUp) return;
-
-    // Increment crash count
-    tracker.crashCount++;
-    tracker.lastCrash = now;
-
-    this.emit({ type: 'agent_crashed', agentId, crashCount: tracker.crashCount });
-    console.log(`🔔 Agent ${agentId} crashed (crash #${tracker.crashCount})`);
-
-    // PAN-1908: emit agent.heartbeat_dead so the event-driven deacon recovery
-    // can mark the agent stopped and resume it with the proper gates, rather
-    // than Cloister scheduling its own auto-restart in parallel.
-    if (this.eventStore) {
-      try {
-        this.eventStore.append({
-          type: 'agent.heartbeat_dead',
-          timestamp: new Date().toISOString(),
-          payload: { agentId, issueId: agentState.issueId, sessionId: agentState.sessionId },
-        });
-      } catch (err) {
-        console.error(`[cloister] Failed to emit heartbeat_dead for ${agentId}:`, err);
-      }
-    }
-
-    // Check if we've exceeded max retries
-    if (tracker.crashCount > config.max_retries) {
-      tracker.gaveUp = true;
-      this.emit({ type: 'agent_gave_up', agentId, maxRetries: config.max_retries });
-      console.error(`🔔 Gave up on restarting ${agentId} after ${config.max_retries} attempts`);
-      return;
-    }
-
-    // Calculate backoff delay for logging/mass-death tracking only — the actual
-    // resume is handled by the deacon's agent.heartbeat_dead handler.
-    const backoffIndex = Math.min(tracker.crashCount - 1, config.backoff_seconds.length - 1);
-    const backoffSeconds = config.backoff_seconds[backoffIndex];
-    const nextRetryAt = new Date(Date.now() + backoffSeconds * 1000);
-    tracker.nextRetryAt = nextRetryAt;
-
-    this.emit({
-      type: 'agent_restarting',
-      agentId,
-      crashCount: tracker.crashCount,
-      backoffSeconds,
-    });
-
-    console.log(
-      `🔔 Deacon will recover ${agentId} via heartbeat_dead (attempt ${tracker.crashCount}/${config.max_retries}, backoff ${backoffSeconds}s)`
-    );
+    return handleAgentCrashWithHost(this.crashHost(), agentId);
   }
 
   /**
    * Restart an agent using its saved session
    */
   private async restartAgent(agentId: string): Promise<void> {
-    const runtime = getRuntimeForAgent(agentId);
-    if (!runtime) {
-      throw new Error(`No runtime found for agent ${agentId}`);
-    }
-
-    // Get agent state to find session ID and workspace
-    const agentState = getAgentStateSync(agentId);
-    if (!agentState?.sessionId) {
-      throw new Error(`No session ID found for agent ${agentId}`);
-    }
-
-    if (!agentState.workspace) {
-      throw new Error(`No workspace found for agent ${agentId}`);
-    }
-
-    // Restart with --resume using spawnAgent with sessionId
-    console.log(`🔔 Restarting ${agentId} with session ${agentState.sessionId.substring(0, 8)}...`);
-    runtime.spawnAgent({
-      agentId,
-      workspace: agentState.workspace,
-      sessionId: agentState.sessionId,
-      runtime: runtime.name,
-    });
-    console.log(`🔔 Successfully restarted ${agentId}`);
+    return restartAgentWithHost(this.crashHost(), agentId);
   }
 
   /**
@@ -1604,44 +722,14 @@ export class CloisterService {
    * Detects when 3+ agents die within 30 seconds and pauses spawns.
    */
   private checkForMassDeaths(): void {
-    const MASS_DEATH_THRESHOLD = 3;
-    const WINDOW_SECONDS = 30;
-
-    const now = Date.now();
-    const windowStart = now - WINDOW_SECONDS * 1000;
-
-    // Clean up old timestamps outside the window
-    this.deathTimestamps = this.deathTimestamps.filter(
-      (timestamp) => timestamp.getTime() >= windowStart
-    );
-
-    // Check if we have mass deaths
-    if (this.deathTimestamps.length >= MASS_DEATH_THRESHOLD) {
-      // Trigger mass death alert
-      this.emit({
-        type: 'mass_death_detected',
-        deathCount: this.deathTimestamps.length,
-        windowSeconds: WINDOW_SECONDS,
-      });
-
-      // Pause spawns
-      if (!this.spawnsPaused) {
-        this.pauseSpawns('Mass death detected - system stability concern');
-        console.error(
-          `🔔 MASS DEATH DETECTED: ${this.deathTimestamps.length} agents died in ${WINDOW_SECONDS}s - spawns paused`
-        );
-      }
-    }
+    return checkForMassDeathsWithHost(this.crashHost());
   }
 
   /**
    * Pause new agent spawns
    */
   private pauseSpawns(reason: string): void {
-    this.spawnsPaused = true;
-    setCloisterSpawnsPausedSync(true);
-    this.emit({ type: 'spawn_paused', reason });
-    console.log(`🔔 Agent spawns paused: ${reason}`);
+    return pauseSpawnsWithHost(this.crashHost(), reason);
   }
 
   /**
@@ -1668,72 +756,14 @@ export class CloisterService {
    * Check for FPP violations and send nudges
    */
   private checkFPPViolations(agentIds: string[]): void {
-    for (const agentId of agentIds) {
-      const violation = checkAgentForViolations(agentId);
-      if (!violation) continue;
-
-      // New violation detected
-      if (violation.nudgeCount === 0) {
-        this.emit({ type: 'fpp_violation_detected', agentId, violation });
-      }
-
-      // Check if we should send a nudge
-      const timeSinceLastNudge = violation.lastNudgeAt
-        ? Date.now() - new Date(violation.lastNudgeAt).getTime()
-        : Infinity;
-
-      // Send nudge every 5 minutes until max nudges
-      const NUDGE_INTERVAL_MS = 5 * 60 * 1000;
-      if (timeSinceLastNudge >= NUDGE_INTERVAL_MS || violation.nudgeCount === 0) {
-        if (hasExceededMaxNudges(violation)) {
-          // Max nudges exceeded - alert user
-          this.emit({ type: 'fpp_max_nudges_exceeded', agentId, violation });
-          console.error(
-            `🔔 Agent ${agentId} exceeded max nudges for ${violation.type} - manual intervention required`
-          );
-        } else {
-          // Send nudge
-          const sent = sendNudge(violation);
-          if (sent) {
-            this.emit({ type: 'fpp_nudge_sent', agentId, nudgeCount: violation.nudgeCount });
-          }
-        }
-      }
-    }
+    return checkFPPViolations(this.healthHost(), agentIds);
   }
 
   /**
    * Check for cost limit alerts
    */
   private checkCostAlerts(agentIds: string[]): void {
-    const config = this.config.cost_limits;
-    if (!config) return;
-
-    for (const agentId of agentIds) {
-      // Extract issue ID from agent ID (format: agent-issue-123 or issue-123)
-      const issueId = agentId.startsWith('agent-')
-        ? agentId.replace(/^agent-/, '')
-        : agentId;
-
-      const alerts = checkCostLimits(agentId, issueId, config);
-      for (const alert of alerts) {
-        this.emit({ type: 'cost_alert', alert });
-
-        // Resolve the entity label: for daily_total, use explicit "(unattributed)" bucket
-        const entityLabel = alert.agentId || alert.issueId || '(unattributed)';
-
-        // Log the alert
-        if (alert.level === 'limit_reached') {
-          console.error(
-            `🔔 COST LIMIT REACHED: ${alert.type} for ${entityLabel} - $${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)}`
-          );
-        } else {
-          console.warn(
-            `🔔 Cost warning: ${alert.type} for ${entityLabel} at ${alert.percentUsed.toFixed(0)}% ($${alert.currentCost.toFixed(2)} / $${alert.limit.toFixed(2)})`
-          );
-        }
-      }
-    }
+    return checkCostAlerts(this.healthHost(), agentIds);
   }
 
   /**
@@ -1747,21 +777,7 @@ export class CloisterService {
    * Check if any specialists need session rotation
    */
   private async checkSpecialistRotations(): Promise<void> {
-    // Check merge-agent (the main candidate for rotation)
-    const mergeAgentResult = await Effect.runPromise(checkAndRotateIfNeeded('merge-agent', process.cwd()));
-    if (mergeAgentResult) {
-      this.emit({ type: 'session_rotated', specialistName: 'merge-agent', result: mergeAgentResult });
-
-      if (mergeAgentResult.success) {
-        console.log(
-          `🔔 Rotated merge-agent session: ${mergeAgentResult.oldSessionId.substring(0, 8)} → ${mergeAgentResult.newSessionId?.substring(0, 8)}`
-        );
-      } else {
-        console.error(`🔔 Failed to rotate merge-agent: ${mergeAgentResult.error}`);
-      }
-    }
-
-    // Could check other specialists here if needed
+    return checkSpecialistRotations(this.healthHost());
   }
 
   /**
@@ -1770,38 +786,7 @@ export class CloisterService {
    * Only writes events when state changes or on first check.
    */
   private recordHealthEvent(health: AgentHealth): void {
-    try {
-      const currentState = health.state;
-      const previousState = this.previousStates.get(health.agentId);
-
-      // Only write event if state changed or this is first check
-      if (previousState === undefined || previousState !== currentState) {
-        // Determine source from heartbeat
-        const source = health.heartbeat?.source
-          ? this.mapHeartbeatSource(health.heartbeat.source)
-          : 'unknown';
-
-        writeHealthEvent({
-          agentId: health.agentId,
-          timestamp: new Date().toISOString(),
-          state: currentState,
-          source,
-          metadata: health.heartbeat
-            ? JSON.stringify({
-                confidence: health.heartbeat.confidence,
-                lastAction: health.heartbeat.lastAction,
-                toolName: health.heartbeat.toolName,
-                timeSinceActivity: health.timeSinceActivity,
-              })
-            : undefined,
-        });
-
-        // Update tracked state
-        this.previousStates.set(health.agentId, currentState);
-      }
-    } catch (error) {
-      console.error(`Failed to record health event for ${health.agentId}:`, error);
-    }
+    return recordHealthEvent(this.healthHost(), health);
   }
 
   /**
@@ -1810,93 +795,14 @@ export class CloisterService {
    * Checks all triggers for each agent and performs handoffs when triggered.
    */
   private async checkHandoffTriggers(agentHealths: AgentHealth[]): Promise<void> {
-    for (const health of agentHealths) {
-      try {
-        // Get agent state
-        const agentState = getAgentStateSync(health.agentId);
-        if (!agentState) continue;
-
-        // Skip if no workspace (can't determine context)
-        if (!agentState.workspace) continue;
-
-        // Check all triggers
-        const triggers = await Effect.runPromise(checkAllTriggers(
-          health.agentId,
-          agentState.workspace,
-          agentState.issueId,
-          agentState.model,
-          health,
-          this.config
-        ));
-
-        // Execute handoff for first triggered condition
-        // (Priority: stuck > planning > test > completion)
-        if (triggers.length > 0) {
-          const trigger = triggers[0];
-
-          // task_complete triggers with a specialist name (e.g. 'test-agent') as suggestedModel
-          // are handled by the `pan done` → completion marker → specialist pipeline flow.
-          // Do NOT perform a model-swap handoff here — it passes the specialist name as a model ID
-          // which is invalid and causes the agent to respawn with an unusable model.
-          const specialistNames = ['review-agent', 'test-agent', 'merge-agent', 'inspect-agent', 'uat-agent'];
-          if (trigger.type === 'task_complete' && specialistNames.includes(trigger.suggestedModel || '')) {
-            console.log(`[cloister] Skipping handoff for ${health.agentId}: task_complete triggers specialist dispatch via completion marker, not model swap`);
-            continue;
-          }
-
-          this.emit({ type: 'handoff_triggered', agentId: health.agentId, trigger });
-
-          console.log(`🔔 Handoff triggered for ${health.agentId}: ${trigger.reason}`);
-
-          // Perform handoff
-          const result = await Effect.runPromise(performHandoff(health.agentId, {
-            targetModel: trigger.suggestedModel || 'sonnet',
-            reason: trigger.reason,
-          }));
-
-          this.emit({ type: 'handoff_completed', agentId: health.agentId, result });
-
-          // Log handoff event
-          if (result.context) {
-            const event = createHandoffEvent(
-              health.agentId,
-              agentState.issueId,
-              result.context,
-              trigger.type,
-              result.success,
-              result.error
-            );
-            logHandoffEventSync(event);
-          }
-
-          if (result.success) {
-            console.log(`✓ Handoff completed: ${health.agentId} → ${result.newAgentId} (${trigger.suggestedModel})`);
-          } else {
-            console.error(`✗ Handoff failed: ${result.error}`);
-          }
-        }
-      } catch (error) {
-        console.error(`Failed to check handoff triggers for ${health.agentId}:`, error);
-      }
-    }
+    return checkHandoffTriggers(this.healthHost(), agentHealths);
   }
 
   /**
    * Map heartbeat source to database source string
    */
   private mapHeartbeatSource(source: string): string {
-    switch (source) {
-      case 'jsonl':
-        return 'jsonl_mtime';
-      case 'tmux':
-        return 'tmux_activity';
-      case 'git':
-        return 'git_activity';
-      case 'active-heartbeat':
-        return 'active_heartbeat';
-      default:
-        return source;
-    }
+    return mapHeartbeatSource(this.healthHost(), source);
   }
 
   /**
@@ -1907,80 +813,21 @@ export class CloisterService {
    * calls for every agent, which scales poorly with agent count.
    */
   getStatus(): CloisterStatus {
-    const now = Date.now();
-    if (this._statusCache && now - this._statusCacheAt < this.STATUS_CACHE_TTL_MS) {
-      return this._statusCache;
-    }
-
-    const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
-    const agentIds = runningAgents.map((a) => a.id);
-
-    const agentHealths: AgentHealth[] = [];
-
-    for (const agentId of agentIds) {
-      const runtime = getRuntimeForAgent(agentId);
-      if (runtime) {
-        const health = getAgentHealth(agentId, runtime);
-        agentHealths.push(health);
-      }
-    }
-
-    const summary = generateHealthSummary(agentHealths);
-    const needsAttention = getAgentsNeedingAttention(agentHealths).map((h) => h.agentId);
-
-    const deaconStatus = getDeaconStatus();
-    const patrol = assessDeaconPatrolFreshness({
-      isRunning: deaconStatus.isRunning,
-      lastPatrol: deaconStatus.state.lastPatrol,
-      patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
-    });
-
-    const status: CloisterStatus = {
-      running: this.isRunning(),
-      lastCheck: this.lastCheck,
-      config: this.config,
-      summary,
-      agentsNeedingAttention: needsAttention,
-      patrol: {
-        ...patrol,
-        loopRunning: deaconStatus.isRunning,
-        patrolIntervalMs: deaconStatus.config.patrolIntervalMs,
-      },
-    };
-
-    this._statusCache = status;
-    this._statusCacheAt = now;
-    return status;
+    return getStatusWithHost(this.statusHost());
   }
 
   /**
    * Get health for a specific agent
    */
   getAgentHealth(agentId: string): AgentHealth | null {
-    const runtime = getRuntimeForAgent(agentId);
-    if (!runtime) {
-      return null;
-    }
-
-    return getAgentHealth(agentId, runtime);
+    return getServiceAgentHealth(this.statusHost(), agentId);
   }
 
   /**
    * Get health for all running agents
    */
   getAllAgentHealth(): AgentHealth[] {
-    const runningAgents = listRunningAgentsSync().filter((a) => a.tmuxActive);
-    const agentHealths: AgentHealth[] = [];
-
-    for (const agent of runningAgents) {
-      const runtime = getRuntimeForAgent(agent.id);
-      if (runtime) {
-        const health = getAgentHealth(agent.id, runtime);
-        agentHealths.push(health);
-      }
-    }
-
-    return agentHealths;
+    return getAllAgentHealthWithHost(this.statusHost());
   }
 
   /**
@@ -2112,34 +959,4 @@ export function getCloisterService(): CloisterService {
  */
 export function setCloisterService(service: CloisterService): void {
   globalService = service;
-}
-
-// ─── PAN-1249: additive Effect variants ───────────────────────────────────────
-// service.ts is the top-level Cloister orchestrator (1817 lines, heavy use of
-// closures and direct fs IO). A full Effect rewrite would cascade into half
-// the codebase (review-agent, test-agent-queue, agents.ts) so for the
-// batch-C migration we expose Effect variants only at the two domain-event
-// entry points. The legacy Promise surfaces stay live for existing callers;
-// Effect callers should prefer the *Effect variants. The internal
-// implementations swallow errors (logging via emitActivityEntry instead),
-// so the error channel is `never`.
-
-/**
- * Effect-typed variant of {@link onIssueStateChange}. Never fails — failures
- * surface through `emitActivityEntry` inside the legacy implementation.
- */
-export function onIssueStateChange(
-  issueId: string,
-  newState: string,
-): Effect.Effect<void> {
-  return Effect.promise(() => onIssueStateChangePromise(issueId, newState));
-}
-
-/**
- * Effect-typed variant of {@link handleCloisterDomainEvent}. Never fails.
- */
-export function handleCloisterDomainEvent(
-  event: CloisterDomainEventLike,
-): Effect.Effect<void> {
-  return Effect.promise(() => handleCloisterDomainEventPromise(event));
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +7,12 @@ const mocks = vi.hoisted(() => ({
   isGitHubAppConfigured: vi.fn(),
   getShadowState: vi.fn(),
   resolveGitHubIssueSync: vi.fn(),
+  // Linear branch
+  resolveTrackerTypeSync: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
+  createTracker: vi.fn(),
+  getLinearApiKey: vi.fn(),
+  linearGetIssue: vi.fn(),
 }));
 
 vi.mock('child_process', () => {
@@ -24,6 +30,7 @@ vi.mock('../../../lib/shadow-state.js', () => ({
 
 vi.mock('../../../lib/tracker-utils.js', () => ({
   resolveGitHubIssueSync: mocks.resolveGitHubIssueSync,
+  resolveTrackerTypeSync: mocks.resolveTrackerTypeSync,
 }));
 
 vi.mock('../../../lib/github-app.js', () => ({
@@ -31,7 +38,28 @@ vi.mock('../../../lib/github-app.js', () => ({
   isGitHubAppConfigured: mocks.isGitHubAppConfigured,
 }));
 
-import { clearIssueClosedCache, isIssueClosed, isTrackerIssueClosed } from '../issue-closed.js';
+vi.mock('../../../lib/projects.js', () => ({
+  resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
+}));
+
+vi.mock('../../../lib/tracker/factory.js', () => ({
+  createTracker: mocks.createTracker,
+}));
+
+vi.mock('../../../lib/tracker/linear.js', () => ({
+  LinearTracker: vi.fn().mockImplementation(() => ({ getIssue: mocks.linearGetIssue })),
+}));
+
+vi.mock('../../../lib/shadow-utils.js', () => ({
+  getLinearApiKey: mocks.getLinearApiKey,
+}));
+
+import {
+  clearIssueClosedCache,
+  isIssueClosed,
+  isTrackerIssueClosed,
+  TRACKER_CLOSED_CACHE_TTL_MS,
+} from '../issue-closed.js';
 
 describe('issue closed detection', () => {
   beforeEach(() => {
@@ -110,5 +138,113 @@ describe('issue closed detection', () => {
 
     expect(mocks.getIssueState).toHaveBeenCalledTimes(1);
     expect(mocks.execFileAsync).not.toHaveBeenCalled();
+  });
+});
+
+describe('linear closed detection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearIssueClosedCache();
+    mocks.getShadowState.mockReturnValue(Effect.succeed(null));
+    // Non-GitHub resolution so the Linear branch runs.
+    mocks.resolveGitHubIssueSync.mockReturnValue({ isGitHub: false });
+    mocks.resolveTrackerTypeSync.mockReturnValue('linear');
+    mocks.resolveProjectFromIssueSync.mockReturnValue({
+      projectKey: 'myn',
+      projectName: 'Mind Your Now',
+      projectPath: '/projects/myn',
+      linearTeam: 'MIN',
+    });
+    mocks.createTracker.mockReturnValue({ getIssue: mocks.linearGetIssue });
+    mocks.getLinearApiKey.mockReturnValue(Effect.succeed('linear-key'));
+    mocks.linearGetIssue.mockReturnValue(
+      Effect.succeed({ ref: 'MIN-729', state: 'closed' }),
+    );
+  });
+
+  it('returns true when the Linear issue is closed (FR-1)', async () => {
+    mocks.linearGetIssue.mockReturnValue(
+      Effect.succeed({ ref: 'MIN-729', state: 'closed' }),
+    );
+
+    await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(true);
+    expect(mocks.linearGetIssue).toHaveBeenCalledWith('MIN-729');
+  });
+
+  it('returns false and skips the API when no Linear key resolves (FR-2)', async () => {
+    mocks.createTracker.mockImplementation(() => {
+      throw new Error('no key');
+    });
+    mocks.getLinearApiKey.mockReturnValue(Effect.succeed(null));
+
+    await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(false);
+    expect(mocks.linearGetIssue).not.toHaveBeenCalled();
+  });
+
+  it('returns false without building a Linear client for non-linear tracker types (FR-3)', async () => {
+    mocks.resolveTrackerTypeSync.mockReturnValue('rally');
+
+    await expect(isTrackerIssueClosed('FOO-1')).resolves.toBe(false);
+    expect(mocks.createTracker).not.toHaveBeenCalled();
+    expect(mocks.linearGetIssue).not.toHaveBeenCalled();
+  });
+
+  it('returns false without a Linear call when the issue resolves to no project (FR-3)', async () => {
+    mocks.resolveProjectFromIssueSync.mockReturnValue(null);
+
+    await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(false);
+    expect(mocks.createTracker).not.toHaveBeenCalled();
+    expect(mocks.linearGetIssue).not.toHaveBeenCalled();
+  });
+
+  it('returns false and caches false when getIssue fails (FR-5)', async () => {
+    mocks.linearGetIssue.mockReturnValue(Effect.fail(new Error('boom')));
+
+    await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(false);
+
+    // The false verdict is cached: a second call within the TTL must not
+    // re-invoke the tracker even though the mock now reports closed.
+    mocks.linearGetIssue.mockReturnValue(
+      Effect.succeed({ ref: 'MIN-729', state: 'closed' }),
+    );
+    await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(false);
+    expect(mocks.linearGetIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns false when the returned ref does not match the requested id (FR-6)', async () => {
+    mocks.linearGetIssue.mockReturnValue(
+      Effect.succeed({ ref: 'MIN-7290', state: 'closed' }),
+    );
+
+    await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(false);
+    expect(mocks.linearGetIssue).toHaveBeenCalledTimes(1);
+  });
+
+  describe('cache TTL', () => {
+    // Fake only Date so the cache's Date.now() comparisons are controllable
+    // without freezing Effect's microtask/real-timer runtime (NFR-2).
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(1_700_000_000_000);
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('serves the cached verdict within the TTL and re-queries after expiry (FR-4)', async () => {
+      mocks.linearGetIssue.mockReturnValue(
+        Effect.succeed({ ref: 'MIN-729', state: 'closed' }),
+      );
+
+      await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(true);
+      await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(true);
+      expect(mocks.linearGetIssue).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(1_700_000_000_000 + TRACKER_CLOSED_CACHE_TTL_MS + 1);
+
+      await expect(isTrackerIssueClosed('MIN-729')).resolves.toBe(true);
+      expect(mocks.linearGetIssue).toHaveBeenCalledTimes(2);
+    });
   });
 });

@@ -739,7 +739,7 @@ describe('isPlanningComplete', () => {
 });
 
 // PAN-2401: the plan read door must overlay the per-issue record's
-// statusOverrides — merged beads read 'completed', never the spec's
+// statusOverrides — merged tasks read 'completed', never the spec's
 // immutable 'pending'.
 describe('mergeRecordStatusOverrides (PAN-2401)', () => {
   it('applies record overrides onto a loaded doc', async () => {

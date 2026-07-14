@@ -297,6 +297,43 @@ export const selectAgentsWithPendingAskUserQuestion = memoizeArraySelector<
 )
 
 /**
+ * PAN-1520 (FR-1) — agents with a pending ExitPlanMode plan payload, oldest
+ * first. Feeds the PlanApprovalDialog the same way the AUQ selector feeds
+ * AskUserQuestionDialog.
+ */
+export const selectAgentsWithPendingProposedPlan = memoizeArraySelector<
+  DashboardState,
+  'agentsById',
+  AgentSnapshot[]
+>(
+  'agentsById',
+  (agentsById) =>
+    Object.values(agentsById)
+      .filter((a) => a.pendingProposedPlan != null)
+      .sort((a, b) => {
+        const aTime = a.pendingProposedPlan?.askedAt ?? ''
+        const bTime = b.pendingProposedPlan?.askedAt ?? ''
+        return aTime === bTime ? a.id.localeCompare(b.id) : aTime.localeCompare(bTime)
+      }),
+)
+
+/**
+ * PAN-1520 (FR-6) — the ONE shared accessor for "does this agent have a
+ * pending channel permission request?". Card-level surfaces combine this with
+ * `isAwaitingInput(agent)` so a permission-only agent lights the same
+ * indicator; deriving it per-component from the raw request map is what
+ * caused the card/needs-you drift this fixes.
+ */
+export const selectPendingPermissionAgentIds = memoizeArraySelector<
+  DashboardState,
+  'channelPermissionRequestsById',
+  ReadonlySet<string>
+>(
+  'channelPermissionRequestsById',
+  (permsById) => new Set(Object.values(permsById ?? {}).map((p) => p.agentId)),
+)
+
+/**
  * PAN-1520 — a single agent-or-conversation subject that is blocked waiting on
  * the operator, across EVERY surface (AskUserQuestion, ExitPlanMode,
  * EnterPlanMode, session-resume, and PermissionRequest). This is what the
@@ -315,6 +352,8 @@ export interface PendingInputSubject {
   kinds: string[]
   /** AUQ payload when an AskUserQuestion is among the kinds (for the dialog). */
   pendingAskUserQuestion?: AgentSnapshot['pendingAskUserQuestion']
+  /** Plan payload when an ExitPlanMode approval is among the kinds (FR-5 routing). */
+  pendingProposedPlan?: AgentSnapshot['pendingProposedPlan']
   /** Outstanding permission requests for this agent (for routing/labels). */
   permissionRequestIds: string[]
   /** Oldest blocking timestamp for stable ordering. */
@@ -378,6 +417,7 @@ export const selectPendingInputSubjects = deriveMemo<
       if (!waiting) continue
       const since =
         a.pendingAskUserQuestion?.askedAt ??
+        a.pendingProposedPlan?.askedAt ??
         agentPerms.map((p) => p.createdAt).sort()[0] ??
         ''
       subjects.push({
@@ -385,6 +425,7 @@ export const selectPendingInputSubjects = deriveMemo<
         issueId: a.issueId,
         kinds,
         pendingAskUserQuestion: a.pendingAskUserQuestion,
+        pendingProposedPlan: a.pendingProposedPlan,
         permissionRequestIds: agentPerms.map((p) => p.requestId),
         since,
       })

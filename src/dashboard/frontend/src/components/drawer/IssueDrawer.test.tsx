@@ -37,7 +37,7 @@ const issue: Issue = {
   updatedAt: '2026-05-18T00:00:00.000Z',
 };
 
-type TestBead = {
+type TestTask = {
   id: string;
   title: string;
   status: string;
@@ -75,8 +75,8 @@ function mockFetch() {
     });
     if (url.includes('/planning-state')) return Response.json({
       hasPlan: currentIssue?.hasPlan ?? false,
-      hasBeads: currentIssue?.hasBeads ?? false,
-      beadsCount: currentIssue?.hasBeads ? 1 : 0,
+      hasTasks: currentIssue?.hasTasks ?? false,
+      tasksCount: currentIssue?.hasTasks ? 1 : 0,
       planningComplete: currentIssue?.planningComplete ?? currentIssue?.hasPlan ?? false,
     });
     if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
@@ -95,10 +95,10 @@ function drawerUi(queryClient: QueryClient) {
   );
 }
 
-function renderDrawer(beads: TestBead[] = []) {
-  if (beads.length > 0) {
+function renderDrawer(tasks: TestTask[] = []) {
+  if (tasks.length > 0) {
     useDashboardStore.setState({
-      issuesRaw: [{ ...issue, beads }],
+      issuesRaw: [{ ...issue, tasks }],
     } as Parameters<typeof useDashboardStore.setState>[0]);
   }
   const queryClient = createQueryClient();
@@ -166,16 +166,16 @@ describe('IssueDrawer', () => {
     useDashboardStore.getState().openIssue('PAN-1');
 
     renderDrawer([
-      { id: 'done', title: 'Done bead', status: 'closed', createdAt: '2026-05-18T00:00:00.000Z', closedAt: '2026-05-18T00:01:00.000Z' },
-      { id: 'open', title: 'Open bead', status: 'open', createdAt: '2026-05-18T00:00:00.000Z' },
+      { id: 'done', title: 'Done task', status: 'closed', createdAt: '2026-05-18T00:00:00.000Z', closedAt: '2026-05-18T00:01:00.000Z' },
+      { id: 'open', title: 'Open task', status: 'open', createdAt: '2026-05-18T00:00:00.000Z' },
     ]);
 
     expect(screen.getByTestId('drawer-tabs')).toHaveClass('px-[14px]');
     expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('py-[10px]', 'text-[13px]', 'font-medium', 'text-foreground');
     expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[14px]', 'right-[14px]', 'h-[2px]', 'bg-primary');
     expect(screen.getByTestId('drawer-tab-plan')).toHaveClass('text-muted-foreground', 'hover:text-foreground');
-    expect(within(screen.getByTestId('drawer-tab-beads')).getByTestId('drawer-tab-beads-count')).toHaveTextContent('1/2');
-    expect(screen.getByTestId('drawer-tab-beads-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
+    expect(within(screen.getByTestId('drawer-tab-tasks')).getByTestId('drawer-tab-tasks-count')).toHaveTextContent('1/2');
+    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
 
     fireEvent.click(screen.getByTestId('drawer-tab-files'));
 
@@ -695,7 +695,7 @@ describe('IssueDrawer', () => {
 
   it('snapshots enabled drawer footer actions for work-running and ready-to-merge phases', () => {
     useDashboardStore.setState({
-      issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
+      issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }],
       agentsById: {
         'agent-PAN-1': {
           id: 'agent-PAN-1',
@@ -723,7 +723,7 @@ describe('IssueDrawer', () => {
 
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
-      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
+      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }],
       agentsById: {},
       reviewStatusByIssueId: {
         'PAN-1': {
@@ -749,13 +749,13 @@ describe('IssueDrawer', () => {
           "issue-action-startAgent",
           "issue-action-syncMain",
           "issue-action-rebuildAndStart",
-          "issue-action-inspectBead",
+          "issue-action-inspectTask",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
           "issue-action-open",
           "issue-action-resetIssue",
           "issue-action-cancel",
-          "issue-action-beads",
+          "issue-action-tasks",
           "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
@@ -770,13 +770,13 @@ describe('IssueDrawer', () => {
           "issue-action-stopAgent",
           "issue-action-pause",
           "issue-action-syncMain",
-          "issue-action-inspectBead",
+          "issue-action-inspectTask",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
           "issue-action-open",
           "issue-action-resetIssue",
           "issue-action-cancel",
-          "issue-action-beads",
+          "issue-action-tasks",
           "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
@@ -879,33 +879,33 @@ describe('IssueDrawer', () => {
     expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 
-  it('renders drawer beads list from drawer data with done and current states', () => {
+  it('renders drawer tasks list from drawer data with done and current states', () => {
     useDashboardStore.getState().openIssue('PAN-1');
 
     renderDrawer([
       {
         id: 'workspace-done',
-        title: 'PAN-1: Completed bead',
+        title: 'PAN-1: Completed task',
         status: 'closed',
         createdAt: '2026-05-18T00:00:00.000Z',
         closedAt: '2026-05-18T00:05:00.000Z',
       },
       {
         id: 'workspace-current',
-        title: 'PAN-1: Current bead',
+        title: 'PAN-1: Current task',
         status: 'in_progress',
         createdAt: '2026-05-18T00:00:00.000Z',
         updatedAt: '2026-05-18T00:03:00.000Z',
       },
     ]);
 
-    expect(screen.getByTestId('drawer-beads-list')).toBeInTheDocument();
-    expect(screen.getByText('Completed bead')).toHaveClass('line-through', 'decoration-[rgba(255,255,255,0.18)]');
+    expect(screen.getByTestId('drawer-tasks-list')).toBeInTheDocument();
+    expect(screen.getByText('Completed task')).toHaveClass('line-through', 'decoration-[rgba(255,255,255,0.18)]');
     expect(screen.getByText('workspace-done')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
     expect(screen.getByText('5m')).toHaveClass('font-mono', 'text-[10px]', 'tabular-nums');
-    expect(screen.getByTestId('drawer-bead-status-done')).toHaveClass('bg-success', 'text-white', 'text-[9px]');
-    expect(screen.getByTestId('drawer-bead-status-current')).toHaveClass('relative');
-    expect(screen.getByTestId('drawer-bead-status-current').firstElementChild).toHaveClass('drawer-bead-current-ping', 'border-[1.5px]', 'border-info');
+    expect(screen.getByTestId('drawer-task-status-done')).toHaveClass('bg-success', 'text-white', 'text-[9px]');
+    expect(screen.getByTestId('drawer-task-status-current')).toHaveClass('relative');
+    expect(screen.getByTestId('drawer-task-status-current').firstElementChild).toHaveClass('drawer-task-current-ping', 'border-[1.5px]', 'border-info');
   });
 
   it('renders four review specialist rows from drawer data with status dots', () => {

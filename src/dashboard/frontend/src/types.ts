@@ -42,10 +42,10 @@ export interface Issue {
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';  // From review-status, set by specialist pipeline
   // Planning-state (embedded from /api/issues via filesystem checks)
   hasPlan?: boolean;
-  hasBeads?: boolean;
+  hasTasks?: boolean;
   planningComplete?: boolean;
   workspacePath?: string;
-  beadCounts?: { completed: number; total: number } | null;
+  taskCounts?: { completed: number; total: number } | null;
 }
 
 export interface GitStatus {
@@ -138,6 +138,12 @@ export interface Agent {
       multiSelect?: boolean;
       options: ReadonlyArray<{ label: string; description?: string }>;
     }>;
+  };
+  // PAN-1520 (FR-1) — pending ExitPlanMode plan payload for the approval modal.
+  pendingProposedPlan?: {
+    toolUseId: string;
+    askedAt: string;
+    plan: string;
   };
   resolution?: AgentResolution;  // Lifecycle completion signal (PAN-309)
   resolutionCount?: number;      // How many times this resolution was set

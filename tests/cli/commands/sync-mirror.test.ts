@@ -34,6 +34,13 @@ const mockEnsureExcalidrawMcp = vi.fn().mockReturnValue(false);
 const mockCreateBackup = vi.fn().mockReturnValue({ targets: [], timestamp: 'now' });
 const mockCleanupAgentDirectories = vi.fn().mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
 const mockStartupSyncNeeded = vi.fn().mockReturnValue({ needed: true, reason: 'test' });
+const mockProvisionClaudeHooks = vi.fn().mockResolvedValue({
+  ok: true,
+  changed: false,
+  binariesSynced: 14,
+  registered: [],
+  pruned: [],
+});
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
@@ -110,6 +117,10 @@ vi.mock('../../../src/lib/agent-directory-cleanup.js', () => ({
   cleanupAgentDirectories: mockCleanupAgentDirectories,
 }));
 
+vi.mock('../../../src/lib/claude-hooks-provision.js', () => ({
+  provisionClaudeHooks: mockProvisionClaudeHooks,
+}));
+
 vi.mock('../../../src/lib/paths.js', () => ({
   SYNC_TARGET: { skills: '/tmp/skills', commands: '/tmp/commands', agents: '/tmp/agents' },
   SYNC_SOURCES: { gitHooks: '/tmp/git-hooks', hooks: '/tmp/hooks', skills: '/tmp/src-skills' },
@@ -143,6 +154,13 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [] });
     mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
     mockStartupSyncNeeded.mockReturnValue({ needed: true, reason: 'test' });
+    mockProvisionClaudeHooks.mockResolvedValue({
+      ok: true,
+      changed: false,
+      binariesSynced: 14,
+      registered: [],
+      pruned: [],
+    });
   });
 
   it('mirrors project skills from the current working directory', async () => {
@@ -155,6 +173,13 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     const { syncCommand } = await import('../../../src/cli/commands/sync.js');
     await syncCommand({});
     expect(mockSyncContextLayers).toHaveBeenCalledTimes(1);
+  });
+
+  it('repairs Claude hook registrations as part of an explicit sync', async () => {
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    expect(mockProvisionClaudeHooks).toHaveBeenCalledTimes(1);
   });
 
   it('prints the devroot deprecation warning when sync.devroot is still set', async () => {

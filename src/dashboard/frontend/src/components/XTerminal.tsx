@@ -97,6 +97,7 @@ interface ContextMenuState {
 
 // Storage key for auto-copy preference
 const AUTOCOPY_STORAGE_KEY = 'overdeck.terminal.autoCopyOnSelect';
+const CTRLV_PASTE_STORAGE_KEY = 'overdeck.terminal.ctrlVPaste';
 
 // Check if platform is Mac
 const isMac = navigator.platform.toLowerCase().includes('mac');
@@ -147,6 +148,19 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     return stored === null ? true : stored === 'true';
   });
 
+  // Ctrl+V-pastes state from localStorage (non-Mac only; Mac pastes with Cmd+V).
+  // Default ON: plain Ctrl+V triggers the browser's native paste. Turned off,
+  // Ctrl+V reaches the pty as a literal ^V (e.g. vim visual-block) and paste
+  // falls back to Ctrl+Shift+V / the context menu.
+  const [ctrlVPaste, setCtrlVPaste] = useState(() => {
+    const stored = localStorage.getItem(CTRLV_PASTE_STORAGE_KEY);
+    return stored == null ? true : stored === 'true';
+  });
+  // Read through a ref inside the custom key handler so toggling the setting
+  // takes effect immediately without tearing down and recreating the terminal.
+  const ctrlVPasteRef = useRef(ctrlVPaste);
+  ctrlVPasteRef.current = ctrlVPaste;
+
   // Context menu state
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -170,6 +184,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       console.error('Failed to save auto-copy setting:', err);
     }
   }, [autoCopyOnSelect]);
+
+  // Persist Ctrl+V-pastes setting to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(CTRLV_PASTE_STORAGE_KEY, String(ctrlVPaste));
+    } catch (err) {
+      console.error('Failed to save Ctrl+V paste setting:', err);
+    }
+  }, [ctrlVPaste]);
 
   // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, max 30s
   const getReconnectDelay = (attempt: number): number => {
@@ -286,12 +309,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // If no selection, let terminal handle (interrupt signal)
     }
 
-    // Ctrl+V / Cmd+V: do NOT intercept. xterm.js handles paste natively via a
-    // `paste` listener on its helper textarea, which works cross-browser
+    // Ctrl+V / Cmd+V: do NOT intercept here. xterm.js handles paste natively
+    // via a `paste` listener on its helper textarea, which works cross-browser
     // (including Firefox) and needs no clipboard-read permission because it
     // rides the browser's trusted paste gesture. Calling preventDefault() +
     // navigator.clipboard.readText() here suppressed that native path and broke
     // paste wherever readText() is blocked or unfocused. (PAN-2529)
+    // Plain Ctrl+V on Linux/Windows reaches that native path only because the
+    // attachCustomKeyEventHandler set at terminal creation tells xterm to skip
+    // the keystroke instead of swallowing it as a literal ^V.
   }, [copySelection]);
 
   // Handle context menu (right-click)
@@ -466,6 +492,26 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // outer browser/app-shell handlers (like chat-input history navigation)
       // never consume them while the pointer is over the terminal.
       term.attachCustomWheelEventHandler(handleTerminalWheel);
+
+      // Plain Ctrl+V on Linux/Windows: xterm.js would otherwise consume the
+      // keystroke and send a literal ^V (0x16) to the pty, so the browser's
+      // native paste never fires and only Ctrl+Shift+V pastes — while the
+      // context menu already advertises Ctrl+V. Returning false makes xterm
+      // skip the event WITHOUT preventDefault, so the browser delivers its
+      // trusted `paste` event to xterm's helper textarea and the native paste
+      // path handles it (no clipboard-read permission needed — PAN-2529).
+      // Trade-off: the pty app then never receives a literal ^V (e.g. vim
+      // visual-block), so the "Ctrl+V pastes clipboard" terminal setting
+      // (default on, read via ctrlVPasteRef) lets users restore the raw
+      // keystroke. macOS is left alone — Cmd+V is the paste gesture there and
+      // Ctrl+V keeps its terminal meaning.
+      if (!isMac) {
+        term.attachCustomKeyEventHandler((e) =>
+          !(ctrlVPasteRef.current
+            && e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey
+            && e.key.toLowerCase() === 'v')
+        );
+      }
 
       // On Linux/non-Mac, xterm only forces selection through mouse-reporting mode
       // when Shift is held. Claude's TUI enables mouse reporting, which makes plain
@@ -764,7 +810,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   };
 
   return (
-    <div className="relative w-full h-full">
+    <div className="relative h-full min-h-0 w-full min-w-0 overflow-hidden">
       {/* Top-right controls. The theme toggle is always available (PAN-1520);
           the settings gear is hidden when embedded (the host owns the chrome). */}
       <div className="absolute top-2 right-2 z-10 flex gap-2">
@@ -812,17 +858,33 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           <p className="text-xs text-muted-foreground mt-2">
             Automatically copy selected text to clipboard
           </p>
+          {!isMac && (
+            <>
+              <label className="flex items-center gap-2 cursor-pointer mt-3">
+                <input
+                  type="checkbox"
+                  checked={ctrlVPaste}
+                  onChange={(e) => setCtrlVPaste(e.target.checked)}
+                  className="w-4 h-4 rounded border-border bg-input text-primary focus:ring-primary"
+                />
+                <span className="text-sm text-muted-foreground">Ctrl+V pastes clipboard</span>
+              </label>
+              <p className="text-xs text-muted-foreground mt-2">
+                Uncheck to send Ctrl+V to the terminal instead (e.g. vim visual-block).
+                Ctrl+Shift+V and right-click always paste.
+              </p>
+            </>
+          )}
         </div>
       )}
 
       {/* Terminal container */}
       <div
         ref={terminalRef}
-        className="absolute inset-0"
+        className="absolute inset-2"
         onClick={handleClick}
         tabIndex={0}
         style={{
-          padding: '8px',
           backgroundColor: effectiveIsDark ? XTERM_BG.dark : XTERM_BG.light,
           overflow: 'hidden',
           outline: 'none',

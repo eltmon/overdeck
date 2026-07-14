@@ -20,7 +20,7 @@ PRD (human, markdown)              ← requirements & intent
   → issue filed in tracker         ← tracked work unit
     → Opus reads PRD + codebase    ← discovery phase
       → vBRIEF Plan (structured)   ← machine-validated plan
-        → beads (execution tasks)  ← agent work items
+        → tasks (execution tasks)  ← agent work items
           → implementation         ← code changes
 ```
 
@@ -28,7 +28,7 @@ PRD (human, markdown)              ← requirements & intent
 
 Planning depth adapts to the tracker's native hierarchy:
 
-| Tracker | Planning Level | vBRIEF Scope | Beads Live At | Workspace Unit |
+| Tracker | Planning Level | vBRIEF Scope | tasks Live At | Workspace Unit |
 |---------|---------------|--------------|---------------|----------------|
 | Rally   | Feature       | Feature (with story items) | Story | Story |
 | Linear  | Issue         | Issue | Issue | Issue |
@@ -45,7 +45,7 @@ The core principle: **plan at the highest natural unit your tracker provides, ex
 | **PRD** | Human | Markdown (`.md`) | Before or alongside issue filing | `docs/prds/` | Requirements, intent, context |
 | **vBRIEF Plan** | Opus | JSON (`.vbrief.json`) | During planning phase | `vbrief/{proposed,active,completed,cancelled}/` | Structured plan with acceptance criteria, dependency DAG |
 | **Continue State** | Agent/System | JSON (`.vbrief.json`) | During planning/execution | `vbrief/active/` (alongside scope vBRIEF) | Operational state, decisions, hazards, resume point, session history |
-| **Beads** | Opus → Agent | git-backed DB | Planning → execution | `.beads/` in workspace | Granular implementation tasks |
+| **tasks** | Opus → Agent | git-backed DB | Planning → execution | `.vBRIEF tasks/` in workspace | Granular implementation tasks |
 
 ### Where Artifacts Live
 
@@ -66,7 +66,7 @@ vbrief/
 workspaces/feature-US101/
   .planning/
     plan.vbrief.json                  ← draft vBRIEF (during planning, before promotion)
-  .beads/                             ← execution tasks
+  .vBRIEF tasks/                             ← execution tasks
   src/                                ← implementation
 ```
 
@@ -215,8 +215,8 @@ This dialog captures user input, displays the vBRIEF plan structure, and manages
 2. `pan plan <issue-id>` triggers Opus planning
 3. Opus reads PRD + issue + codebase → produces `plan.vbrief.json`
 4. vBRIEF items with acceptance criteria are validated against schema
-5. Beads are created from vBRIEF items (one bead per actionable item)
-6. One workspace, beads execute within it
+5. tasks are created from vBRIEF items (one task per actionable item)
+6. One workspace, tasks execute within it
 
 ### Rally: Feature-Level vBRIEF with Story Decomposition
 
@@ -232,7 +232,7 @@ When `pan plan` targets a Rally Feature (`PortfolioItem/Feature`):
    - Story items with `planRef` URIs to (future) story plans
    - Cross-story dependency edges
    - Shared contracts and data models in narratives
-5. No beads at the feature level — beads are a story concern
+5. No tasks at the feature level — tasks are a story concern
 
 #### Phase 2: Story Execution
 
@@ -243,7 +243,7 @@ For each User Story under the Feature:
 3. Opus produces a story-level `plan.vbrief.json` with:
    - Acceptance criteria from Rally + feature plan constraints
    - Implementation items scoped to this story
-4. Beads created from story-level vBRIEF items
+4. tasks created from story-level vBRIEF items
 5. Agents execute, specialists review/test/merge
 6. Cloister uses feature-level `edges` to order story workspace spawning
 
@@ -289,7 +289,7 @@ The agent-generated `.planning/PRD.md` is replaced by the vBRIEF plan (created i
 
 ### What happened to `STATE.md`?
 
-STATE.md is replaced by `continue-<issueId>.vbrief.json` — a structured JSON file that captures the same information (decisions, hazards, resume points) in a machine-parseable format, plus git state, beads mapping, agent model, and session history. See [VBRIEF.md § Continue State](./VBRIEF.md#continue-state--structured-session-history).
+STATE.md is replaced by `continue-<issueId>.vbrief.json` — a structured JSON file that captures the same information (decisions, hazards, resume points) in a machine-parseable format, plus git state, tasks mapping, agent model, and session history. See [VBRIEF.md § Continue State](./VBRIEF.md#continue-state--structured-session-history).
 
 ### Where do vBRIEFs live now?
 
@@ -315,9 +315,9 @@ Features are a planning artifact, not an execution unit. Code changes happen in 
 
 The feature-level vBRIEF plan's `edges` array is parsed when story workspaces are created. Cloister maintains a feature-level dependency map and only spawns story workspaces whose `blocks` dependencies are satisfied.
 
-### What about beads dependencies across stories?
+### What about tasks dependencies across stories?
 
-Beads remain story-scoped. Cross-story ordering is handled at the Cloister level via the vBRIEF dependency graph. This keeps beads simple and workspace-local.
+tasks remain story-scoped. Cross-story ordering is handled at the Cloister level via the vBRIEF dependency graph. This keeps tasks simple and workspace-local.
 
 ### Does this change anything for bug fixes?
 
@@ -329,20 +329,12 @@ Yes. LLMs are good at producing structured JSON when given a schema and examples
 
 ---
 
-## Automatic Beads Conversion
+## Checklist Activation
 
-When the planning agent finishes and the vBRIEF is promoted to `vbrief/proposed/`, Cloister automatically converts the vBRIEF plan into beads:
-
-1. **Read** `plan.vbrief.json` from the workspace
-2. **Topological sort** items using Kahn's algorithm on `blocks` edges
-3. **Create beads** in dependency order via `bd create` with:
-   - Title: `"{plan.id}: {item.title}"`
-   - Labels: `issueLabel,difficulty:X,phase-N`
-   - Description: Narrative Action + acceptance criteria
-   - Dependencies: `--deps "blocks:beadId1,blocks:beadId2"`
-4. **Start work agent** with beads ready for implementation
-
-Implementation: `createBeadsFromVBrief()` in `src/lib/vbrief/beads.ts`.
+When planning finishes, Overdeck promotes the vBRIEF to `specs/` on `overdeck-state`.
+The plan items and their `blocks` edges are the task graph; planning does not convert
+them into another store. A work agent starts only after the plan is readable and has
+at least one implementation item.
 
 ## DAG Visualization
 
@@ -350,7 +342,7 @@ The dashboard visualizes the vBRIEF DAG using the dependency edges between items
 
 ## DAG-Aware Task Scheduling
 
-Work agents use `bd ready -l <issue>` to find unblocked beads — tasks whose dependencies are all closed. This ensures work proceeds in dependency order without manual scheduling. The DAG structure from vBRIEF edges is preserved in beads dependencies during the automatic conversion.
+Work agents use `pan task next <issue>` to find the next dispatchable checklist item whose blockers are terminal. This keeps work in dependency order without duplicating the vBRIEF graph in another store.
 
 ## AC-Driven Specialist Pipeline
 
@@ -358,8 +350,8 @@ Acceptance criteria (`subItems` with `metadata.kind: "acceptance_criterion"`) fl
 
 | Stage | AC Usage |
 |-------|----------|
-| **Work agent** | Sees AC per bead as completion checklist |
-| **Inspect agent** | Verifies per-bead AC against the diff (only on beads flagged `metadata.requiresInspection: true`) |
+| **Work agent** | Sees AC per task as completion checklist |
+| **Inspect agent** | Verifies per-task AC against the diff (only on tasks flagged `metadata.requiresInspection: true`) |
 | **Review agent** | Full AC list for implementation coverage verification |
 | **Test agent** | Maps test results to AC, flags untested criteria |
 | **Verification gate** | Hard-gates on all AC subItems completed |

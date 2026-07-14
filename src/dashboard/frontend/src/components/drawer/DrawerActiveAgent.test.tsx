@@ -22,7 +22,7 @@ describe('classifyStreamLine', () => {
   });
 
   it('classifies arrow/bullet glyphs as verb-line', () => {
-    expect(classifyStreamLine('→ implementing bead 4')).toBe('verb-line');
+    expect(classifyStreamLine('→ implementing task 4')).toBe('verb-line');
     expect(classifyStreamLine('▸ entering review phase')).toBe('verb-line');
     expect(classifyStreamLine('✱ thinking...')).toBe('verb-line');
   });

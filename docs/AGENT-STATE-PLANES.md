@@ -15,7 +15,8 @@ Durable portable state is committed through domain writers to the orphan
   verdicts, ownership, and close-out.
 - `review/`, `test/`, and `feedback/` — durable specialist artifacts.
 - `backlog/` and `notes/` — sequencing and preserved operator notes.
-- `.beads/` — the shared beads database/export surface.
+- `specs/` plus each issue record's `tasks` block — the canonical checklist and its
+  runtime claim/completion state, read and written through the task state doors.
 
 The per-issue record under `records/` is also the permanent home for swarm
 durable state: `slotCompletions`, `finalizedAt`, `failedMergeBlock`,
@@ -25,23 +26,25 @@ canonical, migration-aware paths — one record, read through the per-domain
 resolver and written through the single record writer — so a slot's durable
 completion is never silently lost to a stale workspace-local copy.
 
-`migration-complete.json` at the remote branch tip proves cutover. Before that
-marker exists, read doors use the legacy project `.pan/` and `.beads/` layout.
-Afterward, legacy paths are fallback reads only and their recreation trips
-Doctor/Deacon diagnostics.
+`migration-complete.json` at the remote branch tip proves cutover. `pan sync`,
+dashboard coordinator startup, and work startup reconcile every registered
+project automatically before pipeline writes are allowed. The migrator carries
+tracked and untracked legacy `.pan/` payloads forward, then removes them from
+`main` with an ordinary commit. Afterward, legacy paths are fallback reads only
+and their recreation trips Doctor/Deacon diagnostics.
 
 For polyrepo projects, `pan_records.repo` designates the infra/state-host
 sub-repository. `resolveInfraRepo()` places `overdeck-state` on that repository,
-not on the project root; migration can still read legacy `.pan/` and `.beads/`
-from a non-Git project root during cutover.
+not on the project root; migration can still read legacy `.pan/` from a non-Git
+project root during cutover.
 
 ## Code-owned context and workspace runtime
 
 Project context is reviewed with code on `main` at
 `<projectRoot>/.overdeck/context/`; `.pan/context/` remains a read fallback.
 Workspace-local runtime files use `<workspace>/.overdeck/` and are gitignored.
-Workspace beads resolve the permanent database through an actively maintained
-`.beads/redirect`.
+Task reads resolve the vBRIEF plus issue-record task state through the canonical
+read door; agents mutate that state only through `pan task …`.
 
 ## Runtime plane — local SQLite
 
@@ -85,8 +88,8 @@ trip independently.
 
 ## Migration and recovery
 
-Run `pan admin state migrate <project> --dry-run` first. The real command uses
-a cross-process lock, stable source SHA, source/destination mode-size-hash
-manifest, workspace redirect rewrite, completion marker, and atomic push of
-`main` plus `overdeck-state`. It never deletes a remote state branch as
-automated recovery.
+Automatic reconciliation uses a cross-process lock, stable source SHA,
+source/destination mode-size-hash manifest, workspace redirect rewrite,
+completion marker, and atomic push of `main` plus `overdeck-state`. Operators
+can still run `pan admin state migrate <project> --dry-run` to preview a blocked
+cutover. Recovery never deletes a remote state branch or rewrites history.

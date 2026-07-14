@@ -49,7 +49,7 @@ export interface VBriefPlan {
   status: string;
   metadata?: { tiered_execution?: 'on' | 'off'; [key: string]: unknown };
   /** PAN-2383: computed by the plan read door (effective tiered-execution
-   * state + where it came from). Optional until the read-door bead lands. */
+   * state + where it came from). Optional until the read-door task lands. */
   tieredExecution?: { effective: boolean; source: TieredExecutionSource; override: 'on' | 'off' | null };
   author?: string;
   uid?: string;

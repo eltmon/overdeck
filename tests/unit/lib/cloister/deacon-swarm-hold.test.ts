@@ -247,7 +247,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
     expect(deps.spawnRun).toHaveBeenCalledTimes(1);
     expect(actions).toContain('[swarm] dispatch-halted wi-2: freeze/hold active');
     expect(deps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      '/repo/workspaces/feature-pan-106/.pan/spec.vbrief.json',
+      'PAN-106',
       {
         type: 'unblock',
         itemId: 'wi-2',

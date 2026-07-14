@@ -417,7 +417,7 @@ export function TieredExecutionSection({
           <div>
             <span className="text-sm font-medium text-foreground">Tiered execution</span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Global default for bead routing; issue metadata can override with <code className="font-mono">tiered_execution: on|off</code>.
+              Global default for task routing; issue metadata can override with <code className="font-mono">tiered_execution: on|off</code>.
             </p>
           </div>
           <div className="flex items-center gap-3">

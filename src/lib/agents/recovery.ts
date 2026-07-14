@@ -412,7 +412,7 @@ function generateRecoveryPrompt(state: AgentState): string {
     `- Started: ${state.startedAt}`,
     '',
     '## Recovery Steps',
-    '1. Check beads for context: `bd show ' + state.issueId + '`',
+    '1. Check the vBRIEF task state: `pan task show ' + state.issueId + ' <item-id>`',
     '2. Review recent git commits: `git log --oneline -10`',
     '3. Check hook for pending work: `pan admin fpp check`',
     '4. Resume from last known state',

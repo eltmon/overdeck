@@ -142,13 +142,13 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 5. Work agent reads .pan/continue.json and .pan/spec.vbrief.json and implements remaining work
 ```
 
-### Beads Prerequisite
+### vBRIEF Prerequisite
 
-Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if `.beads/issues.jsonl` does not exist in the workspace. Cloister automatically creates beads from the vBRIEF plan via `createBeadsFromVBrief()` when planning completes. Manual `bd create` is no longer needed.
+A readable, implementation-ready vBRIEF is a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** when the plan is missing, unreadable, belongs to another issue, or contains no implementation items. Planning writes the checklist directly and does not create an external task store.
 
 ### DAG-Aware Task Scheduling
 
-The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. When Cloister converts items to beads, it preserves these dependencies. Work agents use `bd ready -l <issue>` to find unblocked beads, ensuring tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
+The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. Work agents use `pan task next <issue>` to find the next dispatchable checklist item, so tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
 
 ### Acceptance Criteria Pipeline
 

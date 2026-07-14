@@ -46,14 +46,14 @@ export type UseIssueActionsResult = IssueActionLayout & {
   phase: PipelinePhase;
   activeDialog: IssueActionDialogState;
   closeDialog: () => void;
-  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedBeadId?: string | null) => void;
+  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => void;
   isActionPending: (key: IssueActionKey) => boolean;
 };
 
 type PostActionInput = {
   action: IssueActionEntry;
   body?: Record<string, unknown>;
-  selectedBeadId?: string | null;
+  selectedTaskId?: string | null;
 };
 
 type AlertFn = ReturnType<typeof useAlert>;
@@ -74,11 +74,11 @@ async function responseError(response: Response, fallback: string) {
   }
 }
 
-function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | undefined, state: IssueActionState, selectedBeadId?: string | null) {
+function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | undefined, state: IssueActionState, selectedTaskId?: string | null) {
   return endpoint
     .replace(':id', encodeURIComponent(issueId))
     .replace(':agentId', encodeURIComponent(agent?.id ?? ''))
-    .replace(':beadId', encodeURIComponent(selectedBeadId ?? state.selectedBeadId ?? ''));
+    .replace(':taskId', encodeURIComponent(selectedTaskId ?? state.selectedTaskId ?? ''));
 }
 
 const untroubledAction = ISSUE_ACTIONS.find((action) => action.key === 'untroubled');
@@ -123,7 +123,7 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { wipeWorkspace: true };
     case 'completeWorkReset':
       return { spawn: false };
-    case 'inspectBead':
+    case 'inspectTask':
       return { deep: false };
     case 'doneWork':
       return { message: `If implementation is complete, run: pan done ${issueId} -c "Implementation complete". If work remains, continue the current task.` };
@@ -156,8 +156,8 @@ function disabledReasonForAction(action: IssueActionEntry) {
       return 'Restart review is available while review, test, or merge work is active or failed.';
     case 'recoverReview':
       return 'Recover review is available only when the review pipeline is blocked or failed.';
-    case 'inspectBead':
-      return 'Select a bead before requesting inspection.';
+    case 'inspectTask':
+      return 'Select a task before requesting inspection.';
     case 'viewPr':
       return 'No pull request URL is available yet.';
     case 'open':
@@ -166,8 +166,8 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'copySettings':
     case 'destroyWorkspace':
       return 'This action requires an existing workspace.';
-    case 'beads':
-      return 'No plan or beads are available for this issue yet.';
+    case 'tasks':
+      return 'No plan or tasks are available for this issue yet.';
     case 'inference':
       return 'No inference artifact is available for this issue.';
     case 'discussions':
@@ -192,13 +192,13 @@ const dialogActionKeys = new Set<IssueActionKey>([
   'autoPlan',
   'startSkipPlanning',
   'tell',
-  'inspectBead',
+  'inspectTask',
   'open',
   'upload',
 ]);
 
 const artifactTabs: Partial<Record<IssueActionKey, string>> = {
-  beads: 'beads',
+  tasks: 'tasks',
   inference: 'inference',
   discussions: 'discussions',
   transcripts: 'conversation',
@@ -214,7 +214,9 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'destroyWorkspace':
       return `Destroy the workspace for ${issueId}?\n\nThis removes workspace resources but leaves the issue record intact.`;
     case 'resetIssue':
-      return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears beads and vBRIEF state, and moves the issue back to Todo.`;
+      return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and vBRIEF state, and moves the issue back to Todo.`;
+    case 'resetToPlanned':
+      return `Reset ${issueId} to planned?\n\nThis stops issue agents and clears task progress and claims, saved sessions, completion markers, pipeline verdicts, retries, and merge-queue state. It preserves the workspace, branch, commits, and finalized vBRIEF, returns the issue to open + planned, and does not start an agent.`;
     case 'cancel':
       return `Cancel ${issueId}?\n\nThis cancels the issue and wipes the workspace state for the abandoned run.`;
     case 'resetSession':
@@ -223,7 +225,7 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'restartAgent':
       return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
     case 'completeWorkReset':
-      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, vBRIEF, beads, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
+      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, vBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
     case 'purgeReview':
       return `Complete review reset for ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
     default:
@@ -260,7 +262,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       lifecycle: lifecycle ?? agent?.lifecycle ?? null,
       workspace: workspaceInfo,
       hasPlan: issue?.hasPlan ?? false,
-      hasBeads: issue?.hasBeads ?? false,
+      hasTasks: issue?.hasTasks ?? false,
       hasInference: false,
       hasTranscripts: false,
       hasDiscussions: false,
@@ -275,10 +277,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
   const postActionMutation = useMutation({
-    mutationFn: async ({ action, body, selectedBeadId }: PostActionInput) => {
+    mutationFn: async ({ action, body, selectedTaskId }: PostActionInput) => {
       if (!action.endpoint) return { success: true };
       const payload = body ?? bodyForAction(action, issueId, issue);
-      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedBeadId), {
+      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), {
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),
@@ -296,9 +298,9 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSettled: () => setPendingKey(null),
   });
 
-  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedBeadId?: string | null) => {
+  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => {
     setPendingKey(action.key);
-    postActionMutation.mutate({ action, body, selectedBeadId });
+    postActionMutation.mutate({ action, body, selectedTaskId });
   }, [postActionMutation]);
 
   const isActionPending = useCallback((key: IssueActionKey) => pendingKey === key && postActionMutation.isPending, [pendingKey, postActionMutation.isPending]);

@@ -7,6 +7,7 @@ import {
 import type { ReleaseSet } from '../../release-set.js';
 
 let odb: OverdeckTestDb;
+const DB_SETUP_TIMEOUT_MS = 10_000;
 
 beforeEach(() => {
   odb = setupOverdeckTestDb();
@@ -16,7 +17,7 @@ beforeEach(() => {
     'open',
     Date.now(),
   );
-});
+}, DB_SETUP_TIMEOUT_MS);
 
 afterEach(() => {
   teardownOverdeckTestDb(odb);

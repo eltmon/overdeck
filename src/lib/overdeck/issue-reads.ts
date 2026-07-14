@@ -1,9 +1,7 @@
-import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
@@ -21,9 +19,8 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { withBdMutex } from '../bd-mutex.js';
-
-const execFileAsync = promisify(execFile);
+import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readIssueRecordSync } from '../pan-dir/record.js';
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -178,10 +175,11 @@ export function analyzeIssue(id: string) {
   });
 }
 
-export function getIssueBeads(id: string) {
+export function getIssueTasks(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
-    const projectPath = resolveIssueProjectPathSync(id);
+    const resolvedProject = resolveProjectFromIssueSync(id);
+    const projectPath = resolvedProject?.projectPath ?? resolveIssueProjectPathSync(id);
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
 
     // Check for remote workspace (reads non-fatal state files)
@@ -208,40 +206,12 @@ export function getIssueBeads(id: string) {
       return { isRemoteWorkspace: false, remoteVmName: null };
     });
 
-    // Try local beads query (non-fatal on bd error)
-    const { beads, querySource } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string }> => {
-      try {
-        const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-        const { stdout } = await Effect.runPromise(withBdMutex(() => Effect.promise(() => execFileAsync('bd', ['list', '--json', '-l', id.toLowerCase(), '--status', 'all', '--limit', '0'], {
-          cwd: bdSearchDir,
-          encoding: 'utf-8',
-          timeout: 10000,
-        }))));
-        return { beads: JSON.parse(stdout || '[]'), querySource: 'local' };
-      } catch (bdError: any) {
-        console.error('bd search failed:', bdError.message);
-        return { beads: [], querySource: 'local' };
-      }
-    });
-
-    const tasks = beads.map((bead: any) => ({
-      id: bead.id,
-      title: bead.title,
-      status: bead.status,
-      type: bead.issue_type || bead.type || 'task',
-      blockedBy: bead.blocked_by || [],
-      createdAt: bead.created_at,
-      startedAt: bead.started_at,
-      updatedAt: bead.updated_at,
-      closedAt: bead.closed_at,
-      labels: bead.labels || [],
-      priority: bead.priority,
-    }));
-
-    tasks.sort((a: any, b: any) => {
-      if (a.priority !== b.priority) return (a.priority || 4) - (b.priority || 4);
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-    });
+    const doc = workspacePath ? readWorkspacePlanSync(workspacePath) : null;
+    if (!doc) return jsonResponse({ error: `The vBRIEF for ${id} is missing or unreadable.` }, { status: 404 });
+    const record = projectPath ? readIssueRecordSync({ name: resolvedProject?.projectName ?? id, path: projectPath }, id) : null;
+    const blockers = new Map<string, string[]>();
+    for (const edge of doc.plan.edges) if (edge.type === 'blocks') blockers.set(edge.to, [...(blockers.get(edge.to) ?? []), edge.from]);
+    const tasks = doc.plan.items.map((item) => ({ ...item, blockedBy: blockers.get(item.id) ?? [], claim: record?.tasks?.claims[item.id] }));
 
     // Suppress unused variable warning — remoteVmName available for callers if needed
     void remoteVmName;
@@ -250,31 +220,32 @@ export function getIssueBeads(id: string) {
       tasks,
       workspacePath,
       count: tasks.length,
-      source: querySource,
+      source: 'vbrief',
       isRemote: isRemoteWorkspace,
+      sequence: record?.tasks?.sequence ?? 0,
     });
   });
 }
 
-function isValidBeadId(beadId: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(beadId);
+function isValidItemId(itemId: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(itemId);
 }
 
-export function inspectIssueBead(options: {
+export function inspectIssueTask(options: {
   id: string;
-  beadId: string;
+  itemId: string;
   body: unknown;
 }) {
   return Effect.gen(function* () {
-    const { id, beadId, body } = options;
+    const { id, itemId, body } = options;
     if (!parseIssueIdSync(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    if (!beadId.trim()) {
-      return jsonResponse({ error: 'Missing bead ID' }, { status: 400 });
+    if (!itemId.trim()) {
+      return jsonResponse({ error: 'Missing item ID' }, { status: 400 });
     }
-    if (!isValidBeadId(beadId)) {
-      return jsonResponse({ error: 'Invalid bead ID' }, { status: 400 });
+    if (!isValidItemId(itemId)) {
+      return jsonResponse({ error: 'Invalid item ID' }, { status: 400 });
     }
 
     const project = resolveProjectFromIssueSync(id);
@@ -293,7 +264,7 @@ export function inspectIssueBead(options: {
       projectKey: project.projectKey,
       projectPath: project.projectPath,
       issueId: id,
-      beadId,
+      itemId,
       workspace,
       branch: `feature/${issueLower}`,
     }, { deep: (body as { deep?: unknown }).deep === true });

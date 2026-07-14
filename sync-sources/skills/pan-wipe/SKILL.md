@@ -1,6 +1,6 @@
 ---
 name: pan-wipe
-description: "pan wipe <id> — destructive reset to Todo: remove workspace, processes, branches, review state, beads, and tracker status"
+description: "pan wipe <id> — destructive reset to Todo: remove workspace, processes, branches, review state, vBRIEF tasks, and tracker status"
 triggers:
   - pan wipe
   - wipe issue
@@ -27,7 +27,7 @@ Performs the canonical destructive reset-to-Todo for an issue:
 - Removes the workspace directory (`workspaces/feature-<id>/`)
 - Removes agent state (`~/.overdeck/agents/<id>/`)
 - Deletes local and remote feature branches
-- Clears review status and issue beads
+- Clears review status and issue vBRIEF tasks
 - Resets issue status in the tracker to Todo
 
 ## When to Use

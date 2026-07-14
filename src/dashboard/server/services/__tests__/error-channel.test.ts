@@ -15,7 +15,7 @@ import {
   WorkspaceNotFound,
   WorkspaceCreateError,
   AgentAlreadyRunning,
-  BeadsNotInitialized,
+  TasksNotInitialized,
   AgentStartError,
 } from '../typed-errors.js';
 
@@ -151,9 +151,9 @@ describe('Typed errors — Effect channel propagation', () => {
     expect((err as any)._tag).toBe('IssueNotFound');
   });
 
-  it('BeadsNotInitialized has correct structure', () => {
-    const err = new BeadsNotInitialized({ workspace: '/path/to/workspace' });
-    expect(err._tag).toBe('BeadsNotInitialized');
+  it('TasksNotInitialized has correct structure', () => {
+    const err = new TasksNotInitialized({ workspace: '/path/to/workspace' });
+    expect(err._tag).toBe('TasksNotInitialized');
     expect(err.workspace).toBe('/path/to/workspace');
   });
 

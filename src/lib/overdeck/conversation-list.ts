@@ -24,6 +24,7 @@ import {
 } from './conversations.js';
 import {
   askUserQuestionSnapshotFromScan,
+  conversationNeedsTerminal,
   conversationTranscriptMissing,
   resolveSessionFile,
 } from './conversation-reads.js';
@@ -195,6 +196,7 @@ async function enrichConversationList(limit: number, offset: number): Promise<re
         pendingInputKinds,
         pendingAskUserQuestion,
         transcriptMissing: conversationTranscriptMissing(row, sessionAlive, convSf),
+        needsTerminal: await conversationNeedsTerminal(row, sessionAlive, convSf),
       };
     })),
     CONVERSATION_LIST_ENRICHMENT_CONCURRENCY,

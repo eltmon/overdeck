@@ -21,7 +21,6 @@ import { jsonResponse } from '../http-helpers.js';
 import {
   AgentAlreadyRunning,
   AgentStartError,
-  BeadsNotInitialized,
   IssueNotFound,
   PlanEmpty,
   RateLimited,
@@ -50,7 +49,7 @@ let opaqueLastSummaryAt = 0;
  *   TrackerNotConfigured                  → 503 Service Unavailable
  *   RateLimited                           → 429 Too Many Requests
  *   AgentAlreadyRunning                   → 409 Conflict
- *   BeadsNotInitialized, PlanEmpty        → 422 Unprocessable Entity
+ *   PlanEmpty                             → 422 Unprocessable Entity
  *   TrackerApiError                       → 502 Bad Gateway
  *   WorkspaceCreateError, AgentStartError → 500 Internal Server Error
  *   Unknown errors                        → 500 Internal Server Error
@@ -68,7 +67,6 @@ export function httpHandler<R, E>(
     | TrackerNotConfigured
     | RateLimited
     | AgentAlreadyRunning
-    | BeadsNotInitialized
     | PlanEmpty
     | TrackerApiError
     | WorkspaceCreateError
@@ -90,11 +88,6 @@ export function httpHandler<R, E>(
     ),
     Effect.catchTag('AgentAlreadyRunning', (err: AgentAlreadyRunning) =>
       Effect.succeed(jsonResponse({ error: `Agent already running for issue: ${err.id}` }, { status: 409 }))
-    ),
-    Effect.catchTag('BeadsNotInitialized', (err: BeadsNotInitialized) =>
-      Effect.succeed(
-        jsonResponse({ error: `Beads not initialized for workspace: ${err.workspace}` }, { status: 422 })
-      )
     ),
     Effect.catchTag('PlanEmpty', (err: PlanEmpty) =>
       Effect.succeed(jsonResponse({ error: `Plan is empty for issue: ${err.id}` }, { status: 422 }))

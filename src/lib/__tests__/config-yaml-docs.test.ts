@@ -20,7 +20,7 @@ describe('docs RAG configuration', () => {
           'specialist',
           'harness',
           'bd',
-          'beads',
+          'tasks',
           'vbrief',
           'workhorse',
         ],

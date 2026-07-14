@@ -5,6 +5,7 @@ import {
   hasManagedRegion,
   REGION_BEGIN,
   REGION_END,
+  stripBeadsManagedRegion,
 } from '../render.js';
 
 describe('applyManagedRegion', () => {
@@ -20,6 +21,15 @@ describe('applyManagedRegion', () => {
     expect(out.startsWith('# My notes\nstuff')).toBe(true);
     expect(out).toContain('new');
     expect(out).not.toContain('old');
+  });
+
+  it('removes the conflicting Beads profile block while preserving user content', () => {
+    const existing = `# My notes\n\n<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:abc -->\n## Agent Context Profiles\n**Conservative (default):** Do not run git commits or git pushes.\n<!-- END BEADS INTEGRATION -->\n`;
+    const out = applyManagedRegion(existing, 'Overdeck managed work rules');
+    expect(out).toContain('# My notes');
+    expect(out).toContain('Overdeck managed work rules');
+    expect(out).not.toContain('BEADS INTEGRATION');
+    expect(out).not.toContain('Conservative (default)');
   });
 
   // Regression: layer content that mentions the end-marker in prose must not be
@@ -63,6 +73,41 @@ describe('userContentOutsideRegion', () => {
     const managed = `body mentioning ${REGION_END} marker`;
     const file = `# mine\n\n${REGION_BEGIN}\n${managed}\n${REGION_END}\n`;
     expect(userContentOutsideRegion(file)).toBe('# mine');
+  });
+});
+
+describe('stripBeadsManagedRegion', () => {
+  it('is a no-op when Beads did not install an integration block', () => {
+    expect(stripBeadsManagedRegion('# Project\n')).toBe('# Project\n');
+  });
+
+  it('removes only the exact generated block and preserves surrounding rules', () => {
+    const existing = `# User rules
+Keep this command: bd-custom report
+
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:abc -->
+Run bd prime and bd show.
+<!-- END BEADS INTEGRATION -->
+
+## Tracker
+Use Linear for product issues.
+`;
+    expect(stripBeadsManagedRegion(existing)).toBe(`# User rules
+Keep this command: bd-custom report
+
+## Tracker
+Use Linear for product issues.`);
+  });
+
+  it('is idempotent after removing the generated block', () => {
+    const existing = `before\n<!-- BEGIN BEADS INTEGRATION -->\nstale\n<!-- END BEADS INTEGRATION -->\nafter\n`;
+    const cleaned = stripBeadsManagedRegion(existing);
+    expect(stripBeadsManagedRegion(cleaned)).toBe(cleaned);
+  });
+
+  it('does not remove unfenced Beads references', () => {
+    const existing = '# Rules\nUse bd only for local diagnostics.\n';
+    expect(stripBeadsManagedRegion(existing)).toBe(existing);
   });
 });
 

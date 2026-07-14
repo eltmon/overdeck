@@ -7,11 +7,11 @@
  * periodic manual "chore: sync workspace state" passes from the operator and
  * making the project repo stay perpetually dirty.
  *
- * This module exposes a fire-and-forget commit primitive that the pan-dir
+ * This module exposes a serialized write-through commit primitive that pan-dir
  * writers call after they update a file. Commits are:
- *   - fixed-window coalesced (default 10m) so a burst of writes becomes one commit
+ *   - scheduled on the next event-loop turn so every state update reaches git + origin
  *   - serialized within a process so the git index is never contested
- *   - best-effort: failures are logged and never thrown back to the caller
+ *   - best-effort for synchronous callers: failures are logged and reported by flushes
  *   - main-only: feature branches have their own commit cadence owned by agents
  *
  * Cross-machine concern: when an agent's state is canonical on `main`, moving
@@ -36,16 +36,7 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 10 * 60 * 1_000;
-const STATE_FLUSH_WINDOW_MS = parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
 const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
-
-function parseStateFlushWindowMs(value: string | undefined): number {
-  if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-  return parsed;
-}
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -97,6 +88,8 @@ function isAutoCommitExcludedPath(relativePath: string): boolean {
 
 export interface FlushResult {
   committed: boolean;
+  /** True only when the new commit is confirmed on origin. */
+  pushed?: boolean;
   reason?: string;
 }
 
@@ -182,9 +175,9 @@ function isGitError(value: unknown): value is GitError {
 }
 
 /**
- * Queue an auto-commit for one or more files. Returns immediately; the actual
- * git commit happens at the end of the fixed flush window. Multiple calls for
- * the same project root inside the window coalesce without extending it.
+ * Queue an auto-commit for one or more files. Returns immediately; the
+ * serialized commit-and-push starts on the next timer turn. Callers whose
+ * success depends on remote durability must also await flushAutoCommits().
  *
  * PAN-1908: `repoRoot` allows committing files to a different git checkout
  * than the project root (e.g., a declared infra repo for per-issue permanent
@@ -227,38 +220,52 @@ export function queueAutoCommit(opts: {
   pending.set(projectRoot, {
     paths: new Set(paths),
     subjects: [subject],
-    timer: setTimeout(() => void flushInner(projectRoot), STATE_FLUSH_WINDOW_MS),
+    timer: setTimeout(() => void flushInner(projectRoot), 0),
     repoRoot,
     expectedBranch,
   });
 }
 
 /**
- * PAN-1441: queue an auto-commit of the host-main beads export files.
- *
- * Unlike the .pan/* writers, there is no single Overdeck write site for these:
- * `.beads/issues.jsonl` and `.beads/export-state.json` drift on `main` as a
- * side-effect of the `bd` binary re-exporting after dolt syncs (other machines /
- * workspaces pushing to the shared dolt remote). So this is called from the
- * deacon's periodic patrol as a drift sweep rather than wired to a write site.
- *
- * Only existing files are queued: a missing/deleted `issues.jsonl` is skipped so
- * the janitor never stages — and propagates — a transient empty-DB deletion (the
- * PAN-1158 hazard). queueAutoCommit is main-only, coalesced, and a no-op when
- * nothing changed.
+ * PAN-2516 belt-and-suspenders reconciliation for state writes that predate or
+ * bypassed the canonical writer. Patrols commit only the owned spec/record
+ * surfaces; unrelated source or operator changes are never staged.
  */
-export function queueBeadsAutoCommit(projectRoot: string): void {
+export function reconcileStatePlaneDrift(
+  projectRoot: string,
+): Effect.Effect<FlushResult, never> {
   const project = findProjectByPathSync(projectRoot);
-  const beadsRoot = project && resolveStateReadHomeSync(project).migrated
-    ? resolveStateReadHomeSync(project).root
-    : projectRoot;
-  const candidates = [
-    join(beadsRoot, '.beads', 'issues.jsonl'),
-    join(beadsRoot, '.beads', 'export-state.json'),
-  ];
-  const paths = candidates.filter((p) => existsSync(p));
-  if (paths.length === 0) return;
-  queueAutoCommit({ projectRoot, paths, subject: 'chore(beads): sync beads state on main' });
+  const stateHome = project ? resolveStateReadHomeSync(project) : null;
+  const gitRoot = stateHome?.migrated ? stateHome.root : projectRoot;
+  const ownedPaths = stateHome?.migrated
+    ? ['specs', 'records']
+    : ['.pan/specs', '.pan/records'];
+
+  return Effect.gen(function* () {
+    const status = yield* runGit(
+      ['status', '--porcelain=v1', '--untracked-files=all', '--', ...ownedPaths],
+      gitRoot,
+    ).pipe(Effect.match({
+      onSuccess: (result) => result.stdout,
+      onFailure: () => '',
+    }));
+    const paths = status
+      .split('\n')
+      .map((line) => line.trimEnd())
+      .filter(Boolean)
+      .map((line) => line.slice(3))
+      .map((path) => path.includes(' -> ') ? path.split(' -> ').at(-1)! : path)
+      .map((path) => join(gitRoot, path));
+    if (paths.length === 0) return { committed: false, reason: 'no state-plane drift' };
+
+    queueAutoCommit({
+      projectRoot,
+      repoRoot: gitRoot,
+      paths,
+      subject: `chore(state): reconcile ${paths.length} pending spec/record update(s)`,
+    });
+    return yield* flushAutoCommits(projectRoot);
+  });
 }
 
 /**
@@ -412,27 +419,38 @@ function doCommit(
     );
     if (typeof commitOk !== 'boolean') return commitOk;
 
-    yield* maybePushStateCommit(gitRoot, branch);
+    const push = yield* maybePushStateCommit(gitRoot, branch);
+    if (push && !push.pushed) {
+      return { committed: true, pushed: false, reason: push.reason };
+    }
 
-    return { committed: true };
+    return { committed: true, pushed: push?.pushed };
   });
+}
+
+interface PushResult {
+  pushed: boolean;
+  reason?: string;
 }
 
 function maybePushStateCommit(
   gitRoot: string,
   branch: string,
-): Effect.Effect<void, never> {
-  if (process.env.OVERDECK_STATE_AUTOPUSH === '0') {
-    return Effect.void;
-  }
-
-  return pushStateBranch(gitRoot, branch);
+): Effect.Effect<PushResult | null, never> {
+  return runGit(['remote', 'get-url', 'origin'], gitRoot).pipe(
+    Effect.matchEffect({
+      // Unit-test and local scratch repositories may intentionally have no
+      // origin. A configured origin, however, makes push part of the write.
+      onFailure: () => Effect.succeed(null),
+      onSuccess: () => pushStateBranch(gitRoot, branch),
+    }),
+  );
 }
 
 function pushStateBranch(
   gitRoot: string,
   branch: string,
-): Effect.Effect<void, never> {
+): Effect.Effect<PushResult, never> {
   if (branch === 'main') return pushOriginMain(gitRoot, branch, false);
   const timeoutMs = parsePositiveInteger(
     process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS,
@@ -441,49 +459,52 @@ function pushStateBranch(
 
   return runGitWithTimeout(['push', 'origin', branch], gitRoot, timeoutMs).pipe(
     Effect.matchEffect({
-      onSuccess: () => Effect.void,
+      onSuccess: () => Effect.succeed({ pushed: true }),
       onFailure: (err) => {
         const message = err.stderr || err._tag;
         // The paths-only queue has no mutation intent and must never replay or
         // rebase. Domain writers resolve non-fast-forward conflicts before
         // enqueuing a new concrete file version (PAN-2541 D10).
         warnAutoPush(branch, `push failed: ${message}`);
-        return Effect.void;
+        return Effect.succeed({ pushed: false, reason: `push failed: ${message}` });
       },
     }),
   );
 }
 
-function pushOriginMain(gitRoot: string, branch: string, retry: boolean): Effect.Effect<void, never> {
+function pushOriginMain(gitRoot: string, branch: string, retry: boolean): Effect.Effect<PushResult, never> {
   const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
   return runGitWithTimeout(['push', 'origin', 'main'], gitRoot, timeoutMs).pipe(
     Effect.matchEffect({
-      onSuccess: () => Effect.void,
+      onSuccess: () => Effect.succeed({ pushed: true }),
       onFailure: (err) => {
         const message = err.stderr || err._tag;
         if (!retry && isNonFastForwardPushError(message)) return rebaseLegacyMainAndRetry(gitRoot, branch);
         warnAutoPush(branch, `push failed: ${message}`);
-        return Effect.void;
+        return Effect.succeed({ pushed: false, reason: `push failed: ${message}` });
       },
     }),
   );
 }
 
-function rebaseLegacyMainAndRetry(gitRoot: string, branch: string): Effect.Effect<void, never> {
+function rebaseLegacyMainAndRetry(gitRoot: string, branch: string): Effect.Effect<PushResult, never> {
   const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
   return Effect.gen(function* () {
     const fetched = yield* runGitWithTimeout(['fetch', 'origin', 'main'], gitRoot, timeoutMs).pipe(
       Effect.match({ onSuccess: () => true, onFailure: () => false }),
     );
-    if (!fetched || !(yield* isWorkingTreeClean(gitRoot, branch))) return;
+    if (!fetched || !(yield* isWorkingTreeClean(gitRoot, branch))) {
+      return { pushed: false, reason: 'push rejected and reconciliation preconditions failed' };
+    }
     if (!(yield* areLocalAheadCommitsStatePlaneOnly(gitRoot, branch))) {
       warnAutoPush(branch, 'non-fast-forward push rejected and at least one local-ahead commit is not state-plane-only; leaving local main ahead of origin/main');
-      return;
+      return { pushed: false, reason: 'push rejected with non-state local commits' };
     }
     const rebased = yield* runGitWithTimeout(['rebase', 'origin/main'], gitRoot, timeoutMs).pipe(
       Effect.match({ onSuccess: () => true, onFailure: () => false }),
     );
-    if (rebased) yield* pushOriginMain(gitRoot, branch, true);
+    if (rebased) return yield* pushOriginMain(gitRoot, branch, true);
+    return { pushed: false, reason: 'push rejected and state rebase failed' };
   });
 }
 
@@ -542,17 +563,15 @@ function warnAutoPush(branch: string, message: string): void {
 }
 
 /**
- * Find the project root for a `.pan/` or `.beads/` file path. Returns null
- * when the path is not under either marker.
+ * Find the project root for a `.pan/` file path. Returns null otherwise.
  */
 export function deriveProjectRoot(path: string): string | null {
-  for (const marker of [`${sep}.pan${sep}`, `${sep}.beads${sep}`]) {
-    const idx = path.indexOf(marker);
-    if (idx !== -1) return path.slice(0, idx);
-  }
-  // Edge case: the path is the .pan/.beads directory itself.
+  const marker = `${sep}.pan${sep}`;
+  const idx = path.indexOf(marker);
+  if (idx !== -1) return path.slice(0, idx);
+  // Edge case: the path is the .pan directory itself.
   const base = dirname(path);
-  if (base.endsWith(`${sep}.pan`) || base.endsWith(`${sep}.beads`)) {
+  if (base.endsWith(`${sep}.pan`)) {
     return dirname(base);
   }
   return null;

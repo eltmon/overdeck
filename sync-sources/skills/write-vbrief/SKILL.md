@@ -33,7 +33,7 @@ Use this skill when you want to author a vBRIEF plan directly, bypassing the int
 - The issue is small enough that a full planning session would cost more than the work itself
 - You need to rewrite or patch a broken vBRIEF before continuing work
 
-After writing the plan, run `pan plan finalize` to materialize beads and promote the spec to main.
+After writing the plan, run `pan plan finalize` to materialize vBRIEF tasks and promote the spec to main.
 
 ---
 
@@ -158,7 +158,7 @@ The continue file records decisions and hazards so the work agent (and review/te
     { "id": "H1", "summary": "<risk or edge case>", "mitigation": "<how to handle it>" }
   ],
   "resumePoint": null,
-  "beadsMapping": {},
+  "vBRIEF tasksMapping": {},
   "agentModel": "agent:<model-slug>",
   "sessionHistory": [
     {
@@ -175,7 +175,7 @@ Rules:
 - `version` must be `"1"`
 - `issueId` must be uppercase (e.g. `"PAN-1234"`)
 - `resumePoint` stays `null` — the work agent populates it when it begins
-- `beadsMapping` stays `{}` — `pan plan finalize` populates it
+- `vBRIEF tasksMapping` stays `{}` — `pan plan finalize` populates it
 
 ---
 
@@ -189,20 +189,19 @@ pan plan finalize
 
 This atomically:
 1. Reads `.pan/spec.vbrief.json`
-2. Creates beads via `bd create` (one per `items[]` entry, edges respected)
+2. Creates vBRIEF tasks through the canonical writer (one per `items[]` entry, edges respected)
 3. Sets `plan.status` to `"proposed"`
 4. Promotes the canonical spec into `<projectRoot>/.pan/specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json`
 5. Commits on main, pushes, transitions the tracker issue to Planned
 
-Do **not** run `bd create` yourself — `pan plan finalize` is the only sanctioned path.
 
 ---
 
 ## Bead sizing rules
 
-Default to **many small beads** over a few large ones. A well-sized bead:
+Default to **many small vBRIEF tasks** over a few large ones. A well-sized bead:
 
-- Has one focused change (if you need "and" in the title, it's two beads)
+- Has one focused change (if you need "and" in the title, it's two vBRIEF tasks)
 - Is independently reviewable from its diff alone
 - Leaves the tree in a working state if merged alone
 - Has a testable acceptance criterion
@@ -214,7 +213,7 @@ Default to **many small beads** over a few large ones. A well-sized bead:
 - One schema migration = one bead
 - One doc update = one bead (or one per logical cluster, not "update all docs")
 
-When in doubt, split. Too-small beads: mild overhead. Too-large beads: reviewers can't reason about them, agents deliver partial results, and the inspection gate can't verify mid-implementation.
+When in doubt, split. Too-small vBRIEF tasks: mild overhead. Too-large vBRIEF tasks: reviewers can't reason about them, agents deliver partial results, and the inspection gate can't verify mid-implementation.
 
 ---
 
@@ -236,23 +235,23 @@ Edge types: `blocks` (hard), `informs` (soft/advisory), `invalidates`, `suggests
 
 ## Inspection gate (`requiresInspection`)
 
-Set `requiresInspection: true` **only** when a wrong implementation would cascade into downstream beads before the verification gate catches it:
+Set `requiresInspection: true` **only** when a wrong implementation would cascade into downstream vBRIEF tasks before the verification gate catches it:
 
-- **Foundation for downstream beads** — subsequent beads depend on this bead's interfaces, types, or module boundaries
+- **Foundation for downstream vBRIEF tasks** — subsequent vBRIEF tasks depend on this bead's interfaces, types, or module boundaries
 - **Architectural decision crystallizing in code** — naming a public API, choosing a library boundary, picking an event shape
 - **Spec ambiguity risk** — the description is broad enough that two very different diffs could both look "done"
-- **Security/auth surface** — defects here propagate into later beads assuming the security posture
+- **Security/auth surface** — defects here propagate into later vBRIEF tasks assuming the security posture
 - **Cross-cutting protocol or schema** — wire format, DB migration, RPC contract, event payload
 
 Set `requiresInspection: false` for:
 - Mechanical changes (flag flip, rename, single-file tweak)
-- Leaf beads (no downstream bead depends on their internals)
+- Leaf vBRIEF tasks (no downstream bead depends on their internals)
 - Tests, docs, comment-only updates
 - Wrongs that surface immediately at typecheck/lint
 
-When `requiresInspection: true`, you **must** also set `metadata.foundationFor: ["<bead-id>", ...]` listing the downstream beads that would need to be redone if this one were wrong. An empty `foundationFor` on an inspection bead is a planning error — flip it back to `false`.
+When `requiresInspection: true`, you **must** also set `metadata.foundationFor: ["<bead-id>", ...]` listing the downstream vBRIEF tasks that would need to be redone if this one were wrong. An empty `foundationFor` on an inspection bead is a planning error — flip it back to `false`.
 
-Most plans have 0–2 inspection beads. More than 3 suggests the beads are too large.
+Most plans have 0–2 inspection vBRIEF tasks. More than 3 suggests the vBRIEF tasks are too large.
 
 ---
 

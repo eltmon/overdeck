@@ -79,7 +79,6 @@ import {
 import {
   getCachedConflictGateMergeability,
 } from '../../../lib/cloister/conflict-gate.js';
-import { restoreTrackedBeadsExport } from '../../../lib/beads-restore.js';
 import {
   computeQueuePositionFromStatusSync,
   findPositionInQueueSync,
@@ -103,7 +102,6 @@ import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrie
 import { criticalPath, actionableDoc } from '../../../lib/vbrief/dag.js';
 import { getChangedFiles, getDiffBase, getDiffStat, type ChangedFile } from '../../../lib/cloister/review-context.js';
 import { capturePane, listSessionNames, sessionExists } from '../../../lib/tmux.js';
-import { syncBeadStatusToVBrief } from '../../../lib/vbrief/beads.js';
 import { getUnblockedItemsSync } from '../../../lib/cloister/task-readiness.js';
 import { runVerificationForIssue } from '../../../lib/cloister/verification-runner.js';
 import { getTldrDaemonServiceSync } from '../../../lib/tldr-daemon.js';
@@ -1095,23 +1093,6 @@ const postWorkspaceStartRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
     }
 
-    const workspaceBeadsDir = join(workspacePath, '.beads');
-    if (!existsSync(workspaceBeadsDir)) {
-      const projectRootBeadsDir = join(projectPath, '.beads');
-      if (existsSync(projectRootBeadsDir)) {
-        try {
-          yield* Effect.promise(() => execAsync(`cp -r "${projectRootBeadsDir}" "${workspaceBeadsDir}"`, {
-            encoding: 'utf-8',
-          }));
-          console.log(
-            `[workspace/start] Copied beads from project root to workspace for ${issueId}`
-          );
-        } catch (e) {
-          console.warn(`[workspace/start] Could not copy beads: ${e}`);
-        }
-      }
-    }
-
     // Check for ./dev script
     const devScript = join(workspacePath, 'dev');
     const devScriptInContainer = join(workspacePath, '.devcontainer', 'dev');
@@ -1618,10 +1599,10 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       }
 
       if (testStatus === 'passed') {
-        // Mark ready for merge when tests pass. Post-rebase verification in
-        // triggerMerge() is the real quality gate — don't block on stale pre-merge verification.
+        // Tests passing makes the issue operator-mergeable; triggerMerge still runs the post-rebase gate.
         setReviewStatus(issueId, { readyForMerge: true });
         console.log(`[review-status] ${issueId} marked ready for merge after test=passed`);
+        emitActivityEntrySync({ source: 'ship', level: 'success', issueId, message: `${issueId} is ready. Open Awaiting Merge and click MERGE when you are ready to land it.`, link: '/awaiting-merge', desktop: true });
 
         // Post overdeck/tests=success so the CI test job self-skips on this
         // commit. Mirrors what verification-runner does at the pre-review gate.
@@ -1656,7 +1637,7 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
         const notifyAgentId = `agent-${issueId.toLowerCase()}`;
         yield* Effect.tryPromise(() => messageAgent(
           notifyAgentId,
-          `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete — ready for merge. You may stop working on this issue.`
+          `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete. Tell the operator to open Overdeck's Awaiting Merge page and click MERGE when ready. You may stop working on this issue.`
         )).pipe(
           Effect.tap(() => Effect.sync(() => console.log(`[review-status] Notified ${notifyAgentId} that all checks passed`))),
           Effect.catch((err) => Effect.sync(() => console.log(

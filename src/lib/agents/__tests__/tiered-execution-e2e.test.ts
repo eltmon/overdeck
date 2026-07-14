@@ -110,9 +110,9 @@ describe('tiered execution dogfood e2e fixture', () => {
     const doc = fixturePlan();
     const schedule = computeTierRunSchedule(doc, TIER_CONFIG);
     expect(schedule).toEqual([
-      { tierName: 'cheap', beadIds: ['trivial-docs-a', 'trivial-docs-b'] },
-      { tierName: 'standard', beadIds: ['medium-api'] },
-      { tierName: 'frontier', beadIds: ['expert-orchestrator'] },
+      { tierName: 'cheap', taskIds: ['trivial-docs-a', 'trivial-docs-b'] },
+      { tierName: 'standard', taskIds: ['medium-api'] },
+      { tierName: 'frontier', taskIds: ['expert-orchestrator'] },
     ]);
 
     const { spawn, calls: spawnCalls } = fakeSpawn();
@@ -128,10 +128,10 @@ describe('tiered execution dogfood e2e fixture', () => {
     const routed = new Map<string, string>();
     for (const item of doc.plan.items) {
       const tier = resolveTier(item, TIER_CONFIG);
-      const agentId = await manager.dispatchBeadToTier(tier.tierName, item);
+      const agentId = await manager.dispatchTaskToTier(tier.tierName, item);
       routed.set(item.id, agentId);
       expect(agentId).toBe(manager.getStandingAgent(tier.tierName)?.agentId);
-      manager.completeBead(item.id);
+      manager.completeTask(item.id);
     }
     expect(routed).toEqual(new Map([
       ['trivial-docs-a', 'agent-pan-1791-slot-10'],
@@ -173,13 +173,13 @@ describe('tiered execution dogfood e2e fixture', () => {
     const verdicts: SupervisorVerdict[] = [];
     const supervisorId = supervisorAgentId(ISSUE_ID);
 
-    async function commitBead(item: VBriefItem, sha: string, status: SupervisorVerdict['status']): Promise<void> {
+    async function commitTask(item: VBriefItem, sha: string, status: SupervisorVerdict['status']): Promise<void> {
       await broadcastCommit({
         workspace: WORKSPACE,
         issueId: ISSUE_ID,
         sha,
-        beadTitle: item.title,
-        beadId: item.id,
+        taskTitle: item.title,
+        taskId: item.id,
         tiers: standingTiers,
         deliver: deliverFeed,
         gitShow: getDiff,
@@ -194,25 +194,25 @@ describe('tiered execution dogfood e2e fixture', () => {
         prdMarkdown: '- **FR-1 — Dogfood.** The fixture exercises tiered execution.',
         deps: { deliver: deliverSupervisor, getDiff },
       });
-      verdicts.push({ beadId: item.id, status });
+      verdicts.push({ taskId: item.id, status });
     }
 
     const byId = new Map(doc.plan.items.map((item) => [item.id, item]));
-    await commitBead(byId.get('trivial-docs-b')!, 'sha-fast-track', 'passed');
-    await commitBead(byId.get('medium-api')!, 'sha-medium-bad', 'failed');
+    await commitTask(byId.get('trivial-docs-b')!, 'sha-fast-track', 'passed');
+    await commitTask(byId.get('medium-api')!, 'sha-medium-bad', 'failed');
 
     expect(shouldHaltDispatch(verdicts, byId.get('expert-orchestrator')!, doc)).toBe(true);
-    const dispatchBeforeFix = vi.fn(async () => manager.dispatchBeadToTier('frontier', byId.get('expert-orchestrator')!));
+    const dispatchBeforeFix = vi.fn(async () => manager.dispatchTaskToTier('frontier', byId.get('expert-orchestrator')!));
     if (!shouldHaltDispatch(verdicts, byId.get('expert-orchestrator')!, doc)) {
       await dispatchBeforeFix();
     }
     expect(dispatchBeforeFix).not.toHaveBeenCalled();
 
-    await commitBead(byId.get('medium-api')!, 'sha-medium-fix', 'passed');
+    await commitTask(byId.get('medium-api')!, 'sha-medium-fix', 'passed');
     expect(shouldHaltDispatch(verdicts, byId.get('expert-orchestrator')!, doc)).toBe(false);
-    await expect(manager.dispatchBeadToTier('frontier', byId.get('expert-orchestrator')!)).resolves.toBe('agent-pan-1791-slot-12');
-    manager.completeBead('expert-orchestrator');
-    await commitBead(byId.get('expert-orchestrator')!, 'sha-expert', 'passed');
+    await expect(manager.dispatchTaskToTier('frontier', byId.get('expert-orchestrator')!)).resolves.toBe('agent-pan-1791-slot-12');
+    manager.completeTask('expert-orchestrator');
+    await commitTask(byId.get('expert-orchestrator')!, 'sha-expert', 'passed');
 
     expect(deliverFeed).toHaveBeenCalledTimes(4 * standingTiers.length);
     expect(feedDeliveries.map((delivery) => delivery.agentId)).toEqual([
@@ -225,10 +225,10 @@ describe('tiered execution dogfood e2e fixture', () => {
     expect(supervisorDeliveries.every((delivery) => delivery.agentId === supervisorId)).toBe(true);
     expect(supervisorDeliveries.every((delivery) => delivery.caller === 'tier-supervisor:verdict')).toBe(true);
     expect(verdicts).toEqual([
-      { beadId: 'trivial-docs-b', status: 'passed' },
-      { beadId: 'medium-api', status: 'failed' },
-      { beadId: 'medium-api', status: 'passed' },
-      { beadId: 'expert-orchestrator', status: 'passed' },
+      { taskId: 'trivial-docs-b', status: 'passed' },
+      { taskId: 'medium-api', status: 'failed' },
+      { taskId: 'medium-api', status: 'passed' },
+      { taskId: 'expert-orchestrator', status: 'passed' },
     ]);
 
     const replayDeliveries: Array<{ agentId: string; message: string; caller?: string }> = [];

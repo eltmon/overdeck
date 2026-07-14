@@ -2,7 +2,7 @@
 name: plan
 description: >
   Opus-driven planning for issues before Sonnet implementation. Creates workspace,
-  .pan/continue.json, .pan/spec.vbrief.json with beads, and updates issue tracker.
+  .pan/continue.json, .pan/spec.vbrief.json with vBRIEF tasks, and updates issue tracker.
   Ensures strategic decisions are made by Opus, not cheaper models.
 triggers:
   - plan
@@ -31,7 +31,7 @@ license: "MIT"
 
 **Opus plans EVERYTHING. Sonnet executes.**
 
-Do NOT leave any decisions for the implementation agent. Every architectural choice, every file path, every function name, every edge case - all decided here. The implementation agent should be able to work through beads mechanically without making any design decisions.
+Do NOT leave any decisions for the implementation agent. Every architectural choice, every file path, every function name, every edge case - all decided here. The implementation agent should be able to work through vBRIEF tasks mechanically without making any design decisions.
 
 ---
 
@@ -103,7 +103,7 @@ Create `.pan/continue.json` with COMPLETE planning context:
     { "id": "H1", "summary": "<risk/edge case>", "mitigation": "<how to handle it>" }
   ],
   "resumePoint": null,
-  "beadsMapping": {},
+  "vBRIEF tasksMapping": {},
   "agentModel": "plan",
   "sessionHistory": [
     { "timestamp": "<ISO timestamp>", "reason": "planning", "note": "Initial planning session", "agentModel": "plan" }
@@ -113,7 +113,6 @@ Create `.pan/continue.json` with COMPLETE planning context:
 
 ### Step 5: Produce `.pan/spec.vbrief.json`
 
-Create `.pan/spec.vbrief.json` following the vBRIEF schema. This replaces the manual `bd create` loop — `pan plan finalize` reads this file and creates beads automatically.
 
 ```json
 {
@@ -184,22 +183,21 @@ Create `.pan/spec.vbrief.json` following the vBRIEF schema. This replaces the ma
 - Set `edges` to capture blocking relationships between items
 - `difficulty`: trivial (typo/config), simple (1 file), medium (2-3 files), complex (multi-system)
 - 10-40 items for a typical feature; more for large refactors
-- SubItems (acceptance criteria) are NOT converted to beads — they're verification checklists
+- SubItems (acceptance criteria) are NOT converted to vBRIEF tasks — they're verification checklists
 
 **After writing the JSON file:**
 ```bash
-# Materialize beads and mark the workspace spec proposed
+# Materialize vBRIEF tasks and mark the workspace spec proposed
 pan plan finalize
 ```
 
 **Cloister hand-off:** When `pan plan finalize` runs, it automatically:
 1. Reads `.pan/spec.vbrief.json` from the workspace
-2. Calls `createBeadsFromVBrief()` to convert vBRIEF items into beads tasks
+2. Calls `createvBRIEF tasksFromVBrief()` to convert vBRIEF items into vBRIEF tasks
 3. Preserves dependency relationships from `edges` (blocking order)
 4. Includes acceptance criteria in bead descriptions
 5. Marks `plan.status` as `proposed` so the dashboard shows Done
 
-You do NOT need to run `bd create` manually — `pan plan finalize` handles the full conversion.
 
 ### Step 6: Stitch Integration (UI Work)
 
@@ -232,7 +230,7 @@ gh issue comment <number> --body "## Planning Complete
 **Planned by:** Claude Opus 4.6
 **Workspace:** workspaces/feature-<issue-id>/
 
-### Beads: <N> items in .pan/spec.vbrief.json
+### vBRIEF tasks: <N> items in .pan/spec.vbrief.json
 ### Next: /work-issue <ISSUE-ID>"
 ```
 

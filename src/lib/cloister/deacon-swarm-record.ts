@@ -1,9 +1,9 @@
 import {
   readIssueRecordForWorkspaceSync,
-  writeIssueRecordForWorkspaceSync,
   type PanIssueRecord,
   type PanIssueSwarmSlotCompletion,
 } from '../pan-dir/record.js';
+import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
 
 export function createMinimalIssueRecord(issueId: string): PanIssueRecord {
   const now = new Date().toISOString();
@@ -32,17 +32,15 @@ export function createMinimalIssueRecord(issueId: string): PanIssueRecord {
   };
 }
 
-export function writeSwarmFinalizedAt(workspacePath: string, issueId: string, finalizedAt: string): void {
+export async function writeSwarmFinalizedAt(workspacePath: string, issueId: string, finalizedAt: string): Promise<void> {
   const normalizedIssueId = issueId.toUpperCase();
-  const record = readIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId)
-    ?? createMinimalIssueRecord(normalizedIssueId);
-  writeIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId, {
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
     ...record,
     swarm: {
       ...(record.swarm ?? {}),
       finalizedAt,
     },
-  });
+  }));
 }
 
 /**
@@ -51,25 +49,22 @@ export function writeSwarmFinalizedAt(workspacePath: string, issueId: string, fi
  * (statusOverrides, slotAssignments, etc.) — see the byte-identical
  * preservation test in deacon-swarm-slot-completion.test.ts.
  */
-export function writeSwarmSlotCompletion(
+export async function writeSwarmSlotCompletion(
   workspacePath: string,
   issueId: string,
   completion: PanIssueSwarmSlotCompletion,
-): void {
+): Promise<void> {
   const normalizedIssueId = issueId.toUpperCase();
-  const record = readIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId)
-    ?? createMinimalIssueRecord(normalizedIssueId);
-  const swarm = record.swarm ?? {};
-  writeIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId, {
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
     ...record,
     swarm: {
-      ...swarm,
+      ...(record.swarm ?? {}),
       slotCompletions: {
-        ...(swarm.slotCompletions ?? {}),
+        ...(record.swarm?.slotCompletions ?? {}),
         [String(completion.slotIndex)]: completion,
       },
     },
-  });
+  }));
 }
 
 /**
@@ -77,19 +72,16 @@ export function writeSwarmSlotCompletion(
  * (WI-4) has consumed it (merge/requeue). No-op when no marker exists for the
  * slot, so callers can clear unconditionally on the terminal transition.
  */
-export function clearSwarmSlotCompletion(workspacePath: string, issueId: string, slotIndex: number): void {
+export async function clearSwarmSlotCompletion(workspacePath: string, issueId: string, slotIndex: number): Promise<void> {
   const normalizedIssueId = issueId.toUpperCase();
-  const record = readIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId);
-  const existing = record?.swarm?.slotCompletions;
-  if (!existing || !(String(slotIndex) in existing)) return;
-  const next: Record<string, PanIssueSwarmSlotCompletion> = { ...existing };
-  delete next[String(slotIndex)];
-  writeIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId, {
-    ...record,
-    swarm: {
-      ...record!.swarm,
-      slotCompletions: next,
-    },
+  const current = readIssueRecordForWorkspaceSync(workspacePath, normalizedIssueId);
+  if (!current?.swarm?.slotCompletions || !(String(slotIndex) in current.swarm.slotCompletions)) return;
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => {
+    const existing = record.swarm?.slotCompletions;
+    if (!existing || !(String(slotIndex) in existing)) return record;
+    const next: Record<string, PanIssueSwarmSlotCompletion> = { ...existing };
+    delete next[String(slotIndex)];
+    return { ...record, swarm: { ...record.swarm, slotCompletions: next } };
   });
 }
 
@@ -103,12 +95,12 @@ export function clearSwarmSlotCompletion(workspacePath: string, issueId: string,
  * in the CLI command) keeps the god-file done.ts from growing and co-locates the
  * swarm-record mechanics with the other slot-completion door functions.
  */
-export function persistAndVerifySwarmSlotCompletion(
+export async function persistAndVerifySwarmSlotCompletion(
   workspacePath: string,
   issueId: string,
   completion: PanIssueSwarmSlotCompletion,
-): boolean {
-  writeSwarmSlotCompletion(workspacePath, issueId, completion);
+): Promise<boolean> {
+  await writeSwarmSlotCompletion(workspacePath, issueId, completion);
   const reread = readIssueRecordForWorkspaceSync(workspacePath, issueId.toUpperCase());
   const persisted = reread?.swarm?.slotCompletions?.[String(completion.slotIndex)];
   return Boolean(persisted && persisted.agentId === completion.agentId);

@@ -120,6 +120,20 @@ describe('lint-ratchet-audit.sh', () => {
     expect(result.output).toContain('ratchet audit passed');
   });
 
+  it('ignores malformed conflict-marker rows in the baseline', () => {
+    const root = setupRepo();
+    writeFileSync(
+      join(root, 'scripts', 'file-size-baseline.txt'),
+      '1200 src/base.ts\n<<<<<<< HEAD\n=======\n>>>>>>> feature/slot\n',
+    );
+    commitAll(root, 'accidental conflict markers');
+
+    const result = runAudit(root, ['--range', 'HEAD~1..HEAD']);
+
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('ratchet audit passed');
+  });
+
   it('last-commit mode audits the newest ratchet commit even when newer unrelated commits exist', () => {
     const root = setupRepo();
     writeBaseline(root, [[1300, 'src/base.ts']]);

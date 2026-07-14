@@ -29,13 +29,12 @@ export const DEFAULT_DOCS_TRIGGER_REGEXES = [
   'workspace',
   'specialist',
   'harness',
-  'bd',
-  'beads',
   'vbrief',
   'workhorse',
 ];
 
 export const DEFAULT_CONFIG: NormalizedConfig = {
+  swarm: { mode: 'off', maxSlots: 3, autoAdvance: true },
   tmux: {
     configMode: 'managed',
   },

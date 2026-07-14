@@ -27,8 +27,8 @@ MAG='\033[35m'; RED='\033[31m'; WHT='\033[37m'
 # Helper: format token count
 fmt() {
   local n=${1:-0}
-  if (( n >= 1000000 )); then printf "%.1fM" "$(echo "scale=1;$n/1000000" | bc)"
-  elif (( n >= 1000 )); then printf "%.1fk" "$(echo "scale=1;$n/1000" | bc)"
+  if (( n >= 1000000 )); then awk -v n="$n" 'BEGIN { printf "%.1fM", n / 1000000 }'
+  elif (( n >= 1000 )); then awk -v n="$n" 'BEGIN { printf "%.1fk", n / 1000 }'
   else echo "$n"; fi
 }
 

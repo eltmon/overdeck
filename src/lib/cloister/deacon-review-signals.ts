@@ -181,7 +181,12 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
     if (!status || status.reviewStatus !== 'reviewing') continue;
 
     const reviewDir = join(state.workspace, '.pan', 'review', state.reviewRunId!);
-    if (existsSync(join(reviewDir, 'synthesis.md'))) continue;
+    // A synthesis.md on disk does NOT mean the verdict landed: the parent can
+    // die between writing the file and setReviewStatusSync, wedging the issue
+    // in 'reviewing' forever (observed 3× on 2026-07-13). Since reviewStatus
+    // is still 'reviewing' here (guard above), fall through and land the
+    // verdict deterministically instead of skipping.
+    const synthesisAlreadyWritten = existsSync(join(reviewDir, 'synthesis.md'));
 
     const startedMs = Date.parse(state.startedAt);
     const readyLines: string[] = [];
@@ -219,7 +224,7 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
 
     const sessionAlive = await Effect.runPromise(sessionExists(state.id)).catch(() => false);
     const paneDead = sessionAlive ? await Effect.runPromise(isPaneDead(state.id)).catch(() => true) : true;
-    if (lastNudge || !sessionAlive || paneDead) {
+    if (synthesisAlreadyWritten || lastNudge || !sessionAlive || paneDead) {
       const synthesis = synthesizeReviewFromReports({
         issueId: state.issueId,
         reviewDir,

@@ -10,7 +10,8 @@ import { scanPendingInputsPromise, type PendingAskUserQuestionSnapshot, type Pen
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { loadConfigSync } from '../config-yaml.js';
 import { isBackgroundFeatureEnabled } from '../background-ai/features.js';
-import { listSessionNames } from '../tmux.js';
+import { capturePane, listSessionNames } from '../tmux.js';
+import { paneShowsClaudeBootBlockingScreen } from '../cloister/modal-detector.js';
 import { sessionFilePath } from '../paths.js';
 import { resolveDiscoveredSessionFile } from '../conversations/discovered-session-file.js';
 import {
@@ -202,6 +203,31 @@ export function conversationTranscriptMissing(
   return !sessionFile || !existsSync(sessionFile);
 }
 
+const captureVisiblePane = (sessionName: string): Promise<string> =>
+  Effect.runPromise(capturePane(sessionName, 0));
+
+/**
+ * An alive claude-code session with no transcript file yet may be parked on a
+ * boot-blocking TUI screen (first-run onboarding, trust dialog) that only the
+ * terminal can answer — the chat view has nothing to render and its composer
+ * cannot drive the screen. When this returns true the conversation view
+ * auto-switches to terminal mode. Captures only the visible screen, and only
+ * in the no-transcript state, so steady-state conversations never pay the
+ * capture.
+ */
+export async function conversationNeedsTerminal(
+  conv: Conversation,
+  sessionAlive: boolean,
+  sessionFile: string | null,
+  capture: (sessionName: string) => Promise<string> = captureVisiblePane,
+): Promise<boolean> {
+  if (!sessionAlive) return false;
+  if ((conv.harness ?? 'claude-code') !== 'claude-code') return false;
+  if (sessionFile && existsSync(sessionFile)) return false;
+  const pane = await capture(conv.tmuxSession).catch(() => '');
+  return paneShowsClaudeBootBlockingScreen(pane);
+}
+
 // ─── Messages cache ───────────────────────────────────────────────────────────
 
 const MESSAGES_CACHE_MAX = 100;
@@ -339,6 +365,9 @@ export async function getConversationsPendingInputFeed(
       alive.map((conv) => Effect.promise(async () => {
         const convSf = await deps.resolveSessionFile(conv);
         let pending: PendingAskUserQuestionSnapshot | undefined;
+        // PAN-1520 (FR-2) — pending ExitPlanMode plan payload, so the plan
+        // approval modal covers conversation sessions too.
+        let pendingPlan: { toolUseId: string; askedAt: string; plan: string } | undefined;
         let lastActivityAt: string | null = null;
         if (convSf && existsSync(convSf)) {
           try {
@@ -347,7 +376,9 @@ export async function getConversationsPendingInputFeed(
             // non-fatal — askedAt falls back to now for the codex path
           }
           try {
-            pending = askUserQuestionSnapshotFromScan(await scanPendingInputsPromise(convSf));
+            const scan = await scanPendingInputsPromise(convSf);
+            pending = askUserQuestionSnapshotFromScan(scan);
+            pendingPlan = scan.pendingProposedPlan;
           } catch {
             // JSONL scan failure — non-fatal
           }
@@ -360,12 +391,13 @@ export async function getConversationsPendingInputFeed(
           );
           if (codex.approval) pending = codex.approval;
         }
-        if (!pending) return null;
+        if (!pending && !pendingPlan) return null;
         return {
           name: conv.name,
           title: conv.title ?? null,
           issueId: conv.issueId ?? null,
-          pendingAskUserQuestion: pending,
+          ...(pending ? { pendingAskUserQuestion: pending } : {}),
+          ...(pendingPlan ? { pendingProposedPlan: pendingPlan } : {}),
         };
       })),
       8,
@@ -439,6 +471,7 @@ export async function getConversationRead(
       pendingInputKinds,
       pendingAskUserQuestion,
       transcriptMissing: conversationTranscriptMissing(conv, sessionAlive, convSf),
+      needsTerminal: await conversationNeedsTerminal(conv, sessionAlive, convSf),
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);

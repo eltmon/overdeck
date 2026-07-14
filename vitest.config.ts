@@ -5,6 +5,7 @@ import { readQuarantineList } from './src/lib/test-infra/quarantine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const includeBenchmarks = process.env['VITEST_INCLUDE_BENCH'] === '1';
+const includeSlow = process.env['VITEST_INCLUDE_SLOW'] === '1';
 const isCI = process.env['CI'] === 'true';
 const isVerification = process.env['OVERDECK_VERIFICATION'] === '1';
 const isFlakeLane = process.env['OVERDECK_FLAKE_LANE'] === '1';
@@ -31,10 +32,11 @@ export default defineConfig({
     // GitHub Actions runners have limited memory (~7GB). Keep CI parallel but
     // bounded; tests that OOM under two forks need fixture/timer cleanup, not
     // suite-wide serialization. Verification runs preserve the normal local
-    // fork count so PAN-2373 only changes retry/quarantine policy there.
+    // worker count so PAN-2373 only changes retry/quarantine policy there.
     // Local development can use up to 4 workers.
-    // Vitest 4 moved these settings out of poolOptions; keeping the old shape is ignored.
-    forks: { minForks: 1, maxForks: process.env.CI ? 2 : 4, singleFork: false },
+    // Vitest 4 replaced the `forks: { minForks, maxForks }` shape with top-level
+    // `maxWorkers`; the old shape is silently ignored and defaults to CPU count.
+    maxWorkers: process.env.CI ? 2 : 4,
     // Retry once in CI, verification-gate, and flake-lane runs. Local dev stays
     // retry:0 so flakes remain visible during development. A retried-then-passed
     // test is still surfaced by vitest's default reporter.
@@ -47,8 +49,8 @@ export default defineConfig({
     },
     include: defaultInclude,
     exclude: excludeQuarantined
-      ? ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...quarantined]
-      : ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],
+      ? ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...(includeSlow ? [] : ['**/*.slow.test.ts']), ...quarantined]
+      : ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...(includeSlow ? [] : ['**/*.slow.test.ts'])],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

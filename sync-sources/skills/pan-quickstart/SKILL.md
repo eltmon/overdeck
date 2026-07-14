@@ -374,7 +374,7 @@ After completing this quick start, you have:
 
 ### Productivity Tips
 - Use dashboard to monitor multiple agents
-- Set up beads for task tracking
+- Set up vBRIEF tasks for task tracking
 - Configure git hooks for automated workflows
 - Create custom skills for your team's processes
 

@@ -3,15 +3,17 @@ import type { PipelineIssuePhase } from '../../lib/pipeline-state';
 import { compactModelName } from '../../lib/model-names';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
+export type PipelineBucketPhase = PipelineIssuePhase | 'needs-you' | 'stalled';
+
 export interface BucketedFeature {
   feature: ProjectFeature;
   reviewStatus: ReviewStatusSnapshot | undefined;
-  phase: PipelineIssuePhase;
+  phase: PipelineBucketPhase;
 }
 
 export interface PipelineGroup {
   key: string;
-  phase: PipelineIssuePhase | 'needs-you';
+  phase: PipelineBucketPhase;
   title: string;
   subtitle: string;
   entries: BucketedFeature[];
@@ -48,6 +50,50 @@ export function hasWorkSession(feature: ProjectFeature): boolean {
 
 export function hasActiveAgentSignal(feature: ProjectFeature): boolean {
   return hasActiveWorkSession(feature) || ACTIVE_AGENT_STATUSES.has(feature.agentStatus ?? '');
+}
+
+const STALLED_INACTIVITY_MS = 14 * 24 * 60 * 60 * 1000;
+
+function hasAdmittedArtifactSignal(feature: ProjectFeature): boolean {
+  const details = feature.resourceDetails;
+  if (details?.branchAheadOfMain) return true;
+  if (details?.conversations && details.conversations.length > 0) return true;
+
+  const totals = feature.taskTotals;
+  if (totals) {
+    if (totals.inProgress > 0) return true;
+    if (totals.closed > 0 && totals.closed < totals.total) return true;
+  }
+  return false;
+}
+
+function featureLastActivity(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): number {
+  const sessionTimes = (feature.sessions ?? [])
+    .flatMap(session => [session.startedAt, session.endedAt].filter(Boolean))
+    .map(iso => new Date(iso!).getTime())
+    .filter(t => !Number.isNaN(t));
+  const reviewTime = reviewStatus?.updatedAt ? new Date(reviewStatus.updatedAt).getTime() : NaN;
+  const taskUpdated = feature.taskTotals?.lastUpdated
+    ? new Date(feature.taskTotals.lastUpdated).getTime()
+    : NaN;
+  const times = [
+    ...sessionTimes,
+    ...(Number.isNaN(reviewTime) ? [] : [reviewTime]),
+    ...(Number.isNaN(taskUpdated) ? [] : [taskUpdated]),
+  ];
+  return times.length > 0 ? Math.max(...times) : 0;
+}
+
+function isStaleActivity(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+  const last = featureLastActivity(feature, reviewStatus);
+  if (last === 0) return true;
+  return Date.now() - last >= STALLED_INACTIVITY_MS;
+}
+
+export function isStalledFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
+  if (!hasAdmittedArtifactSignal(feature)) return false;
+  if (hasActiveAgentSignal(feature)) return false;
+  return isStaleActivity(feature, reviewStatus);
 }
 
 export function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
@@ -97,6 +143,18 @@ export function pipelineChipFor(entry: BucketedFeature): PipelineChipSpec {
     return {
       key: 'waiting',
       label: 'waiting on you',
+      textClass: 'text-amber-600',
+      bgClass: 'bg-amber-500/14',
+      dotClass: 'bg-amber-500',
+      ringClass: 'border-amber-500',
+      animate: false,
+    };
+  }
+
+  if (phase === 'stalled') {
+    return {
+      key: 'stalled',
+      label: 'stalled — has work, no live agent',
       textClass: 'text-amber-600',
       bgClass: 'bg-amber-500/14',
       dotClass: 'bg-amber-500',
@@ -192,6 +250,10 @@ export function sublineFor(entry: BucketedFeature): string {
     return stuckReason(reviewStatus);
   }
 
+  if (phase === 'stalled') {
+    return 'work artifacts present but no live agent';
+  }
+
   if (reviewStatus?.testStatus === 'testing') return 'tests running now';
   if (reviewStatus?.reviewStatus === 'reviewing') return 'reviewer checking the finished work';
   if (reviewStatus?.reviewStatus === 'passed') {
@@ -276,20 +338,14 @@ export function formatPipelineCost(cost: number | undefined): string {
 }
 
 export function lastActivityAt(entry: BucketedFeature): number {
-  const sessionTimes = (entry.feature.sessions ?? [])
-    .flatMap(session => [session.startedAt, session.endedAt].filter(Boolean))
-    .map(iso => new Date(iso!).getTime())
-    .filter(t => !Number.isNaN(t));
-  const reviewTime = entry.reviewStatus?.updatedAt ? new Date(entry.reviewStatus.updatedAt).getTime() : NaN;
-  const times = [...sessionTimes, ...(Number.isNaN(reviewTime) ? [] : [reviewTime])];
-  return times.length > 0 ? Math.max(...times) : 0;
+  return featureLastActivity(entry.feature, entry.reviewStatus);
 }
 
 export function sortByLastActivity(entries: readonly BucketedFeature[]): BucketedFeature[] {
   return [...entries].sort((a, b) => lastActivityAt(b) - lastActivityAt(a));
 }
 
-export function stageDisplayName(phase: PipelineIssuePhase): { title: string; subtitle: string } {
+export function stageDisplayName(phase: PipelineBucketPhase): { title: string; subtitle: string } {
   switch (phase) {
     case 'ship': return { title: 'Lining up to ship', subtitle: 'ready to merge' };
     case 'review': return { title: 'Being reviewed', subtitle: 'quality checks' };
@@ -298,6 +354,8 @@ export function stageDisplayName(phase: PipelineIssuePhase): { title: string; su
     case 'ready': return { title: 'Ready', subtitle: 'queued for pickup' };
     case 'todo': return { title: 'Todo', subtitle: 'not started' };
     case 'verifying': return { title: 'Verifying', subtitle: 'on main' };
+    case 'stalled': return { title: 'Stalled / fell off the pipeline', subtitle: 'started work with nobody on it' };
+    case 'needs-you': return { title: 'Needs you', subtitle: 'waiting on a human decision' };
     default: return { title: phase, subtitle: '' };
   }
 }
@@ -316,10 +374,30 @@ export function groupPipelineEntries(entries: readonly BucketedFeature[]): Pipel
     });
   }
 
-  const phaseOrder: PipelineIssuePhase[] = ['ship', 'review', 'work', 'plan', 'ready', 'todo', 'verifying'];
+  const stalledEntries = sortByLastActivity(
+    entries.filter(e =>
+      isStalledFeature(e.feature, e.reviewStatus) &&
+      !isNeedsYouFeature(e.feature, e.reviewStatus),
+    ),
+  );
+  if (stalledEntries.length > 0) {
+    groups.push({
+      key: 'stalled',
+      phase: 'stalled',
+      title: 'Stalled / fell off the pipeline',
+      subtitle: 'started work with nobody on it',
+      entries: stalledEntries.map(e => ({ ...e, phase: 'stalled' })),
+    });
+  }
+
+  const phaseOrder: PipelineBucketPhase[] = ['ship', 'review', 'work', 'plan', 'ready', 'todo', 'verifying'];
   for (const phase of phaseOrder) {
     const phaseEntries = sortByLastActivity(
-      entries.filter(e => e.phase === phase && !isNeedsYouFeature(e.feature, e.reviewStatus)),
+      entries.filter(e =>
+        e.phase === phase &&
+        !isNeedsYouFeature(e.feature, e.reviewStatus) &&
+        !isStalledFeature(e.feature, e.reviewStatus),
+      ),
     );
     if (phaseEntries.length === 0) continue;
     const { title, subtitle } = stageDisplayName(phase);

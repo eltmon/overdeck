@@ -43,8 +43,9 @@ describe('pendingCommand', () => {
 
   it('lists pending reviews by default', async () => {
     getStatuses.mockReturnValue({
-      'PAN-1': status('PAN-1'),
+      'PAN-1': status('PAN-1', { reviewRequestedAt: '2026-06-14T00:00:00.000Z' }),
       'PAN-2': status('PAN-2', { reviewStatus: 'passed' }),
+      'PAN-3': status('PAN-3'),
     });
 
     await pendingCommand();
@@ -52,6 +53,7 @@ describe('pendingCommand', () => {
     expect(output(logSpy)).toContain('Pending Reviews');
     expect(output(logSpy)).toContain('PAN-1');
     expect(output(logSpy)).not.toContain('PAN-2');
+    expect(output(logSpy)).not.toContain('PAN-3');
   });
 
   it('lists ready-for-merge issues from SQLite', async () => {

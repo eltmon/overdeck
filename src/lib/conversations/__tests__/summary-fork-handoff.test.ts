@@ -88,7 +88,7 @@ function validDoc(): string {
     '## What has been done',
     'The prompt and handoff path helpers are already in place, and this document exists to satisfy the request handshake.',
     '## Suggested skills',
-    '- /pan-workflow: use when checking Overdeck bead sequencing and completion flow.',
+    '- /pan-workflow: use when checking Overdeck task sequencing and completion flow.',
   ].join('\n\n');
 }
 
@@ -108,7 +108,7 @@ function docWithSuggestedSkillsHeading(heading: string): string {
     '## Current state',
     'The source agent has written a curated transfer document that references project artifacts without duplicating full PRD or plan content.',
     heading,
-    '- /pan-workflow: use when checking Overdeck bead sequencing and completion flow.',
+    '- /pan-workflow: use when checking Overdeck task sequencing and completion flow.',
   ].join('\n\n');
 }
 

@@ -760,12 +760,12 @@ export function getPlanningState(id: string) {
     // It's the definitive signal for "tasks have been generated from this plan."
     const planningComplete = workspacePath ? yield* isPlanningComplete(workspacePath) : false;
 
-    const hasBeads = !!planningComplete;
+    const hasTasks = !!planningComplete;
 
     return jsonResponse({
       hasPlan,
-      hasBeads,
-      beadsCount: 0,  // Deprecated — use hasBeads. Kept for backward compat.
+      hasTasks,
+      beadsCount: 0,  // Deprecated — use hasTasks. Kept for backward compat.
       planningComplete,
       workspacePath,
     });

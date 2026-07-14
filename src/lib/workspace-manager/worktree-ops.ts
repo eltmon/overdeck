@@ -105,30 +105,6 @@ export async function createWorktree(
     // `git rebase origin/main` fails immediately with "unstaged changes" (PAN-495).
     await execAsync('git restore .', { cwd: targetPath }).catch(() => {});
 
-    // Configure beads role so agents don't get "beads.role not configured" warnings
-    await execAsync('git config beads.role contributor', { cwd: targetPath }).catch(() => {});
-
-    // Point the worktree's .beads/ at the source repo's shared Dolt database via a redirect file.
-    // Without this, `bd` in the worktree spins up its own empty database with no issue_prefix
-    // configured, so the first `bd create` errors with "database not initialized: issue_prefix
-    // config is missing". The redirect keeps all worktrees reading/writing the canonical beads
-    // store alongside main. Mirrors the pattern in src/lib/vbrief/beads.ts.
-    const sourceBeadsDir = join(repoPath, '.beads');
-    if (existsSync(sourceBeadsDir)) {
-      const worktreeBeadsDir = join(targetPath, '.beads');
-      const redirectPath = join(worktreeBeadsDir, 'redirect');
-      if (!existsSync(redirectPath)) {
-        try {
-          mkdirSync(worktreeBeadsDir, { recursive: true });
-          // bd resolves the redirect path relative to the worktree root (the parent of .beads/)
-          const relPath = relative(targetPath, sourceBeadsDir);
-          writeFileSync(redirectPath, relPath, 'utf-8');
-        } catch {
-          // Non-fatal — if redirect creation fails, bd falls back to its usual bootstrap path.
-        }
-      }
-    }
-
     return { success: true, message: `Created worktree at ${targetPath}` };
   } catch (error) {
     return { success: false, message: `Failed to create worktree: ${error}` };

@@ -1,6 +1,8 @@
 import { Effect } from 'effect';
+import { exec } from 'node:child_process';
 import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 
 import { listRunningAgents, stopAgent } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -27,6 +29,28 @@ function issueIdFromFeatureWorkspace(entryName: string): string | null {
 function issueIdFromAgentDir(entryName: string): string | null {
   const match = entryName.match(/^agent-([a-z]+-\d+)$/i);
   return match ? match[1].toUpperCase() : null;
+}
+
+const execAsync = promisify(exec);
+
+// Leaked `_devnet` networks are a residue source of their own: a closed issue
+// whose sessions, workspace, and agent dirs are already gone can still hold a
+// bridge network, and Docker's default address pools support only ~31 of them.
+async function listFeatureDevnetIssueIds(): Promise<string[]> {
+  try {
+    const { stdout } = await execAsync(`docker network ls --format '{{.Name}}'`, {
+      encoding: 'utf-8',
+      timeout: 30000,
+    });
+    const issueIds = new Set<string>();
+    for (const name of stdout.trim().split('\n')) {
+      const match = name.match(/-feature-([a-z]+-\d+)_devnet$/i);
+      if (match) issueIds.add(match[1].toUpperCase());
+    }
+    return [...issueIds];
+  } catch {
+    return [];
+  }
 }
 
 async function isClosedIssue(
@@ -193,6 +217,11 @@ export async function reconcileClosedIssueAgents(): Promise<string[]> {
   for (const entryName of listDirectoryNames(AGENTS_DIR)) {
     const issueId = issueIdFromAgentDir(entryName);
     if (!issueId) continue;
+    if (!await isClosedIssue(issueId, closedChecks)) continue;
+    await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
+  }
+
+  for (const issueId of await listFeatureDevnetIssueIds()) {
     if (!await isClosedIssue(issueId, closedChecks)) continue;
     await reapResolvedIssueResidue(issueId, actions, reapedIssueKeys);
   }

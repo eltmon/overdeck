@@ -26,7 +26,7 @@ describe('protected-paths', () => {
   it('exposes a non-empty exclude list with both .pan and .devcontainer', () => {
     expect(GIT_CLEAN_EXCLUDES.length).toBeGreaterThan(0);
     expect(GIT_CLEAN_EXCLUDES).toContain('.pan');
-    expect(GIT_CLEAN_EXCLUDES).toContain('.beads');
+    expect(GIT_CLEAN_EXCLUDES).toContain('.tasks');
     expect(GIT_CLEAN_EXCLUDES).toContain('.devcontainer');
     expect(GIT_CLEAN_EXCLUDES).toContain('.env');
     expect(GIT_CLEAN_EXCLUDES).toContain('node_modules');

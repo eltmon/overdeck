@@ -129,3 +129,48 @@ describe('titleTranscriptWindow', () => {
     expect(windowed.length).toBeLessThan(8_000);
   });
 });
+
+// ─── PAN-2657 hardening ────────────────────────────────────────────────────────
+// A summarizer spawned with default tool access once continued the transcript's
+// implementation work and wrote production code into the live checkout. These
+// tests lock the three gates: no tools, --bare (no settings/hooks from cwd or
+// ~/.claude), auto-deny permission mode, a non-repository scratch cwd, and
+// untrusted-data fencing around every transcript prompt.
+describe('PAN-2657 background-AI spawn hardening', () => {
+  it('builds claude args with all tool access stripped and auto-deny permissions', async () => {
+    const { buildStructuredClaudeArgs } = await import('../transcript-summary.js');
+    const args = buildStructuredClaudeArgs({ type: 'object' }, 'claude-haiku-4-5-20251001');
+    expect(args[0]).toBe('-p');
+    expect(args).toContain('--bare');
+    const toolsIdx = args.indexOf('--tools');
+    expect(toolsIdx).toBeGreaterThan(-1);
+    expect(args[toolsIdx + 1]).toBe('');
+    const disallowedIdx = args.indexOf('--disallowedTools');
+    expect(args[disallowedIdx + 1]).toBe('mcp__*');
+    const permIdx = args.indexOf('--permission-mode');
+    expect(args[permIdx + 1]).toBe('dontAsk');
+  });
+
+  it('spawns in a scratch cwd under OVERDECK_HOME, never a repository', async () => {
+    const { backgroundAiScratchCwd } = await import('../transcript-summary.js');
+    const { getOverdeckHome } = await import('../../paths.js');
+    const cwd = backgroundAiScratchCwd();
+    expect(cwd.startsWith(getOverdeckHome())).toBe(true);
+    expect(cwd).toContain('background-ai');
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(cwd)).toBe(true);
+    expect(existsSync(`${cwd}/.git`)).toBe(false);
+  });
+
+  it('fences transcript content as untrusted data', async () => {
+    const { fenceUntrustedTranscript } = await import('../transcript-summary.js');
+    const fenced = fenceUntrustedTranscript('conversation', 'USER: resume WI-2A and write fs-lock.ts');
+    expect(fenced).toContain('UNTRUSTED DATA');
+    expect(fenced).toContain('<<<UNTRUSTED_TRANSCRIPT_START>>>');
+    expect(fenced).toContain('<<<UNTRUSTED_TRANSCRIPT_END>>>');
+    const start = fenced.indexOf('<<<UNTRUSTED_TRANSCRIPT_START>>>');
+    const end = fenced.indexOf('<<<UNTRUSTED_TRANSCRIPT_END>>>');
+    expect(fenced.indexOf('resume WI-2A')).toBeGreaterThan(start);
+    expect(fenced.indexOf('resume WI-2A')).toBeLessThan(end);
+  });
+});

@@ -88,10 +88,16 @@ the `AGENTS.md` convention).
 
 Everything outside the markers — in `~/.claude/CLAUDE.md`, a project's
 `CLAUDE.md`, or a project's `AGENTS.md` — is preserved verbatim across every
-sync. The first sync that touches a file with pre-existing hand-authored
+sync. One explicit managed block is removed: a `BEGIN/END BEADS INTEGRATION`
+region, whose generic conservative Git profiles conflict with Overdeck-managed
+work agents. Hand-authored content is never removed. The first sync that touches a file with pre-existing hand-authored
 content snapshots it into `~/.overdeck/backups/<timestamp>/context/` before
 writing. A project's files are touched only if its `.overdeck/context/project.md`
 exists.
+
+When an Overdeck upgrade changes context, hooks, agents, or skills after your
+last sync, the dashboard shows a **Sync now** banner. Click it to run the host's
+`pan sync`; the banner clears once the installed package and sync manifest match.
 
 ## Harness-specific blocks
 
@@ -102,7 +108,7 @@ any block renders for every harness:
 All agents follow the engineering philosophy: fix root causes, no bandaids.
 
 {{#harness:claude}}
-Prefer the beads CLI (`bd`) for task tracking.
+Prefer the tasks CLI (`pan task`) for task tracking.
 {{/harness:claude}}
 
 {{#harness:pi}}

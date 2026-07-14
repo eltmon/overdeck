@@ -15,7 +15,7 @@ import {
   SUPERVISOR_SUB_ROLE,
 } from '../tier-supervisor.js';
 
-function bead(id: string, requiresInspection?: boolean) {
+function task(id: string, requiresInspection?: boolean) {
   return {
     id,
     metadata: requiresInspection === undefined ? {} : { requiresInspection },
@@ -23,40 +23,40 @@ function bead(id: string, requiresInspection?: boolean) {
 }
 
 describe('shouldSupervise', () => {
-  it("under policy 'flagged', returns true only for beads with requiresInspection=true", () => {
-    expect(shouldSupervise(bead('a', true), 'flagged')).toBe(true);
-    expect(shouldSupervise(bead('b', false), 'flagged')).toBe(false);
-    expect(shouldSupervise(bead('c'), 'flagged')).toBe(false);
+  it("under policy 'flagged', returns true only for tasks with requiresInspection=true", () => {
+    expect(shouldSupervise(task('a', true), 'flagged')).toBe(true);
+    expect(shouldSupervise(task('b', false), 'flagged')).toBe(false);
+    expect(shouldSupervise(task('c'), 'flagged')).toBe(false);
     expect(shouldSupervise({ id: 'd' }, 'flagged')).toBe(false);
   });
 
-  it("under policy 'all', returns true for every bead", () => {
-    expect(shouldSupervise(bead('a', true), 'all')).toBe(true);
-    expect(shouldSupervise(bead('b', false), 'all')).toBe(true);
-    expect(shouldSupervise(bead('c'), 'all')).toBe(true);
+  it("under policy 'all', returns true for every task", () => {
+    expect(shouldSupervise(task('a', true), 'all')).toBe(true);
+    expect(shouldSupervise(task('b', false), 'all')).toBe(true);
+    expect(shouldSupervise(task('c'), 'all')).toBe(true);
     expect(shouldSupervise({ id: 'd' }, 'all')).toBe(true);
   });
 
   it("under policy 'sampled', rate 0 selects nothing and rate 1 selects everything", () => {
-    const beads = ['a', 'b', 'c', 'd', 'e'].map(id => bead(id));
-    for (const b of beads) {
+    const tasks = ['a', 'b', 'c', 'd', 'e'].map(id => task(id));
+    for (const b of tasks) {
       expect(shouldSupervise(b, 'sampled', { sampleRate: 0 })).toBe(false);
       expect(shouldSupervise(b, 'sampled', { sampleRate: 1 })).toBe(true);
     }
   });
 
-  it("under policy 'sampled', the decision is deterministic per bead id", () => {
+  it("under policy 'sampled', the decision is deterministic per task id", () => {
     for (let i = 0; i < 50; i++) {
-      const b = bead(`bead-${i}`);
+      const b = task(`task-${i}`);
       const first = shouldSupervise(b, 'sampled');
       expect(shouldSupervise(b, 'sampled')).toBe(first);
       expect(shouldSupervise(b, 'sampled', { sampleRate: DEFAULT_SUPERVISOR_SAMPLE_RATE })).toBe(first);
     }
   });
 
-  it("under policy 'sampled', a bead selected at a lower rate stays selected at a higher rate", () => {
+  it("under policy 'sampled', a task selected at a lower rate stays selected at a higher rate", () => {
     for (let i = 0; i < 200; i++) {
-      const b = bead(`bead-${i}`);
+      const b = task(`task-${i}`);
       if (shouldSupervise(b, 'sampled', { sampleRate: 0.1 })) {
         expect(shouldSupervise(b, 'sampled', { sampleRate: 0.9 })).toBe(true);
       }
@@ -67,7 +67,7 @@ describe('shouldSupervise', () => {
     const total = 2000;
     let selected = 0;
     for (let i = 0; i < total; i++) {
-      if (shouldSupervise(bead(`bead-${i}`), 'sampled', { sampleRate: 0.25 })) selected++;
+      if (shouldSupervise(task(`task-${i}`), 'sampled', { sampleRate: 0.25 })) selected++;
     }
     const fraction = selected / total;
     expect(fraction).toBeGreaterThan(0.15);

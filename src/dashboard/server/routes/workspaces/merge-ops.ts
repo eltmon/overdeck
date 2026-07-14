@@ -21,7 +21,6 @@ import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { messageAgent, getAgentState, spawnAgent } from '../../../../lib/agents.js';
-import { queryBeadsForIssue, type BeadEntry } from '../../../../lib/beads-query.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
@@ -168,36 +167,8 @@ export async function reconcileGitHubMergeStatus(issueId: string, status: Pick<R
 }
 
 
-async function readBeadsFromJsonl(workspacePath: string, issueId: string): Promise<BeadEntry[]> {
-  try {
-    const jsonlPath = join(workspacePath, '.beads', 'issues.jsonl');
-    if (!existsSync(jsonlPath)) return [];
-    const raw = await readFile(jsonlPath, 'utf-8');
-    const issueLower = issueId.toLowerCase();
-    const beads: BeadEntry[] = [];
-    for (const line of raw.split('\n')) {
-      if (!line.trim()) continue;
-      try {
-        const entry = JSON.parse(line);
-        const labels = Array.isArray(entry.labels) ? entry.labels : [];
-        if (labels.some((l: string) => l.toLowerCase() === issueLower)) {
-          beads.push({
-            id: String(entry.id ?? ''),
-            title: String(entry.title ?? ''),
-            status: String(entry.status ?? 'open'),
-            labels: labels as string[],
-          });
-        }
-      } catch { /* skip malformed lines */ }
-    }
-    return beads;
-  } catch {
-    return [];
-  }
-}
-
 /**
- * Build a rich PR body with issue link, beads task summary, and AC checklist
+ * Build a rich PR body with issue link, tasks task summary, and AC checklist
  * from the vBRIEF plan. Exported for testing.
  */
 export async function buildRichPRBody(issueId: string, workspacePath: string): Promise<string> {
@@ -230,32 +201,6 @@ export async function buildRichPRBody(issueId: string, workspacePath: string): P
     }
   } catch {
     // No vBRIEF plan — omit checklist
-  }
-
-  // Beads task summary from live Dolt database via bd CLI
-  try {
-    // Use a short lock timeout so PR-body generation does not block behind CLI
-    // processes that hold the cross-process bd lock. queryBeadsForIssue already
-    // falls back to JSONL on failure, so the explicit fallback here is a safety net.
-    const queryResult = await Effect.runPromise(
-      queryBeadsForIssue(workspacePath, issueId, { acquisitionTimeoutMs: 500 }),
-    );
-    let beads = queryResult.beads;
-    if (beads.length === 0) {
-      // Fallback: read from .beads/issues.jsonl when bd CLI is unavailable
-      beads = await readBeadsFromJsonl(workspacePath, issueId);
-    }
-    if (beads.length > 0) {
-      lines.push('## Implementation Tasks');
-      lines.push('');
-      for (const bead of beads) {
-        const checked = bead.status === 'closed' ? 'x' : ' ';
-        lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
-      }
-      lines.push('');
-    }
-  } catch {
-    // No beads — omit task list
   }
 
   return lines.join('\n') || `Automated PR for ${issueId}`;

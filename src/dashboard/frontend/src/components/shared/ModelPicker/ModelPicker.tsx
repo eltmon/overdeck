@@ -21,7 +21,7 @@ export const HARNESS_OPTIONS: Array<{ id: Harness; label: string; description: s
   { id: 'codex', label: 'Codex', description: 'OpenAI Codex CLI harness' },
 ];
 
-export const PI_TOS_BLOCK_REASON = 'ohmypi cannot run Anthropic models when authenticated via Claude Code subscription. Switch Anthropic to API-key auth, or pick a non-Anthropic model.';
+export const PI_TOS_BLOCK_REASON = 'ohmypi cannot run Anthropic models when authenticated via Claude Code subscription (Terms of Service). Switch Anthropic to API-key auth, or pick a non-Anthropic model.';
 
 export type HarnessDecision = { allowed: boolean; reason?: string };
 export type HarnessPolicyDecisions = Record<string, Partial<Record<Harness, HarnessDecision>>>;
@@ -300,22 +300,12 @@ export function HarnessSelect({
   value,
   onChange,
   modelId,
-  groups,
-  onModelChange,
   harnessPolicy,
   label = 'Harness',
 }: {
   value: Harness;
   onChange: (harness: Harness) => void;
   modelId: string;
-  groups: ModelGroup[];
-  /**
-   * Optional model setter. When provided and the user picks a harness that
-   * conflicts with the current model, we auto-flip the model to a compatible
-   * default before changing the harness — instead of grey-ing out the
-   * harness option. (PAN-1067)
-   */
-  onModelChange?: (modelId: string) => void;
   harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
 }) {
@@ -333,28 +323,20 @@ export function HarnessSelect({
   }, [open]);
 
   // If the conversation already has a harness/model combo that policy now
-  // forbids (e.g. config drift), fall back to claude-code. Auto-resolve flow
-  // below covers the user-driven case — this guards stale persisted state.
+  // forbids (e.g. config drift), fall back to claude-code. The click handler
+  // below guards the user-driven case — this guards stale persisted state.
   useEffect(() => {
     const decision = canUsePickerHarness(value, modelId, harnessPolicy);
     if (!decision.allowed) onChange('claude-code');
   }, [value, modelId, harnessPolicy, onChange]);
 
   function handlePick(newHarness: Harness): void {
+    // PAN-2528: blocked harness options are inert. No auto-flip, no onChange.
+    // The disabled attribute already short-circuits DOM-level clicks, but
+    // fireEvent bypasses it, so the early-return also guards programmatic
+    // invocation.
     const decision = canUsePickerHarness(newHarness, modelId, harnessPolicy);
-    if (decision.allowed) {
-      onChange(newHarness);
-      setOpen(false);
-      return;
-    }
-    if (!onModelChange) {
-      // No way to auto-resolve — silently ignore. The caller is responsible
-      // for ensuring model + harness are compatible before passing them in.
-      setOpen(false);
-      return;
-    }
-    const fallback = pickModelForHarness(newHarness, modelId, groups, harnessPolicy);
-    if (fallback !== modelId) onModelChange(fallback);
+    if (!decision.allowed) return;
     onChange(newHarness);
     setOpen(false);
   }
@@ -372,23 +354,25 @@ export function HarnessSelect({
           <div className={styles.pickerDropdown}>
             {HARNESS_OPTIONS.map((harness) => {
               const decision = canUsePickerHarness(harness.id, modelId, harnessPolicy);
-              const willAutoFlip = !decision.allowed;
-              const titleText = willAutoFlip
-                ? (onModelChange ? `Will auto-switch model: ${decision.reason}` : decision.reason)
-                : harness.description;
+              const isBlocked = !decision.allowed;
+              const reasonText = decision.reason ?? PI_TOS_BLOCK_REASON;
+              const titleText = isBlocked ? reasonText : harness.description;
               return (
                 <button
                   key={harness.id}
                   type="button"
-                  className={`${styles.pickerOption} ${harness.id === value ? styles.pickerOptionActive : ''}`}
+                  className={`${styles.pickerOption} ${harness.id === value ? styles.pickerOptionActive : ''} ${isBlocked ? styles.pickerOptionBlocked : ''}`}
                   title={titleText}
                   onClick={() => handlePick(harness.id)}
+                  disabled={isBlocked}
                 >
                   <span className={styles.pickerOptionLabelWithIcon}>
                     <HarnessLogo harness={harness.id} className={styles.harnessLogo} />
                     <span>{harness.label}</span>
                   </span>
-                  {willAutoFlip && !onModelChange && <span className={styles.pickerOptionCost}>ToS gated</span>}
+                  {isBlocked && (
+                    <span className={styles.pickerOptionReason}>{reasonText}</span>
+                  )}
                 </button>
               );
             })}
@@ -397,33 +381,6 @@ export function HarnessSelect({
       </div>
     </div>
   );
-}
-
-/**
- * Find a model the new harness can run. Mirrors the auto-resolve logic in
- * the chat ModelPicker — kept here so legacy HarnessSelect can share it.
- */
-function pickModelForHarness(
-  newHarness: Harness,
-  currentModel: string,
-  groups: ModelGroup[],
-  policy: HarnessPolicyDecisions | undefined,
-): string {
-  const allModels = groups.flatMap((g) => g.models);
-  const allowed = (modelId: string) => canUsePickerHarness(newHarness, modelId, policy).allowed;
-
-  // Hardcoded preferences match HARNESS_DEFAULT_MODEL in the chat picker.
-  const preferred = newHarness === 'ohmypi' ? 'gpt-5.6-sol' : newHarness === 'codex' ? 'codex-4o' : 'claude-sonnet-5';
-  if (allModels.some((m) => m.id === preferred) && allowed(preferred)) return preferred;
-
-  const currentProvider = allModels.find((m) => m.id === currentModel)?.provider;
-  if (currentProvider) {
-    const sameProviderHit = allModels.find((m) => m.provider === currentProvider && allowed(m.id));
-    if (sameProviderHit) return sameProviderHit.id;
-  }
-  const anyHit = allModels.find((m) => allowed(m.id));
-  if (anyHit) return anyHit.id;
-  return currentModel;
 }
 
 export function ModelHarnessPicker({

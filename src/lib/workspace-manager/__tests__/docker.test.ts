@@ -110,11 +110,40 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
 
     for (const command of commands) {
       expect(command).toMatch(
-        /docker (compose -p "overdeck-feature-pan-9999"|network (rm|ls)|ps -a --filter network|rm -f)/,
+        /docker (compose -p "overdeck-feature-pan-9999"|network (rm|ls)|ps -a --filter network|ps -a --format|rm -f)/,
       );
       expect(command).not.toMatch(/docker network prune/);
       expect(command).not.toMatch(/docker system prune/);
     }
+  });
+
+  it('tears down stacks under any project prefix discovered from live networks', async () => {
+    const teardown = await loadTeardown();
+    let networkListCalls = 0;
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('docker network ls')) {
+        networkListCalls += 1;
+        // First call is discovery; final call is post-teardown verification.
+        return {
+          stdout: networkListCalls === 1
+            ? 'bridge\nmyn-feature-min-9999_devnet\nhost\n'
+            : 'bridge\nhost\n',
+          stderr: '',
+        };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    const result = await teardown('min-9999');
+
+    const commands = mockExecAsync.mock.calls.map(([call]) =>
+      typeof call === 'string' ? call : call.cmd,
+    );
+    expect(commands).toContain(
+      'docker compose -p "myn-feature-min-9999" down -v --remove-orphans',
+    );
+    expect(commands).toContain('docker network rm "myn-feature-min-9999_devnet"');
+    expect(result.networkRemoved).toBe(true);
   });
 
   it('force-removes containers still attached to the network when compose down fails', async () => {
@@ -124,7 +153,7 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
         throw new Error('no configuration file provided: not found');
       }
       if (command.includes('docker ps -a --filter network')) {
-        return { stdout: 'abc123\ndef456\n', stderr: '' };
+        return { stdout: 'abc123\toverdeck-feature-pan-9999\ndef456\toverdeck-feature-pan-9999\n', stderr: '' };
       }
       if (command.includes('docker network ls')) {
         return { stdout: 'bridge\nhost\n', stderr: '' };
@@ -140,6 +169,31 @@ describe('teardownWorkspaceDockerByNamePromise', () => {
     expect(commands).toContain('docker rm -f "abc123" "def456"');
     expect(result.steps.some((s) => s.includes('Removed 2 container(s)'))).toBe(true);
     expect(result.networkRemoved).toBe(true);
+  });
+
+  it('disconnects foreign containers (shared traefik) instead of removing them', async () => {
+    const teardown = await loadTeardown();
+    mockExecAsync.mockImplementation(async (command: string) => {
+      if (command.includes('docker ps -a --filter network')) {
+        // One container from this stack, plus traefik (different compose project).
+        return { stdout: 'abc123\toverdeck-feature-pan-9999\ntrf999\toverdeck-infra\n', stderr: '' };
+      }
+      if (command.includes('docker network ls')) {
+        return { stdout: 'bridge\nhost\n', stderr: '' };
+      }
+      return { stdout: '', stderr: '' };
+    });
+
+    await teardown('pan-9999');
+
+    const commands = mockExecAsync.mock.calls.map(([call]) =>
+      typeof call === 'string' ? call : call.cmd,
+    );
+    expect(commands).toContain('docker rm -f "abc123"');
+    expect(commands).toContain(
+      'docker network disconnect -f "overdeck-feature-pan-9999_devnet" "trf999"',
+    );
+    expect(commands.some((c) => c.includes('rm -f') && c.includes('trf999'))).toBe(false);
   });
 
   it('does not run docker rm when no containers are attached to the network', async () => {

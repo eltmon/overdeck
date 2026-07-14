@@ -21,8 +21,9 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync } from '../projects.js';
-import { getVBriefACStatusSync } from '../vbrief/beads.js';
+import { getVBriefACStatusSync } from '../vbrief/acceptance-criteria.js';
 import { VBriefMergeConflictError } from '../vbrief/io.js';
+import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -302,7 +303,7 @@ export function changesetHasNoContent(changedFiles: readonly string[]): boolean 
   const content = changedFiles
     .map((f) => f.trim())
     .filter(Boolean)
-    .filter((f) => !f.startsWith('.pan/') && !f.startsWith('.beads/') && !f.endsWith('.vbrief.json'));
+    .filter((f) => !f.startsWith('.pan/') && !f.endsWith('.vbrief.json'));
   return content.length === 0;
 }
 
@@ -620,7 +621,7 @@ async function runVerificationForIssuePromise(
 
       const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with \`bd close\` — AC statuses sync from closed beads automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
+        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Complete all acceptance criteria BEFORE resubmitting\n\n1. Review the incomplete AC above\n2. Implement the missing requirements and write tests\n3. Close every completed bead with \`pan task close\` — the canonical writer publishes the close and AC statuses sync automatically; never hand-edit spec files\n4. Commit and push ALL changes\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Completed acceptance criteria"\n\nDo NOT resubmit until all AC are completed.`;
 
       try {
         const fileResult = await Effect.runPromise(writeFeedbackFile({
@@ -642,6 +643,49 @@ async function runVerificationForIssuePromise(
         }
       } catch (feedbackErr: any) {
         console.error(`[${logPrefix}] Failed to write AC verification feedback for ${issueId}:`, feedbackErr);
+      }
+
+      return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
+    }
+
+    const taskBlockers = await checkIncompletePlanItemsPromise(workspacePath, issueId);
+    if (taskBlockers.length > 0) {
+      const newCycleCount = currentCycles + 1;
+      const failedCheck = 'incomplete-plan-items';
+      const itemIds = taskBlockers
+        .map((line) => line.match(/^\s+-\s+(\S+)/)?.[1])
+        .filter((id): id is string => Boolean(id));
+      const summary = `Checklist completion check FAILED — ${itemIds.length} incomplete item(s) remain:\n\n${taskBlockers.join('\n')}`;
+
+      setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
+      if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
+        await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
+      }
+
+      const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+        ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
+        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\nComplete each listed item with \`pan task done ${issueId} <item>\` after committing and pushing its implementation, then resubmit the review request.`;
+
+      try {
+        const fileResult = await Effect.runPromise(writeFeedbackFile({
+          issueId,
+          workspacePath,
+          specialist: 'verification-gate',
+          outcome: 'failed',
+          summary: `Checklist completion check FAILED — ${itemIds.length} incomplete item(s) remain (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+          markdownBody: feedbackBody,
+        }));
+        if (fileResult.success) {
+          const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
+            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
+            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${itemIds.length} incomplete item(s) remain.\n\nMUST READ: ${fileResult.filePath}\n\nRead the file, complete every listed item with pan task after committing and pushing, then request a new review with pan review request.`;
+          await deliverVerificationFeedback(issueId, msg, {
+            failedCheck,
+            feedbackPath: fileResult.filePath,
+          }, logPrefix);
+        }
+      } catch (feedbackErr: any) {
+        console.error(`[${logPrefix}] Failed to write open-beads verification feedback for ${issueId}:`, feedbackErr);
       }
 
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };

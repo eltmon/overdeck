@@ -25530,12 +25530,12 @@ function resolveStateReadHomeSync(project, projectKey$1) {
 }
 promisify(execFile$1);
 layer$4.pipe(provide(mergeAll(layer$2, layer)));
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 600 * 1e3;
+const DEFAULT_STATE_FLUSH_WINDOW_MS = 0;
 parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
 function parseStateFlushWindowMs(value) {
 	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
 	const parsed = Number(value);
-	if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
 	return parsed;
 }
 Promise.resolve();
@@ -27481,8 +27481,9 @@ function getProviderForModelSync(modelId) {
 const ALLOWED = { allowed: true };
 const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK = {
 	allowed: false,
-	reason: "ohmypi cannot run Anthropic models when authenticated via Claude Code subscription. Switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi."
+	reason: "Claude Code subscription Terms of Service restrict Anthropic models to the Claude Code harness — ohmypi cannot run Anthropic models under subscription auth. To proceed, switch the Anthropic provider to API-key auth, or pick a non-Anthropic model for ohmypi."
 };
+OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason;
 const SUBSCRIPTION_ONLY_MODEL_BLOCK = {
 	allowed: false,
 	reason: "This OpenAI model needs a ChatGPT/Codex subscription sign-in — it is not served by the plain OpenAI API key. Run `codex login` on the host (workspace containers inherit the host sign-in), or pick a different model."

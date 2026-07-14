@@ -44,7 +44,7 @@ describe('broadcastCommit', () => {
     await broadcastCommit({
       workspace: '/ws',
       sha: 'abc123',
-      beadTitle: 'my bead',
+      taskTitle: 'my task',
       tiers: TIERS,
       deliver,
       gitShow,
@@ -55,7 +55,7 @@ describe('broadcastCommit', () => {
     expect(deliveries.map((d) => d.agentId)).toEqual(TIERS.map((t) => t.agentId));
     for (const delivery of deliveries) {
       expect(delivery.message).toContain('diff --git a/foo.ts b/foo.ts');
-      expect(delivery.message).toContain('Bead: my bead');
+      expect(delivery.message).toContain('Task: my task');
       expect(delivery.caller).toBe('tier-feed:broadcastCommit');
     }
   });
@@ -66,7 +66,7 @@ describe('broadcastCommit', () => {
     const results = await broadcastCommit({
       workspace: '/ws',
       sha: 'abc123',
-      beadTitle: 'my bead',
+      taskTitle: 'my task',
       tiers: TIERS,
       deliver,
       gitShow,
@@ -84,7 +84,7 @@ describe('broadcastCommit', () => {
     await broadcastCommit({
       workspace: '/ws',
       sha: 'abc123',
-      beadTitle: 'my bead',
+      taskTitle: 'my task',
       tiers: TIERS,
       deliver,
       gitShow,
@@ -107,7 +107,7 @@ describe('broadcastCommit', () => {
     const results = await broadcastCommit({
       workspace: '/ws',
       sha: 'abc123',
-      beadTitle: 'my bead',
+      taskTitle: 'my task',
       tiers: TIERS,
       deliver,
       gitShow,
@@ -122,16 +122,16 @@ describe('broadcastCommit', () => {
   });
 
   it('composes deterministic messages so replay reconstructs the identical feed', () => {
-    const first = composeCommitFeedMessage('abc123', 'my bead', 'diff-body\n');
-    const second = composeCommitFeedMessage('abc123', 'my bead', 'diff-body\n');
+    const first = composeCommitFeedMessage('abc123', 'my task', 'diff-body\n');
+    const second = composeCommitFeedMessage('abc123', 'my task', 'diff-body\n');
     expect(first).toBe(second);
   });
 
   it('preserves the pre-callout feed message byte-for-byte when callouts are off', () => {
-    expect(composeCommitFeedMessage('abc123', 'my bead', 'diff-body\n')).toBe([
+    expect(composeCommitFeedMessage('abc123', 'my task', 'diff-body\n')).toBe([
       '# Commit feed (ingestion-only): abc123',
       '',
-      'Bead: my bead',
+      'Task: my task',
       '',
       'This is an ingestion-only feed delivery. Read the diff below to stay',
       'current with work landing on this issue. Do NOT respond to this message,',
@@ -152,8 +152,8 @@ describe('broadcastCommit', () => {
       issueId: 'PAN-1',
       apiUrl: 'http://api.test',
       sha: 'abc123',
-      beadTitle: 'my bead',
-      beadId: 'bead-1',
+      taskTitle: 'my task',
+      taskId: 'task-1',
       tiers: [TIERS[0]],
       feedConfig: feedConfig({ callouts: 'notify' }),
       deliver,
@@ -168,11 +168,11 @@ describe('broadcastCommit', () => {
       'Do not fix it yourself. Do not edit files. A call-out is a flag, not a task.',
     );
     expect(deliveries[0].message).toContain(
-      `"issueId":"PAN-1","sha":"abc123","beadId":"bead-1","tierName":"cheap","agentId":"agent-pan-1-slot-1"`,
+      `"issueId":"PAN-1","sha":"abc123","taskId":"task-1","tierName":"cheap","agentId":"agent-pan-1-slot-1"`,
     );
   });
 
-  it('does not render an invalid call-out curl when the bead id is unavailable', async () => {
+  it('does not render an invalid call-out curl when the task id is unavailable', async () => {
     const { deliver, gitShow, deliveries, recordDelivery } = spies();
 
     await broadcastCommit({
@@ -180,7 +180,7 @@ describe('broadcastCommit', () => {
       issueId: 'PAN-1',
       apiUrl: 'http://api.test',
       sha: 'abc123',
-      beadTitle: 'my bead',
+      taskTitle: 'my task',
       tiers: [TIERS[0]],
       feedConfig: feedConfig({ callouts: 'corroborate' }),
       deliver,
@@ -200,7 +200,7 @@ describe('broadcastCommit', () => {
       workspace: '/ws',
       issueId: 'PAN-1',
       sha: 'abc123',
-      beadTitle: 'my bead',
+      taskTitle: 'my task',
       tiers: TIERS,
       deliver,
       gitShow,
@@ -225,10 +225,10 @@ describe('broadcastCommit', () => {
     const results = await broadcastCommit({
       workspace: '/ws',
       sha: 'abc123',
-      beadTitle: 'state update',
-      commitSubject: 'chore(beads): close bead',
+      taskTitle: 'state update',
+      commitSubject: 'chore(tasks): close task',
       tiers: TIERS,
-      feedConfig: feedConfig({ exclude_subjects: ['chore(beads):'] }),
+      feedConfig: feedConfig({ exclude_subjects: ['chore(tasks):'] }),
       deliver,
       gitShow,
       recordDelivery,
@@ -251,7 +251,7 @@ describe('renderCommitFeedDiff', () => {
     const diff = await renderCommitFeedDiff('/ws', 'abc123', feedConfig({
       exclude: ['bun.lock'],
     }), { gitShow });
-    const message = composeCommitFeedMessage('abc123', 'bead', diff);
+    const message = composeCommitFeedMessage('abc123', 'task', diff);
 
     expect(message).toContain('diff --git a/src/x.ts b/src/x.ts');
     expect(message).not.toContain('bun.lock');

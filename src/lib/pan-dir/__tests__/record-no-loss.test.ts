@@ -53,8 +53,8 @@ describe('PAN-1919 no-loss audit', () => {
         schemaVersion: 2,
         decisions: [{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01T00:00:00Z' }],
         hazards: [{ id: 'H1', summary: 'big refactor', mitigation: 'audit' }],
-        resumePoint: { description: 'resume at record writer', beadId: 'bead-1' },
-        beadsMapping: { 'item-1': ['bead-1'] },
+        resumePoint: { description: 'resume at record writer', taskId: 'task-1' },
+        tasksMapping: { 'item-1': ['task-1'] },
         sessionHistory: [{ reason: 'work', timestamp: '2026-01-01T00:00:00Z' }],
         feedback: [{ seq: 1, specialist: 'review-agent', outcome: 'changes-requested', timestamp: '2026-01-01T00:00:00Z', markdownBody: 'fix it' }],
         pipeline: { issueId: ISSUE_ID, reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00Z' },
@@ -63,7 +63,7 @@ describe('PAN-1919 no-loss audit', () => {
     );
 
     const record = readIssueRecordSync(project(), ISSUE_ID)!;
-    assertHasFields(record, ['decisions', 'hazards', 'resumePoint', 'beadsMapping', 'sessionHistory', 'feedback']);
+    assertHasFields(record, ['decisions', 'hazards', 'resumePoint', 'tasksMapping', 'sessionHistory', 'feedback']);
   });
 
   it('record carries statusOverrides from workspace continue', () => {
@@ -91,8 +91,8 @@ describe('PAN-1919 no-loss audit', () => {
         schemaVersion: 2,
         decisions: [{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01T00:00:00Z' }],
         hazards: [{ id: 'H1', summary: 'big refactor', mitigation: 'audit' }],
-        resumePoint: { description: 'resume at record writer', beadId: 'bead-1' },
-        beadsMapping: { 'item-1': ['bead-1'] },
+        resumePoint: { description: 'resume at record writer', taskId: 'task-1' },
+        tasksMapping: { 'item-1': ['task-1'] },
         sessionHistory: [{ reason: 'work', timestamp: '2026-01-01T00:00:00Z' }],
         feedback: [{ seq: 1, specialist: 'review-agent', outcome: 'changes-requested', timestamp: '2026-01-01T00:00:00Z', markdownBody: 'fix it' }],
         statusOverrides: { 'item-1': 'completed' },
@@ -109,7 +109,7 @@ describe('PAN-1919 no-loss audit', () => {
       'decisions',
       'hazards',
       'resumePoint',
-      'beadsMapping',
+      'tasksMapping',
       'statusOverrides',
       'sessionHistory',
       'feedback',

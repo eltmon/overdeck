@@ -12,6 +12,7 @@
  */
 
 import { contextBridge, ipcRenderer } from "electron";
+import type { UpdateSnapshot } from '@overdeck/contracts';
 
 // ─── IPC channel names (must match main.ts IPC constants) ────────────────────
 
@@ -27,6 +28,10 @@ const IPC = {
   UPDATE_DESKTOP_SETTING: "pan:update-desktop-setting",
   NOTIFY: "pan:notify",
   RESTART_DASHBOARD: "pan:restart-dashboard",
+  GET_UPDATE_STATUS: "pan:get-update-status",
+  CHECK_FOR_UPDATES: "pan:check-for-updates",
+  DOWNLOAD_UPDATE: "pan:download-update",
+  QUIT_AND_INSTALL: "pan:quit-and-install",
 } as const;
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -100,6 +105,11 @@ export interface OverdeckBridge {
 
   /** Stops and restarts the embedded dashboard server in the main process. */
   restartDashboard(): Promise<void>;
+  getUpdateStatus(): Promise<UpdateSnapshot>;
+  checkForUpdates(): Promise<UpdateSnapshot>;
+  downloadUpdate(): Promise<UpdateSnapshot>;
+  quitAndInstall(): void;
+  onUpdateStatus(listener: (status: UpdateSnapshot) => void): () => void;
 }
 
 // ─── Bridge implementation ────────────────────────────────────────────────────
@@ -150,6 +160,16 @@ const bridge: OverdeckBridge = {
 
   restartDashboard: () =>
     ipcRenderer.invoke(IPC.RESTART_DASHBOARD) as Promise<void>,
+
+  getUpdateStatus: () => ipcRenderer.invoke(IPC.GET_UPDATE_STATUS) as Promise<UpdateSnapshot>,
+  checkForUpdates: () => ipcRenderer.invoke(IPC.CHECK_FOR_UPDATES) as Promise<UpdateSnapshot>,
+  downloadUpdate: () => ipcRenderer.invoke(IPC.DOWNLOAD_UPDATE) as Promise<UpdateSnapshot>,
+  quitAndInstall: () => { ipcRenderer.send(IPC.QUIT_AND_INSTALL); },
+  onUpdateStatus: (listener) => {
+    const wrapped = (_event: Electron.IpcRendererEvent, status: UpdateSnapshot) => listener(status);
+    ipcRenderer.on('update-status', wrapped);
+    return () => ipcRenderer.removeListener('update-status', wrapped);
+  },
 };
 
 contextBridge.exposeInMainWorld("overdeckBridge", bridge);
