@@ -22,7 +22,7 @@ import { MINIMUM_BD_VERSION, isSupportedBdVersion, readInstalledBdVersionSync } 
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
 import { generateOverdeckTraefikConfigSync, cleanupTemplateFilesSync, ensureProjectCertsSync, generateTlsConfigSync } from '../../lib/traefik.js';
-import { refreshCacheSync } from '../../lib/sync.js';
+import { refreshCacheSync, syncStatuslineSync } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
@@ -282,6 +282,19 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   await setupHooksCommand();
+
+  // Claude Code reads statusLine from ~/.claude/settings.json at conversation
+  // launch. Provision it during install as well as sync so a first conversation
+  // immediately shows model, context-window, cost, and subscription usage.
+  spinner.start('Installing Claude Code statusline...');
+  const statusline = syncStatuslineSync();
+  if (statusline.errors.length > 0) {
+    spinner.warn(`Claude Code statusline installation had errors: ${statusline.errors.join('; ')}`);
+  } else if (statusline.synced.includes('claude')) {
+    spinner.succeed('Claude Code statusline installed (context and usage limits enabled)');
+  } else {
+    spinner.warn('Claude Code statusline source was unavailable; run pan sync after installation');
+  }
 
   // Step 3: Docker network
   if (!options.skipDocker) {
