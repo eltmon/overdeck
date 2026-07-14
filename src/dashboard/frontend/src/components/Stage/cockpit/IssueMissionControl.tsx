@@ -463,7 +463,7 @@ function IssueTreeLane({
             className="mt-1.5 rounded-[var(--radius-sm)] border border-destructive/50 px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
             onClick={() => actions.all.find((view) => view.action.key === 'purgeReview')?.invoke()}
           >
-            Complete review reset
+            Remove review sessions &amp; reset
           </button>
         </div>
       ) : null}

@@ -699,9 +699,9 @@ export function SessionNode({
   const durationLabel = isLive ? formatDuration(session.duration) : null;
 
   const restartLabel = session.type === 'review'
-    ? 'Restart review'
+    ? 'Re-run review on latest commit'
     : session.type === 'reviewer'
-      ? 'Restart review'
+      ? 'Re-run review on latest commit'
       : !isLive ? 'Start' : undefined;
 
   return (

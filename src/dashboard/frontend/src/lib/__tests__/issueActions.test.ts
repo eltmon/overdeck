@@ -134,6 +134,9 @@ describe('ISSUE_ACTIONS', () => {
   });
 
   it('declares real CLI verbs only for issue-scoped pan commands', () => {
+    expect(action('restartReview').label).toBe('Re-run review on latest commit');
+    expect(action('recoverReview').label).toBe('Reset stalled review state');
+    expect(action('purgeReview').label).toBe('Remove review sessions & reset');
     expect(action('requestReview').panVerb).toBe('review request');
     expect(action('restartReview').panVerb).toBe('review restart');
     expect(action('recoverReview').panVerb).toBe('review reset');

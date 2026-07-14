@@ -160,9 +160,9 @@ function disabledReasonForAction(action: IssueActionEntry) {
     case 'requestReview':
       return 'Review can be requested after workspace work is idle and not already in review.';
     case 'restartReview':
-      return 'Restart review is available while review, test, or merge work is active or failed.';
+      return 'Re-run review is available while review, test, or merge work is active or failed.';
     case 'recoverReview':
-      return 'Recover review is available only when the review pipeline is blocked or failed.';
+      return 'Reset stalled review state is available only when the review pipeline is blocked or failed.';
     case 'inspectTask':
       return 'Select a task before requesting inspection.';
     case 'viewPr':
@@ -234,7 +234,7 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'completeWorkReset':
       return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, vBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
     case 'purgeReview':
-      return `Complete review reset for ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
+      return `Remove review sessions and reset ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
     default:
       return `${action.label} for ${issueId}?`;
   }

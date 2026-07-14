@@ -18,6 +18,7 @@ import { Effect } from 'effect';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
+import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
@@ -82,14 +83,6 @@ function shouldEscalateVerificationFailure(
 ): boolean {
   if (isFinalVerificationAttempt(cycleCount)) return true;
   return cycleCount >= NO_PROGRESS_REPEAT_THRESHOLD && isRepeatFailedCheck(status, failedCheck);
-}
-
-function buildFinalFailureInstructions(issueId: string): string {
-  return `## NEEDS-YOU: Verification stuck
-
-This was the final allowed verification attempt. The work agent is paused so it does not keep spending cycles on the same failing gate.
-
-An operator needs to inspect ${issueId}, decide whether to fix-forward manually, restart the agent with new instructions, or move the issue through the normal pipeline. Do not re-request review automatically.`;
 }
 
 function setStateDerivedVerificationFailure(
@@ -436,7 +429,7 @@ async function runVerificationForIssuePromise(
               const hasConflicts = failures.some(f => f.hasConflicts);
               const repoList = isPolyrepo ? failures.map(f => f.repoName).join(', ') : basename(workspacePath);
               const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
-                ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
+                ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
                 : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}${hasConflicts ? ' — merge conflicts' : ''} in ${repoList}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the sync issues, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
               await deliverVerificationFeedback(issueId, msg, {
                 failedCheck,
@@ -653,7 +646,7 @@ async function runVerificationForIssuePromise(
         }));
         if (fileResult.success) {
           const msg = shouldEscalate
-            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
+            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck}.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, fix the failing check, commit every change, and invoke /rebase-and-submit. The skill will push and request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
@@ -696,7 +689,7 @@ async function runVerificationForIssuePromise(
           }));
           if (fileResult.success) {
             const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
-              ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
+              ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
               : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
             await deliverVerificationFeedback(issueId, msg, {
               failedCheck,
@@ -745,7 +738,7 @@ async function runVerificationForIssuePromise(
         }));
         if (fileResult.success) {
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
-            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
+            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${acStatus.totalPending} AC incomplete.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, complete all pending acceptance criteria, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
@@ -788,7 +781,7 @@ async function runVerificationForIssuePromise(
         }));
         if (fileResult.success) {
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
-            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
+            ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
             : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${itemIds.length} incomplete item(s) remain.\n\nMUST READ: ${fileResult.filePath}\n\nRead the file, complete every listed item with pan task after committing and pushing, then request a new review with pan review request.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
