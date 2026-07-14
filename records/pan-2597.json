@@ -147,6 +147,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-14T18:44:47.289Z"
+    },
+    {
+      "timestamp": "2026-07-14T18:53:46.800Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -273,19 +278,18 @@
     "recordedAt": "2026-07-14T18:53:44.922Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T18:53:44.925Z",
+  "updated": "2026-07-14T18:53:46.971Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T18:44:46.110Z",
+    "updatedAt": "2026-07-14T18:53:46.917Z",
     "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Verification FAILED at test (327907ms):\n\n|     expect(actions.filter((a) => a.includes('PAN-906'))).toHaveLength(…\n       |                                                          ^\n    352|\n    353|     const after = getReviewStatusSync('PAN-906');\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[87/173]⎯\n\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with recent partial task completion\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with recent partial task completion\nAssertionError: expected [] to deeply equal [ 'PAN-9004' ]\n\n- Expected\n+ Received\n\n- [\n-   \"PAN-9004\",\n- ]\n+ []\n\n ❯ tests/unit/dashboard/server/services/resource-discovery.test.ts:602:54\n    600|     const discovered = await discoverResourceAllocatedIssues();\n    601|\n    602|     expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-900…\n       |                                                      ^\n    603|     expect(discovered[0]?.taskTotals).toEqual({\n    604|       total: 3,\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[88/173]⎯\n\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with in-progress tasks\n FAIL  |root| tests/unit/dashboard/server/services/resource-discovery.test.ts > resource-discovery task rollup signal > admits an inactive issue with in-progress tasks\nAssertionError: expected [] to deeply equal [ 'PAN-9004' ]\n\n- Expected\n+ Received\n\n- [\n-   \"PAN-9004\",\n- ]\n+ []\n\n ❯ tests/unit/dashboard/server/services/resource-discovery.test.ts:638:54\n    636|     const discovered = await discoverResourceAllocatedIssues();\n    637|\n    638|     expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-900…\n       |                                                      ^\n    639|     expect(discovered[0]?.taskTotals?.inProgress).toBe(1);\n    640|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[89/173]⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-12T20:09:29.387Z",
@@ -385,15 +389,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 17972645,
-            "output": 14923,
-            "cacheRead": 17022208,
+            "input": 18159001,
+            "output": 15754,
+            "cacheRead": 17155584,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 99893183,
-            "output": 257041,
-            "cacheRead": 96231552,
+            "input": 105674223,
+            "output": 268695,
+            "cacheRead": 101701376,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
@@ -405,10 +409,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 63,
-            "output": 19940,
-            "cacheRead": 11994589,
-            "cacheWrite": 32371
+            "input": 95,
+            "output": 26520,
+            "cacheRead": 20162443,
+            "cacheWrite": 46344
           }
         },
         "plan": {
@@ -430,15 +434,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 17972645,
-          "output": 14923,
-          "cacheRead": 17022208,
+          "input": 18159001,
+          "output": 15754,
+          "cacheRead": 17155584,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 99893183,
-          "output": 257041,
-          "cacheRead": 96231552,
+          "input": 105674223,
+          "output": 268695,
+          "cacheRead": 101701376,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -448,10 +452,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 18509,
-          "output": 74546,
-          "cacheRead": 16837514,
-          "cacheWrite": 330190
+          "input": 18541,
+          "output": 81126,
+          "cacheRead": 25005368,
+          "cacheWrite": 344163
         },
         "anthropic/claude-sonnet-5": {
           "input": 14217,
@@ -461,8 +465,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 103.419858,
-        "pricingAsOf": "2026-07-14T18:44:46.172Z"
+        "usd": 116.73231,
+        "pricingAsOf": "2026-07-14T18:53:46.966Z"
       }
     },
     "merges": [
