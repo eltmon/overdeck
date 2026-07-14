@@ -254,7 +254,6 @@ export async function buildIssueRecord(
 export {
   getIssueRecordPath,
   markRecordPipelineClosedOutSync,
-  writeIssueRecordSync,
   readIssueRecord,
   queueIssueRecordCommit,
 } from './record.js';
