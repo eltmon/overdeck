@@ -23,7 +23,7 @@ import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync } from '../projects.js';
 import { getVBriefACStatusSync } from '../vbrief/beads.js';
 import { VBriefMergeConflictError } from '../vbrief/io.js';
-import { checkOpenBeadsPromise } from '../work/done-preflight.js';
+import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
 const execAsync = promisify(exec);
@@ -648,16 +648,14 @@ async function runVerificationForIssuePromise(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    // Open-beads gate: a terminal issue must not carry open beads. Fail closed
-    // if the canonical resolver cannot answer (PAN-1812).
-    const openBeadsBlockers = await checkOpenBeadsPromise(workspacePath, issueId);
-    if (openBeadsBlockers.length > 0) {
+    const taskBlockers = await checkIncompletePlanItemsPromise(workspacePath, issueId);
+    if (taskBlockers.length > 0) {
       const newCycleCount = currentCycles + 1;
-      const failedCheck = 'open-beads';
-      const beadIds = openBeadsBlockers
+      const failedCheck = 'incomplete-plan-items';
+      const itemIds = taskBlockers
         .map((line) => line.match(/^\s+-\s+(\S+)/)?.[1])
         .filter((id): id is string => Boolean(id));
-      const summary = `Open beads check FAILED — ${beadIds.length} open bead(s) remain:\n\n${openBeadsBlockers.join('\n')}`;
+      const summary = `Checklist completion check FAILED — ${itemIds.length} incomplete item(s) remain:\n\n${taskBlockers.join('\n')}`;
 
       setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
       if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
@@ -666,7 +664,7 @@ async function runVerificationForIssuePromise(
 
       const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
         ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Close all open beads BEFORE resubmitting\n\n1. Review the open beads listed above\n2. Complete any remaining work and close each bead with \`pan beads close <id> --reason <reason>\`\n3. Commit and push ALL changes\n4. ONLY THEN resubmit: pan review request ${issueId} -m "Closed open beads"\n\nDo NOT resubmit until all open beads are closed.`;
+        : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\nComplete each listed item with \`pan task done ${issueId} <item>\` after committing and pushing its implementation, then resubmit the review request.`;
 
       try {
         const fileResult = await Effect.runPromise(writeFeedbackFile({
@@ -674,13 +672,13 @@ async function runVerificationForIssuePromise(
           workspacePath,
           specialist: 'verification-gate',
           outcome: 'failed',
-          summary: `Open beads check FAILED — ${beadIds.length} open bead(s) remain (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+          summary: `Checklist completion check FAILED — ${itemIds.length} incomplete item(s) remain (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
           markdownBody: feedbackBody,
         }));
         if (fileResult.success) {
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts.\n\nMUST READ: ${fileResult.filePath}\n\nYou are paused for operator intervention. Do not re-request review automatically.`
-            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${beadIds.length} open bead(s) remain.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, close all open beads with pan beads close, commit and push every change, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
+            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — ${itemIds.length} incomplete item(s) remain.\n\nMUST READ: ${fileResult.filePath}\n\nRead the file, complete every listed item with pan task after committing and pushing, then request a new review with pan review request.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
             feedbackPath: fileResult.filePath,

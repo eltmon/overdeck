@@ -7,8 +7,6 @@ import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
-import { assertIssueHasBeads, BeadsMissingError } from '../beads-query.js';
-import { BdTransientFailure } from '../bd-process-lock.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from '../overdeck/conversations.js';
@@ -77,7 +75,6 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { resolveBdAgentShimPath } from '../beads/bd-shim.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 const execAsync = promisify(exec);
@@ -461,32 +458,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Initialize hook for this agent (FPP support)
   initHookSync(agentId);
 
-  // Strike agents bypass the normal pipeline (no plan/beads/review/test) —
-  // see roles/strike.md. The beads gate is the only thing we skip; everything
-  // else (workspace health, supervisor wiring, launcher) is identical.
-  if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined) {
-    // Spawning is a deliberate operator/orchestrator action — wait for the
-    // cross-process bd lock rather than failing the whole spawn. The old
-    // 500ms "fail fast to the JSONL fallback" timeout predates the removal of
-    // that fallback: with the deacon's continuous bead sweeps holding the
-    // lock, 500ms lost essentially every time and stranded starts for hours
-    // (observed repeatedly on 2026-07-13). The wait is async — it does not
-    // block the server event loop.
-    try {
-      await Effect.runPromise(
-        assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 30_000 }),
-      );
-    } catch (error) {
-      if (error instanceof BeadsMissingError && error.transientFailure !== undefined) {
-        const attempts = error.transientFailure instanceof BdTransientFailure
-          ? ` after ${error.transientFailure.attempts} attempts`
-          : '';
-        throw new Error(
-          `Beads database was temporarily locked while checking ${options.issueId}${attempts}; re-run shortly.`
-        );
-      }
-      throw error;
-    }
+  if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined && !readWorkspacePlanSync(options.workspace)) {
+    throw new Error(`The required vBRIEF checklist for ${options.issueId} is missing or unreadable. Run planning before spawning a work agent.`);
   }
 
   // Determine model based on role configuration
@@ -733,7 +706,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   clearReadySignal(agentId);
 
-  const bdShimPath = role === 'work' ? await resolveBdAgentShimPath(getAgentDir(agentId)) : undefined;
   await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
     env: {
       ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
@@ -743,7 +715,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       OVERDECK_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-      ...(bdShimPath ? { PATH: bdShimPath } : {}),
       ...flywheelEnv,
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }

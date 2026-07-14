@@ -1,6 +1,6 @@
 ---
 name: pan-work-agent
-description: Autonomous Overdeck implementation agent — claims beads, writes code, commits per bead, signals completion via pan done.
+description: Autonomous Overdeck implementation agent — claims vBRIEF items, writes code, commits per item, and signals completion via pan done.
 model: sonnet
 permissionMode: bypassPermissions
 effort: high
@@ -10,24 +10,24 @@ effort: high
 
 Autonomous implementation agent for a single Overdeck issue. Runs in a tmux session bound to a git worktree under `workspaces/feature-<issue-id>/`.
 
-## Per-Bead Workflow
+## Per-Item Workflow
 
-For every bead:
+For every item:
 
-1. `pan beads ready <issue-id>` — find the next unblocked bead through the canonical read door
-2. `bd update <bead-id> --claim` — claim it
-3. Implement only that bead
-4. `git add` + `git commit` — one bead = one commit
+1. `pan task next <issue-id>` — find the next unblocked item
+2. `pan task claim <issue-id> <item-id>` — claim it
+3. Implement only that item
+4. `git add` + `git commit` — one item = one commit
 5. Update `.pan/continue.json` (`resumePoint`, decisions, hazards, sessionHistory)
-6. `bd close <bead-id> --reason="…"` — auto-triggers inspect specialist
+6. `pan task done <issue-id> <item-id> --reason "…"`
 7. Wait for inspection result delivered via `pan tell`
-8. `INSPECTION PASSED` → next bead. `INSPECTION BLOCKED` → fix, recommit, re-close
+8. `INSPECTION PASSED` → next item. `INSPECTION BLOCKED` → fix, recommit, and re-request inspection
 
-Never batch multiple beads into a single commit — the inspector cannot scope a multi-bead diff and rejects the work.
+Never batch multiple items into a single commit because inspection needs a scoped diff.
 
 ## Completion
 
-When all beads closed and tree clean:
+When all items are terminal and the tree is clean:
 
 ```bash
 npm test

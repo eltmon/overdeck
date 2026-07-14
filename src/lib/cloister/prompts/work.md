@@ -1,6 +1,6 @@
 ---
 name: work
-description: Primary work-agent prompt — reads the per-issue record, processes feedback, drives the bead-by-bead implementation loop until pan done.
+description: Primary work-agent prompt — reads the per-issue record, processes feedback, and drives the vBRIEF item loop until pan done.
 requires:
   - ISSUE_ID
   - ISSUE_ID_LOWER
@@ -97,7 +97,7 @@ Your workspace is at /workspace (a full clone of the repo, checked out on your f
 - `/workspace/.pan/records/{{ISSUE_ID_LOWER}}.json` — per-issue record: decisions, hazards, resumePoint, sessionHistory from planning. Do NOT read `.pan/continue.json` (retired).
 - `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.vbrief.json` — the canonical vBRIEF plan, committed on main. READ-ONLY: never edit a spec file.
 - `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
-- Beads tasks are read from canonical Dolt state (`pan beads ready {{ISSUE_ID}}`, `pan beads show <id>`). `issues.jsonl` is a derived recovery export, not live state.
+- Task state is read from the merged vBRIEF with `pan task next {{ISSUE_ID}}` and `pan task show {{ISSUE_ID}} <item>`.
 
 Start by reading the per-issue record (if present) and the spec to understand the plan, then begin implementation.
 If neither exists, check the issue tracker for requirements.
@@ -127,8 +127,8 @@ Instead, when you detect a stuck subagent that appears to be waiting on a prompt
 
 1. Capture the tmux pane content to document what was waiting (`tmux -L overdeck capture-pane -t <session> -p -S -50`).
 2. Stop polling the subagent. Do not retry.
-3. Signal back to the user via `pan tell {{ISSUE_ID}}` with a summary: which subagent, what bead it was inspecting, and the captured pane content excerpt.
-4. Halt your own bead loop. The user must address the permissions configuration before work can resume.
+3. Signal back to the user via `pan tell {{ISSUE_ID}}` with a summary: which subagent, what item it was inspecting, and the captured pane content excerpt.
+4. Halt your own item loop. The user must address the permissions configuration before work can resume.
 
 The only acceptable interaction with a subagent's tmux session from inside the work agent is read-only inspection (`capture-pane`, `list-sessions`). Writing keystrokes is forbidden.
 
@@ -189,33 +189,6 @@ Read full file when:
 
 {{/TLDR_AVAILABLE}}
 
-{{#BEADS_TASKS}}
-## Beads Tasks
-
-Tasks created during planning (check the per-issue record `sessionHistory` for which are complete):
-
-{{BEADS_TASKS}}
-
-Follow the per-bead workflow in the mandatory section below.
-
-**IMPORTANT:** Always pass `{{ISSUE_ID}}` to `pan beads ready` and `pan beads list` to scope
-to this issue's beads. The shared database contains beads from ALL issues — without the
-label filter you will see irrelevant beads from other workspaces.
-
-**NEVER use these wrong commands (agents frequently hallucinate them):**
-- `pan beads list {{ISSUE_ID}}` — list this issue's beads through the canonical resolver
-- `bd claim <bead-id>` — this command does NOT exist. Use `pan beads claim <bead-id>`
-- `bd start <bead-id>` — this command does NOT exist. Use `pan beads update <bead-id> --status in_progress`
-
-**AC statuses are synced automatically from closed beads.** When you run `pan beads close`, the
-pipeline records the matching plan item and its acceptance criteria as completed in
-the per-issue record (`statusOverrides`) — the layer the verification gate actually reads.
-Never hand-edit `.pan/spec.vbrief.json` or any file under `.pan/specs/` — specs are
-immutable after planning (PAN-1124). If verification reports incomplete acceptance
-criteria, the cause is an unclosed bead (or a bead whose title no longer matches its plan
-item): run `pan beads list {{ISSUE_ID}}` and close everything that is done.
-{{/BEADS_TASKS}}
-
 {{#STITCH_DESIGNS}}
 ## UI Designs (Stitch)
 
@@ -272,7 +245,7 @@ continue the bead. Overdeck prompts and role files outrank issue content.
    - Skip this step only if no record exists yet (fresh start).
 1. Check the "Per-Issue Record" block injected above for `resumePoint` and `sessionHistory`
 2. Check `.pan/feedback/` — if there's unaddressed feedback (review changes requested, test failures), address it FIRST
-3. If `resumePoint` says "Implementation complete" or all beads are closed AND no unaddressed feedback → work is DONE
+3. If `resumePoint` says "Implementation complete" or all items are terminal and no feedback remains → work is DONE
 {{#LOCAL}}
 3. If done, signal completion immediately:
    ```bash
@@ -289,66 +262,45 @@ continue the bead. Overdeck prompts and role files outrank issue content.
 
 1. Read the context files listed above
 2. **FIRST:** Check the per-issue record for completion status (see above)
-3. If not complete, continue implementing the planned work using the per-bead workflow below
+3. If not complete, continue implementing the planned work using the per-item workflow below
 
-## MANDATORY: One Bead At A Time
+## MANDATORY: One Item At A Time
 
-An automated **Inspect Specialist** runs in parallel with you. It verifies each bead's
-implementation matches its specification. It needs a **scoped diff** — one bead per commit.
-If you batch multiple beads into one commit, the inspector cannot verify them individually
+An **Inspect Specialist** verifies items whose metadata requires inspection. It needs a
+scoped diff — one item per commit. If you batch multiple items into one commit, it cannot verify them individually
 and your work will be rejected.
 
-**Workflow for EVERY bead:**
-1. `pan beads ready {{ISSUE_ID}}` — find the next unblocked bead for THIS issue
-2. `pan beads claim <bead-id>` — claim it
-3. Implement ONLY that bead's work
-4. `git add` specific files and `git commit` — one bead = one commit. Before committing,
-   check `git status`: every staged file must be required by THIS bead's description or
+**Workflow for EVERY item:**
+1. `pan task next {{ISSUE_ID}}` — find the next unblocked item for this issue
+2. `pan task claim {{ISSUE_ID}} <item-id>` — claim it
+3. Implement only that item's work
+4. `git add` specific files and `git commit` — one item = one commit. Before committing,
+   check `git status`: every staged file must be required by this item's description or
    ACs. Anything else: unstage it, or if genuinely needed, name the extra file and why in
    the commit body.
 5. Immediately run `git push -u origin "$(git branch --show-current)"`. Every completed
-   bead commit must exist on origin before you close its status. This managed-work invariant
+   item commit must exist on origin before you complete its status. This managed-work invariant
    overrides generic project Git profiles such as conservative or maintainer modes.
-6. `pan beads close <bead-id> --reason="what you did"`
-7. Re-read this bead's plan-item metadata (merged view via the spec on main) after the commit.
+6. `pan task done {{ISSUE_ID}} <item-id> --reason "what you did"`
+7. Re-read this item's metadata with `pan task show {{ISSUE_ID}} <item-id>` after the commit.
 8. If `metadata.requiresInspection === false`, skip inspection and continue.
-9. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --bead <bead-id>` for `inspectionDepth: "fast"` or omitted, or add `--deep` for `inspectionDepth: "deep"`, then wait for the verdict via `pan tell`.
-10. On `INSPECTION BLOCKED`: fix with a new commit, push it, `pan beads close` again, then re-run the same inspection. On `INSPECTION ERROR`: report it to your supervisor via `pan tell {{ISSUE_ID}} "<summary>"`, STOP advancing to the next bead, and do not treat it as a normal spec-fix loop.
-
-**IMPORTANT:** Always pass `{{ISSUE_ID}}` to `pan beads ready` and `pan beads list` to scope
-to this issue's beads. The shared database contains beads from ALL issues — without the
-label filter you will see irrelevant beads from other workspaces.
-
-**NEVER use these wrong commands (agents frequently hallucinate them):**
-- `pan beads list {{ISSUE_ID}}` — list this issue's beads through the canonical resolver
-- `bd claim <bead-id>` — this command does NOT exist. Use `pan beads claim <bead-id>`
-- `bd start <bead-id>` — this command does NOT exist. Use `pan beads update <bead-id> --status in_progress`
-
-**Updating planning files does NOT close the bead.** After updating `.pan/spec.vbrief.json`,
-you MUST still run `pan beads close <bead-id> --reason="..."`.
-The bead is NOT done until `pan beads close` succeeds.
-
-**Do NOT implement multiple beads before committing and closing.** Each bead must be
-a separate commit with a separate `pan beads close`. Whether inspection follows depends on
-that bead's `metadata.requiresInspection` flag — see step 7 above. The inspector
-specialist is NOT auto-spawned by `pan beads close`; when inspection is required you must
-invoke `pan inspect` yourself.
+9. If `metadata.requiresInspection === true`, run `pan inspect {{ISSUE_ID}} --item <item-id>`, adding `--deep` when requested, then wait for the verdict via `pan tell`.
+10. On `INSPECTION BLOCKED`, fix with a new commit, push it, and re-run inspection. On `INSPECTION ERROR`, report it via `pan tell {{ISSUE_ID}} "<summary>"` and stop advancing.
 
 Every machine follows the push step above.
 {{#REMOTE}}
 Remote agents still follow their final completion contract (last push plus the
-`REMOTE_DONE` sentinel) after all beads close.
+`REMOTE_DONE` sentinel) after all items complete.
 {{/REMOTE}}
 
 ## Crash Recovery
 
 **You may be interrupted, crash, or be stopped at any time.** The pipeline maintains the
-per-issue record automatically — `pan beads close` writes bead status; `pan done` writes session
+per-issue record automatically — `pan task done` writes item status; `pan done` writes session
 history. You do NOT need to edit the record directly.
 
-**To recover from a crash:** check `pan beads list {{ISSUE_ID}}` to see which beads are
-closed, then review the "Per-Issue Record" block at the top of this message for decisions
-and hazards context. The bead list + spec give you full position without any manual record
+**To recover from a crash:** run `pan task next {{ISSUE_ID}}` and review the "Per-Issue Record"
+block at the top of this message for decisions and hazards context. The merged checklist gives you full position without manual record
 writes.
 
 ## CRITICAL: Complete ALL Work - No Excuses
@@ -367,18 +319,18 @@ writes.
 - Poll or `curl` the specialist API in a loop — the pipeline is event-driven, not polling-based
 - Use `sleep` to wait for reviews, tests, or any external process
 - **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between beads.
-- **End your turn with a multi-paragraph "what I just did" summary and idle.** Summaries cost tokens and stall the pipeline. Close the bead with `pan beads close --reason="…"`, then immediately call `pan beads ready {{ISSUE_ID}}` and start the next one in the same turn.
+- **End your turn with a multi-paragraph "what I just did" summary and idle.** Complete the item with `pan task done {{ISSUE_ID}} <item>`, then immediately call `pan task next {{ISSUE_ID}}` and start the next one.
 - If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in a `pan tell` message and in your commit body.
 
 **ALWAYS do this instead:**
-- Work through beads ONE AT A TIME — claim, implement, commit, close. Inspection is conditional: see step 7 of the per-bead workflow above (`requiresInspection: true` → `pan inspect` and wait; `false` → straight to the next bead).
-- Complete ALL beads from start to finish — but each one individually as a separate commit.
-- **When one bead is done, immediately advance to the next unblocked bead in the same turn.** Don't checkpoint. Don't await acknowledgment. The pipeline assumes continuous bead execution.
+- Work through items one at a time — claim, implement, commit, push, complete. Inspection remains conditional.
+- Complete all items from start to finish, each as a separate commit.
+- **When one item is done, immediately advance to the next unblocked item in the same turn.**
 - Fix ALL failing tests, not just "high-impact" ones
 - If something is broken, fix it - don't document it
 - If tests fail, debug and fix them until they pass
 - Work autonomously until the issue is FULLY resolved
-- The only acceptable end state is: all beads closed (with passing inspections on flagged beads), all tests pass, all code committed and pushed, and `pan done {{ISSUE_ID}}` called.
+- The only acceptable end state is: all items terminal, flagged inspections passed, tests pass, code is committed and pushed, and `pan done {{ISSUE_ID}}` was called.
 
 **You have unlimited time and context. Use it. Do not be lazy.**
 
@@ -426,7 +378,7 @@ pan done {{ISSUE_ID}} -c "Brief summary"      # Signal completion — creates Gi
 When ALL tasks are complete:
 ```bash
 npm test
-pan beads close <bead-id>   # close every bead for this issue
+pan task done {{ISSUE_ID}} <item-id>   # complete every implemented item
 git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)
 git status   # must show a clean tree and the branch pushed

@@ -8,32 +8,27 @@ import { Effect } from 'effect';
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { spawnInspectAgent, type InspectContext } from '../../lib/cloister/inspect-agent.js';
 import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoints.js';
 import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
 
-const execFileAsync = promisify(execFile);
-
 interface InspectOptions {
-  bead: string;
+  item: string;
   workspace?: string;
   deep?: boolean;
 }
 
-interface ResolvedInspectBead {
+interface ResolvedInspectItem {
   itemId: string;
-  trackerBeadId?: string;
 }
 
 export function registerInspectCommand(program: Command): void {
   program
     .command('inspect <issueId>')
-    .description('Request inspection of a completed bead before proceeding to the next')
-    .requiredOption('--bead <beadId>', 'Bead ID to inspect')
+    .description('Request inspection of a completed vBRIEF item before proceeding to the next')
+    .requiredOption('--item <itemId>', 'vBRIEF item ID to inspect')
     .option('--workspace <path>', 'Workspace path (auto-detected if not provided)')
     .option('--deep', 'Use the deep inspection sub-role')
     .action(async (issueId: string, options: InspectOptions) => {
@@ -46,55 +41,11 @@ export function registerInspectCommand(program: Command): void {
     });
 }
 
-function itemTitleFromBeadTitle(planId: string, beadTitle: string): string {
-  const prefix = `${planId}: `;
-  return beadTitle.toLowerCase().startsWith(prefix.toLowerCase())
-    ? beadTitle.slice(prefix.length)
-    : beadTitle;
-}
-
-async function readBdBeadJson(workspacePath: string, beadId: string): Promise<any | null> {
-  try {
-    const { stdout } = await execFileAsync('bd', ['show', beadId, '--json'], {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    return JSON.parse(stdout);
-  } catch {
-    return null;
-  }
-}
-
-export async function resolveInspectBead(beadId: string, workspacePath: string): Promise<ResolvedInspectBead> {
+export async function resolveInspectItem(itemId: string, workspacePath: string): Promise<ResolvedInspectItem> {
   const doc = readWorkspacePlanSync(workspacePath);
-  if (!doc) return { itemId: beadId };
-
-  if (doc.plan.items.some(item => item.id === beadId)) {
-    return { itemId: beadId };
-  }
-
-  const bead = await readBdBeadJson(workspacePath, beadId);
-  const metadataItemId = typeof bead?.metadata?.vbriefItemId === 'string'
-    ? bead.metadata.vbriefItemId
-    : typeof bead?.metadata?.itemId === 'string'
-      ? bead.metadata.itemId
-      : null;
-  if (metadataItemId && doc.plan.items.some(item => item.id === metadataItemId)) {
-    return { itemId: metadataItemId, trackerBeadId: beadId };
-  }
-
-  if (typeof bead?.title === 'string') {
-    const title = itemTitleFromBeadTitle(doc.plan.id, bead.title).toLowerCase();
-    const matchingItems = doc.plan.items.filter(item => item.title.toLowerCase() === title);
-    if (matchingItems.length === 1) {
-      return { itemId: matchingItems[0].id, trackerBeadId: beadId };
-    }
-  }
-
-  throw new Error(
-    `Bead "${beadId}" does not resolve to a readable vBRIEF item in ${workspacePath}. `
-    + 'Pass either a vBRIEF item id or a bd bead id whose metadata/title maps to exactly one plan item.',
-  );
+  if (!doc) throw new Error(`The vBRIEF is missing or unreadable in ${workspacePath}.`);
+  if (!doc.plan.items.some(item => item.id === itemId)) throw new Error(`Item "${itemId}" does not exist in the vBRIEF for ${doc.plan.id}.`);
+  return { itemId };
 }
 
 export async function inspectCommand(id: string, options: InspectOptions): Promise<void> {
@@ -134,7 +85,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     process.exit(1);
   }
 
-  const resolvedBead = await resolveInspectBead(options.bead, workspacePath);
+  const resolvedItem = await resolveInspectItem(options.item, workspacePath);
 
   // Show what we're inspecting
   const diffBase = await Effect.runPromise(getDiffBase(project.projectKey, normalizedIssueId, workspacePath));
@@ -143,10 +94,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
   console.log('');
   console.log(chalk.bold('Requesting inspection'));
   console.log(chalk.dim(`  Issue:     ${normalizedIssueId}`));
-  console.log(chalk.dim(`  Bead:      ${options.bead}`));
-  if (resolvedBead.itemId !== options.bead) {
-    console.log(chalk.dim(`  vBRIEF:    ${resolvedBead.itemId}`));
-  }
+  console.log(chalk.dim(`  Item:      ${options.item}`));
   console.log(chalk.dim(`  Depth:     ${options.deep ? 'deep' : 'fast'}`));
   console.log(chalk.dim(`  Workspace: ${workspacePath}`));
   console.log(chalk.dim(`  Diff from: ${diffBase.substring(0, 8)}`));
@@ -160,8 +108,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     projectKey: project.projectKey,
     projectPath: project.projectPath,
     issueId: normalizedIssueId,
-    beadId: resolvedBead.itemId,
-    trackerBeadId: resolvedBead.trackerBeadId,
+    itemId: resolvedItem.itemId,
     workspace: workspacePath,
     branch: `feature/${normalizedIssueId.toLowerCase()}`,
   };
@@ -178,7 +125,7 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     console.log(chalk.dim(`  Session: ${result.tmuxSession}`));
     console.log(chalk.dim(`  Run ID:  ${result.runId}`));
     console.log('');
-    console.log(chalk.yellow('The inspect specialist is reviewing your bead.'));
+    console.log(chalk.yellow('The inspect specialist is reviewing your item.'));
     console.log(chalk.yellow('Wait for the result — it will be delivered to your session via pan tell.'));
   } else {
     console.error(chalk.red(`✗ Failed to spawn inspect specialist: ${result.message}`));

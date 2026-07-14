@@ -21,7 +21,6 @@ import * as NodePath from '@effect/platform-node/NodePath';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { extractNumberSync, resolveIssueIdSync } from '../../lib/issue-id.js';
 import { getWorkspacePanPaths } from '../../lib/pan-dir/index.js';
-import { restoreTrackedBeadsExport } from '../../lib/bd-mutex.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveStateReadHomeSync, shouldCommitLegacyWorkspaceArtifacts } from '../../lib/state-read-home.js';
 import { findWorkspacePath } from '../../lib/lifecycle/archive-planning.js';
@@ -917,7 +916,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       scopeDrift,
     });
 
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
     spinner.succeed(`Work complete: ${issueId}`);
     emitActivityEntrySync({
@@ -1049,9 +1047,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.dim(`  Could not auto-trigger review: ${error.message}`));
     }
 
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
 
   } catch (error: any) {
     spinner.fail(error.message);

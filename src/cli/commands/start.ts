@@ -21,25 +21,15 @@ import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
-import { findPlanSync } from '../../lib/vbrief/io.js';
+import { findPlanSync, readWorkspacePlanSync } from '../../lib/vbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
-import { createBeadsFromVBrief } from '../../lib/vbrief/beads.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
 import {
   buildStartPlanningBody,
   printPlanningConnectionError,
   streamPlanningSession,
 } from './planning-stream.js';
-import {
-  BdTransientFailure,
-  type RunBdWithRetryOptions,
-} from '../../lib/bd-process-lock.js';
-import { createBeadsResolver } from '../../lib/beads/resolver.js';
-import { runMutationBatch } from '../../lib/beads/writer.js';
-
-export const RETRYABLE_BD_LOCK_EXIT_CODE = 75;
-const PAN_START_BD_RETRY_OPTIONS: Omit<RunBdWithRetryOptions, 'workspacePath'> = { maxAttempts: 12, initialDelayMs: 1_000, maxDelayMs: 5_000, acquisitionTimeoutMs: 180_000 };
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -597,47 +587,7 @@ import {
   buildWorkAgentPrompt,
   getTrackerContext,
   readPlanningContext,
-  readBeadsTasks,
 } from '../../lib/cloister/work-agent-prompt.js';
-
-export type BeadsTaskCountResult = {
-  count: number;
-  source: 'bd' | 'stale';
-  transientFailure?: unknown;
-};
-
-/**
- * Check whether a workspace has beads tasks (planning must create them before work begins).
- * Uses `bd list` to query the beads database directly (storage-backend agnostic).
- * Exported for testing.
- */
-export function countBeadsTasksDetailed(workspacePath: string, issueId?: string): BeadsTaskCountResult {
-  const resolver = createBeadsResolver(workspacePath);
-  const result = issueId ? resolver.getBeadsForIssueSync(issueId) : null;
-  if (result?.ok) return { count: result.value.length, source: 'bd' };
-  return { count: 0, source: 'stale', transientFailure: result && !result.ok ? result.error : undefined };
-}
-
-export function countBeadsTasks(workspacePath: string, issueId?: string): number {
-  return countBeadsTasksDetailed(workspacePath, issueId).count;
-}
-
-export async function countBeadsTasksDetailedWithRetry(
-  workspacePath: string,
-  issueId?: string,
-  retryOptions: Omit<RunBdWithRetryOptions, 'workspacePath'> = {},
-): Promise<BeadsTaskCountResult> {
-  const result = issueId
-    ? await createBeadsResolver(workspacePath, { retry: { ...PAN_START_BD_RETRY_OPTIONS, ...retryOptions } }).getBeadsForIssue(issueId)
-    : await createBeadsResolver(workspacePath, { retry: { ...PAN_START_BD_RETRY_OPTIONS, ...retryOptions } }).getAllBeads();
-  return result.ok
-    ? { count: result.value.length, source: 'bd' }
-    : { count: 0, source: 'stale', transientFailure: result.error };
-}
-
-export function hasBeadsTasks(workspacePath: string, issueId?: string): boolean {
-  return countBeadsTasks(workspacePath, issueId) > 0;
-}
 
 /**
  * Validate that the resolved vBRIEF belongs to the current issue.
@@ -665,39 +615,6 @@ function validatePlanMatchesIssue(workspacePath: string, issueId: string): { val
   return { valid: true };
 }
 
-function withTransientFailure<T extends object>(result: T, transientFailure: unknown): T & { transientFailure?: unknown } {
-  if (transientFailure === undefined) return result;
-  return { ...result, transientFailure };
-}
-
-type BeadsPlanValidation = { valid: boolean; beadCount: number; planItemCount: number; transientFailure?: unknown };
-
-function validateBeadsMatchPlanFromCount(workspacePath: string, beadCountResult: BeadsTaskCountResult): BeadsPlanValidation {
-  const planPath = findPlanSync(workspacePath);
-  const beadCount = beadCountResult.count;
-  if (!planPath) return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
-
-  try {
-    const raw = readFileSync(planPath, 'utf-8');
-    const parsed = JSON.parse(raw);
-    const planItemCount = Array.isArray(parsed?.plan?.items) ? parsed.plan.items.length : 0;
-    if (planItemCount === 0) return withTransientFailure({ valid: true, beadCount, planItemCount }, beadCountResult.transientFailure);
-    return withTransientFailure({ valid: beadCount === planItemCount, beadCount, planItemCount }, beadCountResult.transientFailure);
-  } catch {
-    return withTransientFailure({ valid: true, beadCount, planItemCount: 0 }, beadCountResult.transientFailure);
-  }
-}
-
-export function validateBeadsMatchPlan(workspacePath: string, issueId: string): BeadsPlanValidation {
-  return validateBeadsMatchPlanFromCount(workspacePath, countBeadsTasksDetailed(workspacePath, issueId));
-}
-
-async function validateBeadsMatchPlanWithRetry(
-  workspacePath: string,
-  issueId: string,
-): Promise<BeadsPlanValidation> {
-  return validateBeadsMatchPlanFromCount(workspacePath, await countBeadsTasksDetailedWithRetry(workspacePath, issueId));
-}
 
 /**
  * Validate that the continue file belongs to the current issue.
@@ -793,20 +710,6 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
   } catch {
     return null;
   }
-}
-
-function transientBeadsFailureMessage(issueId: string, cause?: unknown): string {
-  if (!(cause instanceof BdTransientFailure)) return `Beads database was temporarily locked while checking ${issueId}`;
-  const holder = cause.holder ? `; holder pid=${cause.holder.pid} caller="${cause.holder.caller}"` : '';
-  return `Beads database was temporarily locked while checking ${issueId}; retried ${cause.attempts} times${holder}`;
-}
-
-function failTransientBeadsValidation(spinner: Ora, issueId: string, cause?: unknown): never {
-  spinner.fail(transientBeadsFailureMessage(issueId, cause));
-  console.log('');
-  console.log(chalk.yellow('The beads database is being used by another Overdeck process.'));
-  console.log(chalk.dim(`This is retryable; re-run ${chalk.cyan(`pan start ${issueId}`)} shortly.`));
-  process.exit(RETRYABLE_BD_LOCK_EXIT_CODE);
 }
 
 /** PAN-2410: --fresh means fresh STAFFING, not just a fresh session. Never
@@ -1235,12 +1138,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
       // Show what context would be included
       const planningContext = await readPlanningContext(workspace);
-      const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
+      const taskCount = readWorkspacePlanSync(workspace)?.plan.items.length ?? 0;
       const hasPreWorkspacePRD = await Effect.runPromise(hasPRDDraft(id));
       console.log('');
       console.log(chalk.bold('Context:'));
       console.log(`  Planning:   ${planningContext ? 'Found (.pan/continue.json)' : 'None'}`);
-      console.log(`  Beads:      ${beadsTasks.length} tasks`);
+      console.log(`  Tasks:      ${taskCount} checklist items`);
       if (hasPreWorkspacePRD) {
         console.log(`  Pre-workspace PRD: ${chalk.green('✓')} ${getPRDDraftPathSync(id)}`);
       }
@@ -1288,129 +1191,17 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       spinner.text = `Synthesizing minimal vBRIEF for ${id}...`;
       const issue = await fetchIssueForAutoStart(id);
       await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspace, issue));
-      const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
-      if (recovery.created.length === 0) {
-        await failPostCreateValidation({
-          spinner,
-          issueId: id,
-          projectRoot,
-          workspaceCreatedThisRun,
-          message: `Auto-start synthesized a vBRIEF but no beads were created for ${id}`,
-          printDetails: () => {
-            if (recovery.errors.length > 0) console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
-          },
-        });
-      }
     }
 
-    // SAFEGUARD: Require beads tasks before work begins (matches dashboard start-agent enforcement)
-    const beadsTaskCount = await countBeadsTasksDetailedWithRetry(workspace, id);
-    if (beadsTaskCount.transientFailure && beadsTaskCount.count === 0) {
-      failTransientBeadsValidation(spinner, id, beadsTaskCount.transientFailure);
-    }
-    if (beadsTaskCount.count === 0) {
-      // If no planning was done, this is a simple issue — auto-create a bead so the agent can start
-      const hasPlanningState = findPlanSync(workspace) !== null;
-      if (!hasPlanningState) {
-        spinner.text = `Auto-creating bead for simple issue ${id}...`;
-        try {
-          const created = await runMutationBatch(
-            { project: { workspacePath: workspace }, reason: `create simple implementation bead for ${id}` },
-            (bd) => bd.mutate(['create', `${id}: Implement issue`, '--type', 'task', '-l', `${id.toLowerCase()},difficulty:simple`]),
-          );
-          if (!created.ok) throw new Error(created.message);
-        } catch (bdErr) {
-          await failPostCreateValidation({
-            spinner,
-            issueId: id,
-            projectRoot,
-            workspaceCreatedThisRun,
-            message: `No beads tasks found for ${id} and auto-create failed`,
-            printDetails: () => {},
-          });
-        }
-      } else {
-        // Planning was done but no beads — attempt auto-recovery from vBRIEF (matches dashboard agents.ts path)
-        spinner.text = `No beads found — attempting recovery from vBRIEF plan...`;
-        try {
-          const { createBeadsFromVBrief } = await import('../../lib/vbrief/beads.js');
-          const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
-          if (recovery.created.length > 0) {
-            spinner.succeed(`Recovered ${recovery.created.length} beads from vBRIEF plan`);
-          } else if (recovery.transientFailure) {
-            failTransientBeadsValidation(spinner, id, recovery.transientFailure);
-          } else {
-            await failPostCreateValidation({
-              spinner,
-              issueId: id,
-              projectRoot,
-              workspaceCreatedThisRun,
-              message: `No beads tasks found for ${id} and recovery from vBRIEF failed`,
-              printDetails: () => {
-                if (recovery.errors.length > 0) {
-                  console.log(chalk.dim(`  Errors: ${recovery.errors.join(', ')}`));
-                }
-                console.log('');
-                console.log(chalk.red(`Planning must create a task breakdown before work begins.`));
-                console.log(chalk.dim('Run planning again and ensure it creates beads through the canonical writer.'));
-                console.log('');
-                console.log(chalk.bold('To re-run planning:'));
-                console.log(`  ${chalk.cyan(`Open the dashboard and click 'Plan' for ${id}`)}`);
-              },
-            });
-          }
-        } catch (recoveryErr: any) {
-          await failPostCreateValidation({
-            spinner,
-            issueId: id,
-            projectRoot,
-            workspaceCreatedThisRun,
-            message: `No beads tasks found for ${id}`,
-            printDetails: () => {
-              console.log(chalk.dim(`  Recovery error: ${recoveryErr.message}`));
-              console.log('');
-              console.log(chalk.bold('To re-run planning:'));
-              console.log(`  ${chalk.cyan(`pan plan ${id}`)}`);
-            },
-          });
-        }
-      }
-    }
-
-    let beadCoverage = await validateBeadsMatchPlanWithRetry(workspace, id);
-    if (beadCoverage.transientFailure) {
-      failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
-    }
-    if (!beadCoverage.valid) {
-      // PAN-1512: partial materialization recovery. createBeadsFromVBrief clears
-      // existing beads for the issue before recreating from spec, so it's safe to
-      // call when some beads exist but the count mismatches the spec — typical
-      // when planning was killed mid-materialization or hit a transient bd error.
-      spinner.text = `Beads count off (${beadCoverage.beadCount}/${beadCoverage.planItemCount}) — rematerializing from vBRIEF...`;
-      try {
-        const recovery = await Effect.runPromise(createBeadsFromVBrief(workspace));
-        if (recovery.success && recovery.created.length > 0) {
-          spinner.succeed(`Rematerialized ${recovery.created.length} beads from vBRIEF plan`);
-          beadCoverage = await validateBeadsMatchPlanWithRetry(workspace, id);
-          if (beadCoverage.transientFailure) {
-            failTransientBeadsValidation(spinner, id, beadCoverage.transientFailure);
-          }
-        }
-      } catch (recoveryErr) {
-        // Fall through to the existing failure path below
-      }
-    }
-    if (!beadCoverage.valid) {
+    if (!findPlanSync(workspace)) {
       await failPostCreateValidation({
         spinner,
         issueId: id,
         projectRoot,
         workspaceCreatedThisRun,
-        message: `Beads count (${beadCoverage.beadCount}) does not match vBRIEF plan items (${beadCoverage.planItemCount}) for ${id}`,
+        message: `The required vBRIEF checklist for ${id} is missing or unreadable`,
         printDetails: () => {
-          console.log('');
-          console.log(chalk.red('Work agents require one bead per vBRIEF plan item.'));
-          console.log(chalk.dim('Re-run planning finalization so beads are materialized from the current vBRIEF before starting work.'));
+          console.log(chalk.dim(`Run \`pan plan ${id}\` and finalize a readable implementation plan before starting work.`));
         },
       });
     }
@@ -1489,12 +1280,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     console.log(`  Role:       ${agent.role}`);
     if (resolvedEffort) console.log(`  Effort:     ${resolvedEffort}`);
     const planningContext = await readPlanningContext(workspace);
-    const beadsTasks = await readBeadsTasks(workspace, projectRoot, id);
-    if (planningContext || beadsTasks.length > 0) {
+    const taskCount = readWorkspacePlanSync(workspace)?.plan.items.length ?? 0;
+    if (planningContext || taskCount > 0) {
       console.log('');
       console.log(chalk.bold('Context Loaded:'));
       if (planningContext) console.log(`  Planning:   ${chalk.green('✓')} continue.json`);
-      if (beadsTasks.length > 0) console.log(`  Beads:      ${chalk.green('✓')} ${beadsTasks.length} tasks`);
+      if (taskCount > 0) console.log(`  Tasks:      ${chalk.green('✓')} ${taskCount} checklist items`);
     }
 
     console.log('');
@@ -1511,7 +1302,6 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
 export const __testInternals = {
   failPostCreateValidation,
-  failTransientBeadsValidation, panStartBdRetryOptions: PAN_START_BD_RETRY_OPTIONS,
   repairMainBranchWorkspace,
   resolveExplicitHarnessFlag,
 };

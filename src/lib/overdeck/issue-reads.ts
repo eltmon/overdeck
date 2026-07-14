@@ -294,7 +294,7 @@ export function inspectIssueBead(options: {
       projectKey: project.projectKey,
       projectPath: project.projectPath,
       issueId: id,
-      beadId,
+      itemId: beadId,
       workspace,
       branch: `feature/${issueLower}`,
     }, { deep: (body as { deep?: unknown }).deep === true });

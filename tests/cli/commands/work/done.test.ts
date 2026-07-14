@@ -33,6 +33,7 @@ const mockGetVBriefACStatus = vi.fn().mockReturnValue(null);
 const mockResolveProjectFromIssue = vi.fn();
 const mockFindWorkspacePath = vi.fn();
 const mockGetWorkspaceGitInfo = vi.fn();
+const mockReadWorkspacePlan = vi.fn(() => ({ plan: { id: 'PAN-714', items: [], edges: [] } }));
 
 // execFile mock delegates to mockExecFn so tests that only set up exec
 // implementations also cover the bd list calls done-preflight makes via execFile.
@@ -133,6 +134,11 @@ vi.mock('../../../../src/lib/vbrief/beads.js', () => ({
   getVBriefACStatus: mockGetVBriefACStatus,
   getVBriefACStatusSync: mockGetVBriefACStatus,
   syncBeadStatusToVBrief: vi.fn().mockReturnValue(Effect.succeed(null)),
+}));
+
+vi.mock('../../../../src/lib/vbrief/io.js', async (importActual) => ({
+  ...(await importActual<typeof import('../../../../src/lib/vbrief/io.js')>()),
+  readWorkspacePlanSync: mockReadWorkspacePlan,
 }));
 
 // PAN-1501: the test-requirement gate reaches out to the issue tracker and
@@ -685,18 +691,9 @@ describe('doneCommand preflight failure paths', () => {
         cb(null, { stdout: '', stderr: '' });
       }
     });
-    mockGetVBriefACStatus.mockReturnValue({
-      allCompleted: false,
-      totalPending: 1,
-      totalCount: 2,
-      items: [
-        {
-          itemTitle: 'Feature X',
-          pending: 1,
-          criteria: [{ title: 'Should do Y', status: 'pending' }],
-        },
-      ],
-    });
+    mockReadWorkspacePlan.mockReturnValueOnce({ plan: { id: 'PAN-714', edges: [], items: [
+      { id: 'PAN-714-a', title: 'Feature X', status: 'running', subItems: [{ id: 'ac1', title: 'Should do Y', status: 'pending' }] },
+    ] } } as any);
 
     const { doneCommand } = await import('../../../../src/cli/commands/done.js');
     await doneCommand('PAN-714');
