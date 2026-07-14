@@ -55,13 +55,13 @@ import {
   buildIssueRecord,
   getIssueRecordPath,
   markRecordPipelineClosedOutSync,
-  writeIssueRecordSync,
   queueIssueRecordCommit,
   readIssueRecord,
   updateIssueRecordForIssue,
   claimIssueOwner,
   clearIssueOwner,
 } from '../records.js';
+import { writeIssueRecordSync } from '../record.js';
 
 import {
   readIssueRecordSync,

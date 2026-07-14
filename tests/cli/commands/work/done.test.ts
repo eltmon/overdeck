@@ -102,6 +102,7 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
+  findProjectByPathSync: () => null,
   // PAN-2372: resolveStateReadHomeSync resolves the state-worktree key via
   // projectKey() (in project-key.ts), which calls listProjectsSync(). These
   // preflight/shadow tests exercise doneCommand without caring which state

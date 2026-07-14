@@ -39,6 +39,7 @@ vi.mock('child_process', async (importOriginal) => {
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: mockResolveProjectFromIssueSync,
   getProjectSync: mockGetProjectSync,
+  findProjectByPathSync: () => null,
   listProjectsSync: vi.fn().mockReturnValue([]),
 }));
 

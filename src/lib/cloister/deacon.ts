@@ -1199,7 +1199,7 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         // Serialize with setReviewStatusSync's fire-and-forget journal rebuild so
         // the panDoneRecoveredAt tombstone is written after (and on top of) it.
         await updateIssueRecord(project, issueId, (nextRecord) => {
-          nextRecord.pipeline.panDoneRecoveredAt = now;
+          Object.assign(nextRecord.pipeline, { reviewRequestedAt: now, prUrl, panDoneRecoveredAt: now });
         });
 
         const action = `checkOrphanedCompletions: recovered ${issueId} (PR open but review never dispatched)`;
