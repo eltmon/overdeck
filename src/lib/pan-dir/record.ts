@@ -12,7 +12,7 @@
  * invariant) while still making it portable via `git push`.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, promises as fsp } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, promises as fsp } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
@@ -34,6 +34,8 @@ import type {
   ContinueSessionEntry,
   ScopeDriftRecord,
 } from '../vbrief/continue-state.js';
+import type { PanIssueTasksRecord } from './record-task-types.js';
+export type { PanIssueTasksRecord, TaskClaim, TaskClaimHistoryEntry } from './record-task-types.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -210,6 +212,7 @@ export interface PanIssueRecord {
   resumePoint?: ContinueResumePoint | null;
   beadsMapping?: ContinueBeadsMapping;
   statusOverrides?: Record<string, string>;
+  tasks?: PanIssueTasksRecord;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   scopeDrift?: ScopeDriftRecord;
@@ -354,7 +357,19 @@ function writeRecordFileAtomicSync(path: string, record: PanIssueRecord): void {
   preserveCorruptRecordSync(path);
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync(tmp, JSON.stringify(record, null, 2), 'utf-8');
+  const tmpFd = openSync(tmp, 'r');
+  try {
+    fsyncSync(tmpFd);
+  } finally {
+    closeSync(tmpFd);
+  }
   renameSync(tmp, path);
+  const dirFd = openSync(dirname(path), 'r');
+  try {
+    fsyncSync(dirFd);
+  } finally {
+    closeSync(dirFd);
+  }
   JSON.parse(readFileSync(path, 'utf-8')); // read-back verification; throws if the renamed file is unparseable
 }
 
