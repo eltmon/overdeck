@@ -39,6 +39,7 @@ import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.j
 import { detectAwaitingInputForAgent, detectAwaitingInputFromPaneSync, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
 import { syncCacheSync, getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { capturePane, listSessionNames } from '../../../lib/tmux.js';
+import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import type { AgentSnapshot, SessionNodePresence } from '@overdeck/contracts';
 import { deriveSessionPresence } from '../services/session-presence.js';
@@ -386,6 +387,12 @@ export async function fetchActivityDataWithContext(
 
   // Build specialist sections from review-status history
   const centralStatus = getReviewStatusSync(issueId.toUpperCase());
+
+  // Lint node (PAN-2665): the verification quality-gate run that gates review
+  // dispatch, rendered between Work and Review in the tree.
+  const lintSection = buildLintSessionNode({ workspacePath, issueLower, includeTranscripts, centralStatus: centralStatus ?? null });
+  if (lintSection) sections.push(lintSection);
+
   if (centralStatus?.history && centralStatus.history.length > 0) {
     const tasksDir = join(homedir(), '.overdeck', 'specialists', 'tasks');
     const taskFilesByType: Record<string, string[]> = { review: [], test: [], merge: [] };

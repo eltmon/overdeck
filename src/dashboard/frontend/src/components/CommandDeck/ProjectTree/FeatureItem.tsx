@@ -570,13 +570,14 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
 const TYPE_PRIORITY: Record<string, number> = {
   work: 0,
   strike: 1,
-  review: 2,
-  test: 3,
-  reviewer: 4,
-  planning: 5,
-  ship: 6,
-  merge: 7,
-  legacy: 8,
+  lint: 2,
+  review: 3,
+  test: 4,
+  reviewer: 5,
+  planning: 6,
+  ship: 7,
+  merge: 8,
+  legacy: 9,
 };
 
 const PRESENCE_PRIORITY: Record<string, number> = {

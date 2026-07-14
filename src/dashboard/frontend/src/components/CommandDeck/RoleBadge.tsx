@@ -57,6 +57,7 @@ const SESSION_STYLE: Record<SessionNodeType, RoleStyle> = {
   work: { Icon: Hammer, ring: 'var(--primary)', fg: 'var(--primary)' },
   knowledge: { Icon: BookOpenCheck, ring: 'var(--info)', fg: 'var(--info)' },
   strike: { Icon: Zap, ring: 'var(--warning)', fg: 'var(--warning)' },
+  lint: { Icon: ListChecks, ring: 'var(--info)', fg: 'var(--info)' },
   review: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },
   reviewer: { Icon: ShieldCheck, ring: 'var(--signal-review)', fg: 'var(--signal-review)' },
   test: { Icon: CheckCircle2, ring: 'var(--success)', fg: 'var(--success)' },
