@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   findSpecByIssue: vi.fn(),
   getAgentRuntimeState: vi.fn(),
-  getTasksRollupService: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
     getIssues: vi.fn(),
@@ -32,10 +31,6 @@ vi.mock('node:fs/promises', () => ({
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: mocks.getAgentRuntimeState,
-}));
-
-vi.mock('../../../../../src/dashboard/server/services/tasks-rollup-singleton.js', () => ({
-  getTasksRollupService: mocks.getTasksRollupService,
 }));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
@@ -96,7 +91,6 @@ beforeEach(() => {
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
   mocks.listConversations.mockReturnValue([]);
   mocks.openPullRequests = [];
-  mocks.getTasksRollupService.mockReturnValue({ getProjectRollups: () => null });
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
@@ -573,83 +567,6 @@ describe('resource-discovery conversation signal', () => {
 
     expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9003']);
     expect(discovered[0]?.resourceSources).toContain('conversation');
-  });
-});
-
-describe('resource-discovery task rollup signal', () => {
-  beforeEach(() => {
-    resetResourceAllocatedIssuesCacheForTests();
-    mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-9004', title: 'Task rollup issue', state: 'open', rawTrackerState: 'OPEN' },
-    ]);
-  });
-
-  function setTaskRollups(
-    rollups: Record<string, { total: number; closed: number; inProgress: number; lastUpdated: string | null }>,
-  ) {
-    mocks.getTasksRollupService.mockReturnValue({
-      getProjectRollups: () => ({ rollups: new Map(Object.entries(rollups)), stale: false }),
-    });
-  }
-
-  it('admits an inactive issue with recent partial task completion', async () => {
-    setTaskRollups({
-      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9004']);
-    expect(discovered[0]?.taskTotals).toEqual({
-      total: 3,
-      closed: 1,
-      inProgress: 0,
-      lastUpdated: '2026-07-12T00:00:00Z',
-    });
-  });
-
-  it('excludes an inactive issue when tasks are fully closed', async () => {
-    setTaskRollups({
-      'pan-9004': { total: 3, closed: 3, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
-  });
-
-  it('excludes an inactive issue when partial task completion is stale', async () => {
-    setTaskRollups({
-      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-06-20T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
-  });
-
-  it('admits an inactive issue with in-progress tasks', async () => {
-    setTaskRollups({
-      'pan-9004': { total: 2, closed: 0, inProgress: 1, lastUpdated: '2026-06-20T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9004']);
-    expect(discovered[0]?.taskTotals?.inProgress).toBe(1);
-  });
-
-  it('does not admit a terminal issue even with recent partial task completion', async () => {
-    mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-9004', title: 'Task rollup issue', state: 'closed', rawTrackerState: 'CLOSED' },
-    ]);
-    setTaskRollups({
-      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
   });
 });
 
