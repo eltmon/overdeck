@@ -311,17 +311,17 @@
     "recordedAt": "2026-07-14T21:12:12.074Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T21:23:23.010Z",
+  "updated": "2026-07-14T21:23:26.161Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-14T21:23:22.787Z",
+    "updatedAt": "2026-07-14T21:23:25.994Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (485040ms):\n\nForIssue is not a function\n ❯ src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts:45:43\n     43|     });\n     44|\n     45|     const count = await Effect.runPromise(countTasksForIssue('/ws/pan-…\n       |                                           ^\n     46|     expect(count).toBe(3);\n     47|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[88/177]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts > countTasksForIssue — bd failures must never escape as a 500 > returns 0 for empty bd output\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts > countTasksForIssue — bd failures must never escape as a 500 > returns 0 for empty bd output\nTypeError: countTasksForIssue is not a function\n ❯ src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts:52:43\n     50|     execFileMock.mockResolvedValue({ stdout: '', stderr: '' });\n     51|\n     52|     const count = await Effect.runPromise(countTasksForIssue('/ws/pan-…\n       |                                           ^\n     53|     expect(count).toBe(0);\n     54|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[89/177]⎯\n\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts > countTasksForIssue — bd failures must never escape as a 500 > returns 0 when bd output is not parseable JSON rather than throwing\n FAIL  |root| src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts > countTasksForIssue — bd failures must never escape as a 500 > returns 0 when bd output is not parseable JSON rather than throwing\nTypeError: countTasksForIssue is not a function\n ❯ src/dashboard/server/routes/__tests__/agents-spawn-bead-count.test.ts:59:43\n     57|     execFileMock.mockResolvedValue({ stdout: 'not json at all', stderr…\n     58|\n     59|     const count = await Effect.runPromise(countTasksForIssue('/ws/pan-…\n       |                                           ^\n     60|     expect(count).toBe(0);\n     61|   });\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[90/177]⎯\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
@@ -500,7 +500,7 @@
       },
       "costAtCloseOut": {
         "usd": 149.645894,
-        "pricingAsOf": "2026-07-14T21:23:22.909Z"
+        "pricingAsOf": "2026-07-14T21:23:26.094Z"
       }
     },
     "merges": [
