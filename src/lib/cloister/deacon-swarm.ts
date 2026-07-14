@@ -357,7 +357,7 @@ export async function coordinateSwarmSlots(
       // Eligibility gates dispatch only; active swarms still need merge/gc/endgame passes.
       const swarmInProgress = Object.entries(overrides ?? {})
         .some(([key, value]) => !key.includes('.') && value === 'completed');
-      const policyAllowsDispatch = opts.manual || policy.mode !== 'off' || swarmInProgress;
+      const policyAllowsDispatch = opts.manual || ((policy.mode !== 'off' || swarmInProgress) && (policy.autoAdvance || !swarmInProgress));
       const dispatchEligible = policyAllowsDispatch && readiness.swarmEligible && (slotEligibleCount >= 2 || swarmInProgress);
       if (!policyAllowsDispatch) actions.push(`[swarm] ${issueId}: automatic swarming off (${policy.source.mode}) — single-agent execution remains selected`);
       if (dispatchEligible) {
@@ -912,7 +912,10 @@ export async function dispatchNextWave(
   const actions: string[] = [];
   const mergedItemIds = new Set(reconciled.merged.map(slot => slot.itemId));
   const slotEligibleIds = new Set(readiness.items.filter(item => item.slotEligible).map(item => item.id));
-  const configuredMaxSlotIndex = Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)()));
+  const configuredMaxSlotIndex = Math.min(
+    Math.max(1, Math.floor((deps.getMaxSlotIndex ?? defaultGetMaxSlotIndex)())),
+    Math.max(1, Math.floor(resolveSwarmPolicy(issueId).maxSlots)),
+  );
   const occupiedSlotIndexes = new Set([
     ...blockedSlotIndexes, // PAN-2364: blocked slots count as occupied so other slots cannot collide with them
     ...reconciled.inFlight.map(slot => slot.slotIndex),
