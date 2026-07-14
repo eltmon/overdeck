@@ -25980,7 +25980,8 @@ const STATE_PLANE_PATHS = [
 	".pan/specs/",
 	".pan/test/",
 	".pan/review/",
-	".pan/feedback/"
+	".pan/feedback/",
+	".tasks/"
 ];
 function isStatePlanePath(relativePath) {
 	const normalized = relativePath.trim().replace(/\\/g, "/");

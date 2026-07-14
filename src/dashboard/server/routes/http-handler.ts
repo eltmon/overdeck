@@ -24,6 +24,7 @@ import {
   IssueNotFound,
   PlanEmpty,
   RateLimited,
+  TasksNotInitialized,
   TrackerApiError,
   TrackerNotConfigured,
   WorkspaceCreateError,
@@ -49,7 +50,7 @@ let opaqueLastSummaryAt = 0;
  *   TrackerNotConfigured                  → 503 Service Unavailable
  *   RateLimited                           → 429 Too Many Requests
  *   AgentAlreadyRunning                   → 409 Conflict
- *   PlanEmpty                             → 422 Unprocessable Entity
+ *   PlanEmpty, TasksNotInitialized        → 422 Unprocessable Entity
  *   TrackerApiError                       → 502 Bad Gateway
  *   WorkspaceCreateError, AgentStartError → 500 Internal Server Error
  *   Unknown errors                        → 500 Internal Server Error
@@ -68,6 +69,7 @@ export function httpHandler<R, E>(
     | RateLimited
     | AgentAlreadyRunning
     | PlanEmpty
+    | TasksNotInitialized
     | TrackerApiError
     | WorkspaceCreateError
     | AgentStartError;
@@ -91,6 +93,9 @@ export function httpHandler<R, E>(
     ),
     Effect.catchTag('PlanEmpty', (err: PlanEmpty) =>
       Effect.succeed(jsonResponse({ error: `Plan is empty for issue: ${err.id}` }, { status: 422 }))
+    ),
+    Effect.catchTag('TasksNotInitialized', (err: TasksNotInitialized) =>
+      Effect.succeed(jsonResponse({ error: `Tasks not initialized for workspace: ${err.workspace}` }, { status: 422 }))
     ),
     Effect.catchTag('TrackerApiError', (err: TrackerApiError) =>
       Effect.succeed(

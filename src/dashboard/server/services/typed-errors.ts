@@ -57,6 +57,11 @@ export class PlanEmpty extends Data.TaggedError('PlanEmpty')<{
   readonly id: string;
 }> {}
 
+/** The workspace task store is missing or has not been initialized. */
+export class TasksNotInitialized extends Data.TaggedError('TasksNotInitialized')<{
+  readonly workspace: string;
+}> {}
+
 /** The agent process failed to start. */
 export class AgentStartError extends Data.TaggedError('AgentStartError')<{
   readonly id: string;
