@@ -15,7 +15,7 @@ interface WipeOptions {
 
 export async function wipeCommand(issueId: string, options: WipeOptions): Promise<void> {
   console.log(chalk.yellow(`\n🔥 Reset issue to Todo for ${issueId}\n`));
-  console.log(chalk.yellow('This touches workspace files, running processes, git branches, review state, beads, and tracker status.'));
+  console.log(chalk.yellow('This touches workspace files, running processes, git branches, review state, vBRIEF task state, and tracker status.'));
 
   if (!options.yes && !options.force) {
     const readline = await import('readline');

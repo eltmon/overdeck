@@ -60,7 +60,7 @@ export function decideEscalation(
   const override = overrides[bead.id];
   const currentDifficulty = override?.effectiveDifficulty ?? bead.metadata?.difficulty;
   if (!currentDifficulty) {
-    return { action: 'block', reason: `bead ${itemId} has no effective difficulty` };
+    return { action: 'block', reason: `task ${itemId} has no effective difficulty` };
   }
 
   const promotions = override?.promotions ?? 0;
@@ -74,7 +74,7 @@ export function decideEscalation(
   if (currentDifficulty === 'expert') {
     return {
       action: 'block',
-      reason: `expert bead ${itemId} cannot promote beyond expert`,
+      reason: `expert task ${itemId} cannot promote beyond expert`,
     };
   }
 
@@ -88,7 +88,7 @@ export function decideEscalation(
   if (!to) {
     return {
       action: 'block',
-      reason: `bead ${itemId} cannot promote beyond ${currentDifficulty}`,
+      reason: `task ${itemId} cannot promote beyond ${currentDifficulty}`,
     };
   }
 
