@@ -509,17 +509,6 @@ function IssueTreeContextPanel({
     issue: { title: issueId, summary: 'Issue overview from the tree. Workspace tabs stay visible above this pane.' },
   }
 
-  // Resume affordance for the work agent's own session: a stopped session with
-  // a resumable thread previously offered NO way back in — the composer locks
-  // and the operator had to know `pan resume` (2026-07-14). Reuses the
-  // canonical resumeSession action (same dialog + endpoint as the Actions menu).
-  const sessionActions = useIssueActions(issueId)
-  const resumeView = sessionActions.all.find((view) => view.action.key === 'resumeSession')
-  const showResume = !!selectedSession
-    && selectedSession.type === 'work'
-    && selectedSession.status !== 'running'
-    && !!resumeView?.enabled
-
   const body = (() => {
     if (selectedSession) {
       return (
@@ -550,29 +539,15 @@ function IssueTreeContextPanel({
           <h2 className="truncate text-[16px] font-semibold text-foreground">{title}</h2>
           <p className="mt-1 truncate text-[12px] text-muted-foreground">{summary}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {showResume && resumeView && (
-            <button
-              type="button"
-              onClick={resumeView.invoke}
-              disabled={resumeView.isPending}
-              data-testid="session-resume-button"
-              className="rounded-[var(--radius-sm)] border border-info/40 bg-info/10 px-2.5 py-1.5 text-[12px] font-semibold text-info-foreground hover:bg-info/20 disabled:opacity-60"
-            >
-              {resumeView.isPending ? 'Resuming…' : '▶ Resume session'}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onBackToIssue}
-            className="rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[12px] font-semibold text-foreground hover:bg-accent"
-          >
-            Issue overview
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={onBackToIssue}
+          className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[12px] font-semibold text-foreground hover:bg-accent"
+        >
+          Issue overview
+        </button>
       </div>
       {body}
-      <IssueActionDialogHost issueId={issueId} actions={sessionActions} />
     </div>
   )
 }

@@ -12,6 +12,7 @@ import { useDashboardStore, selectPendingPermissionAgentIds } from '../../../lib
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
 import { ReviewSummary } from './ReviewSummary';
+import { SessionResumeButton } from './SessionResumeButton';
 import { VerificationGatesPanel } from './VerificationGatesPanel';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useConversationUiState } from '../../../hooks/useConversationUiState';
@@ -375,6 +376,9 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
         </button>
         {session.deliveryMethod !== undefined && (
           <DeliveryMethodToggle sessionId={session.sessionId} deliveryMethod={session.deliveryMethod} />
+        )}
+        {issueId && session.type === 'work' && session.status !== 'running' && (
+          <SessionResumeButton issueId={issueId} />
         )}
       </div>
 
