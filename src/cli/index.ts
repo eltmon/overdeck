@@ -125,8 +125,7 @@ import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
-import { registerSwarmCommands } from './commands/swarm.js';
-import { registerTaskCommands } from './commands/task.js';
+import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -595,8 +594,7 @@ program
   .option('--dry-run', 'Print what would happen without spawning')
   .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
 configureKnowledgeCommand(program);
-registerSwarmCommands(program);
-registerTaskCommands(program);
+registerSwarmCommands(program); registerTaskCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
 registerTtsCommands(program);
