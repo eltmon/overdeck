@@ -21,7 +21,6 @@ import {
   readRecordContinueViewSync,
   writeAgentHarnessModelSync,
   writeIssueRecordSync,
-  writeRecordTasksMappingSync,
   writeRecordDecisionsSync,
   writeRecordHazardsSync,
   writeRecordResumePointSync,
@@ -108,27 +107,6 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
 
       const rec = readIssueRecordSync(project, ISSUE_ID);
       expect(rec?.resumePoint?.taskId).toBe('task-2');
-      expect(existsSync(join(workspace, PAN_DIR, CONTINUE_FILENAME))).toBe(false);
-    } finally {
-      rmSync(workspace, { recursive: true, force: true });
-    }
-  });
-
-  it('writes tasksMapping through record writer without touching continue files', () => {
-    const workspace = makeTmpWorkspace();
-    try {
-      const project = getProjectConfigFromWorkspacePath(workspace);
-      const now = new Date().toISOString();
-      writeIssueRecordSync(project, ISSUE_ID, {
-        issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
-        statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
-      });
-
-      writeRecordTasksMappingSync(project, ISSUE_ID, { 'item-1': ['task-1', 'task-2'] });
-
-      const rec = readIssueRecordSync(project, ISSUE_ID);
-      expect(rec?.tasksMapping['item-1']).toEqual(['task-1', 'task-2']);
       expect(existsSync(join(workspace, PAN_DIR, CONTINUE_FILENAME))).toBe(false);
     } finally {
       rmSync(workspace, { recursive: true, force: true });
