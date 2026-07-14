@@ -1,7 +1,4 @@
 all-up
-beads
-beads-completion-check
-beads-overdeck-guide
 benchmark
 bug-fix
 check-merged
@@ -21,6 +18,7 @@ improve-codebase-architecture
 incident-response
 knowledge-capture
 myn-standards
+okf
 onboard-codebase
 overdeck
 ovr

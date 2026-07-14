@@ -372,6 +372,10 @@ describe('AgentState role persistence', () => {
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
     vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../vbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+      readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
+    }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
@@ -457,6 +461,17 @@ describe('AgentState role persistence', () => {
   it('allows explicit host override when the workspace stack is unhealthy', async () => {
     ensurePtySupervisorArtifact();
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-host-'));
+    mkdirSync(join(workspace, '.pan'), { recursive: true });
+    writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
+      vBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
+      plan: {
+        id: 'PAN-1140',
+        title: 'Host override fixture',
+        status: 'running',
+        items: [{ id: 'host-override', title: 'Host override', status: 'pending' }],
+        edges: [],
+      },
+    }));
     const createSessionAsync = vi.fn(async () => undefined);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const emitActivityEntry = vi.fn();
@@ -486,6 +501,10 @@ describe('AgentState role persistence', () => {
       emitActivityEntrySync: emitActivityEntry,
       emitActivityTts: vi.fn(),
       emitActivityTtsSync: vi.fn(),
+    }));
+    vi.doMock('../vbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+      readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
     }));
     vi.doMock('../cloister/work-agent-prompt.js', () => ({
       writeStoryFeatureContext: vi.fn(async () => undefined),
