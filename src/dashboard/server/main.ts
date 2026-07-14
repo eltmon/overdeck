@@ -568,6 +568,15 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopCostReconcileService();
   stopRestartAnnouncer();
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
+  try {
+    // PAN-2669: reap in-flight quality-gate process trees (request-review runs
+    // verification in THIS process) so restarts never orphan vitest children.
+    const { killAllGateProcessGroups } = await import('../../lib/cloister/validation.js');
+    const reaped = killAllGateProcessGroups();
+    if (reaped > 0) console.log(`[overdeck] reaped ${reaped} in-flight gate process group(s)`);
+  } catch (err) {
+    console.warn('[overdeck] gate process reap failed:', err);
+  }
   await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
@@ -673,6 +682,16 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
     const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
     if (reconciliation.decision !== 'pending') {
       void applyBootReconciliationDecision();
+    }
+    try {
+      // PAN-2669: an in-flight verification dies with the process that owned
+      // it; reset stale 'running' statuses so the pipeline re-drives instead
+      // of wedging on a run nothing will ever finish.
+      const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
+      const interrupted = reconcileInterruptedVerifications();
+      if (interrupted > 0) console.log(`[overdeck] reset ${interrupted} verification(s) interrupted by the previous shutdown (PAN-2669)`);
+    } catch (err) {
+      console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
     }
     startDeaconChild().catch((err) => {
       console.error('[overdeck] Cloister auto-start failed:', err);

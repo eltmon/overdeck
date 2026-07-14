@@ -17,11 +17,12 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
-import { writeVerificationArtifact } from './verification-artifact.js';
+import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
+import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
-import { findProjectByPathSync } from '../projects.js';
+import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { getVBriefACStatusSync } from '../vbrief/acceptance-criteria.js';
 import { VBriefMergeConflictError } from '../vbrief/io.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
@@ -139,6 +140,61 @@ async function escalateVerificationStuck(
   } catch (err: any) {
     console.error(`[${logPrefix}] Failed to pause ${agentId} after verification stuck:`, err);
   }
+}
+
+/**
+ * PAN-2669: boot reconciliation for interrupted verifications. A dashboard
+ * restart kills the process that owns an in-flight verification, leaving
+ * `verificationStatus: 'running'` (and a running-outcome artifact) that
+ * nothing will ever complete — the issue wedges. Called once at boot: any
+ * 'running' status is reset to 'pending' (the deacon re-drives it), and the
+ * workspace artifact is finalized so the Test/Lint node shows the
+ * interruption instead of spinning forever.
+ */
+export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliation'): number {
+  let reset = 0;
+  try {
+    const statuses = readReviewStatusMap() ?? {};
+    for (const [issueId, status] of Object.entries(statuses)) {
+      if ((status as { verificationStatus?: string }).verificationStatus !== 'running') continue;
+      setReviewStatusSync(issueId, {
+        verificationStatus: 'pending',
+        verificationNotes: 'Verification was interrupted by a dashboard restart; it re-runs on the next cycle (PAN-2669).',
+      });
+      reset += 1;
+      try {
+        const resolved = resolveProjectFromIssueSync(issueId);
+        const workspacePath = resolved
+          ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
+          : null;
+        const artifact = workspacePath ? readVerificationArtifact(workspacePath) : null;
+        if (workspacePath && artifact?.outcome === 'running') {
+          writeVerificationArtifact(workspacePath, issueId, [
+            ...artifact.gates.map((gate) => ({
+              name: gate.name,
+              passed: gate.passed,
+              required: gate.required,
+              output: gate.output ?? '',
+              durationMs: gate.durationMs,
+              ...(gate.error ? { error: gate.error } : {}),
+            })),
+            {
+              name: artifact.currentGate ?? 'interrupted',
+              passed: false,
+              required: true,
+              output: 'Verification was interrupted by a dashboard restart before this gate finished (PAN-2669).',
+              durationMs: 0,
+              error: 'interrupted by dashboard restart',
+            },
+          ]);
+        }
+      } catch { /* artifact finalization is best-effort */ }
+      console.log(`[${logPrefix}] reset stale running verification for ${issueId} (PAN-2669)`);
+    }
+  } catch (err) {
+    console.warn(`[${logPrefix}] interrupted-verification sweep failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return reset;
 }
 
 async function deliverVerificationFeedback(
