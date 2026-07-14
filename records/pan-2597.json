@@ -171,13 +171,16 @@
       "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
       "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
       "src/dashboard/server/services/codex-conversation-parser.ts",
+      "src/lib/cloister/validation.ts",
       "src/lib/config-yaml/defaults.ts",
       "src/lib/config-yaml/merge.ts",
       "src/lib/config-yaml/roles.ts",
       "src/lib/config-yaml/schema.ts",
       "src/lib/runtimes/tmux-cli.ts",
+      "src/lib/state-plane.ts",
       "sync-sources/hooks/record-cost-event.js",
-      "tests/playwright/conversation-supervisor-uat.test.ts"
+      "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts"
     ],
     "declaredScopeUntouched": [
       "docs/ROLES.md",
@@ -242,6 +245,7 @@
       "src/lib/agents/recovery.ts",
       "src/lib/agents/runtime-command.ts",
       "src/lib/agents/spawn.ts",
+      "src/lib/cloister/validation.ts",
       "src/lib/codex/__fixtures__/app-server-schema.json",
       "src/lib/codex/__tests__/app-server-host.test.ts",
       "src/lib/codex/__tests__/app-server-manager.test.ts",
@@ -260,14 +264,16 @@
       "src/lib/runtimes/behavior.ts",
       "src/lib/runtimes/codex.ts",
       "src/lib/runtimes/tmux-cli.ts",
+      "src/lib/state-plane.ts",
       "sync-sources/hooks/record-cost-event.js",
       "tests/playwright/conversation-supervisor-uat.test.ts",
+      "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
       "tsdown.config.ts"
     ],
-    "recordedAt": "2026-07-14T16:47:08.176Z"
+    "recordedAt": "2026-07-14T18:53:44.922Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-14T18:53:37.960Z",
+  "updated": "2026-07-14T18:53:44.925Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
