@@ -775,7 +775,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-14T05:55:38.495Z",
+  "updated": "2026-07-14T06:41:10.311Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "reviewing",
@@ -856,7 +856,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
