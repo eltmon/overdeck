@@ -328,6 +328,11 @@ export interface QualityGateRunOptions {
   /** PAN-2487: mirror of the human-readable gate progress lines (start/pass/fail
    *  per gate), e.g. into the per-issue ship log so the UI can show live progress. */
   onLog?: (line: string) => void;
+  /** PAN-2665: structured live-progress hooks — fired when a gate starts and
+   *  when its result is known, so the verification artifact can be written
+   *  incrementally and the dashboard's Test/Lint node can render gates live. */
+  onGateStart?: (name: string) => void;
+  onGateResult?: (result: QualityGateResult) => void;
 }
 
 /**
@@ -372,12 +377,14 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
 
     console.log(`[quality-gate] Running "${name}" (${required ? 'required' : 'optional'}) in ${cwd}`);
     opts.onLog?.(`Running gate "${name}"${required ? '' : ' (optional)'}…`);
+    opts.onGateStart?.(name);
     const startTime = Date.now();
 
     if (gate.type === 'http_health') {
       // HTTP health check gate
       const result = await runHttpHealthGate(name, gate, required);
       results.push(result);
+      opts.onGateResult?.(result);
       if (!result.passed && required) {
         console.log(`[quality-gate] ✗ Required gate "${name}" failed — stopping`);
         break;
@@ -437,6 +444,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
             error: `container ${containerName} is not running`,
             infraUnavailable: true,
           });
+          opts.onGateResult?.(results[results.length - 1]!);
           if (required) break;
           continue;
         }
@@ -449,6 +457,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
           error: 'docker daemon unreachable',
           infraUnavailable: true,
         });
+        opts.onGateResult?.(results[results.length - 1]!);
         if (required) break;
         continue;
       }
@@ -515,6 +524,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         output: passOutput,
         durationMs,
       });
+      opts.onGateResult?.(results[results.length - 1]!);
     } else {
       const error: any = lastError;
       const durationMs = Date.now() - startTime;
@@ -529,6 +539,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         durationMs,
         error: error.message?.slice(0, 500),
       });
+      opts.onGateResult?.(results[results.length - 1]!);
 
       if (required) {
         console.log(`[quality-gate] ✗ Required gate "${name}" failed — stopping`);

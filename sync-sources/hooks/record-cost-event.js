@@ -6,16 +6,17 @@ import { dirname, join, resolve, sep } from "path";
 import { homedir, totalmem } from "os";
 import { fileURLToPath } from "url";
 import * as NFS from "node:fs";
-import { appendFileSync as appendFileSync$1, existsSync as existsSync$1, mkdirSync as mkdirSync$1, readFileSync as readFileSync$1, renameSync, writeFileSync as writeFileSync$1 } from "node:fs";
+import { appendFileSync as appendFileSync$1, closeSync as closeSync$1, existsSync as existsSync$1, fsyncSync, mkdirSync as mkdirSync$1, openSync as openSync$1, readFileSync as readFileSync$1, renameSync, rmSync, writeFileSync as writeFileSync$1 } from "node:fs";
 import * as Path from "node:path";
 import { basename, dirname as dirname$1, isAbsolute, join as join$1, resolve as resolve$1 } from "node:path";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import * as OS from "node:os";
+import { hostname } from "node:os";
 import * as NodeChildProcess from "node:child_process";
 import { execFile as execFile$1 } from "node:child_process";
 import * as Crypto from "node:crypto";
 import * as NodeUrl from "node:url";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir as mkdir$1, writeFile as writeFile$1 } from "fs/promises";
 import { promisify } from "node:util";
 import { promisify as promisify$1 } from "util";
 //#region \0rolldown/runtime.js
@@ -2907,7 +2908,7 @@ const isNone = isNone$1;
 * @category Pattern matching
 * @since 2.0.0
 */
-const match$1 = /* @__PURE__ */ dual(2, (self, { onNone, onSome }) => isNone(self) ? onNone() : onSome(self.value));
+const match$3 = /* @__PURE__ */ dual(2, (self, { onNone, onSome }) => isNone(self) ? onNone() : onSome(self.value));
 /**
 * Extracts the value from a `Some`, or evaluates a fallback thunk on `None`.
 *
@@ -4552,7 +4553,7 @@ const weeks = (weeks) => make$7(weeks * 6048e5);
 * @category getters
 * @since 2.0.0
 */
-const toMillis = (self) => match(fromInputUnsafe(self), {
+const toMillis = (self) => match$2(fromInputUnsafe(self), {
 	onMillis: identity,
 	onNanos: (nanos) => Number(nanos) / 1e6,
 	onInfinity: () => Infinity,
@@ -4615,7 +4616,7 @@ const toNanosUnsafe = (input) => {
 * @category pattern matching
 * @since 2.0.0
 */
-const match = /* @__PURE__ */ dual(2, (self, options) => {
+const match$2 = /* @__PURE__ */ dual(2, (self, options) => {
 	switch (self.value._tag) {
 		case "Millis": return options.onMillis(self.value.millis);
 		case "Nanos": return options.onNanos(self.value.nanos);
@@ -5726,6 +5727,11 @@ const matchEffect$2 = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffec
 	onSuccess: options.onSuccess
 }));
 /** @internal */
+const match$1 = /* @__PURE__ */ dual(2, (self, options) => matchEffect$2(self, {
+	onFailure: (error) => sync$1(() => options.onFailure(error)),
+	onSuccess: (value) => sync$1(() => options.onSuccess(value))
+}));
+/** @internal */
 const exit = (self) => effectIsExit(self) ? exitSucceed(self) : exitPrimitive(self);
 const exitPrimitive = /* @__PURE__ */ makePrimitive({
 	op: "Exit",
@@ -5742,6 +5748,11 @@ const exitPrimitive = /* @__PURE__ */ makePrimitive({
 });
 /** @internal */
 const timeoutOrElse$1 = /* @__PURE__ */ dual(2, (self, options) => raceFirst$1(self, flatMap$1(sleep(options.duration), options.orElse)));
+/** @internal */
+const timeout$1 = /* @__PURE__ */ dual(2, (self, duration) => timeoutOrElse$1(self, {
+	duration,
+	orElse: () => fail$3(new TimeoutError())
+}));
 /** @internal */
 const ScopeTypeId = "~effect/Scope";
 /** @internal */
@@ -6097,6 +6108,26 @@ const runForkWith = (context) => (effect, options) => {
 /** @internal */
 const runFork$1 = /* @__PURE__ */ runForkWith(/* @__PURE__ */ empty$2());
 /** @internal */
+const runPromiseExitWith = (context) => {
+	const runFork = runForkWith(context);
+	return (effect, options) => {
+		const fiber = runFork(effect, options);
+		return new Promise((resolve) => {
+			fiber.addObserver((exit) => resolve(exit));
+		});
+	};
+};
+/** @internal */
+const runPromiseWith = (context) => {
+	const runPromiseExit = runPromiseExitWith(context);
+	return (effect, options) => runPromiseExit(effect, options).then((exit) => {
+		if (exit._tag === "Failure") throw causeSquash(exit.cause);
+		return exit.value;
+	});
+};
+/** @internal */
+const runPromise$1 = /* @__PURE__ */ runPromiseWith(/* @__PURE__ */ empty$2());
+/** @internal */
 const runSyncExitWith = (context) => {
 	const runFork = runForkWith(context);
 	return (effect) => {
@@ -6207,7 +6238,15 @@ const processOrPerformanceNow = /* @__PURE__ */ function() {
 const clockWith = (f) => withFiber((fiber) => f(fiber.getRef(ClockRef)));
 /** @internal */
 const sleep = (duration) => clockWith((clock) => clock.sleep(fromInputUnsafe(duration)));
-TaggedError$1("TimeoutError");
+/** @internal */
+const TimeoutErrorTypeId = "~effect/Cause/TimeoutError";
+/** @internal */
+var TimeoutError = class extends TaggedError$1("TimeoutError") {
+	[TimeoutErrorTypeId] = TimeoutErrorTypeId;
+	constructor(message) {
+		super({ message });
+	}
+};
 TaggedError$1("IllegalArgumentError");
 TaggedError$1("ExceededCapacityError");
 /** @internal */
@@ -6463,6 +6502,46 @@ const tracerLogger = /* @__PURE__ */ loggerMake(({ cause, fiber, logLevel, messa
 * @since 2.0.0
 */
 const fail$2 = causeFail;
+/**
+* Collapses a `Cause` into a single `unknown` value, picking the "most
+* important" failure in this order:
+*
+* **When to use**
+*
+* Use to collapse a structured cause to the single value that synchronous and
+* promise runners would throw.
+*
+* **Details**
+*
+* 1. First `Fail` error (the `E` value)
+* 2. First `Die` defect
+* 3. A generic `Error("All fibers interrupted without error")` for interrupt-only causes
+* 4. A generic `Error("Empty cause")` for `empty`
+*
+* This is the function used by `Effect.runPromise` and `Effect.runSync` to
+* decide what to throw.
+*
+* **Gotchas**
+*
+* This function is lossy. Use {@link prettyErrors} or iterate `cause.reasons`
+* when you need all failures.
+*
+* **Example** (squashing a cause)
+*
+* ```ts
+* import { Cause } from "effect"
+*
+* console.log(Cause.squash(Cause.fail("error")))    // "error"
+* console.log(Cause.squash(Cause.die("defect")))    // "defect"
+* ```
+*
+* @see {@link prettyErrors} — non-lossy conversion to `Array<Error>`
+* @see {@link pretty} — human-readable string rendering
+*
+* @category destructors
+* @since 2.0.0
+*/
+const squash = causeSquash;
 /**
 * Returns a `Result` whose success value is the first typed error value `E`
 * from a `Fail` reason in the cause. If the cause has no `Fail` reason,
@@ -6926,7 +7005,7 @@ const makeUnsafe$1 = scopeMakeUnsafe;
 * @category combinators
 * @since 4.0.0
 */
-const provide$1 = provideScope;
+const provide$3 = provideScope;
 /**
 * Registers a finalizer effect on a scope.
 *
@@ -7193,9 +7272,124 @@ var MemoMapImpl = class {
 * @since 4.0.0
 */
 const makeMemoMapUnsafe = () => new MemoMapImpl();
-(class extends Service()("effect/Layer/CurrentMemoMap") {
+/**
+* Context service for the current `MemoMap` used in layer construction.
+*
+* **When to use**
+*
+* Use when building custom layer operations that need to access the current
+* memoization map from the fiber context.
+*
+* **Details**
+*
+* This service wraps a `MemoMap` as a `Context.Service`, making it available
+* for dependency injection during layer construction.
+*
+* @see {@link MemoMap} the memoization map type wrapped by this service
+*
+* @category models
+* @since 3.13.0
+*/
+var CurrentMemoMap = class extends Service()("effect/Layer/CurrentMemoMap") {
 	static getOrCreate = /* @__PURE__ */ getOrElse(this, makeMemoMapUnsafe);
-});
+};
+/**
+* Builds a layer into an `Effect` value, using the specified `MemoMap` to memoize
+* the layer construction.
+*
+* **Example** (Building layers with an explicit memo map)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* class Logger extends Context.Service<Logger, {
+*   readonly log: (msg: string) => Effect.Effect<void>
+* }>()("Logger") {}
+*
+* // Build layers with explicit memoization control
+* const program = Effect.gen(function*() {
+*   const memoMap = yield* Layer.makeMemoMap
+*   const scope = yield* Effect.scope
+*
+*   // Build database layer with memoization
+*   const dbLayer = Layer.succeed(Database, {
+*     query: Effect.fn("Database.query")((sql: string) => Effect.succeed("result"))
+*   })
+*   const dbContext = yield* Layer.buildWithMemoMap(dbLayer, memoMap, scope)
+*
+*   // Build logger layer with same memoization (reuses memo if same layer)
+*   const loggerLayer = Layer.succeed(Logger, {
+*     log: Effect.fn("Logger.log")((msg: string) => Effect.sync(() => console.log(msg)))
+*   })
+*   const loggerContext = yield* Layer.buildWithMemoMap(
+*     loggerLayer,
+*     memoMap,
+*     scope
+*   )
+*
+*   return {
+*     database: Context.get(dbContext, Database),
+*     logger: Context.get(loggerContext, Logger)
+*   }
+* })
+* ```
+*
+* @category memo map
+* @since 2.0.0
+*/
+const buildWithMemoMap = /* @__PURE__ */ dual(3, (self, memoMap, scope) => provideService(map$4(self.build(memoMap, scope), add(CurrentMemoMap, memoMap)), CurrentMemoMap, memoMap));
+/**
+* Builds a layer using an explicit scope.
+*
+* **When to use**
+*
+* Use to control the lifetime of layer resources with a scope supplied by the
+* caller.
+*
+* **Details**
+*
+* Resources created by the layer are released when the supplied scope is
+* closed, unless a resource extends its own scope.
+*
+* **Example** (Building a layer with an explicit scope)
+*
+* ```ts
+* import { Context, Effect, Layer, Scope } from "effect"
+*
+* class Database extends Context.Service<Database, {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }>()("Database") {}
+*
+* // Build a layer with explicit scope control
+* const program = Effect.gen(function*() {
+*   const scope = yield* Effect.scope
+*
+*   const dbLayer = Layer.effect(Database, Effect.gen(function*() {
+*     console.log("Initializing database...")
+*     yield* Scope.addFinalizer(
+*       scope,
+*       Effect.sync(() => console.log("Database closed"))
+*     )
+*     return { query: Effect.fn("Database.query")((sql: string) => Effect.succeed(`Result: ${sql}`)) }
+*   }))
+*
+*   // Build with specific scope - resources tied to this scope
+*   const context = yield* Layer.buildWithScope(dbLayer, scope)
+*   const database = Context.get(context, Database)
+*
+*   return yield* database.query("SELECT * FROM users")
+*   // Database will be closed when scope is closed
+* })
+* ```
+*
+* @category destructors
+* @since 2.0.0
+*/
+const buildWithScope = /* @__PURE__ */ dual(2, (self, scope) => withFiber((fiber) => buildWithMemoMap(self, CurrentMemoMap.getOrCreate(fiber.context), scope)));
 /**
 * Constructs a layer that provides a single service from an already available
 * value.
@@ -7353,7 +7547,7 @@ const effectImpl = (service, effect) => effectContext(map$4(effect, (value) => m
 * @category constructors
 * @since 2.0.0
 */
-const effectContext = (effect) => fromBuildMemo((_, scope) => provide$1(effect, scope));
+const effectContext = (effect) => fromBuildMemo((_, scope) => provide$3(effect, scope));
 const mergeAllEffect = (layers, memoMap, scope) => {
 	const parentScope = forkUnsafe(scope, "parallel");
 	return forEach$2(layers, (layer) => layer.build(memoMap, forkUnsafe(parentScope, "sequential")), { concurrency: layers.length }).pipe(map$4((context) => mergeAll$1(...context)));
@@ -7483,7 +7677,7 @@ const provideWith = (self, that, f) => fromBuild((memoMap, scope) => flatMap$1(A
 * @category utils
 * @since 2.0.0
 */
-const provide = /* @__PURE__ */ dual(2, (self, that) => provideWith(self, that, identity));
+const provide$2 = /* @__PURE__ */ dual(2, (self, that) => provideWith(self, that, identity));
 /**
 * Provides a base class for yieldable errors.
 *
@@ -7739,6 +7933,11 @@ const matchEffect$1 = /* @__PURE__ */ dual(2, (self, options) => matchCauseEffec
 		return !isFailure(halt) ? options.onDone(halt.success.value) : options.onFailure(halt.failure);
 	}
 }));
+//#endregion
+//#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/layer.js
+const provideLayer = (self, layer, options) => scopedWith$1((scope) => flatMap$1(options?.local ? buildWithMemoMap(layer, makeMemoMapUnsafe(), scope) : buildWithScope(layer, scope), (context) => provideContext(self, context)));
+/** @internal */
+const provide$1 = /* @__PURE__ */ dual((args) => isEffect(args[0]), (self, source, options) => isContext(source) ? provideContext(self, source) : provideLayer(self, Array.isArray(source) ? mergeAll(...source) : source, options));
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Effect.js
 /**
@@ -8755,6 +8954,65 @@ const orDie = orDie$1;
 */
 const ignore = ignore$1;
 /**
+* Adds a time limit to an effect, triggering a timeout if the effect exceeds
+* the duration.
+*
+* **When to use**
+*
+* Use when exceeding the time limit should be represented as a typed
+* failure. Use `timeoutOption` when a timeout should become `Option.none`, and
+* `timeoutOrElse` when you want to run a fallback effect.
+*
+* **Details**
+*
+* The `timeout` function allows you to specify a time limit for an
+* effect's execution. If the effect does not complete within the given time, a
+* `TimeoutException` is raised. This can be useful for controlling how long
+* your program waits for a task to finish, ensuring that it doesn't hang
+* indefinitely if the task takes too long.
+*
+* **Gotchas**
+*
+* If the timeout wins, the source effect is interrupted.
+*
+* **Example** (Failing when work takes too long)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* const task = Effect.gen(function*() {
+*   console.log("Start processing...")
+*   yield* Effect.sleep("2 seconds") // Simulates a delay in processing
+*   console.log("Processing complete.")
+*   return "Result"
+* })
+*
+* // Output will show a TimeoutException as the task takes longer
+* // than the specified timeout duration
+* const timedEffect = task.pipe(Effect.timeout("1 second"))
+*
+* Effect.runPromiseExit(timedEffect).then(console.log)
+* // Output:
+* // Start processing...
+* // {
+* //   _id: 'Exit',
+* //   _tag: 'Failure',
+* //   cause: {
+* //     _id: 'Cause',
+* //     _tag: 'Fail',
+* //     failure: { _tag: 'TimeoutException' }
+* //   }
+* // }
+* ```
+*
+* @see {@link timeoutOption} for returning `Option.none` on timeout.
+* @see {@link timeoutOrElse} for a version that allows specifying both success and timeout handlers.
+*
+* @category delays & timeouts
+* @since 2.0.0
+*/
+const timeout = timeout$1;
+/**
 * Applies a timeout to an effect, with a fallback effect executed if the timeout is reached.
 *
 * **When to use**
@@ -8841,6 +9099,59 @@ const timeoutOrElse = timeoutOrElse$1;
 */
 const raceFirst = raceFirst$1;
 /**
+* Handles both success and failure cases of an effect without performing side
+* effects.
+*
+* **When to use**
+*
+* Use when this is useful for structuring your code to respond differently to success or
+* failure without triggering side effects.
+*
+* **Details**
+*
+* `match` lets you define custom handlers for both success and failure
+* scenarios. You provide separate functions to handle each case, allowing you
+* to process the result if the effect succeeds, or handle the error if the
+* effect fails.
+*
+* **Example** (Matching success and failure values)
+*
+* ```ts
+* import { Data, Effect } from "effect"
+*
+* class ExampleError extends Data.TaggedError("ExampleError")<{ readonly message: string }> {}
+*
+* const success: Effect.Effect<number, ExampleError> = Effect.succeed(42)
+*
+* const program1 = Effect.match(success, {
+*   onFailure: (error) => `failure: ${error.message}`,
+*   onSuccess: (value) => `success: ${value}`
+* })
+*
+* // Run and log the result of the successful effect
+* Effect.runPromise(program1).then(console.log)
+* // Output: "success: 42"
+*
+* const failure: Effect.Effect<number, ExampleError> = Effect.fail(
+*   new ExampleError({ message: "Uh oh!" })
+* )
+*
+* const program2 = Effect.match(failure, {
+*   onFailure: (error) => `failure: ${error.message}`,
+*   onSuccess: (value) => `success: ${value}`
+* })
+*
+* // Run and log the result of the failed effect
+* Effect.runPromise(program2).then(console.log)
+* // Output: "failure: Uh oh!"
+* ```
+*
+* @see {@link matchEffect} if you need to perform side effects in the handlers.
+* @category pattern matching
+* @since 2.0.0
+*/
+const match = match$1;
+/**
 * Handles both success and failure by running effectful handlers.
 *
 * **When to use**
@@ -8900,6 +9211,41 @@ const raceFirst = raceFirst$1;
 * @since 2.0.0
 */
 const matchEffect = matchEffect$2;
+/**
+* Provides dependencies to an effect using layers or a context. Use `options.local`
+* to build the layer every time; by default, layers are shared between provide
+* calls.
+*
+* **Example** (Providing dependencies with a layer)
+*
+* ```ts
+* import { Context, Effect, Layer } from "effect"
+*
+* interface Database {
+*   readonly query: (sql: string) => Effect.Effect<string>
+* }
+*
+* const Database = Context.Service<Database>("Database")
+*
+* const DatabaseLive = Layer.succeed(Database)({
+*   query: Effect.fn("Database.query")((sql: string) => Effect.succeed(`Result for: ${sql}`))
+* })
+*
+* const program = Effect.gen(function*() {
+*   const db = yield* Database
+*   return yield* db.query("SELECT * FROM users")
+* })
+*
+* const provided = Effect.provide(program, DatabaseLive)
+*
+* Effect.runPromise(provided).then(console.log)
+* // Output: "Result for: SELECT * FROM users"
+* ```
+*
+* @category environment
+* @since 2.0.0
+*/
+const provide = provide$1;
 /**
 * Optionally accesses a service from the environment.
 *
@@ -9268,6 +9614,43 @@ const forkScoped = forkScoped$1;
 * @since 2.0.0
 */
 const runFork = runFork$1;
+/**
+* Executes an effect and returns the result as a `Promise`.
+*
+* **When to use**
+*
+* Use when you need to execute an effect and work with the
+* result using `Promise` syntax, typically for compatibility with other
+* promise-based code.
+*
+* If the effect succeeds, the promise will resolve with the result. If the
+* effect fails, the promise will reject with an error.
+*
+* **Example** (Running a successful effect as a Promise)
+*
+* ```ts
+* import { Effect } from "effect"
+*
+* Effect.runPromise(Effect.succeed(1)).then(console.log)
+* // Output: 1
+* ```
+*
+* **Example** (Running effects as promises)
+*
+* ```ts
+* //Example: Handling a Failing Effect as a Rejected Promise
+* import { Effect } from "effect"
+*
+* Effect.runPromise(Effect.fail("my error")).catch(console.error)
+* // Output:
+* // (FiberFailure) Error: my error
+* ```
+*
+* @see {@link runPromiseExit} for a version that returns an `Exit` type instead of rejecting.
+* @category running effects
+* @since 2.0.0
+*/
+const runPromise = runPromise$1;
 /**
 * Executes an effect synchronously and returns its success value.
 *
@@ -10734,7 +11117,7 @@ const toTransform = (channel) => channel.transform;
 const asyncQueue = (scope, f, options) => make$4({
 	capacity: options?.bufferSize,
 	strategy: options?.strategy
-}).pipe(tap((queue) => addFinalizer(scope, shutdown(queue))), tap((queue) => forkIn(provide$1(f(queue), scope), scope)));
+}).pipe(tap((queue) => addFinalizer(scope, shutdown(queue))), tap((queue) => forkIn(provide$3(f(queue), scope), scope)));
 /**
 * Creates a `Channel` that interacts with a callback function using a queue, emitting arrays.
 *
@@ -11101,7 +11484,7 @@ const unwrap$2 = (channel) => fromTransform$1((upstream, scope) => {
 	let pull;
 	return succeed(suspend$2(() => {
 		if (pull) return pull;
-		return channel.pipe(provide$1(scope), flatMap((channel) => toTransform(channel)(upstream, scope)), flatMap((pull_) => pull = pull_));
+		return channel.pipe(provide$3(scope), flatMap((channel) => toTransform(channel)(upstream, scope)), flatMap((pull_) => pull = pull_));
 	}));
 });
 const runWith = (self, f, onHalt) => suspend$2(() => {
@@ -11132,7 +11515,7 @@ const runWith = (self, f, onHalt) => suspend$2(() => {
 * @category execution
 * @since 4.0.0
 */
-const runFold = /* @__PURE__ */ dual(3, (self, initial, f) => suspend$2(() => {
+const runFold$1 = /* @__PURE__ */ dual(3, (self, initial, f) => suspend$2(() => {
 	let state = initial();
 	return runWith(self, (pull) => whileLoop({
 		while: constTrue,
@@ -12103,10 +12486,38 @@ const run = /* @__PURE__ */ dual(2, (self, sink) => scopedWith((scope) => toPull
 * @category destructors
 * @since 2.0.0
 */
-const runCollect = (self) => runFold(self.channel, () => [], (acc, chunk) => {
+const runCollect = (self) => runFold$1(self.channel, () => [], (acc, chunk) => {
 	for (let i = 0; i < chunk.length; i++) acc.push(chunk[i]);
 	return acc;
 });
+/**
+* Runs the stream and folds elements using a pure reducer.
+*
+* **Example** (Folding stream values)
+*
+* ```ts
+* import { Console, Effect, Stream } from "effect"
+*
+* const program = Effect.gen(function*() {
+*   const total = yield* Stream.runFold(
+*     Stream.make(1, 2, 3),
+*     () => 0,
+*     (acc, n) => acc + n
+*   )
+*   yield* Console.log(total)
+* })
+*
+* Effect.runPromise(program)
+* // 6
+* ```
+*
+* @category destructors
+* @since 2.0.0
+*/
+const runFold = /* @__PURE__ */ dual(3, (self, initial, f) => runFold$1(self.channel, initial, (acc, arr) => {
+	for (let i = 0; i < arr.length; i++) acc = f(acc, arr[i]);
+	return acc;
+}));
 /**
 * Concatenates all emitted strings into a single string.
 *
@@ -12128,7 +12539,7 @@ const runCollect = (self) => runFold(self.channel, () => [], (acc, chunk) => {
 * @category destructors
 * @since 2.0.0
 */
-const mkString = (self) => runFold(self.channel, () => "", (acc, chunk) => acc + chunk.join(""));
+const mkString = (self) => runFold$1(self.channel, () => "", (acc, chunk) => acc + chunk.join(""));
 //#endregion
 //#region ../../node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/FileSystem.js
 /**
@@ -12317,7 +12728,7 @@ const make$3 = (impl) => FileSystem.of({
 		return fromPull(succeed(flatMap(suspend$2(() => {
 			if (bytesToRead !== void 0 && bytesToRead <= totalBytesRead) return done$1();
 			return bytesToRead !== void 0 && bytesToRead - totalBytesRead < chunkSize ? file.readAlloc(bytesToRead - totalBytesRead) : readChunk;
-		}), match$1({
+		}), match$3({
 			onNone: () => done$1(),
 			onSome: (buf) => {
 				totalBytesRead += BigInt(buf.length);
@@ -12563,6 +12974,7 @@ join(OVERDECK_HOME, "certs");
 join(CONFIG_DIR, "config.toml");
 join(CONFIG_DIR, "settings.json");
 const CLAUDE_DIR = join(homedir(), ".claude");
+join(homedir(), ".agents", "skills");
 join(homedir(), ".codex"), join(homedir(), ".cursor"), join(homedir(), ".gemini"), join(homedir(), ".opencode");
 join(CLAUDE_DIR, "skills"), join(CLAUDE_DIR, "commands"), join(CLAUDE_DIR, "agents");
 join(join(OVERDECK_HOME, "templates"), "claude-md", "sections");
@@ -12607,7 +13019,8 @@ TaggedError("VcsError");
 TaggedError("VcsTimeoutError");
 TaggedError("FsError");
 TaggedError("FsNotFoundError");
-TaggedError("GitError");
+/** A git command exited with a non-zero code. */
+var GitError = class extends TaggedError("GitError") {};
 TaggedError("MergeConflictError");
 /** A tmux command failed. */
 var TmuxError = class extends TaggedError("TmuxError") {};
@@ -18417,7 +18830,7 @@ const makeTempFileFactory = (method) => {
 		const directory = yield* makeDirectory(options);
 		const random = Crypto.randomBytes(6).toString("hex");
 		const name = Path.join(directory, options?.suffix ? `${random}${options.suffix}` : random);
-		yield* writeFile$1(name, new Uint8Array(0));
+		yield* writeFile$2(name, new Uint8Array(0));
 		return name;
 	});
 };
@@ -18524,7 +18937,7 @@ const watchNode = (path) => callback((queue) => acquireRelease(sync(() => {
 	return watcher;
 }), (watcher) => sync(() => watcher.close())));
 const watch = (backend, path) => stat$1(path).pipe(map$3((stat) => backend.pipe(flatMap$2((_) => _.register(path, stat)), getOrElse$1(() => watchNode(path)))), unwrap);
-const writeFile$1 = (path, data, options) => callback$1((resume, signal) => {
+const writeFile$2 = (path, data, options) => callback$1((resume, signal) => {
 	try {
 		NFS.writeFile(path, data, {
 			signal,
@@ -18564,7 +18977,7 @@ const makeFileSystem = /* @__PURE__ */ map$3(/* @__PURE__ */ serviceOption(Watch
 	watch(path) {
 		return watch(backend, path);
 	},
-	writeFile: writeFile$1
+	writeFile: writeFile$2
 }));
 //#endregion
 //#region ../../node_modules/.bun/@effect+platform-node@4.0.0-beta.73/node_modules/@effect/platform-node/dist/NodeFileSystem.js
@@ -25395,6 +25808,20 @@ function listProjectsSync() {
 	}));
 }
 /**
+* Find project by workspace path.
+* Matches any project whose root path is an ancestor of the given path.
+* Used to resolve the tracker (GitHub/GitLab) from a workspace directory.
+*/
+function findProjectByPathSync(workspacePath) {
+	const config = loadProjectsConfigSync();
+	const normalizedTarget = resolve(workspacePath);
+	for (const [, projectConfig] of Object.entries(config.projects)) {
+		const normalizedProject = resolve(projectConfig.path);
+		if (normalizedTarget === normalizedProject || normalizedTarget.startsWith(normalizedProject + "/")) return projectConfig;
+	}
+	return null;
+}
+/**
 * Resolve the correct project path for an issue based on labels
 *
 * @param project - The project config
@@ -25499,10 +25926,11 @@ function resolveProjectFromIssueSync(issueId, labels = []) {
 function projectKey(project, explicit) {
 	if (explicit) return explicit;
 	const projectPath = resolve$1(project.path);
-	return listProjectsSync().find(({ config }) => resolve$1(config.path) === projectPath)?.key ?? basename(projectPath);
+	return (listProjectsSync() ?? []).find(({ config }) => resolve$1(config.path) === projectPath)?.key ?? basename(projectPath);
 }
 //#endregion
 //#region ../../src/lib/state-read-home.ts
+const STATE_BRANCH = "overdeck-state";
 function validMarker(value) {
 	if (!value || typeof value !== "object") return false;
 	const marker = value;
@@ -25528,17 +25956,448 @@ function resolveStateReadHomeSync(project, projectKey$1) {
 		};
 	}
 }
-promisify(execFile$1);
-layer$4.pipe(provide(mergeAll(layer$2, layer)));
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 0;
-parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
-function parseStateFlushWindowMs(value) {
-	if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+//#endregion
+//#region ../../src/lib/state-migration-lock.ts
+function stateMigrationLockPath(projectKey) {
+	return join$1(getOverdeckHome(), "locks", "state-migration", `${projectKey}.lock`);
+}
+function isStateMigrationLocked(projectKey) {
+	try {
+		closeSync$1(openSync$1(stateMigrationLockPath(projectKey), "wx"));
+		rmSync(stateMigrationLockPath(projectKey));
+		return false;
+	} catch {
+		return true;
+	}
+}
+//#endregion
+//#region ../../src/lib/state-plane.ts
+const execFileAsync$1 = promisify(execFile$1);
+const STATE_PLANE_PATHS = [
+	".pan/records/",
+	".pan/continues/",
+	".pan/continue.json",
+	".pan/specs/",
+	".pan/test/",
+	".pan/review/",
+	".pan/feedback/"
+];
+function isStatePlanePath(relativePath) {
+	const normalized = relativePath.trim().replace(/\\/g, "/");
+	return STATE_PLANE_PATHS.some((statePath) => {
+		if (statePath.endsWith("/")) return normalized === statePath.slice(0, -1) || normalized.startsWith(statePath);
+		return normalized === statePath;
+	});
+}
+async function isStatePlaneOnlyDiff(baseSha, tipSha, repoRoot) {
+	const { stdout } = await execFileAsync$1("git", [
+		"diff",
+		"--name-only",
+		baseSha,
+		tipSha
+	], {
+		cwd: repoRoot,
+		encoding: "utf-8"
+	});
+	return stdout.split("\n").map((line) => line.trim()).filter(Boolean).every(isStatePlanePath);
+}
+//#endregion
+//#region ../../src/lib/pan-dir/auto-commit.ts
+/**
+* Auto-commit helper for operational state files (.pan/, .beads/).
+*
+* Background: planning and work agents continuously write to .pan/continues/,
+* .pan/specs/, .pan/drafts/, and .beads/issues.jsonl on the project root.
+* Without this helper those writes accumulate uncommitted on `main`, requiring
+* periodic manual "chore: sync workspace state" passes from the operator and
+* making the project repo stay perpetually dirty.
+*
+* This module exposes a serialized write-through commit primitive that pan-dir
+* writers call after they update a file. Commits are:
+*   - scheduled on the next event-loop turn so every state update reaches git + origin
+*   - serialized within a process so the git index is never contested
+*   - best-effort for synchronous callers: failures are logged and reported by flushes
+*   - main-only: feature branches have their own commit cadence owned by agents
+*
+* Cross-machine concern: when an agent's state is canonical on `main`, moving
+* the agent between machines becomes "stop on A, pull on B, resume on B." The
+* sync-state-via-commit shape this helper produces is the substrate for that.
+*/
+const spawnerLayer = layer$4.pipe(provide$2(mergeAll(layer$2, layer)));
+const DEFAULT_STATE_PUSH_TIMEOUT_MS = 3e4;
+function parsePositiveInteger(value, fallback) {
+	if (!value) return fallback;
 	const parsed = Number(value);
-	if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
+	if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
 	return parsed;
 }
-Promise.resolve();
+/**
+* Paths that must never enter a pipeline auto-commit, regardless of gitignore
+* state. Mirrors the exclusion list in src/lib/cloister/merge-agent.ts.
+*/
+const AUTO_COMMIT_EXCLUDED_PATHS = [
+	".pan/kickoff.md",
+	".pan/continue.json",
+	".pan/handoff-*.md",
+	".pan/spec.vbrief.json",
+	".claude/rules/",
+	".claude/skills/"
+];
+function isAutoCommitExcludedPath(relativePath) {
+	const normalized = relativePath.replace(/\\/g, "/");
+	for (const pattern of AUTO_COMMIT_EXCLUDED_PATHS) if (pattern.endsWith("/")) {
+		if (normalized.startsWith(pattern) || normalized === pattern.slice(0, -1)) return true;
+	} else if (pattern.includes("*")) {
+		if (new RegExp("^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^/]*") + "$").test(normalized)) return true;
+	} else if (normalized === pattern) return true;
+	return false;
+}
+const pending = /* @__PURE__ */ new Map();
+let serializer = Promise.resolve();
+/** Run a git subcommand. Fails with GitError on non-zero exit. */
+function runGit(args, cwd) {
+	return gen(function* () {
+		const handle = yield* make$1("git", [...args], { cwd });
+		const stdoutBuf = yield* runFold(handle.stdout, () => Buffer.alloc(0), (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]));
+		const stderrBuf = yield* runFold(handle.stderr, () => Buffer.alloc(0), (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]));
+		const exitCode = yield* handle.exitCode;
+		if (exitCode !== 0) return yield* fail(new GitError({
+			command: ["git", ...args],
+			stderr: stderrBuf.toString("utf-8"),
+			exitCode
+		}));
+		return {
+			stdout: stdoutBuf.toString("utf-8"),
+			stderr: stderrBuf.toString("utf-8"),
+			exitCode
+		};
+	}).pipe(scoped, provide(spawnerLayer), catchCause((cause) => fail(causeToGitError(cause, args))));
+}
+function runGitWithTimeout(args, cwd, timeoutMs) {
+	return runGit(args, cwd).pipe(timeout(millis(timeoutMs)), catchCause((cause) => fail(causeToGitError(cause, args))));
+}
+function causeToGitError(cause, args) {
+	const squashed = squash(cause);
+	if (isGitError(squashed)) return squashed;
+	return new GitError({
+		command: ["git", ...args],
+		stderr: String(squashed),
+		exitCode: -1,
+		cause
+	});
+}
+function isGitError(value) {
+	return typeof value === "object" && value !== null && "_tag" in value && value._tag === "GitError";
+}
+/**
+* Queue an auto-commit for one or more files. Returns immediately; the
+* serialized commit-and-push starts on the next timer turn. Callers whose
+* success depends on remote durability must also await flushAutoCommits().
+*
+* PAN-1908: `repoRoot` allows committing files to a different git checkout
+* than the project root (e.g., a declared infra repo for per-issue permanent
+* records). When omitted, commits go to `projectRoot` as before.
+*/
+function queueAutoCommit(opts) {
+	const { projectRoot, paths, subject } = opts;
+	let { repoRoot } = opts;
+	if (paths.length === 0) return;
+	let expectedBranch = "main";
+	if (repoRoot && existsSync(join(repoRoot, "migration-complete.json"))) expectedBranch = STATE_BRANCH;
+	const project = findProjectByPathSync(projectRoot);
+	if (project) {
+		const key = listProjectsSync().find(({ config }) => config.path === project.path)?.key;
+		if (key && isStateMigrationLocked(key)) {
+			console.warn(`[pan-dir/auto-commit] refusing state write while migration lock is held for ${key}`);
+			return;
+		}
+		const stateHome = resolveStateReadHomeSync(project);
+		if (stateHome.migrated) {
+			repoRoot = stateHome.root;
+			expectedBranch = STATE_BRANCH;
+		}
+	}
+	const existing = pending.get(projectRoot);
+	if (existing) {
+		paths.forEach((p) => existing.paths.add(p));
+		existing.subjects.push(subject);
+		existing.repoRoot ??= repoRoot;
+		if (expectedBranch === "overdeck-state") existing.expectedBranch = STATE_BRANCH;
+		return;
+	}
+	pending.set(projectRoot, {
+		paths: new Set(paths),
+		subjects: [subject],
+		timer: setTimeout(() => void flushInner(projectRoot), 0),
+		repoRoot,
+		expectedBranch
+	});
+}
+/**
+* Force a flush of any pending commits for `projectRoot`. Returns an Effect that
+* resolves after the commit attempt (success or no-op).
+*/
+function flushAutoCommits(projectRoot) {
+	return promise(() => flushPromise(projectRoot));
+}
+function flushPromise(projectRoot) {
+	const batch = pending.get(projectRoot);
+	if (!batch) return Promise.resolve({
+		committed: false,
+		reason: "no pending"
+	});
+	clearTimeout(batch.timer);
+	return flushInner(projectRoot);
+}
+function flushInner(projectRoot) {
+	const batch = pending.get(projectRoot);
+	if (!batch) return Promise.resolve({
+		committed: false,
+		reason: "no pending"
+	});
+	pending.delete(projectRoot);
+	const task = serializer.then(() => runPromise(doCommit(projectRoot, batch)));
+	serializer = task.catch(() => void 0);
+	return task;
+}
+function doCommit(projectRoot, batch) {
+	const gitRoot = batch.repoRoot ?? projectRoot;
+	return gen(function* () {
+		if (!existsSync(join(gitRoot, ".git"))) {
+			if (batch.expectedBranch === "overdeck-state") {
+				console.warn(`[pan-dir/auto-commit] refusing state write: state worktree is missing at ${gitRoot}`);
+				return {
+					committed: false,
+					reason: `state worktree missing: ${gitRoot}`
+				};
+			}
+			return {
+				committed: false,
+				reason: "not a git repo"
+			};
+		}
+		const branchResult = yield* runGit([
+			"rev-parse",
+			"--abbrev-ref",
+			"HEAD"
+		], gitRoot).pipe(matchEffect({
+			onSuccess: (r) => succeed(r.stdout.trim()),
+			onFailure: (err) => succeed({
+				committed: false,
+				reason: `branch check failed: ${err.stderr || err._tag}`
+			})
+		}));
+		if (typeof branchResult !== "string") return branchResult;
+		const expectedBranch = batch.expectedBranch;
+		if (branchResult !== expectedBranch) return {
+			committed: false,
+			reason: expectedBranch === "main" ? `not on main (${branchResult})` : `expected ${expectedBranch}, found ${branchResult}`
+		};
+		const branch = branchResult;
+		yield* runGit([
+			"fetch",
+			"origin",
+			expectedBranch
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => void_,
+			onFailure: () => void_
+		}));
+		const relativePaths = Array.from(batch.paths).map((p) => relativizeToRoot(p, gitRoot)).filter((p) => !isAutoCommitExcludedPath(p));
+		if (relativePaths.length === 0) return {
+			committed: false,
+			reason: "all paths excluded from auto-commit"
+		};
+		const addOk = yield* runGit([
+			"add",
+			"--",
+			...relativePaths
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => succeed(true),
+			onFailure: (err) => {
+				console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
+				return succeed({
+					committed: false,
+					reason: err.stderr || err._tag
+				});
+			}
+		}));
+		if (typeof addOk !== "boolean") return addOk;
+		if (yield* runGit([
+			"diff",
+			"--cached",
+			"--quiet",
+			"--",
+			...relativePaths
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => succeed(true),
+			onFailure: () => succeed(false)
+		}))) return {
+			committed: false,
+			reason: "no diff"
+		};
+		const commitOk = yield* runGit([
+			"commit",
+			"-m",
+			batch.subjects.length === 1 ? batch.subjects[0] : `chore(state): batch update ${relativePaths.length} pan/beads file(s)`,
+			"--",
+			...relativePaths
+		], gitRoot).pipe(matchEffect({
+			onSuccess: () => succeed(true),
+			onFailure: (err) => {
+				console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
+				return succeed({
+					committed: false,
+					reason: err.stderr || err._tag
+				});
+			}
+		}));
+		if (typeof commitOk !== "boolean") return commitOk;
+		const push = yield* maybePushStateCommit(gitRoot, branch);
+		if (push && !push.pushed) return {
+			committed: true,
+			pushed: false,
+			reason: push.reason
+		};
+		return {
+			committed: true,
+			pushed: push?.pushed
+		};
+	});
+}
+function maybePushStateCommit(gitRoot, branch) {
+	return runGit([
+		"remote",
+		"get-url",
+		"origin"
+	], gitRoot).pipe(matchEffect({
+		onFailure: () => succeed(null),
+		onSuccess: () => pushStateBranch(gitRoot, branch)
+	}));
+}
+function pushStateBranch(gitRoot, branch) {
+	if (branch === "main") return pushOriginMain(gitRoot, branch, false);
+	const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
+	return runGitWithTimeout([
+		"push",
+		"origin",
+		branch
+	], gitRoot, timeoutMs).pipe(matchEffect({
+		onSuccess: () => succeed({ pushed: true }),
+		onFailure: (err) => {
+			const message = err.stderr || err._tag;
+			warnAutoPush(branch, `push failed: ${message}`);
+			return succeed({
+				pushed: false,
+				reason: `push failed: ${message}`
+			});
+		}
+	}));
+}
+function pushOriginMain(gitRoot, branch, retry) {
+	return runGitWithTimeout([
+		"push",
+		"origin",
+		"main"
+	], gitRoot, parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS)).pipe(matchEffect({
+		onSuccess: () => succeed({ pushed: true }),
+		onFailure: (err) => {
+			const message = err.stderr || err._tag;
+			if (!retry && isNonFastForwardPushError(message)) return rebaseLegacyMainAndRetry(gitRoot, branch);
+			warnAutoPush(branch, `push failed: ${message}`);
+			return succeed({
+				pushed: false,
+				reason: `push failed: ${message}`
+			});
+		}
+	}));
+}
+function rebaseLegacyMainAndRetry(gitRoot, branch) {
+	const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
+	return gen(function* () {
+		if (!(yield* runGitWithTimeout([
+			"fetch",
+			"origin",
+			"main"
+		], gitRoot, timeoutMs).pipe(match({
+			onSuccess: () => true,
+			onFailure: () => false
+		}))) || !(yield* isWorkingTreeClean(gitRoot, branch))) return {
+			pushed: false,
+			reason: "push rejected and reconciliation preconditions failed"
+		};
+		if (!(yield* areLocalAheadCommitsStatePlaneOnly(gitRoot, branch))) {
+			warnAutoPush(branch, "non-fast-forward push rejected and at least one local-ahead commit is not state-plane-only; leaving local main ahead of origin/main");
+			return {
+				pushed: false,
+				reason: "push rejected with non-state local commits"
+			};
+		}
+		if (yield* runGitWithTimeout(["rebase", "origin/main"], gitRoot, timeoutMs).pipe(match({
+			onSuccess: () => true,
+			onFailure: () => false
+		}))) return yield* pushOriginMain(gitRoot, branch, true);
+		return {
+			pushed: false,
+			reason: "push rejected and state rebase failed"
+		};
+	});
+}
+function areLocalAheadCommitsStatePlaneOnly(gitRoot, branch) {
+	const timeoutMs = parsePositiveInteger(process.env.OVERDECK_STATE_PUSH_TIMEOUT_MS, DEFAULT_STATE_PUSH_TIMEOUT_MS);
+	return gen(function* () {
+		const commits = yield* runGitWithTimeout([
+			"rev-list",
+			"--reverse",
+			"origin/main..main"
+		], gitRoot, timeoutMs).pipe(match({
+			onSuccess: (result) => result.stdout.split("\n").map((line) => line.trim()).filter(Boolean),
+			onFailure: (err) => {
+				warnAutoPush(branch, `local-ahead commit list failed: ${err.stderr || err._tag}`);
+				return null;
+			}
+		}));
+		if (commits === null) return false;
+		for (const commit of commits) {
+			const parent = yield* runGitWithTimeout([
+				"rev-list",
+				"--parents",
+				"-n",
+				"1",
+				commit
+			], gitRoot, timeoutMs).pipe(match({
+				onSuccess: (result) => result.stdout.trim().split(/\s+/)[1] ?? null,
+				onFailure: () => null
+			}));
+			if (!parent) return false;
+			if (!(yield* promise(() => isStatePlaneOnlyDiff(parent, commit, gitRoot)).pipe(catchCause(() => succeed(false))))) return false;
+		}
+		return true;
+	});
+}
+function isWorkingTreeClean(gitRoot, branch) {
+	return runGit(["status", "--porcelain"], gitRoot).pipe(match({
+		onSuccess: (result) => {
+			const clean = result.stdout.trim().length === 0;
+			if (!clean) warnAutoPush(branch, "non-fast-forward push rejected and working tree is dirty; leaving local main ahead of origin/main");
+			return clean;
+		},
+		onFailure: (err) => {
+			warnAutoPush(branch, `working-tree cleanliness check failed: ${err.stderr || err._tag}`);
+			return false;
+		}
+	}));
+}
+function isNonFastForwardPushError(message) {
+	return /non-fast-forward|fetch first|failed to push some refs|rejected/i.test(message);
+}
+function warnAutoPush(branch, message) {
+	console.warn(`[pan-dir/auto-commit] auto-push warning for ${branch}: ${message}`);
+}
+function relativizeToRoot(absOrRel, projectRoot) {
+	const rootPrefix = projectRoot.endsWith(sep) ? projectRoot : projectRoot + sep;
+	if (absOrRel.startsWith(rootPrefix)) return absOrRel.slice(rootPrefix.length);
+	return absOrRel;
+}
 const RECORD_DIRNAME = "records";
 /** Workspace path for an issue, or null if no project is configured. */
 function getIssueWorkspacePath(issueId) {
@@ -25629,7 +26488,19 @@ function writeRecordFileAtomicSync(path, record) {
 	preserveCorruptRecordSync(path);
 	const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
 	writeFileSync$1(tmp, JSON.stringify(record, null, 2), "utf-8");
+	const tmpFd = openSync$1(tmp, "r");
+	try {
+		fsyncSync(tmpFd);
+	} finally {
+		closeSync$1(tmpFd);
+	}
 	renameSync(tmp, path);
+	const dirFd = openSync$1(dirname$1(path), "r");
+	try {
+		fsyncSync(dirFd);
+	} finally {
+		closeSync$1(dirFd);
+	}
 	JSON.parse(readFileSync$1(path, "utf-8"));
 }
 function writeIssueRecordSync(project, issueId, record) {
@@ -25654,6 +26525,190 @@ function readIssueRecordSync(project, issueId) {
 	} catch {
 		return null;
 	}
+}
+function queueIssueRecordCommit(project, issueId, recordPath) {
+	const basePath = getIssueRecordBasePath(project, issueId);
+	queueAutoCommit({
+		projectRoot: basePath,
+		repoRoot: basePath,
+		paths: [recordPath],
+		subject: `chore(records): update ${issueId.toUpperCase()} per-issue record`
+	});
+	return basePath;
+}
+/** Synchronous variant of ensureIssueRecord. */
+function ensureIssueRecordSync(project, issueId) {
+	const path = getIssueRecordPath(project, issueId);
+	try {
+		const raw = readFileSync$1(path, "utf-8");
+		return JSON.parse(raw);
+	} catch {
+		const now = (/* @__PURE__ */ new Date()).toISOString();
+		return {
+			issueId: issueId.toUpperCase(),
+			schemaVersion: 2,
+			created: now,
+			updated: now,
+			pipeline: {
+				issueId: issueId.toUpperCase(),
+				reviewStatus: "pending",
+				testStatus: "pending",
+				readyForMerge: false,
+				updatedAt: now
+			},
+			closeOut: {
+				usage: {
+					byStage: {},
+					totals: {}
+				},
+				merges: [],
+				ranOn: hostname()
+			}
+		};
+	}
+}
+//#endregion
+//#region ../../src/lib/pan-dir/fs-lock.ts
+/** Cross-process per-issue record locking (PAN-2648 CD-2). */
+const RECORD_LOCK_RETRY_DELAYS_MS = [
+	5,
+	10,
+	20,
+	40,
+	80,
+	160,
+	320,
+	360
+];
+var RecordLockError = class extends Error {
+	constructor(lockPath, owner) {
+		super(`The per-issue record lock at ${lockPath} is held by ${owner}. Retry the command after that writer finishes.`);
+		this.lockPath = lockPath;
+		this.owner = owner;
+		this.name = "RecordLockError";
+	}
+};
+function safeSegment(value) {
+	return value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-");
+}
+function recordLockPath(project, issueId) {
+	const configuredKey = listProjectsSync().find(({ config }) => config.path === project.path)?.key;
+	const projectKey = safeSegment(configuredKey ?? project.name ?? project.path) || "unknown-project";
+	return join$1(getOverdeckHome(), "locks", "records", projectKey, `${issueId.toUpperCase()}.lock`);
+}
+function isPidDead(pid) {
+	if (!pid || pid <= 0 || pid === process.pid) return false;
+	try {
+		process.kill(pid, 0);
+		return false;
+	} catch (error) {
+		return error.code === "ESRCH";
+	}
+}
+async function sweepRecordTmpFiles(recordPath) {
+	try {
+		const dir = dirname$1(recordPath);
+		const base = recordPath.slice(dir.length + 1);
+		const entries = await readdir(dir);
+		await Promise.all(entries.filter((entry) => entry.startsWith(`${base}.`) && entry.endsWith(".tmp")).map((entry) => rm(join$1(dir, entry), { force: true })));
+	} catch {}
+}
+async function readOwner(lockPath) {
+	try {
+		const owner = JSON.parse(await readFile(join$1(lockPath, "owner.json"), "utf8"));
+		return {
+			description: `${owner.writerId ?? "unknown writer"} pid=${owner.pid ?? "unknown"} acquiredAt=${owner.acquiredAt ?? "unknown"}`,
+			pid: owner.pid
+		};
+	} catch {
+		return { description: "unknown writer" };
+	}
+}
+async function acquireRecordLock(lockPath, options) {
+	await mkdir(dirname$1(lockPath), {
+		recursive: true,
+		mode: 448
+	});
+	const delays = options.retryDelaysMs ?? RECORD_LOCK_RETRY_DELAYS_MS;
+	let lastOwner = "unknown writer";
+	for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+		try {
+			await mkdir(lockPath, { mode: 448 });
+			const owner = {
+				writerId: options.writerId,
+				pid: process.pid,
+				acquiredAt: (/* @__PURE__ */ new Date()).toISOString()
+			};
+			try {
+				await writeFile(join$1(lockPath, "owner.json"), JSON.stringify(owner, null, 2), "utf8");
+			} catch (error) {
+				try {
+					await rm(lockPath, {
+						recursive: true,
+						force: true
+					});
+				} catch {}
+				throw error;
+			}
+			await sweepRecordTmpFiles(options.recordPath);
+			return owner;
+		} catch (error) {
+			if (error.code !== "EEXIST") throw error;
+			const owner = await readOwner(lockPath);
+			lastOwner = owner.description;
+			if (isPidDead(owner.pid)) {
+				await rm(lockPath, {
+					recursive: true,
+					force: true
+				});
+				continue;
+			}
+		}
+		const delay = delays[attempt];
+		if (delay === void 0) break;
+		await new Promise((resolve) => setTimeout(resolve, delay));
+	}
+	throw new RecordLockError(lockPath, lastOwner);
+}
+async function releaseRecordLock(lockPath) {
+	await rm(lockPath, {
+		recursive: true,
+		force: true
+	});
+}
+async function withRecordFsLock(project, issueId, options, operation) {
+	const lockPath = recordLockPath(project, issueId);
+	await acquireRecordLock(lockPath, options);
+	try {
+		return await operation();
+	} finally {
+		await releaseRecordLock(lockPath);
+	}
+}
+//#endregion
+//#region ../../src/lib/pan-dir/record-update.ts
+/** The single locked read-modify-write door for per-issue records. */
+async function updateIssueRecord(project, issueId, mutator, options = {}) {
+	const normalizedIssueId = issueId.toUpperCase();
+	const recordPath = getIssueRecordPath(project, normalizedIssueId);
+	const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
+	let commitRoot = null;
+	const record = await withRecordFsLock(project, normalizedIssueId, {
+		writerId,
+		recordPath
+	}, async () => {
+		const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
+		const next = await mutator(current) ?? current;
+		const path = writeIssueRecordSync(project, normalizedIssueId, next);
+		if (options.autoCommit !== false) commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
+		return readIssueRecordSync(project, normalizedIssueId) ?? next;
+	});
+	if (commitRoot) {
+		const flushed = await runPromise(flushAutoCommits(commitRoot));
+		if (flushed.pushed === false) throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? "unknown push failure"}`);
+		if (!flushed.committed && !["no diff", "no pending"].includes(flushed.reason ?? "")) throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? "unknown commit failure"}`);
+	}
+	return record;
 }
 //#endregion
 //#region ../../src/lib/config-yaml/schema.ts
@@ -27780,12 +28835,15 @@ const DEFAULT_DOCS_TRIGGER_REGEXES = [
 	"workspace",
 	"specialist",
 	"harness",
-	"bd",
-	"beads",
 	"vbrief",
 	"workhorse"
 ];
 const DEFAULT_CONFIG = {
+	swarm: {
+		mode: "off",
+		maxSlots: 3,
+		autoAdvance: true
+	},
 	tmux: { configMode: "managed" },
 	enabledProviders: new Set(["anthropic"]),
 	defaultConversationModel: "claude-sonnet-5",
@@ -28162,6 +29220,7 @@ function degradeInvalidTieredExecution(result, err) {
 function mergeConfigs(...configs) {
 	const result = {
 		...DEFAULT_CONFIG,
+		swarm: { ...DEFAULT_CONFIG.swarm },
 		tmux: { ...DEFAULT_CONFIG.tmux },
 		enabledProviders: new Set(DEFAULT_CONFIG.enabledProviders),
 		providerHarnesses: { ...DEFAULT_CONFIG.providerHarnesses },
@@ -28249,6 +29308,10 @@ function mergeConfigs(...configs) {
 	const explicitlyDisabled = /* @__PURE__ */ new Set();
 	const validConfigs = configs.filter((c) => c !== null);
 	for (const config of validConfigs.reverse()) {
+		if (config.swarm) result.swarm = {
+			...result.swarm,
+			...config.swarm
+		};
 		if (config.models?.providers) {
 			const providers = config.models.providers;
 			const legacyKeys = config.api_keys || {};
@@ -30836,7 +31899,7 @@ function getManagedTmuxSocketName() {
 	return process.env.OVERDECK_TMUX_SOCKET_NAME ?? "overdeck";
 }
 async function ensureManagedTmuxDirAsync() {
-	await mkdir(getTmuxDir(), { recursive: true });
+	await mkdir$1(getTmuxDir(), { recursive: true });
 }
 /**
 * True when a tmux server is already answering on the managed socket.
@@ -31095,7 +32158,7 @@ async function reloadManagedTmuxConfigAsync() {
 async function ensureManagedTmuxConfigAsync() {
 	if (tmuxContextPrepared) return;
 	await ensureManagedTmuxDirAsync();
-	await writeFile(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, "utf-8");
+	await writeFile$1(getManagedTmuxConfigPath(), MANAGED_TMUX_CONFIG_CONTENT, "utf-8");
 	await reloadManagedTmuxConfigAsync();
 	tmuxContextPrepared = true;
 }
@@ -31404,7 +32467,10 @@ effect(EventBus, gen(function* () {
 }));
 var Records = class extends Service()("overdeck/Records") {};
 succeed$1(Records, Records.of({
-	writeIssue: (project, issueId, record) => sync(() => writeIssueRecordSync(project, issueId, record)),
+	writeIssue: (project, issueId, record) => promise(async () => {
+		await updateIssueRecord(project, issueId, () => record);
+		return getIssueRecordPath(project, issueId);
+	}),
 	readIssue: (project, issueId) => sync(() => readIssueRecordSync(project, issueId)),
 	readSpec: (planRef) => sync(() => {
 		const path = isAbsolute(planRef) ? planRef : join$1(packageRoot, planRef);
