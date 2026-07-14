@@ -58,6 +58,7 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
+import { resetToPlannedCommand } from './commands/reset-to-planned.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
 import { untroubledCommand } from './commands/untroubled.js';
@@ -459,6 +460,18 @@ program
   .description('Stop running agent (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
+
+program
+  .command('stop <id>')
+  .description('Stop every agent for an issue; preserve its workspace, branch, plan, beads, and commits')
+  .option('--force', 'Force stop without confirmation')
+  .action(killCommand);
+
+program
+  .command('reset-to-planned <id>')
+  .description('Return a finalized issue to post-planning without deleting its workspace, plan, beads, commits, or branch')
+  .option('--dry-run', 'Show the exact reset without changing state')
+  .action(resetToPlannedCommand);
 
 program
   .command('pause <id>')
