@@ -68,6 +68,51 @@ describe('state branch migration no-loss gate', () => {
     await expect(migrateProjectState('fixture', {}, { name: 'Fixture', path: repo })).resolves.toBeUndefined();
   });
 
+  it('migrates untracked pipeline state and generated beads metadata without treating them as dirty code', async () => {
+    mkdirSync(join(repo, '.pan', 'specs'), { recursive: true });
+    mkdirSync(join(repo, '.beads'), { recursive: true });
+    writeFileSync(join(repo, '.pan', 'specs', 'puz-1.vbrief.json'), '{"id":"PUZ-1"}\n');
+    writeFileSync(join(repo, '.beads', 'config.yaml'), 'project_id: PUZ\n');
+    writeFileSync(join(repo, '.beads', 'README'), 'generated tracker infrastructure\n');
+    writeFileSync(join(repo, '.beads', '.gitignore'), 'embeddeddolt/\n');
+
+    await migrateProjectState('fixture-untracked', {}, { name: 'Fixture', path: repo });
+
+    const stateTree = git(repo, 'ls-tree', '-r', '--name-only', 'origin/overdeck-state');
+    expect(stateTree).toContain('specs/puz-1.vbrief.json');
+    expect(stateTree).toContain('.beads/config.yaml');
+    expect(stateTree).toContain('.beads/README');
+    expect(stateTree).toContain('.beads/.gitignore');
+    // Empty legacy directories may remain, but every source payload must be
+    // gone so neither Git nor an agent can discover a state straggler.
+    expect(existsSync(join(repo, '.pan', 'specs', 'puz-1.vbrief.json'))).toBe(false);
+    expect(existsSync(join(repo, '.beads', 'config.yaml'))).toBe(false);
+    expect(existsSync(join(repo, '.beads', 'README'))).toBe(false);
+    expect(existsSync(join(repo, '.beads', '.gitignore'))).toBe(false);
+  });
+
+  it('moves accidentally committed pipeline infrastructure off main with forward-only commits', async () => {
+    mkdirSync(join(repo, '.pan', 'specs'), { recursive: true });
+    writeFileSync(join(repo, '.pan', 'specs', 'puz-1.vbrief.json'), '{"id":"PUZ-1"}\n');
+    writeFileSync(join(repo, '.beads', 'config.yaml'), 'project_id: PUZ\n');
+    writeFileSync(join(repo, '.beads', 'README'), 'generated tracker infrastructure\n');
+    writeFileSync(join(repo, '.beads', '.gitignore'), 'embeddeddolt/\n');
+    git(repo, 'add', '.pan', '.beads');
+    git(repo, 'commit', '-q', '-m', 'commit pipeline artifacts');
+    git(repo, 'push', '-q', 'origin', 'main');
+
+    await migrateProjectState('fixture-committed', {}, { name: 'Fixture', path: repo });
+
+    const mainTree = git(repo, 'ls-tree', '-r', '--name-only', 'origin/main');
+    const stateTree = git(repo, 'ls-tree', '-r', '--name-only', 'origin/overdeck-state');
+    expect(mainTree).not.toContain('.pan/specs/puz-1.vbrief.json');
+    expect(mainTree).not.toContain('.beads/config.yaml');
+    expect(stateTree).toContain('specs/puz-1.vbrief.json');
+    expect(stateTree).toContain('.beads/config.yaml');
+    expect(stateTree).toContain('.beads/README');
+    expect(stateTree).toContain('.beads/.gitignore');
+  });
+
   it('hosts polyrepo state on the designated sub-repo without advancing its main branch', async () => {
     const projectRoot = join(root, 'polyrepo');
     const infra = join(projectRoot, 'infra');

@@ -27,10 +27,12 @@ canonical, migration-aware paths — one record, read through the per-domain
 resolver and written through the single record writer — so a slot's durable
 completion is never silently lost to a stale workspace-local copy.
 
-`migration-complete.json` at the remote branch tip proves cutover. Before that
-marker exists, read doors use the legacy project `.pan/` and `.beads/` layout.
-Afterward, legacy paths are fallback reads only and their recreation trips
-Doctor/Deacon diagnostics.
+`migration-complete.json` at the remote branch tip proves cutover. `pan sync`,
+dashboard coordinator startup, and work startup reconcile every registered
+project automatically before pipeline writes are allowed. The migrator carries
+both tracked and untracked legacy `.pan/` and `.beads/` payloads forward, then
+removes them from `main` with an ordinary commit. Afterward, legacy paths are
+fallback reads only and their recreation trips Doctor/Deacon diagnostics.
 
 For polyrepo projects, `pan_records.repo` designates the infra/state-host
 sub-repository. `resolveInfraRepo()` places `overdeck-state` on that repository,
@@ -86,8 +88,8 @@ trip independently.
 
 ## Migration and recovery
 
-Run `pan admin state migrate <project> --dry-run` first. The real command uses
-a cross-process lock, stable source SHA, source/destination mode-size-hash
-manifest, workspace redirect rewrite, completion marker, and atomic push of
-`main` plus `overdeck-state`. It never deletes a remote state branch as
-automated recovery.
+Automatic reconciliation uses a cross-process lock, stable source SHA,
+source/destination mode-size-hash manifest, workspace redirect rewrite,
+completion marker, and atomic push of `main` plus `overdeck-state`. Operators
+can still run `pan admin state migrate <project> --dry-run` to preview a blocked
+cutover. Recovery never deletes a remote state branch or rewrites history.

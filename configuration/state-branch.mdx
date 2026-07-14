@@ -104,7 +104,14 @@ Overdeck also enforces the separation mechanically:
 
 ## How a project starts using the state branch
 
-Projects opt in one at a time with a single command:
+Overdeck migrates every registered project automatically during `pan sync` and
+before the dashboard starts its pipeline coordinator. Commands that start work
+also enforce the same gate, so an incomplete migration cannot create fresh
+legacy `.pan/` or `.beads/` state. If a safety prerequisite blocks automation,
+Overdeck reports the exact reason and leaves both branches untouched.
+
+The administrative command remains available for previewing or resuming a
+blocked cutover:
 
 ```bash
 pan admin state migrate <project> --dry-run   # print the plan, change nothing
@@ -120,13 +127,14 @@ half-finished or interrupted migration leaves every reader safely on the old
 layout. The command is resumable: run it again after a failure and it
 continues where it stopped.
 
-Until you migrate a project, nothing changes for it — Overdeck keeps reading
-and writing the legacy `.pan/` layout on `main`, and `pan doctor` reports
-"Legacy state layout" for it.
+The migration includes tracked and untracked permanent-state artifacts. If an
+agent already committed `.pan/` or `.beads/` on `main`, the cutover uses ordinary
+forward commits to copy those files onto `overdeck-state` and remove them from
+`main`; it never rewrites published history.
 
 <Info>
-Migration is per project and per repository. Migrating one project never
-affects another, and the mechanism is plain git — GitHub and GitLab remotes
+Migration is per project and per repository. Each project is reconciled
+independently, and the mechanism is plain git — GitHub and GitLab remotes
 behave identically.
 </Info>
 

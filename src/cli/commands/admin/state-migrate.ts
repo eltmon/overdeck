@@ -107,8 +107,15 @@ function workspacePaths(repo: string): string[] {
 function hasNonDoltDirtyState(porcelain: string): boolean {
   return porcelain.split('\n').filter(Boolean).some((line) => {
     const path = line.slice(3).split(' -> ').at(-1) ?? '';
+    if (path === '.pan' || path.startsWith('.pan/') || path === '.beads' || path.startsWith('.beads/')) {
+      return false;
+    }
     return !isDoltRuntimePath(path);
   });
+}
+
+function dedupeManifest(entries: StateMigrationManifestEntry[]): StateMigrationManifestEntry[] {
+  return [...new Map(entries.map((entry) => [entry.destination, entry])).values()];
 }
 
 const GITIGNORE_MANAGED_LINES = [
@@ -199,8 +206,16 @@ export async function migrateProjectState(
       await git(repo, ['worktree', 'add', stateRoot, STATE_BRANCH]);
     }
 
+    // A pipeline may have produced state after the last code commit (the PUZ-1
+    // failure mode). Seed tracked blobs for historical fidelity, then overlay
+    // the current working-tree state so untracked .pan/specs and generated
+    // .beads metadata enter the verified manifest before legacy paths are
+    // removed. Unrelated dirty code remains a hard block above.
     const manifest = sourceIsHostRepo
-      ? await trackedManifest(repo, sourceMainSha, stateRoot)
+      ? dedupeManifest([
+          ...await trackedManifest(repo, sourceMainSha, stateRoot),
+          ...copyLegacyState(legacyStateSource, stateRoot),
+        ])
       : copyLegacyState(legacyStateSource, stateRoot);
     if (manifest.length > 0) {
       await git(stateRoot, ['add', '--all']);

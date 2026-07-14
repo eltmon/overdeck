@@ -36,6 +36,7 @@ import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 import { ensureProjectBeadsBootstrap } from '../../lib/beads/bootstrap.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
+import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
 const BUNDLED_GIT_HOOKS_DIR = SYNC_SOURCES.gitHooks;
@@ -381,6 +382,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // bd install puts the binary in PATH, but bd init must be run once per project to
   // create the Dolt database. Without it, workspace beads creation silently fails.
   const projects = listProjectsSync();
+  for (const { key, config } of projects) {
+    if (!existsSync(config.path)) continue;
+    const migrationSpinner = ora(`Reconciling permanent state for ${config.name}...`).start();
+    const migration = await ensureAutomaticStateMigration(key, config);
+    if (migration.status === 'ready') {
+      migrationSpinner.succeed(`Permanent state ready for ${config.name}`);
+    } else {
+      migrationSpinner.warn(formatAutomaticStateMigrationBlock(migration));
+    }
+  }
   if (projects.length > 0 && checkCommand('bd')) {
     for (const { config } of projects) {
       if (!existsSync(config.path)) continue;

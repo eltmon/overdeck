@@ -7,8 +7,10 @@ tree is flat: `records/`, `continues/`, `specs/`, `drafts/`, `review/`,
 
 The completion marker `migration-complete.json` at the tip of
 `origin/overdeck-state` is the only migration authority. A missing branch or
-an unmarked branch is legacy/in-progress; reads continue through the legacy
-`.pan/` fallback and writes remain on the legacy surface until cutover.
+an unmarked branch is legacy/in-progress. `pan sync`, dashboard coordinator
+startup, and work startup automatically attempt the cutover; pipeline startup
+is blocked if its no-loss gates cannot complete, so new writes do not extend
+the legacy surface.
 
 ## Write policy
 
@@ -33,6 +35,10 @@ an unmarked branch is legacy/in-progress; reads continue through the legacy
   `overdeck-state`. A missing/wrong/dirty worktree is surfaced, never discarded.
 - `pan admin state migrate` owns a cross-process project lock. All write doors
   refuse visibly while it flushes, freezes, manifests, verifies, and cuts over.
+- Automatic migration is single-flight within a process and uses that same
+  cross-process lock. It overlays current tracked and untracked state onto the
+  state branch before verification, including pipeline artifacts an agent may
+  already have committed to `main`.
 - Code branches may delete legacy state during migration but may never add or
   modify state paths. `overdeck-state` may never contain source code.
 

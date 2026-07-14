@@ -9,6 +9,11 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 
+vi.mock('../../../lib/state-auto-migrate.js', () => ({
+  ensureAutomaticStateMigration: vi.fn(async (projectKey: string) => ({ status: 'ready', projectKey, worktree: 'healthy' })),
+  formatAutomaticStateMigrationBlock: vi.fn(),
+}));
+
 const syncMainMock = vi.hoisted(() => vi.fn());
 const spawnAgentMock = vi.hoisted(() => vi.fn());
 const stopAgentMock = vi.hoisted(() => vi.fn());
