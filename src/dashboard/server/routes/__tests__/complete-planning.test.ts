@@ -126,7 +126,6 @@ describe('completePlanningArtifacts', () => {
     const { workspacePath } = makeProject(issueId);
     mkdirSync(join(workspacePath, '.pan', 'drafts'), { recursive: true });
     mkdirSync(join(workspacePath, '.pan', 'specs'), { recursive: true });
-    mkdirSync(join(workspacePath, '.tasks'), { recursive: true });
     writeFileSync(join(workspacePath, '.gitignore'), [
       '.pan/continue.json',
       '.pan/spec.vbrief.json',
@@ -136,12 +135,10 @@ describe('completePlanningArtifacts', () => {
     writeFileSync(join(workspacePath, '.pan', 'specs', 'PAN-1931.vbrief.json'), '{}\n');
     writeFileSync(join(workspacePath, '.pan', 'continue.json'), '{}\n');
     writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), '{}\n');
-    writeFileSync(join(workspacePath, '.tasks', 'issues.jsonl'), '{}\n');
 
     const commands = completePlanningWorkspaceGitAddCommands(workspacePath);
     expect(commands).toEqual([
       ['add', '.pan/'],
-      ['add', '.tasks/'],
       ['add', '.gitignore'],
     ]);
     expect(commands.flat()).not.toContain('-f');
@@ -175,7 +172,7 @@ describe('completePlanningArtifacts', () => {
     ]);
   });
 
-  it('promotes a first-run workspace draft and materializes one task per plan item', async () => {
+  it('promotes a first-run workspace draft and reports one bead per plan item', async () => {
     const issueId = 'PAN-1143';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -185,68 +182,17 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createTasks: async (path) => {
-        expect(path).toBe(workspacePath);
-        return {
-          success: true,
-          created: ['PAN-1143: Promote spec', 'PAN-1143: Create tasks'],
-          errors: [],
-          taskIds: new Map(),
-        };
-      },
     });
 
     const specFiles = readdirSync(join(projectPath, '.pan', 'specs'));
     expect(specFiles).toEqual([result.proposed.filename]);
     expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.vbrief\.json$/);
     expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs', result.proposed.filename));
-    expect(result.taskCount).toBe(2);
+    expect(result.beadCount).toBe(2);
 
     const promoted = JSON.parse(readFileSync(result.proposed.path, 'utf-8'));
     expect(promoted.status).toBe('proposed');
     expect(promoted.plan.status).toBe('proposed');
-  });
-
-  it('does not write a proposed spec when task materialization does not match the plan item count', async () => {
-    const issueId = 'PAN-1144';
-    const { projectPath, workspacePath } = makeProject(issueId);
-    await mkdir(join(workspacePath, '.pan'), { recursive: true });
-    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(makeDoc(issueId), null, 2));
-
-    await expect(completePlanningArtifacts({
-      projectPath,
-      workspacePath,
-      issueId,
-      createTasks: async () => ({
-        success: true,
-        created: ['PAN-1144: Promote spec'],
-        errors: [],
-        taskIds: new Map(),
-      }),
-    })).rejects.toThrow('created 1 tasks for 2 plan items');
-
-    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
-  });
-
-  it('does not write a proposed spec when task materialization reports failure', async () => {
-    const issueId = 'PAN-1145';
-    const { projectPath, workspacePath } = makeProject(issueId);
-    await mkdir(join(workspacePath, '.pan'), { recursive: true });
-    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(makeDoc(issueId), null, 2));
-
-    await expect(completePlanningArtifacts({
-      projectPath,
-      workspacePath,
-      issueId,
-      createTasks: async () => ({
-        success: false,
-        created: ['PAN-1145: Promote spec', 'PAN-1145: Create tasks'],
-        errors: ['bd daemon unavailable'],
-        taskIds: new Map(),
-      }),
-    })).rejects.toThrow('bd daemon unavailable');
-
-    expect(existsSync(join(projectPath, '.pan', 'specs')) ? readdirSync(join(projectPath, '.pan', 'specs')) : []).toEqual([]);
   });
 
   it('rejects quality lint failures before writing a proposed spec', async () => {
@@ -274,9 +220,6 @@ describe('completePlanningArtifacts', () => {
       projectPath,
       workspacePath,
       issueId,
-      createTasks: async () => {
-        throw new Error('createTasks should not run');
-      },
     })).rejects.toMatchObject({
       name: 'PlanQualityLintError',
       issues: expect.arrayContaining([
