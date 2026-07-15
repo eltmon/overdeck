@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T14:29:53.285Z",
+  "updated": "2026-07-15T14:30:09.902Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:29:53.243Z",
-    "inspectNotes": "Inspecting item dod-rows-module"
+    "updatedAt": "2026-07-15T14:30:09.825Z",
+    "inspectNotes": "Item dod-rows-module ack: DOD_ROWS has 8 correctly-ordered/numbered ids, rows 1-7 overridable / row 8 (teardown) not, acceptFlagFor returns --accept-<id>; dod.test.ts passes (3/3)."
   },
   "closeOut": {
     "usage": {
@@ -48,6 +48,14 @@
             "cacheRead": 7915105,
             "cacheWrite": 197959
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 112,
+            "cacheRead": 27914,
+            "cacheWrite": 91146
+          }
         }
       },
       "totals": {
@@ -68,11 +76,17 @@
           "output": 51276,
           "cacheRead": 7915105,
           "cacheWrite": 197959
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 112,
+          "cacheRead": 27914,
+          "cacheWrite": 91146
         }
       },
       "costAtCloseOut": {
-        "usd": 14.578182,
-        "pricingAsOf": "2026-07-15T14:29:53.273Z"
+        "usd": 14.812754,
+        "pricingAsOf": "2026-07-15T14:30:09.885Z"
       }
     },
     "merges": [],
