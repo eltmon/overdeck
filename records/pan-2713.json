@@ -166,23 +166,24 @@
     "recordedAt": "2026-07-15T14:50:52.626Z"
   },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T16:01:21.772Z",
+  "updated": "2026-07-15T16:01:26.448Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:01:21.633Z",
+    "updatedAt": "2026-07-15T16:01:26.448Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2721",
     "lastVerifiedCommit": "026ddb4ab75f74fdb65caebc91c9174e64ab393a",
     "reviewRequestedAt": "2026-07-15T14:51:58.635Z",
-    "reviewSpawnedAt": "2026-07-15T15:44:21.220Z"
+    "reviewSpawnedAt": "2026-07-15T15:44:21.220Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T16:01:26.448Z"
   },
   "closeOut": {
     "usage": {
