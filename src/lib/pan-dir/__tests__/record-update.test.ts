@@ -1,14 +1,12 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Effect } from 'effect';
 
 import type { ProjectConfig } from '../../projects.js';
-import { writeIssueRecordSync, type PanIssueRecord } from '../record.js';
+import type { PanIssueRecord } from '../record.js';
 import { updateIssueRecord } from '../record-update.js';
-import { flushAutoCommits } from '../auto-commit.js';
 
 const ISSUE_ID = 'DURABLE-1';
 
@@ -22,7 +20,7 @@ describe('updateIssueRecord durability', () => {
   let project: ProjectConfig;
   const originalHome = process.env.OVERDECK_HOME;
 
-  beforeEach(async () => {
+  beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'pan-record-update-'));
     remote = mkdtempSync(join(tmpdir(), 'pan-record-update-origin-'));
     process.env.OVERDECK_HOME = join(root, 'overdeck-home');
@@ -42,12 +40,12 @@ describe('updateIssueRecord durability', () => {
       pipeline: { issueId: ISSUE_ID, reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString() },
       closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'main' },
     } as PanIssueRecord;
-    writeIssueRecordSync(project, ISSUE_ID, record);
+    mkdirSync(join(root, '.pan', 'records'), { recursive: true });
+    writeFileSync(join(root, '.pan', 'records', 'durable-1.json'), JSON.stringify(record));
     git(root, 'add', '.pan/records');
     git(root, 'commit', '-q', '-m', 'seed state');
     git(root, 'branch', '-M', 'main');
     git(root, 'push', '-q', '-u', 'origin', 'main');
-    await Effect.runPromise(flushAutoCommits(root));
   });
 
   afterEach(() => {

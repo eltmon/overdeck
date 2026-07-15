@@ -3,7 +3,7 @@ import { hostname } from 'node:os';
 import { Effect } from 'effect';
 
 import type { ProjectConfig } from '../projects.js';
-import { flushAutoCommits } from './auto-commit.js';
+import { flushAutoCommits, type FlushResult } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
 import {
   ensureIssueRecordSync,
@@ -42,18 +42,24 @@ export async function updateIssueRecord(
   const normalizedIssueId = issueId.toUpperCase();
   const recordPath = getIssueRecordPath(project, normalizedIssueId);
   const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
-  let commitRoot: string | null = null;
+  const commit = { flush: undefined as Promise<FlushResult> | undefined };
   const record = await withRecordFsLock(project, normalizedIssueId, { writerId, recordPath }, async () => {
     const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
     const result = await mutator(current);
     const next = result ?? current;
     const path = writeIssueRecordSync(project, normalizedIssueId, next);
-    if (options.autoCommit !== false) commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
+    if (options.autoCommit !== false) {
+      const commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
+      // Start the explicit flush before releasing the filesystem lock. The
+      // queue's zero-delay background timer must not consume the batch first,
+      // or this durability boundary could return while the commit still runs.
+      commit.flush = Effect.runPromise(flushAutoCommits(commitRoot));
+    }
     return readIssueRecordSync(project, normalizedIssueId) ?? next;
   });
 
-  if (commitRoot) {
-    const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
+  if (commit.flush) {
+    const flushed = await commit.flush;
     if (flushed.pushed === false) {
       throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
     }
