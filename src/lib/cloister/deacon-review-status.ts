@@ -21,6 +21,7 @@ import { findWorkspacePath, inferBranchFromWorkspace } from '../lifecycle/archiv
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
+import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 
 const execAsync = promisify(exec);
 
@@ -47,8 +48,6 @@ const execAsync = promisify(exec);
  * resets the counter (see review-agent.ts and checkPostReviewCommits below).
  */
 const REVIEW_INFRA_BREAKER_THRESHOLD = 3;
-const REVIEW_AGENT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
-const REVIEWING_WATCHDOG_THRESHOLD_MS = 45 * 60 * 1000;
 
 /**
  * Orphan-test self-heal state. A test role cannot spawn while the workspace
@@ -194,7 +193,7 @@ async function recoverUnhealthyTestStack(
 
 interface ReviewStatusLike {
   updatedAt?: string;
-  reviewSpawnedAt?: string;
+  reviewSpawnedAt?: string | number;
   reviewStatus?: string;
   verificationStatus?: string;
   testStatus?: string;
@@ -259,32 +258,14 @@ export function completedReviewSnapshotAfterCoordinatorExit(
   };
 }
 
-async function isReviewAgentActiveForIssue(issueId: string, status: ReviewStatusLike): Promise<boolean> {
+async function isReviewAgentActiveForIssue(
+  issueId: string,
+  status: ReviewStatusLike,
+): Promise<{ active: boolean; reason: string }> {
   // PAN-1048 R5: role-primitive review/test runs (agent-<id>-review, agent-<id>-test).
   try {
     const agents = await Effect.runPromise(listRunningAgents());
-    const issueUpper = issueId.toUpperCase();
-    const reviewAgents = agents.filter((agent) => {
-      const id = (agent.issueId ?? '').trim().toUpperCase();
-      const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : agent.id.endsWith('-test') ? 'test' : null);
-      return id === issueUpper && role === 'review';
-    });
-
-    const coordinatorId = `agent-${issueId.toLowerCase()}-review`;
-    if (reviewAgents.some((agent) => agent.id === coordinatorId && (agent.status === 'stopped' || agent.status === 'error'))) {
-      return false;
-    }
-
-    const reviewStartedAt = Date.parse(status.reviewSpawnedAt ?? status.updatedAt ?? '');
-    if (Number.isFinite(reviewStartedAt) && Date.now() - reviewStartedAt >= REVIEWING_WATCHDOG_THRESHOLD_MS) {
-      return false;
-    }
-
-    for (const agent of reviewAgents) {
-      if (agent.status === 'stopped' || agent.status === 'error') continue;
-      const lastActivity = Date.parse(agent.lastActivity ?? '');
-      if (!Number.isFinite(lastActivity) || Date.now() - lastActivity < REVIEW_AGENT_IDLE_THRESHOLD_MS) return true;
-    }
+    return evaluateReviewConvoyLiveness(issueId, status, agents);
   } catch {
     // fall through
   }
@@ -295,7 +276,7 @@ async function isReviewAgentActiveForIssue(issueId: string, status: ReviewStatus
     if (sessionExistsSync(session)) {
       const rState = getAgentRuntimeStateSync(session);
       if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
-        return true;
+        return { active: true, reason: `active global ${type} specialist` };
       }
     }
   }
@@ -307,14 +288,14 @@ async function isReviewAgentActiveForIssue(issueId: string, status: ReviewStatus
       if (!projSpec.isRunning || projSpec.specialistType !== 'review-agent') continue;
       const rState = getAgentRuntimeStateSync(projSpec.tmuxSession);
       if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
-        return true;
+        return { active: true, reason: `active project review specialist ${projSpec.tmuxSession}` };
       }
     }
   } catch {
     // fall through
   }
 
-  return false;
+  return { active: false, reason: 'no active review session' };
 }
 
 async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
@@ -493,7 +474,7 @@ async function reconcileReviewStatusOrphan(
 
   const status = getReviewStatusSync(issueId) ?? rawStatus;
 
-  if (status.stuck) return actions;
+  if (status.stuck && !(status.stuckReason === 'verification_stuck' && status.reviewStatus === 'reviewing')) return actions;
   if (status.deaconIgnored) return actions;
   if (await isIssueClosed(issueId)) return actions;
 
@@ -502,7 +483,11 @@ async function reconcileReviewStatusOrphan(
   const latestTerminalReview = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
   const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
 
-  const reviewAgentActive = await isReviewAgentActiveForIssue(issueId, status);
+  const reviewLiveness = await isReviewAgentActiveForIssue(issueId, status);
+  const reviewAgentActive = reviewLiveness.active;
+  if (status.reviewStatus === 'reviewing') {
+    console.log(`[deacon] Evaluated reviewing status for ${issueId}: ${reviewLiveness.reason}`);
+  }
 
   // A supervised verification worker can finish after the dashboard process
   // that requested it has died. The worker records the pass, but the dead HTTP
