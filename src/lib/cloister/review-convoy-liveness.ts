@@ -1,5 +1,3 @@
-import type { ReviewStatus } from '../review-status.js';
-
 export const REVIEW_AGENT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
 export const REVIEWING_WATCHDOG_THRESHOLD_MS = 45 * 60 * 1000;
 
@@ -22,7 +20,7 @@ export function reviewTimestampMs(value: string | number | undefined): number {
 
 export function evaluateReviewConvoyLiveness(
   issueId: string,
-  status: { reviewSpawnedAt?: ReviewStatus['reviewSpawnedAt']; updatedAt?: string },
+  status: { reviewSpawnedAt?: string | number; updatedAt?: string },
   agents: readonly ReviewAgentRow[],
   now = Date.now(),
 ): ReviewConvoyLiveness {
