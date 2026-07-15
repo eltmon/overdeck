@@ -3745,3 +3745,52 @@ not mine, possibly operator-started (exempt), cannot `pan kill` (forbidden). **S
 PAN-2568, PAN-2598 (+convoy), PAN-1234, PAN-2713, PAN-2715, planning-pan-2702, strike-pan-2722.
 **Main CI:** `19f6989b`/`ebceddd2`/`ccc8f9ff` in progress — verify green.
 **RUN-63: 16 merged, 16 closed out.**
+
+## RUN-63 tick 20 (2026-07-15 ~11:25 local / 15:25Z) — PAN-2710 RELEASED by operator → planning; PAN-2722 fix in CI
+
+**OPERATOR DECISION — PAN-2710 RELEASED for plan→work** (answered my surfaced constraint conflict;
+overrides the drain-only intake freeze for THIS item only — the order book, PAN-2377, and PAN-2702
+stay HELD). Removed `needs-design`, commented the full verified diagnosis on the issue so the planner
+does not re-derive it, and dispatched `pan plan PAN-2710 --auto` → `planning-pan-2710` (Fable 5,
+progressing: ctx 15%, out 2.7k). **On finalize, `pan start PAN-2710` and shepherd to merged.**
+⚠️ **PAN-2569 watch:** planning→work auto-start can silently no-op — if it plans but no work agent
+appears, re-dispatch manually. **I did NOT add the `released` label — that is operator-only; the
+verbal release is the authorization.**
+
+**PAN-2722 → PR #2723, CI running. I OWN THIS MERGE.** Fix is exactly the proposed reorder and I
+verified it myself (11 tests passed, typecheck, lint; diff stat clean — no stale-branch reverts):
+```ts
+if (branch === STATE_BRANCH) return { status: 'healthy', path };   // ← now FIRST; dirty irrelevant
+try {
+  const dirty = await git(path, ['status', '--porcelain']);        // ← lazy, INSIDE the repair path
+  if (dirty) return { status: 'dirty', ... };
+  await git(repoPath, ['worktree', 'remove', path]); …             // the only destructive path
+```
+**Tests are the right shape — the guard is re-scoped, NOT weakened:** the old
+`refuses destructive repair of a dirty state worktree` became
+`treats a dirty state worktree on overdeck-state as healthy` (corrected behavior), and a **NEW** test
+`refuses destructive repair of a dirty wrong-branch state worktree` preserves the original protection
+for the case it actually exists for.
+
+### Live agent set (re-derived THIS tick — it moves constantly)
+| Agent | State |
+| --- | --- |
+| PAN-2597 | `review=reviewing`, convoy up | 
+| PAN-2499 | work + review-supervisor, `review=pending` |
+| PAN-2568 | work, `review=pending` |
+| PAN-2598 | **`review=blocked`** — work agent live and running `npm test` on the feedback |
+| PAN-1234 | **`review=blocked`** — work agent live, working 13m |
+| PAN-2713 | **`review=blocked`** — work agent live, working 9m |
+| PAN-2715 | work + review-supervisor, `review=pending` |
+| planning-pan-2710 | RUNNING (Fable 5) |
+| planning-pan-2702 | RUNNING — **not mine, no `flywheelRunId`, contradicts the operator's "do NOT plan or start" — surfaced, left alone** |
+| strike-pan-2722 | fix pushed → PR #2723 in CI |
+| strike-pan-2710 | aborted (session lingers, harmless) |
+
+**All three `review=blocked` agents are genuinely working their feedback** (verified by pane, not just
+liveness). No blockers on any row. **Main CI GREEN** on `19f6989b` + `ebceddd2`; `5a1bea4e` in progress.
+**RUN-63: 16 merged, 16 closed out.**
+
+**NEXT:** land PR #2723 → close out → deploy. Then `pan start PAN-2710` when planning finalizes.
+Then drive the blocked-review trio to verdict. PAN-1491 stays PAUSED (needs-you: verification stuck
+3/3 — operator gate, do not force).
