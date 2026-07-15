@@ -73,6 +73,7 @@ import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
 import { closeOutCommand } from './commands/close.js';
+import { acceptFlagFor, DOD_ROWS } from '../lib/lifecycle/dod.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
@@ -558,12 +559,18 @@ program
   .option('--project <path>', 'Explicit project path (overrides registry)')
   .action(destroyWorkspaceCommand);
 
-program
+const closeCommand = program
   .command('close <id>')
   .description('Verify, clean up, and close issue on tracker')
   .option('--force', 'Skip confirmation prompt')
-  .option('--json', 'Output as JSON')
-  .action((id, options) => closeOutCommand(id, options));
+  .option('--json', 'Output as JSON');
+for (const row of DOD_ROWS.filter(candidate => candidate.overridable)) {
+  closeCommand.option(
+    acceptFlagFor(row),
+    `Accept a missed DoD row ${row.num} (${row.title}) — recorded as an explicit override in the close-out record`,
+  );
+}
+closeCommand.action((id, options) => closeOutCommand(id, options));
 
 program
   .command('start <id>')
