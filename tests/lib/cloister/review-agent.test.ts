@@ -49,6 +49,7 @@ const {
   mockResolveProjectForIssue,
   mockGetLatestSessionIdSync,
   mockResumeAgent,
+  mockStopAgent,
   mockWipeAgentStateDirs,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
@@ -68,6 +69,7 @@ const {
   mockResolveProjectForIssue: vi.fn(() => ({ name: 'test', path: '/tmp/project' })),
   mockGetLatestSessionIdSync: vi.fn(() => null),
   mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
+  mockStopAgent: vi.fn().mockResolvedValue(undefined),
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -96,6 +98,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
   spawnRun: mockSpawnRun,
   getLatestSessionIdSync: mockGetLatestSessionIdSync,
   resumeAgent: mockResumeAgent,
+  stopAgent: (...args: Parameters<typeof mockStopAgent>) => Effect.promise(() => mockStopAgent(...args)),
   wipeAgentStateDirs: mockWipeAgentStateDirs,
   getProviderAuthMode: vi.fn(async () => 'apikey'),
 }));
@@ -833,6 +836,9 @@ describe('convoy orchestration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAgentState.mockReturnValue(null);
+    mockGetLatestSessionIdSync.mockReturnValue(null);
+    mockResumeAgent.mockResolvedValue({ success: false, error: 'no session' });
+    mockStopAgent.mockResolvedValue(undefined);
     mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
     mockGetAgentState.mockReturnValue(null);
     prepareWorkspace(REVIEW_AGENT_DEFAULT_WORKSPACE);
@@ -921,6 +927,35 @@ describe('convoy orchestration', () => {
       role: 'security',
       sessionName: 'agent-pan-1059-review-security',
     });
+  });
+
+  it('stops an idle-alive reviewer before fresh-spawning the new prompt', async () => {
+    const reviewerId = 'agent-pan-1059-review-security';
+    mockGetAgentState.mockReturnValue({
+      id: reviewerId,
+      model: 'configured-reviewer-model',
+      harness: 'codex',
+    });
+    mockGetLatestSessionIdSync.mockReturnValue('saved-session');
+    mockResumeAgent.mockResolvedValue({
+      success: false,
+      error: `Cannot resume ${reviewerId}: it appears healthy (tmux session up, harness process alive) — there is nothing to resume. Stop it first if you intend to restart it.`,
+    });
+
+    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+      issueId: 'PAN-1059',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
+      subRole: 'security',
+      runId: REVIEW_AGENT_RUN_ID,
+      contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mockStopAgent).toHaveBeenCalledWith(reviewerId);
+    expect(mockStopAgent.mock.invocationCallOrder[0]).toBeLessThan(mockSpawnRun.mock.invocationCallOrder[0]);
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
+    }));
   });
 });
 
