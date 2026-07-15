@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:00:06.424Z",
+  "updated": "2026-07-15T16:00:28.111Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:00:06.301Z",
-    "inspectNotes": "Inspecting item red-window-classifier"
+    "updatedAt": "2026-07-15T16:00:27.123Z",
+    "inspectNotes": "Item red-window-classifier ack: computeRedWindows/selectRerunCandidates are pure, correctly implement fail/success window pairing (trailing-fail=>null), half-open [start,end) window membership, and all four skip reasons (main-still-red, no-red-window-match, attempt-exceeded, missing-attempt); FAILING_CHECK_CONCLUSIONS imported from webhook-handlers.ts (not duplicated); no I/O in module; all ACs satisfied."
   },
   "closeOut": {
     "usage": {
@@ -86,7 +86,7 @@
       },
       "costAtCloseOut": {
         "usd": 12.640416,
-        "pricingAsOf": "2026-07-15T16:00:06.393Z"
+        "pricingAsOf": "2026-07-15T16:00:28.012Z"
       }
     },
     "merges": [],
