@@ -137,17 +137,16 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T13:06:36.013Z",
+  "updated": "2026-07-15T13:06:52.229Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T13:06:35.844Z",
+    "updatedAt": "2026-07-15T13:06:52.229Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -177,7 +176,9 @@
         "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts"
       ],
       "recordedAt": "2026-07-15T10:08:46.962Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T13:06:52.229Z"
   },
   "closeOut": {
     "usage": {
