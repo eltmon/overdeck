@@ -3624,3 +3624,52 @@ this session: PAN-2712 (merge-gate trap) and PAN-2716 (close-out trap).**
 6. **Phase 2 release readiness** once the cohort quiesces → report + suggest. **OPERATOR CUTS; NEVER TAG.**
 7. **HELD:** order book (A13=PAN-2445, B10=PAN-2232, B11=PAN-2233, B12=PAN-2190, B13=PAN-2189),
    PAN-2377 (Phase 3 CANCELLED), PAN-2702 (awaiting operator review). **NO new intake.**
+
+## RUN-63 tick 18 (2026-07-15 ~10:45 local / 14:45Z) — CORRECTIONS to tick 17 + PAN-2710 struck. RUN CONTINUES.
+
+**⚠️ DOCTRINE CORRECTION (operator, now in `roles/flywheel.md` @ `ebceddd24b`): CONTEXT PRESSURE IS
+NOT END-OF-RUN.** The harness compacts and the run continues; **this file is my durable memory across
+compaction.** Never defer actionable work to "the next run" because context feels full; never write
+final-handover notes in place of acting. **The run ends only when the operator pauses/stops it or the
+RUN-63 mission completes.** My tick-14/16/17 "handover" framing was WRONG — I deferred live, landable
+work while treating ~90% context as a shift boundary. It is not. Keep ticking.
+
+**TWO TICK-17 CLAIMS WERE WRONG — corrected here (do not trust tick 17 on these):**
+
+1. **PAN-2692 is LANDED + CLOSED, not blocked.** The strike resolved the file-size ratchet ITSELF by
+   extracting the module — no flywheel intervention and no run boundary needed. Landed in two commits:
+   `71db76939e` (fix(cli): drain durable writes before exit) + `ccc8f9ffdb` (fix(cli): preserve CLI
+   file-size baseline). **Lesson: a strike blocked on a gate is not necessarily stuck — give it time
+   to solve its own blocker before declaring it blocked or escalating.** I called it blocked ~3 minutes
+   after it hit the ratchet.
+2. **PAN-2597 is NOT stalled — it has a LIVE work agent + full review convoy** (`agent-pan-2597` since
+   09:43, `agent-pan-2597-review` + all four sub-reviewers since 10:25). The tick-12 cohort table said
+   "no live agents, restart-vs-salvage cost call" — **that is stale**. It is being driven; do NOT
+   restart it. **PAN-2499 is also live** (`agent-pan-2499` + `-review-supervisor` since 10:30) and was
+   never in my inventory at all. **Re-derive the live-agent set every tick — an inventory goes stale
+   in minutes.**
+
+**[PAN-2710] STRUCK** — `strike-pan-2710`, codex/gpt-5.6-sol, branch `strike/pan-2710`, labeled
+`blocks-main`. **I OWN ITS MERGE.** This is the remaining half of the merge-gate trap and the
+highest-value open substrate item: PAN-2712 (landed, deployed, proven) fixed the *reconciler*;
+PAN-2710 is the *trigger* — nothing re-runs poisoned feature PR checks when main goes red→green, so
+the reconciler keeps re-reading a stale `fail` and re-affirming the blocker. Struck under the
+pipeline-blocker emergency override (merge-gate repair), same basis that made PAN-2712 correct.
+
+**MAIN GREEN** on `eabd0eec`; `ccc8f9ff` + `ebceddd2` in progress — verify.
+**Ready set** empty; **merge-blockers** []. **RUN-63: 16 merged, 16 closed out.**
+
+**STILL TO DO THIS RUN (not "next run" — THIS run):**
+1. Shepherd strike-pan-2710 → review diff (**`git diff origin/main..HEAD --stat` for stale-branch
+   reverts — hit 2 of 4 strikes today**) → gates (`bun install` first) → PR → CI → merge → close →
+   **DEPLOY**.
+2. Drive PAN-2597 + PAN-2499 (live) to verdict → merge → close.
+3. File the **file-size-ratchet incentive smell**: it counts LINES, so it rewards line-packing on the
+   god files it means to improve. PAN-2704 chained 4 `.option()` calls onto one line in
+   `src/cli/index.ts` to pass it; PAN-2692 had to extract a module. Two strikes bent their diffs
+   around it in one day.
+4. Cohort (re-verify live agents FIRST): PAN-2598 (PR #2631), PAN-1234 (PR #2606), PAN-1491, PAN-2568.
+   PAN-2619 = 0 commits; PAN-1232 = no workspace.
+5. PAN-2709 (likely 2 faults), PAN-2706, PAN-2713, PAN-2715, PAN-2699 (`Closes PAN-2699` ≠ `Closes #2699`).
+6. Phase 2 release readiness once quiescent → report + suggest. **OPERATOR CUTS; NEVER TAG.**
+7. HELD: order book (A13/B10–B13), PAN-2377, PAN-2702. NO new intake.
