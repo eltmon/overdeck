@@ -132,6 +132,39 @@ export const DEFAULT_TIERED_EXECUTION_CONFIG: ValidatedTieredExecutionConfig = {
 export const TIERED_EXECUTION_ISSUE_OVERRIDES = ['on', 'off'] as const;
 export type TieredExecutionIssueOverride = typeof TIERED_EXECUTION_ISSUE_OVERRIDES[number];
 
+export function resolveTieredExecutionBlock(
+  config: Pick<TieredExecutionConfig, 'enabled'>,
+  planMetadata: { [key: string]: unknown } | undefined,
+  recordOverride: 'on' | 'off' | null | undefined,
+): {
+  effective: boolean;
+  source: 'issue-override' | 'plan-metadata' | 'global';
+  override: 'on' | 'off' | null;
+} {
+  if (recordOverride === 'on' || recordOverride === 'off') {
+    return {
+      effective: recordOverride === 'on',
+      source: 'issue-override',
+      override: recordOverride,
+    };
+  }
+
+  const planValue = planMetadata?.tiered_execution;
+  if (planValue === 'on' || planValue === 'off') {
+    return {
+      effective: planValue === 'on',
+      source: 'plan-metadata',
+      override: null,
+    };
+  }
+
+  return {
+    effective: config.enabled ?? false,
+    source: 'global',
+    override: null,
+  };
+}
+
 /**
  * Per-issue tiered_execution opt-in/out (PAN-1791 FR-9, PAN-2383 FR-1). Resolves with precedence:
  * record override > plan.metadata.tiered_execution > config.enabled.
