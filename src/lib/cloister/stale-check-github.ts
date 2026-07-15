@@ -18,13 +18,20 @@ function warn(action: string, error: unknown): void {
 }
 
 export async function listRecentMainRuns(repo: string): Promise<WorkflowRun[]> {
+  const result = await probeRecentMainRuns(repo);
+  return result.ok ? result.runs : [];
+}
+
+export async function probeRecentMainRuns(
+  repo: string,
+): Promise<{ ok: true; runs: WorkflowRun[] } | { ok: false }> {
   try {
-    return JSON.parse(await execGh([
+    return { ok: true, runs: JSON.parse(await execGh([
       'run', 'list', '--repo', repo, '--branch', 'main', '--limit', '50', '--json', RUN_FIELDS,
-    ])) as WorkflowRun[];
+    ])) as WorkflowRun[] };
   } catch (error) {
     warn(`list recent main runs for ${repo}`, error);
-    return [];
+    return { ok: false };
   }
 }
 

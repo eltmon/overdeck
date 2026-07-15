@@ -9,7 +9,13 @@ vi.mock('../../../../lib/overdeck/review-status-sync.js', () => ({
   getMergeBlockerReconcileCandidates: () => Effect.succeed(mocks.candidates()),
 }));
 vi.mock('../../../../lib/cloister/stale-check-github.js', () => ({
-  listRecentMainRuns: mocks.mainRuns,
+  probeRecentMainRuns: async (...args: unknown[]) => {
+    try {
+      return { ok: true, runs: await mocks.mainRuns(...args) };
+    } catch {
+      return { ok: false };
+    }
+  },
   getPrHead: mocks.prHead,
   probePrHeadFailingRuns: async (...args: unknown[]) => {
     try {
@@ -114,12 +120,10 @@ it('throttles main probes for three minutes and issue evaluation for ten', async
 });
 
 it('swallows adapter errors and keeps the interval firing', async () => {
-  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   mocks.mainRuns.mockRejectedValueOnce(new Error('offline')).mockResolvedValue([]);
   startStaleCheckRetriggerService();
   await vi.advanceTimersByTimeAsync(60_000);
   await vi.advanceTimersByTimeAsync(60_000);
-  expect(warn).toHaveBeenCalledWith('[stale-check-retrigger] tick failed:', 'offline');
   expect(mocks.mainRuns).toHaveBeenCalledTimes(2);
 });
 
