@@ -12,6 +12,11 @@
       "timestamp": "2026-07-15T10:08:49.797Z",
       "reason": "end",
       "note": "No deviations. Redesigned Tiered Execution around total-function crew routing, expandable crew/supervisor/advanced controls, overrides-only kinds, compaction reroute, YAML preview, no-loss tests, and updated docs."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T11:08:07.091Z"
     }
   ],
   "feedback": [],
@@ -37,7 +42,7 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:08:06.144Z",
+  "updated": "2026-07-15T11:08:07.092Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "reviewing",
