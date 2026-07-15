@@ -99,6 +99,13 @@ describe('IssuePolicyStrip', () => {
     expect(screen.queryByLabelText('Re-review scope for this issue')).not.toBeInTheDocument();
   });
 
+  it('keeps the tiered Work Model default until PAN-2684 lands', async () => {
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    expect(screen.getByLabelText('Work model for this issue')).toHaveDisplayValue('Default · tiered');
+  });
+
   it.each([
     ['issue-override', 'on (issue)'],
     ['plan-metadata', 'on (plan)'],

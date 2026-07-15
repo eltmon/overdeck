@@ -170,6 +170,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
 
   if (!review || !staffing || !swarm) return null;
   const encoded = encodeURIComponent(issueId);
+  // TODO(PAN-2683 FR-3): rename to `crews` once PAN-2684 lands — label copy belongs to whichever lands second.
   const workDefault = staffing.resolved.tiered ? 'tiered' : staffing.resolved.model;
   const needsRestart = Boolean(
     staffing.override.workModel && staffing.override.workModel !== staffing.resolved.recordedModel,
