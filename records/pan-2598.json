@@ -352,17 +352,16 @@
     "recordedAt": "2026-07-15T16:04:48.597Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T17:48:21.883Z",
+  "updated": "2026-07-15T17:59:21.353Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:48:02.737Z",
+    "updatedAt": "2026-07-15T17:59:21.330Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -432,7 +431,9 @@
         "tests/unit/lib/cloister/feedback-target.test.ts"
       ],
       "recordedAt": "2026-07-15T16:04:48.597Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T17:59:21.330Z"
   },
   "closeOut": {
     "usage": {
@@ -550,7 +551,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2631"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-15T17:59:21.350Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 825f90104e57781c3da4b605f869abc7dc8233c3",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2631 MERGED at 2026-07-15T17:47:44Z",
+          "status": "pass",
+          "mergedAt": "2026-07-15T17:47:44Z",
+          "mergeCommit": "6c5083f025c566f70718c5bfbceecb5bb6d35cc7"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 6c5083f025c566f70718c5bfbceecb5bb6d35cc7",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-15T17:58:34.000Z, dist built 2026-07-15T17:58:18.948Z, merge 2026-07-15T17:47:44.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 11 agent state directories; No strike branch strike/pan-2598 found; Pruned 532 checkpoint ref(s) for agent-pan-2598, planning-pan-2598, strike-pan-2598; No specialist registry entries for PAN-2598"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
