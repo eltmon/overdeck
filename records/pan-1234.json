@@ -195,18 +195,20 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:26:06.300Z",
+  "updated": "2026-07-15T15:35:55.546Z",
   "pipeline": {
     "issueId": "PAN-1234",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:25:37.144Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-15T15:35:55.381Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed lint",
+    "testNotes": "Reconciled from green GitHub Actions CI on 81e24a9e: test (https://github.com/eltmon/overdeck/actions/runs/29427575419/job/87393878280)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
+    "reviewedAtCommit": "81e24a9e6ca2eef1359f91c20aefe2ebd6e9b5ee",
     "lastVerifiedCommit": "b51bbe2f5c16b4f6c0521fd7e0a9d4b5610721a6",
     "reviewRequestedAt": "2026-07-15T15:13:58.776Z",
     "reviewSpawnedAt": "2026-07-15T15:25:37.144Z"
@@ -216,21 +218,21 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1151704,
-            "output": 3233,
-            "cacheRead": 1032064,
+            "input": 1207065,
+            "output": 3310,
+            "cacheRead": 1084672,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
-            "input": 19986347,
-            "output": 70889,
-            "cacheRead": 18137216,
+            "input": 21599873,
+            "output": 73182,
+            "cacheRead": 19733376,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 26608507,
-            "output": 42671,
-            "cacheRead": 25888000,
+            "input": 31015998,
+            "output": 50639,
+            "cacheRead": 30235392,
             "cacheWrite": 0
           }
         },
@@ -245,21 +247,21 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1151704,
-          "output": 3233,
-          "cacheRead": 1032064,
+          "input": 1207065,
+          "output": 3310,
+          "cacheRead": 1084672,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
-          "input": 19986347,
-          "output": 70889,
-          "cacheRead": 18137216,
+          "input": 21599873,
+          "output": 73182,
+          "cacheRead": 19733376,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 26608507,
-          "output": 42671,
-          "cacheRead": 25888000,
+          "input": 31015998,
+          "output": 50639,
+          "cacheRead": 30235392,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -270,8 +272,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 64.95341,
-        "pricingAsOf": "2026-07-15T15:25:40.974Z"
+        "usd": 68.620341,
+        "pricingAsOf": "2026-07-15T15:35:55.480Z"
       }
     },
     "merges": [
