@@ -168,6 +168,7 @@ export const SYNC_SOURCES = {
   hooks: join(SYNC_SOURCES_ROOT, 'hooks'),
   gitHooks: join(SYNC_SOURCES_ROOT, 'hooks', 'git-hooks'),
   templates: join(SYNC_SOURCES_ROOT, 'templates'),
+  plugins: join(SYNC_SOURCES_ROOT, 'plugins.json'),
   traefikTemplates: join(SYNC_SOURCES_ROOT, 'templates', 'traefik'),
   claudeMdSections: join(SYNC_SOURCES_ROOT, 'templates', 'claude-md', 'sections'),
 } as const;
