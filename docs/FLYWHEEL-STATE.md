@@ -3024,3 +3024,63 @@ the orchestrator mailbox is effectively write-only when the run is stopped). Rel
 **Still-open cohort with NO live agent (stalled — shepherd after red-main clears):** PAN-1232, PAN-1491,
 PAN-2598, PAN-2568, PAN-2597, PAN-1234, PAN-2619.
 **Close-out tail:** PAN-2699 still OPEN though its fix (`a9abceec`, "Closes PAN-2699") is on main.
+
+## RUN-63 tick 9 (2026-07-15 ~09:06 local / 13:06Z) — RED MAIN CLEARED; PAN-2684 drained; 2 blocked strikes unwedged
+
+**RED-MAIN P0 RESOLVED.** PAN-2703 fix merged → main `3736d5e0a1` (PR #2705, squash). CI fully green
+before merge (test 9m15s, lint 3m42s, build, smoke, guard, flake lane all pass).
+
+- Reviewed the strike diff myself: 3 lines, adds the missing `guard-hook-bundle-freshness.sh` stub to
+  `makeHookFixture()`. Did NOT weaken the assertion or remove the guard call — exactly the diagnosis.
+- Ran gates myself rather than trust the readiness signal: focused test 4/4 (was 1 failed/3 passed),
+  typecheck green, lint green. **Gotcha:** the strike workspace had no `node_modules` — typecheck/lint
+  failed spuriously with `TS2688 Cannot find type definition file for 'node'` and `madge not found`
+  until `bun install` (403ms). A gate failure in a fresh strike workspace is a setup artifact until
+  proven otherwise — install first, then judge.
+- `pan close --force` is required non-interactively; bare `pan close` blocks on a y/N prompt and the
+  CLI then warns about an unsettled top-level await.
+
+**Unwedged the two strikes that were correctly blocked on the red-main gate.** Both had finished their
+fix, run gates, and refused to push without green main — exactly right behavior, and both had
+independently root-caused PAN-2703. Their reports were stale (still reading `origin/main` at
+`aa65f505`); rather than nudge them (forbidden + band-aid), I rebased/pushed/PR'd their work myself
+since whoever owns the strike owns the merge:
+- **PAN-2701** → rebased clean onto `3736d5e0a1`, PR #2707. Diff verified: queues busy-turn codex mail
+  as `mail/<ts>.pending.md`, codex-notify-hook drains oldest at idle using the sanctioned
+  load-buffer → paste-buffer → 300ms → C-m sequence, unlinks only after both tmux ops succeed.
+- **PAN-2690** → rebased clean onto `3736d5e0a1`, PR #2708. Diff verified: live session carrying
+  `reviewer-signaled` renders `idle` not `active`. **Checked the load-bearing claim** — the marker is
+  genuinely per-round: `src/lib/cloister/review-convoy.ts:153` `rm`s it at every reviewer spawn.
+
+**PAN-2684 MERGED + CLOSED OUT** ✅ — PR #2694 → main `e00f7992e3`; `pan close --force` completed all
+steps (worktree, agent state, checkpoint refs, GitHub close, closed-out label, pipeline terminal).
+Note: close-out preserved 5 live review agent rows rather than pruning them (warning, not a failure).
+
+**SUBSTRATE FILED: [PAN-2706]** — ghost test sessions. `agent-pan-2683-test` booted 11:16:56Z and never
+ran: `lastActivity` = `startedAt`+89ms, `costSoFar: 0`, live pane, empty prompt, 1.5h. Two compounding
+defects: (1) `src/lib/agents/spawn.ts:126-155` reaps an existing advancing-role session only if its pane
+is dead or its verdict is terminal — a ghost has a LIVE pane and a non-terminal verdict, so it throws
+`already running`; (2) `src/lib/cloister/test-agent-queue.ts:102-107` catches that, marks
+`testStatus: 'testing'`, sets `testTaskDelivered = true`, and tells the work agent not to poll — with NO
+prompt delivered. Self-healing impossible.
+  **I over-claimed impact and corrected it on the issue.** DB truth: PAN-2683 is `test_status=passed`
+  ("Skipped: no code changed since pre-review verification gate"), so the ghost blocks nothing today —
+  it is a **spawned-then-skipped session leak** + a latent trap, not a live blocker. Lesson: check the
+  authoritative `review_status` row BEFORE writing an impact claim; the pane and the fallback file are
+  not the source of truth.
+
+**Verify-the-verdict lesson:** PAN-2683's review verdict went to the workspace fallback
+(`.overdeck/pipeline-verdict.json`) after a journal-write failure (PAN-2583). That file said
+`reviewStatus: reviewing` while the pane said "Review passed". The DB row is authoritative — read it
+(`review_status` in `~/.overdeck/overdeck.db`) rather than trusting either.
+
+**RUN-63 total drained: 7** — PAN-2611, PAN-2229, PAN-2596, PAN-2602, PAN-2616, PAN-2643, PAN-2684
+(+ PAN-2703 red-main strike merged, close-out pending).
+
+**IN FLIGHT:** PRs #2707 (PAN-2701) + #2708 (PAN-2690) awaiting CI → merge + close out. PAN-2703
+close-out pending. Main CI re-running on `e00f7992e3`.
+**PAN-2683:** review in flight (re-review 1/25), test already passed; `ready_for_merge=0` until review lands.
+**Stalled cohort, no live agents** (shepherd after the merge chain): PAN-1232 (no PR), PAN-1491 (no PR),
+PAN-2598 (PR #2631), PAN-2568 (no PR), PAN-2597 (PR #2601), PAN-1234 (PR #2606), PAN-2619 (no PR).
+**Close-out tail:** PAN-2699 still OPEN — its fix `a9abceec` is on main. Likely cause: the trailer reads
+`Closes PAN-2699`, and GitHub only auto-closes on `Closes #2699`. Repo-wide convention gap worth noting.
