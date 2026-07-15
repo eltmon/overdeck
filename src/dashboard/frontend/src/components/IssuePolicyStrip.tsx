@@ -13,6 +13,11 @@ interface ReviewConfigResponse {
 
 interface StaffingResponse {
   override: { workModel: string | null };
+  tieredExecution: {
+    effective: boolean;
+    source: 'issue-override' | 'plan-metadata' | 'global';
+    override: 'on' | 'off' | null;
+  };
   resolved: { model: string; tiered: boolean; source: 'issue' | 'default'; recordedModel: string | null };
 }
 
@@ -98,11 +103,11 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
     .filter((model, index, all) => all.findIndex((candidate) => candidate.id === model.id) === index)
     .sort((a, b) => a.name.localeCompare(b.name)), [availableModels]);
 
-  const save = useCallback(async (url: string, body: unknown) => {
+  const save = useCallback(async (url: string, body: unknown, method = 'POST') => {
     setSaving(true);
     try {
       const response = await fetch(url, {
-        method: 'POST',
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
@@ -165,10 +170,12 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
 
   if (!review || !staffing || !swarm) return null;
   const encoded = encodeURIComponent(issueId);
+  // TODO(PAN-2683 FR-3): rename to `crews` once PAN-2684 lands — label copy belongs to whichever lands second.
   const workDefault = staffing.resolved.tiered ? 'tiered' : staffing.resolved.model;
   const needsRestart = Boolean(
     staffing.override.workModel && staffing.override.workModel !== staffing.resolved.recordedModel,
   );
+  const crewSuspended = staffing.tieredExecution.effective && Boolean(staffing.override.workModel);
   const effectiveReviewMode = review.override.reviewMode ?? review.resolved.reviewMode;
 
   const modelName = (modelId: string) => models.find((model) => model.id === modelId)?.name ?? modelId;
@@ -176,8 +183,13 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
     review.override.reviewMode && { key: 'review', label: 'review', value: review.override.reviewMode },
     review.override.reReviewScope && { key: 're-review', label: 're-review', value: review.override.reReviewScope },
     review.override.reviewModel && { key: 'review-model', label: 'review model', value: modelName(review.override.reviewModel) },
-    staffing.override.workModel && { key: 'work', label: 'work', value: modelName(staffing.override.workModel) },
+    staffing.override.workModel && {
+      key: 'work',
+      label: 'work',
+      value: `${modelName(staffing.override.workModel)}${crewSuspended ? ' · replaces crews' : ''}`,
+    },
     swarm.configured?.mode && { key: 'swarm', label: 'swarm', value: swarm.configured.mode },
+    staffing.tieredExecution.override && { key: 'crew', label: 'crew', value: staffing.tieredExecution.override },
   ].filter((override): override is { key: string; label: string; value: string } => Boolean(override));
   const overrideCount = overrides.length;
 
@@ -206,6 +218,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
     if (review.override.reviewModel !== null) await save(`/api/review/${encoded}/config`, { reviewModel: null });
     if (staffing.override.workModel !== null) await save(`/api/issues/${encoded}/staffing`, { workModel: null });
     if (swarm.configured?.mode) await save(`/api/issues/${encoded}/swarm-policy`, { value: null });
+    if (staffing.tieredExecution.override !== null) await save(`/api/workspaces/${encoded}/tiered-execution`, { override: null }, 'PATCH');
   };
 
   const rowLabelClass = 'flex items-center gap-1.5 text-[12px] font-medium';
@@ -292,12 +305,15 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             <span className={`${rowLabelClass} ${staffing.override.workModel ? 'text-foreground' : 'text-muted-foreground'}`}>
               <span className={`h-[5px] w-[5px] rounded-full bg-primary ${staffing.override.workModel ? 'opacity-100' : 'opacity-0'}`} /> Model
             </span>
-            <div className={controlCellClass}>
-              <select aria-label="Work model for this issue" className={selectClass} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
-                <option value="">Default · {workDefault}</option>
-                {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-              </select>
-              {staffing.override.workModel && <button type="button" aria-label="Reset work model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button>}
+            <div className="min-w-0">
+              <div className={controlCellClass}>
+                <select aria-label="Work model for this issue" className={selectClass} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
+                  <option value="">Default · {workDefault}</option>
+                  {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+                </select>
+                {staffing.override.workModel && <button type="button" aria-label="Reset work model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button>}
+              </div>
+              {crewSuspended && <div className="mt-1 text-[11px] text-muted-foreground">Overrides crew routing — every item on this issue runs this model.</div>}
             </div>
           </div>
 
@@ -308,6 +324,23 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             <div className={controlCellClass}>
               <Segmented ariaLabel="Swarm mode for this issue" value={swarm.configured?.mode ?? null} resolvedLabel={swarm.resolved.mode} options={[["off", "Off"], ["auto", "Auto"], ["always", "Always"]]} disabled={saving} onChange={(next) => save(`/api/issues/${encoded}/swarm-policy`, { value: next ? { mode: next } : null })} />
               {swarm.configured?.mode && <button type="button" aria-label="Reset swarm mode to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/swarm-policy`, { value: null })}>reset</button>}
+            </div>
+          </div>
+
+          <div className="my-2 grid grid-cols-[92px_1fr] items-center gap-2.5">
+            <span className={`${rowLabelClass} ${staffing.tieredExecution.override ? 'text-foreground' : 'text-muted-foreground'}`}>
+              <span className={`h-[5px] w-[5px] rounded-full bg-primary ${staffing.tieredExecution.override ? 'opacity-100' : 'opacity-0'}`} /> Standing crew
+            </span>
+            <div className={controlCellClass}>
+              <Segmented
+                ariaLabel="Standing crew routing for this issue"
+                value={staffing.tieredExecution.override}
+                resolvedLabel={`${staffing.tieredExecution.effective ? 'on' : 'off'} (${staffing.tieredExecution.source === 'issue-override' ? 'issue' : staffing.tieredExecution.source === 'plan-metadata' ? 'plan' : 'global'})`}
+                options={[["on", "On"], ["off", "Off"]]}
+                disabled={saving}
+                onChange={(next) => save(`/api/workspaces/${encoded}/tiered-execution`, { override: next }, 'PATCH')}
+              />
+              {staffing.tieredExecution.override && <button type="button" aria-label="Reset standing crew to default" className={resetClass} disabled={saving} onClick={() => save(`/api/workspaces/${encoded}/tiered-execution`, { override: null }, 'PATCH')}>reset</button>}
             </div>
           </div>
 
