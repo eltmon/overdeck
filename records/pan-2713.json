@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:32:45.559Z",
+  "updated": "2026-07-15T14:36:14.875Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "step0-deploy-gating": {
-        "writerId": "agent-pan-2713",
-        "agentId": "agent-pan-2713",
-        "pid": 1013778,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:32:45.559Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -157,6 +149,17 @@
         "outcome": "completed",
         "reason": "Added five-cycle staleness reconciliation with throttled signals, merge debounce, shared safety guard, restart marker, detached Node reload, and cooldown; moved the scheduler wrapper out of ratcheted deacon.ts after the file-size hook blocked the first push.",
         "releasedAt": "2026-07-15T14:32:32.511Z"
+      },
+      {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 1013778,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:32:45.559Z",
+        "itemId": "step0-deploy-gating",
+        "outcome": "completed",
+        "reason": "Gated post-merge Step 0 through staleness and deploy-window decisions while preserving stale-clear/unknown restart behavior and in-process fallback; lowered the merge-agent file-size baseline after shrinking the file.",
+        "releasedAt": "2026-07-15T14:36:14.874Z"
       }
     ],
     "statusReasons": {
@@ -183,6 +186,10 @@
       "deploy-patrol": {
         "reason": "Added five-cycle staleness reconciliation with throttled signals, merge debounce, shared safety guard, restart marker, detached Node reload, and cooldown; moved the scheduler wrapper out of ratcheted deacon.ts after the file-size hook blocked the first push.",
         "updatedAt": "2026-07-15T14:32:32.511Z"
+      },
+      "step0-deploy-gating": {
+        "reason": "Gated post-merge Step 0 through staleness and deploy-window decisions while preserving stale-clear/unknown restart behavior and in-process fallback; lowered the merge-agent file-size baseline after shrinking the file.",
+        "updatedAt": "2026-07-15T14:36:14.874Z"
       }
     }
   },
@@ -216,6 +223,11 @@
     "deploy-patrol.deploy-patrol.ac3": "completed",
     "deploy-patrol.deploy-patrol.ac4": "completed",
     "deploy-patrol.deploy-patrol.ac5": "completed",
-    "step0-deploy-gating": "running"
+    "step0-deploy-gating": "completed",
+    "step0-deploy-gating.step0-deploy-gating.ac1": "completed",
+    "step0-deploy-gating.step0-deploy-gating.ac2": "completed",
+    "step0-deploy-gating.step0-deploy-gating.ac3": "completed",
+    "step0-deploy-gating.step0-deploy-gating.ac4": "completed",
+    "step0-deploy-gating.step0-deploy-gating.ac5": "completed"
   }
 }
