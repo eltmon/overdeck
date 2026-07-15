@@ -287,7 +287,7 @@
     "recordedAt": "2026-07-15T15:35:35.783Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:41:02.587Z",
+  "updated": "2026-07-15T15:42:28.068Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
@@ -485,7 +485,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
