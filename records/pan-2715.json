@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:11:46.017Z",
+  "updated": "2026-07-15T15:13:16.996Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "gate-mainverify-row": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 1737272,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:11:46.017Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -166,6 +158,17 @@
         "outcome": "completed",
         "reason": "Checked canonical post-merge state and running issue agents; 14 tests and typecheck passed; pushed 47952854c0",
         "releasedAt": "2026-07-15T15:11:32.863Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1737272,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:11:46.017Z",
+        "itemId": "gate-mainverify-row",
+        "outcome": "completed",
+        "reason": "Checked merge-commit CI results with pass/miss/skip semantics; 18 tests and typecheck passed; pushed d9bce4cf0e",
+        "releasedAt": "2026-07-15T15:13:16.995Z"
       }
     ],
     "statusReasons": {
@@ -191,8 +194,8 @@
         "updatedAt": "2026-07-15T15:11:32.863Z"
       },
       "gate-mainverify-row": {
-        "reason": "Continue next ready vBRIEF item",
-        "updatedAt": "2026-07-15T15:11:46.017Z"
+        "reason": "Checked merge-commit CI results with pass/miss/skip semantics; 18 tests and typecheck passed; pushed d9bce4cf0e",
+        "updatedAt": "2026-07-15T15:13:16.995Z"
       }
     }
   },
@@ -218,6 +221,9 @@
     "gate-postmerge-row.gate-postmerge-row.ac1": "completed",
     "gate-postmerge-row.gate-postmerge-row.ac2": "completed",
     "gate-postmerge-row.gate-postmerge-row.ac3": "completed",
-    "gate-mainverify-row": "running"
+    "gate-mainverify-row": "completed",
+    "gate-mainverify-row.gate-mainverify-row.ac1": "completed",
+    "gate-mainverify-row.gate-mainverify-row.ac2": "completed",
+    "gate-mainverify-row.gate-mainverify-row.ac3": "completed"
   }
 }
