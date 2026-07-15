@@ -207,16 +207,33 @@ describe('state home', () => {
     expect(git(path, ['branch', '--show-current'])).toBe('overdeck-state');
   });
 
-  it('refuses destructive repair of a dirty state worktree', async () => {
+  it('treats a dirty state worktree on overdeck-state as healthy', async () => {
     const parent = pushUnmarkedStateBranch();
     pushCompletionMarker(parent);
     const path = stateWorktreePath(project, { projectKey: 'fixture' });
     await ensureStateWorktree(project, { projectKey: 'fixture' });
     writeFileSync(join(path, 'dirty.txt'), 'preserve me\n');
 
+    await expect(ensureStateWorktree(project, { projectKey: 'fixture' })).resolves.toEqual({
+      status: 'healthy',
+      path,
+    });
+  });
+
+  it('refuses destructive repair of a dirty wrong-branch state worktree', async () => {
+    const parent = pushUnmarkedStateBranch();
+    pushCompletionMarker(parent);
+    const path = stateWorktreePath(project, { projectKey: 'fixture' });
+    mkdirSync(join(overdeckHome, 'state'), { recursive: true });
+    git(repo, ['branch', 'wrong-state-branch', 'main']);
+    git(repo, ['worktree', 'add', '--quiet', path, 'wrong-state-branch']);
+    writeFileSync(join(path, 'dirty.txt'), 'preserve me\n');
+
     await expect(ensureStateWorktree(project, { projectKey: 'fixture' })).resolves.toMatchObject({
       status: 'dirty',
       path,
     });
+    expect(git(path, ['branch', '--show-current'])).toBe('wrong-state-branch');
+    expect(git(path, ['status', '--porcelain'])).toContain('dirty.txt');
   });
 });
