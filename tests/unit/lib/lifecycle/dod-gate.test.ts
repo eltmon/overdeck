@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 import {
+  checkMergedRow,
   checkReviewRow,
   checkTestsRow,
   checkVerificationRow,
   type DodStatusRowDeps,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
+import { stepFailed, stepOk, stepSkipped } from '../../../../src/lib/lifecycle/types.js';
 
 const issueId = 'PAN-2715';
 
@@ -88,5 +90,66 @@ describe('Definition-of-Done status rows', () => {
         expect(row).toMatchObject({ status: 'miss', observed: 'no review status or journal record found' });
       }
     }
+  });
+});
+
+describe('Definition-of-Done merged row', () => {
+  const ctx = {
+    issueId,
+    projectPath: '/tmp/overdeck',
+    github: { owner: 'eltmon', repo: 'overdeck', number: 2715 },
+  };
+
+  it('maps the existing merge verifier result without changing its verdict', async () => {
+    const pass = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepOk('close-out:verify-merged', ['All commits merged to main']),
+      readPullRequest: async () => ({}),
+    });
+    const miss = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepFailed('close-out:verify-merged', 'branch has 2 unmerged commit(s)'),
+      readPullRequest: async () => ({}),
+    });
+    expect(pass).toMatchObject({ status: 'pass', observed: expect.stringContaining('All commits merged to main') });
+    expect(miss).toMatchObject({ status: 'miss', observed: expect.stringContaining('2 unmerged commit') });
+  });
+
+  it('treats the existing idempotent skip as a pass', async () => {
+    const row = await checkMergedRow({ issueId, projectPath: '/tmp/overdeck' }, {
+      verifyMerged: async () => stepSkipped('close-out:verify-merged', ['Issue already closed on forge']),
+      readPullRequest: async () => { throw new Error('must not read without GitHub context'); },
+    });
+    expect(row).toMatchObject({ status: 'pass', observed: 'Issue already closed on forge' });
+  });
+
+  it('adds forge merge time and commit metadata when available', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepOk('close-out:verify-merged', ['Merge specialist confirmed merge completed']),
+      readPullRequest: async (_ctx, branch) => {
+        expect(branch).toBe('feature/pan-2715');
+        return {
+          number: 2720,
+          state: 'MERGED',
+          mergedAt: '2026-07-15T12:00:00Z',
+          mergeCommit: { oid: 'deadbeef' },
+        };
+      },
+    });
+    expect(row).toMatchObject({
+      status: 'pass',
+      mergedAt: '2026-07-15T12:00:00Z',
+      mergeCommit: 'deadbeef',
+      observed: expect.stringContaining('PR #2720 MERGED at 2026-07-15T12:00:00Z'),
+    });
+  });
+
+  it('keeps a git-verified pass when forge metadata lookup fails', async () => {
+    const row = await checkMergedRow(ctx, {
+      verifyMerged: async () => stepOk('close-out:verify-merged', ['All commits merged to main']),
+      readPullRequest: async () => { throw new Error('gh timed out'); },
+    });
+    expect(row).toMatchObject({
+      status: 'pass',
+      observed: expect.stringContaining('forge metadata unavailable: gh timed out'),
+    });
   });
 });

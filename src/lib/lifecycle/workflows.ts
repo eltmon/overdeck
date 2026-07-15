@@ -406,7 +406,7 @@ function verifyBranchMerged(ctx: LifecycleContext): Effect.Effect<StepResult> {
   );
 }
 
-async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
+export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:verify-merged';
   const issueLower = ctx.issueId.toLowerCase();
   const branchName = `feature/${issueLower}`;
