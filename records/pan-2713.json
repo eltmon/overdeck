@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:32:32.511Z",
+  "updated": "2026-07-15T14:32:45.559Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,8 +81,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "step0-deploy-gating": {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 1013778,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:32:45.559Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -207,6 +215,7 @@
     "deploy-patrol.deploy-patrol.ac2": "completed",
     "deploy-patrol.deploy-patrol.ac3": "completed",
     "deploy-patrol.deploy-patrol.ac4": "completed",
-    "deploy-patrol.deploy-patrol.ac5": "completed"
+    "deploy-patrol.deploy-patrol.ac5": "completed",
+    "step0-deploy-gating": "running"
   }
 }
