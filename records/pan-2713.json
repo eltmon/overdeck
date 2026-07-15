@@ -119,21 +119,21 @@
     "recordedAt": "2026-07-15T14:50:52.626Z"
   },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T15:11:35.276Z",
+  "updated": "2026-07-15T15:16:04.531Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:11:35.213Z",
+    "updatedAt": "2026-07-15T15:16:04.477Z",
     "reviewNotes": "[requirements] Deacon can deploy while the flywheel is running — NonGoal 4",
     "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2721",
-    "lastVerifiedCommit": "d5f48b48342d0479980fc4b5b6af0df3ea2378e7",
+    "lastVerifiedCommit": "9e838feb867eb3dc7aac5997325bb8c322a65eb1",
     "reviewRequestedAt": "2026-07-15T14:51:58.635Z",
     "reviewSpawnedAt": "2026-07-15T14:55:28.026Z"
   },
@@ -142,15 +142,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 5251339,
-            "output": 4420,
-            "cacheRead": 5006848,
+            "input": 5946589,
+            "output": 4685,
+            "cacheRead": 5203968,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 44876908,
-            "output": 70073,
-            "cacheRead": 44039680,
+            "input": 48989821,
+            "output": 72042,
+            "cacheRead": 48121088,
             "cacheWrite": 0
           }
         },
@@ -173,15 +173,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 5251339,
-          "output": 4420,
-          "cacheRead": 5006848,
+          "input": 5946589,
+          "output": 4685,
+          "cacheRead": 5203968,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 44876908,
-          "output": 70073,
-          "cacheRead": 44039680,
+          "input": 48989821,
+          "output": 72042,
+          "cacheRead": 48121088,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -198,8 +198,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 43.136309000000004,
-        "pricingAsOf": "2026-07-15T15:11:35.266Z"
+        "usd": 45.393608,
+        "pricingAsOf": "2026-07-15T15:16:04.522Z"
       }
     },
     "merges": [
