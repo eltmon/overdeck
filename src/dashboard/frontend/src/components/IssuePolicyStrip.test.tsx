@@ -48,9 +48,11 @@ describe('IssuePolicyStrip', () => {
     expect(screen.getByLabelText('Issue policy overrides')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Review' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Work' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Review mode for this issue')).toContainElement(document.activeElement as HTMLElement);
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByLabelText('Issue policy overrides')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Issue policies' })).toHaveFocus();
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue policies' }));
     fireEvent.mouseDown(document.body);
@@ -115,8 +117,25 @@ describe('IssuePolicyStrip', () => {
     ];
     for (const ariaLabel of legacyControls) expect(screen.getByLabelText(ariaLabel)).toBeInTheDocument();
 
-    expect(screen.getAllByRole('button', { name: 'reset' })).toHaveLength(5);
-    expect(screen.getByRole('button', { name: 'Reset all to defaults' })).toBeInTheDocument();
+    for (const accessibleName of [
+      'Reset review mode to default',
+      'Reset re-review scope to default',
+      'Reset review model to default',
+      'Reset work model to default',
+      'Reset swarm mode to default',
+    ]) expect(screen.getByRole('button', { name: accessibleName })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset all to defaults' }));
+    await waitFor(() => {
+      const posts = vi.mocked(global.fetch).mock.calls.filter(([, init]) => init?.method === 'POST');
+      expect(posts).toEqual(expect.arrayContaining([
+        ['/api/review/PAN-2681/config', expect.objectContaining({ body: JSON.stringify({ reviewMode: null }) })],
+        ['/api/review/PAN-2681/config', expect.objectContaining({ body: JSON.stringify({ reReviewScope: null }) })],
+        ['/api/review/PAN-2681/config', expect.objectContaining({ body: JSON.stringify({ reviewModel: null }) })],
+        ['/api/issues/PAN-2681/staffing', expect.objectContaining({ body: JSON.stringify({ workModel: null }) })],
+        ['/api/issues/PAN-2681/swarm-policy', expect.objectContaining({ body: JSON.stringify({ value: null }) })],
+      ]));
+    });
     expect(screen.getByText('The work-model override applies to the next spawn; running agents are never restarted automatically.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restart agent with new staffing' })).toBeInTheDocument();
 

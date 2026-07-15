@@ -63,6 +63,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
   const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   const refresh = useCallback(async () => {
     const encoded = encodeURIComponent(issueId);
@@ -114,33 +115,41 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
   const positionPanel = useCallback(() => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
+    const panelWidth = Math.min(400, Math.max(0, window.innerWidth - 16));
     setPanelPos({
       top: rect.bottom + 6,
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - 416)),
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8)),
     });
   }, []);
 
-  const togglePanel = useCallback(() => {
+  const togglePanel = useCallback((opener: HTMLElement) => {
     if (open) {
       setOpen(false);
       return;
     }
+    openerRef.current = opener;
     positionPanel();
     setOpen(true);
   }, [open, positionPanel]);
 
-  const showPanel = useCallback(() => {
+  const showPanel = useCallback((opener: HTMLElement) => {
+    openerRef.current = opener;
     positionPanel();
     setOpen(true);
   }, [positionPanel]);
 
   useEffect(() => {
     if (!open) return;
+    panelRef.current?.querySelector<HTMLElement>('button, select')?.focus();
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (!buttonRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
     };
-    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setOpen(false); };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      openerRef.current?.focus();
+    };
     const dismiss = () => setOpen(false);
     document.addEventListener('mousedown', onMouseDown);
     window.addEventListener('keydown', onKeyDown);
@@ -211,7 +220,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
         aria-label="Issue policies"
         aria-expanded={open}
         className={`inline-flex h-[22px] items-center gap-1.5 rounded border border-border px-2 text-[11px] font-medium hover:bg-muted hover:text-foreground ${overrideCount > 0 ? 'text-foreground' : 'text-muted-foreground'}`}
-        onClick={togglePanel}
+        onClick={(event) => togglePanel(event.currentTarget)}
       >
         <svg aria-hidden="true" className="h-[11px] w-[11px]" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
           <line x1="2" y1="4.5" x2="14" y2="4.5" /><circle cx="6" cy="4.5" r="1.7" fill="currentColor" />
@@ -222,13 +231,13 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
       </button>
 
       {overrides.map((override) => (
-        <button key={override.key} type="button" className="inline-flex h-5 items-center gap-1 rounded border border-primary/32 bg-primary/8 px-1.5 text-[11px] font-medium text-foreground" onClick={showPanel}>
+        <button key={override.key} type="button" className="inline-flex h-5 items-center gap-1 rounded border border-primary/32 bg-primary/8 px-1.5 text-[11px] font-medium text-foreground" onClick={(event) => showPanel(event.currentTarget)}>
           <span className="text-muted-foreground">{override.label} ·</span> {override.value}
         </button>
       ))}
 
       {needsRestart && (
-        <button type="button" className="inline-flex h-5 items-center rounded border border-warning/32 bg-warning/8 px-1.5 text-[11px] font-medium text-warning-foreground" onClick={showPanel}>
+        <button type="button" className="inline-flex h-5 items-center rounded border border-warning/32 bg-warning/8 px-1.5 text-[11px] font-medium text-warning-foreground" onClick={(event) => showPanel(event.currentTarget)}>
           restart pending
         </button>
       )}
@@ -236,8 +245,10 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
       {open && panelPos && createPortal(
         <div
           ref={panelRef}
+          role="dialog"
           aria-label="Issue policy overrides"
-          className="fixed z-[100] w-[400px] rounded-lg border border-border bg-popover px-4 pb-3 pt-3.5 shadow-lg"
+          tabIndex={-1}
+          className="fixed z-[100] w-[400px] max-w-[calc(100vw-16px)] rounded-lg border border-border bg-popover px-4 pb-3 pt-3.5 shadow-lg"
           style={{ top: panelPos.top, left: panelPos.left }}
         >
           <h3 className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Review</h3>
@@ -247,7 +258,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             </span>
             <div className={controlCellClass}>
               <Segmented ariaLabel="Review mode for this issue" value={review.override.reviewMode} resolvedLabel={review.resolved.reviewMode} options={[["quick", "Quick"], ["full", "Full"], ["none", "None"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reviewMode: next })} />
-              {review.override.reviewMode && <button type="button" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewMode: null })}>reset</button>}
+              {review.override.reviewMode && <button type="button" aria-label="Reset review mode to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewMode: null })}>reset</button>}
             </div>
           </div>
 
@@ -258,7 +269,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
               </span>
               <div className={controlCellClass}>
                 <Segmented ariaLabel="Re-review scope for this issue" value={review.override.reReviewScope} resolvedLabel={review.resolved.reReviewScope} options={[["changed", "Changed"], ["all", "All"], ["blockers", "Blockers"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reReviewScope: next })} />
-                {review.override.reReviewScope && <button type="button" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reReviewScope: null })}>reset</button>}
+                {review.override.reReviewScope && <button type="button" aria-label="Reset re-review scope to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reReviewScope: null })}>reset</button>}
               </div>
             </div>
           )}
@@ -272,7 +283,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
                 <option value="">Default · {review.resolved.reviewModel ? modelName(review.resolved.reviewModel) : 'per-role default'}</option>
                 {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
               </select>
-              {review.override.reviewModel && <button type="button" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewModel: null })}>reset</button>}
+              {review.override.reviewModel && <button type="button" aria-label="Reset review model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewModel: null })}>reset</button>}
             </div>
           </div>
 
@@ -286,7 +297,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
                 <option value="">Default · {workDefault}</option>
                 {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
               </select>
-              {staffing.override.workModel && <button type="button" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button>}
+              {staffing.override.workModel && <button type="button" aria-label="Reset work model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button>}
             </div>
           </div>
 
@@ -296,7 +307,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             </span>
             <div className={controlCellClass}>
               <Segmented ariaLabel="Swarm mode for this issue" value={swarm.configured?.mode ?? null} resolvedLabel={swarm.resolved.mode} options={[["off", "Off"], ["auto", "Auto"], ["always", "Always"]]} disabled={saving} onChange={(next) => save(`/api/issues/${encoded}/swarm-policy`, { value: next ? { mode: next } : null })} />
-              {swarm.configured?.mode && <button type="button" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/swarm-policy`, { value: null })}>reset</button>}
+              {swarm.configured?.mode && <button type="button" aria-label="Reset swarm mode to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/swarm-policy`, { value: null })}>reset</button>}
             </div>
           </div>
 
