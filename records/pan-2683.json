@@ -172,7 +172,7 @@
     "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T12:30:02.208Z",
+  "updated": "2026-07-15T13:06:29.266Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "reviewing",
@@ -269,8 +269,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "reviewMode": "full",
   "reReviewScope": "changed",
