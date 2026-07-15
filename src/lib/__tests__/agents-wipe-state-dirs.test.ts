@@ -5,7 +5,7 @@
  * the review restart extension both use to clean state before respawning.
  * Its job is narrow: rm -rf the matching agent dirs under
  * ~/.overdeck/agents/ for a given issue, leaving the work agent dir alone
- * (when rolePrefix is set) or vice versa. Workspace, vBRIEF, beads,
+ * (when rolePrefix is set) or vice versa. Workspace, vBRIEF, tasks,
  * .pan/continue.json, the branch, and the commit history are all outside
  * the scope and must be left intact.
  */

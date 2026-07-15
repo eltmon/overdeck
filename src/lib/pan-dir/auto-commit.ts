@@ -9,8 +9,7 @@
  *
  * This module exposes a serialized write-through commit primitive that pan-dir
  * writers call after they update a file. Commits are:
- *   - scheduled immediately by default so every state update reaches git + origin
- *   - optionally fixed-window coalesced when OVERDECK_STATE_FLUSH_WINDOW_MS is set
+ *   - scheduled on the next event-loop turn so every state update reaches git + origin
  *   - serialized within a process so the git index is never contested
  *   - best-effort for synchronous callers: failures are logged and reported by flushes
  *   - main-only: feature branches have their own commit cadence owned by agents
@@ -37,16 +36,7 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
-const DEFAULT_STATE_FLUSH_WINDOW_MS = 0;
-const STATE_FLUSH_WINDOW_MS = parseStateFlushWindowMs(process.env.OVERDECK_STATE_FLUSH_WINDOW_MS);
 const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
-
-function parseStateFlushWindowMs(value: string | undefined): number {
-  if (!value) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_STATE_FLUSH_WINDOW_MS;
-  return parsed;
-}
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -100,6 +90,14 @@ export interface FlushResult {
   committed: boolean;
   /** True only when the new commit is confirmed on origin. */
   pushed?: boolean;
+  /**
+   * True when a git operation actually errored (branch resolution, `git add`,
+   * or `git commit` exited non-zero) as opposed to a benign no-op such as
+   * "no diff" or "not on main". Door writers that await the flush surface this
+   * loudly so a failed commit never silently leaves the state worktree dirty
+   * (PAN-2677).
+   */
+  errored?: boolean;
   reason?: string;
 }
 
@@ -118,7 +116,20 @@ function runGit(
   cwd: string,
 ): Effect.Effect<GitResult, GitError> {
   return Effect.gen(function* () {
-    const handle = yield* ChildProcess.make('git', [...args], { cwd });
+    // HUSKY=0 disables client-side git hooks for the door's own commits.
+    // A migrated state worktree shares `core.hooksPath` with the code repo's
+    // `.husky/_`, so a `git commit` here would run the code repo's pre-commit
+    // hooks with cwd = the state worktree. Those hook scripts don't exist on
+    // the `overdeck-state` orphan branch and exit 127, failing the commit and
+    // stranding the worktree dirty (PAN-2677). HUSKY=0 is husky's native
+    // disable, not a `--no-verify` bypass of the door's own guarantees — the
+    // state branch has no hooks of its own, and the door is a trusted
+    // single-writer with its own verified-write + push guarantees.
+    const handle = yield* ChildProcess.make('git', [...args], {
+      cwd,
+      env: { HUSKY: '0' },
+      extendEnv: true,
+    });
     const stdoutBuf = yield* Stream.runFold(
       handle.stdout,
       () => Buffer.alloc(0),
@@ -185,10 +196,9 @@ function isGitError(value: unknown): value is GitError {
 }
 
 /**
- * Queue an auto-commit for one or more files. Returns immediately; by default
- * the serialized commit starts on the next timer turn. An explicit positive
- * OVERDECK_STATE_FLUSH_WINDOW_MS retains fixed-window coalescing for operators
- * who knowingly trade durability latency for fewer commits.
+ * Queue an auto-commit for one or more files. Returns immediately; the
+ * serialized commit-and-push starts on the next timer turn. Callers whose
+ * success depends on remote durability must also await flushAutoCommits().
  *
  * PAN-1908: `repoRoot` allows committing files to a different git checkout
  * than the project root (e.g., a declared infra repo for per-issue permanent
@@ -231,38 +241,10 @@ export function queueAutoCommit(opts: {
   pending.set(projectRoot, {
     paths: new Set(paths),
     subjects: [subject],
-    timer: setTimeout(() => void flushInner(projectRoot), STATE_FLUSH_WINDOW_MS),
+    timer: setTimeout(() => void flushInner(projectRoot), 0),
     repoRoot,
     expectedBranch,
   });
-}
-
-/**
- * PAN-1441: queue an auto-commit of the host-main beads export files.
- *
- * Unlike the .pan/* writers, there is no single Overdeck write site for these:
- * `.beads/issues.jsonl` and `.beads/export-state.json` drift on `main` as a
- * side-effect of the `bd` binary re-exporting after dolt syncs (other machines /
- * workspaces pushing to the shared dolt remote). So this is called from the
- * deacon's periodic patrol as a drift sweep rather than wired to a write site.
- *
- * Only existing files are queued: a missing/deleted `issues.jsonl` is skipped so
- * the janitor never stages — and propagates — a transient empty-DB deletion (the
- * PAN-1158 hazard). queueAutoCommit is main-only, coalesced, and a no-op when
- * nothing changed.
- */
-export function queueBeadsAutoCommit(projectRoot: string): void {
-  const project = findProjectByPathSync(projectRoot);
-  const beadsRoot = project && resolveStateReadHomeSync(project).migrated
-    ? resolveStateReadHomeSync(project).root
-    : projectRoot;
-  const candidates = [
-    join(beadsRoot, '.beads', 'issues.jsonl'),
-    join(beadsRoot, '.beads', 'export-state.json'),
-  ];
-  const paths = candidates.filter((p) => existsSync(p));
-  if (paths.length === 0) return;
-  queueAutoCommit({ projectRoot, paths, subject: 'chore(beads): sync beads state on main' });
 }
 
 /**
@@ -370,6 +352,7 @@ function doCommit(
         onFailure: (err) =>
           Effect.succeed({
             committed: false as const,
+            errored: true as const,
             reason: `branch check failed: ${err.stderr || err._tag}`,
           } satisfies FlushResult),
       }),
@@ -414,6 +397,7 @@ function doCommit(
           console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
           return Effect.succeed({
             committed: false as const,
+            errored: true as const,
             reason: err.stderr || err._tag,
           } satisfies FlushResult);
         },
@@ -451,6 +435,7 @@ function doCommit(
           console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
           return Effect.succeed({
             committed: false as const,
+            errored: true as const,
             reason: err.stderr || err._tag,
           } satisfies FlushResult);
         },
@@ -476,9 +461,6 @@ function maybePushStateCommit(
   gitRoot: string,
   branch: string,
 ): Effect.Effect<PushResult | null, never> {
-  if (process.env.OVERDECK_STATE_AUTOPUSH === '0') {
-    return Effect.succeed(null);
-  }
   return runGit(['remote', 'get-url', 'origin'], gitRoot).pipe(
     Effect.matchEffect({
       // Unit-test and local scratch repositories may intentionally have no
@@ -605,17 +587,15 @@ function warnAutoPush(branch: string, message: string): void {
 }
 
 /**
- * Find the project root for a `.pan/` or `.beads/` file path. Returns null
- * when the path is not under either marker.
+ * Find the project root for a `.pan/` file path. Returns null otherwise.
  */
 export function deriveProjectRoot(path: string): string | null {
-  for (const marker of [`${sep}.pan${sep}`, `${sep}.beads${sep}`]) {
-    const idx = path.indexOf(marker);
-    if (idx !== -1) return path.slice(0, idx);
-  }
-  // Edge case: the path is the .pan/.beads directory itself.
+  const marker = `${sep}.pan${sep}`;
+  const idx = path.indexOf(marker);
+  if (idx !== -1) return path.slice(0, idx);
+  // Edge case: the path is the .pan directory itself.
   const base = dirname(path);
-  if (base.endsWith(`${sep}.pan`) || base.endsWith(`${sep}.beads`)) {
+  if (base.endsWith(`${sep}.pan`)) {
     return dirname(base);
   }
   return null;

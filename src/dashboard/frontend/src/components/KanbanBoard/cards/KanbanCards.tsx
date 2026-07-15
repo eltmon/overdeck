@@ -36,7 +36,7 @@ export function FeatureCard({
   isSelected,
   onSelect,
   onPlan,
-  onViewBeads,
+  onViewTasks,
   onViewVBrief,
   planningState: planningStateProp,
   children,
@@ -48,7 +48,7 @@ export function FeatureCard({
   isSelected?: boolean;
   onSelect?: () => void;
   onPlan?: () => void;
-  onViewBeads?: () => void;
+  onViewTasks?: () => void;
   onViewVBrief?: () => void;
   planningState?: PlanningState;
   children?: React.ReactNode;
@@ -64,7 +64,7 @@ export function FeatureCard({
      (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
 
   const hasPlan = planningStateProp?.hasPlan ?? feature.hasPlan ?? false;
-  const hasBeads = planningStateProp?.hasBeads ?? feature.hasBeads ?? false;
+  const hasTasks = planningStateProp?.hasTasks ?? feature.hasTasks ?? false;
   const planLabelExists = hasPlan || feature.labels?.some(l => l.toLowerCase() === 'planned');
 
   return (
@@ -149,10 +149,10 @@ export function FeatureCard({
                 {planLabelExists ? 'See Plan' : 'Plan'}
               </button>
             )}
-            {(hasBeads || (hasPlan && !hasBeads)) && (
+            {(hasTasks || (hasPlan && !hasTasks)) && (
               <button
                 data-testid={`action-tasks-${feature.identifier}`}
-                onClick={(e) => { e.stopPropagation(); onViewBeads && onViewBeads(); }}
+                onClick={(e) => { e.stopPropagation(); onViewTasks && onViewTasks(); }}
                 className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors"
                 title="Tasks"
               >
@@ -544,7 +544,7 @@ interface IssueCardProps {
   isSelected: boolean;
   onSelect: () => void;
   onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
-  onViewBeads?: (issue: Issue) => void;
+  onViewTasks?: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
@@ -580,7 +580,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     agent: activeAgent,
     workspace: { exists: !!(workspaceProp?.path || issue.workspacePath) },
     hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
-    hasBeads: planningState?.hasBeads ?? issue.hasBeads ?? false,
+    hasTasks: planningState?.hasTasks ?? issue.hasTasks ?? false,
     issueCanonicalState: canonical,
     isMerged,
   });
@@ -591,7 +591,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
     cardVerb ? <VerbBadge variant={cardVerb} /> :
     null;
-  const beadProgressColor =
+  const taskProgressColor =
     isReadyToMerge || isMerged || canonical === 'done' ? 'var(--success)' :
     canonical === 'in_review' ? 'var(--warning)' :
     canonical === 'in_progress' ? 'var(--info)' :
@@ -635,8 +635,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const agentSubText = activeAgent
     ? (reviewSpecialists.length > 0 && activeAgent.role === 'review'
       ? `${reviewSpecialists.length} reviewers · ${getFriendlyModelName(activeAgent.model)}`
-      : issue.beadCounts
-        ? `${getFriendlyModelName(activeAgent.model)} · bead ${issue.beadCounts.completed}/${issue.beadCounts.total}`
+      : issue.taskCounts
+        ? `${getFriendlyModelName(activeAgent.model)} · task ${issue.taskCounts.completed}/${issue.taskCounts.total}`
         : getFriendlyModelName(activeAgent.model))
     : '';
   const trackerRef = issue.source === 'github'
@@ -777,11 +777,11 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           </div>
         )}
 
-        {/* Bead progress */}
-        {issue.beadCounts && (
-          <div className="flex items-center gap-2 mt-2" data-component="bead-progress" data-progress={issue.beadCounts.completed}>
+        {/* Task progress */}
+        {issue.taskCounts && (
+          <div className="flex items-center gap-2 mt-2" data-component="task-progress" data-progress={issue.taskCounts.completed}>
             <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-              Beads {issue.beadCounts.completed}/{issue.beadCounts.total}
+              Tasks {issue.taskCounts.completed}/{issue.taskCounts.total}
             </span>
             <div
               className="flex-1 h-[3px] rounded-[2px] overflow-hidden"
@@ -790,8 +790,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               <div
                 className="h-full rounded-[2px]"
                 style={{
-                  width: `${(issue.beadCounts.completed / issue.beadCounts.total) * 100}%`,
-                  background: beadProgressColor,
+                  width: `${(issue.taskCounts.completed / issue.taskCounts.total) * 100}%`,
+                  background: taskProgressColor,
                 }}
               />
             </div>

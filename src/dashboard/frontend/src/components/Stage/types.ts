@@ -32,7 +32,7 @@ export interface StageApi {
 /**
  * Context every pane wrapper receives. The Stage is workspace/issue-scoped
  * (PAN-1549 D3), so `workspaceId` doubles as the issue id. `openPane` lets a
- * pane open + activate another pane. Later pane-wrapper beads widen this as
+ * pane open + activate another pane. Later pane-wrapper tasks widen this as
  * they need more workspace context.
  */
 export interface StageContext {

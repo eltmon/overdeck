@@ -1,7 +1,8 @@
 import { Effect } from 'effect';
 
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
-import { readIssueRecordSync, writeIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
+import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
+import { updateIssueRecord } from '../pan-dir/record-update.js';
 import { listSessionNames, sessionExists } from '../tmux.js';
 
 export type IssueFeedbackTarget =
@@ -95,7 +96,7 @@ export async function resolveIssueFeedbackTarget(
   if (project && record) {
     const fallback = await findLiveUnregisteredSlot(normalizedIssue);
     if (fallback) {
-      writeIssueRecordSync(project, normalizedIssue, selfHealSlotAssignment(record, fallback.agentId, fallback.slotIndex, requestedItemId));
+      await updateIssueRecord(project, normalizedIssue, (current) => selfHealSlotAssignment(current, fallback.agentId, fallback.slotIndex, requestedItemId));
       return { agentId: fallback.agentId };
     }
   }

@@ -137,7 +137,7 @@ export function DrawerAgentSession({ view, agents, agentId, onSelectAgent }: Dra
         <div className="mb-[8px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
           {view === 'conversation' ? 'Conversation' : 'Terminal'}
         </div>
-        <p className="text-[13px] leading-6 text-muted-foreground">
+        <p className="text-[12px] leading-5 text-muted-foreground">
           No agent session for this issue yet. The {view === 'conversation' ? 'transcript' : 'live terminal'} appears here once an agent starts.
         </p>
       </div>

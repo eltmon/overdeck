@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 // main), which is how one issue's workspace ends up showing another issue's
 // spec ("spec drift" — PAN-1982's spec surfaced in feature-pan-1894). Once a
 // file is tracked, .gitignore no longer protects it: the work agent's own
-// `git add -A` / per-bead commits re-carry it into PRs and back onto main.
+// `git add -A` / per-task commits re-carry it into PRs and back onto main.
 // This guard fails the build if any of these ever become tracked again, so the
 // contamination can't silently recur.
 const MUST_NOT_BE_TRACKED = ['.pan/spec.vbrief.json', '.pan/continue.json'];

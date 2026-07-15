@@ -22,32 +22,32 @@ function writeSpec(projectPath: string, issueId: string, planItemCount: number):
   }, null, 2));
 }
 
-function writeBeads(projectPath: string, issueId: string, beadCount: number): void {
-  const beadsDir = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, '.beads');
-  mkdirSync(beadsDir, { recursive: true });
-  const lines = Array.from({ length: beadCount }, (_, index) => JSON.stringify({
+function writeTasks(projectPath: string, issueId: string, taskCount: number): void {
+  const tasksDir = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`, '.tasks');
+  mkdirSync(tasksDir, { recursive: true });
+  const lines = Array.from({ length: taskCount }, (_, index) => JSON.stringify({
     _type: 'issue',
     id: `workspace-${issueId.toLowerCase()}-${index + 1}`,
-    title: `${issueId} bead ${index + 1}`,
+    title: `${issueId} task ${index + 1}`,
     labels: [issueId.toLowerCase()],
   }));
-  writeFileSync(join(beadsDir, 'issues.jsonl'), lines.join('\n'));
+  writeFileSync(join(tasksDir, 'issues.jsonl'), lines.join('\n'));
 }
 
-function writeRedirectBeads(projectPath: string, issueId: string, beadCount: number): void {
+function writeRedirectTasks(projectPath: string, issueId: string, taskCount: number): void {
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const workspaceBeadsDir = join(workspacePath, '.beads');
-  const sharedBeadsDir = join(projectPath, '.beads');
-  mkdirSync(workspaceBeadsDir, { recursive: true });
-  mkdirSync(sharedBeadsDir, { recursive: true });
-  const lines = Array.from({ length: beadCount }, (_, index) => JSON.stringify({
+  const workspaceTasksDir = join(workspacePath, '.tasks');
+  const sharedTasksDir = join(projectPath, '.tasks');
+  mkdirSync(workspaceTasksDir, { recursive: true });
+  mkdirSync(sharedTasksDir, { recursive: true });
+  const lines = Array.from({ length: taskCount }, (_, index) => JSON.stringify({
     _type: 'issue',
     id: `shared-${issueId.toLowerCase()}-${index + 1}`,
-    title: `${issueId} bead ${index + 1}`,
+    title: `${issueId} task ${index + 1}`,
     labels: [issueId.toLowerCase()],
   }));
-  writeFileSync(join(workspaceBeadsDir, 'redirect'), '../../.beads');
-  writeFileSync(join(sharedBeadsDir, 'issues.jsonl'), lines.join('\n'));
+  writeFileSync(join(workspaceTasksDir, 'redirect'), '../../.tasks');
+  writeFileSync(join(sharedTasksDir, 'issues.jsonl'), lines.join('\n'));
 }
 
 beforeEach(() => {
@@ -59,42 +59,40 @@ afterEach(() => {
 });
 
 describe('orphan proposed specs doctor check', () => {
-  it('classifies orphan proposed specs by bead state and groups output by project', () => {
+  it('reports proposed specs that have no in-flight work agent', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-2001', 2);
     writeSpec(projectPath, 'PAN-2002', 2);
-    writeBeads(projectPath, 'PAN-2002', 1);
+    writeTasks(projectPath, 'PAN-2002', 1);
     writeSpec(projectPath, 'PAN-2003', 2);
-    writeBeads(projectPath, 'PAN-2003', 2);
+    writeTasks(projectPath, 'PAN-2003', 2);
 
     const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
     expect(findOrphanProposedSpecs({ projects, tmuxSessionNames: [], agentsDir: join(testDir, 'agents') })).toEqual([
-      expect.objectContaining({ issueId: 'PAN-2001', reason: 'beads-zero', beadCount: 0, planItemCount: 2 }),
-      expect.objectContaining({ issueId: 'PAN-2002', reason: 'beads-mismatch', beadCount: 1, planItemCount: 2 }),
-      expect.objectContaining({ issueId: 'PAN-2003', reason: 'no-agent-no-reason', beadCount: 2, planItemCount: 2 }),
+      expect.objectContaining({ issueId: 'PAN-2001', reason: 'no-agent-no-reason', planItemCount: 2 }),
+      expect.objectContaining({ issueId: 'PAN-2002', reason: 'no-agent-no-reason', planItemCount: 2 }),
+      expect.objectContaining({ issueId: 'PAN-2003', reason: 'no-agent-no-reason', planItemCount: 2 }),
     ]);
 
     const result = checkOrphanProposedSpecs({ projects, tmuxSessionNames: [], agentsDir: join(testDir, 'agents') });
     expect(result.status).toBe('warn');
     expect(result.message).toContain('overdeck (Overdeck CLI)');
-    expect(result.message).toContain('PAN-2001 beads-zero');
-    expect(result.message).toContain('PAN-2002 beads-mismatch');
+    expect(result.message).toContain('PAN-2001 no-agent-no-reason');
+    expect(result.message).toContain('PAN-2002 no-agent-no-reason');
     expect(result.message).toContain('PAN-2003 no-agent-no-reason');
-    expect(result.fix).toContain('free disk');
-    expect(result.fix).toContain('spec items and bead tasks diverged');
     expect(result.fix).toContain('pan start <id>');
   });
 
-  it('counts redirect-backed beads stores', () => {
+  it('does not consult legacy task stores', () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
     writeSpec(projectPath, 'PAN-2004', 2);
-    writeRedirectBeads(projectPath, 'PAN-2004', 2);
+    writeRedirectTasks(projectPath, 'PAN-2004', 2);
 
     const projects = [{ key: 'overdeck', config: { name: 'Overdeck CLI', path: projectPath } }];
     expect(findOrphanProposedSpecs({ projects, tmuxSessionNames: [], agentsDir: join(testDir, 'agents') })).toEqual([
-      expect.objectContaining({ issueId: 'PAN-2004', reason: 'no-agent-no-reason', beadCount: 2, planItemCount: 2 }),
+      expect.objectContaining({ issueId: 'PAN-2004', reason: 'no-agent-no-reason', planItemCount: 2 }),
     ]);
   });
 });

@@ -15,7 +15,7 @@ export interface ReviewStatus {
   inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
   inspectNotes?: string;
   inspectStartedAt?: string;
-  inspectBeadId?: string;
+  inspectTaskId?: string;
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
@@ -116,8 +116,8 @@ export interface WorkspaceInfo {
   services?: { name: string; url?: string }[];
   planningState?: {
     hasPlan: boolean;
-    hasBeads: boolean;
-    beadsCount: number;
+    hasTasks: boolean;
+    tasksCount: number;
     planningComplete: boolean;
     workspacePath?: string;
   };

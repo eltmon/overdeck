@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +15,12 @@ describe('reviewModeCommand', () => {
   beforeEach(() => {
     originalCwd = process.cwd();
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-review-mode-'));
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: workspacePath });
+    execFileSync('git', ['config', 'user.email', 'test@overdeck.local'], { cwd: workspacePath });
+    execFileSync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: workspacePath });
+    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: workspacePath });
+    execFileSync('git', ['commit', '--allow-empty', '-q', '-m', 'chore: seed test repository'], { cwd: workspacePath });
+    execFileSync('git', ['remote', 'add', 'origin', '.'], { cwd: workspacePath });
     process.chdir(workspacePath);
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit');
@@ -28,18 +35,19 @@ describe('reviewModeCommand', () => {
     rmSync(workspacePath, { recursive: true, force: true });
   });
 
-  it("persists reviewMode='full' through the per-issue record write door", () => {
-    reviewModeCommand('pan-1982', 'full');
+  it("persists reviewMode='full' through the per-issue record write door", async () => {
+    await reviewModeCommand('pan-1982', 'full');
 
     const recordPath = join(workspacePath, '.pan', 'records', 'pan-1982.json');
     const record = JSON.parse(readFileSync(recordPath, 'utf-8')) as { issueId: string; reviewMode?: string };
 
     expect(record.issueId).toBe('PAN-1982');
     expect(record.reviewMode).toBe('full');
+    expect(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: workspacePath, encoding: 'utf-8' })).toContain('PAN-1982');
   });
 
-  it('rejects invalid review modes before writing a record', () => {
-    expect(() => reviewModeCommand('PAN-1982', 'bogus')).toThrow('process.exit');
+  it('rejects invalid review modes before writing a record', async () => {
+    await expect(reviewModeCommand('PAN-1982', 'bogus')).rejects.toThrow('process.exit');
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('review mode must be quick, full, or none'));

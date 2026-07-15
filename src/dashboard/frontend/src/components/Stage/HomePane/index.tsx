@@ -6,9 +6,9 @@ export interface HomePaneProps {
   workspaceId: WorkspaceId
   /** Open + activate another pane (used by docks, launcher, timeline). */
   openPane: (spec: PaneSpec) => void
-  // Section content slots — filled by later beads (workspace-header, launcher,
+  // Section content slots — filled by later tasks (workspace-header, launcher,
   // agent-dock, action-dock, timeline, homepane-sections). Optional so the
-  // scaffold renders standalone until those beads land.
+  // scaffold renders standalone until those tasks land.
   header?: ReactNode
   launcher?: ReactNode
   agentDock?: ReactNode
@@ -24,10 +24,10 @@ const SECTIONS = ['header', 'launcher', 'agentDock', 'actionDock', 'detail', 'ti
 const DETAIL_FIRST_SECTIONS = ['header', 'detail', 'launcher', 'agentDock', 'actionDock', 'timeline'] as const
 
 /**
- * HomePane — the permanent paneType='home' body (PAN-1549). This bead lays out
+ * HomePane — the permanent paneType='home' body (PAN-1549). This task lays out
  * the section scaffold (WorkspaceHeader, Launcher, AgentDock, ActionDock,
  * detail, Timeline) in a constrained content column. The sections themselves
- * are populated by later beads; each renders into its named slot here.
+ * are populated by later tasks; each renders into its named slot here.
  */
 export function HomePane(props: HomePaneProps) {
   const sections = props.detailFirst ? DETAIL_FIRST_SECTIONS : SECTIONS

@@ -33,7 +33,7 @@ const identity: MemoryIdentity = {
 const status: MemoryStatus = {
   name: 'PAN-1052 memory work',
   headline: 'Memory retrieval is being wired into prompt-time context.',
-  summary: 'The current bead adds prompt-time retrieval and RAG telemetry.',
+  summary: 'The current task adds prompt-time retrieval and RAG telemetry.',
   goal: 'Inject relevant memory without blocking the agent.',
   phase: 'building',
   accomplished: ['FTS search exists', 'Query expansion exists'],

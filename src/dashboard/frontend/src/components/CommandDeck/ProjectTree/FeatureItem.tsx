@@ -3,7 +3,7 @@ import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
   ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
-  BookText, Bug, Container, Radio, Workflow,
+  BookText, Bug, Container, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
@@ -55,7 +55,7 @@ interface FeatureItemProps {
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'beads', 'pr', 'docker'];
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'tasks', 'pr', 'docker'];
 
 function resourceColor(_feature: ProjectFeature): string {
   // v1.2 color restraint: resources are infrastructure facts, not status —
@@ -84,8 +84,8 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
       return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
     case 'vbrief':
       return details.hasVbrief ? { label: 'vBRIEF', detail: 'present' } : null;
-    case 'beads':
-      return details.hasBeads ? { label: 'beads', detail: 'present' } : null;
+    case 'tasks':
+      return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
     case 'pr':
       return details.prs.length > 0
         ? {
@@ -117,7 +117,7 @@ function ResourceIcon({ source, feature }: { source: ResourceSource; feature: Pr
     : source === 'branch' ? <GitBranch {...props} />
       : source === 'tmux' ? <Radio {...props} />
         : source === 'vbrief' ? <BookText {...props} />
-          : source === 'beads' ? <Bug {...props} />
+          : source === 'tasks' ? <Bug {...props} />
             : source === 'pr' ? <Workflow {...props} />
               : <Container {...props} />;
   return (
@@ -206,7 +206,7 @@ function ResourceStrip({
     }
 
     if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
-    if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
+    if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
     for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
     }
@@ -538,7 +538,7 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
     feature.hasPrd ? 'PRD' : null,
     feature.hasState ? 'continue file' : null,
     feature.resourceDetails?.hasVbrief ? 'vBRIEF' : null,
-    feature.resourceDetails?.hasBeads ? 'beads' : null,
+    feature.resourceDetails?.hasTasks ? 'tasks' : null,
   ].filter((part): part is string => part !== null);
   const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';
 
@@ -570,13 +570,14 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
 const TYPE_PRIORITY: Record<string, number> = {
   work: 0,
   strike: 1,
-  review: 2,
-  test: 3,
-  reviewer: 4,
-  planning: 5,
-  ship: 6,
-  merge: 7,
-  legacy: 8,
+  lint: 2,
+  review: 3,
+  test: 4,
+  reviewer: 5,
+  planning: 6,
+  ship: 7,
+  merge: 8,
+  legacy: 9,
 };
 
 const PRESENCE_PRIORITY: Record<string, number> = {
@@ -1015,6 +1016,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     [visibleSessions],
   );
 
+  const issueConversations = feature.resourceDetails?.conversations ?? [];
+  const hasConversations = issueConversations.length > 0;
+  const hasExpandableChildren = hasVisibleSessions || hasConversations;
+
   const workSession = feature.sessions?.find((s) => s.type === 'work');
   const workSessionId = workSession?.sessionId ?? bestSessionId ?? null;
 
@@ -1108,7 +1113,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         data-issue-id={feature.issueId}
       >
         <div className={styles.featureItemRow}>
-          {hasVisibleSessions ? (
+          {hasExpandableChildren ? (
             <button
               className={styles.featureItemCaret}
               onClick={handleToggleExpanded}
@@ -1260,7 +1265,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       {expanded && (
         <ShipDoorTreeRow issueId={feature.issueId} onSelect={() => onSelect?.()} />
       )}
-      {expanded && hasVisibleSessions && (
+      {expanded && hasExpandableChildren && (
         <div className={styles.sessionList}>
           {(() => {
             const reviewerChildren = visibleSessions.filter(s => s.type === 'reviewer');
@@ -1271,7 +1276,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
             return (
               <>
-                {sortedNonReviewers.map(session => {
+                {hasVisibleSessions && sortedNonReviewers.map(session => {
                   if (session.type === 'review') {
                     return (
                       <ReviewGroup
@@ -1313,6 +1318,20 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     />
                   );
                 })}
+                {hasConversations && issueConversations.map(conv => (
+                  <a
+                    key={`conv-${conv.id}`}
+                    href={`/conv/${conv.id}`}
+                    className={styles.sessionNode}
+                    data-testid={`conversation-${conv.id}`}
+                    title={conv.title ?? conv.name}
+                  >
+                    <MessageSquare size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>{conv.title || 'Conversation'}</span>
+                    <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{conv.status}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted-foreground)', fontVariantNumeric: 'tabular-nums' }}>#{conv.id}</span>
+                  </a>
+                ))}
               </>
             );
           })()}

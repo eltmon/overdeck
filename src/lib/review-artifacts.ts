@@ -5,7 +5,6 @@ import { join } from 'node:path';
 import { Data, Effect } from 'effect';
 import { findPlanSync } from './vbrief/io.js';
 import { promisify } from 'node:util';
-import { queryBeadsForIssue } from './beads-query.js';
 import { getForgeAdapter } from './forge.js';
 import { extractNumberSync } from './issue-id.js';
 import {
@@ -55,21 +54,6 @@ export interface ReviewArtifactCreationResult {
         }
         lines.push('');
       }
-    }
-  } catch {
-    // Optional body enrichment only.
-  }
-
-  try {
-    const { beads } = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
-    if (beads.length > 0) {
-      lines.push('## Implementation Tasks');
-      lines.push('');
-      for (const bead of beads) {
-        const checked = bead.status === 'closed' ? 'x' : ' ';
-        lines.push(`- [${checked}] ${bead.title.replace(/^[^:]+:\s*/, '')}`);
-      }
-      lines.push('');
     }
   } catch {
     // Optional body enrichment only.
@@ -226,4 +210,3 @@ export const createReviewArtifactsForIssue = (
         cause,
       }),
   });
-

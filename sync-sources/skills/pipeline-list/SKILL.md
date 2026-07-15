@@ -140,7 +140,7 @@ PY
 - **Resource view** is backed by the resource-discovery service
   (`src/dashboard/server/services/resource-discovery.ts`), which includes an
   issue when it has ≥1 `resourceSource` (workspace, branch, tmux, docker, pr,
-  vbrief, beads, or active tracker state) and computes `readyForMerge` +
+  vbrief, vBRIEF tasks, or active tracker state) and computes `readyForMerge` +
   `stateLabel`. Same data the Command Deck `fetchProjects()` consumes.
 - **Lifecycle view** ports `getPipelineIssuePhase`
   (`src/dashboard/frontend/src/lib/pipeline-state.ts`). It can't see

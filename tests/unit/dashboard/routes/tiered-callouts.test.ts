@@ -5,15 +5,15 @@ import type { VBriefItem } from '../../../../src/lib/vbrief/types.js';
 const BASE_CALLOUT: TieredCalloutBody = {
   issueId: 'PAN-2222',
   sha: 'abcdef1234567890',
-  beadId: 'bead-1',
+  taskId: 'task-1',
   tierName: 'cheap',
   agentId: 'agent-pan-2222-cheap',
   claim: 'The commit appears to miss the acceptance criteria.',
 };
 
 const ITEM: VBriefItem = {
-  id: 'bead-1',
-  title: 'Bead one',
+  id: 'task-1',
+  title: 'Task one',
   status: 'running',
   metadata: { difficulty: 'simple' },
 };
@@ -56,7 +56,7 @@ describe('handleTieredCallout', () => {
     expect(d.deliverSupervisorReview).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-2222',
       sha: 'abcdef1234567890',
-      beadId: 'bead-1',
+      taskId: 'task-1',
       item: ITEM,
       workspacePath: '/tmp/workspace',
     }));
@@ -72,13 +72,13 @@ describe('handleTieredCallout', () => {
     expect(disabled.deliverSupervisorReview).not.toHaveBeenCalled();
   });
 
-  it('requires beadId before corroborating through the supervisor', async () => {
+  it('requires taskId before corroborating through the supervisor', async () => {
     const d = deps('corroborate');
-    const { beadId: _beadId, ...withoutBeadId } = BASE_CALLOUT;
+    const { taskId: _taskId, ...withoutTaskId } = BASE_CALLOUT;
 
-    const result = await handleTieredCallout(withoutBeadId, d);
+    const result = await handleTieredCallout(withoutTaskId, d);
 
-    expect(result).toEqual({ status: 400, body: { error: 'beadId is required for corroborate callouts' } });
+    expect(result).toEqual({ status: 400, body: { error: 'taskId is required for corroborate callouts' } });
     expect(d.recordCallout).not.toHaveBeenCalled();
     expect(d.deliverSupervisorReview).not.toHaveBeenCalled();
   });

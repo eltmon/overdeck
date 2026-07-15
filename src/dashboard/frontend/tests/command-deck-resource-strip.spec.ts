@@ -29,7 +29,7 @@ interface ResourceIssue {
       isDraft: boolean;
     }>;
     hasVbrief: boolean;
-    hasBeads: boolean;
+    hasTasks: boolean;
     dockerContainerCount: number;
   };
 }
@@ -62,7 +62,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
     hasState: true,
     isShadow: false,
     readyForMerge: false,
-    resourceSources: ['workspace', 'branch', 'tmux', 'vbrief', 'beads', 'pr', 'docker'],
+    resourceSources: ['workspace', 'branch', 'tmux', 'vbrief', 'tasks', 'pr', 'docker'],
     resourceDetails: {
       hasWorkspace: true,
       localBranchCount: 1,
@@ -83,7 +83,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
         },
       ],
       hasVbrief: true,
-      hasBeads: true,
+      hasTasks: true,
       dockerContainerCount: 1,
     },
   },
@@ -109,7 +109,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
       tmuxSessionCount: 0,
       prs: [],
       hasVbrief: false,
-      hasBeads: false,
+      hasTasks: false,
       dockerContainerCount: 0,
     },
   },
@@ -267,7 +267,7 @@ test.describe('Command Deck resource strip', () => {
     await expectResourceChip('branch: local 1 · remote 1', 'branch local 1 · remote 1');
     await expectResourceChip('tmux: 2 sessions', 'tmux');
     await expectResourceChip('vBRIEF: present', 'vBRIEF');
-    await expectResourceChip('beads: present', 'beads');
+    await expectResourceChip('tasks: present', 'tasks');
     await expectResourceChip('PR: #862 (open) · #863 (open, draft)', '#862');
     await expectResourceChip('docker: 1 container', 'stack 1');
     await workspaceIcon.hover();
@@ -278,7 +278,7 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Item.getByText('tmux: agent-pan-862', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('tmux: review-pan-862', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('vBRIEF present', { exact: true })).toBeVisible();
-    await expect(pan862Item.getByText('beads present', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('tasks present', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('PR: #862 PAN-862 main PR (open)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('docker: pan-862-db', { exact: true })).toBeVisible();

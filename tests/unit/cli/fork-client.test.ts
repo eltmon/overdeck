@@ -87,4 +87,19 @@ describe('forkConversationViaServer', () => {
       timedOut: false,
     });
   });
+
+  it('forwards issueId in the request body when provided', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ conversation: { id: 4, name: 'issue-fork', tmuxSession: 'conv-4', forkStatus: null } }))
+      .mockResolvedValue(jsonResponse({ id: 4, name: 'issue-fork', tmuxSession: 'conv-4', forkStatus: null }));
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    const resultPromise = forkConversationViaServer('source', { forkMode: 'handoff', issueId: 'PAN-9005', focus: 'drive' }, { timeoutMs: 1_000, pollMs: 500 });
+    await vi.advanceTimersByTimeAsync(500);
+    await resultPromise;
+
+    const init = fetchMock.mock.calls[0][1] as { body: string };
+    const body = JSON.parse(init.body);
+    expect(body).toMatchObject({ forkMode: 'handoff', issueId: 'PAN-9005', focus: 'drive' });
+  });
 });

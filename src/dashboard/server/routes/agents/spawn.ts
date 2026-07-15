@@ -10,13 +10,13 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { saveAgentStateSync, determineModel, getProviderAuthMode, getAgentState } from '../../../../lib/agents.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
+import { listAgentStates } from '../../../../lib/agents/queries.js';
 import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
-import { withBdMutex } from '../../../../lib/bd-mutex.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { isStateMigrated } from '../../../../lib/state-home.js';
@@ -81,43 +81,6 @@ export function spawnGuardrailResourcesHint(hint?: string): string {
   const resourcesHint = 'Open /resources to inspect Machine Room pressure before retrying.';
   return hint ? `${hint} ${resourcesHint}` : resourcesHint;
 }
-
-/**
- * Count materialized beads for an issue by shelling out to `bd list`.
- *
- * Returns 0 on ANY bd failure — non-zero exit (e.g. bd refusing with "Linear
- * data has never been pulled"), an unparseable JSON body, or the 10s timeout.
- * The caller treats 0 as "no beads yet" and falls through to auto-recovery
- * (createBeadsFromVBrief) and, failing that, a clean 422 `beads_required`.
- *
- * The failure is folded into the success channel with `Effect.matchCause`. A
- * bare `try/catch` around `yield* withBdMutex(...)` does NOT work: withBdMutex
- * converts the child-process rejection into an Effect error-channel failure
- * (via its internal `Effect.tryPromise`), which short-circuits the fiber and is
- * invisible to a JS `try/catch`. Before this helper, that escaped as an
- * unhandled 500 on POST /api/agents instead of the designed 422.
- */
-export const countBeadsForIssue = (
-  workspacePath: string,
-  issueLower: string,
-): Effect.Effect<number, never> =>
-  withBdMutex(() => Effect.promise(() => execFileAsync(
-    'bd',
-    ['list', '--json', '-l', issueLower, '--status', 'all', '--limit', '0'],
-    { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
-  ))).pipe(
-    Effect.matchCause({
-      onFailure: () => 0,
-      onSuccess: ({ stdout }) => {
-        try {
-          const bdTasks = JSON.parse(stdout.trim() || '[]');
-          return Array.isArray(bdTasks) ? bdTasks.length : 0;
-        } catch {
-          return 0;
-        }
-      },
-    }),
-  );
 
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
@@ -248,16 +211,6 @@ export const postAgentsRoute = HttpRouter.add(
     const workspacePanDir = join(workspacePath, PAN_DIRNAME);
     const workspacePanContinuePath = join(workspacePanDir, PAN_CONTINUE_FILENAME);
 
-    const workspaceBeadsDir = join(workspacePath, '.beads');
-    if (!existsSync(workspaceBeadsDir)) {
-      const projectRootBeadsDir = join(projectPath, '.beads');
-      if (existsSync(projectRootBeadsDir)) {
-        try {
-          yield* Effect.promise(() => cp(projectRootBeadsDir, workspaceBeadsDir, { recursive: true }));
-        } catch {}
-      }
-    }
-
     let planPath = yield* findPlan(workspacePath);
     if (autoStart && !planPath) {
       const issueTitle = cachedIssue?.title || issueId;
@@ -273,7 +226,7 @@ export const postAgentsRoute = HttpRouter.add(
     }
     if (!planPath) {
       return jsonResponse({
-        error: `No workspace vBRIEF found for ${issueId}. Work agents require a finalized plan with matching beads.`,
+        error: `No workspace vBRIEF found for ${issueId}. Work agents require a finalized plan.`,
         hint: 'Run planning first, or use auto-start to synthesize a plan before starting the work agent.',
         issueId,
       }, { status: 422 });
@@ -312,62 +265,6 @@ export const postAgentsRoute = HttpRouter.add(
         error: 'Plan exists but contains no items. Planning may have failed or produced an empty plan.',
         hint: 'Re-run planning to produce a plan with tasks and acceptance criteria.',
         issueId,
-      }, { status: 422 });
-    }
-
-    // countBeadsForIssue swallows all bd failures into 0 — a bd error here (e.g.
-    // "Linear data has never been pulled" exiting non-zero) must fall through to
-    // auto-recovery + a clean 422, never escape as an unhandled 500.
-    let beadCount = yield* countBeadsForIssue(workspacePath, issueLower);
-    let hasBeads = beadCount > 0;
-    if (planItemCount !== null && planItemCount > 0 && beadCount !== planItemCount) {
-      hasBeads = false;
-    }
-
-    let recoveryError: string | null = null;
-    if (!hasBeads) {
-      // Auto-recovery: beads DB may not have been initialized (fresh install, or planning
-      // completed before bd init ran). Attempt to create beads from the vBRIEF plan now.
-      console.log(`[agents] No beads for ${issueId} — attempting auto-recovery via createBeadsFromVBrief`);
-      try {
-        const { createBeadsFromVBrief } = yield* Effect.promise(() => import('../../../../lib/vbrief/beads.js'));
-        const recovery = yield* createBeadsFromVBrief(workspacePath);
-        beadCount = recovery.created.length;
-        hasBeads = recovery.created.length > 0 && (planItemCount === null || recovery.created.length === planItemCount);
-        if (hasBeads) {
-          console.log(`[agents] Auto-recovery created ${recovery.created.length} beads for ${issueId}`);
-        } else if (recovery.created.length > 0 && planItemCount !== null) {
-          recoveryError = `created ${recovery.created.length} beads, but vBRIEF has ${planItemCount} plan items`;
-        } else if (recovery.errors.length > 0) {
-          recoveryError = recovery.errors[0] ?? 'Unknown error during beads creation';
-          console.warn(`[agents] Auto-recovery errors: ${recovery.errors.join(', ')}`);
-        } else {
-          recoveryError = 'createBeadsFromVBrief returned no beads and no errors';
-        }
-      } catch (recoveryErr: any) {
-        recoveryError = recoveryErr.message;
-        console.warn(`[agents] Auto-recovery failed: ${recoveryErr.message}`);
-      }
-    }
-
-    if (!hasBeads) {
-      // PAN-1048 C6: Beads are a hard requirement for the work role — without
-      // them the agent has nothing to claim, no Jidoka inspection scope, and
-      // commits would batch across multiple beads. Recovery already attempted
-      // above via createBeadsFromVBrief; if that failed the workspace's vBRIEF
-      // is missing or malformed, which is a planning bug that must surface to
-      // the operator. Refuse the spawn with 422 instead of starting a half-
-      // configured work agent that will silently misbehave.
-      const detail = recoveryError
-        ? ` Beads recovery failed: ${recoveryError}.`
-        : ' No beads exist for this issue.';
-      console.warn(`[agents] Refusing to start work agent for ${issueId} without beads.${detail}`);
-      return jsonResponse({
-        success: false,
-        error: 'beads_required',
-        message: `Cannot start work agent for ${issueId} without beads.${detail} `
-          + 'Re-run planning so beads can be materialized from the vBRIEF plan, then retry.',
-        ...(recoveryError ? { recoveryError } : {}),
       }, { status: 422 });
     }
 
@@ -418,7 +315,7 @@ export const postAgentsRoute = HttpRouter.add(
     }
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* checkCodexAuthStatus();
+      const codexAuth = yield* checkCodexAuthStatus({ agentStates: listAgentStates() });
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
           success: false,
@@ -521,9 +418,6 @@ export const postAgentsRoute = HttpRouter.add(
             `git reset HEAD -- .pan/kickoff.md .pan/continue.json .pan/handoff-*.md .pan/spec.vbrief.json`,
             { cwd: gitRoot, encoding: 'utf-8' },
           ));
-        }
-        if (existsSync(join(gitRoot, '.beads'))) {
-          yield* Effect.promise(() => execAsync(`git add .beads/`, { cwd: gitRoot, encoding: 'utf-8' }));
         }
         // git diff --cached --quiet exits 1 when there ARE staged changes (normal).
         // Handle exit-1 in the Promise so it never becomes an Effect failure.

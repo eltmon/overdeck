@@ -19,7 +19,7 @@ function trivial(scope: string[], id?: string): VBriefItem {
 }
 
 describe('groupFastTrack', () => {
-  it('batches consecutive trivial scope-disjoint beads under one fastTrackBatchKey', () => {
+  it('batches consecutive trivial scope-disjoint tasks under one fastTrackBatchKey', () => {
     const a = trivial(['docs/a.md'], 'a');
     const b = trivial(['docs/b.md'], 'b');
     const c = trivial(['docs/c.md'], 'c');
@@ -32,7 +32,7 @@ describe('groupFastTrack', () => {
     expect(grouping.rest).toHaveLength(0);
   });
 
-  it('rejects a bead whose files_scope overlaps another in the candidate batch', () => {
+  it('rejects a task whose files_scope overlaps another in the candidate batch', () => {
     const a = trivial(['docs/a.md'], 'a');
     const b = trivial(['docs/b.md'], 'b');
     const conflicting = trivial(['docs/a.md'], 'conflict');
@@ -40,7 +40,7 @@ describe('groupFastTrack', () => {
 
     const grouping = groupFastTrack([a, b, conflicting, d]);
 
-    // The overlap closes the first batch; the conflicting bead starts the next.
+    // The overlap closes the first batch; the conflicting task starts the next.
     expect(grouping.batches).toHaveLength(2);
     expect(grouping.batches[0].items.map(i => i.id)).toEqual(['a', 'b']);
     expect(grouping.batches[1].items.map(i => i.id)).toEqual(['conflict', 'd']);
@@ -49,7 +49,7 @@ describe('groupFastTrack', () => {
     }
   });
 
-  it('rejects any medium-or-harder bead from a fast-track batch', () => {
+  it('rejects any medium-or-harder task from a fast-track batch', () => {
     const a = trivial(['docs/a.md'], 'a');
     const medium = item({ difficulty: 'medium', files_scope: ['docs/m.md'], files_scope_confidence: 'high' }, 'medium');
     const b = trivial(['docs/b.md'], 'b');
@@ -57,8 +57,8 @@ describe('groupFastTrack', () => {
 
     const grouping = groupFastTrack([a, medium, b, c]);
 
-    // The medium bead breaks the run: 'a' is a singleton (no batch), the
-    // medium bead is never batched, b+c form the only batch.
+    // The medium task breaks the run: 'a' is a singleton (no batch), the
+    // medium task is never batched, b+c form the only batch.
     expect(grouping.batches).toHaveLength(1);
     expect(grouping.batches[0].items.map(i => i.id)).toEqual(['b', 'c']);
     expect(grouping.rest.map(i => i.id)).toEqual(['a', 'medium']);
@@ -182,7 +182,7 @@ describe('autoMergeFastTrackBatch', () => {
     expect(commands.some(c => c.startsWith('git merge'))).toBe(false);
   });
 
-  it('rejects any batch containing a medium-or-harder bead', async () => {
+  it('rejects any batch containing a medium-or-harder task', async () => {
     const { calls, run } = recordingRun();
     const batch = makeBatch();
     batch.items.push(item({ difficulty: 'medium', files_scope: ['docs/m.md'], files_scope_confidence: 'high' }, 'medium'));

@@ -23,7 +23,9 @@ import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { NormalizedConfig } from '../config-yaml/schema.js';
 import { resolveModel } from '../config-yaml/roles.js';
 import { requireModelOverrideSync } from '../model-validation.js';
+import { readIssueRecordSync } from '../pan-dir/record.js';
 import { getBuiltInDefaultHarness, getProviderForModelSync } from '../providers.js';
+import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { fmix32, fnv1a32 } from '../config-yaml/percent.js';
 import { resolveTier } from './resolve-tier.js';
 import { resolveTieredExecutionEnabled, type TierDistributionEntry } from './tier-table.js';
@@ -49,6 +51,17 @@ export interface ResolveStaffingOptions {
   spawnKey?: string;
   /** Injectable config for tests; defaults to the loaded config. */
   config?: Pick<NormalizedConfig, 'roles' | 'workhorses' | 'tieredExecution' | 'providerHarnesses'>;
+  /** Issue whose durable work-model override should be applied. */
+  issueId?: string;
+}
+
+/** Per-issue work-model override from the issue record, or undefined. */
+export function resolveIssueWorkModel(issueId: string): string | undefined {
+  const resolved = resolveProjectFromIssueSync(issueId);
+  if (!resolved) return undefined;
+  const project = getProjectSync(resolved.projectKey);
+  if (!project) return undefined;
+  return readIssueRecordSync(project, issueId)?.workModel || undefined;
 }
 
 /** Provider-default harness for a model (PAN-1984: harness is derived from the
@@ -86,6 +99,16 @@ export function resolveStaffing(
   options: ResolveStaffingOptions = {},
 ): Staffing {
   const config = options.config ?? loadYamlConfig().config;
+  const issueModel = options.issueId ? resolveIssueWorkModel(options.issueId) : undefined;
+  if (issueModel) {
+    const model = requireModelOverrideSync(issueModel);
+    return {
+      tierName: 'issue-override',
+      model,
+      harness: providerDefaultHarnessSync(model, config),
+      implicit: false,
+    };
+  }
   const tiered = config.tieredExecution;
 
   if (tiered && resolveTieredExecutionEnabled(tiered, options.planMetadata)) {

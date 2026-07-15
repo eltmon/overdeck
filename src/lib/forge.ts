@@ -170,7 +170,7 @@ async function getExistingGitLabArtifact(
   repository?: string
 ): Promise<CreateReviewArtifactResult | null> {
   const { stdout } = await execAsync(
-    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --state opened --json iid,web_url 2>/dev/null || true`,
+    `glab mr list --source-branch ${branchName}${buildRepositoryFlag(repository)} --output json 2>/dev/null || true`,
     { cwd, encoding: 'utf-8' }
   );
   const trimmed = stdout.trim();
@@ -332,10 +332,24 @@ const gitlabForgeAdapter: ForgeAdapter = {
 
     const bodyEnv = input.body ? { PAN_MR_BODY: input.body } : {};
     const bodyFlag = input.body ? ' --description "$PAN_MR_BODY"' : '';
-    const { stdout } = await execAsync(
-      `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
-      { cwd: input.cwd, encoding: 'utf-8', env: { ...process.env, ...bodyEnv }, shell: '/bin/bash' }
-    );
+    let stdout: string;
+    try {
+      ({ stdout } = await execAsync(
+        `glab mr create --source-branch ${input.sourceBranch} --target-branch ${input.targetBranch} --title "${input.title}"${bodyFlag}${buildRepositoryFlag(input.repository)}`,
+        { cwd: input.cwd, encoding: 'utf-8', env: { ...process.env, ...bodyEnv }, shell: '/bin/bash' }
+      ));
+    } catch (error: any) {
+      const message = String(error?.message ?? error);
+      if (message.includes('409') && message.includes('open merge request already exists')) {
+        const existingAfterConflict = await getExistingGitLabArtifact(
+          input.sourceBranch,
+          input.cwd,
+          input.repository,
+        );
+        if (existingAfterConflict) return existingAfterConflict;
+      }
+      throw error;
+    }
     const url = stdout.trim().split('\n').pop()?.trim() || stdout.trim();
     const created = await getExistingGitLabArtifact(input.sourceBranch, input.cwd, input.repository);
     return {

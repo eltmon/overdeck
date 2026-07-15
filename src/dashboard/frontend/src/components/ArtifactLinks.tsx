@@ -5,9 +5,9 @@ import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 interface ArtifactLinksProps {
   issueId: string;
   hasPlan: boolean;
-  hasBeads: boolean;
-  beadsCount?: number;  // Deprecated — use hasBeads
-  onViewBeads: () => void;
+  hasTasks: boolean;
+  tasksCount?: number;  // Deprecated — use hasTasks
+  onViewTasks: () => void;
   onViewVBrief: () => void;
   variant: 'card' | 'inspector';
 }
@@ -15,13 +15,13 @@ interface ArtifactLinksProps {
 export function ArtifactLinks({
   issueId,
   hasPlan,
-  hasBeads,
-  onViewBeads,
+  hasTasks,
+  onViewTasks,
   onViewVBrief,
   variant,
 }: ArtifactLinksProps) {
   const queryClient = useQueryClient();
-  const needsTaskGeneration = hasPlan && !hasBeads;
+  const needsTaskGeneration = hasPlan && !hasTasks;
 
   const generateTasksMutation = useMutation({
     mutationFn: async () => {
@@ -43,7 +43,7 @@ export function ArtifactLinks({
     if (needsTaskGeneration) {
       if (!generateTasksMutation.isPending) generateTasksMutation.mutate();
     } else {
-      onViewBeads();
+      onViewTasks();
     }
   };
 
@@ -55,7 +55,7 @@ export function ArtifactLinks({
   if (variant === 'inspector') {
     return (
       <>
-        {(hasBeads || needsTaskGeneration) && (
+        {(hasTasks || needsTaskGeneration) && (
           <button
             onClick={() => handleTasksClick()}
             disabled={generateTasksMutation.isPending}
@@ -85,7 +85,7 @@ export function ArtifactLinks({
   // card variant — compact chips
   return (
     <>
-      {(hasBeads || needsTaskGeneration) && (
+      {(hasTasks || needsTaskGeneration) && (
         <button
           onClick={(e) => handleTasksClick(e)}
           disabled={generateTasksMutation.isPending}
@@ -94,7 +94,7 @@ export function ArtifactLinks({
               ? 'text-destructive hover:text-destructive/80 font-medium'
               : 'text-success hover:text-success/80'
           }`}
-          title={needsTaskGeneration ? 'Generate beads from vBRIEF plan' : 'Tasks'}
+          title={needsTaskGeneration ? 'Generate tasks from vBRIEF plan' : 'Tasks'}
         >
           {generateTasksMutation.isPending ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -231,7 +231,7 @@ async function copyWorkspacePanStateFromRemote(
 }
 
 /**
- * Copy workspace orchestration state (.pan/ and beads) to a remote VM.
+ * Copy workspace orchestration state to a remote VM.
  */
 async function copyPlanningStateToRemote(
   provider: RemoteProvider,
@@ -244,33 +244,11 @@ async function copyPlanningStateToRemote(
   const steps = [...workspacePanResult.steps];
   const errors = [...workspacePanResult.errors];
 
-  const projectPath = projectConfig?.path;
-  const beadsLocations = [
-    join(localPath, '.beads'),
-    projectPath ? join(projectPath, '.beads') : null,
-  ].filter(Boolean) as string[];
-
-  for (const beadsDir of beadsLocations) {
-    if (existsSync(beadsDir)) {
-      try {
-        await Effect.runPromise(provider.ssh(vmName, 'mkdir -p /workspace/.beads'));
-        const beadsFiles = readdirSync(beadsDir).filter(f => f.endsWith('.db') || f.endsWith('.jsonl'));
-        for (const file of beadsFiles) {
-          await Effect.runPromise(provider.copyToVm(vmName, join(beadsDir, file), `/workspace/.beads/${file}`));
-        }
-        steps.push('Copied beads database');
-        break;
-      } catch (error: any) {
-        errors.push(`Beads: ${error.message}`);
-      }
-    }
-  }
-
   return { steps, errors };
 }
 
 /**
- * Copy workspace orchestration state (.pan/ and beads) from a remote VM.
+ * Copy workspace orchestration state from a remote VM.
  */
 async function copyPlanningStateFromRemote(
   provider: RemoteProvider,
@@ -282,26 +260,6 @@ async function copyPlanningStateFromRemote(
   const workspacePanResult = await copyWorkspacePanStateFromRemote(provider, vmName, localPath);
   const steps = [...workspacePanResult.steps];
   const errors = [...workspacePanResult.errors];
-
-  const beadsCheck = await Effect.runPromise(provider.ssh(vmName, 'ls /workspace/.beads/ 2>/dev/null'));
-  if (beadsCheck.exitCode === 0 && beadsCheck.stdout.trim()) {
-    try {
-      const localBeadsDir = join(localPath, '.beads');
-      mkdirSync(localBeadsDir, { recursive: true });
-
-      const files = beadsCheck.stdout.trim().split('\n').filter(f => f.endsWith('.db') || f.endsWith('.jsonl'));
-      for (const file of files) {
-        try {
-          await Effect.runPromise(provider.copyFromVm(vmName, `/workspace/.beads/${file}`, join(localBeadsDir, file)));
-        } catch {
-          // scp might not work for all files
-        }
-      }
-      steps.push('Copied beads database');
-    } catch (error: any) {
-      errors.push(`Beads: ${error.message}`);
-    }
-  }
 
   return { steps, errors };
 }

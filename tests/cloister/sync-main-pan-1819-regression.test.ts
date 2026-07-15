@@ -125,10 +125,8 @@ describe('syncMainIntoWorkspace pipeline-owned conflicts (PAN-1841)', () => {
     execSync('git config commit.gpgsign false', { cwd: repo });
     execSync(`git remote add origin ${remote}`, { cwd: repo });
 
-    mkdirSync(join(repo, '.beads'), { recursive: true });
     mkdirSync(join(repo, '.pan', 'continues'), { recursive: true });
     mkdirSync(join(repo, '.pan', 'specs'), { recursive: true });
-    writeFileSync(join(repo, '.beads', 'issues.jsonl'), '{"id":"PAN-1","state":"base"}\n');
     writeFileSync(join(repo, '.pan', 'continues', 'PAN-1.vbrief.json'), '{"state":"base"}\n');
     writeFileSync(join(repo, '.pan', 'specs', 'PAN-1.vbrief.json'), '{"spec":"base"}\n');
     writeFileSync(join(repo, 'README.md'), '# base\n');
@@ -137,17 +135,15 @@ describe('syncMainIntoWorkspace pipeline-owned conflicts (PAN-1841)', () => {
     execSync('git push -q -u origin main', { cwd: repo });
 
     execSync('git switch -q -c feature/pan-1841', { cwd: repo });
-    writeFileSync(join(repo, '.beads', 'issues.jsonl'), '{"id":"PAN-1","state":"feature"}\n');
     writeFileSync(join(repo, '.pan', 'continues', 'PAN-1.vbrief.json'), '{"state":"feature"}\n');
     writeFileSync(join(repo, '.pan', 'specs', 'PAN-1.vbrief.json'), '{"spec":"feature"}\n');
-    execSync('git add .beads .pan', { cwd: repo });
+    execSync('git add .pan', { cwd: repo });
     execSync('git commit -q -m "feature state"', { cwd: repo });
 
     execSync('git switch -q main', { cwd: repo });
-    writeFileSync(join(repo, '.beads', 'issues.jsonl'), '{"id":"PAN-1","state":"main"}\n');
     writeFileSync(join(repo, '.pan', 'continues', 'PAN-1.vbrief.json'), '{"state":"main"}\n');
     writeFileSync(join(repo, '.pan', 'specs', 'PAN-1.vbrief.json'), '{"spec":"main"}\n');
-    execSync('git add .beads .pan', { cwd: repo });
+    execSync('git add .pan', { cwd: repo });
     execSync('git commit -q -m "main state"', { cwd: repo });
     execSync('git push -q origin main', { cwd: repo });
 
@@ -159,14 +155,13 @@ describe('syncMainIntoWorkspace pipeline-owned conflicts (PAN-1841)', () => {
     rmSync(remote, { recursive: true, force: true });
   });
 
-  it('prefers origin/main for divergent .pan lifecycle and .beads files', async () => {
+  it('prefers origin/main for divergent .pan lifecycle files', async () => {
     const result = await syncMainIntoWorkspace(repo, 'PAN-1841');
 
     expect(result.success).toBe(true);
     expect(result.conflictFiles).toBeUndefined();
     expect(execSync('git diff --name-only --diff-filter=U', { cwd: repo, encoding: 'utf-8' }).trim()).toBe('');
     expect(execSync('git status --porcelain', { cwd: repo, encoding: 'utf-8' }).trim()).toBe('');
-    expect(readFileSync(join(repo, '.beads', 'issues.jsonl'), 'utf-8')).toBe('{"id":"PAN-1","state":"main"}\n');
     expect(readFileSync(join(repo, '.pan', 'continues', 'PAN-1.vbrief.json'), 'utf-8')).toBe('{"state":"main"}\n');
     expect(readFileSync(join(repo, '.pan', 'specs', 'PAN-1.vbrief.json'), 'utf-8')).toBe('{"spec":"main"}\n');
   });

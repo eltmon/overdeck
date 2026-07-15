@@ -18,9 +18,7 @@ import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { getAgentState } from '../agents.js';
 import { extractPrefixSync } from '../issue-id.js';
 import { reopenWorkspaceState } from '../reopen.js';
-import { findPlan } from '../vbrief/io.js';
 import { removeCompletionMarker } from './workspace-hygiene.js';
-import { withBdMutex } from '../bd-mutex.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -612,38 +610,6 @@ export function reopenIssueTransition(options: {
       } catch { /* non-fatal */ }
     });
 
-    // Recreate beads from vBRIEF plan if workspace exists but beads are missing
-    const beadsRecreated = yield* Effect.promise(async (): Promise<boolean> => {
-      try {
-        const issueLower = id.toLowerCase();
-        const teamPrefix = extractTeamPrefix(id);
-        const projectConfig = teamPrefix ? findProjectByTeamSync(teamPrefix) : null;
-        const projectPath = projectConfig?.path || '';
-        if (projectPath) {
-          const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
-          const { createBeadsFromVBrief } = await import('../vbrief/beads.js');
-          if (existsSync(workspacePath) && await Effect.runPromise(findPlan(workspacePath))) {
-            try {
-              const { stdout: bdCheck } = await Effect.runPromise(withBdMutex(() => Effect.promise(() => execFileAsync(
-                'bd',
-                ['list', '--json', '-l', issueLower, '--limit', '1'],
-                { cwd: workspacePath, encoding: 'utf-8', timeout: 10000 },
-              ))));
-              const existing = JSON.parse(bdCheck.trim() || '[]');
-              if (existing.length === 0) {
-                const result = await Effect.runPromise(createBeadsFromVBrief(workspacePath));
-                if (result.created.length > 0) {
-                  console.log(`[reopen] Recreated ${result.created.length} beads for ${id} from vBRIEF plan`);
-                  return true;
-                }
-              }
-            } catch { /* Non-fatal — beads recreation is best-effort */ }
-          }
-        }
-      } catch { /* non-fatal */ }
-      return false;
-    });
-
     yield* eventStore.append({
       type: 'issue.statusChanged',
       timestamp: new Date().toISOString(),
@@ -667,7 +633,7 @@ export function reopenIssueTransition(options: {
 
     return jsonResponse({
       success: true,
-      message: `Issue ${id} reopened and moved to ${newState}${beadsRecreated ? ' (beads recreated from plan)' : ''}`,
+      message: `Issue ${id} reopened and moved to ${newState}`,
       issueId: issueIdentifier,
       newState,
       resetSummary: null,

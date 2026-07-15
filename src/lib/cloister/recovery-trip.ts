@@ -1,38 +1,42 @@
-import { readIssueRecordForWorkspaceSync, writeIssueRecordForWorkspaceSync, type PanIssueRecoveryTrip } from '../pan-dir/record.js';
-import { createMinimalIssueRecord } from './deacon-swarm-record.js';
+import type { PanIssueRecoveryTrip } from '../pan-dir/record.js';
+import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
 
-export function recordRecoveryFailure(
+export async function recordRecoveryFailure(
   workspacePath: string,
   issue: string,
   recoveryPath: string,
   obligationGeneration: string,
   threshold = 25,
   now = new Date(),
-): { trip: PanIssueRecoveryTrip; emitNeedsYou: boolean } {
+): Promise<{ trip: PanIssueRecoveryTrip; emitNeedsYou: boolean }> {
   const normalized = issue.toUpperCase();
-  const record = readIssueRecordForWorkspaceSync(workspacePath, normalized) ?? createMinimalIssueRecord(normalized);
-  const trips = [...(record.recoveryTrips ?? [])];
-  const index = trips.findIndex(trip => trip.issue === normalized && trip.recoveryPath === recoveryPath && trip.obligationGeneration === obligationGeneration);
-  const prior = index >= 0 ? trips[index] : undefined;
-  if (prior?.open) return { trip: prior, emitNeedsYou: false };
-  const tripCount = (prior?.tripCount ?? 0) + 1;
-  const emitNeedsYou = tripCount >= threshold && !prior?.open;
-  const trip: PanIssueRecoveryTrip = {
-    issue: normalized, recoveryPath, obligationGeneration, tripCount,
-    open: prior?.open === true || emitNeedsYou,
-    ...(prior?.needsYouEmittedAt ? { needsYouEmittedAt: prior.needsYouEmittedAt } : emitNeedsYou ? { needsYouEmittedAt: now.toISOString() } : {}),
-  };
-  if (index >= 0) trips[index] = trip; else trips.push(trip);
-  writeIssueRecordForWorkspaceSync(workspacePath, normalized, { ...record, recoveryTrips: trips });
-  return { trip, emitNeedsYou };
+  let outcome!: { trip: PanIssueRecoveryTrip; emitNeedsYou: boolean };
+  await updateIssueRecordForWorkspace(workspacePath, normalized, record => {
+    const trips = [...(record.recoveryTrips ?? [])];
+    const index = trips.findIndex(trip => trip.issue === normalized && trip.recoveryPath === recoveryPath && trip.obligationGeneration === obligationGeneration);
+    const prior = index >= 0 ? trips[index] : undefined;
+    if (prior?.open) {
+      outcome = { trip: prior, emitNeedsYou: false };
+      return record;
+    }
+    const tripCount = (prior?.tripCount ?? 0) + 1;
+    const emitNeedsYou = tripCount >= threshold;
+    const trip: PanIssueRecoveryTrip = {
+      issue: normalized, recoveryPath, obligationGeneration, tripCount,
+      open: emitNeedsYou,
+      ...(prior?.needsYouEmittedAt ? { needsYouEmittedAt: prior.needsYouEmittedAt } : emitNeedsYou ? { needsYouEmittedAt: now.toISOString() } : {}),
+    };
+    if (index >= 0) trips[index] = trip; else trips.push(trip);
+    outcome = { trip, emitNeedsYou };
+    return { ...record, recoveryTrips: trips };
+  });
+  return outcome;
 }
 
-export function acknowledgeRecoveryTrip(workspacePath: string, issue: string, recoveryPath: string, obligationGeneration: string): void {
+export async function acknowledgeRecoveryTrip(workspacePath: string, issue: string, recoveryPath: string, obligationGeneration: string): Promise<void> {
   const normalized = issue.toUpperCase();
-  const record = readIssueRecordForWorkspaceSync(workspacePath, normalized);
-  if (!record) return;
-  writeIssueRecordForWorkspaceSync(workspacePath, normalized, {
+  await updateIssueRecordForWorkspace(workspacePath, normalized, record => ({
     ...record,
     recoveryTrips: (record.recoveryTrips ?? []).filter(trip => !(trip.issue === normalized && trip.recoveryPath === recoveryPath && trip.obligationGeneration === obligationGeneration)),
-  });
+  }));
 }

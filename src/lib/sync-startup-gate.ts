@@ -1,5 +1,5 @@
 import { createHash, type Hash } from 'crypto';
-import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { OVERDECK_HOME, SYNC_SOURCES, isDevMode } from './paths.js';
 import { listProjectsSync } from './projects.js';
@@ -29,11 +29,16 @@ function computeSyncInputHash(): string {
     updateHashFromDirectory(hash, join(cwdSkillsRoot, 'skills'));
   }
 
-  for (const [key, dir] of Object.entries(SYNC_SOURCES)) {
-    if (!existsSync(dir)) {
-      throw new Error(`missing sync input: ${key} at ${dir}`);
+  for (const [key, sourcePath] of Object.entries(SYNC_SOURCES)) {
+    if (!existsSync(sourcePath)) {
+      throw new Error(`missing sync input: ${key} at ${sourcePath}`);
     }
-    updateHashFromDirectory(hash, dir);
+    // Most sync sources are directories, but some (plugins.json) are single files.
+    if (statSync(sourcePath).isDirectory()) {
+      updateHashFromDirectory(hash, sourcePath);
+    } else {
+      updateHashFromFile(hash, sourcePath);
+    }
   }
 
   const globalMd = join(OVERDECK_HOME, 'context', 'global.md');

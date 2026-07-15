@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Compass, Code2, Eye, FlaskConical, GitMerge, Zap, Archive,
-  ShieldCheck, Lock, Gauge, ClipboardList, Layers, BadgeCheck,
+  ShieldCheck, Lock, Gauge, ClipboardList, Layers, BadgeCheck, ListChecks,
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
   CircleCheck, CircleX, Circle, Loader2, Brain, type LucideIcon,
 } from 'lucide-react'
@@ -35,6 +35,7 @@ function typeIcon(session: SessionNode): LucideIcon {
     case 'planning': return Compass
     case 'legacy': return Archive
     case 'knowledge': return Brain
+    case 'lint': return ListChecks
     case 'review': return Eye
     case 'reviewer': return (session.role && REVIEWER_ROLE_ICON[session.role]) || ShieldCheck
     case 'test': return FlaskConical
@@ -53,6 +54,7 @@ function sessionLabel(session: SessionNode): string {
     case 'knowledge': return 'Knowledge'
     case 'work': return 'Work'
     case 'strike': return 'Strike'
+    case 'lint': return 'Test/Lint'
     case 'review': return 'Review'
     case 'reviewer': return session.role ? cap(session.role) : 'Reviewer'
     case 'test': return 'Test'

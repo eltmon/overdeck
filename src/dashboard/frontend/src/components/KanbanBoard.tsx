@@ -23,7 +23,7 @@ import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgre
 import { useWorkspaceStackHealthQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
 import {
   AgentWarningDialog,
-  BeadsDialog,
+  TasksDialog,
   SyncPromptDialog,
   UndoToast,
 } from './KanbanBoard/dialogs';
@@ -120,7 +120,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   useEffect(() => {
     onPlanDialogChange?.(planDialogIssue?.identifier ?? null);
   }, [planDialogIssue, onPlanDialogChange]);
-  const [beadsDialogIssue, setBeadsDialogIssue] = useState<Issue | null>(null); // Beads viewer
+  const [tasksDialogIssue, setTasksDialogIssue] = useState<Issue | null>(null); // Tasks viewer
   const [vbriefDialogIssue, setVbriefDialogIssue] = useState<Issue | null>(null); // vBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
@@ -546,7 +546,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     for (const issue of filteredIssues) {
       map[issue.identifier] = {
         hasPlan: issue.hasPlan ?? false,
-        hasBeads: issue.hasBeads ?? false,
+        hasTasks: issue.hasTasks ?? false,
         planningComplete: issue.planningComplete ?? false,
       };
     }
@@ -777,7 +777,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onSelectIssue={onSelectIssue}
                     onOpenIssue={openIssue}
                     onPlan={openPlanDialog}
-                    onViewBeads={setBeadsDialogIssue}
+                    onViewTasks={setTasksDialogIssue}
                     onViewVBrief={setVbriefDialogIssue}
                     collapsedFeatures={collapsedFeatures}
                     onToggleFeature={toggleFeature}
@@ -841,11 +841,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         />
       )}
 
-      {/* Beads Dialog - view tasks for issue */}
-      {beadsDialogIssue && (
-        <BeadsDialog
-          issue={beadsDialogIssue}
-          onClose={() => setBeadsDialogIssue(null)}
+      {/* Tasks Dialog - view tasks for issue */}
+      {tasksDialogIssue && (
+        <TasksDialog
+          issue={tasksDialogIssue}
+          onClose={() => setTasksDialogIssue(null)}
         />
       )}
 

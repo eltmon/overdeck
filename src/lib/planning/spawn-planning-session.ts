@@ -496,7 +496,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     let workspaceCreated = false;
     if (existsSync(workspacePath)) {
       const files = await readdir(workspacePath);
-      workspaceCreated = !files.every((f: string) => f === '.pan' || f === '.beads');
+      workspaceCreated = !files.every((f: string) => f === '.pan');
     }
 
     if (!workspaceCreated) {

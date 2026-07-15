@@ -3,6 +3,7 @@ import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
+  findSpecByIssue: vi.fn(),
   getAgentRuntimeState: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
@@ -10,14 +11,22 @@ const mocks = vi.hoisted(() => ({
   },
   listProjectsSync: vi.fn(),
   listSessionNames: vi.fn(),
+  listConversations: vi.fn(),
   loadReadyForMergeFlags: vi.fn(),
   openPullRequests: [] as unknown[],
+  readdir: vi.fn(),
   resolveAgentGitInfo: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock('node:child_process', () => ({
   execFile: mocks.execFile,
+}));
+
+vi.mock('node:fs/promises', () => ({
+  readdir: mocks.readdir,
+  stat: mocks.stat,
 }));
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
@@ -43,6 +52,14 @@ vi.mock('../../../../../src/dashboard/server/services/git-info.js', () => ({
 
 vi.mock('../../../../../src/dashboard/server/services/tracker-config.js', () => ({
   getGitHubConfig: mocks.getGitHubConfig,
+}));
+
+vi.mock('../../../../../src/lib/overdeck/conversations.js', () => ({
+  listConversations: mocks.listConversations,
+}));
+
+vi.mock('../../../../../src/lib/pan-dir/specs.js', () => ({
+  findSpecByIssue: mocks.findSpecByIssue,
 }));
 
 vi.mock('../../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
@@ -72,7 +89,11 @@ beforeEach(() => {
     { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN' } },
   ]);
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
+  mocks.listConversations.mockReturnValue([]);
   mocks.openPullRequests = [];
+  mocks.readdir.mockResolvedValue([]);
+  mocks.stat.mockRejectedValue(new Error('no such file'));
+  mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
   mocks.resolveAgentGitInfo.mockResolvedValue({
     actualBranch: null,
     branchDrifted: false,
@@ -122,10 +143,13 @@ describe('resource-discovery grouping', () => {
           tmuxSessionNames: [],
           prs: [],
           hasVbrief: false,
-          hasBeads: false,
+          hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
+          branchAheadOfMain: false,
+          conversations: [],
         },
+        taskTotals: null,
       },
       {
         issueId: 'AAA-1',
@@ -156,10 +180,13 @@ describe('resource-discovery grouping', () => {
           tmuxSessionNames: [],
           prs: [],
           hasVbrief: false,
-          hasBeads: false,
+          hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
+          branchAheadOfMain: false,
+          conversations: [],
         },
+        taskTotals: null,
       },
       {
         issueId: 'PAN-100',
@@ -195,10 +222,13 @@ describe('resource-discovery grouping', () => {
             },
           ],
           hasVbrief: true,
-          hasBeads: true,
+          hasTasks: true,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-100-db'],
+          branchAheadOfMain: false,
+          conversations: [],
         },
+        taskTotals: null,
       },
     ];
 
@@ -246,10 +276,13 @@ describe('resource-discovery sanitization', () => {
             },
           ],
           hasVbrief: false,
-          hasBeads: false,
+          hasTasks: false,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-300-db'],
+          branchAheadOfMain: false,
+          conversations: [],
         },
+        taskTotals: null,
       },
     ]);
 
@@ -382,6 +415,197 @@ describe('resource-discovery session prefix allowlist', () => {
     expect(isDiscoverableAgentSession('conv-371')).toBe(false);
     expect(isDiscoverableAgentSession('overdeck')).toBe(false);
     expect(isDiscoverableAgentSession('0')).toBe(false);
+  });
+});
+
+describe('resource-discovery branch-ahead signal', () => {
+  beforeEach(() => {
+    resetResourceAllocatedIssuesCacheForTests();
+    mocks.execFile.mockImplementation((command: string, args: string[], _options: unknown, callback: (error: Error | null, result?: { stdout: string }) => void) => {
+      if (command === 'git' && args[0] === 'for-each-ref') {
+        const patterns = args.filter((a) => a.includes('feature/*') || a.includes('bypass/*'));
+        const isNoMerged = args.includes('--no-merged=main');
+        const hasFeature = patterns.some((p) => p.includes('feature/*'));
+        const hasBypass = patterns.some((p) => p.includes('bypass/*'));
+        const isRemote = patterns.some((p) => p.includes('refs/remotes/'));
+        const prefix = isRemote ? 'origin/' : '';
+        const branches: string[] = [];
+        if (hasFeature) {
+          if (isNoMerged) {
+            branches.push(`${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
+          } else {
+            branches.push(`${prefix}feature/pan-9001`, `${prefix}feature/pan-9002`, `${prefix}feature/pan-9003`);
+          }
+        }
+        if (hasBypass) {
+          branches.push(`${prefix}bypass/pan-9002`);
+        }
+        callback(null, { stdout: branches.join('\n') + (branches.length ? '\n' : '') });
+        return;
+      }
+      if (command === 'gh' && args[0] === 'pr') {
+        callback(null, { stdout: JSON.stringify(mocks.openPullRequests) });
+        return;
+      }
+      callback(null, { stdout: '' });
+    });
+  });
+
+  it('records branchAheadOfMain true for a bypass branch with unmerged work', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9002', title: 'Bypass', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9002');
+
+    expect(issue).toBeDefined();
+    expect(issue!.resourceSources).toContain('branch');
+    expect(issue!.resourceDetails.branchAheadOfMain).toBe(true);
+    expect(issue!.resourceDetails.localBranchCount).toBe(2);
+  });
+
+  it('records branchAheadOfMain false for a feature branch fully merged into main', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9001', title: 'Merged', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9001');
+
+    expect(issue).toBeDefined();
+    expect(issue!.resourceSources).toContain('branch');
+    expect(issue!.resourceDetails.branchAheadOfMain).toBe(false);
+  });
+
+  it('admits an inactive issue when a branch is ahead of main (PAN-2602)', async () => {
+    resetResourceAllocatedIssuesCacheForTests();
+    // Re-use the branch mock but give the issue a non-active tracker state.
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9003', title: 'Inactive with branch', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9003');
+
+    expect(issue).toBeDefined();
+    expect(issue!.resourceSources).toContain('branch');
+    expect(issue!.resourceDetails.branchAheadOfMain).toBe(true);
+  });
+});
+
+describe('resource-discovery conversation signal', () => {
+  beforeEach(() => {
+    resetResourceAllocatedIssuesCacheForTests();
+  });
+
+  function makeConversation(overrides: Partial<{ issueId: string | null; archivedAt: string | null; status: string }>): unknown {
+    return {
+      id: 1,
+      name: 'conv-pan-9003',
+      tmuxSession: 'conv-pan-9003',
+      status: 'active',
+      cwd: '/tmp/overdeck',
+      issueId: 'PAN-9003',
+      createdAt: '2026-07-01T00:00:00Z',
+      endedAt: null,
+      lastAttachedAt: null,
+      claudeSessionId: null,
+      title: 'Conversation title',
+      titleSource: null,
+      titleSeed: null,
+      totalCost: 0,
+      totalTokens: 0,
+      archivedAt: null,
+      model: null,
+      effort: null,
+      forkStatus: null,
+      forkError: null,
+      harness: null,
+      deliveryMethod: null,
+      spawnError: null,
+      handoffDocPath: null,
+      handoffTargetConvId: null,
+      forkFallbackReason: null,
+      clearedToConvId: null,
+      forkRequest: null,
+      forkRetryCount: 0,
+      ...overrides,
+    };
+  }
+
+  it('tags a non-archived conversation with an issueId as a conversation resource source', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9003', title: 'Conv issue', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+    mocks.listConversations.mockReturnValue([makeConversation({})]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const issue = discovered.find((entry) => entry.issueId === 'PAN-9003');
+
+    expect(issue).toBeDefined();
+    expect(issue!.resourceSources).toContain('conversation');
+    expect(issue!.resourceDetails.conversations).toEqual([
+      { id: 1, name: 'conv-pan-9003', title: 'Conversation title', status: 'active' },
+    ]);
+  });
+
+  it('ignores conversations with a null issueId', async () => {
+    mocks.listConversations.mockReturnValue([makeConversation({ issueId: null })]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
+  });
+
+  it('admits an inactive issue when it has a linked conversation (PAN-2602)', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9003', title: 'Conv issue inactive', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+    mocks.listConversations.mockReturnValue([makeConversation({})]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9003']);
+    expect(discovered[0]?.resourceSources).toContain('conversation');
+  });
+});
+
+describe('resource-discovery vbrief recency signal', () => {
+  beforeEach(() => {
+    resetResourceAllocatedIssuesCacheForTests();
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-9005', title: 'Vbrief recency issue', state: 'open', rawTrackerState: 'OPEN' },
+    ]);
+    mocks.findSpecByIssue.mockReturnValue(Effect.succeed({ path: '/state/specs/pan-9005.vbrief.json' }));
+  });
+
+  it('admits an inactive issue when its vBRIEF spec was touched recently', async () => {
+    mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
+      if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
+        return [{ name: 'feature-pan-9005', isDirectory: () => true }];
+      }
+      return [];
+    });
+    mocks.stat.mockResolvedValue({ mtimeMs: Date.parse('2026-07-12T00:00:00Z') } as any);
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9005']);
+    expect(discovered[0]?.resourceSources).toContain('vbrief');
+  });
+
+  it('excludes an inactive issue when its vBRIEF spec is stale', async () => {
+    mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
+      if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
+        return [{ name: 'feature-pan-9005', isDirectory: () => true }];
+      }
+      return [];
+    });
+    mocks.stat.mockResolvedValue({ mtimeMs: Date.parse('2026-06-20T00:00:00Z') } as any);
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
   });
 });
 

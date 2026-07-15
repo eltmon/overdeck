@@ -19,8 +19,8 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { createBeadsResolver } from '../beads/resolver.js';
-import { getBeadsHealth } from '../beads/telemetry.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readIssueRecordSync } from '../pan-dir/record.js';
 
 function isGitHubIssue(issueId: string): {
   isGitHub: boolean;
@@ -175,7 +175,7 @@ export function analyzeIssue(id: string) {
   });
 }
 
-export function getIssueBeads(id: string) {
+export function getIssueTasks(id: string) {
   return Effect.gen(function* () {
     const issueLower = id.toLowerCase();
     const resolvedProject = resolveProjectFromIssueSync(id);
@@ -206,76 +206,58 @@ export function getIssueBeads(id: string) {
       return { isRemoteWorkspace: false, remoteVmName: null };
     });
 
-    // Try local beads query (non-fatal on bd error)
-    const { beads, querySource, staleReason } = yield* Effect.promise(async (): Promise<{ beads: any[]; querySource: string; staleReason?: string }> => {
-      const bdSearchDir = (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir());
-      // 8s (was 500ms): under live pipeline traffic the shared bd lock queue
-      // is hot and a 500ms acquisition virtually never wins, leaving the rail
-      // permanently stale. The wait is async (never blocks the event loop)
-      // and stays under the rail's 10s poll interval.
-      const result = await createBeadsResolver(bdSearchDir, { retry: { acquisitionTimeoutMs: 8_000 } }).getBeadsForIssue(id);
-      return result.ok
-        ? { beads: result.value, querySource: 'canonical-dolt' }
-        : { beads: [], querySource: 'canonical-dolt', staleReason: result.reason };
-    });
-
-    const tasks = beads.map((bead: any) => ({
-      id: bead.id,
-      title: bead.title,
-      status: bead.status,
-      type: bead.issue_type || bead.type || 'task',
-      blockedBy: bead.blocked_by || [],
-      createdAt: bead.created_at,
-      startedAt: bead.started_at,
-      updatedAt: bead.updated_at,
-      closedAt: bead.closed_at,
-      labels: bead.labels || [],
-      priority: bead.priority,
-    }));
-
-    tasks.sort((a: any, b: any) => {
-      if (a.priority !== b.priority) return (a.priority || 4) - (b.priority || 4);
-      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    const doc = workspacePath ? readWorkspacePlanSync(workspacePath) : null;
+    if (!doc) return jsonResponse({ error: `The vBRIEF for ${id} is missing or unreadable.` }, { status: 404 });
+    const record = projectPath ? readIssueRecordSync({ name: resolvedProject?.projectName ?? id, path: projectPath }, id) : null;
+    const blockers = new Map<string, string[]>();
+    for (const edge of doc.plan.edges) if (edge.type === 'blocks') blockers.set(edge.to, [...(blockers.get(edge.to) ?? []), edge.from]);
+    // The dashboard task views (TasksRail/TasksPanel) contract is
+    // labels: string[]. xBRIEF items carry difficulty in metadata, not labels,
+    // and raw items may serialize labels as null — normalize here at the read
+    // door so no consumer iterates a null.
+    const tasks = doc.plan.items.map((item) => {
+      const rawLabels = (item as { labels?: unknown }).labels;
+      const labels = Array.isArray(rawLabels)
+        ? rawLabels.filter((l): l is string => typeof l === 'string')
+        : item.metadata?.difficulty
+          ? [`difficulty:${item.metadata.difficulty}`]
+          : [];
+      return { ...item, labels, blockedBy: blockers.get(item.id) ?? [], claim: record?.tasks?.claims[item.id] };
     });
 
     // Suppress unused variable warning — remoteVmName available for callers if needed
     void remoteVmName;
 
-    const freshness = yield* Effect.promise(() => getBeadsHealth(resolvedProject?.projectKey ?? '', (workspacePath && existsSync(workspacePath)) ? workspacePath : (projectPath || homedir())));
     return jsonResponse({
       tasks,
       workspacePath,
       count: tasks.length,
-      source: querySource,
+      source: 'vbrief',
       isRemote: isRemoteWorkspace,
-      lastSyncedAt: freshness.lastSuccessfulPullAt,
-      freshnessAgeMs: freshness.freshnessAgeMs,
-      stale: Boolean(staleReason || freshness.lastSyncError),
-      syncError: staleReason ?? freshness.lastSyncError,
-      health: freshness,
+      sequence: record?.tasks?.sequence ?? 0,
     });
   });
 }
 
-function isValidBeadId(beadId: string): boolean {
-  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(beadId);
+function isValidItemId(itemId: string): boolean {
+  return /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(itemId);
 }
 
-export function inspectIssueBead(options: {
+export function inspectIssueTask(options: {
   id: string;
-  beadId: string;
+  itemId: string;
   body: unknown;
 }) {
   return Effect.gen(function* () {
-    const { id, beadId, body } = options;
+    const { id, itemId, body } = options;
     if (!parseIssueIdSync(id)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    if (!beadId.trim()) {
-      return jsonResponse({ error: 'Missing bead ID' }, { status: 400 });
+    if (!itemId.trim()) {
+      return jsonResponse({ error: 'Missing item ID' }, { status: 400 });
     }
-    if (!isValidBeadId(beadId)) {
-      return jsonResponse({ error: 'Invalid bead ID' }, { status: 400 });
+    if (!isValidItemId(itemId)) {
+      return jsonResponse({ error: 'Invalid item ID' }, { status: 400 });
     }
 
     const project = resolveProjectFromIssueSync(id);
@@ -294,7 +276,7 @@ export function inspectIssueBead(options: {
       projectKey: project.projectKey,
       projectPath: project.projectPath,
       issueId: id,
-      beadId,
+      itemId,
       workspace,
       branch: `feature/${issueLower}`,
     }, { deep: (body as { deep?: unknown }).deep === true });

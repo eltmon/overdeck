@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   spawnReviewRoleForIssue: vi.fn(),
 }));
 
+vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
+  queueAutoCommit: vi.fn(),
+  flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: () => null,
@@ -34,6 +39,12 @@ vi.mock('../../../../src/lib/review-status.js', () => ({
 
 vi.mock('../../../../src/lib/cloister/review-agent.js', () => ({
   spawnReviewRoleForIssue: mocks.spawnReviewRoleForIssue,
+}));
+
+vi.mock('../../../../src/lib/swarm-policy.js', () => ({
+  resolveSwarmPolicy: () => ({ mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global' } }),
+  resolveAutomaticSwarmPolicy: () => ({ policy: { mode: 'auto', source: { mode: 'global' } }, enabled: true }),
+  resolveSwarmMaxSlots: (_issueId: string, configured: number) => configured,
 }));
 
 let tempRoot: string;

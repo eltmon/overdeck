@@ -25,7 +25,7 @@ export type FeedCalloutPolicy = 'off' | 'notify' | 'corroborate';
 export interface TieredCalloutBody {
   issueId: string;
   sha: string;
-  beadId?: string;
+  taskId?: string;
   tierName: string;
   agentId: string;
   claim: string;
@@ -41,7 +41,7 @@ export interface TieredCalloutDeps {
   loadConfig?: (issueId: string) => TieredCalloutConfig | undefined;
   loadPlanMetadata?: (issueId: string) => Record<string, unknown> | undefined;
   getWorkspacePath?: (issueId: string) => string | null;
-  getItem?: (issueId: string, beadId: string) => VBriefItem | undefined;
+  getItem?: (issueId: string, taskId: string) => VBriefItem | undefined;
   recordCallout?: (callout: TieredCalloutBody) => void | Promise<void>;
   surfaceCallout?: (callout: TieredCalloutBody) => Promise<unknown>;
   deliverSupervisorReview?: (options: DeliverCommitForReviewOptions) => Promise<DeliveryResult>;
@@ -59,11 +59,11 @@ function parseCalloutBody(body: unknown): TieredCalloutBody | undefined {
   const tierName = typeof record.tierName === 'string' ? record.tierName.trim() : '';
   const agentId = typeof record.agentId === 'string' ? record.agentId.trim() : '';
   const claim = typeof record.claim === 'string' ? record.claim.trim() : '';
-  const beadId = typeof record.beadId === 'string' && record.beadId.trim().length > 0
-    ? record.beadId.trim()
+  const taskId = typeof record.taskId === 'string' && record.taskId.trim().length > 0
+    ? record.taskId.trim()
     : undefined;
   if (!issueId || !sha || !tierName || !agentId || !claim) return undefined;
-  return { issueId, sha, beadId, tierName, agentId, claim };
+  return { issueId, sha, taskId, tierName, agentId, claim };
 }
 
 function calloutPolicy(config: TieredCalloutConfig): FeedCalloutPolicy {
@@ -81,10 +81,10 @@ function defaultPlanMetadata(issueId: string): Record<string, unknown> | undefin
   return readWorkspacePlanSync(workspacePath)?.plan.metadata;
 }
 
-function defaultItem(issueId: string, beadId: string): VBriefItem | undefined {
+function defaultItem(issueId: string, taskId: string): VBriefItem | undefined {
   const workspacePath = defaultWorkspacePath(issueId);
   if (!workspacePath) return undefined;
-  return readWorkspacePlanSync(workspacePath)?.plan.items.find((item) => item.id === beadId);
+  return readWorkspacePlanSync(workspacePath)?.plan.items.find((item) => item.id === taskId);
 }
 
 function defaultRecordCallout(callout: TieredCalloutBody): void {
@@ -145,9 +145,9 @@ export async function handleTieredCallout(
 
   let supervisorReview: DeliverCommitForReviewOptions | undefined;
   if (policy === 'corroborate') {
-    if (!callout.beadId) return { status: 400, body: { error: 'beadId is required for corroborate callouts' } };
+    if (!callout.taskId) return { status: 400, body: { error: 'taskId is required for corroborate callouts' } };
     const workspacePath = deps.getWorkspacePath?.(callout.issueId) ?? defaultWorkspacePath(callout.issueId);
-    const item = deps.getItem?.(callout.issueId, callout.beadId) ?? defaultItem(callout.issueId, callout.beadId);
+    const item = deps.getItem?.(callout.issueId, callout.taskId) ?? defaultItem(callout.issueId, callout.taskId);
     if (!workspacePath || !item) {
       return { status: 409, body: { error: 'unable to resolve supervisor review context' } };
     }
@@ -157,7 +157,7 @@ export async function handleTieredCallout(
       issueId: callout.issueId,
       item,
       sha: callout.sha,
-      beadId: callout.beadId,
+      taskId: callout.taskId,
     };
   }
 

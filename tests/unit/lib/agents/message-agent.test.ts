@@ -1,5 +1,6 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 
 const mocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
@@ -113,6 +114,10 @@ describe('messageAgent', () => {
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
   });
 
+  afterEach(() => {
+    rmSync('/tmp/agent-pan-2701', { recursive: true, force: true });
+  });
+
   it('delivers to a troubled agent when its tmux session is live', async () => {
     mocks.getAgentStateSync.mockReturnValue({
       id: 'agent-pan-2262',
@@ -135,5 +140,44 @@ describe('messageAgent', () => {
       'agent-pan-2262',
       expect.stringContaining('queued mail without resume'),
     );
+  });
+
+  it('queues a message instead of pasting into a mid-turn codex agent', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+    mocks.waitForAgentIdle.mockResolvedValue(false);
+
+    await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
+
+    expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
+    const mailDir = '/tmp/agent-pan-2701/mail';
+    expect(existsSync(mailDir)).toBe(true);
+    const files = readdirSync(mailDir);
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatch(/\.pending\.md$/);
+    expect(readFileSync(`${mailDir}/${files[0]}`, 'utf-8')).toContain('review feedback');
+  });
+
+  it('marks direct codex delivery as backup mail rather than pending mail', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+
+    await messageAgent('agent-pan-2701', 'operator message', 'pan-tell');
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+    const files = readdirSync('/tmp/agent-pan-2701/mail');
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatch(/\.md$/);
+    expect(files[0]).not.toContain('.pending.md');
   });
 });

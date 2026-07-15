@@ -17,6 +17,13 @@
 #
 set -euo pipefail
 
+# Force C locale so coreutils `sort`/`comm` use code-point ordering, matching
+# the canonicalizer's JS `.sort()` (also code-point). Without this, a non-C
+# LC_COLLATE (e.g. en_US.UTF-8 in CI) orders paths differently than the
+# canonicalizer, and `comm` flags every baselined cycle as both "new" and
+# "stale" — a false positive that has nothing to do with the diff under test.
+export LC_ALL=C
+
 MODE=check
 if [[ "${1:-}" == "--update" ]]; then
   MODE=update

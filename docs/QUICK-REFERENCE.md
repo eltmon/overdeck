@@ -36,15 +36,20 @@ Act on an issue. `<id>` is the universal object.
 | `pan tell <id> <msg>` | Send a message to a running agent |
 | `pan resume <id>` | Resume from saved Claude session |
 | `pan recover <id>` | Recover a crashed or stopped agent |
-| `pan kill <id>` | Stop the agent (workspace preserved) |
+| `pan stop <id>` | Stop every issue agent while preserving workspace, branch, plan, beads, and commits (`pan kill` remains the older alias) |
+| `pan reset-to-planned <id> [--dry-run]` | Clear task progress, claims, execution, and specialist state while preserving finalized planning and code; leaves `pan start` as the next action |
 | `pan sync-main <id>` | Merge latest `main` into the workspace branch |
 | `pan swarm <id>` | Per-item DAG dispatch across plan items (slot-per-item). See [SWARM.md](./SWARM.md). `--dry-run`, `--max-slots`, `--auto-advance`, `--host`, `--task <next\|show\|claim\|done\|block\|unblock\|cancel>` |
+| `pan staffing <id>` | Show or set per-issue work-model and swarm overrides. Use `--model <model>\|default` and `--swarm off\|auto\|always\|default`. |
+| Issue-header Policies control | Open **Policies** from an issue header to set Review (mode, re-review scope, model) and Work (model, swarm) overrides. Active overrides surface as chips beside the control. Model changes apply to the next fresh run; they never restart agents automatically. |
 | `pan done <id>` | Mark work complete → tracker "In Review". Agent stays on standby for UAT tweaks via `pan tell`. |
 | Dashboard MERGE | Click MERGE button when review passes (handles rebase, verify, merge, cleanup) |
 | `pan inspect <id>` | Request human inspection before proceeding |
 | `pan close <id>` | Verify, clean up, close on tracker |
 | `pan reopen <id>` | Re-open for rework (resets specialist state) |
 | `pan wipe <id>` | **Destructive.** Canonical reset-to-Todo for an issue. Confirms. |
+
+The issue menu's **Reset to planned** action runs the same preserving command. Its red **Reset issue** action is different and destructive: it deletes the workspace and branch, clears planning state, and returns the issue to Todo.
 
 ## 2. Observation
 
@@ -252,7 +257,7 @@ One-time migration from `settings.json` → `config.yaml`.
 | `pan cloister *` | `pan admin cloister *` |
 | `pan specialists *` | `pan admin specialists *` |
 | `pan remote *` | `pan admin remote *` |
-| `pan beads *` | `pan admin beads *` |
+| `pan task *` | `pan admin beads *` |
 | `pan db *` | `pan admin db *` |
 | `pan config *` | `pan admin config *` |
 | `pan setup hooks` | `pan admin hooks install` |

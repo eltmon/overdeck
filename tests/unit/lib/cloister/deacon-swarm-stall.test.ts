@@ -167,7 +167,7 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
         stalledForMs: STALL_THRESHOLD_MS + 1,
       }),
     ]);
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
       '[swarm] stalled slot 1 (item wi-a) for PAN-2203: recovery required',
     ]);
     expect(getFailedMergeBlock('PAN-2203', 1)).toEqual(expect.objectContaining({
@@ -177,13 +177,13 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     }));
   });
 
-  it('PAN-2364: records a block for every stalled slot in one pass', () => {
+  it('PAN-2364: records a block for every stalled slot in one pass', async () => {
     const classified = [
       { ...slot(), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
       { ...slot({ itemId: 'wi-b', slotIndex: 2, branch: 'feature/pan-2203-slot-2', agentId: 'agent-pan-2203-slot-2' }), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
     ];
 
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
       '[swarm] stalled slot 1 (item wi-a) for PAN-2203: recovery required',
       '[swarm] stalled slot 2 (item wi-b) for PAN-2203: recovery required',
     ]);
@@ -191,27 +191,27 @@ describe('deacon-swarm stalled-slot detection and duplicate-spawn guard', () => 
     expect(getFailedMergeBlock('PAN-2203', 2)).toEqual(expect.objectContaining({ itemId: 'wi-b', slotIndex: 2 }));
   });
 
-  it('PAN-2364: only records blocks for newly stalled slots when others already hold blocks', () => {
-    recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'Slot 1 stalled with no branch commit or pane output progress' });
+  it('PAN-2364: only records blocks for newly stalled slots when others already hold blocks', async () => {
+    await recordFailedMergeBlock({ issueId: 'PAN-2203', itemId: 'wi-a', slotIndex: 1, note: 'Slot 1 stalled with no branch commit or pane output progress' });
     const classified = [
       { ...slot(), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
       { ...slot({ itemId: 'wi-b', slotIndex: 2, branch: 'feature/pan-2203-slot-2', agentId: 'agent-pan-2203-slot-2' }), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 },
     ];
 
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
       '[swarm] stalled slot 2 (item wi-b) for PAN-2203: recovery required',
     ]);
     expect(getFailedMergeBlock('PAN-2203', 1)).toEqual(expect.objectContaining({ itemId: 'wi-a', slotIndex: 1 }));
     expect(getFailedMergeBlock('PAN-2203', 2)).toEqual(expect.objectContaining({ itemId: 'wi-b', slotIndex: 2 }));
   });
 
-  it('PAN-2364: repeated passes over the same stalled slot are idempotent and do not rewrite the block', () => {
+  it('PAN-2364: repeated passes over the same stalled slot are idempotent and do not rewrite the block', async () => {
     const classified = [{ ...slot(), lifecycle: 'stalled' as const, reason: 'no-progress-timeout' as const, stalledForMs: STALL_THRESHOLD_MS + 1 }];
 
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
+    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([
       '[swarm] stalled slot 1 (item wi-a) for PAN-2203: recovery required',
     ]);
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
+    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
     expect(getFailedMergeBlocks('PAN-2203')).toHaveLength(1);
   });
 
@@ -353,7 +353,7 @@ describe('PAN-2372 WI-5 infer_completion default + classifyDoneWithoutSignal mod
   // The default flipped nudge → auto: a stalled, alive-idle, clean+ahead slot now gets ONE
   // completion nudge and then converges to ready-to-merge signal 'inferred' after two stable
   // observations. Explicit 'nudge' (never converges) and 'off' (no nudge, returns null) keep
-  // their prior semantics. classifyDoneWithoutSignal is exercised directly — the bead names it
+  // their prior semantics. classifyDoneWithoutSignal is exercised directly — the task names it
   // — with an injected now/options and mocked ahead/clean deps, so no wall-clock waits.
   const originalEnv = process.env.PAN_SWARM_INFER_COMPLETION;
 

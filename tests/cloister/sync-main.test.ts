@@ -58,11 +58,18 @@ const execMock = vi.hoisted(() =>
     .mockResolvedValue({ stdout: '', stderr: '' })
 );
 
+const isOperationHeadCheck = (cmd: string) =>
+  /git rev-parse -q --verify (?:MERGE_HEAD|REBASE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD)/.test(cmd);
+
 vi.mock('child_process', () => {
   const kCustom = Symbol.for('nodejs.util.promisify.custom');
 
   function exec(cmd: string, optionsOrCb: any, maybeCallback?: any) {
     const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCallback;
+    if (isOperationHeadCheck(cmd)) {
+      callback(new Error('ref not found'), '', '');
+      return;
+    }
     execMock(cmd, typeof optionsOrCb === 'object' ? optionsOrCb : undefined)
       .then(({ stdout }) => callback(null, stdout, ''))
       .catch((err) => callback(err, '', ''));
@@ -81,13 +88,17 @@ vi.mock('child_process', () => {
       .catch((err) => callback(err, '', ''));
   }
 
-  (exec as any)[kCustom] = execMock;
+  (exec as any)[kCustom] = (cmd: string, opts?: any) => {
+    if (isOperationHeadCheck(cmd)) return Promise.reject(new Error('ref not found'));
+    return execMock(cmd, opts);
+  };
   // execFile's promisified form is called as (file, args, opts). Translate
   // that to the {cmd, opts} shape execMock expects, so test mocks that match
   // on `cmd.includes('tmux capture-pane')` still resolve correctly for the
   // async tmux helpers in src/lib/tmux.ts.
   (execFile as any)[kCustom] = (file: string, args?: string[], opts?: any) => {
     const cmd = Array.isArray(args) && args.length > 0 ? `${file} ${args.join(' ')}` : file;
+    if (isOperationHeadCheck(cmd)) return Promise.reject(new Error('ref not found'));
     return execMock(cmd, opts);
   };
 
@@ -185,7 +196,7 @@ describe('isSyncMainMainPreferredPath', () => {
   it('matches only pipeline-owned sync state paths', () => {
     expect(isSyncMainMainPreferredPath('.pan/continues/PAN-1.vbrief.json')).toBe(true);
     expect(isSyncMainMainPreferredPath('.pan/specs/PAN-1.vbrief.json')).toBe(true);
-    expect(isSyncMainMainPreferredPath('.beads/issues.jsonl')).toBe(true);
+    expect(isSyncMainMainPreferredPath('.tasks/issues.jsonl')).toBe(false);
 
     expect(isSyncMainMainPreferredPath('.pan/continue.json')).toBe(false);
     expect(isSyncMainMainPreferredPath('.pan/spec.vbrief.json')).toBe(false);
@@ -335,10 +346,8 @@ describe('syncMainIntoWorkspace', () => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
         if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
         if (cmd.includes('git merge origin/main')) {
-          const err: any = new Error('CONFLICT (content): Merge conflict in .beads/issues.jsonl');
+          const err: any = new Error('CONFLICT (content): Merge conflict in .pan/continues/PAN-1.vbrief.json');
           err.stdout = [
-            'Auto-merging .beads/issues.jsonl',
-            'CONFLICT (content): Merge conflict in .beads/issues.jsonl',
             'Auto-merging .pan/continues/PAN-1.vbrief.json',
             'CONFLICT (content): Merge conflict in .pan/continues/PAN-1.vbrief.json',
             '',
@@ -350,22 +359,19 @@ describe('syncMainIntoWorkspace', () => {
           conflictScanCount += 1;
           return {
             stdout: conflictScanCount === 1
-              ? '.beads/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n'
+              ? '.pan/continues/PAN-1.vbrief.json\n'
               : '',
             stderr: '',
           };
         }
-        if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .beads')) return { stdout: '', stderr: '' };
         if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .pan/continues')) return { stdout: '', stderr: '' };
         if (cmd.includes('git rm -r --quiet --ignore-unmatch -- .pan/specs')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git checkout origin/main -- .beads')) return { stdout: '', stderr: '' };
         if (cmd.includes('git checkout origin/main -- .pan/continues')) return { stdout: '', stderr: '' };
         if (cmd.includes('git checkout origin/main -- .pan/specs')) return { stdout: '', stderr: '' };
-        if (cmd.includes('git add -A -- .beads')) return { stdout: '', stderr: '' };
         if (cmd.includes('git add -A -- .pan/continues')) return { stdout: '', stderr: '' };
         if (cmd.includes('git add -A -- .pan/specs')) return { stdout: '', stderr: '' };
         if (cmd.includes('git commit --no-edit')) return { stdout: '[feature abc123] Merge remote-tracking branch origin/main\n', stderr: '' };
-        if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: '.beads/issues.jsonl\n.pan/continues/PAN-1.vbrief.json\n', stderr: '' };
+        if (cmd.includes('git diff --name-only ORIG_HEAD HEAD')) return { stdout: '.pan/continues/PAN-1.vbrief.json\n', stderr: '' };
         if (cmd.includes('git log ORIG_HEAD..HEAD --oneline')) return { stdout: 'abc1234 Merge remote-tracking branch origin/main\n', stderr: '' };
         return { stdout: '', stderr: '' };
       });
@@ -374,7 +380,7 @@ describe('syncMainIntoWorkspace', () => {
 
       expect(result.success).toBe(true);
       expect(result.conflictFiles).toBeUndefined();
-      expect(result.changedFiles).toEqual(['.beads/issues.jsonl', '.pan/continues/PAN-1.vbrief.json']);
+      expect(result.changedFiles).toEqual(['.pan/continues/PAN-1.vbrief.json']);
       expect(result.commitCount).toBe(1);
       expect(execMock).not.toHaveBeenCalledWith(
         expect.stringContaining('git merge --abort'),

@@ -41,15 +41,10 @@ export interface ContinueHazard {
 export interface ContinueResumePoint {
   /** Free-form description of what the next agent should do. */
   description: string;
-  /** Optional bead ID the next agent should pick up. */
-  beadId?: string;
+  /** Optional vBRIEF item ID the next agent should pick up. */
+  itemId?: string;
   /** Optional file paths the next agent should read first. */
   filesToRead?: string[];
-}
-
-/** Mapping from plan item / acceptance criterion to bead ID(s). */
-export interface ContinueBeadsMapping {
-  [planItemId: string]: string[];
 }
 
 /** Specialist feedback entry stored on the continue file (Layer 1+). */
@@ -144,7 +139,6 @@ export interface ContinueState {
   decisions: ContinueDecision[];
   hazards: ContinueHazard[];
   resumePoint: ContinueResumePoint | null;
-  beadsMapping: ContinueBeadsMapping;
   /** Agent model for the most recent / current session. */
   agentModel?: string;
   sessionHistory: ContinueSessionEntry[];

@@ -78,6 +78,22 @@ describe('cost-monitor', () => {
   });
 
   describe('checkCostLimits', () => {
+    it('returns no alerts and reads no cost data when limits are not configured (opt-in, PAN-2642)', () => {
+      vi.mocked(getAgentDailyCostSync).mockReturnValue(9999);
+      const alerts = checkCostLimits('agent-1', 'pan-1', undefined);
+      expect(alerts).toHaveLength(0);
+      expect(getAgentDailyCostSync).not.toHaveBeenCalled();
+      expect(getDailyTrends).not.toHaveBeenCalled();
+    });
+
+    it('skips unset limit dimensions and defaults the warn threshold to 0.8', () => {
+      vi.mocked(getAgentDailyCostSync).mockReturnValue(9.0);
+      const alerts = checkCostLimits('agent-1', undefined, { per_agent_usd: 10.0 });
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0]).toMatchObject({ type: 'per_agent', level: 'warning' });
+      expect(getDailyTrends).not.toHaveBeenCalled();
+    });
+
     it('should not alert when under threshold', () => {
       vi.mocked(getAgentDailyCostSync).mockReturnValue(1.0);
       vi.mocked(getDailyTrends).mockReturnValue([

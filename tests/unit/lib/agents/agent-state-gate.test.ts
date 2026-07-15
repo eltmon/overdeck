@@ -96,4 +96,31 @@ describe('decideResumeGate', () => {
     }
     expect(decideResumeGate(undefined, 'message-delivery')).toEqual({ decision: 'proceed' });
   });
+
+  it('re-drives a stopped-by-user agent for rework-owing feedback delivery (PAN-2668)', () => {
+    const stoppedByUser = blocks.find((block) => block.gate === 'stopped-by-user')!;
+    // The completed-handoff + owes-rework exception applies to message delivery
+    // the same way it does to autonomous re-drive — verification/review feedback
+    // must not be silently queued to a stopped agent nothing will resume.
+    expect(decideResumeGate(stoppedByUser, 'message-delivery', { hasCompletedHandoff: true, owesRework: true })).toEqual({
+      decision: 'proceed',
+      clearStoppedByUser: true,
+    });
+    // Either half of the context missing → still queued.
+    expect(decideResumeGate(stoppedByUser, 'message-delivery', { hasCompletedHandoff: true })).toEqual({
+      decision: 'queue-message',
+      reason: stoppedByUser.reason,
+    });
+    expect(decideResumeGate(stoppedByUser, 'message-delivery', { owesRework: true })).toEqual({
+      decision: 'queue-message',
+      reason: stoppedByUser.reason,
+    });
+    // Other gates never re-drive on message delivery, even with full context.
+    for (const block of blocks.filter((candidate) => candidate.gate !== 'stopped-by-user')) {
+      expect(decideResumeGate(block, 'message-delivery', { hasCompletedHandoff: true, owesRework: true })).toEqual({
+        decision: 'queue-message',
+        reason: block.reason,
+      });
+    }
+  });
 });

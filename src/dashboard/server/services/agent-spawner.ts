@@ -11,9 +11,10 @@ import { Effect, Layer, Context } from 'effect';
 import {
   AgentAlreadyRunning,
   AgentStartError,
-  BeadsNotInitialized,
+  PlanEmpty,
   WorkspaceNotFound,
 } from './typed-errors.js';
+import { readWorkspacePlanSync } from '../../../lib/vbrief/io.js';
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ export interface AgentSpawnerShape {
    *
    * Pre-conditions:
    * - The workspace must exist (WorkspaceNotFound if not)
-   * - Beads tasks must be initialized (BeadsNotInitialized if not)
+   * - The merged vBRIEF must contain tasks (PlanEmpty if not)
    * - No agent already running for this issue (AgentAlreadyRunning if so)
    */
   readonly startWork: (
@@ -73,7 +74,7 @@ export interface AgentSpawnerShape {
     opts: StartWorkOptions,
   ) => Effect.Effect<
     SpawnedAgent,
-    WorkspaceNotFound | BeadsNotInitialized | AgentAlreadyRunning | AgentStartError
+    WorkspaceNotFound | PlanEmpty | AgentAlreadyRunning | AgentStartError
   >;
 
   /**
@@ -131,7 +132,7 @@ export const AgentSpawnerLive = Layer.effect(
           const { workspacePath } = opts;
 
           // Guard: reject bare numeric IDs (e.g. "484") — they have no project prefix,
-          // so tracker routing, workspace naming, and beads all fail. Require "PAN-484".
+          // so tracker routing, workspace naming, and tasks all fail. Require "PAN-484".
           if (/^\d+$/.test(issueId)) {
             throw new AgentStartError({
               id: issueId,
@@ -144,12 +145,9 @@ export const AgentSpawnerLive = Layer.effect(
             throw new WorkspaceNotFound({ id: issueId });
           }
 
-          // Guard: beads must be initialized (check .beads dir for tasks)
-          const beadsDir = join(workspacePath, '.beads');
-          const projectBeadsDir = join(workspacePath, '..', '..', '.beads');
-          const hasBeads = existsSync(beadsDir) || existsSync(projectBeadsDir);
-          if (!hasBeads) {
-            throw new BeadsNotInitialized({ workspace: workspacePath });
+          const plan = readWorkspacePlanSync(workspacePath);
+          if (!plan || plan.plan.items.length === 0) {
+            throw new PlanEmpty({ id: issueId });
           }
 
           // Guard: no agent already running
@@ -182,7 +180,7 @@ export const AgentSpawnerLive = Layer.effect(
         catch: (err) => {
           if (
             err instanceof WorkspaceNotFound ||
-            err instanceof BeadsNotInitialized ||
+            err instanceof PlanEmpty ||
             err instanceof AgentAlreadyRunning
           ) return err;
           return new AgentStartError({

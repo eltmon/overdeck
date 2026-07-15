@@ -23,6 +23,8 @@ import {
   renderProjectLayer,
   applyManagedRegion,
   hasManagedRegion,
+  cleanLegacyBeadsTargetSync,
+  type LegacyBeadsCleanup,
   piGlobalContextFile,
   codexGlobalContextFile,
 } from './context-layers/index.js';
@@ -509,12 +511,8 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   return result;
 }
 
-/** A target file whose pre-existing hand-authored content was backed up the
- *  first time `pan sync` injected a managed region into it. */
 export interface ContextFirstInjection {
-  /** The target file (e.g. ~/.claude/CLAUDE.md, <root>/AGENTS.md). */
   file: string;
-  /** Where the pre-existing content was snapshotted before injection. */
   backupPath: string;
 }
 
@@ -529,9 +527,8 @@ export interface ContextLayerSyncResult {
   piGlobalWritten: boolean;
   /** True when ~/.overdeck/context/codex-global.md was written this run. */
   codexGlobalWritten: boolean;
-  /** Files where a managed region was injected into pre-existing content for
-   *  the first time this run (each backed up first). */
   firstInjections: ContextFirstInjection[];
+  legacyBeadsCleanups: LegacyBeadsCleanup[];
   errors: string[];
 }
 
@@ -577,6 +574,7 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     piGlobalWritten: false,
     codexGlobalWritten: false,
     firstInjections: [],
+    legacyBeadsCleanups: [],
     errors: [],
   };
   // One backup dir for every first-injection this run.
@@ -624,15 +622,17 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
     result.errors.push(`codex-global: ${err?.message ?? err}`);
   }
 
-  // Project layers → <projectRoot>/CLAUDE.md (claude-code) + <projectRoot>/AGENTS.md (pi).
-  // No project.md → both renders are empty → leave the project's files alone.
+  // Clean stale agent instructions in every project; Beads itself remains installed.
   for (const { config } of listProjectsSync()) {
     if (!existsSync(config.path)) continue;
     try {
+      let wrote = false;
+      for (const name of ['CLAUDE.md', 'AGENTS.md']) {
+        const cleanup = cleanLegacyBeadsTargetSync(join(config.path, name), backupTimestamp);
+        if (cleanup) result.legacyBeadsCleanups.push(cleanup);
+      }
       const claudeManaged = renderProjectLayer(config.path, 'claude-code');
       const piManaged = renderProjectLayer(config.path, 'ohmypi');
-      if (!claudeManaged && !piManaged) continue;
-      let wrote = false;
       if (claudeManaged) {
         wrote = writeManagedTargetSync(join(config.path, 'CLAUDE.md'), claudeManaged, result, backupTimestamp) || wrote;
       }

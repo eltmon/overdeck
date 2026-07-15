@@ -260,7 +260,7 @@ describe('deacon-swarm completion classification', () => {
       stallThresholdMs: 10_000,
     });
 
-    expect(recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
+    expect(await recordStalledSlotRecovery('PAN-2203', classified)).toEqual([]);
     expect(getFailedMergeBlock('PAN-2203', 1)).toBeUndefined();
   });
 

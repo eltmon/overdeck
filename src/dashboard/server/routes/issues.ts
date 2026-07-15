@@ -13,14 +13,15 @@ import { httpHandler } from './http-handler.js';
  *   POST /api/issues/:id/complete-planning
  *   POST /api/issues/:id/abort
  *   POST /api/issues/:id/reset
+ *   POST /api/issues/:id/reset-to-planned
  *   POST /api/issues/:id/cancel
  *   POST /api/issues/:id/reopen
  *   POST /api/issues/:id/move-status
  *   POST /api/issues/:id/cleanup-workspace
  *   POST /api/issues/:id/deep-wipe
  *   POST /api/issues/:id/close-out
- *   GET  /api/issues/:id/beads
- *   POST /api/issues/:id/beads/:beadId/inspect
+ *   GET  /api/issues/:id/tasks
+ *   POST /api/issues/:id/tasks/:taskId/inspect
  *   GET  /api/issues/:id/costs
  */
 
@@ -31,7 +32,6 @@ import { spawnPlanningSession, type PlanningIssue } from '../../../lib/planning/
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
-import { withBdMutex } from '../../../lib/bd-mutex.js';
 import { spawnInspectAgent } from '../../../lib/cloister/inspect-agent.js';
 import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 
@@ -112,10 +112,10 @@ import {
 import { bulkCloseOut, closeOutIssue } from '../../../lib/overdeck/issue-close-out.js';
 import {
   analyzeIssue,
-  getIssueBeads,
+  getIssueTasks,
   getIssueResourceDetails,
   getResourceAllocatedIssues,
-  inspectIssueBead,
+  inspectIssueTask,
 } from '../../../lib/overdeck/issue-reads.js';
 
 const execAsync = promisify(exec);
@@ -265,6 +265,38 @@ const getIssueShipLogRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: GET /api/issues/:id/verification ─────────────────────────────────
+// PAN-2665: the Test/Lint tree node's live view — the per-workspace
+// verification artifact (written incrementally while gates run) plus the
+// review-status verificationStatus, polled by the panel while running.
+const getIssueVerificationRoute = HttpRouter.add(
+  'GET',
+  '/api/issues/:id/verification',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueIdSync(id)) {
+      return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
+    }
+    return yield* Effect.promise(async () => {
+      const { readVerificationArtifact } = await import('../../../lib/cloister/verification-artifact.js');
+      const { getReviewStatusSync } = await import('../../../lib/review-status.js');
+      const { join } = await import('node:path');
+      const resolved = resolveProjectFromIssueSync(id);
+      const workspacePath = resolved
+        ? join(resolved.projectPath, 'workspaces', `feature-${id.toLowerCase()}`)
+        : null;
+      const artifact = workspacePath ? readVerificationArtifact(workspacePath) : null;
+      const rs = getReviewStatusSync(id.toUpperCase());
+      return jsonResponse({
+        issueId: id.toUpperCase(),
+        verificationStatus: rs?.verificationStatus ?? null,
+        artifact,
+      });
+    });
+  })),
+);
+
 // ─── Route: POST /api/issues/:issueId/close ──────────────────────────────────
 
 const postIssueCloseRoute = HttpRouter.add(
@@ -384,6 +416,24 @@ const postIssueResetRoute = HttpRouter.add(
     const eventStore = yield* EventStoreService;
 
     return yield* resetIssueTransition({ id, body, eventStore });
+  })),
+);
+
+const postIssueResetToPlannedRoute = HttpRouter.add(
+  'POST',
+  '/api/issues/:id/reset-to-planned',
+  httpHandler(Effect.gen(function* () {
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    if (!parseIssueIdSync(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
+    try {
+      const { stdout } = yield* Effect.promise(() => execFileAsync('pan', ['reset-to-planned', id], { encoding: 'utf8' }));
+      invalidateAgentsCache();
+      return jsonResponse({ success: true, message: stdout.trim() });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return jsonResponse({ error: message }, { status: 500 });
+    }
   })),
 );
 
@@ -542,11 +592,11 @@ const postIssuesBulkCloseOutRoute = HttpRouter.add(
   })),
 );
 
-// ─── Route: GET /api/issues/:id/beads ────────────────────────────────────────
+// ─── Route: GET /api/issues/:id/tasks ────────────────────────────────────────
 
-const getIssueBeadsRoute = HttpRouter.add(
+const getIssueTasksRoute = HttpRouter.add(
   'GET',
-  '/api/issues/:id/beads',
+  '/api/issues/:id/tasks',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
     const id = params['id'] ?? '';
@@ -554,15 +604,15 @@ const getIssueBeadsRoute = HttpRouter.add(
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
 
-    return yield* getIssueBeads(id);
+    return yield* getIssueTasks(id);
   })),
 );
 
-// ─── Route: POST /api/issues/:id/beads/:beadId/inspect ───────────────────────
+// ─── Route: POST /api/issues/:id/tasks/:taskId/inspect ───────────────────────
 
-const postIssueBeadInspectRoute = HttpRouter.add(
+const postIssueTaskInspectRoute = HttpRouter.add(
   'POST',
-  '/api/issues/:id/beads/:beadId/inspect',
+  '/api/issues/:id/tasks/:itemId/inspect',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);
@@ -570,16 +620,16 @@ const postIssueBeadInspectRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const id = (params['id'] ?? '').toUpperCase();
-    const beadId = params['beadId'] ?? '';
+    const itemId = params['itemId'] ?? '';
     const body = yield* readJsonBody;
-    return yield* inspectIssueBead({ id, beadId, body });
+    return yield* inspectIssueTask({ id, itemId, body });
   })),
 );
 
 // ─── Route: GET /api/issues/:id/planning-state ───────────────────────────────
 //
 // Lightweight summary of an issue's planning artifacts:
-//   { hasPlan, hasBeads, beadsCount }
+//   { hasPlan, hasTasks, tasksCount }
 // Used by kanban cards to color the vBRIEF/Tasks chips and decide whether to
 // show "Generate Tasks" instead of "Tasks". Cheap so it can be polled per-card.
 
@@ -599,10 +649,10 @@ const getIssuePlanningStateRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:id/generate-tasks ──────────────────────────────
 //
-// Runs createBeadsFromVBrief() against the workspace. Same logic as
+// Runs createTasksFromVBrief() against the workspace. Same logic as
 // `pan plan finalize`, exposed so the
 // dashboard can offer a one-click "Generate Tasks" action when a vBRIEF plan
-// exists but beads were never created (e.g. plans authored before the
+// exists but tasks were never created (e.g. plans authored before the
 // agent-driven finalize flow shipped).
 
 const postIssueGenerateTasksRoute = HttpRouter.add(
@@ -813,12 +863,14 @@ export const issuesRouteLayer = Layer.mergeAll(
   getIssuesRoute,
   getIssueAnalyzeRoute,
   getIssueShipLogRoute,
+  getIssueVerificationRoute,
   postIssueCloseRoute,
   postIssueStartPlanningRoute,
   postIssueAbortPlanningRoute,
   postIssueCompletePlanningRoute,
   postIssueAbortRoute,
   postIssueResetRoute,
+  postIssueResetToPlannedRoute,
   postIssueCancelRoute,
   postIssueReopenRoute,
   postIssueRestartFromPlanRoute,
@@ -828,8 +880,8 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueCopySettingsRoute,
   postIssueCloseOutRoute,
   postIssuesBulkCloseOutRoute,
-  getIssueBeadsRoute,
-  postIssueBeadInspectRoute,
+  getIssueTasksRoute,
+  postIssueTaskInspectRoute,
   getIssuePlanningStateRoute,
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,

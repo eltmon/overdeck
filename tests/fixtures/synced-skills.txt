@@ -1,7 +1,4 @@
 all-up
-beads
-beads-completion-check
-beads-overdeck-guide
 benchmark
 bug-fix
 check-merged
@@ -21,6 +18,7 @@ improve-codebase-architecture
 incident-response
 knowledge-capture
 myn-standards
+okf
 onboard-codebase
 overdeck
 ovr
@@ -79,6 +77,7 @@ pan-subagent-creator
 pan-swarm
 pan-sync
 pan-sync-main
+pan-task
 pan-tell
 pan-test-config
 pan-tldr

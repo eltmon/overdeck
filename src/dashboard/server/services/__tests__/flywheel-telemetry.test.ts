@@ -51,7 +51,7 @@ function criterion5Run(interventionCount: number, options: { outcome?: 'merged' 
   };
 }
 
-function criterion6Run(totalMs: number, counts: { beadsCount?: number; planItemsCount?: number }) {
+function criterion6Run(totalMs: number, counts: { tasksCount?: number; planItemsCount?: number }) {
   return {
     ...counts,
     metrics: metrics({ mergeMs: totalMs }),
@@ -414,9 +414,9 @@ describe('flywheel telemetry', () => {
       criterion6Run(100, { planItemsCount: 2 }),
       criterion6Run(200, { planItemsCount: 2 }),
       criterion6Run(300, { planItemsCount: 2 }),
-      criterion6Run(100, { beadsCount: 6 }),
-      criterion6Run(250, { beadsCount: 6 }),
-      criterion6Run(800, { beadsCount: 6 }),
+      criterion6Run(100, { tasksCount: 6 }),
+      criterion6Run(250, { tasksCount: 6 }),
+      criterion6Run(800, { tasksCount: 6 }),
     ]);
     const value = criterion6Value(criterion);
 
@@ -428,11 +428,11 @@ describe('flywheel telemetry', () => {
     expect(criterion.dataSufficient).toBe(true);
   });
 
-  it('uses beads count before falling back to vBRIEF plan item count for criterion 6 buckets', () => {
+  it('uses tasks count before falling back to vBRIEF plan item count for criterion 6 buckets', () => {
     const criterion = computeCriterion6([
-      criterion6Run(100, { beadsCount: 9, planItemsCount: 2 }),
-      criterion6Run(110, { beadsCount: 9, planItemsCount: 2 }),
-      criterion6Run(120, { beadsCount: 9, planItemsCount: 2 }),
+      criterion6Run(100, { tasksCount: 9, planItemsCount: 2 }),
+      criterion6Run(110, { tasksCount: 9, planItemsCount: 2 }),
+      criterion6Run(120, { tasksCount: 9, planItemsCount: 2 }),
       criterion6Run(200, { planItemsCount: 2 }),
       criterion6Run(220, { planItemsCount: 2 }),
       criterion6Run(240, { planItemsCount: 2 }),
@@ -446,8 +446,8 @@ describe('flywheel telemetry', () => {
 
   it('does not mark undersampled criterion 6 buckets red', () => {
     const criterion = computeCriterion6([
-      criterion6Run(100, { beadsCount: 9 }),
-      criterion6Run(1_000, { beadsCount: 9 }),
+      criterion6Run(100, { tasksCount: 9 }),
+      criterion6Run(1_000, { tasksCount: 9 }),
     ]);
     const value = criterion6Value(criterion);
 
@@ -461,7 +461,7 @@ describe('flywheel telemetry', () => {
     [[100, 100, 250], 'yellow'],
     [[100, 100, 400], 'red'],
   ] as const)('maps criterion 6 headline status for totals %j', (totals, status) => {
-    const criterion = computeCriterion6(totals.map((totalMs) => criterion6Run(totalMs, { beadsCount: 2 })));
+    const criterion = computeCriterion6(totals.map((totalMs) => criterion6Run(totalMs, { tasksCount: 2 })));
 
     expect(criterion.status).toBe(status);
   });

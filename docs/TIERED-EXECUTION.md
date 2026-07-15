@@ -1,6 +1,6 @@
 # Tiered Execution
 
-Tiered execution routes each vBRIEF bead to the cheapest warm agent tier that can do the work, while a durable foreman owns issue bookkeeping and commit boundaries. It is off by default. Enable it only for projects that have explicit tier configuration and are ready for standing tier sessions.
+Tiered execution routes each vBRIEF task to the cheapest warm agent tier that can do the work, while a durable foreman owns issue bookkeeping and commit boundaries. It is off by default. Enable it only for projects that have explicit tier configuration and are ready for standing tier sessions.
 
 ## Configuration
 
@@ -63,11 +63,15 @@ tiered_execution:
 
 ## Settings UI
 
-The dashboard Settings -> Tiered Execution panel is the operator-facing edit surface for project tier configuration. It includes the project enable toggle, an editable tier table for tier names, models, harnesses, and difficulty coverage, plus controls for supervisor policy, `by_kind` routing, feed filtering and call-outs, escalation limits, compaction reroute, and replay threshold. The form validates inline before save, including full difficulty coverage, known model and harness values, required supervisor settings, and valid numeric thresholds.
+The dashboard Settings -> Tiered Execution panel presents the tier table as crews, so operators edit the routing decision rather than YAML tier names. Its five-column board maps every difficulty to exactly one crew, making missing and duplicate difficulty coverage impossible. The crew roster labels each crew by its staffing (for example, `Kimi K2.7 Code` or `4-model mix`), shows blended cost, and expands into single-model or weighted-distribution editors. Harness selectors default to the provider route and warn when an explicit override creates a known routing hazard.
 
-The panel also shows a resolved-state preview so operators can see the effective tiered-execution state that will be used by routing after global config, project config, and issue context are applied.
+The supervisor collapses to a sentence describing its subscription, model, and inspection ownership. Kind routing shows only active override chips plus an add control; when none exist, the panel says that all kinds follow difficulty routing. Commit feed, escalation, and session replay settings live under Advanced disclosures with their resolved values in the summary. Session replay exposes both `replay_threshold` and `compaction_reroute`: **bring back the same session as before** writes `off`, while **re-plan remaining work; retire crews no longer needed** writes `on`. A final disclosure previews the exact `tiered_execution` YAML the next save will write.
 
-On the issue view, any per-issue `plan.metadata.tiered_execution` override is visible in the issue header/resolution area as an editable **Standing Crew** toggle (PAN-2383). Flipping the toggle writes the override to the per-issue permanent record through the record write door. Because the vBRIEF spec remains immutable under PAN-1124, the override is stored outside the spec and resolved at runtime.
+On load, tiers with identical staffing merge into one crew and own the union of their difficulties; this changes only the editing shape, not runtime routing. On save, tier names are derived from the owned difficulties in ladder order, such as `trivial-simple` or `medium-complex-expert`, and every `by_kind` reference is rewritten in the same operation. Hand-authored tier names remain valid and are honored when read from YAML, but the next UI save replaces them with derived names. The operator-approved interaction and copy reference is [`docs/design/mockups/tiered-execution-redesign-pan-2684.html`](design/mockups/tiered-execution-redesign-pan-2684.html).
+
+Every crew must retain at least one difficulty because runtime tiers reject an empty `difficulties` list. If a crew has kind overrides, the Settings UI blocks moving its final difficulty or removing the crew until those overrides are explicitly moved or removed; this prevents an unrelated routing edit from silently deleting kind-routed work.
+
+The issue view's **Policies** panel exposes the per-issue override in its Work group as a **Standing crew** segmented control: `Default · <effective> (<source>)`, `On`, or `Off`. Explicit overrides appear in the collapsed strip as an overrides-only `crew · on|off` chip and write to the per-issue permanent record through `PATCH /api/workspaces/:issueId/tiered-execution`; the vBRIEF spec remains immutable under PAN-1124, so the override is stored outside the spec and resolved at runtime. When a per-issue work-model override is active, it suspends crew routing for the entire issue, and the panel and collapsed chip state that consequence.
 
 ## Resolution Chain
 
@@ -79,14 +83,14 @@ The following precedence applies when resolving tiered execution for an issue:
 
 If a record override is present, it wins over both plan metadata and the global flag. Deleting the record override falls back to plan metadata, and absent both, the global/project flag decides.
 
-Per-bead routing then proceeds as follows:
+Per-task routing then proceeds as follows:
 
-The router chooses a tier deterministically for each ready bead. Models do not race to decide whether to intervene.
+The router chooses a tier deterministically for each ready task. Models do not race to decide whether to intervene.
 
-1. Explicit override: a per-bead or operator override wins when present.
+1. Explicit override: a per-task or operator override wins when present.
 2. Kind routing: `metadata.kind` routes docs, API, backend, frontend, infra, test, refactor, design, and spike work to configured tier preferences when `by_kind` names them.
-3. Difficulty routing: `metadata.difficulty` routes trivial/simple/medium/complex/expert beads when no kind route applies.
-4. Role default: the configured role default tier is used when neither override nor metadata routes the bead.
+3. Difficulty routing: `metadata.difficulty` routes trivial/simple/medium/complex/expert tasks when no kind route applies.
+4. Role default: the configured role default tier is used when neither override nor metadata routes the task.
 
 If the chain reaches a missing tier, missing model, or missing harness, spawn must fail loudly. It must not silently fall back to a literal model ID.
 
@@ -103,11 +107,11 @@ This follows Devin Fusion's failure-mode lesson: when judgment is the deliverabl
 
 ## Standing Warm Tiers
 
-The foreman owns `bd ready`, claiming, status updates, verification commands, commit messages, and bead closure. Tier agents do implementation only. They receive the bead brief, make the scoped change, and return control to the foreman for verification and commit.
+The foreman owns `pan task next`, claiming, status updates, verification commands, commit messages, and task closure. Tier agents do implementation only. They receive the task brief, make the scoped change, and return control to the foreman for verification and commit.
 
-Standing tier agents are long-lived sessions for the life of the issue. The commit feed is an everyone-hears-everything stream: every standing implementation tier receives the committed diff and bead summary, so future tier agents stay warm without re-onboarding. This is intentionally simpler than per-tier relevance filtering and keeps replay deterministic.
+Standing tier agents are long-lived sessions for the life of the issue. The commit feed is an everyone-hears-everything stream: every standing implementation tier receives the committed diff and task summary, so future tier agents stay warm without re-onboarding. This is intentionally simpler than per-tier relevance filtering and keeps replay deterministic.
 
-Feed filtering is subtractive noise removal only. `feed.exclude` removes configured paths from the diff, `feed.exclude_subjects` skips whole commits such as beads-sync commits, and `feed.max_diff_bytes` replaces oversized diffs with `git show --stat` plus an explicit truncation note. Live feed and replay use the same renderer so replayed messages stay byte-identical to live messages under the same config.
+Feed filtering is subtractive noise removal only. `feed.exclude` removes configured paths from the diff, `feed.exclude_subjects` skips whole commits such as tasks-sync commits, and `feed.max_diff_bytes` replaces oversized diffs with `git show --stat` plus an explicit truncation note. Live feed and replay use the same renderer so replayed messages stay byte-identical to live messages under the same config.
 
 `feed.callouts` controls quiet-but-vigilant listener authority:
 
@@ -119,35 +123,35 @@ A call-out is a flag, not a task. Listener agents must not edit files, self-assi
 
 ## Event-Driven Supervisor
 
-The supervisor is a standing review tier, not an implementer. It wakes on commit events and reviews the diff against the bead description and acceptance criteria.
+The supervisor is a standing review tier, not an implementer. It wakes on commit events and reviews the diff against the task description and acceptance criteria.
 
 Supported subscription policies (`supervisor.subscribe`):
 
-- `all`: review every bead commit.
-- `flagged`: review only commits for beads flagged for inspection (e.g. `requiresInspection: true` in bead metadata).
+- `all`: review every task commit.
+- `flagged`: review only commits for tasks flagged for inspection (e.g. `requiresInspection: true` in task metadata).
 - `sampled`: review a configured sample of commits for cost measurement.
 
 There is no `off` policy — the supervisor block is required whenever tiers are configured. To run without supervision, disable tiered execution entirely.
 
-Supervisor findings block the foreman before downstream beads proceed. A clean supervisor ack does not replace the normal review and test pipeline.
+Supervisor findings block the foreman before downstream tasks proceed. A clean supervisor ack does not replace the normal review and test pipeline.
 
 When `supervisor.owns_inspection: true` and tiered execution is enabled for the issue, `pan inspect` routes to the standing supervisor instead of spawning an ephemeral inspect specialist. If the supervisor session is absent, Overdeck starts it first; if that fails, inspection fails loudly rather than silently falling back. With the flag explicitly set to `false`, the existing ephemeral inspect path is unchanged (and it remains the path when no supervisor is configured at all).
 
 ## Escalation
 
-Escalation is disabled by default. When `escalation.enabled: true`, deterministic trigger events can promote a bead's effective difficulty exactly one step up the ladder:
+Escalation is disabled by default. When `escalation.enabled: true`, deterministic trigger events can promote a task's effective difficulty exactly one step up the ladder:
 
 `trivial -> simple -> medium -> complex -> expert`
 
-Triggers are supervisor `BLOCKED` verdicts for the bead's commit, verification failures attributed to the bead, and floundering when a configured per-difficulty time budget is exceeded. `retries_at_tier` controls how many attempts stay on the current tier before promotion, and `max_promotions` caps promotions per bead. At `expert`, or after the promotion cap is reached, the result is block-and-surface for operator attention.
+Triggers are supervisor `BLOCKED` verdicts for the task's commit, verification failures attributed to the task, and floundering when a configured per-difficulty time budget is exceeded. `retries_at_tier` controls how many attempts stay on the current tier before promotion, and `max_promotions` caps promotions per task. At `expert`, or after the promotion cap is reached, the result is block-and-surface for operator attention.
 
-Example with `retries_at_tier: 1` and `max_promotions: 2`: a `simple` bead gets one retry at `simple`; the next qualifying trigger promotes it to `medium`; another retry/promotion cycle can move it to `complex`; a further trigger blocks because the promotion cap is spent. Promotions are recorded as effective difficulty in workspace `.pan/continue.json` `tierOverrides`, not by mutating the vBRIEF spec.
+Example with `retries_at_tier: 1` and `max_promotions: 2`: a `simple` task gets one retry at `simple`; the next qualifying trigger promotes it to `medium`; another retry/promotion cycle can move it to `complex`; a further trigger blocks because the promotion cap is spent. Promotions are recorded as effective difficulty in workspace `.pan/continue.json` `tierOverrides`, not by mutating the vBRIEF spec.
 
 ## Trivial Fast-Track
 
-Trivial and simple beads can run in a cheap in-context path when their metadata is high-confidence and the files scope is narrow. The trust boundary is strict: fast-track agents may edit only the claimed bead scope, and the foreman still runs the bead's verification command before committing.
+Trivial and simple tasks can run in a cheap in-context path when their metadata is high-confidence and the files scope is narrow. The trust boundary is strict: fast-track agents may edit only the claimed task scope, and the foreman still runs the task's verification command before committing.
 
-Fast-track is for mechanical work such as docs, tests, small refactors, and obvious single-file changes. It is not a bypass for security, schema, auth, or cross-cutting protocol beads.
+Fast-track is for mechanical work such as docs, tests, small refactors, and obvious single-file changes. It is not a bypass for security, schema, auth, or cross-cutting protocol tasks.
 
 ## Replay and Compaction
 

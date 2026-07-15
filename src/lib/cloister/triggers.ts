@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfigSync } from './config.js';
-import { createBeadsResolver } from '../beads/resolver.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 
 /** Single-flight prevents concurrent dashboard polls from duplicating the canonical read. */
 const taskCompletionInflight = new Map<string, Promise<TriggerDetection>>();
@@ -261,16 +261,17 @@ function detectTestFailure(workspace: string): {
     }
 
     try {
-      const result = await createBeadsResolver(workspace).getBeadsForIssue(issueId);
-      if (!result.ok) throw result.error;
-      const tasks = result.value.filter((task) => task.status === 'closed');
-      const implementTask = tasks.find((t: any) =>
-        t.title.toLowerCase().includes('implement') ||
-        t.labels?.includes('implementation')
+      // Cached bulk snapshot (10s TTL): this trigger runs on every health sweep
+      // per agent — per-issue bd processes here kept the bd lock hot (PAN-2640).
+      const plan = readWorkspacePlanSync(workspace);
+      if (!plan) throw new Error(`No readable plan for ${issueId}`);
+      const tasks = plan.plan.items.filter((task) => task.status === 'completed');
+      const implementTask = tasks.find((task) =>
+        task.title.toLowerCase().includes('implement')
       );
 
       if (implementTask) {
-        const openTasks = result.value.filter((task) => task.status === 'open');
+        const openTasks = plan.plan.items.filter((task) => !['completed', 'cancelled'].includes(task.status));
 
         if (openTasks.length === 0) {
           return {

@@ -6,12 +6,15 @@ import { useDashboardStore } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { trackerIssueUrl } from '../../lib/issueLinks';
 import { toast } from 'sonner';
+import { DiffPanel } from '../DiffPanel';
+import { DiffWorkerPoolProvider } from '../DiffWorkerPoolProvider';
+import type { TurnDiffSummary } from '../chat/chat-types';
 import DrawerActionBar from './DrawerActionBar';
-import DrawerActiveAgent from './DrawerActiveAgent';
+import DrawerActiveAgent, { formatSpend } from './DrawerActiveAgent';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerArtifactsPanel from './DrawerArtifactsPanel';
-import DrawerBeadsList from './DrawerBeadsList';
+import DrawerTasksList from './DrawerTasksList';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import DrawerVerificationGates from './DrawerVerificationGates';
@@ -21,7 +24,9 @@ import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
 import { VBriefViewer } from '../vbrief/VBriefViewer';
 import type { VBriefDocument } from '../vbrief/types';
 import { PanOpenInPicker } from '../PanOpenInPicker';
+import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
+import { IssuePolicyStrip } from '../IssuePolicyStrip';
 
 const ACTIVITY_PHASE_DOT_CLASSES = {
   work: 'bg-primary',
@@ -66,15 +71,30 @@ function DrawerActivityPanel() {
   );
 }
 
+function DrawerSwarmPolicy({ issueId }: { issueId: string }) {
+  const { data, refetch } = useQuery({ queryKey: ['issue-swarm-policy', issueId], queryFn: async () => (await fetch(`/api/issues/${encodeURIComponent(issueId)}/swarm-policy`)).json() as Promise<{ configured: { mode?: string } | null; resolved: { mode: string; source: { mode: string } } }> });
+  const save = async (mode: string) => { const res = await fetch(`/api/issues/${encodeURIComponent(issueId)}/swarm-policy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: mode ? { mode } : null }) }); if (!res.ok) return toast.error('Could not save swarm policy'); await refetch(); toast.success('Swarm policy saved'); };
+  return <section className="rounded-[var(--radius)] border border-border p-4"><div className="flex items-center justify-between gap-4"><div><h3 className="text-sm font-semibold">Swarming</h3><p className="text-xs text-muted-foreground">Effective: {data?.resolved?.mode ?? 'off'} · {data?.resolved?.source?.mode ?? 'default'}</p></div><select aria-label="Issue swarm policy" className="rounded-md border border-input bg-background px-2 py-1.5 text-xs" value={data?.configured?.mode ?? ''} onChange={e => void save(e.target.value)}><option value="">Inherit project</option><option value="off">Off</option><option value="auto">Auto</option><option value="always">Always</option></select></div><p className="mt-2 text-xs text-muted-foreground">Applies to future dispatches; running swarms are unchanged.</p></section>;
+}
+
 function DrawerPlanPanel({ issueId }: { issueId: string }) {
   const { data, isLoading, isError } = useQuery<VBriefDocument | null>({
     queryKey: ['drawer-vbrief-plan', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);
-      if (!res.ok) return null;
+      // AC-17: 404 = no plan for this workspace yet → empty (delegate to
+      // VBriefViewer). Any other non-OK status (or a network throw) is a
+      // genuine fetch failure → render the error line. Returning null for all
+      // non-OK (the old behavior) swallowed real errors and rendered an empty
+      // plan instead of the required error line.
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(`plan fetch failed: ${res.status}`);
       return res.json() as Promise<VBriefDocument>;
     },
+    // AC-18: the panel unmounts when the plan tab is inactive; without a
+    // staleTime, switching away and back refetches and flickers.
     retry: false,
+    staleTime: 60_000,
   });
 
   return (
@@ -135,6 +155,68 @@ function DrawerWorkspaceSection({ issueId }: { issueId: string }) {
   );
 }
 
+/** PRD §6 — Files tab. Renders the existing DiffPanel for the issue's work
+ * agent (its diff route /api/agents/:id/diffs is the branch-vs-main diff).
+ * Falls back to a 12px muted empty state when no workspace branch exists yet.
+ * Adds no server endpoint — DiffPanel's own route is reused. */
+function DrawerFilesPanel({ issueId, agentId }: { issueId: string; agentId: string | null }) {
+  // Same query key as DrawerWorkspaceSection so the existence check dedupes to
+  // one network call per issue.
+  const { data: workspace } = useQuery<WorkspaceInfo | null>({
+    queryKey: ['drawer-workspace', issueId],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${issueId}`);
+      if (!res.ok) return null;
+      return res.json() as Promise<WorkspaceInfo>;
+    },
+    retry: false,
+  });
+
+  const hasWorkspace = !!workspace?.exists;
+
+  // Turn summaries feed DiffPanel's turn strip. Fetched only once a workspace
+  // branch AND a work agent exist; DiffPanel fetches the per-turn / vs-main file
+  // content itself from the same /api/agents/:id/diffs base.
+  const { data: diffData } = useQuery<{ summaries: TurnDiffSummary[] } | null>({
+    queryKey: ['agent-diff-summaries', agentId],
+    queryFn: async () => {
+      const res = await fetch(`/api/agents/${encodeURIComponent(agentId!)}/diffs`);
+      if (!res.ok) return null;
+      return res.json() as Promise<{ summaries: TurnDiffSummary[] }>;
+    },
+    enabled: hasWorkspace && !!agentId,
+    refetchInterval: 5000,
+  });
+
+  // AC-34: the Files tab renders the branch-vs-main DiffPanel whenever a
+  // workspace branch exists. The diff route is agent-scoped —
+  // /api/agents/:id/diffs/vs-main resolves the agent's workspace, which IS the
+  // feature/<issue-id> branch — so the panel must mount with a real agent id.
+  // A workspace branch always has its creating agent in the drawer agents list
+  // (pickDefaultDrawerAgent includes ended agents), so agentId is a proven
+  // invariant whenever hasWorkspace; the inconsistent no-agent case has no
+  // branch-diff source and is left unrendered rather than faked with an empty
+  // agent id that would request /api/agents//diffs/vs-main.
+  if (!hasWorkspace) {
+    return <p className="text-[12px] text-muted-foreground">No workspace branch yet.</p>;
+  }
+  if (!agentId) {
+    return null;
+  }
+
+  return (
+    <DiffWorkerPoolProvider>
+      <DiffPanel
+        mode="inline"
+        agentId={agentId}
+        isolateSelection
+        defaultView="vs-main"
+        turnDiffSummaries={diffData?.summaries ?? []}
+      />
+    </DiffWorkerPoolProvider>
+  );
+}
+
 function tabLabel(tab: string) {
   return tab.replace(/-/g, ' ').replace(/\b\w/g, (match) => match.toUpperCase());
 }
@@ -158,6 +240,28 @@ export function IssueDrawer() {
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
   const { issue, agents } = useDrawerData();
 
+  // Active agent drives the header meta row (branch chip + cost figure). Mirrors
+  // the DrawerActiveAgent definition of "active": any agent that is not in a
+  // terminal state (dead/failed has no recoverable session). PRD §4.7.8.
+  const activeAgent =
+    agents.find((agent) => agent.status !== 'dead' && agent.status !== 'failed') ?? null;
+  const branchLabel = activeAgent?.git?.branch ?? '—';
+  const costLabel = activeAgent ? formatSpend(activeAgent.costSoFar) : '—';
+
+  // PRD §4.7.8 priority bar color: 1=destructive, 2=warning, 3=muted, 4=transparent.
+  const priorityBarClass =
+    issue?.priority === 1
+      ? 'bg-destructive'
+      : issue?.priority === 2
+        ? 'bg-warning'
+        : issue?.priority === 3
+          ? 'bg-muted-foreground'
+          : 'bg-transparent';
+
+  // Canonical work agent for the Files tab — the agent whose branch diff we show.
+  // Independent of the Conversation/Terminal selection (effectiveAgentId) so the
+  // Files tab always reflects the issue's work, not a user-picked peer session.
+  const filesAgentId = pickDefaultDrawerAgent(agents)?.id ?? null;
   // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
   // survives a Conversation ⇄ Terminal tab switch; falls back to the default
   // pick whenever the selection is cleared or no longer matches an agent.
@@ -237,14 +341,27 @@ export function IssueDrawer() {
         className="flex h-screen w-[min(980px,calc(100vw-48px))] max-w-[calc(100vw-48px)] origin-right scale-100 flex-col overflow-hidden border-l border-border bg-background opacity-100 shadow-[-24px_0_64px_rgb(0_0_0_/_40%)] animate-[issue-drawer-slide-in_200ms_ease-in-out]"
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="flex h-[52px] items-center gap-[12px] border-b border-border px-[22px]">
+        <header className="flex items-start gap-[12px] border-b border-border pt-[16px] px-[22px] pb-0">
+          <div
+            data-testid="drawer-header-priority-bar"
+            aria-hidden="true"
+            className={cn('mt-[2px] h-[28px] w-[4px] shrink-0 rounded-full', priorityBarClass)}
+          />
           <div className="min-w-0 flex-1">
-            <div className="truncate font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+            <div className="truncate font-mono text-[13px] text-muted-foreground">
               {drawer.issueId}
             </div>
             <h2 className="truncate font-display text-[22px] font-semibold leading-none tracking-[-0.01em] text-foreground">
               {issue?.title ?? 'Issue details'}
             </h2>
+            <div data-testid="drawer-header-meta" className="mt-[8px] flex items-center gap-[8px]">
+              <span className="rounded-[var(--radius-md)] bg-accent px-[8px] py-[2px] text-[12px] text-muted-foreground">
+                {branchLabel}
+              </span>
+              <span className="text-[12px] text-[var(--signal-cost-foreground)]">
+                {costLabel}
+              </span>
+            </div>
           </div>
           {(() => {
             // PAN-1610: one-click jump to the full issue on its tracker.
@@ -277,7 +394,7 @@ export function IssueDrawer() {
           <div
             className={cn(
               'flex min-w-0 flex-col',
-              drawer.tab === 'conversation' || drawer.tab === 'terminal'
+              drawer.tab === 'conversation' || drawer.tab === 'terminal' || drawer.tab === 'files'
                 ? 'min-h-0 p-[14px]'
                 : 'overflow-auto px-[22px] py-[18px]',
             )}
@@ -285,16 +402,22 @@ export function IssueDrawer() {
             {drawer.tab === 'overview' ? (
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
                 <PhaseTimeline />
+                {drawer.issueId && <UatEnvironmentPanel issueId={drawer.issueId} />}
                 <DrawerPickupSection issueId={drawer.issueId} />
+                <section className="rounded-[var(--radius)] border border-border bg-card p-[14px]" aria-label="Issue policies">
+                  <IssuePolicyStrip issueId={drawer.issueId} />
+                </section>
+                {/* Retained until the PAN-2499 no-loss audit explicitly retires this older, expanded swarm surface. */}
+                <DrawerSwarmPolicy issueId={drawer.issueId} />
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <DrawerActiveAgent />
                 <DrawerVerificationGates />
-                <DrawerBeadsList />
+                <DrawerTasksList />
                 <DrawerReviewSpecialists />
               </div>
-            ) : drawer.tab === 'beads' ? (
-              <div data-testid="drawer-tab-panel-beads">
-                <DrawerBeadsList />
+            ) : drawer.tab === 'tasks' ? (
+              <div data-testid="drawer-tab-panel-tasks">
+                <DrawerTasksList />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
               <DrawerPlanPanel issueId={drawer.issueId} />
@@ -316,6 +439,10 @@ export function IssueDrawer() {
                 agentId={effectiveAgentId}
                 onSelectAgent={setSelectedAgentId}
               />
+            ) : drawer.tab === 'files' ? (
+              <div data-testid="drawer-tab-panel-files" className="min-h-0 flex-1">
+                <DrawerFilesPanel issueId={drawer.issueId} agentId={filesAgentId} />
+              </div>
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />
             )}

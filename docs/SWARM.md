@@ -2,11 +2,22 @@
 
 Swarm v2 runs one work agent per vBRIEF item when the plan DAG, file scope, and global capacity allow safe parallel work. It is coordinated by Deacon, not by a durable sidecar runtime file.
 
+When resolved swarm mode is `off`, Deacon performs no automatic slot dispatch,
+recovery, merge, or cleanup. Existing slots are preserved but do not advance,
+and `pan start` refuses to launch a primary work agent while any slot is live.
+Use `pan stop <id>` to preserve the work and stop every issue session before
+returning to single-agent execution.
+
 The shipped operator entry point is:
 
 ```bash
 pan swarm <id>
 ```
+
+Use `pan staffing <id> --swarm off|auto|always|default` to set or clear the durable per-issue
+swarm override. The issue-header Policies control exposes the same setting, and
+`GET/POST /api/issues/:issueId/swarm-policy` provides API parity; the issue layer beats project
+and global swarm modes.
 
 The shipped recovery entry point is:
 

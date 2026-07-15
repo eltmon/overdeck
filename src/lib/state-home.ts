@@ -166,9 +166,7 @@ export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Pro
   // in exactly the polyrepo case.
   const legacyStateRoot = project.path;
   return STATE_BRANCH_PATHS
-    .map((statePath) => statePath === '.beads/'
-      ? join(legacyStateRoot, '.beads')
-      : join(legacyStateRoot, '.pan', statePath.slice(0, -1)))
+    .map((statePath) => join(legacyStateRoot, '.pan', statePath.slice(0, -1)))
     .filter(existsSync);
 }
 

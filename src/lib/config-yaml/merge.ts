@@ -108,6 +108,7 @@ function degradeInvalidTieredExecution(
 export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: NormalizedConfig; explicitlyDisabled: Set<ModelProvider> } {
   const result: NormalizedConfig = {
     ...DEFAULT_CONFIG,
+    swarm: { ...DEFAULT_CONFIG.swarm },
     tmux: {
       ...DEFAULT_CONFIG.tmux,
     },
@@ -215,6 +216,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
   // Merge in reverse order (lowest precedence first)
   for (const config of validConfigs.reverse()) {
+    if (config.swarm) result.swarm = { ...result.swarm, ...config.swarm };
     // Merge providers
     if (config.models?.providers) {
       const providers = config.models.providers;

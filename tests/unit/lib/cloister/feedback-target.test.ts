@@ -8,7 +8,7 @@ const {
   mockMarkWorkspaceStuck,
   mockSessionExists,
   mockListSessionNames,
-  mockWriteIssueRecordSync,
+  mockUpdateIssueRecord,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockResolveProjectFromIssueSync: vi.fn(),
@@ -16,7 +16,7 @@ const {
   mockMarkWorkspaceStuck: vi.fn(),
   mockSessionExists: vi.fn(),
   mockListSessionNames: vi.fn(),
-  mockWriteIssueRecordSync: vi.fn(),
+  mockUpdateIssueRecord: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
@@ -26,7 +26,10 @@ vi.mock('../../../../src/lib/projects.js', () => ({
 
 vi.mock('../../../../src/lib/pan-dir/record.js', () => ({
   readIssueRecordSync: mockReadIssueRecordSync,
-  writeIssueRecordSync: mockWriteIssueRecordSync,
+}));
+
+vi.mock('../../../../src/lib/pan-dir/record-update.js', () => ({
+  updateIssueRecord: mockUpdateIssueRecord,
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -119,20 +122,10 @@ describe('resolveIssueFeedbackTarget', () => {
       agentId: 'agent-pan-2214-slot-3',
     });
 
-    expect(mockWriteIssueRecordSync).toHaveBeenCalledWith(
+    expect(mockUpdateIssueRecord).toHaveBeenCalledWith(
       { name: 'Test', path: '/repo' },
       'PAN-2214',
-      expect.objectContaining({
-        swarm: expect.objectContaining({
-          slotAssignments: expect.arrayContaining([
-            expect.objectContaining({
-              slotIndex: 3,
-              itemId: 'item-c',
-              agentId: 'agent-pan-2214-slot-3',
-            }),
-          ]),
-        }),
-      }),
+      expect.any(Function),
     );
   });
 

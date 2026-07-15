@@ -3,6 +3,10 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+vi.mock('../../../lib/state-auto-migrate.js', () => ({
+  requireAutomaticStateMigration: vi.fn(),
+}));
+
 const lifecycleMocks = vi.hoisted(() => ({
   getWorkAgentLifecycleStateSync: vi.fn(),
   assertCanStartFreshSync: vi.fn(),
@@ -71,10 +75,10 @@ describe('pan start on already-running work agent (PAN-2407)', () => {
   function createWorkspace(issueId: string) {
     const workspacePath = join(tmpDir, 'workspaces', `feature-${issueId.toLowerCase()}`);
     mkdirSync(workspacePath, { recursive: true });
-    mkdirSync(join(workspacePath, '.beads'), { recursive: true });
+    mkdirSync(join(workspacePath, '.tasks'), { recursive: true });
     writeFileSync(
-      join(workspacePath, '.beads', 'issues.jsonl'),
-      JSON.stringify({ id: 'bead-1', title: 'Implement issue', labels: [issueId.toLowerCase()] }) + '\n',
+      join(workspacePath, '.tasks', 'issues.jsonl'),
+      JSON.stringify({ id: 'task-1', title: 'Implement issue', labels: [issueId.toLowerCase()] }) + '\n',
     );
     return workspacePath;
   }

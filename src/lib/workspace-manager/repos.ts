@@ -44,7 +44,7 @@ export async function addReposToWorkspacePromise(options: AddReposToWorkspaceOpt
   // Check which repos are already in the workspace
   const existingEntries = readdirSync(workspacePath).filter(f => {
     const fullPath = join(workspacePath, f);
-    return f !== '.planning' && f !== '.claude' && f !== '.pan' && f !== '.beads' && existsSync(fullPath);
+    return f !== '.planning' && f !== '.claude' && f !== '.pan' && existsSync(fullPath);
   });
 
   for (const repo of reposToAdd) {

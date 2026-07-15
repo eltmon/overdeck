@@ -17,7 +17,6 @@ import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { loadCloisterConfig } from './config.js';
 import { clearIssueClosedCache, isIssueClosed } from './issue-closed.js';
-import { createBeadsResolver } from '../beads/resolver.js';
 
 const DEFAULT_ATTEMPT_INTERVAL_MS = 5 * 60 * 1000;
 const execAsync = promisify(exec);
@@ -61,7 +60,7 @@ export interface OrphanProposedCandidate {
   projectPath: string;
   issueId: string;
   specPath: string;
-  beadCount: number;
+  taskCount: number;
   planItemCount: number;
 }
 
@@ -135,12 +134,6 @@ async function readJsonFile<T>(path: string): Promise<T | null> {
   } catch {
     return null;
   }
-}
-
-async function countBeadsForIssue(projectPath: string, issueId: string): Promise<number | null> {
-  const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`);
-  const result = await createBeadsResolver(existsSync(workspacePath) ? workspacePath : projectPath).countBeadsForIssue(issueId);
-  return result.ok ? result.value : null;
 }
 
 async function defaultGetAgentState(agentId: string): Promise<Pick<AgentState, 'status' | 'paused' | 'troubled'> | null> {
@@ -217,8 +210,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
 
       const planItems = Array.isArray(spec.plan.items) ? spec.plan.items : [];
       const planItemCount = planItems.length;
-      const beadCount = await countBeadsForIssue(config.path, issueId);
-      if (planItemCount === 0 || beadCount !== planItemCount) continue;
+      if (planItemCount === 0) continue;
 
       candidates.push({
         projectKey: key,
@@ -226,7 +218,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
         projectPath: config.path,
         issueId,
         specPath,
-        beadCount,
+        taskCount: planItemCount,
         planItemCount,
       });
     }
@@ -453,9 +445,8 @@ export async function handleOrphanProposedSpec(
 
   const planItems = Array.isArray(planDoc.plan?.items) ? planDoc.plan.items : [];
   const planItemCount = planItems.length;
-  const beadCount = await countBeadsForIssue(resolved.projectPath, upperIssueId);
-  if (planItemCount === 0 || beadCount !== planItemCount) {
-    logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'bead-mismatch', planItemCount, beadCount });
+  if (planItemCount === 0) {
+    logReconcilerDiagnostic('spawn-skipped', { issueId: upperIssueId, reason: 'empty-plan', planItemCount });
     return [];
   }
 

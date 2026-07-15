@@ -2,13 +2,17 @@
  * pan update - Update Overdeck to latest version
  */
 
-import { execSync } from 'child_process';
+import { execFile } from 'child_process';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { loadConfigSync } from '../../lib/config.js';
 import { syncCommand } from './sync.js';
+import { promisify } from 'util';
+import { UpdateManager } from '../../lib/update-manager.js';
+
+const execFileAsync = promisify(execFile);
 
 // Get current installed version
 function getCurrentVersion(): string {
@@ -24,38 +28,6 @@ function getCurrentVersion(): string {
   }
 }
 
-// Get latest version from npm
-async function getLatestVersion(): Promise<string> {
-  try {
-    const result = execSync('npm view @overdeck/core version', {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-    return result.trim();
-  } catch {
-    throw new Error('Failed to check npm for latest version');
-  }
-}
-
-// Compare semver versions
-function isNewer(latest: string, current: string): boolean {
-  const parseVersion = (v: string) => {
-    const parts = v.replace(/^v/, '').split('.');
-    return {
-      major: parseInt(parts[0] || '0', 10),
-      minor: parseInt(parts[1] || '0', 10),
-      patch: parseInt(parts[2] || '0', 10),
-    };
-  };
-
-  const l = parseVersion(latest);
-  const c = parseVersion(current);
-
-  if (l.major !== c.major) return l.major > c.major;
-  if (l.minor !== c.minor) return l.minor > c.minor;
-  return l.patch > c.patch;
-}
-
 export async function updateCommand(options: {
   check?: boolean;
   force?: boolean;
@@ -65,10 +37,14 @@ export async function updateCommand(options: {
   const currentVersion = getCurrentVersion();
   console.log(`Current version: ${chalk.cyan(currentVersion)}`);
 
+  let manager: UpdateManager;
   let latestVersion: string;
   try {
     console.log(chalk.dim('Checking npm for latest version...'));
-    latestVersion = await getLatestVersion();
+    manager = new UpdateManager({ currentVersion, installMode: 'npm-global' });
+    const snapshot = await manager.check();
+    if (snapshot.phase === 'error' || !snapshot.targetVersion) throw new Error(snapshot.error ?? 'No published version found');
+    latestVersion = snapshot.targetVersion;
     console.log(`Latest version:  ${chalk.cyan(latestVersion)}`);
   } catch (error) {
     console.error(chalk.red('Failed to check for updates'));
@@ -76,9 +52,9 @@ export async function updateCommand(options: {
     process.exit(1);
   }
 
-  const needsUpdate = isNewer(latestVersion, currentVersion);
+  const needsUpdate = manager!.getSnapshot().phase === 'available';
 
-  if (!needsUpdate) {
+  if (!needsUpdate && !options.force) {
     console.log(chalk.green('\n✓ You are on the latest version'));
     return;
   }
@@ -97,9 +73,7 @@ export async function updateCommand(options: {
   console.log(chalk.dim('\nUpdating Overdeck...'));
 
   try {
-    execSync('npm install -g @overdeck/core@latest', {
-      stdio: 'inherit',
-    });
+    await execFileAsync('npm', ['install', '--global', `@overdeck/core@${latestVersion}`]);
 
     console.log(chalk.green(`\n✓ Updated to ${latestVersion}`));
     console.log(chalk.dim('Installed package: @overdeck/core'));

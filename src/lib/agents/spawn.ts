@@ -7,8 +7,6 @@ import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
-import { assertIssueHasBeads, BeadsMissingError } from '../beads-query.js';
-import { BdTransientFailure } from '../bd-process-lock.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from '../overdeck/conversations.js';
@@ -18,6 +16,7 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { resetPipelineVerdictsForWorkStartSync } from '../review-status.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
@@ -77,7 +76,6 @@ import {
   writeChannelsBridgeMcpConfig,
 } from './supervisor-channels.js';
 import { stopAgent } from './termination.js';
-import { resolveBdAgentShimPath } from '../beads/bd-shim.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 const execAsync = promisify(exec);
@@ -165,6 +163,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     role,
     model: selectedModel,
   });
+  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
+  // missing/expired/burned — it would wedge silently in a 401 loop.
+  assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
 
   if (
@@ -461,29 +462,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // Initialize hook for this agent (FPP support)
   initHookSync(agentId);
 
-  // Strike agents bypass the normal pipeline (no plan/beads/review/test) —
-  // see roles/strike.md. The beads gate is the only thing we skip; everything
-  // else (workspace health, supervisor wiring, launcher) is identical.
-  if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined) {
-    // Use a short lock timeout when spawning from HTTP handlers so dashboard
-    // requests fail fast to the JSONL fallback instead of blocking behind CLI
-    // processes that hold the cross-process bd lock. The CLI `pan start` path
-    // already performs a long-timeout live query before reaching spawnAgent.
-    try {
-      await Effect.runPromise(
-        assertIssueHasBeads(options.workspace, options.issueId, { acquisitionTimeoutMs: 500 }),
-      );
-    } catch (error) {
-      if (error instanceof BeadsMissingError && error.transientFailure !== undefined) {
-        const attempts = error.transientFailure instanceof BdTransientFailure
-          ? ` after ${error.transientFailure.attempts} attempts`
-          : '';
-        throw new Error(
-          `Beads database was temporarily locked while checking ${options.issueId}${attempts}; re-run shortly.`
-        );
-      }
-      throw error;
-    }
+  if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined && !readWorkspacePlanSync(options.workspace)) {
+    throw new Error(`The required vBRIEF checklist for ${options.issueId} is missing or unreadable. Run planning before spawning a work agent.`);
   }
 
   // Determine model based on role configuration
@@ -518,6 +498,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role,
     model: selectedModel,
   });
+  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
+  // missing/expired/burned — it would wedge silently in a 401 loop.
+  assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   // Create state
   const state: AgentState = {
@@ -730,7 +713,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
 
   clearReadySignal(agentId);
 
-  const bdShimPath = role === 'work' ? await resolveBdAgentShimPath(getAgentDir(agentId)) : undefined;
   await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
     env: {
       ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
@@ -740,7 +722,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       OVERDECK_SESSION_TYPE: role,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
       GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-      ...(bdShimPath ? { PATH: bdShimPath } : {}),
       ...flywheelEnv,
       ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
     }

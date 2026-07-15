@@ -9,7 +9,7 @@ export interface PipelineStateInput {
   lifecycle?: Pick<WorkAgentLifecycle, 'canResumeSession'> | null;
   workspace?: Pick<WorkspaceInfo, 'exists'> | null;
   hasPlan: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   issueCanonicalState?: string | null;
   isMerged?: boolean;
 }

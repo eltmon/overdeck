@@ -230,6 +230,8 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
     enabled: !!projectKey,
   });
   const value = data?.value ?? null;
+  const { data: swarmData } = useQuery({ queryKey: ['project-swarm-policy', projectKey], queryFn: async () => (await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`)).json() as Promise<{ configured: { mode?: 'off' | 'auto' | 'always' } | null }> });
+  const swarmMutation = useMutation({ mutationFn: async (mode: 'off' | 'auto' | 'always' | null) => { const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/swarm-policy`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: mode ? { mode } : null }) }); if (!res.ok) throw new Error('Failed to save swarm policy'); }, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project-swarm-policy', projectKey] }) });
   const mutation = useMutation({
     mutationFn: async (next: 'auto' | 'hold' | null) => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/auto-merge-default`, {
@@ -282,6 +284,7 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
       <div style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
         Applies to this project's issues that have no explicit per-issue auto-merge setting.
       </div>
+      <div className="mt-2 flex flex-wrap items-center gap-3 border-t border-border pt-3"><span className="text-[13px] text-foreground">Automatic swarming</span><select aria-label="Project swarm policy" className="rounded-md border border-input bg-background px-2 py-1.5 text-xs" value={swarmData?.configured?.mode ?? ''} onChange={e => { const value = e.target.value; swarmMutation.mutate(value === 'off' || value === 'auto' || value === 'always' ? value : null); }}><option value="">Inherit global</option><option value="off">Off</option><option value="auto">Auto</option><option value="always">Always</option></select><span className="text-[11px] text-muted-foreground">Future dispatches only</span></div>
     </div>
   );
 }

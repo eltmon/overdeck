@@ -46,7 +46,7 @@ import { spawnRun } from './spawn.js';
 /** One tier run: consecutive beads in DAG order that route to the same tier. */
 export interface TierRun {
   tierName: string;
-  beadIds: string[];
+  itemIds: string[];
 }
 
 export class StandingTierError extends Error {
@@ -78,9 +78,9 @@ export function computeTierRunSchedule(
       const tier = resolveTier(item, config);
       const currentRun = runs[runs.length - 1];
       if (currentRun && currentRun.tierName === tier.tierName) {
-        currentRun.beadIds.push(item.id);
+        currentRun.itemIds.push(item.id);
       } else {
-        runs.push({ tierName: tier.tierName, beadIds: [item.id] });
+        runs.push({ tierName: tier.tierName, itemIds: [item.id] });
       }
     }
   }
@@ -134,7 +134,7 @@ export interface StandingTierManagerOptions {
  */
 /** The bead currently being implemented by a standing tier agent. */
 export interface InFlightBead {
-  beadId: string;
+  itemId: string;
   tierName: string;
   agentId: string;
 }
@@ -212,12 +212,12 @@ export class StandingTierManager {
   async dispatchBeadToTier(tierName: string, bead: Pick<VBriefItem, 'id'>): Promise<string> {
     if (this.inFlight) {
       throw new StandingTierError(
-        `bead '${this.inFlight.beadId}' is still in flight on tier '${this.inFlight.tierName}' for ${this.options.issueId}; `
+        `bead '${this.inFlight.itemId}' is still in flight on tier '${this.inFlight.tierName}' for ${this.options.issueId}; `
         + `only one implementation agent works a bead at a time — complete it before dispatching '${bead.id}'`,
       );
     }
     const agentId = await this.ensureStandingAgentForTier(tierName, bead);
-    this.inFlight = { beadId: bead.id, tierName, agentId };
+    this.inFlight = { itemId: bead.id, tierName, agentId };
     return agentId;
   }
 
@@ -227,11 +227,11 @@ export class StandingTierManager {
   }
 
   /** Mark the in-flight bead complete (committed + broadcast), freeing dispatch. */
-  completeBead(beadId: string): void {
-    if (!this.inFlight || this.inFlight.beadId !== beadId) {
+  completeBead(itemId: string): void {
+    if (!this.inFlight || this.inFlight.itemId !== itemId) {
       throw new StandingTierError(
-        `bead '${beadId}' is not the in-flight bead for ${this.options.issueId}`
-        + `${this.inFlight ? ` ('${this.inFlight.beadId}' is)` : ' (nothing is in flight)'}`,
+        `bead '${itemId}' is not the in-flight bead for ${this.options.issueId}`
+        + `${this.inFlight ? ` ('${this.inFlight.itemId}' is)` : ' (nothing is in flight)'}`,
       );
     }
     this.inFlight = undefined;
@@ -239,7 +239,7 @@ export class StandingTierManager {
 
   private async spawnStandingTier(tierName: string): Promise<StandingTierAgent> {
     const firstRun = this.options.schedule.find((run) => run.tierName === tierName);
-    const firstItemId = firstRun?.beadIds[0];
+    const firstItemId = firstRun?.itemIds[0];
     if (!firstItemId) {
       throw new StandingTierError(
         `tier '${tierName}' has no scheduled beads for ${this.options.issueId}; nothing to spawn a standing session for`,

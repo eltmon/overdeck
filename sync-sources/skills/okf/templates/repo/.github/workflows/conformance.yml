@@ -1,0 +1,20 @@
+name: OKF conformance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - run: python3 -m pip install PyYAML
+      # Scripts are vendored into the bundle (.okf/scripts) so conformance runs
+      # with only Python 3 + PyYAML — no external repo checkout.
+      - run: python3 .okf/scripts/validate.py --bundle . --strict
+      - run: python3 .okf/scripts/diff_lint.py --base . --head .

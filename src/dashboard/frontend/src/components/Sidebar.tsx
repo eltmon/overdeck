@@ -136,9 +136,11 @@ interface SidebarProps {
   onSelectProject?: (projectName: string) => void;
   /** PAN-1970: open the New Project modal. */
   onNewProject?: () => void;
+  /** Open the shared updater dialog from the version affordance. */
+  onOpenUpdater?: () => void;
 }
 
-export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject, onOpenUpdater }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
@@ -357,20 +359,18 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
         {/* ─── Header: Logo + Collapse button ─── */}
         <div className="flex items-center justify-between h-12 px-3 shrink-0 border-b border-border">
           {!collapsed && (
-            <button
-              onClick={() => onTabChange('home')}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0"
-              title="Go to Home"
-            >
+            <div className="flex items-center gap-2 min-w-0">
+            <button onClick={() => onTabChange('home')} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0" title="Go to Home">
               <OverdeckMark className="w-5 h-5 text-primary shrink-0" />
               {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Overdeck
               </span>
-              {versionData?.version && (
-                <span className="text-[10px] text-muted-foreground font-normal">v{versionData.version}</span>
-              )}
             </button>
+            {versionData?.version && (
+              <button onClick={onOpenUpdater} className="rounded px-1 py-0.5 text-[10px] font-normal text-muted-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" title="Click to update Overdeck to the latest version" aria-label={`Overdeck version ${versionData.version}. Click to check for updates.`}>v{versionData.version}</button>
+            )}
+            </div>
           )}
           {collapsed && (
             <button

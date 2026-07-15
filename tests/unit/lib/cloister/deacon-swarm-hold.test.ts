@@ -1,8 +1,10 @@
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 
@@ -13,6 +15,11 @@ const mocks = vi.hoisted(() => ({
   isDeaconGloballyPausedSync: vi.fn(() => false),
 }));
 
+vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
+  queueAutoCommit: vi.fn(),
+  flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: (projectPath: string) =>
@@ -21,6 +28,15 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   // these tests fixture records at the workspace .pan/records/ path, so treat
   // issues as unregistered and use the workspace-door fallback.
   resolveProjectFromIssueSync: () => null,
+}));
+
+// PAN-2665 fixture repair: swarm policy now defaults to OFF (1ebb3234da);
+// these tests exercise holds/recovery, so pin the policy to enabled the same
+// way deacon-swarm-doneness.test.ts does.
+vi.mock(import('../../../../src/lib/swarm-policy.js'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  resolveSwarmPolicy: () => ({ mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global', maxSlots: 'global', autoAdvance: 'global' } }),
+  resolveAutomaticSwarmPolicy: () => ({ policy: { mode: 'auto', maxSlots: 3, autoAdvance: true, source: { mode: 'global', maxSlots: 'global', autoAdvance: 'global' } }, enabled: true }),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -34,6 +50,8 @@ vi.mock('../../../../src/lib/overdeck/control-settings.js', async (importOrigina
 }));
 
 let tempRoot: string;
+const recordRemotes: string[] = [];
+const recordRoots: string[] = [];
 
 beforeEach(async () => {
   tempRoot = await mkdtemp(join(tmpdir(), 'overdeck-swarm-hold-'));
@@ -45,7 +63,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await rm(tempRoot, { recursive: true, force: true });
+  for (const remote of recordRemotes.splice(0)) removeGitRecordRemote(remote);
+  for (const root of recordRoots.splice(0)) await cleanupGitRecordRoot(root);
+  await rm(tempRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): void {
@@ -91,7 +111,14 @@ function makeDoc(issueId: string, itemCount: number): VBriefDocument {
 
 function setupWorkspace(issueLower: string, issueUpper: string): string {
   const projectPath = join(tempRoot, 'project');
-  mkdirSync(join(projectPath, 'workspaces', `feature-${issueLower}`), { recursive: true });
+  const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
+  mkdirSync(workspacePath, { recursive: true });
+  // The PAN-2541 durable write door commits records from the workspace dir
+  // (getIssueRecordBasePath prefers an existing workspace) — make it a repo.
+  if (!existsSync(join(workspacePath, '.git'))) {
+    recordRemotes.push(initGitRecordRoot(workspacePath));
+    recordRoots.push(workspacePath);
+  }
   writeSpec(projectPath, issueUpper, makeDoc(issueUpper, 2));
   mocks.listProjectsSync.mockReturnValue([{ config: { path: projectPath } }]);
   return projectPath;
@@ -247,7 +274,7 @@ describe('per-spawn freeze/hold re-check (PAN-2214 slot-20 regression)', () => {
     expect(deps.spawnRun).toHaveBeenCalledTimes(1);
     expect(actions).toContain('[swarm] dispatch-halted wi-2: freeze/hold active');
     expect(deps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      '/repo/workspaces/feature-pan-106/.pan/spec.vbrief.json',
+      'PAN-106',
       {
         type: 'unblock',
         itemId: 'wi-2',

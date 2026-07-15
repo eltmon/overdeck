@@ -12,7 +12,7 @@
  * invariant) while still making it portable via `git push`.
  */
 
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync, promises as fsp } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync, promises as fsp } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
@@ -26,7 +26,6 @@ import {
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ReviewMode } from '../config-yaml.js';
 import type {
-  ContinueBeadsMapping,
   ContinueDecision,
   ContinueFeedbackEntry,
   ContinueHazard,
@@ -34,6 +33,8 @@ import type {
   ContinueSessionEntry,
   ScopeDriftRecord,
 } from '../vbrief/continue-state.js';
+import type { PanIssueTasksRecord } from './record-task-types.js';
+export type { PanIssueTasksRecord, TaskClaim, TaskClaimHistoryEntry } from './record-task-types.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -101,6 +102,12 @@ export interface PanIssueSwarmSlotCompletion {
 }
 
 export interface PanIssueSwarmRecord {
+  /** Per-issue policy overrides; unset fields inherit from project/global. */
+  policy?: {
+    mode?: 'off' | 'auto' | 'always';
+    maxSlots?: number;
+    autoAdvance?: boolean;
+  };
   finalizedAt?: string;
   /**
    * @deprecated Read for migration only; new blocks live in `failedMergeBlocks`
@@ -175,7 +182,7 @@ export interface PanIssuePipelineRecord {
  * Single durable record per issue. Contains the superset of data previously
  * scattered across project continue, workspace continue, and state.json:
  *
- *   - decisions / hazards / resumePoint / beadsMapping / sessionHistory /
+ *   - decisions / hazards / resumePoint / sessionHistory /
  *     feedback (from continues)
  *   - statusOverrides (from workspace continue)
  *   - harness / model (from state.json)
@@ -196,14 +203,18 @@ export interface PanIssueRecord {
   reviewMode?: ReviewMode;
   /** PAN-1874: per-issue re-review scope override; beats project/global config. */
   reReviewScope?: 'all' | 'changed' | 'blockers';
+  /** Per-issue convoy model override; beats roles.review for every reviewer. */
+  reviewModel?: string;
   /** Per-issue tiered execution override; beats plan-metadata and global config. */
   tieredExecutionOverride?: 'on' | 'off';
+  /** PAN-2674: per-issue work-model override; beats tier table and roles.work. */
+  workModel?: string;
 
   decisions?: ContinueDecision[];
   hazards?: ContinueHazard[];
   resumePoint?: ContinueResumePoint | null;
-  beadsMapping?: ContinueBeadsMapping;
   statusOverrides?: Record<string, string>;
+  tasks?: PanIssueTasksRecord;
   sessionHistory?: ContinueSessionEntry[];
   feedback?: ContinueFeedbackEntry[];
   scopeDrift?: ScopeDriftRecord;
@@ -348,7 +359,19 @@ function writeRecordFileAtomicSync(path: string, record: PanIssueRecord): void {
   preserveCorruptRecordSync(path);
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync(tmp, JSON.stringify(record, null, 2), 'utf-8');
+  const tmpFd = openSync(tmp, 'r');
+  try {
+    fsyncSync(tmpFd);
+  } finally {
+    closeSync(tmpFd);
+  }
   renameSync(tmp, path);
+  const dirFd = openSync(dirname(path), 'r');
+  try {
+    fsyncSync(dirFd);
+  } finally {
+    closeSync(dirFd);
+  }
   JSON.parse(readFileSync(path, 'utf-8')); // read-back verification; throws if the renamed file is unparseable
 }
 
@@ -714,7 +737,6 @@ export interface RecordContinueView {
   decisions: ContinueDecision[];
   hazards: ContinueHazard[];
   resumePoint: ContinueResumePoint | null;
-  beadsMapping: ContinueBeadsMapping;
   sessionHistory: ContinueSessionEntry[];
   feedback: ContinueFeedbackEntry[];
   scopeDrift?: ScopeDriftRecord;
@@ -730,7 +752,6 @@ export function readRecordContinueViewSync(
     decisions: record.decisions ?? [],
     hazards: record.hazards ?? [],
     resumePoint: record.resumePoint ?? null,
-    beadsMapping: record.beadsMapping ?? {},
     sessionHistory: record.sessionHistory ?? [],
     feedback: record.feedback ?? [],
     scopeDrift: record.scopeDrift,
@@ -921,36 +942,6 @@ export async function writeRecordResumePoint(
 ): Promise<void> {
   const record = await ensureIssueRecord(project, issueId);
   record.resumePoint = resumePoint;
-  const recordPath = writeIssueRecordSync(project, issueId, record);
-  if (opts.autoCommit !== false) {
-    queueIssueRecordCommit(project, issueId, recordPath);
-  }
-}
-
-/** Write beadsMapping into the per-issue record (sync). */
-export function writeRecordBeadsMappingSync(
-  project: ProjectConfig,
-  issueId: string,
-  beadsMapping: ContinueBeadsMapping,
-  opts: WriteStatusOverrideOptions = {},
-): void {
-  const record = ensureIssueRecordSync(project, issueId);
-  record.beadsMapping = beadsMapping;
-  const recordPath = writeIssueRecordSync(project, issueId, record);
-  if (opts.autoCommit !== false) {
-    queueIssueRecordCommit(project, issueId, recordPath);
-  }
-}
-
-/** Write beadsMapping into the per-issue record (async). */
-export async function writeRecordBeadsMapping(
-  project: ProjectConfig,
-  issueId: string,
-  beadsMapping: ContinueBeadsMapping,
-  opts: WriteStatusOverrideOptions = {},
-): Promise<void> {
-  const record = await ensureIssueRecord(project, issueId);
-  record.beadsMapping = beadsMapping;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   if (opts.autoCommit !== false) {
     queueIssueRecordCommit(project, issueId, recordPath);

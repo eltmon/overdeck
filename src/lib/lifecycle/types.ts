@@ -60,9 +60,6 @@ export interface TeardownOptions {
   skipDocker?: boolean;
   /** Delete workspace directory (worktree + files). Default: true */
   deleteWorkspace?: boolean;
-  /** Clear beads for this issue from project root. Default: false.
-   *  Only set to true for destructive wipe — normal completion should preserve beads. */
-  clearBeads?: boolean;
   /** Project-specific workspace config for tunnel/Hume cleanup */
   workspaceConfig?: {
     tunnel?: any;
@@ -83,8 +80,6 @@ export interface ArchiveOptions {
 export interface ApproveOptions {
   /** Skip the merge step (e.g. if already merged). Default: false */
   skipMerge?: boolean;
-  /** Skip beads compaction. Default: false */
-  skipBeadsCompaction?: boolean;
 }
 
 /** Options for the deep-wipe workflow */

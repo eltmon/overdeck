@@ -5,6 +5,12 @@ import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-d
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
 
+// PAN-2689: fire-and-forget journal writes die with the process in a short-lived
+// CLI (pan admin specialists done exits in <1s; the record write + fallback chain
+// takes seconds). Track every in-flight write so CLI entry points can drain them
+// before process.exit — the long-lived server never needs to await these.
+const pendingJournalWrites = new Set<Promise<void>>();
+
 export function updateIssueRecordForReviewStatusSync(issueId: string, status: ReviewStatus): void {
   // PAN-2583: the state-dir journal is the durable home, but a sandboxed reviewer
   // (codex workspace-write) cannot write ${OVERDECK_HOME}/state — and swallowing that
@@ -12,13 +18,27 @@ export function updateIssueRecordForReviewStatusSync(issueId: string, status: Re
   // journal write does not land, drop the durable verdict into the workspace runtime
   // dir (the one place a sandboxed agent can always write); readJournalStatusSync
   // overlays it on the next host-side read.
-  void Promise.resolve(updateIssueRecordForIssue(issueId, status))
+  const write = Promise.resolve(updateIssueRecordForIssue(issueId, status))
     .then((landed) => {
       // Only an explicit `false` means the durable write failed — undefined
       // (e.g. a test double) is "unknown", not "failed".
       if (landed === false) writeWorkspaceVerdictFallbackSync(issueId, status);
     })
     .catch(() => writeWorkspaceVerdictFallbackSync(issueId, status));
+  pendingJournalWrites.add(write);
+  void write.finally(() => pendingJournalWrites.delete(write));
+}
+
+/**
+ * PAN-2689: await every in-flight journal write. A short-lived CLI process MUST
+ * call this before process.exit or the verdict written by setReviewStatusSync is
+ * silently lost (the DB write already fails readonly in a sandbox, so the dying
+ * journal write was the only durable copy).
+ */
+export async function flushReviewStatusJournalWrites(): Promise<void> {
+  while (pendingJournalWrites.size > 0) {
+    await Promise.allSettled([...pendingJournalWrites]);
+  }
 }
 
 /** Resolve and read the per-issue journal record's pipeline block, or null. Best-effort. */

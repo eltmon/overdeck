@@ -155,7 +155,7 @@ Do NOT flag:
 ### 2. No Blocking Operations
 - **NEVER `execSync` or `spawnSync` in server/dashboard code** — blocks Node event loop, freezes UI
 - Must use `execAsync` (promisified `exec`) or async `spawn`
-- Same rule for all shell commands: tmux, git, bd, docker, etc.
+- Same rule for all shell commands: tmux, git, docker, etc.
 - Only exception: one-time startup code before server listens
 
 ### 3. No Dead Code

@@ -43,6 +43,8 @@ export interface HealthHost {
   lastPokeTimestamps: Map<string, number>;
   pokeProgress: Map<string, { fingerprint: string; ineffective: number }>;
   previousStates: Map<string, HealthState>;
+  /** cost-alert keys (`type:entity:level`) already alerted — see checkCostAlerts */
+  activeCostAlertKeys: Set<string>;
   handleAgentCrash(agentId: string): Promise<void>;
   checkCompletionMarkers(): Promise<void>;
   recordHealthEvent(health: AgentHealth): void;
@@ -367,11 +369,19 @@ export function checkFPPViolations(host: HealthHost, agentIds: string[]): void {
 }
 
 /**
- * Check for cost limit alerts
+ * Check for cost limit alerts.
+ *
+ * Each alert fires once per threshold crossing, not on every sweep — the
+ * un-deduped shape wrote the same "COST LIMIT REACHED" line hundreds of
+ * thousands of times (480k+ lines in one dashboard.log). Keys are cleared
+ * when the alert stops firing so a fresh crossing alerts again.
  */
 export function checkCostAlerts(host: HealthHost, agentIds: string[]): void {
     const config = host.config.cost_limits;
     if (!config) return;
+
+    const active = host.activeCostAlertKeys;
+    const firing = new Set<string>();
 
     for (const agentId of agentIds) {
       // Extract issue ID from agent ID (format: agent-issue-123 or issue-123)
@@ -381,10 +391,15 @@ export function checkCostAlerts(host: HealthHost, agentIds: string[]): void {
 
       const alerts = checkCostLimits(agentId, issueId, config);
       for (const alert of alerts) {
-        host.emit({ type: 'cost_alert', alert });
-
         // Resolve the entity label: for daily_total, use explicit "(unattributed)" bucket
         const entityLabel = alert.agentId || alert.issueId || '(unattributed)';
+
+        const key = `${alert.type}:${entityLabel}:${alert.level}`;
+        firing.add(key);
+        if (active.has(key)) continue; // already alerted this crossing
+        active.add(key);
+
+        host.emit({ type: 'cost_alert', alert });
 
         // Log the alert
         if (alert.level === 'limit_reached') {
@@ -398,7 +413,11 @@ export function checkCostAlerts(host: HealthHost, agentIds: string[]): void {
         }
       }
     }
-  
+
+    // Drop keys that stopped firing so the next crossing re-alerts.
+    for (const key of active) {
+      if (!firing.has(key)) active.delete(key);
+    }
 }
 
 /**

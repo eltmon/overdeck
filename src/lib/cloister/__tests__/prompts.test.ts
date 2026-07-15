@@ -180,15 +180,15 @@ requires:
 name: scratch
 description: section context
 optional:
-  - BEADS
+  - TASKS
 ---
-{{#BEADS}}Beads:
-{{BEADS}}{{/BEADS}}`
+{{#TASKS}}Tasks:
+{{TASKS}}{{/TASKS}}`
         );
-        const out = yield* renderPrompt({ name: SCRATCH, vars: { BEADS: '- bead-1\n- bead-2' } });
-        expect(out).toContain('Beads:');
-        expect(out).toContain('- bead-1');
-        expect(out).toContain('- bead-2');
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { TASKS: '- task-1\n- task-2' } });
+        expect(out).toContain('Tasks:');
+        expect(out).toContain('- task-1');
+        expect(out).toContain('- task-2');
       })
     );
 
@@ -199,13 +199,13 @@ optional:
 name: scratch
 description: empty section
 optional:
-  - BEADS
+  - TASKS
 ---
 before
-{{#BEADS}}should not appear{{/BEADS}}
+{{#TASKS}}should not appear{{/TASKS}}
 after`
         );
-        const out = yield* renderPrompt({ name: SCRATCH, vars: { BEADS: '' } });
+        const out = yield* renderPrompt({ name: SCRATCH, vars: { TASKS: '' } });
         expect(out).not.toContain('should not appear');
         expect(out).toContain('before');
         expect(out).toContain('after');
@@ -219,9 +219,9 @@ after`
 name: scratch
 description: undefined section
 optional:
-  - BEADS
+  - TASKS
 ---
-{{#BEADS}}hidden{{/BEADS}}done`
+{{#TASKS}}hidden{{/TASKS}}done`
         );
         const out = yield* renderPrompt({ name: SCRATCH, vars: {} });
         expect(out).toBe('done');
@@ -397,7 +397,7 @@ optional:
       Effect.gen(function* () {
         const baseVars = {
           ISSUE_ID: 'PAN-611',
-          INSTRUCTIONS_BLOCK: 'Continue the bead.',
+          INSTRUCTIONS_BLOCK: 'Continue the task.',
         };
         const enabled = yield* renderPrompt({
           name: 'resume-work',
@@ -501,7 +501,6 @@ optional:
             LOCAL: true,
             REMOTE: false,
             PROJECT_ROOT: '/project',
-            BEADS_TASKS: '',
             STITCH_DESIGNS: '',
             POLYREPO_CONTEXT: '',
             PENDING_FEEDBACK: '',
@@ -516,7 +515,35 @@ optional:
       })
     );
 
-    it.effect('renders per-bead push instruction for local and remote work prompts', () =>
+    it.effect('requires observing review request completion after an exec yield', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'work',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            ISSUE_ID_LOWER: 'pan-611',
+            BRANCH_NAME: 'feature/pan-611',
+            WORKSPACE_PATH: '/workspace',
+            LOCAL: true,
+            REMOTE: false,
+            PROJECT_ROOT: '/project',
+            STITCH_DESIGNS: '',
+            POLYREPO_CONTEXT: '',
+            PENDING_FEEDBACK: 'Fix the failed test.',
+            NEW_TRACKER_CONTEXT: '',
+            TLDR_AVAILABLE: false,
+          },
+        });
+
+        expect(out).toContain('A yielded exec result');
+        expect(out).toContain('poll that same background terminal until it exits');
+        expect(out).toContain('inspect its real exit code');
+        expect(out).toContain('pan show PAN-611');
+        expect(out).toContain('pan review pending');
+      })
+    );
+
+    it.effect('renders per-task push instruction for local and remote work prompts', () =>
       Effect.gen(function* () {
         const baseVars = {
           ISSUE_ID: 'PAN-611',
@@ -524,7 +551,6 @@ optional:
           BRANCH_NAME: 'feature/pan-611',
           WORKSPACE_PATH: '/workspace',
           PROJECT_ROOT: '/project',
-          BEADS_TASKS: '',
           STITCH_DESIGNS: '',
           POLYREPO_CONTEXT: '',
           PENDING_FEEDBACK: '',

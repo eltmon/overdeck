@@ -260,7 +260,7 @@ describe('reopenWorkspaceState', () => {
           decisions: [],
           hazards: [],
           resumePoint: null,
-          beadsMapping: {},
+          tasksMapping: {},
           statusOverrides: {},
           sessionHistory: [
             { timestamp: now, reason: 'planning', note: 'initial seed' },

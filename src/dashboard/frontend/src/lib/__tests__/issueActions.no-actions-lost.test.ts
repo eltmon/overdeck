@@ -26,7 +26,7 @@ const legacyCommandDeckIssueActions = [
   { legacyKey: 'createWorkspace', registryKey: 'createWorkspace', surfaceText: 'Create Workspace' },
   { legacyKey: 'copySettings', registryKey: 'copySettings', surfaceText: 'Copy Settings' },
   { legacyKey: 'closeOut', registryKey: 'closeOut', surfaceText: 'Close Out' },
-  { legacyKey: 'beads', registryKey: 'beads', surfaceText: 'Tasks' },
+  { legacyKey: 'tasks', registryKey: 'tasks', surfaceText: 'Tasks' },
   { legacyKey: 'inference', registryKey: 'inference', surfaceText: 'Inference' },
   { legacyKey: 'discussions', registryKey: 'discussions', surfaceText: 'Discussions' },
   { legacyKey: 'transcripts', registryKey: 'transcripts', surfaceText: 'Transcripts' },
@@ -38,17 +38,18 @@ const legacyCommandDeckIssueActions = [
   { legacyKey: 'restartAgent', registryKey: 'restartAgent', surfaceText: 'Restart agent' },
   { legacyKey: 'restartFromPlan', registryKey: 'restartFromPlan', surfaceText: 'Restart from plan' },
   { legacyKey: 'resetIssue', registryKey: 'resetIssue', surfaceText: 'Reset issue' },
+  { legacyKey: 'resetToPlanned', registryKey: 'resetToPlanned', surfaceText: 'Reset to planned' },
   { legacyKey: 'cancel', registryKey: 'cancel', surfaceText: 'Cancel Issue' },
 ] as const satisfies readonly { legacyKey: string; registryKey: IssueActionKey | null; surfaceText: string; note?: string }[];
 
 const commandDeckGapActions = [
   'untroubled',
-  'inspectBead',
+  'inspectTask',
   'open',
 ] as const satisfies readonly IssueActionKey[];
 
 const badgeBarActions = [
-  { surfaceText: 'Tasks', registryKey: 'beads' },
+  { surfaceText: 'Tasks', registryKey: 'tasks' },
   { surfaceText: 'Status', registryKey: 'statusReview' },
   { surfaceText: 'Inference', registryKey: 'inference' },
   { surfaceText: 'Discussions', registryKey: 'discussions' },

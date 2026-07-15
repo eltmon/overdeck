@@ -15,7 +15,7 @@ import type {
   ContinueDecision,
   ContinueHazard,
   ContinueResumePoint,
-  ContinueBeadsMapping,
+  ContinueTasksMapping,
   ContinueGitState,
   ContinueSessionReason,
 } from '../continue-state.js';
@@ -32,8 +32,8 @@ describe('ContinueState type exports (types-only module)', () => {
     const gitState: ContinueGitState = { branch: 'feature/pan-946', sha: 'abc123', dirty: false };
     const decision: ContinueDecision = { id: 'D1', summary: 'Use record', recordedAt: now };
     const hazard: ContinueHazard = { id: 'H1', summary: 'Watch out', mitigation: 'be careful' };
-    const resumePoint: ContinueResumePoint = { description: 'Resume at bead-2', beadId: 'bead-2' };
-    const beadsMapping: ContinueBeadsMapping = { 'item-1': ['bead-1'] };
+    const resumePoint: ContinueResumePoint = { description: 'Resume at task-2', taskId: 'task-2' };
+    const tasksMapping: ContinueTasksMapping = { 'item-1': ['task-1'] };
     const sessionEntry: ContinueSessionEntry = { timestamp: now, reason: 'start' as ContinueSessionReason };
     const feedbackEntry: ContinueFeedbackEntry = {
       seq: 1,
@@ -51,7 +51,7 @@ describe('ContinueState type exports (types-only module)', () => {
       decisions: [decision],
       hazards: [hazard],
       resumePoint,
-      beadsMapping,
+      tasksMapping,
       sessionHistory: [sessionEntry],
       feedback: [feedbackEntry],
     };

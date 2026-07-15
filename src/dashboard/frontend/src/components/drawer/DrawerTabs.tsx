@@ -5,7 +5,7 @@ import { useDrawerData } from './useDrawerData';
 const DRAWER_TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'plan', label: 'Plan' },
-  { id: 'beads', label: 'Beads' },
+  { id: 'tasks', label: 'Tasks' },
   { id: 'conversation', label: 'Conversation' },
   { id: 'terminal', label: 'Terminal' },
   { id: 'activity', label: 'Activity' },
@@ -13,16 +13,16 @@ const DRAWER_TABS = [
   { id: 'artifacts', label: 'Artifacts' },
 ] as const;
 
-function beadCount(beads: ReturnType<typeof useDrawerData>['beads']) {
-  if (beads.length === 0) return '0/0';
-  const done = beads.filter((bead) => bead.status === 'done').length;
-  return `${done}/${beads.length}`;
+function taskCount(tasks: ReturnType<typeof useDrawerData>['tasks']) {
+  if (tasks.length === 0) return '0/0';
+  const done = tasks.filter((task) => task.status === 'done').length;
+  return `${done}/${tasks.length}`;
 }
 
 export default function DrawerTabs() {
   const activeTab = useDashboardStore((state) => state.drawer.tab);
   const setDrawerTab = useDashboardStore((state) => state.setDrawerTab);
-  const { beads } = useDrawerData();
+  const { tasks } = useDrawerData();
 
   return (
     <nav data-component="drawer-tabs" data-testid="drawer-tabs" className="border-b border-border bg-background/95 px-[14px]" role="tablist" aria-label="Issue drawer sections">
@@ -43,9 +43,9 @@ export default function DrawerTabs() {
               onClick={() => setDrawerTab(tab.id)}
             >
               {tab.label}
-              {tab.id === 'beads' ? (
-                <span data-testid="drawer-tab-beads-count" className="ml-[6px] rounded-full bg-primary/15 px-[5px] py-[1px] font-mono text-[10px] leading-none text-primary">
-                  {beadCount(beads)}
+              {tab.id === 'tasks' ? (
+                <span data-testid="drawer-tab-tasks-count" className="ml-[6px] rounded-full bg-primary/15 px-[5px] py-[1px] font-mono text-[10px] leading-none text-primary">
+                  {taskCount(tasks)}
                 </span>
               ) : null}
               {active ? <span data-testid="drawer-tab-active-underline" className="absolute bottom-0 left-[14px] right-[14px] h-[2px] bg-primary" /> : null}

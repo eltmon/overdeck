@@ -7,7 +7,7 @@ const actionInvoke = vi.fn()
 
 const uiState = vi.hoisted(() => ({
   hasPlan: true,
-  hasBeads: true,
+  hasTasks: true,
 }))
 
 const queryMocks = vi.hoisted(() => {
@@ -80,7 +80,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       primary: all.slice(0, 2),
       secondary: all.slice(2, 4),
       overflow: all.slice(4),
-      state: { hasPlan: uiState.hasPlan, hasBeads: uiState.hasBeads },
+      state: { hasPlan: uiState.hasPlan, hasTasks: uiState.hasTasks },
       activeDialog: null,
     }
   },
@@ -94,7 +94,7 @@ vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div>
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({ BeadsTab: () => <div>Beads tab</div> }))
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({ TasksTab: () => <div>Tasks tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div>Costs tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab', () => ({ DiscussionsTab: () => <div>Discussions tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/MarkdownTab', () => ({ MarkdownTab: ({ body }: { body?: string }) => <div>{body ?? 'Markdown tab'}</div> }))
@@ -120,7 +120,7 @@ vi.mock('./AgentsLane', () => ({
     </div>
   ),
 }))
-vi.mock('./BeadsRail', () => ({ BeadsRail: () => <div>Beads rail</div> }))
+vi.mock('./TasksRail', () => ({ TasksRail: () => <div>Tasks rail</div> }))
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 
@@ -279,7 +279,7 @@ describe('IssueMissionControl', () => {
     const originalSections = queryMocks.activityQuery.data.sections
     const originalReview = queryMocks.reviewStatusQuery.data
     const originalHasPlan = uiState.hasPlan
-    const originalHasBeads = uiState.hasBeads
+    const originalHasTasks = uiState.hasTasks
 
     queryMocks.activityQuery.data.sections = [
       {
@@ -293,7 +293,7 @@ describe('IssueMissionControl', () => {
     ]
     queryMocks.reviewStatusQuery.data = undefined
     uiState.hasPlan = false
-    uiState.hasBeads = false
+    uiState.hasTasks = false
 
     renderMissionControl()
 
@@ -305,7 +305,7 @@ describe('IssueMissionControl', () => {
     queryMocks.activityQuery.data.sections = originalSections
     queryMocks.reviewStatusQuery.data = originalReview
     uiState.hasPlan = originalHasPlan
-    uiState.hasBeads = originalHasBeads
+    uiState.hasTasks = originalHasTasks
   })
 
   it('groups all issue actions in the mega-menu', () => {

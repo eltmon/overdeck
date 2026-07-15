@@ -8,11 +8,16 @@
 // can detect turn-end activity. Also writes a `completed` marker used by
 // the recovery path to detect agent idle state.
 
-'use strict';
+// This file is installed extensionless to ~/.overdeck/bin/ and invoked as
+// `node codex-notify-hook`. Node 22 loads an extensionless entry point as an ES
+// module, so this hook MUST use ESM `import` syntax — `require` throws
+// "require is not defined in ES module scope" and the whole hook dies before it
+// can write a heartbeat or signal the synthesis agent (PAN-2675).
 
-const { join } = require('node:path');
-const { homedir } = require('node:os');
-const { writeFileSync, mkdirSync, existsSync } = require('node:fs');
+import { join } from 'node:path';
+import { homedir, tmpdir } from 'node:os';
+import { writeFileSync, mkdirSync, existsSync, readFileSync, statSync, unlinkSync, appendFileSync, readdirSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const agentId = process.env.OVERDECK_AGENT_ID;
 if (!agentId) process.exit(0); // Not a Overdeck-managed agent
@@ -20,11 +25,8 @@ if (!agentId) process.exit(0); // Not a Overdeck-managed agent
 // Read event JSON from stdin (Codex delivers via stdin by default).
 let eventData = {};
 try {
-  const chunks = [];
-  process.stdin.setEncoding('utf8');
-  for (const chunk of []) { chunks.push(chunk); }
   // Synchronous stdin read — Codex provides the event before invoking the shim.
-  const raw = require('node:fs').readFileSync('/dev/stdin', 'utf8').trim();
+  const raw = readFileSync('/dev/stdin', 'utf8').trim();
   if (raw) eventData = JSON.parse(raw);
 } catch {
   // Ignore parse errors — best-effort heartbeat.
@@ -60,3 +62,91 @@ try {
 try {
   writeFileSync(join(agentDir, 'turn-completed'), timestamp + '\n');
 } catch { /* ignore */ }
+
+// PAN-2701: a paste sent while Codex is mid-turn remains unsubmitted in its
+// input box. messageAgent therefore queues busy-turn messages in mail/. At the
+// idle boundary, submit the oldest message and delete it only after both tmux
+// operations succeed. One message per turn keeps ordering deterministic; the
+// next turn completion drains the next file.
+try {
+  const mailDir = join(agentDir, 'mail');
+  const mailFile = readdirSync(mailDir)
+    .filter((name) => name.endsWith('.pending.md'))
+    .sort()[0];
+  if (mailFile) {
+    const mailPath = join(mailDir, mailFile);
+    const queued = readFileSync(mailPath, 'utf8').replace(/^# Message\r?\n\r?\n/, '').replace(/\r?\n$/, '');
+    const tmpFile = join(tmpdir(), `codex-mail-${agentId}-${process.pid}-${Date.now()}`);
+    let delivered = false;
+    try {
+      writeFileSync(tmpFile, queued);
+      const load = spawnSync('tmux', ['-L', 'overdeck', 'load-buffer', tmpFile], { stdio: 'ignore' });
+      const paste = load.status === 0
+        ? spawnSync('tmux', ['-L', 'overdeck', 'paste-buffer', '-t', agentId], { stdio: 'ignore' })
+        : undefined;
+      if (paste?.status === 0) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+        const submit = spawnSync('tmux', ['-L', 'overdeck', 'send-keys', '-t', agentId, 'C-m'], { stdio: 'ignore' });
+        delivered = submit.status === 0;
+      }
+    } catch { /* best-effort */ }
+    try { unlinkSync(tmpFile); } catch { /* ignore */ }
+    if (delivered) {
+      try { unlinkSync(mailPath); } catch { /* retry on the next turn */ }
+    }
+  }
+} catch { /* no queue or best-effort failure — never crash the hook */ }
+
+// PAN-2675: interactive convoy reviewer (codex harness) finished a turn. If it
+// wrote its report and hasn't signaled yet, deliver REVIEWER_READY to the
+// synthesis agent — the codex mirror of the claude-code Stop-hook block
+// (PAN-1557). A turn-end with no report is left alone: Deacon's REVIEWER_TIMEOUT
+// is the failure path, so we never emit a premature REVIEWER_FAILED.
+// Pattern: agent-<issueId>-review-<subRole>
+try {
+  if (/^agent-.+-review-(security|correctness|performance|requirements)$/.test(agentId)) {
+    const statePath = join(agentDir, 'state.json');
+    const markerPath = join(agentDir, 'reviewer-signaled');
+    if (existsSync(statePath) && !existsSync(markerPath)) {
+      let state = {};
+      try { state = JSON.parse(readFileSync(statePath, 'utf8')); } catch { /* leave empty */ }
+      const outPath = typeof state.reviewOutputPath === 'string' ? state.reviewOutputPath : '';
+      const subRole = typeof state.reviewSubRole === 'string' ? state.reviewSubRole : '';
+      const synthId = typeof state.reviewSynthesisAgentId === 'string' ? state.reviewSynthesisAgentId : '';
+      const reportNonEmpty = outPath && existsSync(outPath) && statSync(outPath).size > 0;
+      if (outPath && subRole && synthId && reportNonEmpty) {
+        // Deliver via load-buffer + paste-buffer + Enter on the overdeck socket
+        // (matches the Stop-hook and the project's tmux-delivery rule). The
+        // synthesis session is an interactive tmux session, so the paste reaches
+        // its prompt. Best-effort: if delivery fails, do NOT write the marker so
+        // a later turn can retry.
+        const tmpFile = join(tmpdir(), `reviewer-ready-${agentId}-${process.pid}-${Date.now()}`);
+        let delivered = false;
+        try {
+          writeFileSync(tmpFile, `REVIEWER_READY ${subRole} ${outPath}`);
+          spawnSync('tmux', ['-L', 'overdeck', 'load-buffer', tmpFile], { stdio: 'ignore' });
+          const paste = spawnSync('tmux', ['-L', 'overdeck', 'paste-buffer', '-t', synthId], { stdio: 'ignore' });
+          if (paste.status === 0) {
+            // Let the pasted text render before sending Enter (~300ms), matching
+            // the async-tmux delivery pattern.
+            Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+            spawnSync('tmux', ['-L', 'overdeck', 'send-keys', '-t', synthId, 'C-m'], { stdio: 'ignore' });
+            delivered = true;
+          }
+        } catch { /* best-effort */ }
+        try { unlinkSync(tmpFile); } catch { /* ignore */ }
+        if (delivered) {
+          try { writeFileSync(markerPath, ''); } catch { /* ignore */ }
+          try {
+            const logsDir = join(overdeckHome, 'logs');
+            mkdirSync(logsDir, { recursive: true });
+            appendFileSync(
+              join(logsDir, 'hooks.log'),
+              `[${new Date().toISOString()}] codex-notify-hook: ${agentId} signaled REVIEWER_READY ${subRole} to ${synthId}\n`,
+            );
+          } catch { /* ignore */ }
+        }
+      }
+    }
+  }
+} catch { /* best-effort — never crash the hook */ }

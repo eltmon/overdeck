@@ -8,12 +8,6 @@ vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: vi.fn().mockReturnValue(null),
 }));
 
-vi.mock('../../beads/resolver.js', () => ({
-  createBeadsResolver: (workspacePath: string) => ({
-    issueHasBeads: async () => ({ ok: true, value: existsSync(join(workspacePath, '.beads', 'issues.jsonl')) }),
-  }),
-}));
-
 import { collectOpenBacklog } from '../backlog-input.js';
 import { getReviewStatusSync } from '../../review-status.js';
 
@@ -113,21 +107,21 @@ describe('collectOpenBacklog', () => {
     expect(result.manifest[0].ready).toBe(false);
   });
 
-  it('ready=false when spec exists but workspace beads are missing', async () => {
+  it('ready=true when a spec exists without a legacy workspace task store', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
-    expect(result.manifest[0].ready).toBe(false);
+    expect(result.manifest[0].ready).toBe(true);
   });
 
-  it('ready=true when spec and workspace beads both exist', async () => {
+  it('ready=true when spec and workspace tasks both exist', async () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(join(specsDir, '2026-01-01-PAN-1-my-feature.vbrief.json'), '{}');
-    const beadsDir = join(tmpDir, 'workspaces', 'feature-pan-1', '.beads');
-    mkdirSync(beadsDir, { recursive: true });
-    writeFileSync(join(beadsDir, 'issues.jsonl'), '');
+    const tasksDir = join(tmpDir, 'workspaces', 'feature-pan-1', '.tasks');
+    mkdirSync(tasksDir, { recursive: true });
+    writeFileSync(join(tasksDir, 'issues.jsonl'), '');
     const result = await collectOpenBacklog(tmpDir, [makeIssue({ ref: 'PAN-1' })]);
     expect(result.manifest[0].ready).toBe(true);
   });

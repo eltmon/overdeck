@@ -1,9 +1,9 @@
 /**
  * PAN-382: Inspect Agent — Per-step verification specialist.
  *
- * Spawns after each bead completion to verify the implementation matches
+ * Spawns after each item completion to verify the implementation matches
  * its specification and architectural constraints before the agent
- * proceeds to the next bead.
+ * proceeds to the next item.
  */
 
 import { readFileSync, existsSync, writeFileSync, mkdirSync } from 'fs';
@@ -11,7 +11,7 @@ import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
 import { fileURLToPath } from 'url';
-import { exec, execFile } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { ProcessSpawnError } from '../errors.js';
@@ -22,7 +22,6 @@ import {
   saveCheckpoint,
 } from './inspect-checkpoints.js';
 import { setReviewStatusSync } from '../review-status.js';
-import { withBdMutex } from '../bd-mutex.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import {
   createSession,
@@ -49,7 +48,6 @@ import {
 } from '../agents/tier-supervisor.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -62,9 +60,7 @@ export interface InspectContext {
   projectPath: string;
   issueId: string;
   /** Canonical vBRIEF item id being inspected. */
-  beadId: string;
-  /** Original bd tracker id, when the caller passed one that differs from the vBRIEF item id. */
-  trackerBeadId?: string;
+  itemId: string;
   workspace: string;
   branch?: string;
 }
@@ -75,38 +71,8 @@ export interface InspectContext {
 export interface InspectResult {
   success: boolean;
   inspectResult: 'PASS' | 'BLOCKED';
-  beadId: string;
+  itemId: string;
   notes?: string;
-}
-
-/**
- * Read a bead's description using the bd CLI.
- */
-async function getBeadDescription(beadId: string, workspacePath: string): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync('bd', ['show', beadId, '--json'], {
-      cwd: workspacePath,
-      encoding: 'utf-8',
-    });
-    const bead = JSON.parse(stdout);
-    const parts: string[] = [];
-    if (bead.title) parts.push(`**Title:** ${bead.title}`);
-    if (bead.description) parts.push(`**Description:** ${bead.description}`);
-    if (bead.acceptance) parts.push(`**Acceptance Criteria:** ${bead.acceptance}`);
-    if (bead.notes) parts.push(`**Notes:** ${bead.notes}`);
-    if (bead.labels?.length) parts.push(`**Labels:** ${bead.labels.join(', ')}`);
-    return parts.join('\n\n') || `Bead ${beadId} (no description available)`;
-  } catch {
-    try {
-      const { stdout } = await execFileAsync('bd', ['show', beadId], {
-        cwd: workspacePath,
-        encoding: 'utf-8',
-      });
-      return stdout.trim() || `Bead ${beadId} (no description available)`;
-    } catch {
-      return `Bead ${beadId} (unable to read bead description)`;
-    }
-  }
 }
 
 async function buildInspectPromptPromise(context: InspectContext): Promise<string> {
@@ -118,8 +84,10 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
 
   const template = readFileSync(templatePath, 'utf-8');
 
-  // Get bead description
-  const beadDescription = await getBeadDescription(context.trackerBeadId ?? context.beadId, context.workspace);
+  const doc = readWorkspacePlanSync(context.workspace);
+  const item = doc?.plan.items.find(candidate => candidate.id === context.itemId);
+  if (!item) throw new Error(`Item ${context.itemId} requires a readable vBRIEF entry in ${context.workspace}.`);
+  const itemDescription = `**Title:** ${item.title}\n\n**Action:** ${item.narrative?.Action ?? 'No narrative provided.'}`;
 
   // Get diff scope
   const diffBase = await Effect.runPromise(getDiffBase(context.projectKey, context.issueId, context.workspace));
@@ -131,12 +99,12 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
     .replace(/\{\{apiUrl\}\}/g, apiUrl)
     .replace(/\{\{projectPath\}\}/g, context.projectPath)
     .replace(/\{\{issueId\}\}/g, context.issueId)
-    .replace(/\{\{beadId\}\}/g, context.beadId)
+    .replace(/\{\{itemId\}\}/g, context.itemId)
     .replace(/\{\{workspacePath\}\}/g, context.workspace)
     .replace(/\{\{checkpoint\}\}/g, diffBase.substring(0, 8))
     .replace(/\{\{diffBase\}\}/g, diffBase)
     .replace(/\{\{diffStats\}\}/g, diffStats)
-    .replace(/\{\{beadDescription\}\}/g, beadDescription)
+    .replace(/\{\{itemDescription\}\}/g, itemDescription)
     .replace(/\{\{resultStatus\}\}/g, '${RESULT_STATUS}')
     .replace(/\{\{resultNotes\}\}/g, '${RESULT_NOTES}');
 
@@ -159,10 +127,10 @@ async function routeInspectToStandingSupervisorIfEnabled(
   const enabled = resolveTieredExecutionEnabled(tiered, doc?.plan.metadata);
   if (!enabled) return undefined;
 
-  const item = doc?.plan.items.find(candidate => candidate.id === context.beadId);
+  const item = doc?.plan.items.find(candidate => candidate.id === context.itemId);
   if (!doc || !item) {
     throw new Error(
-      `Standing supervisor inspection for ${context.issueId} bead ${context.beadId} requires a readable vBRIEF item in ${context.workspace}.`,
+      `Standing supervisor inspection for ${context.issueId} item ${context.itemId} requires a readable vBRIEF item in ${context.workspace}.`,
     );
   }
 
@@ -173,9 +141,9 @@ async function routeInspectToStandingSupervisorIfEnabled(
 
   setReviewStatusSync(context.issueId.toUpperCase(), {
     inspectStatus: 'inspecting',
-    inspectNotes: `Inspecting bead ${context.beadId}`,
+    inspectNotes: `Inspecting item ${context.itemId}`,
     inspectStartedAt: new Date().toISOString(),
-    inspectBeadId: context.beadId,
+    inspectBeadId: context.itemId,
   });
 
   const sha = await Effect.runPromise(getCurrentHead(context.workspace));
@@ -186,14 +154,14 @@ async function routeInspectToStandingSupervisorIfEnabled(
     issueId: context.issueId,
     item,
     sha,
-    beadId: context.beadId,
+    itemId: context.itemId,
     prdMarkdown,
   });
 
   return {
     success: true,
     tmuxSession: agentId,
-    message: `Routed inspect for ${context.issueId} bead ${context.beadId} to standing supervisor`,
+    message: `Routed inspect for ${context.issueId} item ${context.itemId} to standing supervisor`,
   };
 }
 
@@ -210,8 +178,8 @@ async function spawnInspectAgentPromise(
 }> {
   const subRole = opts.deep ? 'inspect-deep' : 'inspect';
   const issueLower = context.issueId.toLowerCase();
-  const beadSlug = context.beadId.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 24);
-  const tmuxSession = `inspect-${issueLower}-${beadSlug}`;
+  const itemSlug = context.itemId.replace(/[^a-z0-9-]/gi, '-').toLowerCase().slice(0, 24);
+  const tmuxSession = `inspect-${issueLower}-${itemSlug}`;
 
   try {
     if (await isIssueClosed(context.issueId.toUpperCase())) {
@@ -236,9 +204,9 @@ async function spawnInspectAgentPromise(
     const prompt = await Effect.runPromise(buildInspectPrompt(context));
     setReviewStatusSync(context.issueId.toUpperCase(), {
       inspectStatus: 'inspecting',
-      inspectNotes: `Inspecting bead ${context.beadId}`,
+      inspectNotes: `Inspecting item ${context.itemId}`,
       inspectStartedAt: new Date().toISOString(),
-      inspectBeadId: context.beadId,
+      inspectBeadId: context.itemId,
     });
 
     // Resolve model via the role primitive: work.<inspect|inspect-deep>.
@@ -333,7 +301,7 @@ async function spawnInspectAgentPromise(
       success: true,
       runId: sessionId,
       tmuxSession,
-      message: `Spawned ${subRole} for ${context.issueId} bead ${context.beadId}`,
+      message: `Spawned ${subRole} for ${context.issueId} item ${context.itemId}`,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -347,17 +315,17 @@ async function spawnInspectAgentPromise(
 }async function onInspectCompletePromise(
   projectKey: string,
   issueId: string,
-  beadId: string,
+  itemId: string,
   status: 'passed' | 'failed',
   workspacePath: string
 ): Promise<void> {
   if (status === 'passed') {
     const commitSha = await Effect.runPromise(getCurrentHead(workspacePath));
-    saveCheckpoint(projectKey, issueId, beadId, commitSha);
-    console.log(`[inspect] Checkpoint saved for ${issueId} bead ${beadId} at ${commitSha.substring(0, 8)}`);
+    saveCheckpoint(projectKey, issueId, itemId, commitSha);
+    console.log(`[inspect] Checkpoint saved for ${issueId} item ${itemId} at ${commitSha.substring(0, 8)}`);
 
   } else {
-    console.log(`[inspect] Bead ${beadId} blocked for ${issueId} — no checkpoint saved`);
+    console.log(`[inspect] Item ${itemId} blocked for ${issueId} — no checkpoint saved`);
   }
 }
 
@@ -377,7 +345,7 @@ export function buildInspectPrompt(
     catch: (cause) =>
       new ProcessSpawnError({
         command: 'inspect-agent',
-        args: ['buildInspectPrompt', context.beadId],
+        args: ['buildInspectPrompt', context.itemId],
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),
@@ -408,9 +376,9 @@ export function spawnInspectAgent(
 export function onInspectComplete(
   projectKey: string,
   issueId: string,
-  beadId: string,
+  itemId: string,
   status: 'passed' | 'failed',
   workspacePath: string,
 ): Effect.Effect<void> {
-  return Effect.promise(() => onInspectCompletePromise(projectKey, issueId, beadId, status, workspacePath));
+  return Effect.promise(() => onInspectCompletePromise(projectKey, issueId, itemId, status, workspacePath));
 }

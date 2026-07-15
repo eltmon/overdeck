@@ -55,13 +55,13 @@ import {
   buildIssueRecord,
   getIssueRecordPath,
   markRecordPipelineClosedOutSync,
-  writeIssueRecordSync,
   queueIssueRecordCommit,
   readIssueRecord,
   updateIssueRecordForIssue,
   claimIssueOwner,
   clearIssueOwner,
 } from '../records.js';
+import { writeIssueRecordSync } from '../record.js';
 
 import {
   readIssueRecordSync,
@@ -73,8 +73,6 @@ import {
   writeRecordHazards,
   writeRecordResumePointSync,
   writeRecordResumePoint,
-  writeRecordBeadsMappingSync,
-  writeRecordBeadsMapping,
 } from '../record.js';
 
 describe('buildIssueRecord', () => {
@@ -102,10 +100,9 @@ describe('buildIssueRecord', () => {
         gitState: { branch: 'feature/pan-1908', sha: 'abc123', dirty: false },
         decisions: [{ id: 'D1', summary: 'keep state.json', recordedAt: '2026-01-01' }],
         hazards: [{ id: 'H1', summary: 'big PR', mitigation: 'audit' }],
-        resumePoint: { description: 'resume here', beadId: 'infra-record-writer' },
+        resumePoint: { description: 'resume here', taskId: 'infra-record-writer' },
         sessionHistory: [{ reason: 'work', note: 'did stuff', timestamp: '2026-01-01T00:00:00.000Z' }],
         agentModel: 'claude-opus-4-8',
-        beadsMapping: { 'item-1': ['bead-a'] },
       }),
     );
 
@@ -114,8 +111,7 @@ describe('buildIssueRecord', () => {
     expect(record.issueId).toBe('PAN-1908');
     expect(record.decisions).toHaveLength(1);
     expect(record.hazards).toHaveLength(1);
-    expect(record.resumePoint).toEqual({ description: 'resume here', beadId: 'infra-record-writer' });
-    expect(record.beadsMapping).toEqual({ 'item-1': ['bead-a'] });
+    expect(record.resumePoint).toEqual({ description: 'resume here', taskId: 'infra-record-writer' });
     expect(record.sessionHistory).toHaveLength(1);
     expect(record.feedback).toEqual([]);
     expect(record).not.toHaveProperty('continue');
@@ -519,8 +515,7 @@ describe('readRecordContinueViewSync (PAN-1919)', () => {
       schemaVersion: 2,
       decisions: [{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01' }],
       hazards: [{ id: 'H1', summary: 'big change', mitigation: 'audit' }],
-      resumePoint: { description: 'resume here', beadId: 'bead-abc' },
-      beadsMapping: { 'item-1': ['bead-a'] },
+      resumePoint: { description: 'resume here', taskId: 'task-abc' },
       sessionHistory: [{ reason: 'work', note: 'did stuff', timestamp: '2026-01-01T00:00:00.000Z' }],
       feedback: [{ seq: 1, specialist: 'review-agent', outcome: 'approved', timestamp: '2026-01-01T00:00:00.000Z', markdownBody: 'lgtm' }],
       pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
@@ -531,8 +526,7 @@ describe('readRecordContinueViewSync (PAN-1919)', () => {
     expect(view).not.toBeNull();
     expect(view?.decisions).toEqual([{ id: 'D1', summary: 'use record', recordedAt: '2026-01-01' }]);
     expect(view?.hazards).toEqual([{ id: 'H1', summary: 'big change', mitigation: 'audit' }]);
-    expect(view?.resumePoint).toEqual({ description: 'resume here', beadId: 'bead-abc' });
-    expect(view?.beadsMapping).toEqual({ 'item-1': ['bead-a'] });
+    expect(view?.resumePoint).toEqual({ description: 'resume here', taskId: 'task-abc' });
     expect(view?.sessionHistory).toHaveLength(1);
     expect(view?.feedback).toHaveLength(1);
   });
@@ -550,7 +544,6 @@ describe('readRecordContinueViewSync (PAN-1919)', () => {
     expect(view?.decisions).toEqual([]);
     expect(view?.hazards).toEqual([]);
     expect(view?.resumePoint).toBeNull();
-    expect(view?.beadsMapping).toEqual({});
     expect(view?.sessionHistory).toEqual([]);
     expect(view?.feedback).toEqual([]);
   });
@@ -676,7 +669,7 @@ describe('writeRecordResumePoint / writeRecordResumePointSync (PAN-1919)', () =>
       closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
     });
 
-    const resumePoint = { description: 'continue from bead-x', beadId: 'bead-x' };
+    const resumePoint = { description: 'continue from task-x', taskId: 'task-x' };
     writeRecordResumePointSync(project, 'PAN-1919', resumePoint);
 
     const record = readIssueRecordSync(project, 'PAN-1919');
@@ -690,7 +683,7 @@ describe('writeRecordResumePoint / writeRecordResumePointSync (PAN-1919)', () =>
     writeIssueRecordSync(project, 'PAN-1919', {
       issueId: 'PAN-1919',
       schemaVersion: 2,
-      resumePoint: { description: 'old', beadId: 'bead-old' },
+      resumePoint: { description: 'old', taskId: 'task-old' },
       pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
       closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
     });
@@ -703,57 +696,11 @@ describe('writeRecordResumePoint / writeRecordResumePointSync (PAN-1919)', () =>
 
   it('async: persists resumePoint and queues commit', async () => {
     const project = makeProject();
-    const resumePoint = { description: 'async resume', beadId: 'bead-async' };
+    const resumePoint = { description: 'async resume', taskId: 'task-async' };
     await writeRecordResumePoint(project, 'PAN-1919', resumePoint);
 
     const record = readIssueRecordSync(project, 'PAN-1919');
     expect(record?.resumePoint).toEqual(resumePoint);
-    expect(mockQueueAutoCommit).toHaveBeenCalled();
-  });
-});
-
-describe('writeRecordBeadsMapping / writeRecordBeadsMappingSync (PAN-1919)', () => {
-  let tmp: string;
-
-  beforeEach(() => {
-    tmp = mkdtempSync(join(tmpdir(), 'pan-records-beads-'));
-    mockQueueAutoCommit.mockClear();
-  });
-
-  afterEach(() => {
-    rmSync(tmp, { recursive: true, force: true });
-  });
-
-  function makeProject(): ProjectConfig {
-    return { name: 'Test', path: tmp };
-  }
-
-  it('sync: persists beadsMapping and leaves other fields intact', () => {
-    const project = makeProject();
-    writeIssueRecordSync(project, 'PAN-1919', {
-      issueId: 'PAN-1919',
-      schemaVersion: 2,
-      decisions: [{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }],
-      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
-      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
-    });
-
-    const beadsMapping = { 'item-1': ['bead-a', 'bead-b'], 'item-2': ['bead-c'] };
-    writeRecordBeadsMappingSync(project, 'PAN-1919', beadsMapping);
-
-    const record = readIssueRecordSync(project, 'PAN-1919');
-    expect(record?.beadsMapping).toEqual(beadsMapping);
-    expect(record?.decisions).toEqual([{ id: 'D1', summary: 'keep', recordedAt: '2026-01-01' }]);
-    expect(mockQueueAutoCommit).toHaveBeenCalled();
-  });
-
-  it('async: persists beadsMapping and queues commit', async () => {
-    const project = makeProject();
-    const beadsMapping = { 'async-item': ['bead-x'] };
-    await writeRecordBeadsMapping(project, 'PAN-1919', beadsMapping);
-
-    const record = readIssueRecordSync(project, 'PAN-1919');
-    expect(record?.beadsMapping).toEqual(beadsMapping);
     expect(mockQueueAutoCommit).toHaveBeenCalled();
   });
 });
@@ -827,7 +774,7 @@ describe('PAN-1919: buildIssueRecord backfill migration', () => {
     rmSync(project.path, { recursive: true, force: true });
   });
 
-  it('prefers existing record harness/model over agents table', async () => {
+  it('prefers live agents-table harness/model over existing record (PAN-2686)', async () => {
     const project = makeProject();
     writeIssueRecordSync(project, 'PAN-1919', {
       issueId: 'PAN-1919',
@@ -842,8 +789,46 @@ describe('PAN-1919: buildIssueRecord backfill migration', () => {
     ]);
 
     const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('claude-code');
+    expect(record.model).toBe('claude-opus-4-8');
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('keeps existing record harness/model when no agent row remains', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      harness: 'pi',
+      model: 'kimi-k2.5',
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
     expect(record.harness).toBe('pi');
     expect(record.model).toBe('kimi-k2.5');
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('ignores a mid-spawn placeholder row and falls back to the existing record', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      harness: 'codex',
+      model: 'gpt-5.5',
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      { id: 'agent-pan-1919', issueId: 'PAN-1919', role: 'work', harness: 'claude-code', model: 'pending-work-spawn', status: 'starting', startedAt: '2026-06-22T00:00:00.000Z' },
+    ]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('codex');
+    expect(record.model).toBe('gpt-5.5');
     rmSync(project.path, { recursive: true, force: true });
   });
 });

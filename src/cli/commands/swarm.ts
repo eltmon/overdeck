@@ -133,7 +133,7 @@ export async function swarmCommand(
   // dispatchNextWave with an EMPTY reconcile result and raced the Deacon
   // (PAN-2214). Re-running the command is idempotent: already-dispatched
   // work is reconciled, not re-spawned.
-  const actions = await deps.coordinateSwarmSlots({ issueId: issue });
+  const actions = await deps.coordinateSwarmSlots({ issueId: issue, manual: true });
 
   if (actions.length === 0) {
     deps.console.log(chalk.yellow(`No swarm slots dispatched for ${issue}.`));
@@ -187,7 +187,7 @@ export async function swarmRecoverCommand(
       const retried = actions.some(line => line.includes(`archived failed slot ${slotIndex} `));
       if (retried) {
         const itemId = actions.find(line => line.includes(`archived failed slot ${slotIndex} `))?.match(/\(item ([^)]+)\)/)?.[1];
-        if (itemId) acknowledgeRecoveryTrip(workspacePath, issue, 'swarm-slot-requeue', itemId);
+        if (itemId) await acknowledgeRecoveryTrip(workspacePath, issue, 'swarm-slot-requeue', itemId).catch(() => undefined);
         for (const line of actions) deps.console.log(line);
         return { ok: true, actions, workspacePath };
       }
@@ -420,9 +420,9 @@ export async function swarmResetCommand(
     await deps.runGitCommand(`git branch -D ${JSON.stringify(branch)}`, workspacePath);
   }
 
-  deps.clearAllSlotAssignments(workspacePath, issue);
+  await deps.clearAllSlotAssignments(workspacePath, issue);
   for (const block of deps.getFailedMergeBlocks(issue, workspacePath)) {
-    deps.clearFailedMergeBlock(issue, block.slotIndex, workspacePath);
+    await deps.clearFailedMergeBlock(issue, block.slotIndex, workspacePath);
   }
 
   // No stale running registration may survive: mark live-status rows stopped.

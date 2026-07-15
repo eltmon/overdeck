@@ -10,7 +10,7 @@ import {
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
-import { sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
+import { capturePaneSync, detectTerminalApiErrorSync, sessionExistsSync, killSessionSync, listPaneValuesSync } from '../tmux.js';
 import { loadCloisterConfigSync, DEFAULT_CLOISTER_CONFIG, type StuckRemediationConfig } from './config.js';
 import { getAgentEffectiveLastActivityMs, isAgentIdleForNudge } from './agent-idle.js';
 import { describeAgentDeath } from './agent-death.js';
@@ -21,7 +21,8 @@ import {
   writeStuckRemediationState,
   type StuckRemediationState,
 } from './stuck-remediation-state.js';
-import { queryReadyBeadsByIssueLabels, resolveBeadsQueryRoot, type ReadyBeadsByIssue } from '../beads-query.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { getDispatchableItems } from '../vbrief/dag.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
 
 export interface StuckRemediationOptions {
@@ -142,7 +143,7 @@ async function evaluateWedgedReworkAgent(
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, transitionAction(3, issueId, idleMinutes, 'rework-wedge-troubled'));
-    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return true;
   }
 
@@ -150,10 +151,6 @@ async function evaluateWedgedReworkAgent(
   writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
   logAction(actions, transitionAction(3, issueId, idleMinutes, 'killed-for-respawn'));
   return true;
-}
-
-function hasReadyBeads(readyByQueryRoot: Map<string, ReadyBeadsByIssue>, agent: AgentState, issueLabel: string): boolean {
-  return (readyByQueryRoot.get(resolveBeadsQueryRoot(agent.workspace))?.[issueLabel] ?? []).length > 0;
 }
 
 function shouldCheckReadyBeadsForAgent(agent: AgentState, now: number): boolean {
@@ -201,9 +198,9 @@ function logAction(actions: string[], action: string): void {
   logDeaconEventSync(action);
 }
 
-function surfaceStuckNeedsYou(agent: AgentState, issueId: string, generation: string, actions: string[]): void {
+async function surfaceStuckNeedsYou(agent: AgentState, issueId: string, generation: string, actions: string[]): Promise<void> {
   if (!agent.workspace) return;
-  const failure = recordRecoveryFailure(agent.workspace, issueId, 'stuck-remediation', generation, 1);
+  const failure = await recordRecoveryFailure(agent.workspace, issueId, 'stuck-remediation', generation, 1);
   if (failure.emitNeedsYou) logAction(actions, `[deacon] needs-you ${issueId}: stuck remediation exhausted`);
 }
 
@@ -212,7 +209,6 @@ async function evaluateAgent(
   config: StuckRemediationConfig,
   now: number,
   actions: string[],
-  readyByQueryRoot: Map<string, ReadyBeadsByIssue>,
 ): Promise<void> {
   const agentId = agent.id;
   if (!agentId) return;
@@ -242,7 +238,9 @@ async function evaluateAgent(
   if (!agent.workspace) return;
 
   const issueId = issueIdForAgent(agent);
-  if (hasReadyBeads(readyByQueryRoot, agent, issueId.toLowerCase())) return;
+  const plan = readWorkspacePlanSync(agent.workspace);
+  if (!plan) return;
+  if (getDispatchableItems(plan, new Set()).length > 0) return;
 
   const lastActivityMs = getAgentEffectiveLastActivityMs(agentId);
   if (lastActivityMs === null) return;
@@ -262,11 +260,20 @@ async function evaluateAgent(
   const lastStage = stuckState?.lastStage ?? 0;
   const firstStuck = firstStuckAt(lastActivity, stuckState);
 
+  const terminalProviderError = detectTerminalApiErrorSync(capturePaneSync(agentId, 80));
+  if (terminalProviderError) {
+    markAgentTroubled(agentId);
+    writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
+    logAction(actions, `${agentId} provider-terminal: ${terminalProviderError.summary}`);
+    await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    return;
+  }
+
   if (idleMinutes >= config.stage3_minutes && lastStage < 3) {
     markAgentTroubled(agentId);
     writeStuckRemediationState(agentId, stageState(3, now, firstStuck));
     logAction(actions, transitionAction(3, issueId, idleMinutes, 'marked-troubled'));
-    surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
+    await surfaceStuckNeedsYou(agent, issueId, firstStuck, actions);
     return;
   }
 
@@ -541,30 +548,14 @@ export async function checkStuckAgentRemediation(opts: StuckRemediationOptions =
   const actions: string[] = [];
   const now = opts.now ?? Date.now();
   const runningAgents = listRunningAgentsSync();
-  const readyByQueryRoot = new Map<string, ReadyBeadsByIssue>();
-  const workAgentsByQueryRoot = new Map<string, AgentState[]>();
   let sawFlywheelOrchestrator = false;
-
-  for (const agent of runningAgents) {
-    if (!shouldCheckReadyBeadsForAgent(agent, now)) continue;
-    const queryRoot = resolveBeadsQueryRoot(agent.workspace);
-    const workspaceAgents = workAgentsByQueryRoot.get(queryRoot) ?? [];
-    workspaceAgents.push(agent);
-    workAgentsByQueryRoot.set(queryRoot, workspaceAgents);
-  }
-
-  for (const [queryRoot, workspaceAgents] of workAgentsByQueryRoot) {
-    const issueIds = workspaceAgents.map(issueIdForAgent);
-    const ready = await Effect.runPromise(queryReadyBeadsByIssueLabels(queryRoot, issueIds, { acquisitionTimeoutMs: 500 }));
-    readyByQueryRoot.set(queryRoot, ready.byIssue);
-  }
 
   for (const agent of runningAgents) {
     if (agent.id === FLYWHEEL_ORCHESTRATOR_AGENT_ID || agent.role === 'flywheel') {
       sawFlywheelOrchestrator = true;
     }
     try {
-      await evaluateAgent(agent, config, now, actions, readyByQueryRoot);
+      await evaluateAgent(agent, config, now, actions);
     } catch (error) {
       const agentId = agent.id || '(unknown)';
       const message = `[deacon] stuck-remediation agent=${agentId} error=${error instanceof Error ? error.message : String(error)}`;

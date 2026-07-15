@@ -2,10 +2,10 @@ import { existsSync } from 'node:fs';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../agents/slot-reconcile.js';
 import {
   readIssueRecordForWorkspaceSync,
-  writeIssueRecordForWorkspaceSync,
   type PanIssueRecord,
   type PanIssueSwarmSupersededAttempt,
 } from '../pan-dir/record.js';
+import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
 import { createMinimalIssueRecord, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import type { PersistedTaskOperation } from '../vbrief/dag.js';
 import type { VBriefDocument } from '../vbrief/types.js';
@@ -18,7 +18,7 @@ export const SWARM_SUPERSEDED_RETENTION = 'issue-close-out' as const;
 
 export interface FailedSlotArchiveDeps {
   runGitCommand: (command: string, cwd: string) => Promise<unknown>;
-  clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => void;
+  clearSlotAssignment: (workspacePath: string, issueId: string, slotIndex: number, itemId?: string) => Promise<void>;
 }
 interface ClassifiedSlot extends ReconciledSlotItem { lifecycle: string; reason?: string }
 
@@ -62,19 +62,18 @@ export async function archiveFailedSwarmSlot(
     reason: slot.reason ?? 'failed swarm slot',
     supersededAt: now.toISOString(),
   };
-  const existing = readIssueRecordForWorkspaceSync(workspacePath, normalized) ?? createMinimalIssueRecord(normalized);
-  writeIssueRecordForWorkspaceSync(workspacePath, normalized, {
+  await updateIssueRecordForWorkspace(workspacePath, normalized, existing => ({
     ...existing,
     swarm: {
       ...(existing.swarm ?? {}),
       supersededAttempts: [...(existing.swarm?.supersededAttempts ?? []), attempt],
     },
-  });
+  }));
   // PAN-2372 WI-4 / FR-6: this slot is being superseded/requeued — clear its
   // durable completion marker so a fresh attempt on the same slotIndex is not
   // falsely observed as already-completed by classifyInFlightSlots.
-  clearSwarmSlotCompletion(workspacePath, normalized, slot.slotIndex);
-  deps.clearSlotAssignment(workspacePath, normalized, slot.slotIndex, slot.itemId);
+  await clearSwarmSlotCompletion(workspacePath, normalized, slot.slotIndex);
+  await deps.clearSlotAssignment(workspacePath, normalized, slot.slotIndex, slot.itemId);
   return attempt;
 }
 
@@ -84,7 +83,7 @@ export async function requeueFailedSwarmSlots(
   classified: ClassifiedSlot[],
   doc: VBriefDocument,
   reconciled: SlotReconcileResult,
-  deps: FailedSlotArchiveDeps & { applyTaskOperationToPlanFile: (path: string, operation: PersistedTaskOperation, workspace?: string) => Promise<unknown> },
+  deps: FailedSlotArchiveDeps & { applyTaskOperationToPlanFile: (issueId: string, operation: PersistedTaskOperation, workspacePath?: string) => Promise<unknown> },
   blockedSlotIndexes: Set<number> = new Set(),
 ): Promise<{ doc: VBriefDocument; actions: string[] }> {
   let nextDoc = doc;
@@ -97,14 +96,14 @@ export async function requeueFailedSwarmSlots(
     const admission = decideAutonomousRedrive(slot.agentId ? getAgentStateSync(slot.agentId) ?? {} : {}, { owesRework: true });
     if (admission.decision === 'defer') { actions.push(`[swarm] deferred failed slot ${slot.slotIndex}: ${admission.reason}`); continue; }
     const attempt = await archiveFailedSwarmSlot(issueId, workspacePath, slot, deps);
-    await deps.applyTaskOperationToPlanFile(`${workspacePath}/.pan/spec.vbrief.json`, {
+    await deps.applyTaskOperationToPlanFile(issueId, {
       type: 'unblock', itemId: slot.itemId, writerId: 'deacon-swarm', reason: `Redispatch after ${slot.reason ?? 'slot failure'}`,
     }, workspacePath);
     reconciled.inFlight = reconciled.inFlight.filter(candidate => candidate.itemId !== slot.itemId);
     reconciled.superseded = [...(reconciled.superseded ?? []), attempt];
     nextDoc = { ...nextDoc, plan: { ...nextDoc.plan, items: nextDoc.plan.items.map(item => item.id === slot.itemId ? { ...item, status: 'pending' as const } : item) } };
     actions.push(`[swarm] archived failed slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}`);
-    const failure = recordRecoveryFailure(workspacePath, issueId, 'swarm-slot-requeue', slot.itemId);
+    const failure = await recordRecoveryFailure(workspacePath, issueId, 'swarm-slot-requeue', slot.itemId);
     if (failure.emitNeedsYou) actions.push(`[swarm] needs-you ${issueId}: slot item ${slot.itemId} failed ${failure.trip.tripCount} times`);
   }
   return { doc: nextDoc, actions };

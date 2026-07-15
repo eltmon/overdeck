@@ -165,9 +165,9 @@ describe('resolveSlotTierSpawnParams', () => {
 
   it('carries the resolved tier model and harness into the spawn params when tiering is on', () => {
     mockConfig(TIER_CONFIG);
-    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('bead-x', { difficulty: 'expert' })]));
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'expert' })]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual({
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({
       model: 'claude-opus-4-8',
       harness: 'claude-code',
       tierName: 'frontier',
@@ -177,37 +177,37 @@ describe('resolveSlotTierSpawnParams', () => {
 
   it('staffs from the implicit roles.work tier when tiering is disabled (PAN-2397)', () => {
     mockConfig({ ...TIER_CONFIG, enabled: false });
-    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('bead-x', { difficulty: 'expert' })]));
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'expert' })]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual(IMPLICIT_PARAMS);
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual(IMPLICIT_PARAMS);
   });
 
   it('lets an explicit per-spawn model override outrank tier routing', () => {
     mockConfig(TIER_CONFIG);
-    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('bead-x', { difficulty: 'expert' })]));
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', { difficulty: 'expert' })]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'bead-x', 'claude-sonnet-5')).toEqual({});
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x', 'claude-sonnet-5')).toEqual({});
   });
 
   it('falls through to the implicit roles.work tier for an unlabeled item (PAN-2397)', () => {
     mockConfig(TIER_CONFIG);
-    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('bead-x', {})]));
+    vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('task-x', {})]));
 
-    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual(IMPLICIT_PARAMS);
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual(IMPLICIT_PARAMS);
   });
 
   it('throws when tiering is enabled but the slot item is missing from the plan', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(planDoc([planItem('other', { difficulty: 'medium' })]));
 
-    expect(() => resolveSlotTierSpawnParams('/ws', 'bead-x')).toThrow("item 'bead-x' was not found");
+    expect(() => resolveSlotTierSpawnParams('/ws', 'task-x')).toThrow("item 'task-x' was not found");
   });
 
   it('falls through to role-default routing when tiering is enabled but no plan is readable', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(null);
 
-    expect(resolveSlotTierSpawnParams('/ws', 'bead-x')).toEqual({});
+    expect(resolveSlotTierSpawnParams('/ws', 'task-x')).toEqual({});
   });
 });
 

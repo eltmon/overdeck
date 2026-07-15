@@ -171,7 +171,7 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
         'You appear active but have made no observable progress (no new commits, unchanged output) across multiple checks. '
         + 'Do exactly one of: (1) work is done — commit, push, and run pan done; '
         + '(2) blocked — state the blocker in one sentence and commit what you have as WIP; '
-        + '(3) lost context — re-read your bead (bd show), your latest .pan/feedback/ file, and git status, then resume. Act now.';
+        + '(3) lost context — re-read your vBRIEF item (`pan task show`), your latest .pan/feedback/ file, and git status, then resume. Act now.';
     }
   }
 

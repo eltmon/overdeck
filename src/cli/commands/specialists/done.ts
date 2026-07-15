@@ -160,7 +160,7 @@ export async function doneCommand(
       if (options.notes) update.inspectNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Inspection passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent can proceed to next bead'));
+        console.log(chalk.dim('  Agent can proceed to the next vBRIEF task'));
       } else {
         console.log(chalk.yellow(`✗ Inspection blocked for ${normalizedIssueId}`));
         console.log(chalk.dim('  Agent must fix issues and re-request inspection'));
@@ -266,6 +266,11 @@ export async function doneAndExitCommand(
   options: DoneOptions,
 ): Promise<never> {
   await doneCommand(specialist, issueId, options);
+  // PAN-2689: setReviewStatusSync's journal write is fire-and-forget; in this
+  // short-lived process an immediate exit kills it — and in a sandbox (readonly
+  // DB) that write is the ONLY durable copy of the verdict. Drain it first.
+  const { flushReviewStatusJournalWrites } = await import('../../../lib/overdeck/review-status-record-sync.js');
+  await flushReviewStatusJournalWrites();
   process.exit(0);
 }
 

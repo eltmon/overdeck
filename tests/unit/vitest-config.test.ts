@@ -12,7 +12,7 @@ describe('vitest.config.ts flake policy', () => {
     vi.unstubAllEnvs();
   });
 
-  async function loadConfig(): Promise<{ test: { retry: number; include: string[]; exclude: string[]; forks: { maxForks: number } } }> {
+  async function loadConfig(): Promise<{ test: { retry: number; include: string[]; exclude: string[]; maxWorkers: number } }> {
     const mod = await import(CONFIG_PATH);
     return mod.default;
   }
@@ -26,9 +26,9 @@ describe('vitest.config.ts flake policy', () => {
 
     expect(config.test.retry).toBe(0);
     expect(config.test.exclude).not.toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(config.test.exclude).not.toContain('src/lib/vbrief/__tests__/create-beads.test.ts');
+    expect(config.test.exclude).not.toContain('src/lib/vbrief/__tests__/create-tasks.test.ts');
     expect(config.test.include).toContain('tests/**/*.test.ts');
-    expect(config.test.forks.maxForks).toBe(4);
+    expect(config.test.maxWorkers).toBe(4);
   });
 
   it('sets retry:1 in CI and excludes quarantined tests', async () => {
@@ -40,8 +40,7 @@ describe('vitest.config.ts flake policy', () => {
 
     expect(config.test.retry).toBe(1);
     expect(config.test.exclude).toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(config.test.exclude).toContain('src/lib/vbrief/__tests__/create-beads.test.ts');
-    expect(config.test.forks.maxForks).toBe(2);
+    expect(config.test.maxWorkers).toBe(2);
   });
 
   it('sets retry:1 in verification mode, excludes quarantined tests, and preserves local fork count', async () => {
@@ -53,8 +52,7 @@ describe('vitest.config.ts flake policy', () => {
 
     expect(config.test.retry).toBe(1);
     expect(config.test.exclude).toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(config.test.exclude).toContain('src/lib/vbrief/__tests__/create-beads.test.ts');
-    expect(config.test.forks.maxForks).toBe(4);
+    expect(config.test.maxWorkers).toBe(4);
   });
 
   it('flake-lane mode sets retry:1 and does not exclude quarantined tests', async () => {
@@ -66,6 +64,6 @@ describe('vitest.config.ts flake policy', () => {
 
     expect(config.test.retry).toBe(1);
     expect(config.test.exclude).not.toContain('tests/playwright/conversation-supervisor-uat.test.ts');
-    expect(config.test.exclude).not.toContain('src/lib/vbrief/__tests__/create-beads.test.ts');
+    expect(config.test.exclude).not.toContain('src/lib/vbrief/__tests__/create-tasks.test.ts');
   });
 });

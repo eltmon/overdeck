@@ -17,7 +17,7 @@ allowed-tools:
 
 `pan approve` was a legacy CLI command that bypassed critical infrastructure:
 - **Merge queue** — no serialization, could collide with concurrent merges
-- **Post-merge lifecycle** — no Docker cleanup, label cleanup, stash cleanup, beads compaction
+- **Post-merge lifecycle** — no Docker cleanup, label cleanup, stash cleanup, vBRIEF tasks compaction
 - **Idempotency guards** — no protection against the infinite loop (PAN-328)
 - **Verification gate** — no post-rebase quality checks
 

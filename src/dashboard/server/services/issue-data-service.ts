@@ -26,10 +26,10 @@ import type { VBriefDocument } from '../../../lib/vbrief/types.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 
 /**
- * Compute bead progress counts from a cached plan document.
+ * Compute task progress counts from a cached plan document.
  * Exported for testing.
  */
-export function computeBeadCounts(doc: VBriefDocument | null): { completed: number; total: number } | null {
+export function computeTaskCounts(doc: VBriefDocument | null): { completed: number; total: number } | null {
   const items = doc?.plan?.items ?? [];
   if (items.length === 0) return null;
   return { completed: items.filter((i) => i.status === 'completed').length, total: items.length };
@@ -156,10 +156,10 @@ function mapRallyStateToCanonical(issueState: string): string {
 interface PlanningStateCacheEntry {
   result: {
     hasPlan: boolean;
-    hasBeads: boolean;
+    hasTasks: boolean;
     planningComplete: boolean;
     workspacePath: string;
-    beadCounts: { completed: number; total: number } | null;
+    taskCounts: { completed: number; total: number } | null;
   };
   planMtimeMs: number; // -1 when no plan file existed at compute time
   continueMtimeMs: number; // -1 when no continue.json existed at compute time
@@ -173,23 +173,23 @@ const DAY_MS = 86_400_000;
 
 function getCachedPlanningState(identifier: string): {
   hasPlan: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   planningComplete: boolean;
   workspacePath: string;
-  beadCounts: { completed: number; total: number } | null;
+  taskCounts: { completed: number; total: number } | null;
 } {
   try {
     const resolved = resolveProjectFromIssueSync(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) {
-      return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null };
+      return { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null };
     }
     const issueLower = identifier.toLowerCase();
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     return planningStateCache.get(identifier)?.result
-      ?? { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath, beadCounts: null };
+      ?? { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath, taskCounts: null };
   } catch {
-    return { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null };
+    return { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null };
   }
 }
 
@@ -200,7 +200,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     const resolved = resolveProjectFromIssueSync(identifier);
     const projectPath = resolved?.projectPath ?? '';
     if (!projectPath) return updatePlanningStateCache(identifier, {
-      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
+      result: { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null },
       planMtimeMs: -1,
       continueMtimeMs: -1,
     });
@@ -209,7 +209,7 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
       return updatePlanningStateCache(identifier, {
-        result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath, beadCounts: null },
+        result: { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath, taskCounts: null },
         planMtimeMs: -1,
         continueMtimeMs: -1,
       });
@@ -240,15 +240,15 @@ async function refreshPlanningState(identifier: string): Promise<boolean> {
 
     const doc = planPath ? await Effect.runPromise(readWorkspacePlan(workspacePath)) : null;
     const planningComplete = doc?.plan?.status ? PLANNING_FINISHED_STATUSES.has(doc.plan.status) : false;
-    const beadCounts = computeBeadCounts(doc);
+    const taskCounts = computeTaskCounts(doc);
     return updatePlanningStateCache(identifier, {
-      result: { hasPlan: planPath !== null, hasBeads: planningComplete, planningComplete, workspacePath, beadCounts },
+      result: { hasPlan: planPath !== null, hasTasks: planningComplete, planningComplete, workspacePath, taskCounts },
       planMtimeMs,
       continueMtimeMs,
     });
   } catch {
     return updatePlanningStateCache(identifier, {
-      result: { hasPlan: false, hasBeads: false, planningComplete: false, workspacePath: '', beadCounts: null },
+      result: { hasPlan: false, hasTasks: false, planningComplete: false, workspacePath: '', taskCounts: null },
       planMtimeMs: -1,
       continueMtimeMs: -1,
     });
@@ -521,10 +521,10 @@ export class IssueDataService {
       return {
         ...issue,
         hasPlan: ps.hasPlan,
-        hasBeads: ps.hasBeads,
+        hasTasks: ps.hasTasks,
         planningComplete: ps.planningComplete,
         workspacePath: ps.workspacePath || undefined,
-        beadCounts: ps.beadCounts,
+        taskCounts: ps.taskCounts,
       };
     });
 

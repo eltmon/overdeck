@@ -78,7 +78,36 @@ describe('userContentOutsideRegion', () => {
 
 describe('stripBeadsManagedRegion', () => {
   it('is a no-op when Beads did not install an integration block', () => {
-    expect(stripBeadsManagedRegion('# Project\n')).toBe('# Project');
+    expect(stripBeadsManagedRegion('# Project\n')).toBe('# Project\n');
+  });
+
+  it('removes only the exact generated block and preserves surrounding rules', () => {
+    const existing = `# User rules
+Keep this command: bd-custom report
+
+<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:abc -->
+Run bd prime and bd show.
+<!-- END BEADS INTEGRATION -->
+
+## Tracker
+Use Linear for product issues.
+`;
+    expect(stripBeadsManagedRegion(existing)).toBe(`# User rules
+Keep this command: bd-custom report
+
+## Tracker
+Use Linear for product issues.`);
+  });
+
+  it('is idempotent after removing the generated block', () => {
+    const existing = `before\n<!-- BEGIN BEADS INTEGRATION -->\nstale\n<!-- END BEADS INTEGRATION -->\nafter\n`;
+    const cleaned = stripBeadsManagedRegion(existing);
+    expect(stripBeadsManagedRegion(cleaned)).toBe(cleaned);
+  });
+
+  it('does not remove unfenced Beads references', () => {
+    const existing = '# Rules\nUse bd only for local diagnostics.\n';
+    expect(stripBeadsManagedRegion(existing)).toBe(existing);
   });
 });
 

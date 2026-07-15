@@ -25,7 +25,6 @@ import { mergeSkillsIntoWorkspaceSync } from '../../lib/skills-merge.js';
 import { generateClaudeMdSync, TemplateVariables } from '../../lib/template.js';
 import { createWorkspace as createWorkspaceFromConfig } from '../../lib/workspace-manager.js';
 import { createWorktree } from '../../lib/worktree.js';
-import { initializeWorkspaceBeads } from './workspace-beads.js';
 import { createRemoteWorkspace } from './workspace-remote.js';
 
 const execAsync = promisify(exec);
@@ -268,14 +267,6 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
       console.log('  Cleared stale workspace-local .pan runtime state');
     }
 
-    // Initialize fresh beads for this workspace (remove inherited beads from main)
-    spinner.text = 'Initializing workspace beads...';
-    const beadsResult = await initializeWorkspaceBeads(workspacePath, issueId);
-    let workspaceBeadId: string | undefined;
-    if (beadsResult.success) {
-      workspaceBeadId = beadsResult.beadId;
-    }
-
     // Generate CLAUDE.md
     spinner.text = 'Generating CLAUDE.md...';
     const variables: TemplateVariables = {
@@ -286,7 +277,6 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
       FRONTEND_URL: `https://${folderName}.localhost:3000`,
       API_URL: `https://api-${folderName}.localhost:8080`,
       PROJECT_NAME: projectName,
-      BEAD_ID: workspaceBeadId,
     };
 
     const claudeMd = generateClaudeMdSync(variables);
@@ -424,15 +414,6 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
       }
       console.log('');
     }
-
-    console.log(chalk.bold('Beads:'));
-    if (beadsResult.success && workspaceBeadId) {
-      console.log(`  Status:  ${chalk.green('Initialized fresh')}`);
-      console.log(`  Task:    ${chalk.cyan(workspaceBeadId)}`);
-    } else {
-      console.log(`  Status:  ${chalk.yellow('Not initialized')} - ${beadsResult.error || 'unknown error'}`);
-    }
-    console.log('');
 
     if (options.docker) {
       console.log(chalk.bold('Docker:'));

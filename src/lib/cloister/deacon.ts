@@ -154,8 +154,9 @@ import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, res
 import { tryYieldForAdvancingDispatch } from './preemption.js';
 import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
-import { readIssueRecordSync, ensureIssueRecordSync, writeIssueRecordSync } from '../pan-dir/record.js';
-import { queryBeadsForIssue } from '../beads-query.js';
+import { readIssueRecordSync } from '../pan-dir/record.js';
+import { updateIssueRecord } from '../pan-dir/record-update.js';
+import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
@@ -1183,9 +1184,9 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         const workspacePath = findWorkspacePath(resolved.projectPath, issueLower);
         if (!workspacePath || !existsSync(workspacePath)) continue;
 
-        const beadResult = await Effect.runPromise(queryBeadsForIssue(workspacePath, issueId));
-        if (beadResult.transientFailure || beadResult.beads.length === 0) continue;
-        if (beadResult.beads.some((bead) => bead.status !== 'closed')) continue;
+        const plan = readWorkspacePlanSync(workspacePath);
+        if (!plan || plan.plan.items.length === 0) continue;
+        if (plan.plan.items.some((item) => !['completed', 'cancelled'].includes(item.status))) continue;
 
         const { stdout } = await execAsync(
           `gh pr list --head feature/${issueLower} --state open --json url --jq '.[0].url'`,
@@ -1197,10 +1198,8 @@ export async function checkOrphanedCompletions(): Promise<string[]> {
         setReviewStatusSync(issueId, { reviewRequestedAt: now, prUrl });
         // Serialize with setReviewStatusSync's fire-and-forget journal rebuild so
         // the panDoneRecoveredAt tombstone is written after (and on top of) it.
-        await withIssueRecordLock(issueId, async () => {
-          const nextRecord = ensureIssueRecordSync(project, issueId);
-          nextRecord.pipeline.panDoneRecoveredAt = now;
-          writeIssueRecordSync(project, issueId, nextRecord);
+        await updateIssueRecord(project, issueId, (nextRecord) => {
+          Object.assign(nextRecord.pipeline, { reviewRequestedAt: now, prUrl, panDoneRecoveredAt: now });
         });
 
         const action = `checkOrphanedCompletions: recovered ${issueId} (PR open but review never dispatched)`;
@@ -1924,7 +1923,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
       const autoRequeueCount = status.autoRequeueCount || 0;
       if (autoRequeueCount >= 25) {
         console.log(`[deacon] Dead-end detected for ${key} but circuit breaker active (${autoRequeueCount}/25 requeues used)`);
-        const trip = recordDeadEndNeedsYou(key, 'dead-end-rebuild', status.updatedAt ?? 'rework', `Dead-end recovery needs-you: ${key} exhausted 25 requeues`);
+        const trip = await recordDeadEndNeedsYou(key, 'dead-end-rebuild', status.updatedAt ?? 'rework', `Dead-end recovery needs-you: ${key} exhausted 25 requeues`);
         if (trip) actions.push(trip);
         continue;
       }
@@ -1968,7 +1967,7 @@ export async function checkDeadEndAgents(): Promise<string[]> {
           const gateDecision = decideAgentAutonomousRedrive(agentState ?? {}, getAgentDir(agentSessionName), true);
           if (gateDecision.decision === 'defer') {
             console.log(`[deacon] PAN-2209: ${issueId} (${statusType}) re-drive deferred — ${gateDecision.reason}`);
-            const trip = gateDecision.needsYou && recordDeadEndNeedsYou(issueId, 'operator-stopped-rework', status.updatedAt ?? statusType, `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`);
+            const trip = gateDecision.needsYou && await recordDeadEndNeedsYou(issueId, 'operator-stopped-rework', status.updatedAt ?? statusType, `Dead-end recovery needs-you: ${issueId} was explicitly stopped before handoff`);
             if (trip) actions.push(trip);
           } else {
             if (gateDecision.gateDecision.clearStoppedByUser && agentState) { delete agentState.stoppedByUser; saveAgentStateSync(agentState); }
@@ -2078,10 +2077,10 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         const nudgeMessage = status.reviewStatus === 'failed'
           ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .pan/spec.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : isReviewBlocked
-            ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
+            ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`
             : isVerificationFailed
-              ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". Do NOT stop until pan review request completes successfully.`
-              : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
+              ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`
+              : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`;
 
         await Effect.runPromise(sendKeys(agentSessionName, nudgeMessage));
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
@@ -2755,6 +2754,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
 
+  for (const a of await (await import('./stale-task-claims.js')).patrolStaleTaskClaims()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   const stuckRemediationActions = await checkStuckAgentRemediation();
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);

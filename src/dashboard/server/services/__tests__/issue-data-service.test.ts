@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { computeBeadCounts, IssueDataService, shouldRefreshPlanningStateForIssue } from '../issue-data-service.js';
+import { computeTaskCounts, IssueDataService, shouldRefreshPlanningStateForIssue } from '../issue-data-service.js';
 import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
 import { mergeConfigs } from '../../../../lib/config-yaml.js';
 
-describe('computeBeadCounts', () => {
+describe('computeTaskCounts', () => {
   function makeDoc(items: Array<{ status: string }>): VBriefDocument {
     return {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
@@ -26,22 +26,22 @@ describe('computeBeadCounts', () => {
       status: i < 7 ? 'completed' : 'pending',
     }));
     const doc = makeDoc(items);
-    expect(computeBeadCounts(doc)).toEqual({ completed: 7, total: 12 });
+    expect(computeTaskCounts(doc)).toEqual({ completed: 7, total: 12 });
   });
 
   it('returns 0 completed for a plan with 0 of 5', () => {
     const items = Array.from({ length: 5 }, () => ({ status: 'pending' }));
     const doc = makeDoc(items);
-    expect(computeBeadCounts(doc)).toEqual({ completed: 0, total: 5 });
+    expect(computeTaskCounts(doc)).toEqual({ completed: 0, total: 5 });
   });
 
   it('returns null when the plan has no items', () => {
     const doc = makeDoc([]);
-    expect(computeBeadCounts(doc)).toBeNull();
+    expect(computeTaskCounts(doc)).toBeNull();
   });
 
   it('returns null when the document is null', () => {
-    expect(computeBeadCounts(null)).toBeNull();
+    expect(computeTaskCounts(null)).toBeNull();
   });
 
   it('returns null when the document has no plan', () => {
@@ -49,7 +49,7 @@ describe('computeBeadCounts', () => {
       vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
       plan: { id: 'plan-1', title: 'Test', status: 'active', items: [], edges: [] },
     } as VBriefDocument;
-    expect(computeBeadCounts(doc)).toBeNull();
+    expect(computeTaskCounts(doc)).toBeNull();
   });
 });
 

@@ -765,7 +765,7 @@ function clearFlywheelRunGate(runId: string): void {
 }
 
 // Stop the orchestrator, write the report, commit state changes, and clear the gate.
-export async function flywheelStopCommand(): Promise<void> {
+export async function flywheelStopCommand(options: Pick<ReportOptions, 'cwd'> = {}): Promise<void> {
   try {
     const sessionAlive = await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
     if (sessionAlive) {
@@ -779,8 +779,11 @@ export async function flywheelStopCommand(): Promise<void> {
     }
 
     // The orchestrator has already been stopped, so force the report path to
-    // bypass its alive-session guard and finalize the run.
-    await flywheelReportCommand({ force: true });
+    // bypass its alive-session guard and finalize the run. Thread cwd through
+    // explicitly — the report path commits docs/FLYWHEEL-STATE.md in its cwd,
+    // and an implicit process.cwd() here has committed into the wrong repo
+    // when invoked from tests or another checkout (PAN-2658).
+    await flywheelReportCommand({ force: true, cwd: options.cwd });
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

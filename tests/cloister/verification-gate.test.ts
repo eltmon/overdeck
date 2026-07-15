@@ -24,7 +24,11 @@ vi.mock('child_process', () => {
       .catch((err: any) => callback(err, err.stdout || '', err.stderr || ''));
   }
 
-  (exec as any)[kCustom] = execMock;
+  (exec as any)[kCustom] = (cmd: string, options?: any) => {
+    const promise = execMock(cmd, options) as ReturnType<typeof execMock> & { child?: { pid: number } };
+    promise.child = { pid: 12345 };
+    return promise;
+  };
 
   return { exec, execFile: vi.fn() };
 });

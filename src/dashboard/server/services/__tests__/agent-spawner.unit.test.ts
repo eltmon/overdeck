@@ -55,6 +55,11 @@ const mockResolveProjectFromIssue = vi.fn().mockReturnValue({ path: '/projects/m
 vi.mock('../../../../lib/projects.js', () => ({
   resolveProjectFromIssue: mockResolveProjectFromIssue,
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
+  findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+}));
+
+vi.mock('../../../../lib/vbrief/io.js', () => ({
+  readWorkspacePlanSync: vi.fn().mockReturnValue({ plan: { items: [{ id: 'item-1' }] } }),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

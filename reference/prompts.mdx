@@ -73,7 +73,7 @@ generating prompts for an LLM, not HTML — but everything else is vanilla
 Mustache with its usual section syntax.
 
 Any non-trivial composition — choosing between two instruction variants,
-joining an array of file paths, formatting a table of beads — happens in
+joining an array of file paths, formatting a table of tasks — happens in
 TypeScript. The TypeScript builds a string, then passes that string to the
 template as a single variable. This keeps templates readable and keeps
 business logic in a place where `tsc` and your tests can see it.
@@ -193,7 +193,7 @@ loader enforces this structure — a missing or malformed block throws
 ```markdown
 ---
 name: work
-description: Work-agent prompt — implementation-phase instructions, per-bead workflow, finalization steps.
+description: Work-agent prompt — implementation-phase instructions, per-task workflow, finalization steps.
 requires:
   - ISSUE_ID
   - ISSUE_TITLE
@@ -322,13 +322,13 @@ The ten templates currently under `src/lib/cloister/prompts/`, grouped by the ro
 
 ### Work agent templates
 
-Templates that drive the **work agent** — the specialist that actually writes code against beads tasks.
+Templates that drive the **work agent** — the specialist that implements vBRIEF checklist items.
 
 | Template | Used by | Purpose |
 |----------|---------|---------|
-| `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: per-bead loop, commit + update STATE.md + `bd close`, quality gates, finalization. |
-| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent via `claude --resume` when a work agent is woken up from a stopped session. Includes STATE.md snapshot, open beads, pending feedback, and next-step instructions. |
-| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps a serialized `HandoffContext` (git state, beads, STATE.md, AI summaries) with a preamble explaining who took over and why. |
+| `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: per-task loop, commit + update STATE.md + `pan task close`, quality gates, finalization. |
+| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent via `claude --resume` when a work agent is woken up from a stopped session. Includes STATE.md snapshot, open tasks, pending feedback, and next-step instructions. |
+| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps a serialized `HandoffContext` (git state, tasks, STATE.md, AI summaries) with a preamble explaining who took over and why. |
 
 ### Planning agent templates
 
@@ -363,7 +363,7 @@ Templates still on the **pre-loader ad-hoc pattern**. They work, but new edits s
 
 | Template | Used by | Purpose |
 |----------|---------|---------|
-| `inspect-agent.md` | Inspect specialist (`buildInspectPrompt`) | Per-bead spec verification mid-implementation. Still uses the legacy `readFileSync` + `String.replace` path. |
+| `inspect-agent.md` | Inspect specialist (`buildInspectPrompt`) | Per-task spec verification mid-implementation. Still uses the legacy `readFileSync` + `String.replace` path. |
 
 ### Deleted (replaced by the loader)
 

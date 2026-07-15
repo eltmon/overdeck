@@ -99,18 +99,18 @@ const ROLES: RoleDefinition[] = [
     id: 'plan',
     name: 'Plan',
     icon: DraftingCompass,
-    description: 'Researches the issue, writes the vBRIEF, and creates beads.',
+    description: 'Researches the issue, writes the vBRIEF, and creates tasks.',
     defaultModel: 'workhorse:expensive',
   },
   {
     id: 'work',
     name: 'Work',
     icon: Code,
-    description: 'Implements beads in the issue workspace.',
+    description: 'Implements tasks in the issue workspace.',
     defaultModel: 'workhorse:mid',
     subRoles: [
-      { id: 'inspect', name: 'Inspect', description: 'Fast per-bead inspection.', defaultModel: 'workhorse:cheap' },
-      { id: 'inspect-deep', name: 'Inspect Deep', description: 'Deeper inspection for complex bead diffs.', defaultModel: 'workhorse:mid' },
+      { id: 'inspect', name: 'Inspect', description: 'Fast per-task inspection.', defaultModel: 'workhorse:cheap' },
+      { id: 'inspect-deep', name: 'Inspect Deep', description: 'Deeper inspection for complex task diffs.', defaultModel: 'workhorse:mid' },
     ],
   },
   {

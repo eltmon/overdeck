@@ -2,7 +2,6 @@ import { join } from 'node:path';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import type { Issue, IssueState, TrackerType } from '../tracker/interface.js';
 import { getReviewStatusSync } from '../review-status.js';
-import { createBeadsResolver } from '../beads/resolver.js';
 import { parseSequenceMd } from './sequence-io.js';
 import type { SequenceDoc } from './types.js';
 
@@ -125,22 +124,11 @@ export async function collectOpenBacklog(
   const specsDir = join(projectRoot, '.pan', 'specs');
   const workspacesDir = join(projectRoot, 'workspaces');
   const issuesWithSpecs = new Set<string>();
-  const issuesWithBeads = new Set<string>();
   if (!opts?.hasSpecFn) {
     if (existsSync(specsDir)) {
       for (const f of readdirSync(specsDir)) {
         const match = /^[\d-]+-([A-Z]+-\d+)-/i.exec(f);
         if (match) issuesWithSpecs.add(match[1]!.toUpperCase());
-      }
-    }
-    if (existsSync(workspacesDir)) {
-      for (const dir of readdirSync(workspacesDir)) {
-        const match = /^feature-([a-z]+-\d+)$/i.exec(dir);
-        if (match) {
-          const issueId = match[1]!.toUpperCase();
-          const result = await createBeadsResolver(join(workspacesDir, dir)).issueHasBeads(issueId);
-          if (result.ok && result.value) issuesWithBeads.add(issueId);
-        }
       }
     }
   }
@@ -157,8 +145,7 @@ export async function collectOpenBacklog(
 
     const ready = opts?.hasSpecFn
       ? opts.hasSpecFn(issue.ref)
-      : (issuesWithSpecs.has(issue.ref.toUpperCase()) &&
-         issuesWithBeads.has(issue.ref.toUpperCase()));
+      : issuesWithSpecs.has(issue.ref.toUpperCase());
 
     const createdMs = issue.createdAt ? new Date(issue.createdAt).getTime() : now;
 

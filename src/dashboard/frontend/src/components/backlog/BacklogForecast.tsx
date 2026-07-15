@@ -179,7 +179,7 @@ export function BacklogForecast({ className, n = 5, onSelectIssue }: { className
           ))}
           {data.waves.length === 0 && (
             <div className="bkf-emptywaves">
-              No auto-pickable work. An issue must be <b>Ready</b> (marked workable), <b>Planned</b> (has a spec + beads),
+              No auto-pickable work. An issue must be <b>Ready</b> (marked workable), <b>Planned</b> (has a spec + tasks),
               <b>and Released</b> (operator reviewed the plan and released it for pickup — PAN-2059) to enter a wave.
               Plan the ones in <b>Needs planning</b>, then <b>Release</b> the ones in <b>Needs release</b>.
             </div>

@@ -12,7 +12,6 @@ import { registerCloisterCommands } from '../cloister/index.js';
 import { registerSpecialistsCommands } from '../specialists/index.js';
 import { registerRemoteCommands } from '../remote/index.js';
 import { registerDbCommands } from '../db.js';
-import { registerBeadsCommands } from '../beads.js';
 import { registerConfigCommand } from '../config.js';
 import { hooksStatusCommand, parseHookHarness, setupHooksCommand } from '../setup/hooks.js';
 import { tldrCommand } from './tldr-handler.js';
@@ -43,11 +42,9 @@ export function registerAdminCommands(program: Command): void {
   // pan admin db — database seeding
   registerDbCommands(admin);
 
-  // pan beads — canonical beads mutation door (top level: the work-agent
-  // prompts instruct `pan beads close|claim|...`; PAN-2564 FR-9/WI-13).
+  // pan task — canonical beads mutation door (top level: the work-agent
+  // prompts instruct `pan task close|claim|...`; PAN-2564 FR-9/WI-13).
   // Also kept under pan admin beads for the reconcile/migration-gate docs.
-  registerBeadsCommands(program);
-  registerBeadsCommands(admin);
 
   // pan admin config — configuration management
   registerConfigCommand(admin);

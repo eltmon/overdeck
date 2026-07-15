@@ -15,6 +15,7 @@ import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import {
   getAgentDir,
+  getLatestSessionIdSync,
   normalizeAgentId,
   type AgentRuntimeState,
   type AgentState,
@@ -314,7 +315,11 @@ function buildStoppedAgentLifecycle(
   const agentId = normalizeAgentId(agentOrIssueId);
   const hasAgentState = true;
   const hasLiveTmuxSession = false;
-  const hasSavedSession = !!runtimeData.claudeSessionId;
+  // claudeSessionId only covers claude-code agents — codex agents keep their
+  // resumable thread in codex-thread-id, which getLatestSessionIdSync resolves
+  // (PAN-1988). Without the fallback the listing reports canResumeSession=false
+  // for every stopped codex agent and the UI never offers Resume.
+  const hasSavedSession = !!runtimeData.claudeSessionId || !!getLatestSessionIdSync(agentId);
   const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
   const agentStatus = state.status || 'unknown';
   const runtime = runtimeData.state || 'uninitialized';

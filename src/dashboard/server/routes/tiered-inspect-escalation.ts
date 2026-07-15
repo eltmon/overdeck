@@ -50,21 +50,21 @@ export function handleTieredInspectFailureEscalation(
   const doc = readPlan(workspacePath);
   if (!resolveTieredExecutionEnabled(tiered, doc?.plan.metadata)) return null;
 
-  const beadId = notes?.match(/[Bb]ead\s+(\S+)/)?.[1];
-  if (!doc || !beadId) return null;
-  const item = doc.plan.items.find(candidate => candidate.id === beadId);
+  const taskId = notes?.match(/[Bb]ead\s+(\S+)/)?.[1];
+  if (!doc || !taskId) return null;
+  const item = doc.plan.items.find(candidate => candidate.id === taskId);
   if (!item) return null;
 
   const overrides = readOverrides(workspacePath);
   const decision = decide({
     kind: 'supervisor-blocked',
-    beadId,
+    taskId,
     sha: getReviewStatusSync(issueId)?.reviewedAtCommit ?? 'unknown',
     attemptsAtCurrentTier: tiered.escalation.retries_at_tier,
   }, item, tiered.escalation, overrides);
 
   if (decision.action === 'promote') {
-    recordPromotion(workspacePath, beadId, decision.from, decision.to, decision.reason);
+    recordPromotion(workspacePath, taskId, decision.from, decision.to, decision.reason);
   }
 
   return decision;

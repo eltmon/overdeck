@@ -207,13 +207,13 @@ workspaces/feature-min-123/
 
 When the planning session completes, the AI generates:
 - **STATE.md** - Current understanding, decisions made, and implementation plan
-- **Beads tasks** - Trackable sub-tasks with dependencies for the implementation
+- **vBRIEF tasks** - Trackable plan items with dependencies for the implementation
 - **Feature PRD** - Copied to `docs/prds/active/{issue}-plan.md` for documentation
 
 **What works:**
-1. **Context recovery** - If Claude's context compacts, STATE.md and beads preserve the planning decisions
+1. **Context recovery** - If an agent's context compacts, the vBRIEF and durable issue record preserve the planning decisions
 2. **Audit trail** - See decisions made in STATE.md
-3. **Beads tasks** - Sub-tasks created during planning ARE persisted (beads uses label-based isolation)
+3. **vBRIEF tasks** - Plan items and their status overlays are persisted through the canonical task writer
 
 ## Safeguards
 

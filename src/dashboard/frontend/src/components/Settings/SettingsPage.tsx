@@ -19,6 +19,7 @@ import { ConversationSettingsSection } from './sections/ConversationSettingsSect
 import { ProviderManagementSection } from './sections/ProviderManagementSection';
 import { PermissionsSection } from './sections/PermissionsSection';
 import { TieredExecutionSection } from './sections/TieredExecutionSection';
+import { SwarmSettingsSection } from './sections/SwarmSettingsSection';
 import { CloisterSection } from './sections/CloisterSection';
 import { RemoteSection } from './sections/RemoteSection';
 import { MemorySection } from './sections/MemorySection';
@@ -551,6 +552,7 @@ export function SettingsPage() {
         saveStatus={saveStatus}
         onSettingsChange={applySettings}
       />
+      <SwarmSettingsSection formData={formData} onSettingsChange={applySettings} />
 
       <CloisterSection
         cloisterConfigError={cloisterConfigError}

@@ -119,18 +119,6 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
     },
   },
   {
-    id: 'bd',
-    name: 'beads',
-    required: false,
-    purpose: 'Git-backed issue tracking used by the work pipeline',
-    versionArgs: ['--version'],
-    install: {
-      linux: 'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash',
-      mac: 'brew install gastownhall/beads/bd',
-      win: 'Use WSL2 — inside your distro, run the beads install script',
-    },
-  },
-  {
     id: 'bun',
     name: 'Bun',
     required: false,

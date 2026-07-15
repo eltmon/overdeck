@@ -685,6 +685,7 @@ export async function configureWorkspaceForBot(
   const { exec } = await import('child_process');
   const { promisify } = await import('util');
   const { writeFileSync } = await import('fs');
+  const { resolve } = await import('path');
   const execAsync = promisify(exec);
   const { name, email } = getBotIdentity();
 
@@ -695,7 +696,9 @@ export async function configureWorkspaceForBot(
   // Use git credential store with a workspace-local credential file.
   // Token is refreshed at workspace creation (~1hr TTL). For long sessions,
   // call refreshWorkspaceToken() to get a fresh one.
-  const credFile = join(workspacePath, '.git', 'pan-credentials');
+  const { stdout: gitDirOutput } = await execAsync('git rev-parse --git-dir', { cwd: workspacePath, encoding: 'utf-8' });
+  const gitDir = resolve(workspacePath, gitDirOutput.trim());
+  const credFile = join(gitDir, 'pan-credentials');
   writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
 
   // Set remote to HTTPS and configure credential store

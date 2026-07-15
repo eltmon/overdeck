@@ -253,7 +253,7 @@ describe('FleetAgentsView', () => {
     expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-reopen')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-syncMain')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-inspectBead')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-inspectTask')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
   });

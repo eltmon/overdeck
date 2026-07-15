@@ -2,11 +2,10 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getReviewStatusSync } from '../review-status.js';
 import type { ClassifyLookups } from './pickup.js';
-import { createBeadsResolver } from '../beads/resolver.js';
 
 /**
  * Build the {@link ClassifyLookups} the shared pickup module needs from live project
- * state: labels (in-memory issue service), planned (vBRIEF spec + beads), and
+ * state: labels (in-memory issue service), planned (readable vBRIEF spec), and
  * in-pipeline (review status / live workspace). Shared by the dashboard forecast
  * route and the Flywheel run-cohort snapshot so both classify issues identically
  * (PAN-2006 single source of truth). The issue service is lazy-required to avoid a
@@ -14,7 +13,7 @@ import { createBeadsResolver } from '../beads/resolver.js';
  */
 export function buildClassifyLookups(
   projectRoot: string,
-  opts?: { labels?: (id: string) => readonly string[]; issuesWithBeads?: ReadonlySet<string> },
+  opts: { labels?: (id: string) => readonly string[] } = {},
 ): ClassifyLookups {
   // Labels come from the in-memory issue service (server-side). A CLI/sandbox process cannot
   // reach that singleton, so callers there must pass `opts.labels` (e.g. gh-derived) — without
@@ -46,27 +45,11 @@ export function buildClassifyLookups(
     }
   }
   const workspacesDir = join(projectRoot, 'workspaces');
-  // Server callers MUST pass opts.issuesWithBeads (computed async from one bulk
-  // resolver read): the sync fallback below runs execFileSync('bd') once per
-  // workspace (~2s each × ~30 dirs) and BLOCKS the event loop for a minute —
-  // acceptable only in CLI/sandbox processes that cannot share the async path.
-  const beadsIssues = new Set<string>(opts?.issuesWithBeads ?? []);
-  if (!opts?.issuesWithBeads && existsSync(workspacesDir)) {
-    for (const dir of readdirSync(workspacesDir)) {
-      const m = /^feature-([a-z]+-\d+)$/i.exec(dir);
-      if (m) {
-        const issueId = m[1]!.toUpperCase();
-        const result = createBeadsResolver(join(workspacesDir, dir)).getBeadsForIssueSync(issueId);
-        if (result.ok && result.value.length > 0) beadsIssues.add(issueId);
-      }
-    }
-  }
-
   return {
     labels: opts?.labels ?? ((id) => labelsByIssue.get(id.toUpperCase()) ?? []),
     isPlanned: (id) => {
       const u = id.toUpperCase();
-      return specIssues.has(u) && beadsIssues.has(u);
+      return specIssues.has(u);
     },
     isInPipeline: (id) => {
       const u = id.toUpperCase();

@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
 import inquirer from 'inquirer';
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync, readFileSync, copyFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -18,11 +18,10 @@ import {
 } from '../../lib/paths.js';
 import { getDefaultConfigSync, saveConfigSync, loadConfigSync } from '../../lib/config.js';
 import { Effect } from 'effect';
-import { MINIMUM_BD_VERSION, isSupportedBdVersion, readInstalledBdVersionSync } from '../../lib/beads/version.js';
 import { detectPlatform } from '../../lib/platform.js';
 import { detectDnsSyncMethod, ensureBaseDomain, syncDnsToWindows } from '../../lib/dns.js';
 import { generateOverdeckTraefikConfigSync, cleanupTemplateFilesSync, ensureProjectCertsSync, generateTlsConfigSync } from '../../lib/traefik.js';
-import { refreshCacheSync } from '../../lib/sync.js';
+import { refreshCacheSync, syncStatuslineSync } from '../../lib/sync.js';
 import { ensureGlobalLayer } from '../../lib/context-layers/index.js';
 import { setupHooksCommand } from './setup/hooks.js';
 import { installTtsDaemonDependencies } from '../../lib/tts-daemon.js';
@@ -35,7 +34,6 @@ export function registerInstallCommand(program: Command): void {
     .option('--minimal', 'Skip Traefik and mkcert (use port-based routing)')
     .option('--skip-mkcert', 'Skip mkcert/HTTPS setup')
     .option('--skip-docker', 'Skip Docker network setup')
-    .option('--skip-beads', 'Skip beads CLI installation')
     .option('--skip-moonshine', 'Skip Moonshine voice sidecar build (AutoPreso + Voice STT will not work without it)')
     .option('--skip-tts-daemon', 'Skip Qwen TTS daemon venv install (CUDA torch download is large)')
     .action(installCommand);
@@ -46,7 +44,6 @@ interface InstallOptions {
   minimal?: boolean;
   skipMkcert?: boolean;
   skipDocker?: boolean;
-  skipBeads?: boolean;
   skipMoonshine?: boolean;
   skipTtsDaemon?: boolean;
 }
@@ -149,18 +146,6 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     fix: 'Download from https://github.com/FiloSottile/mkcert/releases',
   });
 
-  // Beads CLI (optional - will be auto-installed)
-  const beadsVersion = readInstalledBdVersionSync();
-  const hasBeads = beadsVersion !== null;
-  results.push({
-    name: 'Beads CLI (bd)',
-    passed: hasBeads && isSupportedBdVersion(beadsVersion),
-    message: hasBeads
-      ? isSupportedBdVersion(beadsVersion) ? `v${beadsVersion}` : `v${beadsVersion} is below required v${MINIMUM_BD_VERSION}`
-      : 'not found (will auto-install)',
-    fix: 'curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash',
-  });
-
   // jq (JSON processor — used by statusline, beads, merge-agent, review-agent, dashboard)
   const hasJq = checkCommand('jq');
   results.push({
@@ -192,7 +177,7 @@ function checkPrerequisites(): { results: PrereqResult[]; allPassed: boolean } {
     results,
     // These are auto-installed later or optional. jq must not block before
     // setupHooksCommand gets the chance to install it.
-    allPassed: results.filter((r) => !['mkcert', 'ttyd', 'Beads CLI (bd)', 'jq'].includes(r.name)).every((r) => r.passed),
+    allPassed: results.filter((r) => !['mkcert', 'ttyd', 'jq'].includes(r.name)).every((r) => r.passed),
   };
 }
 
@@ -263,6 +248,19 @@ async function installCommand(options: InstallOptions): Promise<void> {
   }
 
   await setupHooksCommand();
+
+  // Claude Code reads statusLine from ~/.claude/settings.json at conversation
+  // launch. Provision it during install as well as sync so a first conversation
+  // immediately shows model, context-window, cost, and subscription usage.
+  spinner.start('Installing Claude Code statusline...');
+  const statusline = syncStatuslineSync();
+  if (statusline.errors.length > 0) {
+    spinner.warn(`Claude Code statusline installation had errors: ${statusline.errors.join('; ')}`);
+  } else if (statusline.synced.includes('claude')) {
+    spinner.succeed('Claude Code statusline installed (context and usage limits enabled)');
+  } else {
+    spinner.warn('Claude Code statusline source was unavailable; run pan sync after installation');
+  }
 
   // Step 3: Docker network
   if (!options.skipDocker) {
@@ -404,76 +402,6 @@ async function installCommand(options: InstallOptions): Promise<void> {
     }
   } else {
     spinner.info('ast-grep already installed');
-  }
-
-  // Step 5b: Install beads CLI (git-backed issue tracker)
-  if (options.skipBeads) {
-    spinner.info('Skipping beads installation (--skip-beads)');
-  } else {
-    const hasBeadsNow = checkCommand('bd');
-    if (!hasBeadsNow) {
-    spinner.start('Installing beads CLI (bd)...');
-    try {
-      const plat = await Effect.runPromise(detectPlatform());
-      if (plat === 'darwin') {
-        // macOS - try homebrew
-        try {
-          execSync('brew install gastownhall/beads/bd', { stdio: 'pipe', timeout: 120000 });
-          spinner.succeed('beads installed via Homebrew');
-        } catch {
-          // Fall back to curl script
-          try {
-            execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
-              stdio: 'pipe',
-              timeout: 120000,
-            });
-            spinner.succeed('beads installed via install script');
-          } catch {
-            spinner.warn('beads installation failed - install manually: brew install gastownhall/beads/bd');
-          }
-        }
-      } else {
-        // Linux/WSL - use install script
-        try {
-          execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
-            stdio: 'pipe',
-            timeout: 120000,
-          });
-          spinner.succeed('beads installed via install script');
-        } catch (error) {
-          spinner.warn('beads installation failed - install manually: curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash');
-        }
-      }
-    } catch (error) {
-      spinner.warn('beads installation failed (workspace beads tracking will not work)');
-    }
-  } else {
-    // Check if upgrade is needed
-    try {
-      const currentVersion = readInstalledBdVersionSync();
-      if (currentVersion) {
-        if (!isSupportedBdVersion(currentVersion)) {
-          spinner.start(`Upgrading beads from v${currentVersion} to v${MINIMUM_BD_VERSION}+...`);
-          const plat = await Effect.runPromise(detectPlatform());
-          if (plat === 'darwin') {
-            execSync('brew upgrade gastownhall/beads/bd', { stdio: 'pipe', timeout: 120000 });
-          } else {
-            execSync('curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash', {
-              stdio: 'pipe',
-              timeout: 120000,
-            });
-          }
-          spinner.succeed('beads upgraded');
-        } else {
-          spinner.info(`beads v${currentVersion} installed`);
-        }
-      } else {
-        spinner.info('beads already installed');
-      }
-    } catch (error) {
-      spinner.warn('beads version check or upgrade failed - install manually: curl -sSL https://raw.githubusercontent.com/gastownhall/beads/main/scripts/install.sh | bash');
-    }
-    }
   }
 
   // Step 5d: Build Moonshine voice sidecar (AutoPreso + Voice STT)
@@ -687,9 +615,6 @@ async function installCommand(options: InstallOptions): Promise<void> {
     console.log(`  2. Access dashboard at ${chalk.cyan(`http://localhost:${config.dashboard.port}`)}`);
   }
 
-  console.log(`  4. In each project root, initialize beads task tracking:`);
-  console.log(`     ${chalk.cyan('cd /path/to/your-project && pan sync')}`);
-  console.log(`     ${chalk.dim('pan sync bootstraps the registered project canonical beads home')}`);
-  console.log(`  5. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
+  console.log(`  4. Create a workspace with ${chalk.cyan('pan workspace create <issue-id>')}`);
   console.log('');
 }

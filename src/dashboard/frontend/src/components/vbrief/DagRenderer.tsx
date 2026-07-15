@@ -18,7 +18,7 @@ import { useMemo } from 'react';
 
 export interface DagNode {
   id: string;
-  /** Plain-language title (bead title), NOT the bead id. */
+  /** Plain-language title (task title), NOT the task id. */
   title: string;
   /** Who is/was on it — model or tier name, shown small. */
   assignee?: string;

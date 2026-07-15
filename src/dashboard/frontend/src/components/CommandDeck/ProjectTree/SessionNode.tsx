@@ -16,6 +16,7 @@ import {
   ClipboardList,
   Layers,
   Archive,
+  ListChecks,
   Loader2,
   Terminal,
   FileText,
@@ -206,6 +207,7 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   work: Code2,
   knowledge: BookOpenCheck,
   strike: Zap,
+  lint: ListChecks,
   planning: Compass,
   review: Eye,
   test: FlaskConical,
@@ -269,6 +271,7 @@ function deriveSessionLabel(session: SessionNodeType, _resolvedModel?: string | 
     case 'ship': return 'Ship';
     case 'merge': return 'Merge';
     case 'test': return 'Test';
+    case 'lint': return 'Test/Lint';
     case 'review': return 'Review';
     case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
     case 'work': return 'Work';
@@ -303,6 +306,8 @@ function describeSessionPurpose(session: SessionNodeType): string {
         : 'Specialist reviewer in the review pipeline.';
     case 'test':
       return 'Verification and test session for this issue.';
+    case 'lint':
+      return 'Quality-gate run (install/typecheck/lint/test) that gates review dispatch.';
     case 'ship':
       return 'Ship agent — rebases, verifies, and pushes the branch for merge.';
     case 'merge':
@@ -694,9 +699,9 @@ export function SessionNode({
   const durationLabel = isLive ? formatDuration(session.duration) : null;
 
   const restartLabel = session.type === 'review'
-    ? 'Restart review'
+    ? 'Re-run review on latest commit'
     : session.type === 'reviewer'
-      ? 'Restart review'
+      ? 'Re-run review on latest commit'
       : !isLive ? 'Start' : undefined;
 
   return (
