@@ -37,17 +37,17 @@
     "recordedAt": "2026-07-15T09:57:51.722Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:57:55.820Z",
+  "updated": "2026-07-15T09:58:52.105Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T09:57:55.767Z",
+    "updatedAt": "2026-07-15T09:58:52.047Z",
     "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2693"
   },
@@ -62,9 +62,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 27749680,
-            "output": 19189,
-            "cacheRead": 27450624,
+            "input": 28302696,
+            "output": 19335,
+            "cacheRead": 28001792,
             "cacheWrite": 0
           }
         },
@@ -93,9 +93,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 27749680,
-          "output": 19189,
-          "cacheRead": 27450624,
+          "input": 28302696,
+          "output": 19335,
+          "cacheRead": 28001792,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -112,8 +112,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 22.493209,
-        "pricingAsOf": "2026-07-15T09:57:55.813Z"
+        "usd": 22.782413000000002,
+        "pricingAsOf": "2026-07-15T09:58:52.098Z"
       }
     },
     "merges": [
