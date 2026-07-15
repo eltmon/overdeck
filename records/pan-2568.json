@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:38:37.000Z",
+  "updated": "2026-07-15T15:38:40.418Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -128,7 +128,7 @@
   "statusOverrides": {
     "injection-budget": "completed",
     "size-scaled-waits": "completed",
-    "full-length-purge": "pending",
+    "full-length-purge": "running",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
     "size-scaled-waits.size-scaled-waits.ac2": "completed",
     "size-scaled-waits.size-scaled-waits.ac3": "completed",
@@ -164,8 +164,16 @@
     }
   },
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "full-length-purge": {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 2310969,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:38:40.418Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
