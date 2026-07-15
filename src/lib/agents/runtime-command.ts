@@ -633,12 +633,12 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   }
 
   // tools: allow-list → --allowedTools (comma-joined single arg so the variadic
-  // never swallows later flags). Append `mcp__<server>` for each declared MCP
-  // server so its tools survive the strict allow-list.
+  // never swallows later flags). Append `mcp__<server>__*` for each declared
+  // MCP server so all of its namespaced tools survive the strict allow-list.
   if (Array.isArray(frontmatter.tools)) {
     const toolNames = frontmatter.tools.filter((t): t is string => typeof t === 'string');
     if (toolNames.length > 0) {
-      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}`)];
+      const allowed = [...toolNames, ...mcpNames.map((n) => `mcp__${n}__*`)];
       flags.push(` --allowedTools '${allowed.join(',')}'`);
     }
   }
