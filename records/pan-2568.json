@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:32:48.198Z",
+  "updated": "2026-07-15T15:32:51.191Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -100,7 +100,7 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "statusOverrides": {
-    "injection-budget": "pending",
+    "injection-budget": "running",
     "size-scaled-waits": "completed",
     "full-length-purge": "running",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
@@ -131,8 +131,16 @@
     }
   },
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "injection-budget": {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 2195583,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:32:51.190Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
