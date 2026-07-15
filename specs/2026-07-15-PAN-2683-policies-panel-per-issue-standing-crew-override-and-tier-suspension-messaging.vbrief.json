@@ -1,0 +1,413 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-15T06:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2683: feat(dashboard): Policies panel — add per-issue tiered-execution override and tier-suspension messaging (PAN-2681 follow-up)",
+    "updated": "2026-07-15T06:37:14.973Z"
+  },
+  "plan": {
+    "id": "pan-2683",
+    "title": "Policies panel — per-issue Standing-crew override and tier-suspension messaging",
+    "status": "proposed",
+    "uid": "87362650-8357-4de6-a29a-c31898930608",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-15T06:40:00.000Z",
+    "updated": "2026-07-15T06:37:14.973Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2683",
+        "label": "PAN-2683",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2683.md",
+        "label": "PRD rev 2",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2681",
+        "label": "PAN-2681 (Policies popover, merged #2682)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2684",
+        "label": "PAN-2684 (crews settings redesign, parallel)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "policies-panel",
+      "tiered-execution",
+      "standing-crew"
+    ],
+    "narratives": {
+      "Problem": "The per-issue Standing-crew (tiered-execution) override has no live UI: its old control sits in PlanCard.tsx inside IssueCockpitBody.tsx, which is mounted nowhere. Separately, when tiered execution is effective and a per-issue work-model override is set, the whole tier table is suspended for that issue (resolveStaffing returns the issue-override pseudo-tier), but the Policies panel and chips give no hint of that consequence. Finally, the strip's staffing GET resolves tiered state without plan metadata, so plan-level tiered_execution overrides are invisible to the UI.",
+      "Proposal": "One additive backend change (D-R): a pure resolveTieredExecutionBlock helper in tier-table.ts feeding a new tieredExecution: { effective, source, override } block on GET /api/issues/:issueId/staffing, with plan metadata loaded via findSpecByIssue and resolved.tiered set to block.effective (fixing the plan-metadata omission without new throw paths). On top of it, three presentation changes in IssuePolicyStrip.tsx: a Standing-crew Segmented row in the Work group writing through the existing PATCH /api/workspaces/:issueId/tiered-execution door (chip 'crew · on|off', overrides-only), FR-2 suspension helper text + chip suffix on the Work Model control, and the FR-3 label copy per the PAN-2684 landing-order rule. Docs updated. No resolver, write-door, or spawn-path behavior changes.",
+      "NonGoals": "- No changes to resolution logic: resolveStaffing, resolveTieredExecutionEnabled/ForIssue behavior, and spawn paths stay byte-for-byte in behavior (NFR-1).\n- No changes to the PATCH /api/workspaces/:issueId/tiered-execution write door, including its write-before-plan-check quirk for planless issues (hazard H1 — noted, not fixed).\n- No edits to PlanCard.tsx / IssueCockpitBody.tsx (dead code, left untouched per surgical-change rule); no relocation or deletion.\n- No new Mintlify page for the Policies panel (PRD states none covers it); docs change is limited to docs/TIERED-EXECUTION.md.\n- No settings-side (global/kind-level) tiered-execution UI — that is PAN-2684's surface (Settings/sections/TieredExecutionSection.tsx), which shares no files with this issue."
+    },
+    "autoDecisions": [
+      {
+        "summary": "tieredExecution.source uses the existing wire vocabulary 'issue-override'|'plan-metadata'|'global' instead of the PRD's 'issue'|'plan'|'global'",
+        "rationale": "The PATCH route already returns a tieredExecution block with exactly those source values (workspace-data.ts:975-997); one vocabulary across both doors prevents drift, and the UI maps to short display labels."
+      },
+      {
+        "summary": "The shared ladder helper is added to tier-table.ts but the PATCH route's inline ladder is NOT refactored to use it",
+        "rationale": "NFR-1 says the write door stays untouched; the helper mirrors the inline ladder's non-throwing semantics and the duplication is recorded in continue.json D1 rather than silently expanding scope."
+      },
+      {
+        "summary": "resolved.tiered is computed as block.effective rather than by passing plan metadata to resolveTieredExecutionEnabledForIssue",
+        "rationale": "Delivers the same plan-metadata fix while guaranteeing resolved.tiered and tieredExecution.effective agree, and avoids the resolver's throw-on-malformed-metadata path on a GET endpoint (hazard H2)."
+      },
+      {
+        "summary": "FR-3 resolves to: keep the 'tiered' label with a TODO referencing PAN-2683 FR-3 unless PAN-2684 is already merged at implementation time",
+        "rationale": "The issue comment assigns the 'crews' copy to whichever issue lands second; PAN-2684 was OPEN at planning time, so the conditional rule is encoded in the item instead of guessing the merge order."
+      },
+      {
+        "summary": "The strip's save() helper gains an optional method parameter (default 'POST') for the PATCH write",
+        "rationale": "Smallest change that reuses the existing saving/refresh lifecycle instead of a parallel fetch path."
+      }
+    ],
+    "items": [
+      {
+        "id": "staffing-tiered-block",
+        "title": "D-R: additive tieredExecution block on the staffing GET via a pure ladder helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2683",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "standing-crew-row",
+            "work-model-suspension-copy"
+          ],
+          "files_scope": [
+            "src/lib/agents/tier-table.ts",
+            "src/lib/agents/__tests__/tier-table.test.ts",
+            "src/dashboard/server/routes/projects.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/agents/__tests__/tier-table.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tier-table.test.ts passes including new resolveTieredExecutionBlock cases (record override, plan metadata on/off, malformed plan value falls back to global, global default)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "D-R",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "1) In src/lib/agents/tier-table.ts add an exported pure function resolveTieredExecutionBlock(config: Pick<TieredExecutionConfig,'enabled'>, planMetadata: {[k:string]: unknown} | undefined, recordOverride: 'on'|'off'|null|undefined): { effective: boolean; source: 'issue-override'|'plan-metadata'|'global'; override: 'on'|'off'|null }. It replicates the NON-THROWING ladder already inline in the PATCH route (workspace-data.ts:975-991): recordOverride 'on'/'off' -> source 'issue-override'; else planMetadata?.tiered_execution === 'on'/'off' -> source 'plan-metadata'; else source 'global' with effective = config.enabled ?? false. It must NOT call resolveTieredExecutionEnabled (which throws on malformed plan values, tier-table.ts:158). Do NOT modify any existing function in the file and do NOT touch the PATCH route. 2) In src/dashboard/server/routes/projects.ts, change getIssueStaffingPayload (line 727) to accept a planMetadata parameter; inside, read recordOverride from the already-loaded record (record?.tieredExecutionOverride ?? null), compute const block = resolveTieredExecutionBlock(config.tieredExecution, planMetadata, recordOverride), set resolved.tiered = block.effective (replacing the current resolveTieredExecutionEnabledForIssue call that omits plan metadata), and add tieredExecution: block to the returned payload alongside the existing keys. 3) In both callers (getIssueStaffingRoute line ~752 and postIssueStaffingRoute line ~769), yield* findSpecByIssue(project.path, issueId) from src/lib/pan-dir/specs.ts (already an Effect; wrap with a catch that resolves null so a spec-read failure degrades to planMetadata undefined) and pass spec?.doc?.plan?.metadata (check PanSpecEntry's actual doc field name when editing) as planMetadata. An issue with no spec passes undefined and the ladder falls through to global. 4) Add unit tests for the helper in src/lib/agents/__tests__/tier-table.test.ts covering all four ladder outcomes plus the malformed-plan-value fallback."
+        },
+        "items": [
+          {
+            "id": "staffing-tiered-block.ac1",
+            "title": "Given an issue record with tieredExecutionOverride 'off' and global enabled=true, GET /api/issues/:issueId/staffing returns tieredExecution { effective: false, source: 'issue-override', override: 'off' } and resolved.tiered === false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staffing-tiered-block.ac2",
+            "title": "Given no record override and a spec with plan.metadata.tiered_execution 'on' while global enabled=false, the staffing payload returns effective true with source 'plan-metadata' — the previously-invisible plan override now surfaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staffing-tiered-block.ac3",
+            "title": "Given a malformed plan.metadata.tiered_execution value (e.g. 'maybe') the helper falls back to source 'global' and the staffing GET still returns 200 — it never throws TieredExecutionConfigError",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staffing-tiered-block.ac4",
+            "title": "The payload preserves every existing key (override.workModel, resolved.model/tiered/source/recordedModel) so existing strip consumers keep working, and resolveTieredExecutionEnabled/ForIssue, resolveStaffing, spawn-prep.ts, and the PATCH tiered-execution route are unmodified in the diff",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "standing-crew-row",
+        "title": "FR-1: Standing crew row, chip, reset, and Reset-all in the Policies panel Work group",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssuePolicyStrip.test.tsx passes with new Standing-crew cases and the updated affordance inventory"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In IssuePolicyStrip.tsx: 1) extend StaffingResponse with tieredExecution: { effective: boolean; source: 'issue-override'|'plan-metadata'|'global'; override: 'on'|'off'|null } (from item staffing-tiered-block). 2) Extend the save() helper (line 101) with an optional method parameter defaulting to 'POST'. 3) Add a 'Standing crew' row to the Work section (after the Swarm row, same grid-row markup as Swarm at lines 304-312): a Segmented control with ariaLabel 'Standing crew routing for this issue', value = staffing.tieredExecution.override, options [['on','On'],['off','Off']], resolvedLabel = `${tieredExecution.effective ? 'on' : 'off'} (${shortSource})` where shortSource maps issue-override->issue, plan-metadata->plan, global->global; onChange calls save(`/api/workspaces/${encoded}/tiered-execution`, { override: next }, 'PATCH') — note this door takes the RAW issueId path param shape already used by PlanCard.tsx:41 and body { override: 'on'|'off'|null }; a reset link (save with { override: null }) renders only when override is non-null, matching the other rows' pattern. 4) Add the override dot indicator on the row label like every other row. 5) Add the chip to the overrides array (line 175-181): { key: 'crew', label: 'crew', value: staffing.tieredExecution.override } rendered only when override is non-null (overrides-only rule). 6) Extend resetAll (line 203) with: if (staffing.tieredExecution.override !== null) await save(`/api/workspaces/${encoded}/tiered-execution`, { override: null }, 'PATCH'). 7) Tests in IssuePolicyStrip.test.tsx (149-line file, mock-fetch pattern from line 35 onward): row renders effective value + source for all THREE sources (issue-override, plan-metadata, global fixtures); setting On issues the PATCH with { override: 'on' }; chip 'crew · on' appears only when overridden; the row reset and Reset-all both clear via PATCH { override: null }; update the 'preserves every affordance' inventory test (line 98) to include the new row (hazard H3)."
+        },
+        "items": [
+          {
+            "id": "standing-crew-row.ac1",
+            "title": "Given tieredExecution { effective: true, source: 'global', override: null }, the Work group renders a Standing crew row whose Default segment reads 'Default · on (global)' and no 'crew' chip renders in the collapsed strip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standing-crew-row.ac2",
+            "title": "Clicking 'Off' sends PATCH /api/workspaces/PAN-XXXX/tiered-execution with body { override: 'off' } and after refresh the collapsed strip renders the chip 'crew · off'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standing-crew-row.ac3",
+            "title": "Given an active override, the row's reset link and the panel's 'Reset all to defaults' each sends PATCH { override: null } and after refresh the strip renders no 'crew' chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "standing-crew-row.ac4",
+            "title": "Component tests cover the Default label for all three sources — 'on (issue)', 'on (plan)', 'on (global)' render from source values 'issue-override', 'plan-metadata', 'global' respectively — and the affordance-inventory test passes with the row included",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "work-model-suspension-copy",
+        "title": "FR-2: crew-suspension helper text and chip suffix on the work-model override",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssuePolicyStrip.test.tsx passes with FR-2 conditional-rendering cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In IssuePolicyStrip.tsx, define const crewSuspended = staffing.tieredExecution.effective && Boolean(staffing.override.workModel) (use the new block, not resolved.tiered — they agree after item staffing-tiered-block, but new code reads the block). 1) When crewSuspended, render helper text under the Work Model row (inside its grid cell, below the select+reset line, muted-foreground styling consistent with the panel's 11px type scale): 'Overrides crew routing — every item on this issue runs this model.' 2) In the overrides array, when crewSuspended the work chip value becomes `${modelName(staffing.override.workModel)} · replaces crews` so the collapsed chip reads 'work · GPT-5.5 · replaces crews'. 3) Neither the helper nor the suffix renders when tieredExecution.effective is false or no work-model override is set. Tests: fixture with tiered effective + workModel override shows both helper and suffix; tiered effective without override shows neither; override without tiered shows the plain 'work · <model>' chip and no helper."
+        },
+        "items": [
+          {
+            "id": "work-model-suspension-copy.ac1",
+            "title": "Given tieredExecution.effective true AND override.workModel set, the panel renders the helper text 'Overrides crew routing — every item on this issue runs this model.' under the Work Model row and the collapsed chip reads 'work · <model name> · replaces crews'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-model-suspension-copy.ac2",
+            "title": "Given tieredExecution.effective true and NO work-model override, neither the helper text nor the chip suffix renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "work-model-suspension-copy.ac3",
+            "title": "Given a work-model override while tieredExecution.effective is false, the chip renders as plain 'work · <model name>' with no suffix and no helper text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "crews-label-copy",
+        "title": "FR-3: work default label copy per the PAN-2684 landing-order rule",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-15T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "expected_outputs": [
+            "IssuePolicyStrip.test.tsx passes with the label assertion matching the decided copy"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Decision rule (continue.json D5): check whether PAN-2684 is merged into main at implementation time (gh issue view 2684 --json state, or git log main --grep 2684; corroborate by grepping Settings/sections/TieredExecutionSection.tsx for 'crew' copy). If MERGED: change the workDefault expression (IssuePolicyStrip.tsx line 168) from 'tiered' to 'crews' so the Work Model default option reads 'Default · crews'. If NOT merged (it was OPEN at planning time — the expected case): keep 'tiered' unchanged and add a one-line TODO comment at that site: '// TODO(PAN-2683 FR-3): rename to `crews` once PAN-2684 lands — label copy belongs to whichever lands second.' Either way, assert the rendered label in the component test so the decided copy is locked."
+        },
+        "items": [
+          {
+            "id": "crews-label-copy.ac1",
+            "title": "The Work Model default option renders 'Default · crews' if PAN-2684 is merged at implementation time, otherwise it preserves 'Default · tiered' and the diff contains a code comment referencing PAN-2683 FR-3 at IssuePolicyStrip.tsx's workDefault site",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crews-label-copy.ac2",
+            "title": "A component test asserts the rendered default-label copy that was decided, so a later silent copy change fails the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Single-label copy task; two ACs fully pin the conditional outcome and its test lock."
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-tiered-execution",
+        "title": "Docs: point docs/TIERED-EXECUTION.md at the Policies-panel surface",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-15T06:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2683",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TIERED-EXECUTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Policies' docs/TIERED-EXECUTION.md",
+            "grep -cn 'PlanCard' docs/TIERED-EXECUTION.md || true"
+          ],
+          "expected_outputs": [
+            "docs/TIERED-EXECUTION.md describes the per-issue Standing-crew override as living in the issue view's Policies panel (Work group)",
+            "no remaining claim that the per-issue override UI lives on the plan card"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "AC-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/TIERED-EXECUTION.md, find the paragraph describing the per-issue override UI (it currently claims the control lives on the plan card / PlanCard in the issue cockpit — locate via grep for 'PlanCard', 'plan card', or 'Settings UI'). Replace the stale claim with the new reality: the per-issue Standing-crew override lives in the issue view's Policies panel, Work group, as a 'Standing crew' segmented control (Default · effective (source) / On / Off) with an overrides-only 'crew · on|off' chip, writing through PATCH /api/workspaces/:issueId/tiered-execution. Mention the FR-2 behavior in one sentence: a per-issue work-model override suspends crew routing for the issue and the panel says so. Per the PRD, no Mintlify page covers the Policies panel, so this is the only doc touched — state nothing else needs updating."
+        },
+        "items": [
+          {
+            "id": "docs-tiered-execution.ac1",
+            "title": "docs/TIERED-EXECUTION.md contains a passage naming the issue view's Policies panel (Work group, 'Standing crew' control with segments, chip, and the PATCH door) as the per-issue override surface",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-tiered-execution.ac2",
+            "title": "The stale plan-card/PlanCard location claim is removed from the doc — grep for the old claim returns no live-UI assertion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Single-doc paragraph swap; two ACs cover addition and removal completely."
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "staffing-tiered-block",
+        "to": "standing-crew-row",
+        "type": "blocks"
+      },
+      {
+        "from": "staffing-tiered-block",
+        "to": "work-model-suspension-copy",
+        "type": "blocks"
+      },
+      {
+        "from": "standing-crew-row",
+        "to": "work-model-suspension-copy",
+        "type": "blocks"
+      },
+      {
+        "from": "work-model-suspension-copy",
+        "to": "crews-label-copy",
+        "type": "blocks"
+      },
+      {
+        "from": "standing-crew-row",
+        "to": "docs-tiered-execution",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-15-PAN-2683-policies-panel-per-issue-standing-crew-override-and-tier-suspension-messaging.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
