@@ -119,15 +119,7 @@
       "timestamp": "2026-07-15T11:28:07.362Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T11:28:07Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2683\n\n# Review Synthesis — PAN-2683 — 2026-07-15T10:46:00-04:00\n\n## Verdict: CHANGES REQUESTED — the branch now changes a spawn-path surface prohibited by NFR-1\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/context.json`\n- Branch: `feature/2683` (workspace HEAD is `feature/pan-2683`)\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683`\n- HEAD reviewed: `a30ce0dd6f2523d0419da931283a3f546cb3797e`\n- Cycle number: 3\n- Prior cycle SHA: `5f460ca4e455e84d3d525b34ef616344b8f9f867`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] Spawn-path files changed despite the byte-for-byte non-goal — `src/lib/agents/runtime-command.ts:638`\n\nNFR-1 explicitly requires spawn paths to remain byte-for-byte unchanged, but the current PR changes role runtime command construction from `mcp__<server>` to `mcp__<server>__*` and updates `src/lib/__tests__/agent-state-role.test.ts` accordingly. This is a behavior-changing expansion of the strict role allow-list in a spawn-path surface, and it is unrelated to the issue-policy staffing UI delivered by PAN-2683.\n\nThe finding survives the cycle-three convergence gate: these lines differ from the prior approved HEAD and appear in the new top commit, `a30ce0dd6f` (`fix: expose specialist MCP tools (PAN-2683)`). Remove both runtime-command and associated test changes from this PR, then land that independently required behavior under its own issue and requirements.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security found no vulnerabilities or advisories, including in the new MCP wildcard behavior.\n- Correctness found no functional defects in the changed implementation.\n- Performance found no material latency, memory, concurrency, or scaling regressions.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2683 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/__tests__/agent-state-role.test.ts",
@@ -155,24 +147,24 @@
     "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T12:29:52.937Z",
+  "updated": "2026-07-15T12:29:53.609Z",
   "pipeline": {
     "issueId": "PAN-2683",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T12:29:52.896Z",
+    "updatedAt": "2026-07-15T12:29:53.515Z",
     "reviewNotes": "Agent re-review request (1/25): Removed out-of-scope spawn-path change",
     "testNotes": "npm run typecheck passed; npm run lint passed; unrestricted npm test passed 984 root files/9,119 tests plus 3 frontend files/32 tests; npm run build:dashboard passed; workspace-built Node 22 dashboard booted on isolated port 3013 and /api/health confirmed repoRoot=/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683. Browser UAT required for Policies panel Standing crew control/chip/reset/helper-copy flows but no Playwright MCP tools are exposed to this test role, so those paths could not be exercised. Required canonical .pan/records/pan-2683.json and .pan/specs/ vBRIEF are also absent from the workspace; retired local continue/spec files were not used as canonical inputs.",
     "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2693",
     "reviewedAtCommit": "5f460ca4e455e84d3d525b34ef616344b8f9f867",
     "lastVerifiedCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c",
-    "reviewSpawnedAt": "2026-07-15T11:26:12.342Z"
+    "reviewSpawnedAt": "2026-07-15T12:29:53.515Z"
   },
   "closeOut": {
     "usage": {
@@ -244,7 +236,7 @@
       },
       "costAtCloseOut": {
         "usd": 74.393304,
-        "pricingAsOf": "2026-07-15T12:29:52.933Z"
+        "pricingAsOf": "2026-07-15T12:29:53.581Z"
       }
     },
     "merges": [
