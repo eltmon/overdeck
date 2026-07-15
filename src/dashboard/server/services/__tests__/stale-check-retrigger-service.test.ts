@@ -152,14 +152,14 @@ it('does not retry a failed rerun command after the retention window', async () 
   expect(log).not.toHaveBeenCalledWith(expect.stringContaining('skipping run 10'));
 });
 
-it('does not retry a failed rerun when its candidate disappears and returns', async () => {
+it('does not retry a failed rerun when its candidate disappears for over 24 hours and returns', async () => {
   mocks.rerun.mockResolvedValue(false);
   await __tickOnceForTests();
 
   mocks.candidates.mockReturnValue([]);
+  vi.advanceTimersByTime(24 * 60 * 60_000 + 1);
   await __tickOnceForTests();
   mocks.candidates.mockReturnValue([candidate()]);
-  vi.advanceTimersByTime(10 * 60_000);
   await __tickOnceForTests();
 
   expect(mocks.rerun).toHaveBeenCalledTimes(1);
