@@ -9,7 +9,7 @@ import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, sessionExists, sessionExistsSync } from '../tmux.js';
-import { flagCodexAgentAuthBurned, paneShowsCodexAuthBurn } from '../codex-auth.js';
+import { applyCodexAuthBurnFlag, paneShowsCodexAuthBurn } from '../codex-auth.js';
 
 const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
 const REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS = 60 * 1000;
@@ -385,10 +385,14 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
       contextOverflowDetected = isContextOverflowTail(tail);
       // PAN-2285: a convoy reviewer wedged on a revoked Codex refresh token shows
       // the burn markers in its pane. The idle-no-output path below already fails
-      // this reviewer; flag the native auth as burned so the CodexAuthBanner
-      // fires and the operator is pointed at re-authentication.
-      if (paneShowsCodexAuthBurn(tail)) {
-        flagCodexAgentAuthBurned(agentId);
+      // this reviewer; additionally mark it troubled and persist the burn flag in
+      // its agent state (same shape as checkApiErrorAgents) — this monitor runs
+      // in the deacon CHILD process, so the flag must reach the dashboard
+      // server's banner endpoint and spawn gate through the shared agents table,
+      // not module memory.
+      if (paneShowsCodexAuthBurn(tail) && applyCodexAuthBurnFlag(state)) {
+        saveAgentStateSync(state);
+        logDeaconEventSync(`review-monitor: ${agentId} marked troubled — Codex refresh token revoked (codex-auth-burned)`);
       }
     }
 
