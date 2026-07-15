@@ -16,33 +16,33 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:19:27.405Z",
+  "updated": "2026-07-15T15:19:40.643Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:30:09.825Z",
-    "inspectNotes": "Item dod-rows-module ack: DOD_ROWS has 8 correctly-ordered/numbered ids, rows 1-7 overridable / row 8 (teardown) not, acceptFlagFor returns --accept-<id>; dod.test.ts passes (3/3)."
+    "updatedAt": "2026-07-15T15:19:40.579Z",
+    "inspectNotes": "Inspecting item gate-assemble-wire"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 381951,
-            "output": 956,
-            "cacheRead": 343552,
+            "input": 2874457,
+            "output": 4699,
+            "cacheRead": 2527104,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 1955847,
-            "output": 6648,
-            "cacheRead": 1856768,
+            "input": 17464856,
+            "output": 44575,
+            "cacheRead": 16975616,
             "cacheWrite": 0
           }
         },
@@ -56,24 +56,24 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 2,
-            "output": 112,
-            "cacheRead": 27914,
-            "cacheWrite": 91146
+            "input": 4,
+            "output": 834,
+            "cacheRead": 146974,
+            "cacheWrite": 96292
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 381951,
-          "output": 956,
-          "cacheRead": 343552,
+          "input": 2874457,
+          "output": 4699,
+          "cacheRead": 2527104,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 1955847,
-          "output": 6648,
-          "cacheRead": 1856768,
+          "input": 17464856,
+          "output": 44575,
+          "cacheRead": 16975616,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -83,15 +83,15 @@
           "cacheWrite": 197959
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2,
-          "output": 112,
-          "cacheRead": 27914,
-          "cacheWrite": 91146
+          "input": 4,
+          "output": 834,
+          "cacheRead": 146974,
+          "cacheWrite": 96292
         }
       },
       "costAtCloseOut": {
-        "usd": 14.812754,
-        "pricingAsOf": "2026-07-15T14:30:09.885Z"
+        "usd": 25.504694,
+        "pricingAsOf": "2026-07-15T15:19:40.627Z"
       }
     },
     "merges": [],
