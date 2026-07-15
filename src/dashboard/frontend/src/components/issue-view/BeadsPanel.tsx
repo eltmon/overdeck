@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { formatRelativeTime } from '../../../lib/formatRelativeTime'
-import styles from './beadsRail.module.css'
+import { formatRelativeTime } from '../../lib/formatRelativeTime'
+import styles from '../Stage/cockpit/beadsRail.module.css'
 
 /**
  * BeadsRail — the persistent at-a-glance progress column for the issue cockpit
@@ -70,7 +70,7 @@ function BlockedNote({ blockedBy }: { blockedBy: string[] }) {
   )
 }
 
-export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull: () => void }) {
+export function BeadsPanel({ issueId, onOpenFull = () => undefined, compact = false }: { issueId: string; onOpenFull?: () => void; compact?: boolean }) {
   const queryClient = useQueryClient()
   const [showAllCompleted, setShowAllCompleted] = useState(false)
   const { data, isLoading, refetch, isRefetching } = useQuery<BeadsResponse>({
@@ -100,8 +100,16 @@ export function BeadsRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
   const hiddenCompleted = done.length - completedShown.length
   const now = new Date()
 
+  if (compact) {
+    return (
+      <button type="button" data-section="beads-panel-compact" className={styles.count} onClick={onOpenFull} title={`${done.length} of ${total} beads complete`}>
+        beads {done.length}/{total} · {pctDone}%
+      </button>
+    )
+  }
+
   return (
-    <aside className={styles.rail} aria-label="Beads progress">
+    <aside data-section="beads-panel" className={styles.rail} aria-label="Beads progress">
       <div className={styles.header}>
         <span className={styles.title}>Beads</span>
         <span className={data?.stale ? styles.stale : styles.freshness} title={data?.syncError ?? undefined}>

@@ -31,7 +31,7 @@ import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
-import { BeadsRail } from './BeadsRail'
+import { BeadsPanel } from '../../issue-view/BeadsPanel'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
@@ -980,7 +980,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'beads' && <BeadsTab issueId={issueId} />}
           </div>
         </main>
-        <BeadsRail issueId={issueId} onOpenFull={() => selectTab('beads')} />
+        <BeadsPanel issueId={issueId} onOpenFull={() => selectTab('beads')} />
       </div>
     </div>
   )

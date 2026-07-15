@@ -24,7 +24,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'DrawerPausedBanner', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx' },
   { section: 'DrawerVerificationGates', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/VerificationGates.tsx' },
   { section: 'DrawerReviewSpecialists', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerReviewSpecialists.tsx' },
-  { section: 'DrawerBeadsList', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerBeadsList.tsx' },
+  { section: 'DrawerBeadsList', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/BeadsPanel.tsx' },
   { section: 'DrawerPlanPanel / VBriefViewer', view: 'console', home: 'src/dashboard/frontend/src/components/vbrief/VBriefViewer.tsx' },
   { section: 'DrawerArtifactsPanel', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerArtifactsPanel.tsx' },
   { section: 'DrawerActivityRail / DrawerActivityPanel', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerActivityRail.tsx' },
@@ -44,7 +44,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'PRD / Timeline / Discussion tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/ActivityTab.tsx' },
   { section: 'Costs / Artifacts / Ship tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/CostsTab.tsx' },
   { section: 'Conversation / Files / Terminal tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx' },
-  { section: 'BeadsRail / BeadsTab', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/BeadsRail.tsx' },
+  { section: 'BeadsRail / BeadsTab', view: 'cockpit', home: 'src/dashboard/frontend/src/components/issue-view/BeadsPanel.tsx' },
   { section: 'Awareness rail', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
   { section: 'ReviewPolicyControl', view: 'cockpit', home: 'src/dashboard/frontend/src/components/ReviewPolicyControl.tsx' },
 
@@ -94,6 +94,8 @@ export const VERIFICATION_GATES_SECTIONS = [
 ] as const;
 
 export type VerificationGatesSection = (typeof VERIFICATION_GATES_SECTIONS)[number];
+
+export const BEADS_PANEL_SECTIONS = ['beads-panel', 'beads-panel-compact'] as const;
 
 export const ACTIVE_AGENT_PANEL_SECTIONS = [
   'active-agent-panel',

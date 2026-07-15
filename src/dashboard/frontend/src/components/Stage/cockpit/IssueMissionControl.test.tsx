@@ -105,7 +105,7 @@ vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
 vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div>Agents lane</div> }))
-vi.mock('./BeadsRail', () => ({ BeadsRail: () => <div>Beads rail</div> }))
+vi.mock('../../issue-view/BeadsPanel', () => ({ BeadsPanel: () => <div>Beads panel</div> }))
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 

@@ -10,7 +10,7 @@ import DrawerActionBar from './DrawerActionBar';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerArtifactsPanel from './DrawerArtifactsPanel';
-import DrawerBeadsList from './DrawerBeadsList';
+import { BeadsPanel } from '../issue-view/BeadsPanel';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import { VerificationGates } from '../issue-view/VerificationGates';
@@ -289,12 +289,12 @@ export function IssueDrawer() {
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" />
                 <VerificationGates issueId={drawer.issueId} />
-                <DrawerBeadsList />
+                <BeadsPanel issueId={drawer.issueId} />
                 <DrawerReviewSpecialists />
               </div>
             ) : drawer.tab === 'beads' ? (
               <div data-testid="drawer-tab-panel-beads">
-                <DrawerBeadsList />
+                <BeadsPanel issueId={drawer.issueId} />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
               <DrawerPlanPanel issueId={drawer.issueId} />

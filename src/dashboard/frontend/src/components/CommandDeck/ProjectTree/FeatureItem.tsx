@@ -29,6 +29,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
 import { ShipProgress } from '../../issue-view/ShipProgress';
+import { BeadsPanel } from '../../issue-view/BeadsPanel';
 import { deriveShip } from '../../issue-view/derivations';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import styles from '../styles/command-deck.module.css';
@@ -1242,6 +1243,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       </ContextMenuTrigger>
       </div>
       <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
+      {feature.resourceDetails?.hasBeads && (
+        <BeadsPanel issueId={feature.issueId} compact onOpenFull={() => onSelect?.()} />
+      )}
 
       {expanded && (
         <CompactShipRow issueId={feature.issueId} onClick={() => onSelect?.()} />
