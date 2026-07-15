@@ -876,37 +876,19 @@ export function writeCloseOutDodGateSync(
   queueIssueRecordCommit(project, issueId, recordPath);
 }
 
-/** Dashboard-safe asynchronous close-out audit write door. */
-export async function writeCloseOutDodGate(
-  project: ProjectConfig,
-  issueId: string,
-  dodGate: NonNullable<PanIssueCloseOutRecord['dodGate']>,
-): Promise<void> {
+export async function writeCloseOutDodGate(project: ProjectConfig, issueId: string, dodGate: NonNullable<PanIssueCloseOutRecord['dodGate']>): Promise<void> {
   const recordPath = getIssueRecordPath(project, issueId);
   const record = await readIssueRecord(project, issueId);
   if (!record) throw new Error(`Issue record not found for ${issueId}`);
   record.closeOut.dodGate = dodGate;
-  record.updated = new Date().toISOString();
-  await fsp.mkdir(dirname(recordPath), { recursive: true });
+  record.updated = new Date().toISOString(); await fsp.mkdir(dirname(recordPath), { recursive: true });
   const tmp = `${recordPath}.${process.pid}.${Date.now()}.tmp`;
-  await fsp.writeFile(tmp, JSON.stringify(record, null, 2), 'utf-8');
-  const tmpHandle = await fsp.open(tmp, 'r');
-  try {
-    await tmpHandle.sync();
-  } finally {
-    await tmpHandle.close();
-  }
-  await fsp.rename(tmp, recordPath);
-  const dirHandle = await fsp.open(dirname(recordPath), 'r');
-  try {
-    await dirHandle.sync();
-  } finally {
-    await dirHandle.close();
-  }
-  JSON.parse(await fsp.readFile(recordPath, 'utf-8'));
-  queueIssueRecordCommit(project, issueId, recordPath);
+  await fsp.writeFile(tmp, JSON.stringify(record, null, 2), 'utf-8'); const tmpHandle = await fsp.open(tmp, 'r');
+  try { await tmpHandle.sync(); } finally { await tmpHandle.close(); }
+  await fsp.rename(tmp, recordPath); const dirHandle = await fsp.open(dirname(recordPath), 'r');
+  try { await dirHandle.sync(); } finally { await dirHandle.close(); }
+  JSON.parse(await fsp.readFile(recordPath, 'utf-8')); queueIssueRecordCommit(project, issueId, recordPath);
 }
-
 // ─── Continue field setters ───────────────────────────────────────────────────
 
 /** Write decisions into the per-issue record (sync). */
