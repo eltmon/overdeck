@@ -87,17 +87,17 @@
     "recordedAt": "2026-07-15T16:10:43.479Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:10:48.877Z",
+  "updated": "2026-07-15T16:10:49.529Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:10:48.215Z",
+    "updatedAt": "2026-07-15T16:10:49.453Z",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
     "reviewRequestedAt": "2026-07-15T16:10:47.225Z",
@@ -170,9 +170,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 49300517,
-            "output": 81673,
-            "cacheRead": 48351232,
+            "input": 49390313,
+            "output": 81959,
+            "cacheRead": 48440064,
             "cacheWrite": 0
           }
         },
@@ -201,9 +201,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 49300517,
-          "output": 81673,
-          "cacheRead": 48351232,
+          "input": 49390313,
+          "output": 81959,
+          "cacheRead": 48440064,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -220,8 +220,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 44.891958,
-        "pricingAsOf": "2026-07-15T16:10:48.495Z"
+        "usd": 44.949774,
+        "pricingAsOf": "2026-07-15T16:10:49.515Z"
       }
     },
     "merges": [
