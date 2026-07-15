@@ -3,12 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Circle, CheckCircle2, Clock, List, GitFork, ListTodo, RefreshCw, Loader2, Download, ChevronDown, ChevronRight } from 'lucide-react';
 import { PlanMapViewer } from './vbrief/PlanMapViewer.js';
 import type { VBriefItem, VBriefDocument } from './vbrief/types.js';
+import { taskStatusBucket } from '../lib/taskStatus';
 
 interface TaskTask {
   id: string;
   name?: string;
   title?: string;
-  status: 'open' | 'closed';
+  /** Raw vBRIEF item status ('planned' | 'running' | 'completed' | …); legacy beads values tolerated (PAN-2696). */
+  status: string;
   labels: string[];
   blockedBy: string[];
   blocks: string[];
@@ -61,8 +63,8 @@ export function TasksPanel({ issueId }: TasksPanelProps) {
   });
   const planHasItems = planDoc != null && (planDoc.plan?.items?.length ?? 0) > 0;
 
-  const openTasks = tasksData?.tasks?.filter(t => t.status === 'open') || [];
-  const closedTasks = tasksData?.tasks?.filter(t => t.status === 'closed') || [];
+  const openTasks = tasksData?.tasks?.filter(t => taskStatusBucket(t.status) !== 'done') || [];
+  const closedTasks = tasksData?.tasks?.filter(t => taskStatusBucket(t.status) === 'done') || [];
 
   function toggleView(next: 'list' | 'graph') {
     setView(next);
@@ -212,13 +214,13 @@ function TaskItem({ task, planDoc }: { task: TaskTask; planDoc: VBriefDocument |
   return (
     <div
       className={`rounded border text-xs ${
-        task.status === 'open'
+        taskStatusBucket(task.status) !== 'done'
           ? 'border-border bg-card/50'
           : 'border-border bg-card/50 opacity-60'
       }`}
     >
       <div className="flex items-start gap-2 p-2">
-        {task.status === 'open' ? (
+        {taskStatusBucket(task.status) !== 'done' ? (
           <Circle className="w-3.5 h-3.5 text-primary mt-0.5 shrink-0" />
         ) : (
           <CheckCircle2 className="w-3.5 h-3.5 text-success mt-0.5 shrink-0" />
@@ -336,11 +338,11 @@ function PlanItemDetail({ item, doc, tasks }: PlanItemDetailProps) {
       {/* Task status */}
       {matchedTask && (
         <div className="flex items-center gap-1 text-[10px]">
-          {matchedTask.status === 'closed'
+          {taskStatusBucket(matchedTask.status) === 'done'
             ? <CheckCircle2 className="w-3 h-3 text-success shrink-0" />
             : <Circle className="w-3 h-3 text-primary shrink-0" />}
           <span className="text-muted-foreground">
-            Task: {matchedTask.status === 'closed' ? 'completed' : 'open'} ({matchedTask.id})
+            Task: {matchedTask.status} ({matchedTask.id})
           </span>
         </div>
       )}

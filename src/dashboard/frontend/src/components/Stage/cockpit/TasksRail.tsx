@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
+import { taskStatusBucket } from '../../../lib/taskStatus'
 import styles from './tasksRail.module.css'
 
 /**
@@ -19,7 +20,7 @@ interface TaskTask {
   id: string
   name?: string
   title?: string
-  /** Raw bd status: 'open' | 'in_progress' | 'closed' | 'blocked' | … */
+  /** Raw vBRIEF item status ('planned' | 'running' | 'completed' | …); legacy beads values tolerated (PAN-2696). */
   status: string
   labels: string[]
   blockedBy: string[]
@@ -33,10 +34,6 @@ interface TasksResponse {
   issueId: string
   workspacePath: string
   tasks: TaskTask[]
-  lastSyncedAt: string | null
-  freshnessAgeMs: number | null
-  stale: boolean
-  syncError: string | null
 }
 
 const DIFFICULTIES = ['trivial', 'simple', 'medium', 'complex', 'expert']
@@ -89,9 +86,9 @@ export function TasksRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
   }, [issueId, queryClient])
 
   const tasks = data?.tasks ?? []
-  const done = tasks.filter((t) => t.status === 'closed')
-  const working = tasks.filter((t) => t.status === 'in_progress')
-  const upcoming = tasks.filter((t) => t.status !== 'closed' && t.status !== 'in_progress')
+  const done = tasks.filter((t) => taskStatusBucket(t.status) === 'done')
+  const working = tasks.filter((t) => taskStatusBucket(t.status) === 'working')
+  const upcoming = tasks.filter((t) => taskStatusBucket(t.status) === 'upcoming')
   const total = tasks.length
   const pctDone = total ? Math.round((done.length / total) * 100) : 0
   const pctWorking = total ? Math.round((working.length / total) * 100) : 0
@@ -104,13 +101,6 @@ export function TasksRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
     <aside className={styles.rail} aria-label="Tasks progress">
       <div className={styles.header}>
         <span className={styles.title}>Tasks</span>
-        <span className={data?.stale ? styles.stale : styles.freshness} title={data?.syncError ?? undefined}>
-          {data?.stale
-            ? 'stale'
-            : data?.lastSyncedAt
-              ? `synced ${formatRelativeTime(data.lastSyncedAt, now)}`
-              : 'not synced'}
-        </span>
         <div className={styles.counts}>
           {total > 0 ? (
             <>
