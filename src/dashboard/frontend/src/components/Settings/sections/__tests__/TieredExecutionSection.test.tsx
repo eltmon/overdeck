@@ -203,6 +203,8 @@ describe('TieredExecutionSection', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: /Standing reviewer/ }));
+
     fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'claude-opus-4-8' } });
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.model).toBe('claude-opus-4-8');
 
@@ -216,7 +218,7 @@ describe('TieredExecutionSection', () => {
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.owns_inspection).toBe(true);
   });
 
-  it('edits by_kind mappings to configured tier names', () => {
+  it('adds and removes overrides while the default stays quiet', () => {
     const onSettingsChange = vi.fn();
     render(
       <TieredExecutionSection
@@ -239,9 +241,11 @@ describe('TieredExecutionSection', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('backend'), { target: { value: 'cheap' } });
-
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.by_kind.backend).toBe('cheap');
+    expect(screen.getByText('All kinds follow difficulty routing.')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Kind to override'), { target: { value: 'backend' } });
+    fireEvent.change(screen.getByLabelText('Crew for kind override'), { target: { value: 'cheap' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add override' }));
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.by_kind.backend).toBe('trivial-simple-medium-complex-expert');
   });
 
   it('prefers editable by_kind over stale derived byKind values', () => {
@@ -273,7 +277,7 @@ describe('TieredExecutionSection', () => {
       />,
     );
 
-    expect(screen.getByLabelText('backend')).toHaveValue('cheap');
+    expect(screen.getByText('backend → Claude Haiku 4.5')).toBeTruthy();
   });
 
   it('edits feed, escalation, and replay threshold values', () => {

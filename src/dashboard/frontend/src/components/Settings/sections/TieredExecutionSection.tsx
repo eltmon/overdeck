@@ -9,6 +9,7 @@ import {
   deriveTierName,
   DIFFICULTIES,
   importCrews,
+  providerDefaultHarness,
   serializeCrews,
   type Crew,
   type CrewAssignments,
@@ -25,7 +26,6 @@ interface TieredExecutionSectionProps {
 
 const ITEM_KINDS = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
 const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex'];
-const SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
 const CALLOUTS = ['off', 'notify', 'corroborate'] as const;
 // Defaults must NEVER be a frontier model (fable/opus). The first catalog
 // entries are premium models, and defaulting new crews/the supervisor to
@@ -100,7 +100,17 @@ export function TieredExecutionSection({
   const normalizedConfig = { ...defaultTieredExecution(config?.enabled ?? false), ...config };
   const { crews, assign, rest } = importCrews(normalizedConfig);
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
-  const byKind = config?.by_kind ?? config?.byKind ?? {};
+  const [supervisorOpen, setSupervisorOpen] = useState(false);
+  const [kindDraft, setKindDraft] = useState<typeof ITEM_KINDS[number]>('docs');
+  const [crewDraft, setCrewDraft] = useState('');
+  const byKind = rest.by_kind;
+  const supervisor = rest.supervisor;
+  const supervisorModelName = Object.values(MODELS_BY_PROVIDER).flatMap((provider) => provider.models)
+    .find((model) => model.id === (supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL))?.name ?? supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL;
+  const crewName = (crewId: string | undefined) => {
+    const crew = crews.find((entry) => entry.id === crewId);
+    return crew ? crewLabel(crew) : crewId ?? 'Unknown crew';
+  };
   const reason = validationReason(config);
   const enabled = config?.enabled ?? false;
   const serverTieredError = saveErrorMessage?.includes('tiered_execution') ? saveErrorMessage : null;
@@ -117,7 +127,6 @@ export function TieredExecutionSection({
   const replayThresholdError = serverTieredError?.includes('tiered_execution.replay_threshold') || reason?.includes('tiered_execution.replay_threshold')
     ? serverTieredError ?? reason
     : null;
-  const tierNames = Object.keys(config?.tiers ?? {});
 
   const updateTieredExecution = (nextConfig: TieredExecutionConfig) => {
     onSettingsChange({
@@ -159,28 +168,23 @@ export function TieredExecutionSection({
   };
 
   const handleSupervisorPatch = (patch: Partial<NonNullable<TieredExecutionConfig['supervisor']>>) => {
-    const next = currentConfig();
-    updateTieredExecution({
-      ...next,
+    writeCrews(crews, assign, {
+      ...rest,
       supervisor: {
-        model: next.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL,
-        harness: next.supervisor?.harness ?? 'claude-code',
-        subscribe: next.supervisor?.subscribe ?? 'flagged',
-        owns_inspection: next.supervisor?.owns_inspection ?? false,
+        model: rest.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL,
+        harness: rest.supervisor?.harness ?? 'claude-code',
+        subscribe: rest.supervisor?.subscribe ?? 'flagged',
+        owns_inspection: rest.supervisor?.owns_inspection ?? false,
         ...patch,
       },
     });
   };
 
-  const handleByKindChange = (kind: typeof ITEM_KINDS[number], tierName: string) => {
-    const next = currentConfig();
-    const byKind = { ...(next.by_kind ?? {}) };
-    if (tierName) byKind[kind] = tierName;
-    else delete byKind[kind];
-    updateTieredExecution({
-      ...next,
-      by_kind: byKind,
-    });
+  const handleByKindChange = (kind: typeof ITEM_KINDS[number], crewId: string) => {
+    const next = { ...byKind };
+    if (crewId) next[kind] = crewId;
+    else delete next[kind];
+    writeCrews(crews, assign, { ...rest, by_kind: next });
   };
 
   const handleFeedPatch = (patch: Partial<NonNullable<TieredExecutionConfig['feed']>>, opts: { debounce?: boolean } = {}) => {
@@ -351,14 +355,18 @@ export function TieredExecutionSection({
           )}
         </div>
 
-        <div className="px-4 py-3 rounded-lg border border-border/70">
-          <span className="text-sm font-medium text-foreground">Supervisor</span>
-          <div className="mt-3 grid gap-3 @xl:grid-cols-2">
+        <div className="rounded-lg border border-border/70">
+          <button type="button" aria-expanded={supervisorOpen} onClick={() => setSupervisorOpen(!supervisorOpen)} className="flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-primary">
+            <span>{supervisorOpen ? '▾' : '▸'}</span><span className="text-sm font-medium text-foreground">Standing reviewer</span>
+            <span className="text-xs text-muted-foreground">— {supervisor?.subscribe === 'all' ? 'reviews every commit' : supervisor?.subscribe === 'sampled' ? 'reviews a sample' : 'wakes on flagged commits'} · {supervisorModelName} · {supervisor?.owns_inspection ? 'owns inspection' : 'inspection stays separate'}</span>
+          </button>
+          {supervisorOpen && <div className="grid gap-3 border-t border-border/70 px-4 py-3 @xl:grid-cols-2">
+            <p className="col-span-full text-xs text-muted-foreground">Wakes on every commit a crew makes and reviews the diff against the task's acceptance criteria. Required whenever crews are configured.</p>
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-foreground">Model</span>
               <select
-                value={config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL}
-                onChange={(event) => handleSupervisorPatch({ model: event.target.value, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: config?.supervisor?.subscribe ?? 'flagged' })}
+                value={supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL}
+                onChange={(event) => handleSupervisorPatch({ model: event.target.value })}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
               >
                 {Object.entries(MODELS_BY_PROVIDER).map(([providerId, provider]) => (
@@ -373,21 +381,23 @@ export function TieredExecutionSection({
             <label className="space-y-1.5">
               <span className="text-xs font-medium text-foreground">Harness</span>
               <select
-                value={config?.supervisor?.harness ?? 'claude-code'}
-                onChange={(event) => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, harness: event.target.value as Harness, subscribe: config?.supervisor?.subscribe ?? 'flagged' })}
+                value={supervisor?.harness ?? 'claude-code'}
+                onChange={(event) => handleSupervisorPatch({ harness: event.target.value === 'auto' ? providerDefaultHarness(supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, formData) : event.target.value as Harness })}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
               >
+                <option value="auto">auto ({providerDefaultHarness(supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, formData)})</option>
                 {HARNESSES.map((harness) => <option key={harness} value={harness}>{harness}</option>)}
               </select>
             </label>
             <label className="space-y-1.5">
-              <span className="text-xs font-medium text-foreground">Subscribe</span>
+              <span className="text-xs font-medium text-foreground">Reviews</span>
               <select
-                value={config?.supervisor?.subscribe ?? 'flagged'}
-                onChange={(event) => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: event.target.value as NonNullable<TieredExecutionConfig['supervisor']>['subscribe'] })}
+                aria-label="Subscribe"
+                value={supervisor?.subscribe ?? 'flagged'}
+                onChange={(event) => handleSupervisorPatch({ subscribe: event.target.value as NonNullable<TieredExecutionConfig['supervisor']>['subscribe'] })}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
               >
-                {SUBSCRIPTIONS.map((subscription) => <option key={subscription} value={subscription}>{subscription}</option>)}
+                <option value="all">every commit (all)</option><option value="flagged">only commits flagged for inspection (flagged)</option><option value="sampled">a sample, for cost measurement (sampled)</option>
               </select>
             </label>
             <div className="flex items-end justify-between gap-3">
@@ -395,38 +405,30 @@ export function TieredExecutionSection({
               <button
                 type="button"
                 role="switch"
-                aria-checked={config?.supervisor?.owns_inspection ?? false}
+                aria-checked={supervisor?.owns_inspection ?? false}
                 aria-label="Supervisor owns inspection"
-                onClick={() => handleSupervisorPatch({ model: config?.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL, harness: config?.supervisor?.harness ?? 'claude-code', subscribe: config?.supervisor?.subscribe ?? 'flagged', owns_inspection: !(config?.supervisor?.owns_inspection ?? false) })}
+                onClick={() => handleSupervisorPatch({ owns_inspection: !(supervisor?.owns_inspection ?? false) })}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  config?.supervisor?.owns_inspection ? 'bg-primary' : 'bg-muted'
+                  supervisor?.owns_inspection ? 'bg-primary' : 'bg-muted'
                 }`}
               >
                 <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                  config?.supervisor?.owns_inspection ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                  supervisor?.owns_inspection ? 'translate-x-[18px]' : 'translate-x-[3px]'
                 }`} />
               </button>
             </div>
-          </div>
+          </div>}
           {supervisorError && <p className="mt-3 text-xs text-destructive">{supervisorError}</p>}
         </div>
 
         <div className="px-4 py-3 rounded-lg border border-border/70">
           <span className="text-sm font-medium text-foreground">Kind overrides</span>
-          <div className="mt-3 grid gap-3 @lg:grid-cols-2 @2xl:grid-cols-3">
-            {ITEM_KINDS.map((kind) => (
-              <label key={kind} className="space-y-1.5">
-                <span className="text-xs font-medium text-foreground">{kind}</span>
-                <select
-                  value={byKind[kind] ?? ''}
-                  onChange={(event) => handleByKindChange(kind, event.target.value)}
-                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                >
-                  <option value="">Default routing</option>
-                  {tierNames.map((tierName) => <option key={tierName} value={tierName}>{tierName}</option>)}
-                </select>
-              </label>
-            ))}
+          <p className="mt-2 text-xs text-muted-foreground">{Object.keys(byKind).length ? `${Object.keys(byKind).length} kinds overridden; the rest follow difficulty routing.` : 'All kinds follow difficulty routing.'}</p>
+          <div className="mt-2 flex flex-wrap gap-2">{Object.entries(byKind).map(([kind, crewId]) => <span key={kind} className="rounded-full border border-border px-2 py-1 text-xs">{kind} → {crewName(crewId)}<button type="button" aria-label={`Remove ${kind} override`} onClick={() => handleByKindChange(kind as typeof ITEM_KINDS[number], '')} className="ml-2">×</button></span>)}</div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <select aria-label="Kind to override" value={kindDraft} onChange={(event) => setKindDraft(event.target.value as typeof ITEM_KINDS[number])} className="rounded-md border border-border bg-background px-2 py-1.5 text-xs">{ITEM_KINDS.map((kind) => <option key={kind} value={kind}>{kind}</option>)}</select>
+            <select aria-label="Crew for kind override" value={crewDraft} onChange={(event) => setCrewDraft(event.target.value)} className="rounded-md border border-border bg-background px-2 py-1.5 text-xs"><option value="">Choose crew</option>{crews.map((crew) => <option key={crew.id} value={crew.id}>{crewLabel(crew)}</option>)}</select>
+            <button type="button" disabled={!crewDraft} onClick={() => handleByKindChange(kindDraft, crewDraft)} className="rounded-md border border-border px-2.5 py-1.5 text-xs">Add override</button>
           </div>
           {byKindError && <p className="mt-3 text-xs text-destructive">{byKindError}</p>}
         </div>
