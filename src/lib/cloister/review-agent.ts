@@ -55,6 +55,7 @@ import { providerDefaultHarnessSync } from '../agents/staffing.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { type ReReviewScope } from './review-rerun-scope.js';
+import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
   computeConvoyScope,
   launchConvoyReviewersPromise,
@@ -76,6 +77,9 @@ export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.
+
+const reviewSynthesisPath = (reviewDir: string): string => join(reviewDir, 'synthesis.md');
+const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'review.md');
 
 function buildReviewRolePrompt(opts: {
   issueId: string;
@@ -101,7 +105,7 @@ function buildReviewRolePrompt(opts: {
   const carried = opts.carriedSubRoles ?? [];
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
   const expectedSignals = inScope.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
-  const synthesisPath = join(opts.reviewDir, 'synthesis.md');
+  const synthesisPath = reviewSynthesisPath(opts.reviewDir);
   const runningDesc = inScope.length === REVIEW_SUB_ROLES.length
     ? 'the four convoy reviewers (security, correctness, performance, requirements)'
     : `${inScope.length} convoy reviewer(s) this cycle (${inScope.join(', ')})`;
@@ -229,7 +233,7 @@ function buildSelfReviewPrompt(opts: {
   contextManifestPath?: string;
   tier1Summary?: string;
 }): string {
-  const reviewReportPath = join(opts.reviewDir, 'review.md');
+  const reviewReportPath = selfReviewReportPath(opts.reviewDir);
   const prompt = [
     `CODE REVIEW for ${opts.issueId} — you are the sole reviewer; review the change yourself.`,
     '',
@@ -407,10 +411,16 @@ async function spawnReviewRoleForIssuePromise(
           let reportWritten = false;
           if (currentRunId) {
             try {
-              reportWritten = existsSync(join(opts.workspace, PAN_DIRNAME, 'review', currentRunId, 'review.md'));
+              const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', currentRunId);
+              reportWritten = existsSync(selfReviewReportPath(reviewDir))
+                || existsSync(reviewSynthesisPath(reviewDir));
             } catch { /* probe failure — fall back to verdict-only evidence */ }
           }
-          finishedIdle = (terminal || reportWritten) && newerRequest;
+          const reviewAgents = listAgentIdsByPrefixSync(reviewSessionName)
+            .map(id => getAgentStateFileSync(id))
+            .filter(state => state !== null && state !== undefined);
+          const convoyLiveness = evaluateReviewConvoyLiveness(opts.issueId, status ?? {}, reviewAgents);
+          finishedIdle = (terminal || reportWritten || !convoyLiveness.active) && newerRequest;
           if (finishedIdle) {
             console.log(
               `[review-agent] ${reviewSessionName} is finished-idle (verdict ${status?.reviewStatus}, newer request pending) — warm-reusing for the new review cycle`,
@@ -427,7 +437,7 @@ async function spawnReviewRoleForIssuePromise(
 
       if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
-        return { success: true, message: `Review already in progress: ${reviewSessionName}` };
+        return { success: false, message: `Review dispatch skipped — already running: ${reviewSessionName}` };
       }
       // Session pane is dead, force mode, stale runId, or finished-idle — kill the
       // convoy tmux and respawn (the spawn path resumes the saved session, so a
