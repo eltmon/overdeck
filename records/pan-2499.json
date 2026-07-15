@@ -11,33 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:41:50.987Z",
+  "updated": "2026-07-15T14:43:51.586Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:41:50.901Z",
-    "inspectNotes": "Inspection error for bead issue-view-model: tmux session inspect-pan-2499-issue-view-model exited before producing a verdict. No verdict was produced."
+    "updatedAt": "2026-07-15T14:43:51.499Z",
+    "inspectNotes": "Item issue-view-model ack: b50e3ba5 adds the AC4 derivation-export test (renamed to .tsx); verified against current tree — IssueViewModel has exactly 10 sub-objects (types.ts:15-26), agents[].active/ship.status=merged fixtures pass, useIssueView.ts:511-515 sources data only via the 5 existing queries.ts hooks (no raw useQuery), derivations.ts has exactly one definition each of isAgentRunning/readyForMerge/mergeStep/stuckReason re-exported via index.ts, and operator.needsYou kind=troubled is modeled and tested. Non-blocking FYI: a legacy second stuckReason exists in pipeline-helpers.ts:127, predating this bead by many commits (git log -S confirms) — not added by this work, out of WI-1 scope."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 958492,
-            "output": 3385,
-            "cacheRead": 793728,
+            "input": 1083174,
+            "output": 3433,
+            "cacheRead": 915328,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 6024035,
-            "output": 17091,
-            "cacheRead": 5800192,
+            "input": 6600332,
+            "output": 17570,
+            "cacheRead": 6371328,
             "cacheWrite": 0
           }
         },
@@ -59,10 +59,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16813,
-            "output": 4763,
-            "cacheRead": 1235888,
-            "cacheWrite": 199806
+            "input": 16837,
+            "output": 11242,
+            "cacheRead": 2885237,
+            "cacheWrite": 218772
           }
         },
         "work": {
@@ -76,15 +76,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 958492,
-          "output": 3385,
-          "cacheRead": 793728,
+          "input": 1083174,
+          "output": 3433,
+          "cacheRead": 915328,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 6024035,
-          "output": 17091,
-          "cacheRead": 5800192,
+          "input": 6600332,
+          "output": 17570,
+          "cacheRead": 6371328,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -94,10 +94,10 @@
           "cacheWrite": 432038
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16813,
-          "output": 4763,
-          "cacheRead": 1235888,
-          "cacheWrite": 199806
+          "input": 16837,
+          "output": 11242,
+          "cacheRead": 2885237,
+          "cacheWrite": 218772
         },
         "custom/kimi-k2.7-code": {
           "input": 3398495,
@@ -107,8 +107,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 59.621602,
-        "pricingAsOf": "2026-07-15T14:41:50.965Z"
+        "usd": 60.389467,
+        "pricingAsOf": "2026-07-15T14:43:51.558Z"
       }
     },
     "merges": [],
