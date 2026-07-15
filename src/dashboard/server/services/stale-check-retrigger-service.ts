@@ -14,22 +14,40 @@ interface ServiceState {
   timer: ReturnType<typeof setInterval> | null;
   repoWindows: Map<string, CachedWindows>;
   lastEvaluated: Map<string, number>;
-  attemptedRunIds: Set<number>;
-  loggedSkips: Set<number>;
+  attemptedRunIds: Map<number, number>;
+  loggedSkips: Map<number, number>;
+  inFlight: boolean;
 }
 
 const POLL_INTERVAL_MS = 60_000;
 const MAIN_PROBE_INTERVAL_MS = 3 * 60_000;
 const EVAL_INTERVAL_MS = 10 * 60_000;
 const MAX_RERUNS_PER_TICK = 5;
+const RUN_STATE_RETENTION_MS = 24 * 60 * 60_000;
 
 const serviceState: ServiceState = {
   timer: null,
   repoWindows: new Map(),
   lastEvaluated: new Map(),
-  attemptedRunIds: new Set(),
-  loggedSkips: new Set(),
+  attemptedRunIds: new Map(),
+  loggedSkips: new Map(),
+  inFlight: false,
 };
+
+function pruneState(state: ServiceState, issueIds: Set<string>, repos: Set<string>, now: number): void {
+  for (const issueId of state.lastEvaluated.keys()) {
+    if (!issueIds.has(issueId)) state.lastEvaluated.delete(issueId);
+  }
+  for (const repo of state.repoWindows.keys()) {
+    if (!repos.has(repo)) state.repoWindows.delete(repo);
+  }
+  for (const [runId, recordedAt] of state.attemptedRunIds) {
+    if (now - recordedAt >= RUN_STATE_RETENTION_MS) state.attemptedRunIds.delete(runId);
+  }
+  for (const [runId, recordedAt] of state.loggedSkips) {
+    if (now - recordedAt >= RUN_STATE_RETENTION_MS) state.loggedSkips.delete(runId);
+  }
+}
 
 function parsePrUrl(url: string | undefined | null): PrRef | null {
   if (!url) return null;
@@ -53,9 +71,15 @@ async function tickOnce(state: ServiceState): Promise<void> {
       const failing = candidate.blockerReasons?.some((blocker) => blocker.type === 'failing_checks');
       return ref && failing ? [{ candidate, ref }] : [];
     });
+    const now = Date.now();
+    pruneState(
+      state,
+      new Set(candidates.map(({ candidate }) => candidate.issueId)),
+      new Set(candidates.map(({ ref }) => ref.repo)),
+      now,
+    );
     if (candidates.length === 0) return;
 
-    const now = Date.now();
     let retriggered = 0;
     let skipped = 0;
 
@@ -76,7 +100,7 @@ async function tickOnce(state: ServiceState): Promise<void> {
       for (const entry of selection.skipped) {
         skipped++;
         if (!state.loggedSkips.has(entry.run.databaseId)) {
-          state.loggedSkips.add(entry.run.databaseId);
+          state.loggedSkips.set(entry.run.databaseId, now);
           console.log(`[stale-check-retrigger] skipping run ${entry.run.databaseId} for ${candidate.issueId}: ${entry.reason}`);
         }
       }
@@ -90,7 +114,7 @@ async function tickOnce(state: ServiceState): Promise<void> {
         }
         const window = windows.get(run.workflowName)?.find(({ start, end }) =>
           end !== null && start <= run.createdAt && run.createdAt < end);
-        state.attemptedRunIds.add(run.databaseId);
+        state.attemptedRunIds.set(run.databaseId, now);
         const succeeded = await rerunFailedRun(ref.repo, run.databaseId);
         if (succeeded && window?.end) {
           retriggered++;
@@ -108,9 +132,19 @@ async function tickOnce(state: ServiceState): Promise<void> {
   }
 }
 
+async function runTickIfIdle(state: ServiceState): Promise<void> {
+  if (state.inFlight) return;
+  state.inFlight = true;
+  try {
+    await tickOnce(state);
+  } finally {
+    state.inFlight = false;
+  }
+}
+
 export function startStaleCheckRetriggerService(): void {
   if (serviceState.timer !== null) return;
-  serviceState.timer = setInterval(() => void tickOnce(serviceState), POLL_INTERVAL_MS);
+  serviceState.timer = setInterval(() => void runTickIfIdle(serviceState), POLL_INTERVAL_MS);
   serviceState.timer.unref?.();
 }
 
@@ -124,5 +158,5 @@ export function stopStaleCheckRetriggerService(): void {
 }
 
 export async function __tickOnceForTests(): Promise<void> {
-  await tickOnce(serviceState);
+  await runTickIfIdle(serviceState);
 }

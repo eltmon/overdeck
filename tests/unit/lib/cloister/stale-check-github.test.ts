@@ -7,7 +7,10 @@ import {
   rerunFailedRun,
 } from '../../../../src/lib/cloister/stale-check-github.js';
 
-vi.mock('node:child_process', () => ({ execFile: vi.fn() }));
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:child_process')>(),
+  execFile: vi.fn(),
+}));
 
 const execFileMock = execFile as unknown as ReturnType<typeof vi.fn>;
 
@@ -50,9 +53,29 @@ describe('listPrHeadFailingRuns', () => {
 
     await expect(listPrHeadFailingRuns('eltmon/overdeck', 'feature/pan-2710', 'current')).resolves.toEqual([current]);
     expect(execFileMock.mock.calls[0][1]).toEqual([
-      'run', 'list', '--repo', 'eltmon/overdeck', '--branch', 'feature/pan-2710', '--status', 'failure',
+      'run', 'list', '--repo', 'eltmon/overdeck', '--branch', 'feature/pan-2710', '--status', 'completed',
       '--json', 'databaseId,workflowName,createdAt,conclusion,status,attempt,headSha',
     ]);
+  });
+
+  it.each(['ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE'])(
+    'keeps the canonical %s failing conclusion',
+    async (conclusion) => {
+      const failing = { databaseId: 20, workflowName: 'CI', createdAt: '2026-07-15T10:00:00Z', conclusion, status: 'completed', attempt: 1, headSha: 'current' };
+      respond(JSON.stringify([failing]));
+
+      await expect(listPrHeadFailingRuns('repo', 'branch', 'current')).resolves.toEqual([failing]);
+    },
+  );
+
+  it('discards successful and incomplete runs before classification', async () => {
+    const base = { databaseId: 20, workflowName: 'CI', createdAt: '2026-07-15T10:00:00Z', status: 'completed', attempt: 1, headSha: 'current' };
+    respond(JSON.stringify([
+      { ...base, conclusion: 'SUCCESS' },
+      { ...base, databaseId: 21, conclusion: 'FAILURE', status: 'in_progress' },
+    ]));
+
+    await expect(listPrHeadFailingRuns('repo', 'branch', 'current')).resolves.toEqual([]);
   });
 
   it('returns an empty list and warns on malformed output', async () => {

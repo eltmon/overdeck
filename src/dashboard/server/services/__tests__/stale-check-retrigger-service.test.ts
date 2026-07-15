@@ -115,3 +115,49 @@ it('swallows adapter errors and keeps the interval firing', async () => {
   expect(warn).toHaveBeenCalledWith('[stale-check-retrigger] tick failed:', 'offline');
   expect(mocks.mainRuns).toHaveBeenCalledTimes(2);
 });
+
+it('does not overlap interval ticks while an evaluation is pending', async () => {
+  let resolveHead!: (head: { headRefName: string; headRefOid: string }) => void;
+  mocks.prHead.mockReturnValue(new Promise((resolve) => { resolveHead = resolve; }));
+  startStaleCheckRetriggerService();
+
+  await vi.advanceTimersByTimeAsync(60_000);
+  await vi.advanceTimersByTimeAsync(60_000);
+  expect(mocks.prHead).toHaveBeenCalledTimes(1);
+
+  resolveHead({ headRefName: 'feature/pan-2710', headRefOid: 'sha' });
+  await vi.advanceTimersByTimeAsync(0);
+});
+
+it('prunes issue throttles when candidates disappear', async () => {
+  await __tickOnceForTests();
+  mocks.candidates.mockReturnValue([]);
+  await __tickOnceForTests();
+  mocks.candidates.mockReturnValue([candidate()]);
+
+  await __tickOnceForTests();
+  expect(mocks.prHead).toHaveBeenCalledTimes(2);
+});
+
+it('expires run-id deduplication state after its retention window', async () => {
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  mocks.rerun.mockResolvedValue(false);
+  await __tickOnceForTests();
+
+  vi.advanceTimersByTime(24 * 60 * 60_000 + 1);
+  await __tickOnceForTests();
+
+  expect(mocks.rerun).toHaveBeenCalledTimes(2);
+  expect(log).not.toHaveBeenCalledWith(expect.stringContaining('skipping run 10'));
+});
+
+it('expires skip-log deduplication after its retention window', async () => {
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  mocks.prRuns.mockResolvedValue([run({ attempt: 2 })]);
+  await __tickOnceForTests();
+
+  vi.advanceTimersByTime(24 * 60 * 60_000 + 1);
+  await __tickOnceForTests();
+
+  expect(log.mock.calls.filter(([message]) => String(message).includes('skipping run 10'))).toHaveLength(2);
+});
