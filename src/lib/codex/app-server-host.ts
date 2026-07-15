@@ -251,7 +251,13 @@ export class CodexAppServerHost {
     if (!this.options.stdin || this.input) return;
     this.input = createInterface({ input: this.options.stdin, crlfDelay: Infinity });
     this.input.on('line', (line) => {
-      void this.handlePaneLine(line);
+      // An unhandled rejection here kills the whole host process, ending the
+      // conversation session — render the failure into the pane instead.
+      void this.handlePaneLine(line).catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        this.writePaneLine(`[error] ${message}`);
+        void this.appendEvent('stdin/error', { message });
+      });
     });
   }
 

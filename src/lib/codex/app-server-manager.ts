@@ -97,12 +97,16 @@ export class CodexAppServerManager extends EventEmitter {
   }
 
   async startThread(options: ThreadOptions): Promise<unknown> {
-    return this.request('thread/start', this.buildThreadParams(options));
+    const result = await this.request('thread/start', this.buildThreadParams(options));
+    this.applyThreadResult(result);
+    return result;
   }
 
   async resumeThread(threadId: string, options: ThreadOptions): Promise<unknown> {
     try {
-      return await this.request('thread/resume', { ...this.buildThreadParams(options), threadId });
+      const result = await this.request('thread/resume', { ...this.buildThreadParams(options), threadId });
+      this.applyThreadResult(result);
+      return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (!isMissingThreadResumeError(message)) throw error;
@@ -208,6 +212,16 @@ export class CodexAppServerManager extends EventEmitter {
       this.pending.delete(String(message.id));
       if (message.error?.message) pending.reject(new Error(`${pending.method} failed: ${String(message.error.message)}`));
       else pending.resolve(message.result);
+    }
+  }
+
+  // thread/start and thread/resume responses both carry the thread; the
+  // thread/started notification fires only for fresh threads, so on resume the
+  // response is the only source of the active threadId.
+  private applyThreadResult(result: unknown): void {
+    const thread = asRecord(asRecord(result).thread);
+    if (typeof thread.id === 'string') {
+      this.sessionState = { ...this.sessionState, state: 'idle', threadId: thread.id };
     }
   }
 

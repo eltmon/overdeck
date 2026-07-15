@@ -327,6 +327,22 @@ describe('CodexAppServerHost', () => {
     await vi.waitFor(() => expect(manager.startTurnCalls.at(-1)).toEqual({ text: 'typed turn', options: {} }));
   });
 
+  it('renders a stdin turn failure into the pane instead of crashing the host', async () => {
+    const manager = new FakeManager();
+    manager.startTurn = async () => {
+      throw new Error('Cannot start a turn before a thread is active.');
+    };
+    const stdin = new PassThrough();
+    const { stdout, lines } = captureStdout();
+    const host = makeHost(manager, { stdin, stdout, model: 'gpt-5.6-sol' });
+    host.startPaneInput();
+
+    stdin.write('typed turn\n');
+
+    await vi.waitFor(() => expect(lines).toContain('[error] Cannot start a turn before a thread is active.'));
+    expect(readEventLog()).toContainEqual(expect.objectContaining({ type: 'stdin/error' }));
+  });
+
   it('resolves a pending approval from y on stdin without starting a turn', async () => {
     const manager = new FakeManager();
     const stdin = new PassThrough();

@@ -90,6 +90,35 @@ describe('CodexAppServerManager', () => {
     manager.stop();
   });
 
+  it('adopts the threadId from a thread/resume response with no thread/started notification', async () => {
+    // codex app-server emits thread/started only for fresh threads; a resumed
+    // thread is announced solely through the thread/resume response.
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      if (message.method === 'thread/resume') server.send({ id: message.id, result: { thread: { id: 'thread-resumed' } } });
+      if (message.method === 'turn/start') server.send({ id: message.id, result: {} });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.144.1', spawnProcess: () => fake.child });
+    await manager.start();
+    await manager.resumeThread('thread-resumed', { model: 'caller-model' });
+    expect(manager.getState().threadId).toBe('thread-resumed');
+    await manager.startTurn('after resume');
+    expect(fake.messages).toContainEqual(expect.objectContaining({ method: 'turn/start', params: expect.objectContaining({ threadId: 'thread-resumed' }) }));
+    manager.stop();
+  });
+
+  it('adopts the threadId from a thread/start response before any notification', async () => {
+    const fake = createFakeAppServer((message, server) => {
+      if (message.method === 'initialize') server.send({ id: message.id, result: {} });
+      if (message.method === 'thread/start') server.send({ id: message.id, result: { thread: { id: 'thread-from-response' } } });
+    });
+    const manager = new CodexAppServerManager({ cwd: '/tmp', readVersion: async () => '0.144.1', spawnProcess: () => fake.child });
+    await manager.start();
+    await manager.startThread({ model: 'caller-model' });
+    expect(manager.getState().threadId).toBe('thread-from-response');
+    manager.stop();
+  });
+
   it('falls back only for missing-thread resume errors', async () => {
     const warnings: string[] = [];
     const fake = createFakeAppServer((message, server) => {
