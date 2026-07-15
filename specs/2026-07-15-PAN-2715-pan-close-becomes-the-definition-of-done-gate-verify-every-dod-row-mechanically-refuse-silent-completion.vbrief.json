@@ -4,17 +4,17 @@
     "created": "2026-07-15T13:46:49Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2715: pan close becomes the Definition-of-Done gate — verify every DoD row mechanically, refuse silent completion",
-    "updated": "2026-07-15T14:09:22.795Z"
+    "updated": "2026-07-15T17:37:26.058Z"
   },
   "plan": {
     "id": "pan-2715",
     "title": "pan close becomes the Definition-of-Done gate — verify every DoD row mechanically, refuse silent completion",
-    "status": "running",
+    "status": "completed",
     "uid": "94a3fd4d-8f0b-4413-9d6d-0513b454161b",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-15T13:46:49Z",
-    "updated": "2026-07-15T14:09:22.795Z",
+    "updated": "2026-07-15T17:37:26.058Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2715",
@@ -901,5 +901,5 @@
       "canonicalFilename": "2026-07-15-PAN-2715-pan-close-becomes-the-definition-of-done-gate-verify-every-dod-row-mechanically-refuse-silent-completion.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
