@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:09:43.280Z",
+  "updated": "2026-07-15T14:10:21.479Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -51,5 +51,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "build-commit-stamp": {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 643857,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:10:21.479Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "build-commit-stamp": "running"
+  }
 }
