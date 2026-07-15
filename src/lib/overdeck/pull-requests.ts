@@ -45,6 +45,8 @@ const GH_PR_VIEW_FIELDS = [
   'files',
   'labels',
   'mergeable',
+  'mergedAt',
+  'mergeCommit',
   'body',
 ].join(',');
 
@@ -77,7 +79,33 @@ export interface IssuePullRequestData {
   files: Array<{ path: string; additions: number; deletions: number }>;
   labels: Array<{ name?: string; color?: string }>;
   mergeable: string | null;
+  mergedAt?: string;
+  mergeCommit?: { oid?: string } | string | null;
   body: string;
+}
+
+export async function fetchCommitCheckRuns(
+  owner: string,
+  repo: string,
+  commit: string,
+): Promise<{ total: number; failed: string[]; pending: string[] }> {
+  const { stdout } = await execFileAsync(
+    'gh',
+    ['api', `repos/${owner}/${repo}/commits/${encodeURIComponent(commit)}/check-runs?per_page=100`,
+      '-H', 'Accept: application/vnd.github+json'],
+    { encoding: 'utf-8', timeout: 15000, maxBuffer: 8 * 1024 * 1024 },
+  );
+  const payload = JSON.parse(stdout) as { check_runs?: Array<{ name?: string; status?: string; conclusion?: string | null }> };
+  const runs = payload.check_runs ?? [];
+  return {
+    total: runs.length,
+    failed: runs
+      .filter(run => run.conclusion != null && !['success', 'skipped', 'neutral'].includes(run.conclusion))
+      .map(run => run.name ?? 'unnamed check'),
+    pending: runs
+      .filter(run => run.status !== 'completed')
+      .map(run => run.name ?? 'unnamed check'),
+  };
 }
 
 export interface IssuePrEndpointResponse {
