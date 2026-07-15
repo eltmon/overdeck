@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   saveAgentStateProgram: vi.fn(),
   getAgentStateProgram: vi.fn(),
   getAgentStateSync: vi.fn(),
+  getAgentStateFileSync: vi.fn(),
+  listAgentIdsByPrefixSync: vi.fn(),
   getLatestSessionIdSync: vi.fn(),
   resumeAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
@@ -43,6 +45,15 @@ vi.mock('../../agents.js', () => ({
   resumeAgent: mocks.resumeAgent,
   wipeAgentStateDirs: mocks.wipeAgentStateDirs,
   messageAgent: vi.fn(),
+}));
+
+vi.mock('../../agents/agent-state.js', () => ({
+  getAgentStateSync: mocks.getAgentStateFileSync,
+}));
+
+vi.mock('../../overdeck/agents.js', () => ({
+  listAgentIdsByPrefixSync: mocks.listAgentIdsByPrefixSync,
+  removeAgentSync: vi.fn(),
 }));
 
 vi.mock('../../tmux.js', () => ({
@@ -116,6 +127,8 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
     mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
     mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getAgentStateFileSync.mockReturnValue(undefined);
+    mocks.listAgentIdsByPrefixSync.mockReturnValue([]);
     mocks.getLatestSessionIdSync.mockReturnValue(undefined);
     mocks.resumeAgent.mockResolvedValue({ success: false, reason: 'no session' });
     mocks.wipeAgentStateDirs.mockResolvedValue(undefined);
@@ -187,10 +200,43 @@ describe('spawnReviewRoleForIssue', () => {
     }));
 
     expect(result).toEqual({
-      success: true,
-      message: 'Review already in progress: agent-pan-1194-review',
+      success: false,
+      message: 'Review dispatch skipped — already running: agent-pan-1194-review',
     });
     expect(mocks.killSession).not.toHaveBeenCalled();
     expect(mocks.spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('re-dispatches a finished convoy when synthesis exists and a newer request is pending', async () => {
+    const workspace = '/tmp/pan-review-finished-convoy';
+    const reviewDir = `${workspace}/.pan/review/agent-pan-1194-review-abc12345`;
+    const { mkdir, writeFile } = await import('fs/promises');
+    await mkdir(reviewDir, { recursive: true });
+    await writeFile(`${reviewDir}/synthesis.md`, '# Review complete\n');
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
+    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+    mocks.getReviewStatus.mockReturnValue({
+      reviewStatus: 'pending',
+      reviewRequestedAt: '2026-07-15T19:00:00.000Z',
+      reviewSpawnedAt: '2026-07-15T18:00:00.000Z',
+    });
+    mocks.listAgentIdsByPrefixSync.mockReturnValue(['agent-pan-1194-review']);
+    mocks.getAgentStateFileSync.mockReturnValue({
+      id: 'agent-pan-1194-review',
+      issueId: 'PAN-1194',
+      role: 'review',
+      status: 'running',
+      lastActivity: '2099-01-01T00:00:00.000Z',
+    });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace,
+      branch: 'feature/pan-1194',
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mocks.killSession).toHaveBeenCalledWith('agent-pan-1194-review');
+    expect(mocks.spawnRun).toHaveBeenCalled();
   });
 });
