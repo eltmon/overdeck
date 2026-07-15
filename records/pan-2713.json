@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:23:58.759Z",
+  "updated": "2026-07-15T14:25:45.096Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "stale-build-chip": {
-        "writerId": "agent-pan-2713",
-        "agentId": "agent-pan-2713",
-        "pid": 890062,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:23:58.759Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -124,6 +116,17 @@
         "outcome": "completed",
         "reason": "Added cached deploy staleness to system-health snapshots and frontend types, with success, null-on-error, and 60-second cache tests.",
         "releasedAt": "2026-07-15T14:23:47.413Z"
+      },
+      {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 890062,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:23:58.759Z",
+        "itemId": "stale-build-chip",
+        "outcome": "completed",
+        "reason": "Added the header stale-build text signal with build/origin tooltip and component coverage for stale, fresh, unknown, and unavailable states.",
+        "releasedAt": "2026-07-15T14:25:45.096Z"
       }
     ],
     "statusReasons": {
@@ -138,6 +141,10 @@
       "health-staleness-surface": {
         "reason": "Added cached deploy staleness to system-health snapshots and frontend types, with success, null-on-error, and 60-second cache tests.",
         "updatedAt": "2026-07-15T14:23:47.413Z"
+      },
+      "stale-build-chip": {
+        "reason": "Added the header stale-build text signal with build/origin tooltip and component coverage for stale, fresh, unknown, and unavailable states.",
+        "updatedAt": "2026-07-15T14:25:45.096Z"
       }
     }
   },
@@ -156,6 +163,9 @@
     "health-staleness-surface.health-staleness-surface.ac1": "completed",
     "health-staleness-surface.health-staleness-surface.ac2": "completed",
     "health-staleness-surface.health-staleness-surface.ac3": "completed",
-    "stale-build-chip": "running"
+    "stale-build-chip": "completed",
+    "stale-build-chip.stale-build-chip.ac1": "completed",
+    "stale-build-chip.stale-build-chip.ac2": "completed",
+    "stale-build-chip.stale-build-chip.ac3": "completed"
   }
 }
