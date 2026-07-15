@@ -1,0 +1,424 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-15T15:20:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2710: Feature PRs keep stale failed checks after red main clears — nothing re-triggers them, so they stay out of the merge gate until manually re-run",
+    "updated": "2026-07-15T15:13:26.014Z"
+  },
+  "plan": {
+    "id": "pan-2710",
+    "title": "Feature PRs keep stale failed checks after red main clears — nothing re-triggers them, so they stay out of the merge gate until manually re-run",
+    "status": "proposed",
+    "uid": "ea88807f-5881-4da0-82ed-805bb8e64e56",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-15T15:20:00.000Z",
+    "updated": "2026-07-15T15:13:26.014Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2710",
+        "label": "PAN-2710",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2712",
+        "label": "PAN-2712 (reconciler half, landed 2b8971f9b5)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "merge-gate",
+      "ci",
+      "cloister",
+      "dashboard-server",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "When main goes red, every open feature PR inherits the failing check. When main recovers, nothing re-runs those PR checks: the stale fail stays on the statusCheckRollup, the PAN-2712 reconciler faithfully re-observes it and re-latches the failing_checks blocker (src/lib/webhook-handlers.ts:270-295), and readyForMerge stays 0 forever (src/lib/review-status.ts:401-407). Proven on PAN-2683 / PR #2693: all gates passed, held out of the merge gate until a manual `gh run rerun 29414663205 --failed`. That manual command is exactly what needs automating.",
+      "Proposal": "Add a level-triggered stale-check re-trigger service to the dashboard server. Each tick it selects review_status rows carrying failing_checks blockers (reusing getMergeBlockerReconcileCandidates), probes main's run history per repo, computes per-workflow red windows with a pure classifier, and re-runs (`gh run rerun <id> --failed`) each failing run on a candidate PR's current head that is completed, attempt === 1, and created inside a *closed* red window of the same workflow. GitHub's attempt counter is the durable once-only guard; red-window membership is the inherited-vs-independently-broken guard; everything re-derives from GitHub so restarts lose nothing. Blocker clearing afterwards is owned by the existing PAN-2712 reconciler cadence.",
+      "NonGoals": "- No failure-signature matching between PR check names and main's failing set (red-window membership is the guard)\n- No new durable transition state, DB table, or state-branch record — idempotency is GitHub-derived\n- No new UI/dashboard surface for poisoned-PR visibility — structured server logs only\n- No re-runs for PRs outside Overdeck management (no review_status failing_checks blocker → not a candidate)\n- No changes to PAN-2712 reconciler cadence or blocker semantics; this service never writes review_status\n- No webhook (workflow_run) ingestion — polling only, consistent with the reconcile service's webhook-gap rationale\n- No retry loop on a failed `gh run rerun` — one attempt, then log and leave the manual fallback"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Level-triggered condition polling instead of durable edge-triggered red→green transition state.",
+        "rationale": "The strike asked for a 'durable transition owner'; deriving the condition from GitHub every tick (main run history + attempt counter) is durable across restarts with zero new persistence, and cannot miss a transition that happens while the server is down — an event-based design would."
+      },
+      {
+        "summary": "Idempotency via GitHub run `attempt === 1` guard rather than a local re-trigger ledger.",
+        "rationale": "After `gh run rerun`, attempt >= 2 permanently, so 'once per PR per transition' is enforced by GitHub state that survives any local wipe. Verified live on 2026-07-15 that `gh run list --json attempt` returns the field. A genuinely broken PR gets at most one gratuitous re-run, then is never touched again."
+      },
+      {
+        "summary": "Inherited-failure guard = per-workflow red-window membership computed from main's run history; signature matching declared a NonGoal.",
+        "rationale": "The issue offered 'run predates fixing commit and/or signature match'. Red windows make the time predicate precise and per-workflow, and additionally protect PRs that failed while main was green (independently broken) — strictly stronger than the suggested minimum while simpler than signature matching."
+      },
+      {
+        "summary": "Candidate population = review_status rows with failing_checks blockers, not all open repo PRs.",
+        "rationale": "These are the rows the merge gate actually holds back, they already carry prUrl, and PAN-2712's candidate SQL selects them — reusing the read door keeps scope to Overdeck-managed PRs and makes steady-state (no candidates) cost zero GitHub calls."
+      },
+      {
+        "summary": "Visibility = structured server logs (per-rerun line + per-tick summary), no UI surface.",
+        "rationale": "The issue requires re-triggering to never be silent; logs satisfy that. A dashboard surface was listed only as the fallback if automation were absent."
+      },
+      {
+        "summary": "Docs land in reference/troubleshooting.mdx.",
+        "rationale": "The user-visible symptom is 'PR stuck UNSTABLE after main recovered'; troubleshooting is where an operator looks, and no existing merge-blocker doc page covers this subsystem."
+      }
+    ],
+    "items": [
+      {
+        "id": "red-window-classifier",
+        "title": "Pure classifier: compute per-workflow red windows on main and select poisoned PR runs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T15:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2710",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "retrigger-service"
+          ],
+          "files_scope": [
+            "src/lib/cloister/stale-check-classifier.ts",
+            "tests/unit/lib/cloister/stale-check-classifier.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/stale-check-classifier.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stale-check-classifier.test.ts passes with cases for closed window, open window, multiple windows, attempt>=2, run outside any window, run predating history, and workflow mismatch",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/stale-check-classifier.ts, a pure module with no I/O. Define `interface WorkflowRun { databaseId: number; workflowName: string; createdAt: string; conclusion: string; status: string; attempt: number; headSha?: string }` matching `gh run list --json databaseId,workflowName,createdAt,conclusion,status,attempt,headSha`. Export (1) `computeRedWindows(mainRuns: WorkflowRun[]): Map<string, Array<{ start: string; end: string | null }>>` — group completed runs by workflowName, sort by createdAt ascending; a window opens at the createdAt of a failing completed run (conclusion in FAILING_CHECK_CONCLUSIONS, imported from src/lib/webhook-handlers.ts:192) when no window is open, and closes (end) at the createdAt of the next successful completed run of the same workflow; a trailing failing run leaves end === null (main still red). Non-completed runs are ignored. (2) `selectRerunCandidates(prFailingRuns: WorkflowRun[], redWindows: ReturnType<typeof computeRedWindows>): { rerun: WorkflowRun[]; skipped: Array<{ run: WorkflowRun; reason: 'attempt-exceeded' | 'main-still-red' | 'no-red-window-match' | 'not-completed' | 'missing-attempt' }> }` — a run is selected for rerun iff status === 'completed', conclusion in FAILING_CHECK_CONCLUSIONS, attempt === 1 (typeof attempt !== 'number' → skipped 'missing-attempt'), and createdAt falls inside a window of the same workflowName with start <= createdAt and end !== null and createdAt < end... note: createdAt inside [start, end) of a CLOSED window selects; inside an OPEN window (end === null) → 'main-still-red'; no containing window → 'no-red-window-match'. Timestamps compare as ISO-8601 strings (same format from gh) — document this in the module header. Write exhaustive unit tests in tests/unit/lib/cloister/stale-check-classifier.test.ts (mirror the directory convention of tests/unit/lib/cloister/in-flight-guard.test.ts). No timers involved — plain synchronous tests."
+        },
+        "items": [
+          {
+            "id": "red-window-classifier.ac1",
+            "title": "Given a main run history of fail(t1) then success(t2) for workflow CI, computeRedWindows returns exactly one CI window { start: t1, end: t2 }; a trailing fail with no later success produces end === null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "red-window-classifier.ac2",
+            "title": "selectRerunCandidates returns in `rerun` only PR runs that are completed, failing-concluded, attempt === 1, and created inside a closed red window of the same workflowName",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "red-window-classifier.ac3",
+            "title": "A PR run created inside an OPEN window is skipped with reason 'main-still-red'; a run created while main was green for its workflow (or predating available history) is skipped with reason 'no-red-window-match'; attempt >= 2 produces 'attempt-exceeded'; a missing attempt field produces 'missing-attempt'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "red-window-classifier.ac4",
+            "title": "The classifier produces its results from literal in-memory fixtures alone (no I/O in the module), and returns conclusions-classification driven by FAILING_CHECK_CONCLUSIONS imported from src/lib/webhook-handlers.ts rather than a duplicated set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gh-run-adapter",
+        "title": "Async gh adapter: list main runs, list PR-head failing runs with attempt, resolve PR head, rerun failed jobs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T15:20:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2710",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/stale-check-github.ts",
+            "tests/unit/lib/cloister/stale-check-github.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/stale-check-github.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stale-check-github.test.ts passes with execFile mocked: JSON parsing, headSha filtering, rerun success returning true, rerun/list errors returning false/[] with a warn log and no throw",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/stale-check-github.ts wrapping the gh CLI with promisified async execFile (copy the execFilePromise helper pattern and 30s timeouts from src/lib/cloister/ci-failure-feedback.ts:21-35; NEVER execSync — this code is reachable from the dashboard server). Export: (1) `listRecentMainRuns(repo: string): Promise<WorkflowRun[]>` → `gh run list --repo <repo> --branch main --limit 50 --json databaseId,workflowName,createdAt,conclusion,status,attempt,headSha`. (2) `listPrHeadFailingRuns(repo: string, headRef: string, headSha: string): Promise<WorkflowRun[]>` → `gh run list --repo <repo> --branch <headRef> --status failure --json <same fields>` filtered to r.headSha === headSha (mirror listFailingRuns at ci-failure-feedback.ts:85-113, adding attempt). (3) `getPrHead(repo: string, prNumber: number): Promise<{ headRefName: string; headRefOid: string } | null>` → `gh pr view <n> --repo <repo> --json headRefName,headRefOid`. (4) `rerunFailedRun(repo: string, runId: number): Promise<boolean>` → `gh run rerun <runId> --failed --repo <repo>`; resolve true on success, false + console.warn on any error (in-progress run, expired run, API failure) — never throw. Import the WorkflowRun type from stale-check-classifier.ts. All list functions return [] (and getPrHead null) on error with a console.warn, matching the ci-failure-feedback error posture. Unit tests mock node:child_process execFile."
+        },
+        "items": [
+          {
+            "id": "gh-run-adapter.ac1",
+            "title": "listRecentMainRuns invokes gh with --branch main --limit 50 and returns parsed WorkflowRun[] including the attempt field; on gh failure it returns [] and emits a console.warn instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-adapter.ac2",
+            "title": "listPrHeadFailingRuns returns only runs whose headSha equals the PR's current head oid, discarding failing runs from older pushes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-adapter.ac3",
+            "title": "rerunFailedRun invokes `gh run rerun <id> --failed` and returns true on exit 0; on non-zero exit it returns false and warns, and the module never calls execSync (grep of the file produces no execSync match)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gh-run-adapter.ac4",
+            "title": "getPrHead returns { headRefName, headRefOid } parsed from gh pr view JSON and null on error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retrigger-service",
+        "title": "Stale-check re-trigger service: tick loop selecting failing_checks candidates and re-running poisoned runs once",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T15:20:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2710",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/stale-check-retrigger-service.ts",
+            "src/dashboard/server/services/__tests__/stale-check-retrigger-service.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/services/__tests__/stale-check-retrigger-service.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "stale-check-retrigger-service.test.ts passes under vi.useFakeTimers covering: happy-path rerun + log, no-candidates tick performs zero gh calls, main-still-red no-op, attempt>=2 skip, failed-while-green skip, once-only rerun across consecutive ticks, global 5-rerun cap, throttle windows respected",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/stale-check-retrigger-service.ts as a structural mirror of merge-blocker-reconcile-service.ts (module-level ServiceState, POLL_INTERVAL_MS = 60_000 setInterval with .unref(), exported start/stop functions, exported `__tickOnceForTests`). Tick algorithm: (1) `await Effect.runPromise(getMergeBlockerReconcileCandidates())` (src/lib/overdeck/review-status-sync.ts) and keep rows where blockerReasons contains type 'failing_checks' AND prUrl parses via the same regex pattern as parsePrUrl in merge-blocker-reconcile-service.ts:59 (copy the small helper — do not export/import across services). If none remain, return immediately — the tick must make zero gh calls (NFR-2). (2) Group survivors by repo; for each repo, if its main-probe throttle (MAIN_PROBE_INTERVAL_MS = 3 * 60_000, per-repo Map) allows, call listRecentMainRuns and computeRedWindows; cache the windows per repo within ServiceState alongside the probe timestamp so throttled ticks reuse the last probe. (3) For each candidate whose per-issue eval throttle (EVAL_INTERVAL_MS = 10 * 60_000) allows: getPrHead → listPrHeadFailingRuns(repo, headRefName, headRefOid) → selectRerunCandidates(runs, windows). (4) For each selected run, subject to a global MAX_RERUNS_PER_TICK = 5 cap and an in-memory attemptedRunIds Set<number> (skip if present): call rerunFailedRun; on true, add to attemptedRunIds and console.log `[stale-check-retrigger] re-ran run <databaseId> (<workflowName>) for <ISSUEID> PR #<n>: failed at <createdAt> inside main red window <start> → <end>`; on false, still add to attemptedRunIds (H1 — never loop on a failing rerun). (5) Log skipped runs once per databaseId (in-memory loggedSkips Set) as `[stale-check-retrigger] skipping run <id> for <ISSUEID>: <reason>`, and end the tick with a summary `[stale-check-retrigger] <N> candidate PR(s) with failing_checks; <M> re-triggered, <K> skipped` only when N > 0. stopStaleCheckRetriggerService clears the interval and all Maps/Sets. Errors anywhere in the tick are caught and swallowed with a warn — the service must never crash the server. Tests MUST use vi.useFakeTimers()/advanceTimersByTimeAsync (repo rule — never real timers) and mock the classifier's inputs via vi.mock of stale-check-github.ts and review-status-sync.ts."
+        },
+        "items": [
+          {
+            "id": "retrigger-service.ac1",
+            "title": "Given a candidate with a failing_checks blocker and a PR-head failing run (attempt 1) created inside a closed main red window, one tick invokes rerunFailedRun exactly once for that run and emits the per-rerun log line naming issue, PR number, run id, workflow, and window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retrigger-service.ac2",
+            "title": "A tick with no failing_checks candidates returns without invoking any gh adapter function (zero gh calls verified via mock call counts)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retrigger-service.ac3",
+            "title": "When main is still red for the workflow (open window), or the run has attempt >= 2, or the run failed while main was green, the tick invokes zero reruns and logs the skip reason once per run id across consecutive ticks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retrigger-service.ac4",
+            "title": "Given a run that was already re-triggered (or whose rerun call failed), later ticks produce zero further rerunFailedRun calls for that run id; each tick emits at most 5 reruns and defers the remainder to subsequent ticks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retrigger-service.ac5",
+            "title": "Per-repo main probes occur at most every 3 minutes and per-issue evaluations at most every 10 minutes under fake-timer advancement; an adapter that throws never escapes the tick (the interval keeps firing)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-boot",
+        "title": "Start/stop the stale-check re-trigger service from dashboard server boot and shutdown",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T15:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-2710",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "npm run build produces dist/dashboard/server.js containing the [stale-check-retrigger] service registration (grep of dist output or build success plus source wiring reviewed in diff)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/main.ts, import startStaleCheckRetriggerService/stopStaleCheckRetriggerService and call the start function directly after startMergeBlockerReconcileService() at main.ts:170, with a matching `console.log('[overdeck] StaleCheckRetriggerService started')`. Add the stop call to the same shutdown path that calls stopCostReconcileService() (main.ts:568). No other boot-path changes. NOTE for review/test roles: this touches the dashboard boot path — per the no-live-boot-hotpatch rule, verification must runtime-boot-test the built dist (throwaway instance) rather than trusting typecheck alone; do not restart the live server into this change unverified."
+        },
+        "items": [
+          {
+            "id": "wire-boot.ac1",
+            "title": "Dashboard server boot emits '[overdeck] StaleCheckRetriggerService started' after the merge-blocker reconcile service line, observable in a throwaway boot of dist/dashboard/server.js under Node 22",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-boot.ac2",
+            "title": "Graceful shutdown invokes stopStaleCheckRetriggerService so the process exits without a lingering interval keeping the event loop alive (interval is also unref'd)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Single-file two-line wiring change; boot and shutdown observability are the only behaviors it introduces"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-troubleshooting",
+        "title": "Document the stale-check re-trigger behavior and manual fallback in troubleshooting",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T15:20:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2710",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors; troubleshooting.mdx renders a section titled to match 'stale failed checks' describing the automation, its guards, its log prefix, and the manual gh run rerun fallback"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a section to reference/troubleshooting.mdx (match the page's existing heading/style conventions) titled e.g. 'PR stuck with stale failed checks after main recovers'. It must explain: (1) the symptom — PR shows UNSTABLE / failing `test` check and ready_for_merge stays 0 even though review/test/verification passed and main is green; (2) the cause — the check failed while main was red and GitHub never re-runs it; (3) the automation — the dashboard's stale-check re-trigger service re-runs poisoned checks once (attempt 1 only, only runs that failed inside a main red window, never while main is still red), logging under the `[stale-check-retrigger]` prefix; (4) the manual fallback when automation cannot act (run predates history, attempt already >= 2, dashboard down): `gh run rerun <run-id> --failed`, and that the blocker then clears within one reconcile poll (~10 min). Keep it operator-facing: define 'red window' and 'ready_for_merge' inline per the explain-fully rule."
+        },
+        "items": [
+          {
+            "id": "docs-troubleshooting.ac1",
+            "title": "reference/troubleshooting.mdx contains a new section that names the symptom, the [stale-check-retrigger] log prefix, and the exact manual fallback command `gh run rerun <run-id> --failed`",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-troubleshooting.ac2",
+            "title": "The section contains inline definitions of 'red window' and the once-only attempt guard so an operator can act without reading source code",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion",
+              "acJustification": "Docs-only item; the two ACs cover the full operator-facing content contract"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "red-window-classifier",
+        "to": "retrigger-service",
+        "type": "blocks"
+      },
+      {
+        "from": "gh-run-adapter",
+        "to": "retrigger-service",
+        "type": "blocks"
+      },
+      {
+        "from": "retrigger-service",
+        "to": "wire-boot",
+        "type": "blocks"
+      },
+      {
+        "from": "retrigger-service",
+        "to": "docs-troubleshooting",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-15-PAN-2710-feature-prs-keep-stale-failed-checks-after-red-main-clears-nothing-re-triggers-them-so-they-stay-out-of-the-merge-gate-until-manually-re-run.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
