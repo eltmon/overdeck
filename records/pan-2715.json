@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:13:39.052Z",
+  "updated": "2026-07-15T15:15:40.259Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "gate-deploy-row": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 1774236,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:13:39.052Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -177,6 +169,17 @@
         "outcome": "completed",
         "reason": "Checked merge-commit CI results with pass/miss/skip semantics; 18 tests and typecheck passed; pushed d9bce4cf0e",
         "releasedAt": "2026-07-15T15:13:16.995Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1774236,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:13:39.052Z",
+        "itemId": "gate-deploy-row",
+        "outcome": "completed",
+        "reason": "Implemented build-commit and timestamp deploy evidence; 22 tests and typecheck passed; pushed d5e07d0ebf",
+        "releasedAt": "2026-07-15T15:15:40.259Z"
       }
     ],
     "statusReasons": {
@@ -206,8 +209,8 @@
         "updatedAt": "2026-07-15T15:13:16.995Z"
       },
       "gate-deploy-row": {
-        "reason": "Continue next ready item after main-verification completion",
-        "updatedAt": "2026-07-15T15:13:39.052Z"
+        "reason": "Implemented build-commit and timestamp deploy evidence; 22 tests and typecheck passed; pushed d5e07d0ebf",
+        "updatedAt": "2026-07-15T15:15:40.259Z"
       }
     }
   },
@@ -237,6 +240,10 @@
     "gate-mainverify-row.gate-mainverify-row.ac1": "completed",
     "gate-mainverify-row.gate-mainverify-row.ac2": "completed",
     "gate-mainverify-row.gate-mainverify-row.ac3": "completed",
-    "gate-deploy-row": "running"
+    "gate-deploy-row": "completed",
+    "gate-deploy-row.gate-deploy-row.ac1": "completed",
+    "gate-deploy-row.gate-deploy-row.ac2": "completed",
+    "gate-deploy-row.gate-deploy-row.ac3": "completed",
+    "gate-deploy-row.gate-deploy-row.ac4": "completed"
   }
 }
