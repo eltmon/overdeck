@@ -11,31 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T15:26:41.299Z",
+  "updated": "2026-07-15T15:27:31.841Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:22:04.994Z"
+    "updatedAt": "2026-07-15T15:27:31.762Z",
+    "inspectNotes": "Inspecting item red-window-classifier"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 53714,
-            "output": 219,
-            "cacheRead": 29952,
+            "input": 223640,
+            "output": 780,
+            "cacheRead": 155136,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 679401,
-            "output": 2187,
-            "cacheRead": 550656,
+            "input": 3232757,
+            "output": 8709,
+            "cacheRead": 3015424,
             "cacheWrite": 0
           }
         },
@@ -50,15 +52,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 53714,
-          "output": 219,
-          "cacheRead": 29952,
+          "input": 223640,
+          "output": 780,
+          "cacheRead": 155136,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 679401,
-          "output": 2187,
-          "cacheRead": 550656,
+          "input": 3232757,
+          "output": 8709,
+          "cacheRead": 3015424,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -69,15 +71,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 9.259917,
-        "pricingAsOf": "2026-07-15T15:22:05.078Z"
+        "usd": 11.130901,
+        "pricingAsOf": "2026-07-15T15:27:31.823Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 2,
     "claims": {},
