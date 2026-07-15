@@ -104,7 +104,7 @@ export function TieredExecutionSection({
     by_kind: config?.by_kind ?? config?.byKind ?? {},
   };
   const { crews, assign, rest } = importCrews(normalizedConfig);
-  let outgoingConfig = normalizedConfig;
+  let outgoingConfig: TieredExecutionConfig = normalizedConfig;
   try {
     outgoingConfig = serializeCrews(crews, assign, rest);
   } catch {
