@@ -21,6 +21,8 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
   const [snapshot, setSnapshot] = useState<UpdateSnapshot | null>(null);
   const [actionPending, setActionPending] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
   const bridge = window.overdeckBridge;
 
   const check = useCallback(async () => {
@@ -63,12 +65,20 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
 
   useEffect(() => {
     if (!isOpen) return;
+    previousFocusRef.current = document.activeElement as HTMLElement | null;
+    window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>('button, a[href]')?.focus(), 0);
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && !['downloading', 'installing'].includes(snapshot?.phase ?? '')) onClose();
+      if (event.key === 'Tab' && dialogRef.current) {
+        const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]')];
+        const first = focusable[0]; const last = focusable.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose]);
+    return () => { window.removeEventListener('keydown', onKeyDown); previousFocusRef.current?.focus(); };
+  }, [isOpen, onClose, snapshot?.phase]);
 
   if (!isOpen) return null;
 
@@ -82,13 +92,14 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
     : phase === 'ready'
       ? (incompatibleAgents ? `Waiting for ${runningAgentCount} active agent${runningAgentCount === 1 ? '' : 's'}` : 'Restart and update')
       : phase === 'current'
-        ? 'Check again'
+        ? 'Done'
         : phase === 'error'
           ? 'Try again'
           : null;
 
   const runAction = async () => {
-    if (phase === 'current' || phase === 'error') return check();
+    if (phase === 'current') return onClose();
+    if (phase === 'error') return check();
     if (phase === 'ready') {
       if (incompatibleAgents) return;
       if (bridge) bridge.restartAndInstallUpdate();
@@ -105,7 +116,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
   };
 
   const statusCopy = phase === 'current'
-    ? `You’re running the latest ${snapshot?.channel ?? 'stable'} version.`
+    ? 'You’re up to date'
     : phase === 'ready'
       ? 'The update is ready. Restart Overdeck when you are ready.'
       : phase === 'error'
@@ -122,9 +133,9 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
     <div
       ref={overlayRef}
       className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => { if (event.target === overlayRef.current) onClose(); }}
+      onMouseDown={(event) => { if (event.target === overlayRef.current && !['downloading', 'installing'].includes(phase)) onClose(); }}
     >
-      <section className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="update-dialog-title">
+      <section ref={dialogRef} className="w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="update-dialog-title">
         <header className="flex items-start justify-between border-b border-border px-6 py-5">
           <div className="flex gap-3">
             <div className="mt-0.5 rounded-xl bg-primary/10 p-2.5 text-primary"><Rocket className="h-5 w-5" /></div>
@@ -133,7 +144,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
               <p className="mt-1 text-sm text-muted-foreground">{statusCopy}</p>
             </div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground" aria-label="Close updater"><X className="h-4 w-4" /></button>
+          <button onClick={onClose} disabled={['downloading', 'installing'].includes(phase)} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40" aria-label="Close updater"><X className="h-4 w-4" /></button>
         </header>
 
         <div className="space-y-5 px-6 py-5">
@@ -142,6 +153,8 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
             <ArrowUpRight className="h-4 w-4 text-primary" />
             <div><div className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Latest</div><div className="mt-1 font-mono text-sm text-foreground">{snapshot?.targetVersion ? `v${snapshot.targetVersion}` : 'Checking…'}</div></div>
           </div>
+
+          {phase === 'current' && <p className="text-sm text-muted-foreground">Installed version v{snapshot?.currentVersion}. Checked just now.</p>}
 
           {(phase === 'checking' || phase === 'downloading' || phase === 'installing') && (
             <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Update progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={snapshot?.progress?.percent}><div className="h-full rounded-full bg-primary motion-safe:transition-[width] motion-safe:duration-200" style={{ width: `${snapshot?.progress?.percent ?? 50}%` }} /></div>
@@ -169,7 +182,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
             {snapshot?.installMode === 'development' ? 'Development checkout — install manually' : 'Your projects and agent history stay in place'}
           </div>
           <div className="flex gap-2">
-            <button onClick={onClose} className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground">Not now</button>
+            <button onClick={onClose} disabled={['downloading', 'installing'].includes(phase)} className="rounded-lg border border-border px-4 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-40">{phase === 'available' ? 'Later' : 'Done'}</button>
             {actionLabel && snapshot?.installMode !== 'development' && (
               <button onClick={() => void runAction()} disabled={actionPending || incompatibleAgents} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50">
                 {(actionPending || ['checking', 'downloading', 'installing'].includes(phase)) ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}

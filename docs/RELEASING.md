@@ -198,6 +198,12 @@ For the bootstrap (or an emergency manual publish), authenticate with a **Granul
 
 ## When to cut stable vs canary
 
+### Desktop update artifact gate
+
+The desktop matrix must upload one coherent set of generated updater assets before a draft release becomes public. Windows supplies the NSIS `.exe`, its blockmap when emitted, and `latest.yml` or `beta.yml`; macOS supplies both `.dmg` and Squirrel.Mac `.zip`, blockmaps, and `latest-mac.yml` or `beta-mac.yml`; Linux supplies `.AppImage` and `latest-linux.yml` or `beta-linux.yml`.
+
+Each manifest is stamped with integer dashboard and agent protocol versions. `scripts/check-release-artifacts.mjs` confirms that every named payload exists in the same artifact set and matches its SHA-512 checksum. Stable versions accept only `latest*` manifests and normal GitHub releases; `-canary.N` versions accept only `beta*` manifests and prereleases. Do not publish a release that fails this gate. An unsigned macOS build is a manual-download artifact, not a supported in-app update.
+
 Choose **stable** when:
 - the current `main` snapshot is something you would recommend to normal users
 - you want `npm install -g @overdeck/core` to pick it up by default

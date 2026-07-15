@@ -171,7 +171,7 @@ Available methods:
 | `getUpdateStatus()` | Returns the shared updater snapshot |
 | `checkForUpdates()` | Resolves the current channel's exact GitHub release and manifest |
 | `downloadUpdate()` | Downloads and verifies the native update |
-| `quitAndInstall()` | Restarts into an update that has finished downloading |
+| `restartAndInstallUpdate()` | Explicitly restarts into an update that has finished downloading |
 | `onUpdateStatus(listener)` | Subscribes to update lifecycle and progress changes |
 
 ---
@@ -193,6 +193,8 @@ This is equivalent to `pan up` without the Electron wrapper — useful on headle
 The version beside the **Overdeck** wordmark is an update control. Hovering it explains the action; clicking it opens the updater and always performs a fresh check. The same dialog opens from **Help → Check for Updates…** in the desktop app.
 
 The dialog shows the installed and target versions, the GitHub release changelog, download/install progress, and the final restart action. If no newer release exists, it confirms that Overdeck is current instead of silently closing. Development checkouts are detected and show a manual-update message rather than modifying the repository.
+
+No update check or download restarts Overdeck. Desktop downloads may install on a later normal application quit, preserving the native updater's existing behavior, but an immediate restart happens only after **Restart Overdeck** is clicked. The updater adds no telemetry.
 
 The action depends on how Overdeck is running:
 

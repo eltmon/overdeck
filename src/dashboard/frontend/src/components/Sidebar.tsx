@@ -9,6 +9,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
 import { OverdeckMark } from './OverdeckMark';
+import { VersionUpdateButton } from './VersionUpdateButton';
 import { fetchConversations } from './CommandDeck/ConversationList';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
@@ -368,7 +369,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               </span>
             </button>
             {versionData?.version && (
-              <button onClick={onOpenUpdater} className="rounded px-1 py-0.5 text-[10px] font-normal text-muted-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" title="Click to update Overdeck to the latest version" aria-label={`Overdeck version ${versionData.version}. Click to check for updates.`}>v{versionData.version}</button>
+              <VersionUpdateButton currentVersion={versionData.version} onOpen={() => onOpenUpdater?.()} />
             )}
             </div>
           )}

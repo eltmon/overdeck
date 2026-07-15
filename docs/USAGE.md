@@ -1,5 +1,13 @@
 # Overdeck Usage Guide
 
+## Updating Overdeck
+
+In the expanded dashboard sidebar, click the version beside the Overdeck wordmark to perform a fresh update check. The dialog reports whether the installed stable or canary build is current, shows exact-version release notes when an update exists, and keeps download/install progress visible until an explicit restart action is available.
+
+Browser installations asynchronously install the exact resolved `@overdeck/core` version, run `pan sync`, and then offer **Restart dashboard**. The Electron app downloads and verifies its signed platform package before offering **Restart Overdeck**. Neither path interrupts active sessions during the check or download; a release with a changed agent protocol blocks restart until active agents stop. Source checkouts are check-only and must be updated through Git.
+
+The CLI alternatives remain `pan update`, `pan update --check`, and `pan update --force`. `--force` reinstalls the exact version resolved from the build's stable or canary channel; it does not install an unbounded `latest` package.
+
 **Detailed installation, configuration, and usage guide for Overdeck CLI**
 
 ---

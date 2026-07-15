@@ -151,7 +151,9 @@ pan init              Initialize ~/.overdeck/
 pan install           Install prerequisites (ttyd, beads, Traefik, mkcert)
 pan setup             Interactive setup wizard
 pan doctor            Check system health and dependencies
-pan update            Update Overdeck to latest version
+pan update            Install the exact latest version for this build's channel
+pan update --check    Check without installing
+pan update --force    Reinstall the exact resolved version
 pan sync              Sync skills/agents/rules to devroot
 pan backup            Manage backups
 pan restore [ts]      Restore from backup
