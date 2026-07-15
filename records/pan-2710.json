@@ -574,15 +574,7 @@
       "timestamp": "2026-07-15T18:48:30.212Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T18:48:30Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T14:48:02-04:00\n\n## Verdict: CHANGES REQUESTED — all four convoy reviewers failed before producing usable reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-c3181b1f/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: c3181b1f66f9b00a5cd4d2aff3a1d0fd1eb4e8dd\n- Cycle number: 11\n- Prior cycle SHA: 1697a98a2b93d41692e74ae31f834b78f6d8f7e2\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | failed | — | infrastructure failure |\n| performance | failed | — | infrastructure failure |\n| requirements | failed | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-security already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n### [correctness] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-correctness already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n### [performance] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-performance already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n### [requirements] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-requirements already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n## Non-blocking Findings\n\nNone. No reviewer produced a usable report in this cycle.\n\n## Clean Sub-roles\n\nNone. All four sub-roles ended in infrastructure failure.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-c3181b1f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -609,22 +601,22 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T19:32:49.266Z",
+  "updated": "2026-07-15T19:33:01.400Z",
   "pipeline": {
     "issueId": "PAN-2710",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T19:32:49.202Z",
+    "updatedAt": "2026-07-15T19:33:01.286Z",
     "inspectNotes": "Verified against ab30bec102 (src/lib/cloister/stale-check-classifier.ts + tests/unit/lib/cloister/stale-check-classifier.test.ts). AC1: computeRedWindows closes fail(t1)->success(t2) into one {start,end} window, trailing fail leaves end:null (tests confirm). AC2: selectRerunCandidates requires completed+attempt===1+failing-concluded+containing closed window of same workflowName before adding to rerun[]. AC3: main-still-red (open window), no-red-window-match (green interval / predating history / workflow mismatch), attempt-exceeded (attempt!==1), missing-attempt (checked before other reasons) all covered by dedicated tests with exact reason strings. AC4: module is pure (no fs/network I/O, operates only on passed-in arrays); imports FAILING_CHECK_CONCLUSIONS from ../webhook-handlers.js (webhook-handlers.ts:192) rather than duplicating the conclusion set; test 'recognizes every conclusion from the canonical failing set' cross-checks all 7 values. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
     "lastVerifiedCommit": "c3181b1f66f9b00a5cd4d2aff3a1d0fd1eb4e8dd",
     "reviewRequestedAt": "2026-07-15T19:32:48.867Z",
-    "reviewSpawnedAt": "2026-07-15T18:47:15.656Z"
+    "reviewSpawnedAt": "2026-07-15T19:33:01.285Z"
   },
   "closeOut": {
     "usage": {
@@ -688,7 +680,7 @@
       },
       "costAtCloseOut": {
         "usd": 102.88624,
-        "pricingAsOf": "2026-07-15T19:32:49.237Z"
+        "pricingAsOf": "2026-07-15T19:33:01.371Z"
       }
     },
     "merges": [
