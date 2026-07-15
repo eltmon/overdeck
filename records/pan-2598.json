@@ -281,19 +281,19 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:31:41.490Z",
+  "updated": "2026-07-15T15:32:59.709Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-15T15:31:40.625Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-15T15:32:59.456Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at typecheck (4521ms):\n\n\n> @overdeck/core@0.45.19 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.45.19 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.19 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ Build start\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
@@ -384,9 +384,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 48759434,
-            "output": 37912,
-            "cacheRead": 48113920,
+            "input": 49724969,
+            "output": 38286,
+            "cacheRead": 49040384,
             "cacheWrite": 0
           }
         },
@@ -445,9 +445,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 48759434,
-          "output": 37912,
-          "cacheRead": 48113920,
+          "input": 49724969,
+          "output": 38286,
+          "cacheRead": 49040384,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -476,8 +476,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 99.612193,
-        "pricingAsOf": "2026-07-15T15:31:40.691Z"
+        "usd": 100.282,
+        "pricingAsOf": "2026-07-15T15:32:59.549Z"
       }
     },
     "merges": [
