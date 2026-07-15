@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:46:49.376Z",
+  "updated": "2026-07-15T15:47:00.778Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -282,5 +282,36 @@
         "updatedAt": "2026-07-15T15:40:46.056Z"
       }
     }
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "src/lib/__tests__/deliver-agent-message.test.ts",
+      "src/lib/agents/delivery.ts",
+      "src/lib/channels/SMOKE_TEST.md",
+      "src/lib/channels/__tests__/injection-budget.test.ts",
+      "src/lib/channels/__tests__/pty-supervisor.test.ts",
+      "src/lib/channels/injection-budget.ts",
+      "src/lib/channels/pty-supervisor.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/tmux.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "src/lib/__tests__/deliver-agent-message.test.ts",
+      "src/lib/agents/delivery.ts",
+      "src/lib/channels/SMOKE_TEST.md",
+      "src/lib/channels/__tests__/injection-budget.test.ts",
+      "src/lib/channels/__tests__/pty-supervisor.test.ts",
+      "src/lib/channels/injection-budget.ts",
+      "src/lib/channels/pty-supervisor.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/tmux.ts"
+    ],
+    "recordedAt": "2026-07-15T15:47:00.777Z"
   }
 }
