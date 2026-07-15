@@ -1,0 +1,905 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-15T13:46:49Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2715: pan close becomes the Definition-of-Done gate — verify every DoD row mechanically, refuse silent completion",
+    "updated": "2026-07-15T13:53:14.362Z"
+  },
+  "plan": {
+    "id": "pan-2715",
+    "title": "pan close becomes the Definition-of-Done gate — verify every DoD row mechanically, refuse silent completion",
+    "status": "proposed",
+    "uid": "94a3fd4d-8f0b-4413-9d6d-0513b454161b",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-15T13:46:49Z",
+    "updated": "2026-07-15T13:53:14.362Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2715",
+        "label": "PAN-2715",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2713",
+        "label": "PAN-2713",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "close-out",
+      "definition-of-done",
+      "lifecycle",
+      "cli",
+      "gate"
+    ],
+    "narratives": {
+      "Problem": "Close-out verifies only its own teardown. Nothing audits the full Definition of Done, so an issue can be closed-out while DoD steps silently never happened — on 2026-07-15, PAN-2684/2690/2701 were fully closed while the live dashboard ran a build from before their merges. pan close (and the dashboard Close Out action) must become the mechanical DoD gate: check every row of docs/DEFINITION-OF-DONE.md, report each row's state as a table (row, expected, observed, PASS/MISS/SKIP), block on any MISS unless an explicit per-row --accept-<row> override is given, and write the gate result (including accepted misses, with who/when) into the issue's close-out record on overdeck-state.",
+      "Proposal": "Create one shared DoD definition module src/lib/lifecycle/dod.ts (DOD_ROWS: 8 rows with kebab ids review, tests, verification, merged, post-merge, main-verify, deploy, teardown) that the gate evaluator, the CLI accept flags, and a doc-drift test all enumerate from. Build per-row checkers in src/lib/lifecycle/dod-gate.ts that read ONLY through existing doors: getReviewStatusSync with a pipeline-journal fallback (rows 1-3), the exported verifyBranchMergedImpl + gh PR state (row 4), canonical state + agents resolver (row 5), gh check-runs on the merge commit (row 6), and a best-effort deploy staleness check against the live dashboard's process start time and dist mtime vs the PR mergedAt — preferring a buildCommit field from /api/version when PAN-2713 lands (row 7). Wire evaluateDodGate into closeOut() in workflows.ts before any archive/teardown step so both pan close and the dashboard route get it; emit one StepResult per row; refuse completion when any MISS lacks its accept. Persist the gate table + accepted misses into PanIssueCloseOutRecord.dodGate through the record write door. Register --accept-<row> flags on pan close generated from DOD_ROWS, accept acceptedRows in the close-out route body, surface gate misses in the CloseOutIssueButton error state, and update docs/DEFINITION-OF-DONE.md + the pan-close skill in the same change.",
+      "NonGoals": "- Does not implement PAN-2713's build-commit exposure endpoint; row 7 stays best-effort (process start time + dist mtime) until it lands, with forward-compat for a buildCommit field.\n- Does not add a durable 'verified on main' state or any new deacon verification flow; row 6 reads existing forge CI results only.\n- Does not change pan wipe, deep-wipe, reset-to-todo, cancel, approve, or plain close() workflows — the gate wires into closeOut() only.\n- Does not build a dashboard UI for per-row acceptance; the route accepts acceptedRows and the existing Close Out button surfaces misses in its error state.\n- Does not change --force semantics: it still only skips the interactive confirmation prompt and never bypasses the gate.\n- Does not add auto-accept behavior for the deacon's auto close-out; a blocked auto close-out records a failure as today.\n- No new direct store access — every fact is read through an existing read door."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Row ids and flags: review, tests, verification, merged, post-merge, main-verify, deploy, teardown; overridable rows 1-7 get --accept-<id>; row 8 (teardown) is performed by close-out itself and has no accept flag.",
+        "rationale": "The issue mandates per-row --accept-<row> flags; kebab ids double as flag suffixes and as record keys, keeping one vocabulary across gate, CLI, record, and doc."
+      },
+      {
+        "summary": "Row 4 (merged) is overridable like the others (explicit --accept-merged, recorded), while remaining a hard block by default.",
+        "rationale": "The issue says every missed row 'requires an explicit per-row --accept-<row> override that is recorded — never a silent pass'; an operator can already close unmerged issues on GitHub directly, so a recorded override is strictly more auditable."
+      },
+      {
+        "summary": "Row 6 (verified on main) = CI check-runs on the merge commit concluded successfully, via gh api; SKIP with note when no merge SHA or no checks exist.",
+        "rationale": "No durable verified-on-main marker exists in code (the doc's 'verifying_on_main -> verified' has no live owner); forge CI conclusion at the merge commit is the only mechanical evidence available through a door."
+      },
+      {
+        "summary": "Row 7 (deploy) applies only when the live dashboard's /api/health repoRoot equals the issue's project root; dashboard unreachable => MISS; other projects => SKIP; PASS requires both server process start time and dist/dashboard/server.js mtime after PR mergedAt, or buildCommit ancestry when /api/version exposes it.",
+        "rationale": "The issue explicitly scopes row 7 to the live dashboard build and asks for best-effort start-time/build-stamp comparison until PAN-2713 lands; deploy semantics for non-overdeck projects are undefined and must not fake a PASS."
+      },
+      {
+        "summary": "Gate result is persisted to the close-out record only on a COMPLETED close-out; a blocked run returns the table in CLI output / WorkflowResult / 422 body but writes nothing durable.",
+        "rationale": "The issue requires the record to carry the gate result of the close-out that happened; recording aborted attempts would need new record semantics the issue does not ask for."
+      },
+      {
+        "summary": "'skipped' review/test statuses count as PASS with an observed note, matching reviewGatesPassedSync semantics; rows 1-3 fall back to the durable pipeline journal when the review-status row was already cleared.",
+        "rationale": "The gate reports pipeline state, it does not re-litigate per-issue review policy; the journal fallback keeps legitimate close-out re-runs (PAN-2611) from false-blocking."
+      },
+      {
+        "summary": "No separate PRD draft was written; the issue body is implementation-ready and this vBRIEF carries the file-level detail.",
+        "rationale": "Auto mode; the issue already contains requirement, row list, implementation notes, and acceptance criteria — a PRD would duplicate it and create drift."
+      }
+    ],
+    "items": [
+      {
+        "id": "dod-rows-module",
+        "title": "Create the shared DoD row definition module (DOD_ROWS)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "dod-doc-drift-guard",
+            "gate-status-rows",
+            "gate-merged-row",
+            "gate-postmerge-row",
+            "gate-mainverify-row",
+            "gate-deploy-row",
+            "gate-assemble-wire",
+            "record-dod-gate",
+            "cli-accept-flags"
+          ],
+          "files_scope": [
+            "src/lib/lifecycle/dod.ts",
+            "tests/unit/lib/lifecycle/dod.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/lifecycle/dod.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "Create src/lib/lifecycle/dod.ts exporting: (a) `DodRowId` union type ('review' | 'tests' | 'verification' | 'merged' | 'post-merge' | 'main-verify' | 'deploy' | 'teardown'); (b) `DodRowDef { id: DodRowId; num: 1..8; title: string; expected: string; overridable: boolean }`; (c) `DOD_ROWS: readonly DodRowDef[]` with the 8 rows matching docs/DEFINITION-OF-DONE.md (num 1 review … num 8 teardown; rows 1-7 overridable, row 8 not); (d) `acceptFlagFor(row): string` returning `--accept-<id>`; (e) result types `DodRowStatus = 'pass' | 'miss' | 'skip'`, `DodRowResult { id, num, title, expected, observed, status, acceptedBy?: { flag: string; by: string; at: string } }`, `DodGateResult { rows: DodRowResult[]; passed: boolean; misses: DodRowId[]; accepted: DodRowId[] }`. Write tests/unit/lib/lifecycle/dod.test.ts asserting uniqueness, numbering, overridability split, and flag derivation. No behavior beyond the definition module."
+        },
+        "items": [
+          {
+            "id": "dod-rows-module.ac1",
+            "title": "src/lib/lifecycle/dod.ts exports DOD_ROWS, which contains exactly 8 entries numbered 1-8 with ids review, tests, verification, merged, post-merge, main-verify, deploy, teardown",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-rows-module.ac2",
+            "title": "DOD_ROWS marks rows 1-7 overridable:true and row 8 (teardown) overridable:false, and acceptFlagFor returns --accept-<id> for each overridable row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-rows-module.ac3",
+            "title": "tests/unit/lib/lifecycle/dod.test.ts passes, asserting unique ids, contiguous 1-8 numbering, and the overridable split",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-doc-drift-guard",
+        "title": "Doc drift guard: DEFINITION-OF-DONE.md table locked to DOD_ROWS by a test",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+            "docs/DEFINITION-OF-DONE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-doc-drift.test.ts"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/lifecycle/dod-doc-drift.test.ts passes"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/lifecycle/dod-doc-drift.test.ts that reads docs/DEFINITION-OF-DONE.md from the repo root, parses the markdown table rows (lines starting with `| <n> |`), and asserts (a) the table has exactly DOD_ROWS.length data rows and (b) every DOD_ROWS entry's num appears as a table row. Update docs/DEFINITION-OF-DONE.md to state that the canonical row list lives in src/lib/lifecycle/dod.ts (naming each row's kebab id in the table, e.g. a `gate id` column or inline code in the Step cell) and that this test blocks silent drift. Changing either surface alone fails the test."
+        },
+        "items": [
+          {
+            "id": "dod-doc-drift-guard.ac1",
+            "title": "The drift test fails when a row is added to or removed from either DOD_ROWS or the doc table alone (row-count and per-num assertions), and passes on the updated pair",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-doc-drift-guard.ac2",
+            "title": "docs/DEFINITION-OF-DONE.md names src/lib/lifecycle/dod.ts as the shared definition and shows each row's gate id (review, tests, verification, merged, post-merge, main-verify, deploy, teardown)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-status-rows",
+        "title": "Row checkers 1-3: review, tests, verification via review-status door with journal fallback",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-gate.test.ts row 1-3 cases pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready"
+        },
+        "narrative": {
+          "Action": "Create src/lib/lifecycle/dod-gate.ts with checker functions checkReviewRow / checkTestsRow / checkVerificationRow. Each takes the issueId plus injected deps (default: getReviewStatusSync from src/lib/review-status.ts and readIssueRecordSync + getProjectConfigFromWorkspacePath from src/lib/pan-dir/record.ts) and returns a DodRowResult. Logic: read getReviewStatusSync(issueId); if null, fall back to readIssueRecordSync(project, issueId)?.pipeline (the durable journal — covers PAN-2611 re-runs after clearReviewStatus). Row 1 PASS when reviewStatus is 'passed' or 'skipped' (observed notes 'skipped per issue policy'); row 2 same for testStatus; row 3 PASS when verificationStatus is 'passed' or 'skipped' AND, when status came from the live door, lastVerifiedCommit is present (observed includes the commit); MISS otherwise with the actual status in observed; MISS with observed 'no review status or journal record found' when both sources are empty. Checkers never throw. Unit tests mock both doors and cover: passed, skipped, failed, pending, cleared-status-with-journal-fallback, and no-data cases per row."
+        },
+        "items": [
+          {
+            "id": "gate-status-rows.ac1",
+            "title": "Given reviewStatus/testStatus/verificationStatus 'passed' (or 'skipped'), each checker returns status 'pass' with the source status in observed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-status-rows.ac2",
+            "title": "Given a non-passed status (pending/failed/blocked), each checker returns status 'miss' with the actual status named in observed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-status-rows.ac3",
+            "title": "Given getReviewStatusSync returns null but the pipeline journal carries passed verdicts, each checker falls back to the journal and returns 'pass' with observed noting the journal source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-status-rows.ac4",
+            "title": "Given both sources empty, each checker returns 'miss' (never throws) with observed explaining no status was found",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-merged-row",
+        "title": "Row checker 4: merged on the forge (reuse verifyBranchMergedImpl)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-gate row 4 cases pass and existing workflows.test.ts stays green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Appends to src/lib/lifecycle/dod-gate.ts created by gate-status-rows — deliberately serialized on the shared module file."
+        },
+        "narrative": {
+          "Action": "Export the existing verifyBranchMergedImpl (currently module-private at src/lib/lifecycle/workflows.ts:410) without changing its logic. Add checkMergedRow to dod-gate.ts: call verifyBranchMergedImpl(ctx) and map its StepResult to a DodRowResult (stepOk -> pass with the step details joined into observed; stepSkipped -> pass with observed noting 'issue already closed on forge' context; stepFailed -> miss with the error as observed). Additionally, when ctx.github is present, read `gh pr view` state for the feature branch (execFile with 10s timeout, same pattern as readGitHubCanonicalState in src/cli/commands/close.ts:48) and append 'PR #<n> MERGED at <mergedAt>' to observed when available; a gh failure only degrades observed, never flips a pass to miss on its own. Capture mergedAt and the merge commit SHA on the returned row result's extra fields (mergedAt?: string, mergeCommit?: string) for reuse by rows 6-7. Unit tests mock verifyBranchMergedImpl and execFile."
+        },
+        "items": [
+          {
+            "id": "gate-merged-row.ac1",
+            "title": "verifyBranchMergedImpl is exported and all existing closeOut merge-verification behavior is preserved (existing workflows.test.ts passes unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-merged-row.ac2",
+            "title": "checkMergedRow returns 'pass' when verifyBranchMergedImpl reports merged and 'miss' with the unmerged-commit error in observed when it fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-merged-row.ac3",
+            "title": "When ctx.github is present and gh resolves the PR, the row result carries mergedAt and mergeCommit fields and observed names the PR number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-merged-row.ac4",
+            "title": "Given a gh CLI error (timeout/nonzero exit), checkMergedRow returns the git-verified 'pass' unchanged and records the gh error text in observed instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-postmerge-row",
+        "title": "Row checker 5: post-merge lifecycle ran (state label + no running issue agents)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "dod-gate row 5 cases pass"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Appends to the shared dod-gate.ts module — deliberately serialized after the earlier row checkers."
+        },
+        "narrative": {
+          "Action": "Add checkPostMergeRow to dod-gate.ts. Evidence, all through doors with injected deps: (a) canonical state — for GitHub issues call the same gh issue view state+labels door as readGitHubCanonicalState (src/cli/commands/close.ts:48) and map via mapGitHubStateToCanonical; PASS-evidence when canonical state is 'verifying_on_main' (postMergeLifecycle applied the label) OR mergeStatus from the row-1-3 status source is 'merged'; (b) agents — via the agents resolver used by close-out surfaces (getAgentState/listRunningAgentsSync from src/lib/agents.ts as imported in src/lib/overdeck/issue-close-out.ts): MISS when a work (agent-<issue>) or planning (planning-<issue>) agent for this issue is still in a running state, with the agent ids named in observed. PASS requires (a) satisfied AND (b) clear. SKIP is never returned for this row. Errors in either probe degrade to miss with the error in observed. Unit tests mock both deps and cover: verifying_on_main + no agents (pass), running work agent (miss naming the agent), state neither verifying_on_main nor merged (miss), gh error (miss with error text)."
+        },
+        "items": [
+          {
+            "id": "gate-postmerge-row.ac1",
+            "title": "Given canonical state verifying_on_main and no running work/planning agents for the issue, checkPostMergeRow returns 'pass'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-postmerge-row.ac2",
+            "title": "Given a running work or planning agent for the issue, the row returns 'miss' and observed names the running agent id(s)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-postmerge-row.ac3",
+            "title": "Given canonical state neither verifying_on_main nor mergeStatus merged, the row returns 'miss' with the observed state named",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-mainverify-row",
+        "title": "Row checker 6: verified on main via merge-commit CI check-runs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "dod-gate row 6 cases pass"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Appends to the shared dod-gate.ts module and consumes the mergeCommit captured by gate-merged-row — deliberately serialized."
+        },
+        "narrative": {
+          "Action": "Add checkMainVerifyRow to dod-gate.ts. Input: the mergeCommit SHA captured by checkMergedRow (threaded through the evaluator, item gate-assemble-wire). When no mergeCommit is available or ctx.github is absent, return 'skip' with observed 'no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)'. Otherwise run `gh api repos/<owner>/<repo>/commits/<sha>/check-runs --jq '{total: .total_count, failed: [.check_runs[] | select(.conclusion != null and .conclusion != \"success\" and .conclusion != \"skipped\" and .conclusion != \"neutral\") | .name], pending: [.check_runs[] | select(.status != \"completed\") | .name]}'` via execFile with 10s timeout. PASS when total > 0, failed is empty, and pending is empty (observed: '<n> check-runs concluded successfully on <sha>'); MISS when any failed (observed names the failing checks) or any pending (observed names them as still running); SKIP when total is 0 (observed: 'no CI check-runs on merge commit'). gh errors return 'miss' with the error text. Unit tests mock execFile for all five cases."
+        },
+        "items": [
+          {
+            "id": "gate-mainverify-row.ac1",
+            "title": "Given all check-runs on the merge commit concluded success/skipped/neutral, the row returns 'pass' with the run count and SHA in observed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-mainverify-row.ac2",
+            "title": "Given a failed or still-pending check-run, the row returns 'miss' and observed names the failing or pending check names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-mainverify-row.ac3",
+            "title": "Given no resolvable merge commit or zero check-runs, the row returns 'skip' with an observed note defining why",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-deploy-row",
+        "title": "Row checker 7: live dashboard build includes the merge (best-effort staleness check)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-gate row 7 cases pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "readinessReason": "Appends to the shared dod-gate.ts module and consumes mergedAt from gate-merged-row — deliberately serialized on the shared file."
+        },
+        "narrative": {
+          "Action": "Add checkDeployRow to dod-gate.ts, deps injected for tests (fetch, execFile, fs.stat, dashboard URL resolver). Steps: (1) resolve the dashboard base URL via getDashboardApiUrl() (src/lib/config.ts, precedence OVERDECK_DASHBOARD_URL > DASHBOARD_URL > config > loopback default); (2) GET /api/health with a 3s timeout — unreachable => 'miss' with observed 'dashboard not reachable at <url> — a merged fix is not live if no server is serving it'; (3) scope check: when health.repoRoot does not equal ctx.projectPath (the issue's project root), return 'skip' with observed 'live dashboard serves <repoRoot>, not this project — deploy semantics undefined for <project>'; (4) forward-compat (PAN-2713): GET /api/version — if the JSON carries a buildCommit (or commit) field, verify inclusion with `git merge-base --is-ancestor <mergeCommit> <buildCommit>` in repoRoot: ancestor => 'pass' (observed 'build commit <short> contains merge <short>'), not-ancestor => 'miss'; (5) best-effort fallback when no buildCommit: require mergedAt from checkMergedRow (absent => 'miss' with observed 'cannot resolve merge time'); find the PID owning the dashboard port (parse port from the URL; `lsof -t -i :<port> -s TCP:LISTEN` or ss fallback) and read its start time via `ps -o lstart= -p <pid>`; stat <repoRoot>/dist/dashboard/server.js mtime; 'pass' only when BOTH server start time AND dist mtime are after mergedAt (observed states both timestamps vs mergedAt and is explicitly labeled 'best-effort — build commit not exposed (PAN-2713)'); either earlier => 'miss' with the stale timestamp named. All probe errors => 'miss' with the error in observed; never throw. Unit tests mock all deps: unreachable, other-project skip, buildCommit pass/miss, best-effort pass, stale-process miss, stale-dist miss."
+        },
+        "items": [
+          {
+            "id": "gate-deploy-row.ac1",
+            "title": "Given /api/version exposes a build commit that contains the merge commit (merge-base --is-ancestor succeeds), the row returns 'pass' naming both commits in observed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-deploy-row.ac2",
+            "title": "Given no build-commit field and a dashboard process started (or dist/dashboard/server.js built) before the PR mergedAt, the row returns 'miss' with the stale timestamp and mergedAt both stated in observed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-deploy-row.ac3",
+            "title": "Given both server start time and dist mtime after mergedAt, the row returns 'pass' with observed labeled best-effort and referencing PAN-2713",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-deploy-row.ac4",
+            "title": "Given the live dashboard serves a different repoRoot than the issue's project, the row returns 'skip' with the mismatch explained; given the dashboard is unreachable, it returns 'miss'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gate-assemble-wire",
+        "title": "Assemble evaluateDodGate and wire it into closeOut() — block on unaccepted MISS",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "record-dod-gate",
+            "cli-accept-flags",
+            "route-accepted-rows"
+          ],
+          "files_scope": [
+            "src/lib/lifecycle/dod-gate.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "src/lib/lifecycle/types.ts",
+            "tests/unit/lib/lifecycle/dod-gate.test.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-gate.test.ts tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "integration cases pass: fully-green closeOut completes; deploy-stale closeOut blocks with row 7 miss; accepted miss proceeds",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "Add `evaluateDodGate(ctx: LifecycleContext, opts: { acceptedRows?: DodRowId[]; acceptedBy?: string }, deps?)` to dod-gate.ts: run checkers for rows 1-7 in row order (threading mergedAt/mergeCommit from row 4 into rows 6-7), stamp acceptedBy `{ flag: acceptFlagFor(id), by: opts.acceptedBy ?? process.env.OVERDECK_AGENT_ID ?? os.userInfo().username, at: new Date().toISOString() }` onto each MISS whose id is in acceptedRows, and return DodGateResult where passed = every row is 'pass', 'skip', or an accepted 'miss'. Reject (throw TypeError) acceptedRows entries that are not overridable DOD_ROWS ids. Wire into closeOut() in workflows.ts as the FIRST step block: extend the closeOut opts type (src/lib/lifecycle/types.ts or the opts intersection) with `{ dodAcceptedRows?: DodRowId[]; dodAcceptedBy?: string }`; emit one StepResult per gate row named `dod:<id>` (pass -> stepOk with 'expected: …; observed: …' details; skip -> stepSkipped; accepted miss -> stepSkipped with 'MISS accepted via --accept-<id> by <who>'; unaccepted miss -> stepFailed). When the gate does not pass, append stepFailed('close-out:dod-gate', 'Definition-of-Done gate blocked close-out: <miss ids>. Re-run with --accept-<id> to record an explicit override.') and return the failed WorkflowResult before ANY archive/teardown/close step runs. Attach the DodGateResult to the WorkflowResult as a new optional `dodGate` field (types.ts). Row 8 (teardown) is represented in the final result by the existing teardown/verified steps — evaluateDodGate returns rows 1-7 only and the row-8 DodRowResult is synthesized after teardown from those StepResults when building the record (item record-dod-gate). The existing verifyBranchMerged step in closeOut() is REPLACED by gate row 4 (same impl, no loss); approve()/close()/deepWipe() are untouched. Tests: (a) all-green mocked checkers -> closeOut proceeds to existing steps; (b) row 7 miss unaccepted -> workflow fails, no closeIssue/teardown calls made; (c) row 7 miss with dodAcceptedRows ['deploy'] -> proceeds and the step log shows the acceptance; (d) deepWipe/close results contain no dod:* steps."
+        },
+        "items": [
+          {
+            "id": "gate-assemble-wire.ac1",
+            "title": "Given all rows pass, closeOut() runs its existing archive/teardown/close steps and the result contains eight dod:* / teardown row entries plus the prior steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-assemble-wire.ac2",
+            "title": "Given an unaccepted miss on any row, closeOut() returns a failed WorkflowResult before any archive, teardown, tracker-close, or status-clear step executes, and the failure message names the missed row ids and their --accept flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-assemble-wire.ac3",
+            "title": "Given dodAcceptedRows containing the missed row's id, closeOut() proceeds and the corresponding step detail records the flag, who, and when",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gate-assemble-wire.ac4",
+            "title": "evaluateDodGate rejects non-overridable or unknown row ids in acceptedRows with a thrown TypeError, and approve()/close()/deepWipe() results contain no dod:* steps",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "record-dod-gate",
+        "title": "Persist the gate table + accepted overrides into the close-out record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/pan-dir/closeout-preserve.test.ts",
+            "tests/unit/lib/lifecycle/workflows.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pan-dir/closeout-preserve.test.ts tests/unit/lib/lifecycle/workflows.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record tests pass showing dodGate persisted with rows and accepted overrides",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "Extend PanIssueCloseOutRecord (src/lib/pan-dir/record.ts:57) with `dodGate?: { evaluatedAt: string; rows: Array<{ id: string; num: number; title: string; expected: string; observed: string; status: 'pass' | 'miss' | 'skip'; acceptedBy?: { flag: string; by: string; at: string } }>; accepted: string[] }`. Add a write-door function `writeCloseOutDodGateSync(project, issueId, dodGate)` next to markRecordPipelineClosedOutSync that merges the field into the record via the existing writeIssueRecordSync path (respecting the PAN-2466 empty-closeOut preservation guard — a populated dodGate must survive later empty-closeOut writes; extend that guard's merge to treat dodGate as closeOut data). In closeOut() (workflows.ts), after the teardown steps succeed, synthesize the row-8 DodRowResult from the teardown StepResults (pass when no blocking teardown failure) and call the writer inside the same step block as markPipelineClosedOutStep, emitting a stepOk('close-out:record-dod-gate', …) / stepSkipped on write failure (non-fatal, matching markPipelineClosedOutStep's error posture). Tests: record round-trip persists rows and acceptedBy who/when; the PAN-2466 guard keeps a populated dodGate when an empty closeOut is written afterward."
+        },
+        "items": [
+          {
+            "id": "record-dod-gate.ac1",
+            "title": "A completed closeOut() persists closeOut.dodGate into the issue record with all 8 rows (including synthesized row 8) and evaluatedAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-dod-gate.ac2",
+            "title": "The record stores each accepted miss with flag, by (agent id or OS username), and at timestamp, and the top-level accepted array contains its row id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "record-dod-gate.ac3",
+            "title": "A later record write carrying an empty closeOut preserves the populated dodGate (PAN-2466 guard extended), proven by a unit test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-accept-flags",
+        "title": "pan close: --accept-<row> flags, gate table output, --json payload",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/close.ts",
+            "src/cli/commands/__tests__/close.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/close.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "close.test.ts passes including accept-flag plumbing and blocked-gate output cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "In src/cli/index.ts (close command registration at line 562), iterate DOD_ROWS.filter(r => r.overridable) and register `.option(acceptFlagFor(row), 'Accept a missed DoD row <num> (<title>) — recorded as an explicit override in the close-out record')` for each (commander camelCases them: options.acceptReview, options.acceptMainVerify, …). In closeOutCommand (src/cli/commands/close.ts): map the camelCased options back to row ids, pass `dodAcceptedRows`/`dodAcceptedBy` into the closeOut ctx/opts, and render the gate as an aligned table before the step list — columns: row #, id, EXPECTED (the row's expected text), OBSERVED, and PASS (green) / MISS (red) / SKIP (yellow) / MISS-ACCEPTED (yellow, with who) — with a lead-in sentence defining the table per the operator-messages rule ('Definition-of-Done gate: each row below is a step an issue must complete before close-out; MISS means the step has not verifiably happened'). On a blocked gate, print which --accept-<id> flag would override each miss and exit 1. --json output includes the full dodGate object from the WorkflowResult. --force continues to skip only the confirmation prompt; assert in a test it does not bypass the gate. Update the confirmation preamble's numbered list to mention the gate runs first."
+        },
+        "items": [
+          {
+            "id": "cli-accept-flags.ac1",
+            "title": "pan close --help prints one --accept-<id> option per overridable DOD_ROWS entry (7 flags), generated from the module — adding a row to DOD_ROWS adds its flag without touching index.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-accept-flags.ac2",
+            "title": "A blocked close prints the gate table with row/expected/observed/MISS, names the exact --accept-<id> flag per miss, and exits 1 without running cleanup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-accept-flags.ac3",
+            "title": "Passing --accept-deploy (or any accept flag) reaches closeOut() as dodAcceptedRows=['deploy'] and the completed run's output marks that row MISS-ACCEPTED with who",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-accept-flags.ac4",
+            "title": "--force alone does not suppress a gate block (test proves a missed row still exits 1 under --force), and --json emits the dodGate rows",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-accepted-rows",
+        "title": "Dashboard Close Out: acceptedRows in the route body, gate misses in the 422 and button error",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/issues.ts",
+            "src/lib/overdeck/issue-close-out.ts",
+            "src/dashboard/server/routes/__tests__/issues-close-out.test.ts",
+            "src/dashboard/frontend/src/components/CloseOutIssueButton.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/issues-close-out.test.ts",
+            "cd src/dashboard/frontend && npx vitest run src/components/CloseOutIssueButton.test.tsx 2>/dev/null || npx vitest run",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issues-close-out route tests pass including acceptedRows pass-through and 422-with-gate-rows cases",
+            "frontend tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "POST /api/issues/:id/close-out (src/dashboard/server/routes/issues.ts:563) parses an optional JSON body `{ acceptedRows?: string[]; acceptedBy?: string }` and threads it to closeOutIssue(id, opts) (src/lib/overdeck/issue-close-out.ts:101), which passes dodAcceptedRows/dodAcceptedBy (default acceptedBy: 'dashboard-operator') into closeOut(). When the workflow fails on the gate, the existing 422 closeOutFailureResponse payload additionally carries `dodGate: { rows, misses }` so callers can see exactly which rows missed and their accept flags. Invalid acceptedRows ids return 400 with the valid id list. bulkCloseOut keeps its current no-accepts behavior (a gate miss fails that issue's entry — never silent). Frontend: CloseOutIssueButton.tsx renders the miss rows from the 422 body in its error state as '<num> <title>: <observed>' lines (plain text list, no new acceptance UI — per NonGoals). Route tests mock closeOut and assert body plumbing + 422 shape; frontend test asserts the error render of gate misses."
+        },
+        "items": [
+          {
+            "id": "route-accepted-rows.ac1",
+            "title": "POST close-out with body acceptedRows ['deploy'] reaches closeOut() as dodAcceptedRows ['deploy']; an invalid row id returns 400 naming the valid ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-accepted-rows.ac2",
+            "title": "A gate-blocked close-out returns 422 whose body includes dodGate.rows with per-row expected/observed/status and the missed row ids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-accepted-rows.ac3",
+            "title": "CloseOutIssueButton renders the missed rows (num, title, observed) from the 422 response in its error state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-doc-update",
+        "title": "Update the pan-close skill and finalize DEFINITION-OF-DONE.md wording",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:46:49Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2715",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-close/SKILL.md",
+            "docs/DEFINITION-OF-DONE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) completes without errors — skill flags match pan close --help"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "Update sync-sources/skills/pan-close/SKILL.md: document the DoD gate (what it checks, the table output), list every --accept-<id> flag with its row meaning, state that --force never bypasses the gate, and show a blocked-then-accepted example. scripts/lint-skills.sh (wired into npm run lint) cross-checks the skill's flags against `pan close --help`, so this must land with (or after) cli-accept-flags in the same PR. Finalize docs/DEFINITION-OF-DONE.md: row 7's owner cell changes from 'GAP — PAN-2713' to name the gate's best-effort staleness check (PAN-2713 still owns the durable build-commit signal), the 'Enforcement is the gate' rule states the gate is live and enumerates rows from src/lib/lifecycle/dod.ts, and note the deacon auto-close-out behavior change (a gate miss now blocks auto close-out and surfaces as a recorded failure)."
+        },
+        "items": [
+          {
+            "id": "skill-doc-update.ac1",
+            "title": "npm run lint passes with the updated SKILL.md — every --accept flag in the skill exists in pan close --help and vice versa",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-doc-update.ac2",
+            "title": "SKILL.md shows the gate table format, contains every --accept flag, and records that --force does not bypass the gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-doc-update.ac3",
+            "title": "docs/DEFINITION-OF-DONE.md row 7 shows the gate's best-effort check as interim owner and the doc contains a reference to src/lib/lifecycle/dod.ts as the row source the gate enumerates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "dod-rows-module",
+        "to": "dod-doc-drift-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-rows-module",
+        "to": "gate-status-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-rows-module",
+        "to": "gate-merged-row",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-rows-module",
+        "to": "gate-postmerge-row",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-rows-module",
+        "to": "gate-mainverify-row",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-rows-module",
+        "to": "gate-deploy-row",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-status-rows",
+        "to": "gate-assemble-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-merged-row",
+        "to": "gate-assemble-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-postmerge-row",
+        "to": "gate-assemble-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-mainverify-row",
+        "to": "gate-assemble-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-deploy-row",
+        "to": "gate-assemble-wire",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-merged-row",
+        "to": "gate-mainverify-row",
+        "type": "informs"
+      },
+      {
+        "from": "gate-merged-row",
+        "to": "gate-deploy-row",
+        "type": "informs"
+      },
+      {
+        "from": "gate-assemble-wire",
+        "to": "record-dod-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-assemble-wire",
+        "to": "cli-accept-flags",
+        "type": "blocks"
+      },
+      {
+        "from": "gate-assemble-wire",
+        "to": "route-accepted-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-accept-flags",
+        "to": "skill-doc-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-15-PAN-2715-pan-close-becomes-the-definition-of-done-gate-verify-every-dod-row-mechanically-refuse-silent-completion.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
