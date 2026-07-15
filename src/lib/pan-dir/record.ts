@@ -203,6 +203,8 @@ export interface PanIssueRecord {
   reviewMode?: ReviewMode;
   /** PAN-1874: per-issue re-review scope override; beats project/global config. */
   reReviewScope?: 'all' | 'changed' | 'blockers';
+  /** Per-issue convoy model override; beats roles.review for every reviewer. */
+  reviewModel?: string;
   /** Per-issue tiered execution override; beats plan-metadata and global config. */
   tieredExecutionOverride?: 'on' | 'off';
   /** PAN-2674: per-issue work-model override; beats tier table and roles.work. */

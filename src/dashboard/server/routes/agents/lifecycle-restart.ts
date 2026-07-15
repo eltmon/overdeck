@@ -10,6 +10,7 @@ import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/vbrief/io.j
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
 import { getDispatchableItems } from '../../../../lib/vbrief/dag.js';
 import { loadConfigSync } from '../../../../lib/config-yaml.js';
+import { getIssueStageSync, isTerminalIssueStage } from '../../../../lib/overdeck/agents.js';
 
 import {
   getAgentState,
@@ -425,11 +426,18 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
       return jsonResponse({ error: `Agent ${id} not found` }, { status: 404 });
     }
     const issueId = agentState.issueId ?? id.replace(/^agent-/, '').toUpperCase();
+    const issueStage = getIssueStageSync(issueId);
+    if (wantsSpawn && isTerminalIssueStage(issueStage)) {
+      return jsonResponse({
+        error: `${issueId} is already ${issueStage?.replaceAll('_', ' ')}. Reopen the issue before starting fresh work.`,
+        issueStage,
+      }, { status: 409 });
+    }
 
     const lifecycle = yield* getWorkAgentLifecycleState(id);
     if (lifecycle.hasLiveTmuxSession) {
       return jsonResponse({
-        error: `Agent ${id} has a live tmux session. Run 'pan kill ${issueId}' first, then retry.`,
+        error: `Agent ${id} has a live tmux session. Run 'pan kill ${id}' to stop only this work agent, then retry.`,
         lifecycle,
       }, { status: 409 });
     }
@@ -522,9 +530,22 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
         cwd: workspacePath,
       }));
     } catch (err: any) {
+      saveAgentStateSync({
+        id: agentSessionName,
+        issueId,
+        workspace: workspacePath,
+        harness: effectiveHarness ?? agentState.harness ?? 'claude-code',
+        role: 'work',
+        model: spawnModel,
+        status: 'stopped',
+        startedAt: new Date().toISOString(),
+        stoppedAt: new Date().toISOString(),
+      });
+      const details = err?.message ?? String(err);
       return jsonResponse({
         success: false,
-        error: `Agent dir wiped but spawn failed: ${err?.message ?? String(err)}`,
+        error: 'The old agent state was cleared, but the fresh agent could not start. Resolve the startup blocker, then try again.',
+        details,
         wiped: wipeResult.removed,
       }, { status: 500 });
     }

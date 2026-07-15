@@ -456,7 +456,7 @@ program
 program
   .command('kill <id>')
   .alias('stop')
-  .description('Stop running agent (workspace preserved)')
+  .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
 registerResetToPlannedCommand(program);

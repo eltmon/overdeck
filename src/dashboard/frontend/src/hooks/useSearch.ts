@@ -165,7 +165,10 @@ export function useSearch(query: string, filters: SearchFilters, options: UseSea
   return {
     results,
     groupedResults,
-    isSearching: query !== debouncedQuery,
+    // Keep the loading state active until the debounced query catches up.
+    // Without trimming here, typing whitespace could briefly publish an empty
+    // result set as final while the next meaningful query was still pending.
+    isSearching: query.trim() !== debouncedQuery.trim(),
     hasResults: results.length > 0,
     resultCount: results.length,
   };

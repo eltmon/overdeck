@@ -285,6 +285,11 @@ function buildSelfReviewPrompt(opts: {
 async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
+  if (!opts.model) {
+    const project = resolveProjectForIssue(opts.issueId);
+    const issueModel = project ? readIssueRecordSync(project, opts.issueId)?.reviewModel : undefined;
+    if (issueModel) opts = { ...opts, model: issueModel };
+  }
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
   // PAN-2420: GitHub-authoritative guard. Do not waste time on conflict-gate

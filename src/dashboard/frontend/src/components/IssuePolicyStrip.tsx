@@ -6,8 +6,8 @@ type ReReviewScopeValue = 'all' | 'changed' | 'blockers';
 type SwarmMode = 'off' | 'auto' | 'always';
 
 interface ReviewConfigResponse {
-  override: { reviewMode: ReviewModeValue | null; reReviewScope: ReReviewScopeValue | null };
-  resolved: { reviewMode: ReviewModeValue; reReviewScope: ReReviewScopeValue };
+  override: { reviewMode: ReviewModeValue | null; reReviewScope: ReReviewScopeValue | null; reviewModel: string | null };
+  resolved: { reviewMode: ReviewModeValue; reReviewScope: ReReviewScopeValue; reviewModel: string };
 }
 
 interface StaffingResponse {
@@ -88,7 +88,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ spawn: true, model: staffing.override.workModel }),
       });
-      const result = await response.json() as { error?: string };
+      const result = await response.json() as { error?: string; details?: string };
       setRestartMessage(response.ok ? 'Fresh restart requested.' : (result.error ?? 'Restart failed.'));
       if (response.ok) await refresh();
     } catch {
@@ -111,6 +111,10 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             <option value="changed">re-review: changed</option><option value="all">re-review: all</option><option value="blockers">re-review: blockers</option>
           </select>
         )}
+        <select aria-label="Review model for this issue" className={`${selectClass} ${review.override.reviewModel ? 'border-primary' : 'border-border'}`} disabled={saving} value={review.override.reviewModel ?? ''} onChange={(event) => save(`/api/review/${encoded}/config`, { reviewModel: event.target.value || null })}>
+          <option value="">{`reviewers: default (${review.resolved.reviewModel})`}</option>
+          {models.map((model) => <option key={model.id} value={model.id}>{`reviewers: ${model.name}`}</option>)}
+        </select>
         <select aria-label="Work model for this issue" className={`${selectClass} ${staffing.override.workModel ? 'border-primary' : 'border-border'}`} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
           <option value="">{`work: default (${workDefault})`}</option>
           {models.map((model) => <option key={model.id} value={model.id}>{`work: ${model.name}`}</option>)}

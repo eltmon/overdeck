@@ -11,7 +11,7 @@ describe('IssuePolicyStrip', () => {
   beforeEach(() => {
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = input.toString();
-      if (url.includes('/api/review/')) return response({ override: { reviewMode: null, reReviewScope: null }, resolved: { reviewMode: 'full', reReviewScope: 'changed' } });
+      if (url.includes('/api/review/')) return response({ override: { reviewMode: null, reReviewScope: null, reviewModel: null }, resolved: { reviewMode: 'full', reReviewScope: 'changed', reviewModel: 'gpt-5.5' } });
       if (url.includes('/staffing')) return response({ override: { workModel: 'gpt-5.5' }, resolved: { model: 'gpt-5.5', tiered: false, source: 'issue', recordedModel: 'claude-sonnet-5' } });
       if (url.includes('/swarm-policy')) return response({ configured: null, resolved: { mode: 'off', source: { mode: 'default' } } });
       if (url.includes('/available-models')) return response({ openai: [{ id: 'gpt-5.5', name: 'GPT 5.5' }] });
@@ -20,12 +20,23 @@ describe('IssuePolicyStrip', () => {
     }) as typeof fetch;
   });
 
-  it('renders all four shared controls with resolved default labels', async () => {
+  it('renders all shared controls with resolved default labels', async () => {
     render(<IssuePolicyStrip issueId="PAN-2674" />);
     expect(await screen.findByLabelText('Review mode for this issue')).toBeInTheDocument();
     expect(screen.getByLabelText('Re-review scope for this issue')).toBeInTheDocument();
+    expect(screen.getByLabelText('Review model for this issue')).toHaveTextContent('reviewers: default (gpt-5.5)');
     expect(screen.getByLabelText('Work model for this issue')).toHaveTextContent('work: default (gpt-5.5)');
     expect(screen.getByLabelText('Swarm mode for this issue')).toHaveTextContent('swarm: default (off)');
+  });
+
+  it('persists one per-issue model for the whole review convoy', async () => {
+    render(<IssuePolicyStrip issueId="PAN-2674" />);
+    const reviewers = await screen.findByLabelText('Review model for this issue');
+    fireEvent.change(reviewers, { target: { value: 'gpt-5.5' } });
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/review/PAN-2674/config', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ reviewModel: 'gpt-5.5' }),
+    })));
   });
 
   it('persists a work-model selection and offers an explicit fresh restart', async () => {
