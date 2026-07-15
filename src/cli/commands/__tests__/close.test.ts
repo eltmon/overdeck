@@ -91,7 +91,7 @@ describe('closeOutCommand', () => {
       issueId: 'PAN-1190',
       projectPath: '/repo',
       github: { owner: 'eltmon', repo: 'overdeck', number: 1190 },
-    });
+    }, { dodAcceptedRows: [], dodAcceptedBy: expect.any(String) });
   });
 
   it('skips the confirmation prompt when --force is used', async () => {
@@ -99,6 +99,61 @@ describe('closeOutCommand', () => {
 
     expect(mocks.createInterface).not.toHaveBeenCalled();
     expect(mocks.closeOut).toHaveBeenCalledOnce();
+  });
+
+  it('maps per-row accept options into closeOut and renders accepted attribution', async () => {
+    mocks.closeOut.mockReturnValueOnce(Effect.succeed({
+      workflow: 'close-out', issueId: 'PAN-1190', success: true, duration: 1, steps: [],
+      dodGate: {
+        passed: true, misses: ['deploy'], accepted: ['deploy'],
+        rows: [{
+          id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge',
+          observed: 'server is stale', status: 'miss',
+          acceptedBy: { flag: '--accept-deploy', by: 'conv-operator', at: '2026-07-15T13:00:00Z' },
+        }],
+      },
+    }));
+    vi.stubEnv('OVERDECK_AGENT_ID', 'conv-operator');
+
+    await expect(closeOutCommand('PAN-1190', { force: true, acceptDeploy: true })).rejects.toThrow('process.exit unexpectedly called with "0"');
+
+    expect(mocks.closeOut).toHaveBeenCalledWith(expect.anything(), {
+      dodAcceptedRows: ['deploy'],
+      dodAcceptedBy: 'conv-operator',
+    });
+    const output = vi.mocked(console.log).mock.calls.map(call => String(call[0])).join('\n');
+    expect(output).toContain('Definition-of-Done gate');
+    expect(output).toContain('MISS-ACCEPTED (conv-operator)');
+  });
+
+  it('prints blocking gate rows and --force does not bypass them', async () => {
+    mocks.closeOut.mockReturnValueOnce(Effect.succeed({
+      workflow: 'close-out', issueId: 'PAN-1190', success: false, duration: 1,
+      steps: [{ step: 'close-out:dod-gate', success: false, skipped: false, error: 'blocked' }],
+      dodGate: {
+        passed: false, misses: ['deploy'], accepted: [],
+        rows: [{ id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge', observed: 'server is stale', status: 'miss' }],
+      },
+    }));
+
+    await expect(closeOutCommand('PAN-1190', { force: true })).rejects.toThrow('process.exit unexpectedly called with "1"');
+
+    const output = vi.mocked(console.log).mock.calls.map(call => String(call[0])).join('\n');
+    expect(output).toContain('server is stale');
+    expect(output).toContain('--accept-deploy');
+  });
+
+  it('includes the gate in JSON output', async () => {
+    mocks.closeOut.mockReturnValueOnce(Effect.succeed({
+      workflow: 'close-out', issueId: 'PAN-1190', success: false, duration: 1, steps: [],
+      dodGate: { passed: false, misses: ['deploy'], accepted: [], rows: [] },
+    }));
+
+    await closeOutCommand('PAN-1190', { force: true, json: true });
+
+    const output = vi.mocked(console.log).mock.calls.map(call => String(call[0])).join('\n');
+    expect(output).toContain('"dodGate"');
+    expect(output).toContain('"deploy"');
   });
 
   it('allows the flywheel orchestrator to close out', async () => {

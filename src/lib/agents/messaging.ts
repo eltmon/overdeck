@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -61,6 +61,15 @@ function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery
 }
 
 const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-message']);
+
+function claimCodexIdleTurn(agentId: string): boolean {
+  try {
+    unlinkSync(join(getAgentDir(agentId), 'turn-completed'));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
   if (!USER_MESSAGE_INTERVENTION_SOURCES.has(caller)) return;
@@ -363,10 +372,13 @@ export async function messageAgent(
     throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
 
-  // Wait for the agent to be idle at the prompt before sending — reduces dropped
-  // Enter when Claude Code is still rendering. PAN-1594: hook-driven (runtime
-  // mirror 'idle' via Stop/SessionStart hook), not a tmux pane-scrape.
-  const promptReady = await waitForAgentIdle(normalizedId, 5000);
+  // Codex's notify hook writes turn-completed at every idle boundary. Claiming
+  // that marker makes the idle signal one-shot: the next message starts a turn,
+  // and further messages queue until the hook reports the next completion.
+  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594).
+  const promptReady = expectedHarness === 'codex'
+    ? claimCodexIdleTurn(normalizedId)
+    : await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
     if (expectedHarness === 'codex') {
       queueAgentMail(normalizedId, message, true);

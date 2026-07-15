@@ -1,6 +1,8 @@
 import type { ViewMode as ConversationViewMode } from '../components/chat/ConversationPanel';
 import type { Tab } from '../components/Header';
 
+export const LAST_TAB_STORAGE_KEY = 'overdeck:last-tab';
+
 export const TAB_PATHS: Record<Tab, string> = {
   home: '/',
   pipeline: '/pipeline',
@@ -30,13 +32,40 @@ const PATH_TO_TAB: Record<string, Tab> = {
   ) as Record<string, Tab>,
 };
 
+export function getLastTab(): Tab | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value = window.localStorage.getItem(LAST_TAB_STORAGE_KEY) as Tab | null;
+    if (value && value in TAB_PATHS) return value;
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 function getTabFromPath(): Tab {
   const path = window.location.pathname;
   if (path.startsWith('/conv/')) return 'command-deck';
+  // PAN-1234: /issues/:id opens the drawer on the user's last surface,
+  // defaulting to Pipeline when there is no prior tab.
+  if (path.startsWith('/issues/')) {
+    return getLastTab() ?? 'pipeline';
+  }
   // Cockpit deep-link: /command-deck/<project>/<issue> (PAN-2005). The bare
   // /command-deck is matched by PATH_TO_TAB below; the nested form needs the prefix.
   if (path.startsWith('/command-deck/')) return 'command-deck';
   return PATH_TO_TAB[path] || 'home';
+}
+
+/** Extract issue id from /issues/:id direct-link routes. */
+export function getIssueIdFromPath(path = window.location.pathname): string | null {
+  const match = path.match(/^\/issues\/([^/]+)$/);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1] ?? '');
+  } catch {
+    return match[1] ?? null;
+  }
 }
 
 /**

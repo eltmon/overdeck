@@ -324,7 +324,10 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
     expect(projectMocks.resolveProjectFromIssueSync).toHaveBeenCalledWith('PAN-9999');
-    expect(lifecycleMocks.closeOut).toHaveBeenCalledWith(expect.objectContaining({ issueId: 'PAN-9999' }));
+    expect(lifecycleMocks.closeOut).toHaveBeenCalledWith(
+      expect.objectContaining({ issueId: 'PAN-9999' }),
+      expect.objectContaining({ dodAcceptedRows: [] }),
+    );
   });
 
   it('resolves bare numeric input before pan inspect resolves the project', async () => {

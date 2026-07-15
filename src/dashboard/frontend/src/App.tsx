@@ -38,7 +38,10 @@ import {
   getCockpitRouteFromPath,
   getCommandDeckProjectRouteFromPath,
   getConversationRouteState,
+  getIssueIdFromPath,
+  getLastTab,
   getSessionKeyFromSearch,
+  LAST_TAB_STORAGE_KEY,
   normalizeCurrentRoute,
   TAB_PATHS,
   type ConversationViewModeMap,
@@ -223,6 +226,7 @@ export default function App() {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const drawerOpen = drawerIssueId !== null;
   const openIssue = useDashboardStore((state) => state.openIssue);
+  const openIssueFromRoute = useDashboardStore((state) => state.openIssueFromRoute);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
 
   // Dashboard lifecycle state from event store (restart events)
@@ -379,6 +383,35 @@ export default function App() {
     }
   }, [activeTab, experimentalFeaturesEnabled, experimentalFeaturesKnown, setActiveTab]);
 
+  // PAN-1234: remember the last active surface so /issues/:id can land there.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(LAST_TAB_STORAGE_KEY, activeTab);
+    } catch {
+      // ignore
+    }
+  }, [activeTab]);
+
+  // PAN-1234: /issues/:id opens the drawer without rewriting the URL.
+  const applyIssueRoute = useCallback(() => {
+    const issueId = getIssueIdFromPath();
+    if (!issueId) return;
+    // Ensure the parent surface is active (initial load may resolve it from
+    // getTabFromPath, but popstate can arrive with any tab).
+    const targetTab = getLastTab() ?? 'pipeline';
+    if (activeTab !== targetTab) {
+      setActiveTabState(targetTab);
+    }
+    openIssueFromRoute(issueId, TAB_PATHS[targetTab], window.location.pathname);
+  }, [activeTab, openIssueFromRoute]);
+
+  // PAN-1234: handle direct navigation to /issues/:id on initial load and on
+  // browser back/forward. Keep the URL unchanged (no ?issue= rewrite).
+  useEffect(() => {
+    applyIssueRoute();
+  }, [applyIssueRoute]);
+
   // Sync the URL to the active issue cockpit (PAN-2005). replaceState (like the
   // conversation route) keeps history clean; reload/bookmark restores the tab.
   // issueId=null reverts to the project home when a project is active.
@@ -486,10 +519,13 @@ export default function App() {
         setSelectedProjectKey(null);
       }
       syncDrawerFromUrl();
+      // PAN-1234: /issues/:id must open the drawer even though the URL carries no
+      // ?issue= query param. This runs after syncDrawerFromUrl so it wins.
+      applyIssueRoute();
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [syncDrawerFromUrl]);
+  }, [syncDrawerFromUrl, applyIssueRoute]);
 
   // Agents from Zustand store (event-sourced — no polling)
   // Cast to Agent[] since AgentSnapshot is a compatible subset for the fields used here
@@ -523,13 +559,49 @@ export default function App() {
   } = usePendingInputDialogs({ agents, issues });
   useDesktopActivityNotifications();
 
+  // PAN-1234: global 'g' chord state for lens navigation (g p, g b, g a, g c).
+  const chordRef = useRef<{ prefix: string | null; timer: ReturnType<typeof setTimeout> | null }>({ prefix: null, timer: null });
+
   // Global keyboard shortcuts: / for search, Cmd+K for command palette
   useEffect(() => {
+    const CHORD_TIMEOUT_MS = 1500;
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMac = navigator.platform.includes('Mac');
       const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
       const target = e.target as HTMLElement;
       const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
+      // PAN-1234: lens-navigation chord (e.g. g p → Pipeline). Disabled inside
+      // inputs/textareas/contentEditable or while the command palette is open.
+      if (!inInput && !isPaletteOpen) {
+        if (e.key === 'g') {
+          e.preventDefault();
+          chordRef.current.prefix = 'g';
+          if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
+          chordRef.current.timer = setTimeout(() => {
+            chordRef.current.prefix = null;
+            chordRef.current.timer = null;
+          }, CHORD_TIMEOUT_MS);
+          return;
+        }
+
+        if (chordRef.current.prefix === 'g') {
+          if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
+          chordRef.current.timer = null;
+          chordRef.current.prefix = null;
+
+          const lens = e.key === 'p' ? 'pipeline'
+            : e.key === 'b' ? 'kanban'
+            : e.key === 'a' ? 'agents'
+            : e.key === 'c' ? 'command-deck'
+            : null;
+          if (lens) {
+            e.preventDefault();
+            setActiveTab(lens);
+          }
+          return;
+        }
+      }
 
       if (e.key === '/' && !inInput) {
         e.preventDefault();
@@ -541,8 +613,11 @@ export default function App() {
     };
 
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (chordRef.current.timer) clearTimeout(chordRef.current.timer);
+    };
+  }, [isPaletteOpen, setActiveTab, setIsSearchOpen, setIsPaletteOpen]);
 
   // Listen for menu actions from desktop app (open-settings, etc.)
   useEffect(() => {
@@ -735,6 +810,7 @@ export default function App() {
             onPlanDialogChange={setPlanDialogIssueId}
             onSelectAgent={setSelectedAgent}
             onBacklogIssueAction={handleBacklogIssueAction}
+            keyboardShortcutsDisabled={isSearchOpen || isPaletteOpen}
           />
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers

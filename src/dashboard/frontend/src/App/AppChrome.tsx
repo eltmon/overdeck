@@ -9,6 +9,7 @@ import { CodexAuthBanner } from '../components/CodexAuthBanner';
 import { SetupChecklistBanner } from '../components/SetupChecklistBanner';
 import { SyncRequiredBanner } from '../components/SyncRequiredBanner';
 import { SystemHealthPill } from '../components/SystemHealthPill';
+import { StaleBuildChip } from '../components/StaleBuildChip';
 import { triggerEmergencyStop, EMERGENCY_STOP_HOTKEY_LABEL } from '../components/EmergencyStopOverlay';
 import type { Tab } from '../components/Header';
 import type { TrackerStatusItem } from './api';
@@ -216,6 +217,7 @@ export function AppChrome({
           )}
           <StoppedAgentsBanner variant="pill" />
           <LowCostModePill onOpenSettings={onOpenSettings} />
+          <StaleBuildChip />
           <SystemHealthPill />
           <SystemMenu onOpenSettings={onOpenSettings} />
           {/* The Command Deck has the always-on Awareness rail, so the global

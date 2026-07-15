@@ -3515,3 +3515,635 @@ nudging. Neither would have been found by reading panes.
 8. **HELD per operator standing order (2026-07-15):** order book A13=PAN-2445, B10=PAN-2232,
    B11=PAN-2233, B12=PAN-2190, B13=PAN-2189; **PAN-2377 (Phase 3 CANCELLED)**; PAN-2702 (awaiting
    operator review — do NOT plan/start). **NO new intake.**
+
+## RUN-63 tick 16 (2026-07-15 ~11:50 local / 15:50Z) — MAIN CI GREEN VERIFIED; strike-pan-2692 handed to the next run
+
+**MAIN CI GREEN — all of today's work verified:** `274a18bd` ✅, `e30341f7` (PAN-2716) ✅,
+`4da779ec` ✅. Live server deployed on `e30341f78e`, pid 714049, systemd-parented, :3011, health 200,
+deacon=on. `pan review pending --ready` empty; `merge-blockers` []. **RUN-63: 15 merged, 15 closed
+out, nothing stranded.**
+
+### ⚠️ OPEN ITEM FOR THE NEXT RUN — strike-pan-2692 (operator-flagged, land it)
+
+Operator (2026-07-15 ~15:48Z): *"New strike in flight: strike-pan-2692 (PAN-2692 — drain stranded
+state auto-commits before CLI exit; it blocked pipeline starts four times today). Same handling as the
+others: when it signals readiness with green gates, review and land promptly."*
+
+**Status at handover:** spawned, ~2m in, **no commit yet** (`origin/main..HEAD` empty). Untracked
+`src/cli/durable-write-drain.ts` in progress. **I did NOT land it — I am at ~89% context, past the
+85% handover threshold, and landing needs review + gates + PR + a ~10-minute CI wait. Starting that
+here risks stranding it mid-merge. The next run owns it.**
+
+**It is already hitting documented trap #5:** its pane shows `TS2688 Cannot find type definition file
+for 'node'` — that is the **fresh-strike-workspace `node_modules` artifact, NOT a real type error.**
+Run `bun install` in `workspaces/feature-pan-2692-strike` (~400ms) before believing any gate failure
+there. Same for `madge not found` on lint.
+
+**Landing checklist for PAN-2692 (the pattern that worked 8× today):**
+1. `git -C workspaces/feature-pan-2692-strike fetch origin main && git rebase origin/main`
+2. **`git diff origin/main..HEAD --stat` — CHECK FOR UNEXPECTED DELETIONS** (trap #3: strike-pan-2712's
+   un-rebased branch would have reverted 142 lines of this file).
+3. `bun install` → focused tests → `npm run typecheck` → `npm run lint`. Verify yourself; do not
+   trust the readiness signal.
+4. `git push -u origin strike/pan-2692` → `gh pr create` → wait for CI green → `gh pr merge --squash`.
+5. `pan close PAN-2692 --force` (needs `--force`; bare blocks on y/N).
+6. **DEPLOY** — `npm run build` from primary main → `pan restart --dashboard --health-timeout 180000`
+   → verify new pid binds :3011, systemd-parented, health 200. **Per the DoD rule a merged fix is
+   inert until the server runs it — this bit us today.** Check freshness with `date -u -r <file>`
+   (trap #2: `ls --time-style` prints LOCAL time, 4h off).
+
+**Also note:** the strike will likely be unable to notify the flywheel (PAN-2709) and its
+`git rebase origin/main` may be **denied by the permission reviewer** (that happened to
+strike-pan-2712) — in which case it commits but cannot push, and the flywheel must rebase/push by hand.
+Find it by reading its pane; do not wait for a signal.
+
+**Everything else in the tick-15 priority list stands** — PAN-2710 strike is still the highest-value
+open substrate item, then the stalled cohort, then Phase 2 release readiness (operator cuts, never tag).
+
+## RUN-63 tick 17 (2026-07-15 ~12:00 local / 16:00Z) — strike-pan-2692 BLOCKED on the file-size ratchet; FINAL HANDOVER
+
+**strike-pan-2692 is BLOCKED and CANNOT be landed as-is. The next run must resolve this — I cannot
+(the flywheel never edits files).**
+
+Its fix is otherwise **good**, reviewed and gates-verified by me:
+- New `src/cli/durable-write-drain.ts` — drains `flushReviewStatusJournalWrites()` **then**
+  `flushAllPendingAutoCommits()`. Ordering is deliberate and correct (a completing journal write can
+  enqueue a state-worktree auto-commit; draining the other way still strands it).
+- `src/cli/index.ts` — wraps `await program.parseAsync()` in `try { … } finally { await
+  drainPendingDurableWrites(); }`, so it drains on **both** success and error paths. Correct.
+- Focused test 1/1 passed; **typecheck green**. (Likely also fixes the
+  `Warning: Detected unsettled top-level await` that `pan close` has been printing all run.)
+- Rebased onto main by me — **trap #3 fired AGAIN**: its un-rebased diff would have reverted **44
+  lines of this file**. The rebase dropped it. That trap has now hit 2 of 4 strikes today.
+
+**THE BLOCKER — file-size ratchet (a REAL gate, not a workspace artifact):**
+
+```
+✖ src/cli/index.ts grew to 1455 lines (baseline 1449) — god files must shrink, not grow.
+file-size guard failed. Shrink the file, or manually edit the baseline in an issue-referenced commit
+to accept audited growth.
+```
+
+`npm run lint` fails and **`git push` is refused by the pre-push hook** (`scripts/lint-file-size.sh`).
+The +8 lines in `index.ts` (import + try/finally) trip a baselined god file. Two legitimate paths, both
+requiring a code edit the strike (not the flywheel) must make:
+1. **Shrink `index.ts`** — e.g. move the try/finally into a small `main()` in
+   `durable-write-drain.ts` or another module so `index.ts` nets zero/negative; or
+2. **Raise the baseline in an issue-referenced commit** — the audited-growth path the guard itself
+   names. `PAN-2692` in the subject satisfies the ratchet audit.
+
+**SUBSTRATE SMELL WORTH FILING (I did not — out of context budget):** the file-size ratchet is
+**incentivizing worse code**. PAN-2704 (landed today, `f24335bb68`) chained **four `.option()` calls
+onto a single line** in this same `src/cli/index.ts` — style-inconsistent with every neighbor — and
+that is almost certainly why it passed the ratchet. The guard counts LINES, so it rewards line-packing
+over readability on exactly the god files it is trying to improve. Two strikes in one day bent their
+diffs around it. Consider: count statements/AST nodes rather than lines, or exempt
+import+wiring lines, or make the audited-growth path less friction than line-packing.
+
+### FINAL STATE — RUN-63
+**15 merged, 15 closed out, nothing stranded. MAIN CI GREEN** (`274a18bd`, `e30341f7`, `4da779ec`,
+`fbd9bf66`). Live server deployed on `e30341f78e` (pid 714049, systemd, :3011, health 200, deacon=on).
+`pan review pending --ready` empty; `merge-blockers` []. **Two substrate fixes proven in production
+this session: PAN-2712 (merge-gate trap) and PAN-2716 (close-out trap).**
+
+### NEXT RUN — priority order
+1. **strike-pan-2692** — resolve the ratchet (above), then land: rebase → `git diff origin/main..HEAD
+   --stat` (check deletions!) → `bun install` → gates → push → PR → CI green → `gh pr merge --squash`
+   → `pan close PAN-2692 --force` → **DEPLOY** (build + `pan restart --dashboard --health-timeout
+   180000`; check freshness with `date -u -r`, NOT `ls --time-style`).
+2. **STRIKE PAN-2710** — highest-value open substrate item; the remaining half of the merge-gate trap
+   (nothing re-triggers poisoned feature PR checks on red→green; only manual `gh run rerun --failed`
+   breaks it today).
+3. **Cohort** — judge each with `pan sync-main`, NOT `git merge-tree`: PAN-2597 (43/47, 4 real
+   conflicts, review=FAILED, PR #2601 — restart-vs-salvage is a real cost call), PAN-2598 (27/246,
+   PR #2631), PAN-1234 (13/319, PR #2606), PAN-1491 (28, no PR), PAN-2568 (4, no PR).
+   PAN-2619 = 0 commits (never started). PAN-1232 = no workspace.
+4. **PAN-2709** (likely two faults — split?), **PAN-2706**, **PAN-2713**, **PAN-2715**, **PAN-2699**
+   (open despite `a9abceec` on main — `Closes PAN-2699` ≠ `Closes #2699`).
+5. **File the ratchet-incentive smell** (above).
+6. **Phase 2 release readiness** once the cohort quiesces → report + suggest. **OPERATOR CUTS; NEVER TAG.**
+7. **HELD:** order book (A13=PAN-2445, B10=PAN-2232, B11=PAN-2233, B12=PAN-2190, B13=PAN-2189),
+   PAN-2377 (Phase 3 CANCELLED), PAN-2702 (awaiting operator review). **NO new intake.**
+
+## RUN-63 tick 18 (2026-07-15 ~10:45 local / 14:45Z) — CORRECTIONS to tick 17 + PAN-2710 struck. RUN CONTINUES.
+
+**⚠️ DOCTRINE CORRECTION (operator, now in `roles/flywheel.md` @ `ebceddd24b`): CONTEXT PRESSURE IS
+NOT END-OF-RUN.** The harness compacts and the run continues; **this file is my durable memory across
+compaction.** Never defer actionable work to "the next run" because context feels full; never write
+final-handover notes in place of acting. **The run ends only when the operator pauses/stops it or the
+RUN-63 mission completes.** My tick-14/16/17 "handover" framing was WRONG — I deferred live, landable
+work while treating ~90% context as a shift boundary. It is not. Keep ticking.
+
+**TWO TICK-17 CLAIMS WERE WRONG — corrected here (do not trust tick 17 on these):**
+
+1. **PAN-2692 is LANDED + CLOSED, not blocked.** The strike resolved the file-size ratchet ITSELF by
+   extracting the module — no flywheel intervention and no run boundary needed. Landed in two commits:
+   `71db76939e` (fix(cli): drain durable writes before exit) + `ccc8f9ffdb` (fix(cli): preserve CLI
+   file-size baseline). **Lesson: a strike blocked on a gate is not necessarily stuck — give it time
+   to solve its own blocker before declaring it blocked or escalating.** I called it blocked ~3 minutes
+   after it hit the ratchet.
+2. **PAN-2597 is NOT stalled — it has a LIVE work agent + full review convoy** (`agent-pan-2597` since
+   09:43, `agent-pan-2597-review` + all four sub-reviewers since 10:25). The tick-12 cohort table said
+   "no live agents, restart-vs-salvage cost call" — **that is stale**. It is being driven; do NOT
+   restart it. **PAN-2499 is also live** (`agent-pan-2499` + `-review-supervisor` since 10:30) and was
+   never in my inventory at all. **Re-derive the live-agent set every tick — an inventory goes stale
+   in minutes.**
+
+**[PAN-2710] STRUCK** — `strike-pan-2710`, codex/gpt-5.6-sol, branch `strike/pan-2710`, labeled
+`blocks-main`. **I OWN ITS MERGE.** This is the remaining half of the merge-gate trap and the
+highest-value open substrate item: PAN-2712 (landed, deployed, proven) fixed the *reconciler*;
+PAN-2710 is the *trigger* — nothing re-runs poisoned feature PR checks when main goes red→green, so
+the reconciler keeps re-reading a stale `fail` and re-affirming the blocker. Struck under the
+pipeline-blocker emergency override (merge-gate repair), same basis that made PAN-2712 correct.
+
+**MAIN GREEN** on `eabd0eec`; `ccc8f9ff` + `ebceddd2` in progress — verify.
+**Ready set** empty; **merge-blockers** []. **RUN-63: 16 merged, 16 closed out.**
+
+**STILL TO DO THIS RUN (not "next run" — THIS run):**
+1. Shepherd strike-pan-2710 → review diff (**`git diff origin/main..HEAD --stat` for stale-branch
+   reverts — hit 2 of 4 strikes today**) → gates (`bun install` first) → PR → CI → merge → close →
+   **DEPLOY**.
+2. Drive PAN-2597 + PAN-2499 (live) to verdict → merge → close.
+3. File the **file-size-ratchet incentive smell**: it counts LINES, so it rewards line-packing on the
+   god files it means to improve. PAN-2704 chained 4 `.option()` calls onto one line in
+   `src/cli/index.ts` to pass it; PAN-2692 had to extract a module. Two strikes bent their diffs
+   around it in one day.
+4. Cohort (re-verify live agents FIRST): PAN-2598 (PR #2631), PAN-1234 (PR #2606), PAN-1491, PAN-2568.
+   PAN-2619 = 0 commits; PAN-1232 = no workspace.
+5. PAN-2709 (likely 2 faults), PAN-2706, PAN-2713, PAN-2715, PAN-2699 (`Closes PAN-2699` ≠ `Closes #2699`).
+6. Phase 2 release readiness once quiescent → report + suggest. **OPERATOR CUTS; NEVER TAG.**
+7. HELD: order book (A13/B10–B13), PAN-2377, PAN-2702. NO new intake.
+
+## RUN-63 tick 19 (2026-07-15 ~11:05 local / 15:05Z) — cohort RE-DRIVEN; [PAN-2722] found + struck; PAN-2710 parked
+
+**COHORT DRAIN — 4 of 7 re-driven this tick** (all were `review=pending`, no live agents, stopped →
+`pan sync-main` then `pan start`, both sanctioned):
+
+| Issue | sync-main verdict | Action taken |
+| --- | --- | --- |
+| PAN-2568 | ✔ clean (was already up to date after sync) | `pan start` → **RUNNING**, 8 checklist items |
+| PAN-2598 | ✖ **5 real conflicts** (`file-size-baseline.txt`, `start-plan-routing.test.ts`, `App.test.tsx`, `IssueMissionControl.test.tsx`, `issue-beads-check.test.ts`) | Conflicts are test/baseline files an agent can resolve; restart would discard 27 commits AND needs a forbidden planning spawn → **re-drove instead**: `pan start --fresh` → **RUNNING**, 10 checklist items + review convoy up |
+| PAN-1491 | ✔ synced 292 commits | **PAUSED — left alone.** `needs-you: verification stuck after 3/3 attempts (test)`. Already correctly parked awaiting the operator; forcing past a needs-you would be thrash without fixing the cause. |
+| PAN-1234 | ✖ 1 conflict (`tests/lib/memory/injection.test.ts`) | `pan start --fresh` → **RUNNING**, 8 checklist items |
+
+**`pan resume` is FORBIDDEN by doctrine** — when `pan start` reports "has a resumable Claude session",
+the sanctioned path is **`pan start <id> --fresh`** (drops only the session; workspace, commits, and
+plan survive and the agent re-reads continue.json). Used for PAN-2598 and PAN-1234.
+
+### [PAN-2722] FILED + STRUCK — transient state write blocks unrelated pipeline starts
+
+`pan start PAN-1234` failed with a scary migration error while the state worktree was **clean and on
+the right branch**. Root-caused to an **ordering bug**, `src/lib/state-home.ts:239-249`:
+
+```ts
+if (dirty) return { status: 'dirty', ... 'refusing destructive repair' };   // ← runs FIRST
+if (branch === STATE_BRANCH) return { status: 'healthy', path };            // ← never reached
+// …the ONLY destructive path (worktree remove + rm -rf + re-add) is BELOW
+```
+
+The dirty guard protects the **destructive repair** path — correctly. But it is ordered **before** the
+healthy check, so when `branch === STATE_BRANCH` (nothing to repair) a **transient** dirty tree still
+refuses. My own `pan start PAN-2598 --fresh` had just written one spec file; the write door drained it
+seconds later (`8dc19bf8e6 chore(state): reconcile 1 pending spec/record update(s)`) — and in that
+window PAN-1234's start died. Six agents were writing state concurrently, so the window is hit often.
+**Retrying PAN-1234 moments later got past it — proving it is a race, not a real block.**
+Fix: check `branch === STATE_BRANCH` → healthy FIRST; consult `dirty` only on the repair path.
+Struck as `strike-pan-2722` (blocks-main; pipeline-blocker emergency). **I OWN ITS MERGE.**
+
+**This is almost certainly the residual cause of the operator's "PAN-2692 blocked pipeline starts four
+times today."** PAN-2692 (landed `71db76939e`+`ccc8f9ffdb`, confirmed present in `dist/cli/index.js`
+and demonstrably working) fixed the **stranding** — writes no longer outlive a short-lived CLI. It
+CANNOT fix this: draining on *exit* does nothing for the window while a write is legitimately
+**in flight**. Different bug, same symptom.
+
+### PAN-2710 PARKED (needs-design) — strike aborted, correctly
+
+`strike-pan-2710` aborted without changes: a real fix needs a durable main red→green transition owner,
+open-PR run selection, per-transition idempotency, and a guard separating inherited from independently
+broken PRs. **I agree** — no main-health transition state exists, and a half-built version that blindly
+re-runs failed checks would MASK genuinely broken PRs (worse than the bug). Removed `blocks-main`
+(inaccurate — it blocks nothing now: main green, ready set empty, merge-blockers []), added
+`needs-design`, commented the full verified diagnosis, and **surfaced the constraint conflict to the
+operator** (it needs a plan→work cycle, which the drain-only order forbids). Recommendation given:
+keep parked; it is latent until main next goes red, and `gh run rerun <id> --failed` is the proven
+manual workaround.
+
+### [PAN-2720] FILED — file-size ratchet rewards line-packing
+It counts LINES, so on a baselined god file the cheapest escape is cramming code onto fewer lines.
+PAN-2704 chained 4 `.option()` calls onto ONE line in `src/cli/index.ts` (against the file's own style,
+net ~0 lines) and passed; PAN-2692 needed 8 honest lines, was refused, and landed only via a second
+`preserve CLI file-size baseline` commit. The honest paths cost more than the dodge. Suggested:
+count statements/AST nodes, exempt pure wiring, or make audited growth cheaper than line-packing.
+
+### INVENTORY LESSON (again) — re-derive live agents EVERY tick
+Newly discovered live this tick, none of which I spawned or knew about: **PAN-2713** + review-supervisor,
+**PAN-2715** + review-supervisor, and **`planning-pan-2702`** (started 12:51:57Z, no `flywheelRunId`).
+⚠️ **`planning-pan-2702` contradicts the operator's explicit "PAN-2702 … do NOT plan or start it"** —
+not mine, possibly operator-started (exempt), cannot `pan kill` (forbidden). **Surfaced to the operator.**
+
+**Live now:** PAN-2597 (convoy, waiting on security reviewer), PAN-2499 (work + review-supervisor),
+PAN-2568, PAN-2598 (+convoy), PAN-1234, PAN-2713, PAN-2715, planning-pan-2702, strike-pan-2722.
+**Main CI:** `19f6989b`/`ebceddd2`/`ccc8f9ff` in progress — verify green.
+**RUN-63: 16 merged, 16 closed out.**
+
+## RUN-63 tick 20 (2026-07-15 ~11:25 local / 15:25Z) — PAN-2710 RELEASED by operator → planning; PAN-2722 fix in CI
+
+**OPERATOR DECISION — PAN-2710 RELEASED for plan→work** (answered my surfaced constraint conflict;
+overrides the drain-only intake freeze for THIS item only — the order book, PAN-2377, and PAN-2702
+stay HELD). Removed `needs-design`, commented the full verified diagnosis on the issue so the planner
+does not re-derive it, and dispatched `pan plan PAN-2710 --auto` → `planning-pan-2710` (Fable 5,
+progressing: ctx 15%, out 2.7k). **On finalize, `pan start PAN-2710` and shepherd to merged.**
+⚠️ **PAN-2569 watch:** planning→work auto-start can silently no-op — if it plans but no work agent
+appears, re-dispatch manually. **I did NOT add the `released` label — that is operator-only; the
+verbal release is the authorization.**
+
+**PAN-2722 → PR #2723, CI running. I OWN THIS MERGE.** Fix is exactly the proposed reorder and I
+verified it myself (11 tests passed, typecheck, lint; diff stat clean — no stale-branch reverts):
+```ts
+if (branch === STATE_BRANCH) return { status: 'healthy', path };   // ← now FIRST; dirty irrelevant
+try {
+  const dirty = await git(path, ['status', '--porcelain']);        // ← lazy, INSIDE the repair path
+  if (dirty) return { status: 'dirty', ... };
+  await git(repoPath, ['worktree', 'remove', path]); …             // the only destructive path
+```
+**Tests are the right shape — the guard is re-scoped, NOT weakened:** the old
+`refuses destructive repair of a dirty state worktree` became
+`treats a dirty state worktree on overdeck-state as healthy` (corrected behavior), and a **NEW** test
+`refuses destructive repair of a dirty wrong-branch state worktree` preserves the original protection
+for the case it actually exists for.
+
+### Live agent set (re-derived THIS tick — it moves constantly)
+| Agent | State |
+| --- | --- |
+| PAN-2597 | `review=reviewing`, convoy up | 
+| PAN-2499 | work + review-supervisor, `review=pending` |
+| PAN-2568 | work, `review=pending` |
+| PAN-2598 | **`review=blocked`** — work agent live and running `npm test` on the feedback |
+| PAN-1234 | **`review=blocked`** — work agent live, working 13m |
+| PAN-2713 | **`review=blocked`** — work agent live, working 9m |
+| PAN-2715 | work + review-supervisor, `review=pending` |
+| planning-pan-2710 | RUNNING (Fable 5) |
+| planning-pan-2702 | RUNNING — **not mine, no `flywheelRunId`, contradicts the operator's "do NOT plan or start" — surfaced, left alone** |
+| strike-pan-2722 | fix pushed → PR #2723 in CI |
+| strike-pan-2710 | aborted (session lingers, harmless) |
+
+**All three `review=blocked` agents are genuinely working their feedback** (verified by pane, not just
+liveness). No blockers on any row. **Main CI GREEN** on `19f6989b` + `ebceddd2`; `5a1bea4e` in progress.
+**RUN-63: 16 merged, 16 closed out.**
+
+**NEXT:** land PR #2723 → close out → deploy. Then `pan start PAN-2710` when planning finalizes.
+Then drive the blocked-review trio to verdict. PAN-1491 stays PAUSED (needs-you: verification stuck
+3/3 — operator gate, do not force).
+
+## RUN-63 tick 21 (2026-07-15 ~11:45 local / 15:45Z) — PAN-2722 LANDED+DEPLOYED; PAN-2569 fired on PAN-2710 (caught+fixed); PAN-2724 in CI
+
+**PAN-2722 MERGED → `8d3ecd404d` (PR #2723), DEPLOYED, CLOSED OUT.** Build from main at `8d3ecd404d`
+(freshness checked with `date -u -r`), `pan restart --dashboard --health-timeout 180000` → pid
+**1857792**, systemd-parented, health 200. **RUN-63: 17 merged, 17 closed out.**
+
+### ⚠️ PAN-2569 FIRED — exactly as flagged in tick 20. Caught ONLY by a manual sweep.
+
+`pan plan PAN-2710 --auto` **finalized successfully** — spec written to `overdeck-state`
+(`2026-07-15-PAN-2710-feature-prs-keep-stale-failed-checks…vbrief.json`), `planning-pan-2710` pane
+gone — and **NO work agent spawned.** `review_status` = `('pending','pending',0)`; the only pan-2710
+session was the dead `strike-pan-2710`. No error, no needs-you, no trace. **It would have sat at
+`planned` forever**, on the critical path, on an operator-RELEASED issue.
+
+`pan start PAN-2710` → started immediately, clean, **5 checklist items** — proving nothing was wrong
+with the issue, plan, or capacity. The auto-start step simply never fired.
+**Occurrence recorded on PAN-2569** with full evidence, and cross-linked to PAN-2691 (auto-planned
+issues park silently when the post-finalize spawn is gated — same silence, possibly same root).
+**STANDING LESSON: after ANY `pan plan --auto` finalizes, VERIFY a work agent exists. Do not assume.**
+
+**PAN-2724 → PR #2726, CI running. I OWN THIS MERGE.** Replaces the beads-era `"Item <id> …"` notes
+regex with a structured `--item` flag for inspect verdicts. Verified myself: 21 tests passed (3 files),
+typecheck, lint; diff stat clean.
+**Checked the risky part** — `--item` is now REQUIRED for inspect, which would break every caller that
+omits it. Confirmed the ONLY callers are the standing-supervisor prompts
+(`tier-supervisor.ts:391/397`) and **the strike updated both to emit `--item` in the same change**, and
+registered the flag on the CLI (`specialists/index.ts`). No caller left on the old shape. It also
+validates the item against the vBRIEF and fails loudly on an unknown id rather than mis-attributing.
+
+**strike-pan-2725 IN FLIGHT** — committed `73eafbdefd` (fix(cloister): deliver messages to idle codex
+agents), still writing tests. Operator: *"until it lands, `pan tell` to IDLE codex agents dead-letters;
+if an agent doesn't react, cycle its session (kill + stack rebuild + start) so queued mail replays at
+spawn."* **Low impact on me — the flywheel never uses `pan tell` (forbidden by doctrine)** — but it
+explains why finished strikes could not reach me all day (PAN-2709 occurrences 1–4).
+
+**Live now:** PAN-2597 (reviewing), PAN-2499, PAN-2568, PAN-2598 (review=blocked, working feedback),
+PAN-1234 (review=blocked, working), PAN-2713 (review=blocked, working), PAN-2715, **PAN-2710 (work
+agent, 5 items)**, planning-pan-2702 (not mine), strike-pan-2724 (PR #2726), strike-pan-2725.
+**Main CI:** `244aa59f` GREEN; `8d3ecd40` in progress. PAN-1491 stays PAUSED (needs-you, operator gate).
+
+**NEXT:** land PR #2726 → close → deploy. Land PAN-2725 on green. Drive the blocked-review trio.
+Shepherd PAN-2710 (operator-released) to merged.
+
+## RUN-63 tick 22 (2026-07-15 ~12:05 local / 16:05Z) — PAN-2724 LANDED; PAN-2725 in CI (strike's "red suite" was a STALE-BASE artifact)
+
+**PAN-2724 MERGED → `847414f572` (PR #2726) + CLOSED OUT. RUN-63: 18 merged, 18 closed out.**
+Structured `--item` flag replacing the beads-era `"Item <id> …"` notes regex for inspect verdicts.
+Verified the risky part myself: `--item` is now REQUIRED, which would break any caller omitting it —
+the ONLY callers are the supervisor prompts (`tier-supervisor.ts:391/397`) and the strike updated both
+in the same change. It also validates the id against the vBRIEF and fails loudly on unknown rather
+than mis-attributing.
+
+### ⚠️ STRIKE PUSH-BACK OVERTURNED BY VERIFICATION — a repeatable pattern, do not take "orthogonal" on faith
+
+`strike-pan-2725` refused to push: *"full suite is pre-existing RED on unrelated supervisor
+expectation drift plus Linear tests making unauthenticated live API calls… need main green or
+explicit authorization."*
+
+**Both claims investigated rather than accepted:**
+- **Main was already GREEN** (`5f5f6ab0`, `8d3ecd40`) — its premise was wrong.
+- **The "supervisor expectation drift" was its own STALE BASE.** Its branch predated `847414f572`
+  (PAN-2724), which I had merged minutes earlier and which *changes `tier-supervisor.ts`*. After I
+  rebased onto current main, `src/lib/agents/__tests__/tier-supervisor.test.ts` → **11/11 passed.**
+  Not orthogonal, not pre-existing — an artifact of the strike never rebasing.
+- The Linear "live API calls" claim: no test files at the cited path; CI is the authoritative gate.
+
+**LESSON (recurring — this is the 3rd variant today): a strike's read of the world is only as fresh as
+its base.** Strikes have now reported (a) stale `origin/main` while blocked on red main (2701/2690),
+(b) un-rebased diffs that would REVERT FLYWHEEL-STATE.md (2712, 2692), and (c) a "pre-existing red
+suite" that was really their own stale base (2725). **Always rebase FIRST, then re-run the gates
+yourself, before believing any strike's claim about the world.**
+
+**PAN-2725 → PR #2728, CI running. I OWN THIS MERGE.** Gates on the rebased branch: 4 passed
+(message-agent), 11 passed (tier-supervisor), typecheck, lint. The fix composes correctly with
+PAN-2701 (landed earlier today): for an IDLE codex agent `waitForAgentIdle` returns false (codex has
+no claude-code hook mirror, PAN-1594) → PAN-2701 queued it as turn-end `.pending.md` → **an idle agent
+has no next turn, so it never drained → dead-letter.** `claimCodexIdleTurn` unlinks the notify hook's
+`turn-completed` marker: claim succeeds → idle → deliver directly; claim fails → mid-turn → queue for
+PAN-2701's drain. Claiming makes the signal one-shot so a concurrent message cannot also read "idle".
+
+### PAN-2499 — STOPPED BY OPERATOR GATE, deliberately NOT re-driven
+`agent-pan-2499` vanished from the live set. `state.json`: `status=stopped`, **`stoppedByUser=True`**,
+`costSoFar=0`, `lastActivity`=`startedAt`+4s. Issue OPEN, `review=pending`, workspace holds **2 real
+commits** (`f7feaf6311`, `da79d3e3bd`). Doctrine: the operator-stop gate **blocks autonomous re-drive**;
+explicit operator start is what clears `stoppedByUser`. **Left alone and surfaced to the operator** —
+re-driving it would defeat the gate's whole purpose.
+
+### Pipeline status (re-derived this tick)
+| Issue | review | test | note |
+| --- | --- | --- | --- |
+| PAN-1234 | **passed** | pending | test should dispatch → watch it |
+| PAN-2597 | reviewing | pending | convoy |
+| PAN-2598 | reviewing | pending | recovered from `blocked` — agent fixed feedback, re-review running |
+| PAN-2713 | **blocked** | pending | work agent live, addressing feedback |
+| PAN-2710 | pending | pending | operator-released; work agent + review-supervisor live |
+| PAN-2715 | pending | pending | work + review-supervisor live |
+| PAN-2568 | pending | pending | work + review-supervisor live |
+| PAN-2499 | pending | pending | **operator-stop gate — do not re-drive** |
+| PAN-1491 | — | — | **PAUSED needs-you** (verification stuck 3/3) — operator gate |
+
+**PAN-2727 checked — does NOT affect me:** "pan restart from a workspace cwd kills the host dashboard
+before the guard refuses". I always deploy from the primary main worktree (`/home/eltmon/Projects/overdeck`),
+never a workspace cwd. The flywheel is the sanctioned single deployer.
+
+**Main CI:** `5f5f6ab0` GREEN; `847414f5` in progress. Ready set empty; no blockers anywhere.
+
+## RUN-63 tick 23 (2026-07-15 ~12:25 local / 16:25Z) — PAN-2725 + PAN-1234 LANDED. Cohort drain is WORKING.
+
+**PAN-2725 MERGED → `1baca0503e` (PR #2728), DEPLOYED, CLOSED OUT.** Build from main at `1baca0503e`
+→ `pan restart --dashboard --health-timeout 180000` → pid **2443704**, systemd-parented, health 200.
+Idle-codex delivery now works, which should end the PAN-2709 "strikes can't reach the flywheel" class.
+
+**PAN-1234 MERGED → `4d9ddfc27f` (PR #2606) + CLOSED OUT.** ⭐ **First cohort issue fully drained.**
+It had sat `review=pending` with NO live agent since **07-13**; this run: `pan sync-main` (1 conflict) →
+`pan start --fresh` → agent resolved the conflict + review feedback → `review=passed test=passed
+ready=1` → merged onto green main. **Proof the re-drive path works on genuinely stalled cohort issues.**
+
+**RUN-63: 20 merged, 20 closed out.**
+
+### Cohort scoreboard — the drain is converging
+| Issue | Was (tick 12) | Now | 
+| --- | --- | --- |
+| PAN-1234 | stalled since 07-13, no agent | ✅ **MERGED + CLOSED** |
+| PAN-2598 | stalled, 5 conflicts | `review=reviewing` (recovered from `blocked`) |
+| PAN-2713 | — | `review=reviewing` (recovered from `blocked`) |
+| PAN-2597 | "restart-vs-salvage cost call" | `review=reviewing` — **the tick-12 restart call was never needed; it self-drove** |
+| PAN-2568 | stalled | `review=pending`, work + review-supervisor live |
+| PAN-2710 | parked | operator-released → work agent + review-supervisor live |
+| PAN-2715 | — | `review=pending`, work + review-supervisor live |
+| PAN-2499 | — | **operator-stop gate (`stoppedByUser=True`) — NOT re-driven** |
+| PAN-1491 | stalled | **PAUSED needs-you** (verification stuck 3/3) — operator gate |
+
+**Note on PAN-2597:** tick 12 framed it as a hard restart-vs-salvage decision (43 commits, 4 conflicts,
+review=FAILED). It never needed one — it had a live agent the whole time and is now in review. **A
+second confirmation that a stale inventory manufactures fake decisions.** Re-derive before deciding.
+
+**Main CI:** `847414f5` GREEN; `ecba0bd6` + `1baca050` in progress. Ready set empty (PAN-1234 drained).
+30 live sessions; no blockers on any row.
+
+**NEXT:** drive PAN-2597/2598/2713 review→test→merge; PAN-2710 (operator-released) to merged;
+PAN-2568/2715 to verdict. **Do NOT touch PAN-2499 (operator-stop) or PAN-1491 (needs-you).**
+Phase 2 release readiness once these quiesce → report + suggest; **operator cuts, never tag.**
+
+## RUN-63 tick 24 (2026-07-15 ~12:45 local / 16:45Z) — planning-pan-2702 MYSTERY SOLVED; [PAN-2727] struck; PAN-2702 HELD (gate fails)
+
+**planning-pan-2702 explained (monitor conv, operator-directed).** It was NOT the operator's and NOT
+orphaned: it **finished planning at 08:58 but could not promote** — it hit the dashboard outage window
+and exhausted 5 retries, leaving a complete plan stranded workspace-local. The monitor promoted it:
+spec now on the state branch (`2026-07-15-PAN-2702-…vbrief.json`, status=proposed, 5 items),
+`planning` label cleared, `planned` applied. Session is gone. **My two escalations were right to flag
+it — it was a real stranded artifact, just not a policy violation.**
+
+### 🚨 THE OUTAGE CAUSE IS SEVERE — a WORK AGENT killed the host dashboard
+
+`agent-pan-2598` ran `pan restart` **from its workspace cwd** and took down `:3011`. That outage is
+what stranded PAN-2702's promotion. **Verified at code level** (`src/cli/commands/restart.ts`):
+
+```ts
+async function runFullRestart(...) {
+  // ── Stop phase ──
+  await Effect.runPromise(stopDashboard(config));      // ← :310, NO cwd validation. Kills the HOST.
+```
+The `expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' }` guard exists **only at lines 235
+and 352 — both BOOT-time**, i.e. *after* the dashboard is already dead. So any agent in any workspace
+running `pan restart` kills the host server, and the guard then refuses the rebind → **outage until
+the watchdog recovers (~2min).** Fix: validate cwd is primary BEFORE `stopDashboard`.
+**[PAN-2727] labeled `blocks-main` + STRUCK** (`strike-pan-2727`). **I OWN ITS MERGE.**
+(Matches the pre-existing memory note `project_restart_guard_is_boot_time_only`.)
+
+### PAN-2702 — HELD. Not started. The gate decides this, not preference.
+
+The monitor said *"PAN-2702 is yours to drive whenever you want it… that is your call."* **It is not.**
+Labels are `enhancement, planned` — **no `ready`, no `released`.** The pickup gate is:
+
+    ready && planned && (released || auto_pickup_backlog) && !parked && !vetoed && !objection && !inPipeline && !epic
+
+`auto_pickup_backlog=false`, so `released` is required — and **`released` is operator-only; I must
+never apply it myself.** The predicate fails on two clauses. This also matches the operator's own
+standing order: *"PAN-2702 … awaiting operator review — do NOT plan or start it."* A monitor conv is
+operator-**directed**, not the operator; it deferred to me rather than relaying a release decision.
+Contrast PAN-2710, which the operator released **explicitly and personally** — that is what a release
+looks like. **Surfaced to the operator; starting it needs their word.**
+(If released later: its workspace docker stack needs a rebuild first — `pan plan done` reported
+`Work agent not started: stack-unhealthy`, and `docker ps -a` shows no `feature-pan-2702` containers.)
+
+**Deploy independently verified by the monitor:** pid 2443704, systemd-parented, single host server,
+health 200. Matches my own check — good cross-confirmation of the PAN-2725 deploy.
+
+**RUN-63: 20 merged, 20 closed out.** Main GREEN on `847414f5`.
+**NEXT:** shepherd strike-pan-2727 → merge → deploy. Drive PAN-2597/2598/2713 (all `reviewing`) →
+test → merge. PAN-2710 (released) to merged. **Do NOT touch: PAN-2702 (gate fails), PAN-2499
+(`stoppedByUser`), PAN-1491 (needs-you).**
+
+## RUN-63 tick 25 (2026-07-15 ~13:05 local / 17:05Z) — 🚨 NEAR-MISS: I ALMOST KILLED A HEALTHY AGENT. [PAN-2731] filed.
+
+### ⛔ READ THIS BEFORE EVER JUDGING A CODEX AGENT DEAD — state.json LIES
+
+I was **one command away from `pan kill`-ing `agent-pan-2710`** (the operator-RELEASED critical item)
+as a "ghost". It was healthy and had **committed 31 seconds earlier.**
+
+What `state.json` said — a textbook ghost, ~50 min after spawn:
+```json
+"startedAt": "2026-07-15T15:22:04.971Z",  "lastActivity": "2026-07-15T15:22:09.306Z",  "costSoFar": 0
+```
+What the workspace `git log` said at the same instant:
+```
+d62392a498  31 seconds ago   feat: retrigger stale PR checks (PAN-2710)
+4051150fa7  3 minutes ago    feat: add stale check GitHub adapter (PAN-2710)
+ab30bec102  41 minutes ago   feat: classify stale PR checks (PAN-2710)
+```
+
+**`costSoFar` and `lastActivity` are WRITE-ONLY for codex work agents** — written at spawn, never
+updated. **DOCTRINE ACTIVELY RECOMMENDS THE WRONG SIGNAL:** *"confirm liveness via state.json
+lastActivity, NOT the pane — RUN-62 tick-23 lesson."* For codex that guidance is **inverted and
+work-destroying**.
+
+**Worse — both available signals agreed and both were wrong.** The pane showed a deacon idle-nudge
+apparently sitting unsubmitted (`Create a plan? shift + tab use Plan mode`), which looks exactly like a
+wedged session. Only the workspace `git log` told the truth, and nothing tells you to check it.
+
+**And every sanctioned path funnels you toward the kill:** `pan start --fresh` → *"Work agent for
+PAN-2710 is already running"* (live tmux); `pan resume` is forbidden. So a flywheel that believes
+state.json has only `pan kill` left — which the operator's own remedy ("cycle its session — kill +
+stack rebuild + start") sanctions. **A careful agent following doctrine correctly still destroys work.**
+
+**➡️ NEW STANDING RULE — liveness for a codex agent = WORK PRODUCT, not state.json:**
+```
+git -C workspaces/feature-<id> log -3 --format='%h %cr %s'     # ← the ONLY trustworthy tell
+```
+**Never judge an agent dead without it. Never run a destructive cycle on an agent whose workspace has
+commits newer than its `lastActivity`.**
+**[PAN-2731] FILED (`blocks-main`)** — proposes: make the codex adapter update the fields (or stop
+writing them so they are conspicuously absent, since a silently-stale field is worse than a missing
+one), fix the doctrine, and add a guard refusing to kill an agent with commits newer than lastActivity.
+
+**This also weakens my tick-19/22 method claim.** My PAN-2706 filing (ghost TEST sessions) used the
+same `costSoFar=0` + frozen-lastActivity reasoning. Its conclusion still held there (test was `skipped`
+and the session genuinely never ran), but **the method was unsound** — I got the right answer for a
+shaky reason. Re-verify PAN-2706 against work product before acting on it.
+
+**PAN-2710 was NOT killed. It is healthy and working** — 3 commits, actively progressing the
+red→green re-trigger feature (classify stale checks → gh adapter → retrigger).
+
+### Other this tick
+- **PAN-2713 MERGED → `4edf304cd5` (PR #2721) + CLOSED OUT. RUN-63: 21 merged, 21 closed out.**
+  (Fittingly, the deploy-step gap that bit me earlier today.)
+- **PAN-2727 → PR #2730, CI running. I OWN THIS MERGE.** Guard verified: `refuseWorkspaceDashboardRestart`
+  runs at `restart.ts:212` — **before** `stopDashboard` at :337 — and only for `dashboard`/`full` scope.
+  Confirmed it does NOT break flywheel deploys: `isWorkspaceRepoRoot` matches `…/workspaces/feature-*`,
+  so the primary checkout (`/home/eltmon/Projects/overdeck`) is never refused; workspace AND strike
+  checkouts are, correctly. Gates: 2 passed, typecheck, lint.
+- Main CI **GREEN** on `df457876`, `fab2a69e`, `4d9ddfc2`, `1baca050`.
+- PAN-2568 `review=blocked` (agent live, working 9m); PAN-2715 working 13m; PAN-2597/2598 `reviewing`.
+
+## RUN-63 tick 26 (2026-07-15 ~13:20 local / 17:20Z) — PAN-2727 LANDED + LIVE-VERIFIED. Outage class CLOSED.
+
+**PAN-2727 MERGED → `41ef651624` (PR #2730), DEPLOYED, CLOSED OUT. RUN-63: 22 merged, 22 closed out.**
+Deploy: built from main → `pan restart --dashboard --health-timeout 180000` → pid **3039531**,
+systemd-parented, health 200. **My own restart from the primary checkout was NOT refused — no false
+positive.**
+
+### ✅ LIVE PRODUCTION VERIFICATION — the guard fires, and the dashboard survives
+Ran the exact command that caused today's outage, from a workspace cwd:
+```
+$ cd workspaces/feature-pan-2568 && pan restart --dashboard
+Refusing to restart the host dashboard from workspace checkout
+  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568.
+  Run this command from the primary checkout at /home/eltmon/Projects/overdeck.
+
+health BEFORE: 200   pid BEFORE: 3039531
+health AFTER:  200   pid AFTER:  3039531   ✅ same pid — dashboard untouched
+```
+**The outage class that stranded planning-pan-2702 this morning is CLOSED.** (agent-pan-2598 ran this
+same command from its workspace and killed `:3011`; PAN-2702's planning then exhausted 5 promote
+retries and stranded a complete plan workspace-local.) Third substrate fix live-verified this run,
+after PAN-2712 (merge-gate) and PAN-2716 (close-out).
+
+### Third live-verified fix — the pattern that works
+For each: root-cause to `file:line` → strike → **rebase + re-run gates myself** → PR → CI green →
+merge → **deploy** → **prove it in production**. Merged-and-closed is NOT done; deployed-and-observed is.
+
+**RUN-63 substrate fixes landed + deployed + proven:** PAN-2712 (failing_checks never re-checked →
+merge gate froze), PAN-2716 (close-out head-equality → completed work stranded), PAN-2727 (restart
+killed host dashboard from any workspace). Plus PAN-2703 (red main), PAN-2701/2725 (codex delivery),
+PAN-2690, PAN-2722 (state-worktree race), PAN-2724, PAN-2692, PAN-2713, PAN-1234, PAN-2684, PAN-2683.
+
+**STILL OPEN / NEXT:**
+- **PAN-2731 (`blocks-main`, filed tick 25)** — state.json write-only fields for codex ⇒ doctrine's
+  liveness check calls healthy agents ghosts and routes to `pan kill`. **I nearly destroyed
+  agent-pan-2710 with it.** Strike-worthy; arguably the highest-value open item now.
+- **PAN-2710** — HEALTHY and working (3 commits: classify stale checks → gh adapter → retrigger).
+  Operator-released. Shepherd to merged.
+- PAN-2597 / PAN-2598 `reviewing`; PAN-2568 `review=blocked` (agent live); PAN-2715 working.
+- PAN-2720 (ratchet rewards line-packing), PAN-2706 (ghost test sessions — **re-verify against work
+  product; its method was the unsound one from tick 25**), PAN-2709 (2 faults?), PAN-2715/2713 done.
+- **HELD, do not touch:** PAN-2702 (pickup gate fails: no `ready`, no `released` — operator-only),
+  PAN-2499 (`stoppedByUser`), PAN-1491 (needs-you), order book (A13/B10–B13), PAN-2377.
+- Phase 2 release readiness once the cohort quiesces → report + suggest. **OPERATOR CUTS; NEVER TAG.**
+
+## RUN-63 tick 27 (2026-07-15 ~12:40 local / 16:40Z) — DRAIN AUDIT: 3 primary-path defects filed, 1 orphan PR closed, 1 strike launched.
+
+**Cohort re-derived from scratch (my inventory has gone stale twice — never trust the notes).**
+4 open PRs, ALL MERGEABLE: #2732 (2715), #2729 (2568), #2631 (2598), #2601 (2597).
+
+### 🔴 PAN-2735 (`blocks-main`, STRIKE LAUNCHED) — the drain's top blocker. **This is the good one.**
+**`reviewStatus='reviewing'` has NO watchdog, and its one recovery path is disabled by a lie.**
+`deacon-review-status.ts:525` recovers orphaned `reviewing` only `if (!reviewAgentActive)`.
+`isReviewAgentActiveForIssue` (`:258-268`) returns true for **any** review row not `stopped`/`error`.
+The 4 sub-reviewers on 2597/2598 are latched `status=running` while **idle 124m/100m**, parked at the
+codex default prompt (`› Implement {feature}`) — so `reviewAgentActive` is permanently true and
+`reviewing` can NEVER be recovered. Synthesis parents (`agent-pan-259X-review`) are **`stopped`** —
+which is exactly why 2597/2598 lack the `-review` session that healthy 2568/2715 have.
+- **The 2597 security reviewer CLAIMS "the security review is complete and written to the designated
+  output file" — and no `security.md` exists.** 3/4 reports ⇒ synthesis can never fire.
+- **Runs pile up unexecuted:** 2598's last 4 runs (15:30/15:40/15:52/16:11Z) wrote `context.json` and
+  NOTHING else while the reviewers sat idle since 14:49. 2597 has **14** run dirs, 2598 **11**.
+- **The backstop is healthy; the trigger is a lie.** PAN-1864's deacon synthesis fallback WORKS —
+  2598's 14:49 synthesis is stamped "Generated by Deacon fallback" and correctly said CHANGES
+  REQUESTED. It is simply never invoked again. Textbook backstop-is-a-symptom.
+- **Sibling PAN-2731, opposite direction** (cross-linked): there frozen `lastActivity` made a HEALTHY
+  agent look dead (nearly killed it); here latched `status=running` makes DEAD agents look healthy.
+  **Same root: codex liveness fields are write-only, and every consumer trusts them as ground truth.**
+  `lastActivity` IS populated (124m) — the staleness signal exists and is simply unused. → fix #1.
+
+### PAN-2733 — `substrate-bug-poller` has NEVER run. **49,907 failed polls.**
+`BOT_LOGIN = 'panopticon-agent[bot]'` (`:74`) is a **git commit author string, not a GitHub user** —
+`gh api /users/panopticon-agent` → **404**. So `author:` 422s deterministically (reproduced; all three
+spellings fail — there IS no correct one). It's the FIRST call, and `:214 if (authorResults === null)
+return;` aborts the whole scan ⇒ **the `label:substrate` scan has never executed once.** Not degraded —
+a no-op that logs. Also `:232` `issue.user?.login === BOT_LOGIN` can never match ⇒ everything
+misattributed `operator`. (Every issue here is authored by `eltmon`.)
+
+### PAN-2734 — merge queue head-of-line zombie. **Closed PAN-2325 re-triggered on all 294 boots.**
+All 4 queued issues are **CLOSED** (PAN-2325/2318/2167/2683 — I merged+closed 2683 myself today and
+its entry is still there = direct proof). `removeMerge()` and `cleanupOldEntries()` both have **ZERO
+callers**. `resumeQueuedMerges` resumes only the **head** with no validity check → closed 2325 retried
+forever, and 2318/2167/2683 behind it can never be reached. Latent not fatal (`current=null` lets real
+merges through — why RUN-63's merges land anyway).
+
+### PR #2620 CLOSED (orphan) — **verified obsolete before touching it**
+PAN-2610 closed COMPLETED 2026-07-13 via `strike/pan-2610` (`6f12ea15c6`); #2620 was the superseded
+work-agent branch. PAN-2648 then deleted the beads subsystem — **all 4 files it touches are DELETED on
+main** ⇒ `CONFLICTING/DIRTY`, unmergeable by construction. Nothing to rebase onto.
+
+### Healthy — leave alone
+PAN-2568 + PAN-2715 convoys **ACTIVE** (idle 3–5m), synthesis parents alive; deacon re-driving both
+(`transitioned PAN-2568 to in_review`, `delivered review feedback to the work agent for PAN-2715`).
+PAN-2710 work agent live. **Do NOT touch:** PAN-2499 (`stoppedByUser`), PAN-1491/PAN-2214 (paused,
+needs-you), PAN-2702 (gate fails `ready`+`released` — operator-only), order book, PAN-2377.
+
+**METHOD NOTE (cost me twice):** `date -u -d @t '+%H:%MZ'` drops the DATE — I misread 2-day-old runs as
+3h old. Always print `%m-%d %H:%MZ`. And verify agents by **work product**, never by liveness fields.

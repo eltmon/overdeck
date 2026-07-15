@@ -19,6 +19,10 @@ import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
+  SUPERVISOR_CLIENT_MARGIN_MS,
+  supervisorInjectionBudgetMs,
+} from '../channels/injection-budget.js';
+import {
   captureTranscriptUserRecordSnapshot,
   hasNewTranscriptUserRecord,
   type TranscriptUserRecordSnapshot,
@@ -248,15 +252,14 @@ export async function deliverAgentMessage(
       supervisorFailure = 'pty-token-missing';
     } else {
       try {
-        // Must exceed the supervisor's worst-case echo-confirmation path
-        // (2 attempts × 2.5s + 2 purges × 150ms ≈ 5.3s, pty-supervisor.ts).
-        // A shorter client timeout abandons the POST mid-retry and fires the
-        // tmux fallback while the supervisor is still writing — re-creating
-        // the duplicate-submit race PAN-1769 fixed.
+        // The client deadline must remain above the supervisor's payload-aware
+        // worst-case injection budget. Abandoning the POST mid-injection would
+        // fire the tmux fallback while the supervisor is still writing and
+        // re-create the duplicate-writer race PAN-1769 fixed.
         await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
-          8_000,
+          supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS,
           ptyToken,
           PTY_TOKEN_HEADER,
         );

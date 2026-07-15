@@ -245,6 +245,11 @@ The supervisor is Node 22-only because it owns a real PTY through
 `${OVERDECK_HOME}/sockets/pty-<id>.sock` at mode `0600`, accepts authenticated
 HTTP-on-unix POSTs, writes each delivered message into Claude's PTY input, and
 echoes the message into the tmux transcript so operators can see what was sent.
+`src/lib/channels/injection-budget.ts` is the single timing source for the
+supervisor's payload-sized echo, settle, and purge waits and for the delivery
+client deadline that must outlast them. The supervisor accepts at most 262,144
+characters, returns HTTP 400 above that limit, and can therefore purge every
+character it accepted before retrying without stacking duplicate composer text.
 
 `deliverAgentMessage(agentId, message, caller?)` is the single delivery
 primitive. In automatic mode it tries, in order:
@@ -252,6 +257,13 @@ primitive. In automatic mode it tries, in order:
 1. PTY supervisor socket (`path: "supervisor"`)
 2. legacy Claude Code Channels MCP socket for already-wired sessions
 3. tmux paste-buffer fallback
+
+Summary forks add a pane-verified recovery above that transport: when the
+runtime transcript stays silent but the delivered tail remains in the composer,
+the fork pipeline sends at most two standalone Enter keystrokes. If submission
+still cannot be confirmed, it keeps the conversation alive but records
+`forkStatus = 'failed'` with an actionable `forkError` instead of presenting an
+empty transcript as a healthy completed fork.
 
 Docker workspaces remain excluded from supervisor wiring until host/container
 socket sharing is designed; Pi keeps using its `rpc.in` FIFO. H1 lifecycle

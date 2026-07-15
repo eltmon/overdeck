@@ -6,7 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../../pty-token.js';
-import { createPtySupervisorServer, injectPtyMessage } from '../pty-supervisor.js';
+import { createPtySupervisorServer, createSocketWriteLogQueue, injectPtyMessage } from '../pty-supervisor.js';
+import { INPUT_PURGE_MAX_CHARS, echoConfirmTimeoutMs, purgeSettleMs } from '../injection-budget.js';
 
 const REPO_ROOT = process.cwd();
 const SUPERVISOR_ENTRY = join(REPO_ROOT, 'dist/pty-supervisor.js');
@@ -16,6 +17,27 @@ let tmpHome: string;
 let proc: ChildProcess | null;
 let stdout = '';
 let stderr = '';
+
+describe('socket write log queue', () => {
+  it('bounds stalled logging and retains metadata instead of full payloads', async () => {
+    const stalledWrite = vi.fn(() => new Promise<void>(() => undefined));
+    const queue = createSocketWriteLogQueue(stalledWrite, 2);
+    const payload = { content: 'x'.repeat(INPUT_PURGE_MAX_CHARS), caller: 'queue-test' };
+
+    expect(queue.enqueue('agent-one', payload)).toBe(true);
+    expect(queue.enqueue('agent-two', payload)).toBe(true);
+    expect(queue.enqueue('agent-three', payload)).toBe(false);
+    await Promise.resolve();
+
+    expect(stalledWrite).toHaveBeenCalledOnce();
+    expect(stalledWrite).toHaveBeenCalledWith({
+      agentId: 'agent-one',
+      contentLength: INPUT_PURGE_MAX_CHARS,
+      caller: 'queue-test',
+    });
+    expect(stalledWrite.mock.calls[0]?.[0]).not.toHaveProperty('content');
+  });
+});
 
 function startSupervisor(agentId: string, command: string, args: string[] = []): ChildProcess {
   proc = spawn(process.execPath, [SUPERVISOR_ENTRY, command, ...args], {
@@ -188,17 +210,19 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
   it('purges between retries and before rejecting so unconfirmed writes never stack', async () => {
     vi.useFakeTimers();
     const fake = createFakePty();
-    const purge = '\x7f'.repeat('missing echo'.length + 8);
+    const content = 'missing echo';
+    const purge = '\x7f'.repeat(content.length + 8);
 
-    const delivered = injectPtyMessage(fake.child, 'agent-unit-miss', { content: 'missing echo', echo: false });
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-miss', { content, echo: false });
     const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
-    expect(fake.writes).toEqual(['missing echo']);
-    await vi.advanceTimersByTimeAsync(2_650);
-    expect(fake.writes).toEqual(['missing echo', purge, 'missing echo']);
-    await vi.advanceTimersByTimeAsync(2_650);
+    expect(fake.writes).toEqual([content]);
+    // 12 bytes => echoConfirmTimeoutMs = 2600ms; second write lands after purge settle.
+    await vi.advanceTimersByTimeAsync(2_800);
+    expect(fake.writes).toEqual([content, purge, content]);
+    await vi.advanceTimersByTimeAsync(2_800);
 
     await rejected;
-    expect(fake.writes).toEqual(['missing echo', purge, 'missing echo', purge]);
+    expect(fake.writes).toEqual([content, purge, content, purge]);
     expect(fake.writes).not.toContain('\r');
   });
 
@@ -231,16 +255,118 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
   it('submits exactly one copy when the echo only appears after the purged retry', async () => {
     vi.useFakeTimers();
     const fake = createFakePty();
-    const purge = '\x7f'.repeat('late echo'.length + 8);
+    const content = 'late echo';
+    const purge = '\x7f'.repeat(content.length + 8);
 
-    const delivered = injectPtyMessage(fake.child, 'agent-unit-late', { content: 'late echo', echo: false });
-    await vi.advanceTimersByTimeAsync(2_650);
-    expect(fake.writes).toEqual(['late echo', purge, 'late echo']);
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-late', { content, echo: false });
+    await vi.advanceTimersByTimeAsync(2_800);
+    expect(fake.writes).toEqual([content, purge, content]);
     fake.emit('late echo');
     await vi.advanceTimersByTimeAsync(400);
 
     await expect(delivered).resolves.toBeUndefined();
-    expect(fake.writes).toEqual(['late echo', purge, 'late echo', '\r']);
+    expect(fake.writes).toEqual([content, purge, content, '\r']);
+  });
+
+  it('scales the echo-confirm window so a large payload confirms without purging', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    // 36 KiB => echoConfirmTimeoutMs = 2500 + 36*100 = 6100ms.
+    const content = 'x'.repeat(36 * 1024);
+    const echoedPrefix = 'x'.repeat(40);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-large', { content, echo: false });
+    expect(fake.writes).toEqual([content]);
+
+    // The old fixed 2.5s window would have purged by now; the scaled window must not.
+    await vi.advanceTimersByTimeAsync(2_500);
+    expect(fake.writes).toEqual([content]);
+
+    // Echo arrives at t=6s, still inside the 6100ms window.
+    fake.emit(echoedPrefix);
+    await vi.advanceTimersByTimeAsync(3_500);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(fake.writes).toEqual([content, '\r']);
+  });
+
+  it('keeps the small-message echo timeout near the previous fixed floor', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'x'.repeat(512);
+    const purge = '\x7f'.repeat(content.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-small', { content, echo: false });
+    const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
+    expect(fake.writes).toEqual([content]);
+
+    // 512 bytes => echoConfirmTimeoutMs = 2500 + 1*100 = 2600ms.
+    await vi.advanceTimersByTimeAsync(2_800);
+    expect(fake.writes).toEqual([content, purge, content]);
+    await vi.advanceTimersByTimeAsync(2_800);
+
+    await rejected;
+    expect(fake.writes).toEqual([content, purge, content, purge]);
+  });
+
+  it('warns with the computed echo-confirm timeout value', async () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const fake = createFakePty();
+    // 2 KiB => echoConfirmTimeoutMs = 2500 + 2*100 = 2700ms.
+    const content = 'x'.repeat(2 * 1024);
+    const echoTimeout = echoConfirmTimeoutMs(content.length);
+    const settle = purgeSettleMs(content.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-warn', { content, echo: false });
+    await vi.advanceTimersByTimeAsync(echoTimeout);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`after ${echoTimeout}ms`),
+    );
+
+    // Second attempt echo timeout + both purge settles + margin.
+    await vi.advanceTimersByTimeAsync(echoTimeout + 2 * settle + 100);
+    await expect(delivered).rejects.toThrow(/input echo confirmation failed/);
+    warnSpy.mockRestore();
+  });
+
+  it('purges the full 30,000-char written length, not the old 8,192-char cap', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'x'.repeat(30_000);
+    const purge = '\x7f'.repeat(30_008);
+    const echoTimeout = echoConfirmTimeoutMs(content.length);
+    const settle = purgeSettleMs(content.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-purge-full', { content, echo: false });
+    const rejected = expect(delivered).rejects.toThrow(/input echo confirmation failed/);
+
+    await vi.advanceTimersByTimeAsync(echoTimeout);
+    expect(fake.writes).toEqual([content, purge]);
+
+    // Second attempt echo timeout + both purge settles + margin.
+    await vi.advanceTimersByTimeAsync(echoTimeout + 2 * settle + 100);
+    await rejected;
+  });
+
+  it('scales the post-purge settle with the erased length', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'x'.repeat(30_000);
+    const purge = '\x7f'.repeat(30_008);
+    const echoTimeout = echoConfirmTimeoutMs(content.length);
+    const settle = purgeSettleMs(content.length + 8);
+
+    const delivered = injectPtyMessage(fake.child, 'agent-unit-purge-settle', { content, echo: false });
+
+    await vi.advanceTimersByTimeAsync(echoTimeout + settle - 100);
+    expect(fake.writes).toEqual([content, purge]);
+
+    await vi.advanceTimersByTimeAsync(100);
+    expect(fake.writes).toEqual([content, purge, content]);
+
+    await vi.runAllTimersAsync();
+    await expect(delivered).rejects.toThrow(/input echo confirmation failed/);
   });
 
   it('returns non-2xx from the supervisor server when echo confirmation fails', async () => {
@@ -312,7 +438,9 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     await waitForProcessOutput(() => stdout.includes(content), 'supervisor did not echo posted content');
     expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(1);
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-echo.log');
-    expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
+    await vi.waitFor(() => {
+      expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
+    });
   });
 
   it('returns non-2xx after one retry when child PTY output never reflects the input', async () => {
@@ -337,6 +465,27 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-no-echo.log');
     expect(readFileSync(logPath, 'utf8')).toContain('"kind":"echo_confirm_failed"');
   }, 15_000);
+
+  it('rejects socket posts whose content exceeds INPUT_PURGE_MAX_CHARS', async () => {
+    const agentId = 'agent-server-too-long';
+    const token = await writePtyToken(agentId);
+    const fake = createFakePty();
+    const server = createPtySupervisorServer(agentId, fake.child);
+    const socketPath = join(tmpHome, 'sockets', `pty-${agentId}.sock`);
+    mkdirSync(join(tmpHome, 'sockets'), { recursive: true, mode: 0o700 });
+    await new Promise<void>((resolve) => server.listen(socketPath, () => resolve()));
+
+    try {
+      const result = await postToUnixSocket(socketPath, token, {
+        content: 'x'.repeat(INPUT_PURGE_MAX_CHARS + 1),
+        echo: false,
+      });
+      expect(result.status).toBe(400);
+      expect(fake.writes).toEqual([]);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
 
   it('creates the supervisor socket at mode 0600', async () => {
     const { socketPath } = await readySupervisor('agent-mode');

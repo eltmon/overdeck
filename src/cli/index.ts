@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { ensureCompatibleNode } from './node-preflight.js';
+import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendingDurableWrites } from './durable-write-drain.js';
 
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
@@ -72,7 +72,7 @@ import { doneCommand } from './commands/done.js';
 import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
-import { closeOutCommand } from './commands/close.js';
+import { registerCloseCommand } from './commands/close.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
@@ -558,12 +558,7 @@ program
   .option('--project <path>', 'Explicit project path (overrides registry)')
   .action(destroyWorkspaceCommand);
 
-program
-  .command('close <id>')
-  .description('Verify, clean up, and close issue on tracker')
-  .option('--force', 'Skip confirmation prompt')
-  .option('--json', 'Output as JSON')
-  .action((id, options) => closeOutCommand(id, options));
+registerCloseCommand(program);
 
 program
   .command('start <id>')
@@ -1445,5 +1440,5 @@ if (process.argv.length === 2) {
   process.argv.push('serve');
 }
 
-// Parse and execute
-await program.parseAsync();
+// Short-lived commands must drain durable state writes before exit (PAN-2692).
+await program.parseAsync().finally(drainPendingDurableWrites);

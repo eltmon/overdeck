@@ -10,6 +10,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import type { IssueTracker } from '../tracker/interface.js';
+import type { DodGateResult, DodRowId } from './dod.js';
 
 export interface StepResult {
   step: string;
@@ -25,6 +26,12 @@ export interface WorkflowResult {
   success: boolean;     // true only if ALL non-skipped steps succeeded
   steps: StepResult[];
   duration: number;     // ms
+  dodGate?: DodGateResult;
+}
+
+export interface CloseOutOptions {
+  dodAcceptedRows?: DodRowId[];
+  dodAcceptedBy?: string;
 }
 
 /** Context shared across lifecycle operations */
