@@ -137,17 +137,17 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T12:00:49.611Z",
+  "updated": "2026-07-15T13:06:34.338Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-15T12:00:49.494Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-15T13:06:34.254Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -184,15 +184,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3075503,
-            "output": 5877,
-            "cacheRead": 2437760,
+            "input": 3108406,
+            "output": 6035,
+            "cacheRead": 2445312,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 61945761,
-            "output": 104529,
-            "cacheRead": 60480256,
+            "input": 62258615,
+            "output": 105442,
+            "cacheRead": 60790784,
             "cacheWrite": 0
           }
         },
@@ -215,15 +215,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3075503,
-          "output": 5877,
-          "cacheRead": 2437760,
+          "input": 3108406,
+          "output": 6035,
+          "cacheRead": 2445312,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 61945761,
-          "output": 104529,
-          "cacheRead": 60480256,
+          "input": 62258615,
+          "output": 105442,
+          "cacheRead": 60790784,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -240,8 +240,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 46.551353,
-        "pricingAsOf": "2026-07-15T12:00:49.564Z"
+        "usd": 46.745637,
+        "pricingAsOf": "2026-07-15T13:06:34.333Z"
       }
     },
     "merges": [
