@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:30:29.919Z",
+  "updated": "2026-07-15T14:35:39.674Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -116,7 +116,9 @@
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
-  "statusOverrides": {},
+  "statusOverrides": {
+    "no-loss-manifest": "running"
+  },
   "swarm": {
     "slotAssignments": [
       {
@@ -141,8 +143,16 @@
     }
   },
   "tasks": {
-    "sequence": 0,
-    "claims": {},
+    "sequence": 1,
+    "claims": {
+      "no-loss-manifest": {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1030453,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:35:39.674Z"
+      }
+    },
     "claimHistory": []
   }
 }
