@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:20:54.365Z",
+  "updated": "2026-07-15T15:21:27.391Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,8 +100,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 16,
-    "claims": {},
+    "sequence": 17,
+    "claims": {
+      "record-dod-gate": {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1930228,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:21:27.391Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -226,6 +234,10 @@
       "gate-assemble-wire": {
         "reason": "Assembled rows 1-7 into a blocking close-out gate with explicit per-row accepts; 56 tests and typecheck passed; pushed 97f9155806",
         "updatedAt": "2026-07-15T15:19:27.405Z"
+      },
+      "record-dod-gate": {
+        "reason": "Required gate assembly inspection passed",
+        "updatedAt": "2026-07-15T15:21:27.391Z"
       }
     }
   },
@@ -264,6 +276,7 @@
     "gate-assemble-wire.gate-assemble-wire.ac1": "completed",
     "gate-assemble-wire.gate-assemble-wire.ac2": "completed",
     "gate-assemble-wire.gate-assemble-wire.ac3": "completed",
-    "gate-assemble-wire.gate-assemble-wire.ac4": "completed"
+    "gate-assemble-wire.gate-assemble-wire.ac4": "completed",
+    "record-dod-gate": "running"
   }
 }
