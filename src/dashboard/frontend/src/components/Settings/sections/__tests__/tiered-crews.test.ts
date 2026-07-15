@@ -99,4 +99,29 @@ describe('tiered crews mapping', () => {
     expect(config.tiers.expert.model).toBe('claude-sonnet-5');
     expect(config.tiers.expert.harness).toBe('claude-code');
   });
+
+  it('retains a kind-routed crew after its final difficulty is reassigned', () => {
+    const imported = importCrews({
+      enabled: true,
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+        standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['simple', 'medium', 'complex', 'expert'] },
+      },
+      by_kind: { docs: 'cheap' },
+      replay_threshold: 0.5,
+    });
+
+    const serialized = serializeCrews(
+      imported.crews,
+      { ...imported.assign, trivial: 'standard' },
+      imported.rest,
+    );
+
+    expect(serialized.tiers['kind-docs']).toMatchObject({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      difficulties: [],
+    });
+    expect(serialized.by_kind).toEqual({ docs: 'kind-docs' });
+  });
 });
