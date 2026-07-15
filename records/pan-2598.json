@@ -248,25 +248,20 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-13T11:20:19.204Z",
+  "updated": "2026-07-15T14:49:16.293Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-13T11:18:08.397Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at build (3194ms):\n\n\n> @overdeck/core@0.45.16 build\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs\n\n\n> @overdeck/core@0.45.16 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.16 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n",
+    "updatedAt": "2026-07-15T14:49:16.228Z",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
-    "lastVerifiedCommit": "349caea7a3c94c674d4f4b619293807fa7d542e2",
-    "reviewRequestedAt": "2026-07-13T10:56:07.402Z",
-    "reviewSpawnedAt": "2026-07-13T11:00:44.352Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -380,9 +375,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 3482328,
-            "output": 451154,
-            "cacheRead": 205205504,
+            "input": 3483074,
+            "output": 451554,
+            "cacheRead": 205448192,
             "cacheWrite": 0
           }
         }
@@ -413,15 +408,15 @@
           "cacheWrite": 346536
         },
         "custom/kimi-k2.7-code": {
-          "input": 3482328,
-          "output": 451154,
-          "cacheRead": 205205504,
+          "input": 3483074,
+          "output": 451554,
+          "cacheRead": 205448192,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 71.141883,
-        "pricingAsOf": "2026-07-13T11:18:08.503Z"
+        "usd": 71.190303,
+        "pricingAsOf": "2026-07-15T14:49:16.286Z"
       }
     },
     "merges": [
@@ -429,8 +424,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
