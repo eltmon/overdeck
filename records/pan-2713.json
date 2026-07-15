@@ -42,6 +42,11 @@
       "reason": "feedback",
       "note": "[2026-07-15T14:56Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-15T14:56:43.014Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:16:08.239Z"
     }
   ],
   "feedback": [],
@@ -111,23 +116,23 @@
     "recordedAt": "2026-07-15T14:50:52.626Z"
   },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T15:16:06.692Z",
+  "updated": "2026-07-15T15:16:08.240Z",
   "pipeline": {
     "issueId": "PAN-2713",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:16:05.515Z",
+    "updatedAt": "2026-07-15T15:16:06.834Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2721",
     "lastVerifiedCommit": "9e838feb867eb3dc7aac5997325bb8c322a65eb1",
     "reviewRequestedAt": "2026-07-15T14:51:58.635Z",
-    "reviewSpawnedAt": "2026-07-15T14:55:28.026Z"
+    "reviewSpawnedAt": "2026-07-15T15:16:06.833Z"
   },
   "closeOut": {
     "usage": {
@@ -191,7 +196,7 @@
       },
       "costAtCloseOut": {
         "usd": 45.393608,
-        "pricingAsOf": "2026-07-15T15:16:06.072Z"
+        "pricingAsOf": "2026-07-15T15:16:06.938Z"
       }
     },
     "merges": [
