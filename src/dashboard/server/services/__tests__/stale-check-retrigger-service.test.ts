@@ -137,7 +137,7 @@ it('prunes issue throttles when candidates disappear', async () => {
 
   await __tickOnceForTests();
   expect(mocks.prHead).toHaveBeenCalledTimes(2);
-  expect(mocks.rerun).toHaveBeenCalledTimes(2);
+  expect(mocks.rerun).toHaveBeenCalledTimes(1);
 });
 
 it('does not retry a failed rerun command after the retention window', async () => {
@@ -150,6 +150,34 @@ it('does not retry a failed rerun command after the retention window', async () 
 
   expect(mocks.rerun).toHaveBeenCalledTimes(1);
   expect(log).not.toHaveBeenCalledWith(expect.stringContaining('skipping run 10'));
+});
+
+it('does not retry a failed rerun when its candidate disappears and returns', async () => {
+  mocks.rerun.mockResolvedValue(false);
+  await __tickOnceForTests();
+
+  mocks.candidates.mockReturnValue([]);
+  await __tickOnceForTests();
+  mocks.candidates.mockReturnValue([candidate()]);
+  vi.advanceTimersByTime(10 * 60_000);
+  await __tickOnceForTests();
+
+  expect(mocks.rerun).toHaveBeenCalledTimes(1);
+});
+
+it('bounds failed-attempt suppression to one high watermark per issue', async () => {
+  mocks.rerun.mockResolvedValue(false);
+  mocks.prRuns.mockResolvedValue([
+    run({ databaseId: 10 }),
+    run({ databaseId: 11 }),
+    run({ databaseId: 12 }),
+  ]);
+  await __tickOnceForTests();
+
+  vi.advanceTimersByTime(24 * 60 * 60_000 + 1);
+  await __tickOnceForTests();
+
+  expect(mocks.rerun).toHaveBeenCalledTimes(3);
 });
 
 it('expires skip-log deduplication after its retention window', async () => {
