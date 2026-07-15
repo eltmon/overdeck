@@ -517,26 +517,25 @@
     "recordedAt": "2026-07-15T14:19:56.585Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T14:19:56.588Z",
+  "updated": "2026-07-15T14:19:57.791Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:19:36.152Z",
+    "updatedAt": "2026-07-15T14:19:57.622Z",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "lastVerifiedCommit": "e5336d14e94936e9ee99022f6247d3ee0b6f2d16",
-    "reviewRequestedAt": "2026-07-15T14:19:34.810Z",
+    "reviewRequestedAt": "2026-07-15T14:19:57.386Z",
     "reviewSpawnedAt": "2026-07-15T14:19:36.151Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/circular-deps-baseline.txt",
-        "scripts/source-introspection-baseline.txt",
         "src/cli/commands/__tests__/review-mode.test.ts",
         "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
         "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
@@ -547,7 +546,6 @@
         "src/dashboard/server/services/typed-errors.ts",
         "src/lib/cloister/verification-runner.ts",
         "src/lib/cloister/verification-types.ts",
-        "src/lib/cloister/verification-worker-supervisor.ts",
         "src/lib/config-yaml/defaults.ts",
         "src/lib/config-yaml/merge.ts",
         "src/lib/config-yaml/roles.ts",
@@ -611,7 +609,6 @@
         "docs/CODEX-APP-SERVER-PROTOCOL.md",
         "packages/contracts/src/harness-behavior.ts",
         "scripts/circular-deps-baseline.txt",
-        "scripts/source-introspection-baseline.txt",
         "src/cli/commands/__tests__/review-mode.test.ts",
         "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
         "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
@@ -630,7 +627,6 @@
         "src/lib/agents/spawn.ts",
         "src/lib/cloister/verification-runner.ts",
         "src/lib/cloister/verification-types.ts",
-        "src/lib/cloister/verification-worker-supervisor.ts",
         "src/lib/codex/__fixtures__/app-server-schema.json",
         "src/lib/codex/__tests__/app-server-host.test.ts",
         "src/lib/codex/__tests__/app-server-manager.test.ts",
@@ -656,7 +652,7 @@
         "tests/unit/lib/pan-dir/cutover-behavioral.test.ts",
         "tsdown.config.ts"
       ],
-      "recordedAt": "2026-07-15T01:58:04.401Z"
+      "recordedAt": "2026-07-15T14:19:56.585Z"
     }
   },
   "closeOut": {
@@ -749,7 +745,7 @@
       },
       "costAtCloseOut": {
         "usd": 229.721433,
-        "pricingAsOf": "2026-07-15T14:19:36.361Z"
+        "pricingAsOf": "2026-07-15T14:19:57.728Z"
       }
     },
     "merges": [
