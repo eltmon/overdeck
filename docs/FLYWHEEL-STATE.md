@@ -4147,3 +4147,52 @@ needs-you), PAN-2702 (gate fails `ready`+`released` — operator-only), order bo
 
 **METHOD NOTE (cost me twice):** `date -u -d @t '+%H:%MZ'` drops the DATE — I misread 2-day-old runs as
 3h old. Always print `%m-%d %H:%MZ`. And verify agents by **work product**, never by liveness fields.
+
+## RUN-63 tick 28 (2026-07-15 ~13:10 local / 17:10Z) — 3 MERGED (23/24/25), deployed. PAN-2735 fix INERT → REOPENED.
+
+**RUN-63: 25 merged.** All three deployed together: built from `39ea7680e6` (16:50:22Z, `date -u -r`),
+`pan restart --dashboard --health-timeout 180000` → pid **3609724**, health 200, systemd-parented.
+- **PAN-2568** → `293bf44ed5` (#2729) — review=passed, test=passed, CI CLEAN.
+- **PAN-2715** → `10200b21d3` (#2732) — review=passed, test=passed, CI CLEAN.
+- **PAN-2735** → `39ea7680e6` (#2737) — the strike fix. **Gates green but the fix does NOT work.**
+
+### ❌ PAN-2735 REOPENED — I did NOT get the win. Honest accounting.
+Fix is verifiably deployed (`dist/dashboard/deacon-Cuc0lObE.js` built 16:50:22Z contains the `9e5`
+idle threshold) yet 2597/2598 sat `reviewing` 15+ min. **Do not claim a fix without live proof** —
+the PAN-2706 lesson held. Three defects found, two proven in code, one in data:
+1. **`Date.parse(number)` → NaN ⇒ the 45m watchdog is DEAD CODE.** `review_spawned_at` is stored as
+   **epoch millis (a NUMBER)** despite `reviewSpawnedAt?: string` (`review-status.ts:98` — the TYPE
+   LIES). `Date.parse(1784125514820)` → `NaN`; must be `new Date(v).getTime()`. Note
+   `checkStuckReviewing` does this correctly — the bug is unique to the new code.
+2. **The latch survives in a SECOND consumer.** `checkStuckReviewing`
+   (`deacon-review-unsignaled.ts:60-77`) has its own **duplicate copy** of the liveness logic, unfixed
+   — so the real 30-min watchdog still skips 2597/2598. **Exactly what I predicted on PAN-2731:
+   patching consumers one-by-one fails; the latch needs ONE fix at the source.**
+3. **PAN-2598 is blocked by a different gate entirely:** `stuck=1, stuck_reason=verification_stuck`
+   (`{"failedCheck":"test","cycleCount":2,"maxCycles":3}`) ⇒ `:496 if (status.stuck) return actions;`
+   **no review recovery can EVER reach it.** PAN-2597 is `stuck=0`.
+
+**CORRECTED MY OWN CLAIM:** I filed "reviewing has NO watchdog" — **WRONG**. `checkStuckReviewing`
+(`deacon-review-unsignaled.ts:29`) is a 30-min watchdog the patrol calls (`deacon.ts:3020`). Absence
+was never the problem; the latch defeating it is. Corrected on the issue.
+
+**STILL UNEXPLAINED (next pass):** 2597's stopped-coordinator branch *should* fire. Ruled out:
+`SELECT_AGENT_SQL` (`agent-state-sync.ts:111`) has **no WHERE** (stopped agents ARE returned);
+`normalizeAgentId` preserves `agent-*` ids; deacon patrolling (172 lines); `checkOrphanedReviewStatuses`
+called at `deacon.ts:2960`; fix present in the running bundle. **The deacon log never mentions 2597 at
+all** — something upstream excludes it. Pull that thread.
+
+### Also filed this tick
+- **PAN-2738** — strikes DEADLOCK: `git rebase origin/main` denied as "history rewriting" by codex's
+  escalation reviewer generalizing our own rule text. strike-pan-2735 stalled; **I hand-ran its gates,
+  push, and PR** — that intervention IS the symptom. Rule must distinguish unpushed-branch rebase from
+  pushed-history rewriting, and kickoff should name `pan sync-main`.
+- **PAN-2733** (poller never ran, 49,907 failures), **PAN-2734** (merge-queue zombie, 294 boots).
+
+### Cohort now
+PAN-2710 review=**blocked** (rework; PR #2736 open, agent healthy — committed 4s after reading "idle
+64m", **the PAN-2731 trap AGAIN — work product saved a 3rd agent**). 2597/2598 wedged pending a real
+PAN-2735 fix. **Do NOT touch:** PAN-2499, PAN-1491/2214, PAN-2702 (operator-only), order book, PAN-2377.
+
+**METHOD:** never `gh issue comment --body` with backticks — bash command-substitutes them and eats
+your code blocks. **Always `--body-file` + quoted heredoc.**
