@@ -247,9 +247,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T17:44:35.711Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T17:48Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T17:48:02.167Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T17:48:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T18:12:00-04:00\n\n## Verdict: CHANGES REQUESTED — failed rerun state is never evicted after issues leave the candidate set\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-eabb1d66/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: eabb1d6607a0dc44823f3655cd0acc08c8379d7a\n- Cycle number: 7\n- Prior cycle SHA: ecca922cfc951338f50eb35c75f0bba967df8037\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-eabb1d66/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-eabb1d66/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-eabb1d66/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-eabb1d66/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Failed rerun state is never evicted for departed issues — `src/dashboard/server/services/stale-check-retrigger-service.ts:40`\nCycle 7 removed `FailedRuns.lastSeenAt` and all `failedRunsByIssue` eviction from `pruneState`. Each failed `gh run rerun` now leaves an issue-keyed set strongly referenced for the dashboard process lifetime when that issue departs the candidate set, so retained state grows with historical failed issues rather than active candidates. Restore bounded cleanup without reintroducing the cycle-6 idempotency defect: failed IDs must remain suppressed when an unchanged run returns, while entries that GitHub-derived current run state proves irrelevant must be removed; empty issue buckets should also be deleted.\n\n## Non-blocking Findings\n\n### [security] [demoted: previously reviewed] Unvalidated PR repository can drive privileged workflow reruns — `src/dashboard/server/services/stale-check-retrigger-service.ts:55`\nThe repository URL parsing and mutation path are inside the PR diff, but they did not change after the cycle-6 synthesis, whose security reviewer passed them. Under the cycle-7 convergence gate this finding is not promotable to a blocker. The reported risk is that a non-canonical or untracked repository from mutable review-status data can reach `gh run rerun` with dashboard credentials.\n\n### [correctness] [demoted: previously reviewed] Red-window history is hardcoded to `main` instead of the PR target branch — `src/lib/cloister/stale-check-github.ts:28`\nThe hardcoded `--branch main` is inside the PR diff, but it did not change after the cycle-6 synthesis, whose correctness review did not flag it. Under the cycle-7 convergence gate this finding is not promotable to a blocker. The reported risk affects managed repositories whose effective merge target is not named `main`.\n\n### [performance] Candidate evaluation performs serial N+1 GitHub CLI calls — `src/dashboard/server/services/stale-check-retrigger-service.ts:90`\nEligible candidates are evaluated with sequential subprocess-backed GitHub calls, so a degraded connection or large backlog can extend a tick substantially. This was reported as advisory and remains non-blocking.\n\n## Scope Note\nThe cycle-7 convergence gate was applied against `ecca922cfc951338f50eb35c75f0bba967df8037`. The performance blocker survives because this cycle removed inactive failed-run eviction; the security and correctness findings cite code unchanged since the previous synthesis and are therefore recorded as advisory rather than promoted.\n\n## Clean Sub-roles\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-eabb1d66/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -276,7 +289,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:45:31.880Z",
+  "updated": "2026-07-15T17:48:02.167Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
