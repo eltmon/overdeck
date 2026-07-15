@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:45:41.304Z",
+  "updated": "2026-07-15T14:45:58.856Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -131,7 +131,11 @@
     "clear-gates-server.clear-gates-server.ac1": "completed",
     "clear-gates-server.clear-gates-server.ac2": "completed",
     "clear-gates-server.clear-gates-server.ac3": "completed",
-    "agent-step-row": "running"
+    "agent-step-row": "completed",
+    "agent-step-row.agent-step-row.ac1": "completed",
+    "agent-step-row.agent-step-row.ac2": "completed",
+    "agent-step-row.agent-step-row.ac3": "completed",
+    "agent-step-row.agent-step-row.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -157,16 +161,8 @@
     }
   },
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "agent-step-row": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1182287,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:45:41.304Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -200,6 +196,17 @@
         "outcome": "completed",
         "reason": "Verified existing pushed server implementation: clearGates clears paused/troubled gates through shared agent-state doors, preserves gated refusal without the flag, emits intervention events; 20 focused route tests, typecheck, and full lint/state-write gate pass.",
         "releasedAt": "2026-07-15T14:45:28.642Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1182287,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:45:41.304Z",
+        "itemId": "agent-step-row",
+        "outcome": "completed",
+        "reason": "Verified existing pushed shared AgentStepRow adoption in cockpit and rail: 10 focused tests cover density, active-only spinner, reviewer verdict, and all context actions; full typecheck/lint already pass and legacy file-size baselines are removed.",
+        "releasedAt": "2026-07-15T14:45:58.856Z"
       }
     ],
     "statusReasons": {
@@ -214,6 +221,10 @@
       "clear-gates-server": {
         "reason": "Verified existing pushed server implementation: clearGates clears paused/troubled gates through shared agent-state doors, preserves gated refusal without the flag, emits intervention events; 20 focused route tests, typecheck, and full lint/state-write gate pass.",
         "updatedAt": "2026-07-15T14:45:28.642Z"
+      },
+      "agent-step-row": {
+        "reason": "Verified existing pushed shared AgentStepRow adoption in cockpit and rail: 10 focused tests cover density, active-only spinner, reviewer verdict, and all context actions; full typecheck/lint already pass and legacy file-size baselines are removed.",
+        "updatedAt": "2026-07-15T14:45:58.856Z"
       }
     }
   }
