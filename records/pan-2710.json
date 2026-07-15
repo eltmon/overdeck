@@ -139,17 +139,17 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:11:14.714Z",
+  "updated": "2026-07-15T17:16:06.106Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:11:14.638Z",
+    "updatedAt": "2026-07-15T17:16:06.018Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Inspection error for bead red-window-classifier: tmux session inspect-pan-2710-red-window-classifier exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
@@ -161,15 +161,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3445291,
-            "output": 5978,
-            "cacheRead": 3102976,
+            "input": 3701810,
+            "output": 6217,
+            "cacheRead": 3350400,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 67752296,
-            "output": 82996,
-            "cacheRead": 66578432,
+            "input": 76868378,
+            "output": 84988,
+            "cacheRead": 75646464,
             "cacheWrite": 0
           }
         },
@@ -192,15 +192,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3445291,
-          "output": 5978,
-          "cacheRead": 3102976,
+          "input": 3701810,
+          "output": 6217,
+          "cacheRead": 3350400,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 67752296,
-          "output": 82996,
-          "cacheRead": 66578432,
+          "input": 76868378,
+          "output": 84988,
+          "cacheRead": 75646464,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -217,8 +217,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 50.656421,
-        "pricingAsOf": "2026-07-15T17:11:14.696Z"
+        "usd": 55.490447,
+        "pricingAsOf": "2026-07-15T17:16:06.098Z"
       }
     },
     "merges": [
