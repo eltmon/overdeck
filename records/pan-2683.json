@@ -102,20 +102,21 @@
     "recordedAt": "2026-07-15T09:57:51.722Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T10:50:48.983Z",
+  "updated": "2026-07-15T10:52:11.263Z",
   "pipeline": {
     "issueId": "PAN-2683",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T10:50:45.171Z",
+    "updatedAt": "2026-07-15T10:52:11.225Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues (tier-table malformed-value validation); workspace cleared of generated hook-bundle noise",
     "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2693",
+    "reviewedAtCommit": "5f460ca4e455e84d3d525b34ef616344b8f9f867",
     "lastVerifiedCommit": "5f460ca4e455e84d3d525b34ef616344b8f9f867",
     "reviewSpawnedAt": "2026-07-15T10:50:45.170Z"
   },
@@ -130,9 +131,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 45060419,
-            "output": 42882,
-            "cacheRead": 44000512,
+            "input": 46337707,
+            "output": 45745,
+            "cacheRead": 45232128,
             "cacheWrite": 0
           }
         },
@@ -169,9 +170,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 45060419,
-          "output": 42882,
-          "cacheRead": 44000512,
+          "input": 46337707,
+          "output": 45745,
+          "cacheRead": 45232128,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -188,8 +189,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 56.647401,
-        "pricingAsOf": "2026-07-15T10:50:45.263Z"
+        "usd": 57.577459,
+        "pricingAsOf": "2026-07-15T10:52:11.256Z"
       }
     },
     "merges": [
