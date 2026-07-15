@@ -69,6 +69,26 @@ describe('closeOut no-loss guard (PAN-2466)', () => {
     expect(after?.closeOut?.usage?.totals?.input).toBe(9999);
   });
 
+  it('an empty later write preserves a populated Definition-of-Done gate', () => {
+    const ws = mkdtempSync(join(tmpdir(), 'pan-closeout-'));
+    dirs.push(ws);
+    const project = getProjectConfigFromWorkspacePath(ws);
+    const withGate = structuredClone(EMPTY)!;
+    withGate.dodGate = {
+      evaluatedAt: '2026-07-15T13:00:00Z',
+      accepted: ['deploy'],
+      rows: [{
+        id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge',
+        observed: 'accepted stale build', status: 'miss',
+        acceptedBy: { flag: '--accept-deploy', by: 'operator', at: '2026-07-15T13:00:00Z' },
+      }],
+    };
+    writeIssueRecordSync(project, 'PAN-2466', baseRecord('PAN-2466', withGate));
+    writeIssueRecordSync(project, 'PAN-2466', baseRecord('PAN-2466', EMPTY));
+
+    expect(readIssueRecordSync(project, 'PAN-2466')?.closeOut.dodGate).toEqual(withGate.dodGate);
+  });
+
   it('first write of a fresh record with empty closeOut is untouched', () => {
     const ws = mkdtempSync(join(tmpdir(), 'pan-closeout-'));
     dirs.push(ws);

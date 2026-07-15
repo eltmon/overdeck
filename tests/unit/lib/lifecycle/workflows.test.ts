@@ -16,6 +16,7 @@ const {
   mockClearReviewStatus,
   mockResetPostMergeState,
   mockMarkRecordPipelineClosedOutSync,
+  mockWriteCloseOutDodGateSync,
   mockSweepOrphanedTasks,
   mockEvaluateDodGate,
 } = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ const {
   mockClearReviewStatus: vi.fn(),
   mockResetPostMergeState: vi.fn(),
   mockMarkRecordPipelineClosedOutSync: vi.fn(),
+  mockWriteCloseOutDodGateSync: vi.fn(),
   mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
   mockEvaluateDodGate: vi.fn(),
 }));
@@ -82,6 +84,7 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
     ...actual,
     getProjectConfigFromWorkspacePath: vi.fn((workspacePath: string) => ({ name: 'inferred', path: workspacePath })),
     markRecordPipelineClosedOutSync: mockMarkRecordPipelineClosedOutSync,
+    writeCloseOutDodGateSync: mockWriteCloseOutDodGateSync,
   };
 });
 
@@ -318,6 +321,15 @@ describe('workflows', () => {
         details: expect.arrayContaining([expect.stringContaining('MISS accepted via --accept-deploy by operator')]),
       });
       expect(result.steps.some(step => step.step.startsWith('archive-planning:'))).toBe(true);
+      expect(mockWriteCloseOutDodGateSync).toHaveBeenCalledWith(
+        expect.anything(),
+        'PAN-100',
+        expect.objectContaining({
+          rows: expect.arrayContaining([expect.objectContaining({ id: 'teardown', status: 'pass' })]),
+          accepted: ['deploy'],
+        }),
+      );
+      expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({ success: true });
     });
 
     it('should verify branch merged before proceeding', async () => {

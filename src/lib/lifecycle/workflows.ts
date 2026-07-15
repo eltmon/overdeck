@@ -30,7 +30,11 @@ import { teardownWorkspace } from './teardown-workspace.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
-import { getProjectConfigFromWorkspacePath, markRecordPipelineClosedOutSync } from '../pan-dir/record.js';
+import {
+  getProjectConfigFromWorkspacePath,
+  markRecordPipelineClosedOutSync,
+  writeCloseOutDodGateSync,
+} from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { evaluateDodGate } from './dod-gate.js';
 import { acceptFlagFor, DOD_ROWS, type DodGateResult } from './dod.js';
@@ -224,6 +228,13 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
+    const teardownDef = DOD_ROWS.find(row => row.id === 'teardown')!;
+    dodGate.rows.push({
+      ...teardownDef,
+      status: 'pass',
+      observed: teardownSteps.flatMap(step => step.details ?? []).join('; ') || 'close-out teardown completed',
+    });
+
     // 6+7. Close issue + apply label
     const closeSteps = yield* closeIssue(ctx, {
       tracker: opts.tracker,
@@ -239,6 +250,8 @@ export function closeOut(
     // 8. Mark durable pipeline terminal before clearing the DB cache.
     const markTerminal = yield* markPipelineClosedOutStep(ctx);
     allSteps.push(markTerminal);
+    const recordDodGate = yield* recordDodGateStep(ctx, dodGate);
+    allSteps.push(recordDodGate);
     if (markTerminal.success) {
       const pruned = pruneStoppedAgentsForIssue(ctx.issueId);
       allSteps.push(pruned.preserved.length > 0
@@ -269,6 +282,26 @@ function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepRes
   }).pipe(
     Effect.catch((err) =>
       Effect.succeed(stepSkipped(step, [`Pipeline terminal marker failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
+    ),
+  );
+}
+
+function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult): Effect.Effect<StepResult> {
+  const step = 'close-out:record-dod-gate';
+  return Effect.try({
+    try: () => {
+      const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
+      writeCloseOutDodGateSync(project, ctx.issueId.toUpperCase(), {
+        evaluatedAt: new Date().toISOString(),
+        rows: dodGate.rows,
+        accepted: dodGate.accepted,
+      });
+      return stepOk(step, ['Recorded Definition-of-Done gate with 8 rows']);
+    },
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepSkipped(step, [`Definition-of-Done gate record failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
     ),
   );
 }

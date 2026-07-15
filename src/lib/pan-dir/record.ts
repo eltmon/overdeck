@@ -34,6 +34,7 @@ import type {
   ScopeDriftRecord,
 } from '../vbrief/continue-state.js';
 import type { PanIssueTasksRecord } from './record-task-types.js';
+import type { DodRowResult } from '../lifecycle/dod.js';
 export type { PanIssueTasksRecord, TaskClaim, TaskClaimHistoryEntry } from './record-task-types.js';
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
@@ -59,6 +60,11 @@ export interface PanIssueCloseOutRecord {
   merges: string[];
   ranOn: string;
   closedAt?: string;
+  dodGate?: {
+    evaluatedAt: string;
+    rows: DodRowResult[];
+    accepted: string[];
+  };
 }
 
 export interface PanIssueSwarmFailedMergeBlock {
@@ -296,7 +302,8 @@ function preserveCloseOutSync(path: string, record: PanIssueRecord): PanIssueRec
     !incoming ||
     (Object.keys(incoming.usage?.byStage ?? {}).length === 0 &&
       Object.keys(incoming.usage?.totals ?? {}).length === 0 &&
-      (incoming.merges ?? []).length === 0);
+      (incoming.merges ?? []).length === 0 &&
+      !incoming.dodGate);
   if (!incomingEmpty || !existsSync(path)) return record;
   try {
     const onDisk = JSON.parse(readFileSync(path, 'utf-8')) as PanIssueRecord;
@@ -305,7 +312,8 @@ function preserveCloseOutSync(path: string, record: PanIssueRecord): PanIssueRec
       disk &&
       (Object.keys(disk.usage?.byStage ?? {}).length > 0 ||
         Object.keys(disk.usage?.totals ?? {}).length > 0 ||
-        (disk.merges ?? []).length > 0);
+        (disk.merges ?? []).length > 0 ||
+        Boolean(disk.dodGate));
     if (diskHasData) {
       console.warn(`[record] Preserving populated closeOut for ${record.issueId} — incoming write carried an empty closeOut (PAN-2466 guard)`);
       return { ...record, closeOut: disk };
@@ -852,6 +860,18 @@ export function markRecordPipelineClosedOutSync(
   record.pipeline.verificationStatus = undefined;
   record.pipeline.mergeStatus = 'merged';
   record.pipeline.updatedAt = now;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** Persist the completed Definition-of-Done gate through the issue record write door. */
+export function writeCloseOutDodGateSync(
+  project: ProjectConfig,
+  issueId: string,
+  dodGate: NonNullable<PanIssueCloseOutRecord['dodGate']>,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  record.closeOut.dodGate = dodGate;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }
