@@ -60,18 +60,18 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:31:50.917Z",
+  "updated": "2026-07-15T11:31:51.292Z",
   "pipeline": {
     "issueId": "PAN-2684",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T11:31:50.868Z",
-    "reviewNotes": "Reassigning a crew's final difficulty silently deletes its kind overrides.",
+    "updatedAt": "2026-07-15T11:31:51.243Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2694",
     "lastVerifiedCommit": "5975f975e47524c4553d6159c295b7ea013adfac",
@@ -161,7 +161,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.991417,
-        "pricingAsOf": "2026-07-15T11:31:50.901Z"
+        "pricingAsOf": "2026-07-15T11:31:51.288Z"
       }
     },
     "merges": [
