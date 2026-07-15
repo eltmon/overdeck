@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:11:32.864Z",
+  "updated": "2026-07-15T15:11:46.017Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,8 +100,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "gate-mainverify-row": {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1737272,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:11:46.017Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -181,6 +189,10 @@
       "gate-postmerge-row": {
         "reason": "Checked canonical post-merge state and running issue agents; 14 tests and typecheck passed; pushed 47952854c0",
         "updatedAt": "2026-07-15T15:11:32.863Z"
+      },
+      "gate-mainverify-row": {
+        "reason": "Continue next ready vBRIEF item",
+        "updatedAt": "2026-07-15T15:11:46.017Z"
       }
     }
   },
@@ -205,6 +217,7 @@
     "gate-postmerge-row": "completed",
     "gate-postmerge-row.gate-postmerge-row.ac1": "completed",
     "gate-postmerge-row.gate-postmerge-row.ac2": "completed",
-    "gate-postmerge-row.gate-postmerge-row.ac3": "completed"
+    "gate-postmerge-row.gate-postmerge-row.ac3": "completed",
+    "gate-mainverify-row": "running"
   }
 }
