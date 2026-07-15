@@ -2,7 +2,7 @@
   "issueId": "PAN-2698",
   "schemaVersion": 2,
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-15T13:06:57.947Z",
+  "updated": "2026-07-15T13:06:58.414Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2698: Codex role spawns get no MCP servers — test role cannot run required browser UAT on codex (Playwright missing)",
       "timestamp": "2026-07-15T13:06:57.947Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
