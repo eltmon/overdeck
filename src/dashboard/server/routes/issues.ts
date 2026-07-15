@@ -574,7 +574,7 @@ const postIssueCloseOutRoute = HttpRouter.add(
     if (authError) return authError;
 
     const text = yield* request.text;
-    let body: { acceptedRows?: unknown; acceptedBy?: unknown } = {};
+    let body: { acceptedRows?: unknown } = {};
     try {
       body = text ? JSON.parse(text) : {};
     } catch {
@@ -587,13 +587,9 @@ const postIssueCloseOutRoute = HttpRouter.add(
     )) {
       return jsonResponse({ error: `Invalid acceptedRows; valid ids: ${validRows.join(', ')}`, validRows }, { status: 400 });
     }
-    if (body.acceptedBy !== undefined && typeof body.acceptedBy !== 'string') {
-      return jsonResponse({ error: 'acceptedBy must be a string' }, { status: 400 });
-    }
-
     return yield* closeOutIssue(id, {
       acceptedRows: (body.acceptedRows ?? []) as DodRowId[],
-      acceptedBy: typeof body.acceptedBy === 'string' ? body.acceptedBy : 'dashboard-operator',
+      acceptedBy: 'dashboard-operator',
     });
   })),
 );

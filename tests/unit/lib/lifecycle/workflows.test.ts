@@ -84,7 +84,7 @@ vi.mock('../../../../src/lib/pan-dir/record.js', async (importOriginal) => {
     ...actual,
     getProjectConfigFromWorkspacePath: vi.fn((workspacePath: string) => ({ name: 'inferred', path: workspacePath })),
     markRecordPipelineClosedOutSync: mockMarkRecordPipelineClosedOutSync,
-    writeCloseOutDodGateSync: mockWriteCloseOutDodGateSync,
+    writeCloseOutDodGate: mockWriteCloseOutDodGateSync,
   };
 });
 

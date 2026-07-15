@@ -221,12 +221,12 @@ describe('POST /api/issues/:id/close-out', () => {
     ]);
   });
 
-  it('passes accepted rows and attribution into closeOut', async () => {
+  it('uses trusted server attribution for accepted rows', async () => {
     const result = await postCloseOut('PAN-1190', {}, { acceptedRows: ['deploy'], acceptedBy: 'operator' });
     expect(result.status).toBe(200);
     expect(closeOutMock).toHaveBeenCalledWith(expect.anything(), {
       dodAcceptedRows: ['deploy'],
-      dodAcceptedBy: 'operator',
+      dodAcceptedBy: 'dashboard-operator',
     });
   });
 

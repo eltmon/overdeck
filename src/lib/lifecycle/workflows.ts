@@ -33,7 +33,7 @@ import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-pop
 import {
   getProjectConfigFromWorkspacePath,
   markRecordPipelineClosedOutSync,
-  writeCloseOutDodGateSync,
+  writeCloseOutDodGate,
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { evaluateDodGate } from './dod-gate.js';
@@ -293,10 +293,10 @@ function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepRes
 
 function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult): Effect.Effect<StepResult> {
   const step = 'close-out:record-dod-gate';
-  return Effect.try({
-    try: () => {
+  return Effect.tryPromise({
+    try: async () => {
       const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
-      writeCloseOutDodGateSync(project, ctx.issueId.toUpperCase(), {
+      await writeCloseOutDodGate(project, ctx.issueId.toUpperCase(), {
         evaluatedAt: new Date().toISOString(),
         rows: dodGate.rows,
         accepted: dodGate.accepted,
