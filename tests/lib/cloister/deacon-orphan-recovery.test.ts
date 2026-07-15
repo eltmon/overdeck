@@ -23,20 +23,6 @@ import { existsSync, mkdirSync, writeFileSync, unlinkSync, rmSync } from 'fs';
 import { join } from 'path';
 import { getOverdeckHome } from '../../../src/lib/paths.js';
 
-const { mockExec, mockExecAsync } = vi.hoisted(() => {
-  const asyncImpl = vi.fn().mockResolvedValue({ stdout: '', stderr: '' });
-  const callbackImpl = vi.fn((_command: string, _options: unknown, callback: (error: Error | null, stdout: string, stderr: string) => void) => {
-    callback(null, '', '');
-  });
-  Object.assign(callbackImpl, { [Symbol.for('nodejs.util.promisify.custom')]: asyncImpl });
-  return { mockExec: callbackImpl, mockExecAsync: asyncImpl };
-});
-
-vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, exec: mockExec };
-});
-
 // ---------------------------------------------------------------------------
 // Mock review-status before importing deacon
 // ---------------------------------------------------------------------------
@@ -509,19 +495,19 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
 
   it('resumes review when verification passed during a dashboard restart', async () => {
     const workspace = '/workspaces/feature-pan-369-test';
+    const verifiedHead = 'verified-head';
     const agentId = `agent-${ISSUE_ID.toLowerCase()}`;
     const agentDir = join(getOverdeckHome(), 'agents', agentId);
     completedProcessedPath = join(agentDir, 'completed.processed');
 
     mkdirSync(agentDir, { recursive: true });
     writeFileSync(completedProcessedPath, '', 'utf-8');
-    mockExecAsync.mockResolvedValueOnce({ stdout: 'verified-head\n', stderr: '' });
     mockLoadReviewStatuses.mockReturnValue({
       [ISSUE_ID]: {
         reviewStatus: 'failed',
         reviewNotes: 'Verification failed at test',
         verificationStatus: 'passed',
-        lastVerifiedCommit: 'verified-head',
+        lastVerifiedCommit: verifiedHead,
         testStatus: 'pending',
         prUrl: 'https://github.com/test/repo/pull/1',
         readyForMerge: false,
@@ -532,9 +518,10 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: '/workspaces' });
     mockSpawnReviewRoleForIssue.mockResolvedValue({ success: true, message: 'dispatched' });
 
-    const actions = await checkOrphanedReviewStatuses();
+    const actions = await checkOrphanedReviewStatuses({
+      readWorkspaceHead: vi.fn().mockResolvedValue(verifiedHead),
+    });
 
-    expect(mockExecAsync).toHaveBeenCalledWith('git rev-parse HEAD', { cwd: workspace });
     expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, {
       reviewStatus: 'pending',
       reviewNotes: undefined,

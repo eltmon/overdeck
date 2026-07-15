@@ -210,6 +210,10 @@ interface ReviewStatusLike {
   stuckDetails?: string;
 }
 
+interface OrphanRecoveryOptions {
+  readWorkspaceHead?: (workspace: string) => Promise<string>;
+}
+
 function latestHistoryEntry(
   history: Array<{ type: string; status: string; notes?: string }> | undefined,
   type: 'review' | 'test',
@@ -461,7 +465,11 @@ export async function handleWorkCompleted(issueId: string): Promise<string[]> {
  * PAN-1908: per-issue orphan reconciler for a single review-status row. Used by
  * the legacy checkOrphanedReviewStatuses safety net and by reactive handlers.
  */
-async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewStatusLike): Promise<string[]> {
+async function reconcileReviewStatusOrphan(
+  issueId: string,
+  rawStatus: ReviewStatusLike,
+  options: OrphanRecoveryOptions = {},
+): Promise<string[]> {
   const actions: string[] = [];
 
   const status = getReviewStatusSync(issueId) ?? rawStatus;
@@ -495,8 +503,10 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
 
     if (workspace) {
       try {
-        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspace });
-        if (stdout.trim() === status.lastVerifiedCommit) {
+        const currentHead = options.readWorkspaceHead
+          ? await options.readWorkspaceHead(workspace)
+          : (await execAsync('git rev-parse HEAD', { cwd: workspace })).stdout.trim();
+        if (currentHead === status.lastVerifiedCommit) {
           setReviewStatusSync(issueId, {
             reviewStatus: 'pending',
             reviewNotes: undefined,
@@ -691,7 +701,7 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
   return actions;
 }
 
-export async function checkOrphanedReviewStatuses(): Promise<string[]> {
+export async function checkOrphanedReviewStatuses(options: OrphanRecoveryOptions = {}): Promise<string[]> {
   const actions: string[] = [];
 
   try {
@@ -700,7 +710,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     // as a thin SQLite-only safety net for dropped events.
     const statuses = loadReviewStatuses();
     for (const [issueId, status] of Object.entries(statuses)) {
-      const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike);
+      const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike, options);
       actions.push(...result);
     }
   } catch (error: unknown) {
