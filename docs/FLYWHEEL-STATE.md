@@ -3987,3 +3987,64 @@ health 200. Matches my own check — good cross-confirmation of the PAN-2725 dep
 **NEXT:** shepherd strike-pan-2727 → merge → deploy. Drive PAN-2597/2598/2713 (all `reviewing`) →
 test → merge. PAN-2710 (released) to merged. **Do NOT touch: PAN-2702 (gate fails), PAN-2499
 (`stoppedByUser`), PAN-1491 (needs-you).**
+
+## RUN-63 tick 25 (2026-07-15 ~13:05 local / 17:05Z) — 🚨 NEAR-MISS: I ALMOST KILLED A HEALTHY AGENT. [PAN-2731] filed.
+
+### ⛔ READ THIS BEFORE EVER JUDGING A CODEX AGENT DEAD — state.json LIES
+
+I was **one command away from `pan kill`-ing `agent-pan-2710`** (the operator-RELEASED critical item)
+as a "ghost". It was healthy and had **committed 31 seconds earlier.**
+
+What `state.json` said — a textbook ghost, ~50 min after spawn:
+```json
+"startedAt": "2026-07-15T15:22:04.971Z",  "lastActivity": "2026-07-15T15:22:09.306Z",  "costSoFar": 0
+```
+What the workspace `git log` said at the same instant:
+```
+d62392a498  31 seconds ago   feat: retrigger stale PR checks (PAN-2710)
+4051150fa7  3 minutes ago    feat: add stale check GitHub adapter (PAN-2710)
+ab30bec102  41 minutes ago   feat: classify stale PR checks (PAN-2710)
+```
+
+**`costSoFar` and `lastActivity` are WRITE-ONLY for codex work agents** — written at spawn, never
+updated. **DOCTRINE ACTIVELY RECOMMENDS THE WRONG SIGNAL:** *"confirm liveness via state.json
+lastActivity, NOT the pane — RUN-62 tick-23 lesson."* For codex that guidance is **inverted and
+work-destroying**.
+
+**Worse — both available signals agreed and both were wrong.** The pane showed a deacon idle-nudge
+apparently sitting unsubmitted (`Create a plan? shift + tab use Plan mode`), which looks exactly like a
+wedged session. Only the workspace `git log` told the truth, and nothing tells you to check it.
+
+**And every sanctioned path funnels you toward the kill:** `pan start --fresh` → *"Work agent for
+PAN-2710 is already running"* (live tmux); `pan resume` is forbidden. So a flywheel that believes
+state.json has only `pan kill` left — which the operator's own remedy ("cycle its session — kill +
+stack rebuild + start") sanctions. **A careful agent following doctrine correctly still destroys work.**
+
+**➡️ NEW STANDING RULE — liveness for a codex agent = WORK PRODUCT, not state.json:**
+```
+git -C workspaces/feature-<id> log -3 --format='%h %cr %s'     # ← the ONLY trustworthy tell
+```
+**Never judge an agent dead without it. Never run a destructive cycle on an agent whose workspace has
+commits newer than its `lastActivity`.**
+**[PAN-2731] FILED (`blocks-main`)** — proposes: make the codex adapter update the fields (or stop
+writing them so they are conspicuously absent, since a silently-stale field is worse than a missing
+one), fix the doctrine, and add a guard refusing to kill an agent with commits newer than lastActivity.
+
+**This also weakens my tick-19/22 method claim.** My PAN-2706 filing (ghost TEST sessions) used the
+same `costSoFar=0` + frozen-lastActivity reasoning. Its conclusion still held there (test was `skipped`
+and the session genuinely never ran), but **the method was unsound** — I got the right answer for a
+shaky reason. Re-verify PAN-2706 against work product before acting on it.
+
+**PAN-2710 was NOT killed. It is healthy and working** — 3 commits, actively progressing the
+red→green re-trigger feature (classify stale checks → gh adapter → retrigger).
+
+### Other this tick
+- **PAN-2713 MERGED → `4edf304cd5` (PR #2721) + CLOSED OUT. RUN-63: 21 merged, 21 closed out.**
+  (Fittingly, the deploy-step gap that bit me earlier today.)
+- **PAN-2727 → PR #2730, CI running. I OWN THIS MERGE.** Guard verified: `refuseWorkspaceDashboardRestart`
+  runs at `restart.ts:212` — **before** `stopDashboard` at :337 — and only for `dashboard`/`full` scope.
+  Confirmed it does NOT break flywheel deploys: `isWorkspaceRepoRoot` matches `…/workspaces/feature-*`,
+  so the primary checkout (`/home/eltmon/Projects/overdeck`) is never refused; workspace AND strike
+  checkouts are, correctly. Gates: 2 passed, typecheck, lint.
+- Main CI **GREEN** on `df457876`, `fab2a69e`, `4d9ddfc2`, `1baca050`.
+- PAN-2568 `review=blocked` (agent live, working 9m); PAN-2715 working 13m; PAN-2597/2598 `reviewing`.
