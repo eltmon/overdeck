@@ -172,18 +172,18 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T16:33:58.520Z",
+  "updated": "2026-07-15T16:37:08.539Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:33:57.064Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-15T16:37:08.460Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
     "lastVerifiedCommit": "8f7e211e4c68285b3e3761825ce5bfef37c131aa",
@@ -219,6 +219,28 @@
         "src/lib/tmux.ts"
       ],
       "recordedAt": "2026-07-15T15:47:00.777Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-8f7e211e/security.md",
+        "atCommit": "8f7e211e4c68285b3e3761825ce5bfef37c131aa"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-8f7e211e/correctness.md",
+        "atCommit": "8f7e211e4c68285b3e3761825ce5bfef37c131aa"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-8f7e211e/performance.md",
+        "atCommit": "8f7e211e4c68285b3e3761825ce5bfef37c131aa"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-8f7e211e/requirements.md",
+        "atCommit": "8f7e211e4c68285b3e3761825ce5bfef37c131aa"
+      }
     }
   },
   "closeOut": {
@@ -226,15 +248,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 4915019,
-            "output": 7141,
-            "cacheRead": 4523008,
+            "input": 4991598,
+            "output": 7192,
+            "cacheRead": 4598144,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 68354400,
-            "output": 96157,
-            "cacheRead": 66914304,
+            "input": 73480983,
+            "output": 104133,
+            "cacheRead": 71928064,
             "cacheWrite": 0
           }
         },
@@ -271,15 +293,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 4915019,
-          "output": 7141,
-          "cacheRead": 4523008,
+          "input": 4991598,
+          "output": 7192,
+          "cacheRead": 4598144,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 68354400,
-          "output": 96157,
-          "cacheRead": 66914304,
+          "input": 73480983,
+          "output": 104133,
+          "cacheRead": 71928064,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -308,8 +330,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 60.781714,
-        "pricingAsOf": "2026-07-15T16:33:57.387Z"
+        "usd": 64.091989,
+        "pricingAsOf": "2026-07-15T16:37:08.515Z"
       }
     },
     "merges": [
