@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:31:40.387Z",
+  "updated": "2026-07-15T16:31:49.723Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
@@ -200,5 +200,30 @@
     "docs-troubleshooting": "completed",
     "docs-troubleshooting.docs-troubleshooting.ac1": "completed",
     "docs-troubleshooting.docs-troubleshooting.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "reference/troubleshooting.mdx",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/services/__tests__/stale-check-retrigger-service.test.ts",
+      "src/dashboard/server/services/stale-check-retrigger-service.ts",
+      "src/lib/cloister/stale-check-classifier.ts",
+      "src/lib/cloister/stale-check-github.ts",
+      "tests/unit/lib/cloister/stale-check-classifier.test.ts",
+      "tests/unit/lib/cloister/stale-check-github.test.ts"
+    ],
+    "actualChangedFiles": [
+      "reference/troubleshooting.mdx",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/services/__tests__/stale-check-retrigger-service.test.ts",
+      "src/dashboard/server/services/stale-check-retrigger-service.ts",
+      "src/lib/cloister/stale-check-classifier.ts",
+      "src/lib/cloister/stale-check-github.ts",
+      "tests/unit/lib/cloister/stale-check-classifier.test.ts",
+      "tests/unit/lib/cloister/stale-check-github.test.ts"
+    ],
+    "recordedAt": "2026-07-15T16:31:49.721Z"
   }
 }
