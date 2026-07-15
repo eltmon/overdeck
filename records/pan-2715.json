@@ -16,33 +16,33 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:19:40.643Z",
+  "updated": "2026-07-15T15:20:54.365Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:19:40.579Z",
-    "inspectNotes": "Inspecting item gate-assemble-wire"
+    "updatedAt": "2026-07-15T15:20:53.636Z",
+    "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2874457,
-            "output": 4699,
-            "cacheRead": 2527104,
+            "input": 3359897,
+            "output": 4995,
+            "cacheRead": 2993920,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 17464856,
-            "output": 44575,
-            "cacheRead": 16975616,
+            "input": 18469312,
+            "output": 45433,
+            "cacheRead": 17974272,
             "cacheWrite": 0
           }
         },
@@ -56,24 +56,24 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 4,
-            "output": 834,
-            "cacheRead": 146974,
-            "cacheWrite": 96292
+            "input": 16,
+            "output": 5771,
+            "cacheRead": 934449,
+            "cacheWrite": 113575
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2874457,
-          "output": 4699,
-          "cacheRead": 2527104,
+          "input": 3359897,
+          "output": 4995,
+          "cacheRead": 2993920,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 17464856,
-          "output": 44575,
-          "cacheRead": 16975616,
+          "input": 18469312,
+          "output": 45433,
+          "cacheRead": 17974272,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -83,15 +83,15 @@
           "cacheWrite": 197959
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4,
-          "output": 834,
-          "cacheRead": 146974,
-          "cacheWrite": 96292
+          "input": 16,
+          "output": 5771,
+          "cacheRead": 934449,
+          "cacheWrite": 113575
         }
       },
       "costAtCloseOut": {
-        "usd": 25.504694,
-        "pricingAsOf": "2026-07-15T15:19:40.627Z"
+        "usd": 26.308859,
+        "pricingAsOf": "2026-07-15T15:20:53.788Z"
       }
     },
     "merges": [],
