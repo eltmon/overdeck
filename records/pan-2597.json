@@ -446,23 +446,20 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T14:08:07.309Z",
+  "updated": "2026-07-15T14:10:48.032Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:08:06.132Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed test",
-    "testNotes": "BLOCKED before gates could run cleanly: workspace has an in-progress, uncommitted `git merge origin/main` (MERGE_HEAD=ac998a91b01b16a7b8963855808a6590ace37122, which is origin/main's current tip). 4 files carry unresolved literal conflict markers: src/cli/commands/__tests__/review-mode.test.ts, src/dashboard/server/routes/__tests__/codex-auth.test.ts, src/lib/cloister/verification-runner.ts, src/lib/cloister/verification-types.ts. Ran `npm run typecheck`: fails with 9x TS1185 'Merge conflict marker encountered' in verification-runner.ts and verification-types.ts, confirming the broken tree (contracts build step succeeded; tsc --noEmit failed). Did not proceed to lint/test/UAT since the tree cannot compile. The reviewed commit (eb12cf2f82, matches pipeline.reviewedAtCommit) is clean by itself — this is a workspace-state issue from a stuck main-sync attempt, not a defect in the reviewed diff. Test role boundaries forbid resolving merge conflicts, editing code, or committing, so this cannot be fixed here. REQUIRED FIX: a work/sync agent must run `git merge --abort` (if recoverable) or properly re-run `pan sync-main PAN-2597`, resolve the 4 conflicted files, commit, and push before test verification can proceed. Per-issue vBRIEF confirms no browser UAT is required — narratives.NonGoals explicitly states 'No dashboard frontend changes for pane visibility' and all 15 plan items are kind:backend/api/docs/spike with unit-test-only verify_commands.",
+    "updatedAt": "2026-07-15T14:10:47.645Z",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
-    "reviewedAtCommit": "eb12cf2f826738b95aea1d084cd59eda75e5f13c",
     "reviewRequestedAt": "2026-07-15T13:43:27.668Z",
     "reviewSpawnedAt": "2026-07-15T13:44:06.216Z",
     "scopeDrift": {
@@ -596,9 +593,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 22869192,
-            "output": 25560,
-            "cacheRead": 21240576,
+            "input": 22975173,
+            "output": 25717,
+            "cacheRead": 21319168,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -608,9 +605,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 53918606,
-            "output": 101310,
-            "cacheRead": 51630080,
+            "input": 55467181,
+            "output": 102714,
+            "cacheRead": 53166592,
             "cacheWrite": 0
           }
         },
@@ -649,9 +646,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 22869192,
-          "output": 25560,
-          "cacheRead": 21240576,
+          "input": 22975173,
+          "output": 25717,
+          "cacheRead": 21319168,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -661,9 +658,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53918606,
-          "output": 101310,
-          "cacheRead": 51630080,
+          "input": 55467181,
+          "output": 102714,
+          "cacheRead": 53166592,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -680,8 +677,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 218.46503,
-        "pricingAsOf": "2026-07-15T14:08:07.296Z"
+        "usd": 219.335721,
+        "pricingAsOf": "2026-07-15T14:10:47.705Z"
       }
     },
     "merges": [
