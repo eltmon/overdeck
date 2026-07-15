@@ -3,6 +3,7 @@ import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 import {
   checkMergedRow,
+  checkMainVerifyRow,
   checkPostMergeRow,
   checkReviewRow,
   checkTestsRow,
@@ -202,5 +203,47 @@ describe('Definition-of-Done post-merge row', () => {
       listAgents: clearAgents,
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('gh timed out') });
+  });
+});
+
+describe('Definition-of-Done main-verification row', () => {
+  const ctx = {
+    issueId,
+    projectPath: '/tmp/overdeck',
+    github: { owner: 'eltmon', repo: 'overdeck', number: 2715 },
+  };
+
+  it('passes when every merge-commit check-run concluded successfully', async () => {
+    const row = await checkMainVerifyRow(ctx, 'abc123', {
+      readCheckRuns: async () => ({ total: 4, failed: [], pending: [] }),
+    });
+    expect(row).toMatchObject({ status: 'pass', observed: '4 check-runs concluded successfully on abc123' });
+  });
+
+  it('misses and names failed and pending check-runs', async () => {
+    const row = await checkMainVerifyRow(ctx, 'abc123', {
+      readCheckRuns: async () => ({ total: 3, failed: ['unit'], pending: ['browser'] }),
+    });
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('failed checks: unit');
+    expect(row.observed).toContain('still running: browser');
+  });
+
+  it('skips when no merge commit or no check-runs can prove verification', async () => {
+    const noCommit = await checkMainVerifyRow(ctx, undefined, {
+      readCheckRuns: async () => { throw new Error('must not run'); },
+    });
+    const noChecks = await checkMainVerifyRow(ctx, 'abc123', {
+      readCheckRuns: async () => ({ total: 0, failed: [], pending: [] }),
+    });
+    expect(noCommit).toMatchObject({ status: 'skip', observed: expect.stringContaining('no merge commit resolvable') });
+    expect(noChecks).toMatchObject({ status: 'skip', observed: expect.stringContaining('no CI check-runs') });
+  });
+
+  it('turns gh failures into an observed miss', async () => {
+    const row = await checkMainVerifyRow(ctx, 'abc123', {
+      readCheckRuns: async () => { throw new Error('rate limited'); },
+    });
+    expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('rate limited') });
   });
 });

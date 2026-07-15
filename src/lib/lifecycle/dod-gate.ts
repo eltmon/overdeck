@@ -83,6 +83,25 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
   listAgents: listRunningAgentsSync,
 };
 
+interface MainVerifyRowDeps {
+  readCheckRuns: (ctx: LifecycleContext, mergeCommit: string) => Promise<{
+    total: number;
+    failed: string[];
+    pending: string[];
+  }>;
+}
+
+const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
+  readCheckRuns: async (ctx, mergeCommit) => {
+    if (!ctx.github) return { total: 0, failed: [], pending: [] };
+    const { stdout } = await execFileAsync('gh', [
+      'api', `repos/${ctx.github.owner}/${ctx.github.repo}/commits/${mergeCommit}/check-runs`,
+      '--jq', '{total: .total_count, failed: [.check_runs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral") | .name], pending: [.check_runs[] | select(.status != "completed") | .name]}',
+    ], { encoding: 'utf-8', timeout: 10000 });
+    return JSON.parse(stdout);
+  },
+};
+
 const defaultDeps: DodStatusRowDeps = {
   getReviewStatus: getReviewStatusSync,
   getJournalStatus: issueId => {
@@ -215,5 +234,37 @@ export async function checkPostMergeRow(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return result('post-merge', 'miss', `post-merge evidence unavailable: ${message}`);
+  }
+}
+
+export async function checkMainVerifyRow(
+  ctx: LifecycleContext,
+  mergeCommit?: string,
+  deps: MainVerifyRowDeps = defaultMainVerifyRowDeps,
+): Promise<DodRowResult> {
+  if (!ctx.github || !mergeCommit) {
+    return result(
+      'main-verify',
+      'skip',
+      'no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)',
+    );
+  }
+
+  try {
+    const checks = await deps.readCheckRuns(ctx, mergeCommit);
+    if (checks.total === 0) {
+      return result('main-verify', 'skip', `no CI check-runs on merge commit ${mergeCommit}`);
+    }
+    if (checks.failed.length > 0 || checks.pending.length > 0) {
+      const parts = [
+        ...(checks.failed.length > 0 ? [`failed checks: ${checks.failed.join(', ')}`] : []),
+        ...(checks.pending.length > 0 ? [`still running: ${checks.pending.join(', ')}`] : []),
+      ];
+      return result('main-verify', 'miss', `${parts.join('; ')} on ${mergeCommit}`);
+    }
+    return result('main-verify', 'pass', `${checks.total} check-runs concluded successfully on ${mergeCommit}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return result('main-verify', 'miss', `could not read merge-commit check-runs: ${message}`);
   }
 }
