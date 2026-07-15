@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:25:34.666Z",
+  "updated": "2026-07-15T15:29:59.548Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "cli-accept-flags": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 2020611,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:25:34.665Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -210,6 +202,17 @@
         "outcome": "completed",
         "reason": "Persisted eight-row gate and accepted override attribution through record write door; tests/typecheck passed; pushed 06a647843a",
         "releasedAt": "2026-07-15T15:25:13.608Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 2020611,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:25:34.665Z",
+        "itemId": "cli-accept-flags",
+        "outcome": "completed",
+        "reason": "Added seven generated accept flags, gate table/JSON output, force non-bypass tests; shrank CLI registry and lowered size ratchet; pushed through 27c6346ef1",
+        "releasedAt": "2026-07-15T15:29:59.548Z"
       }
     ],
     "statusReasons": {
@@ -251,8 +254,8 @@
         "updatedAt": "2026-07-15T15:25:13.608Z"
       },
       "cli-accept-flags": {
-        "reason": "Continue next ready CLI surface item",
-        "updatedAt": "2026-07-15T15:25:34.665Z"
+        "reason": "Added seven generated accept flags, gate table/JSON output, force non-bypass tests; shrank CLI registry and lowered size ratchet; pushed through 27c6346ef1",
+        "updatedAt": "2026-07-15T15:29:59.548Z"
       }
     }
   },
@@ -296,6 +299,10 @@
     "record-dod-gate.record-dod-gate.ac1": "completed",
     "record-dod-gate.record-dod-gate.ac2": "completed",
     "record-dod-gate.record-dod-gate.ac3": "completed",
-    "cli-accept-flags": "running"
+    "cli-accept-flags": "completed",
+    "cli-accept-flags.cli-accept-flags.ac1": "completed",
+    "cli-accept-flags.cli-accept-flags.ac2": "completed",
+    "cli-accept-flags.cli-accept-flags.ac3": "completed",
+    "cli-accept-flags.cli-accept-flags.ac4": "completed"
   }
 }
