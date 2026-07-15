@@ -143,32 +143,68 @@ describe('initCodexHome', () => {
     expect(config).toContain('trust_level = "trusted"')
   })
 
-  it('seeds auth.json from the global ~/.codex so the TUI skips sign-in onboarding', () => {
+  it('symlinks auth.json to the global ~/.codex so all agents share one token family (PAN-2285)', () => {
     // The fake HOME is the test base; withFakeCodexHome() points CODEX_HOME at
     // <base>/.codex, which is also where homedir()/.codex resolves. Drop a fake
     // global credential there.
-    const { writeFileSync: writeNode, readFileSync: readNode, existsSync: existsNode } = require('node:fs')
-    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global"}}')
+    const { writeFileSync: writeNode, readFileSync: readNode, existsSync: existsNode, lstatSync: lstatNode, realpathSync: realpathNode } = require('node:fs')
+    const globalAuth = join(ctx.codexHome, 'auth.json')
+    writeNode(globalAuth, '{"tokens":{"access_token":"global"}}')
 
     const codexDir = join(ctx.agentsHome, 'agent-init-auth')
     initCodexHome(codexDir)
 
     const seeded = join(codexDir, 'auth.json')
     expect(existsNode(seeded)).toBe(true)
+    // It is a symlink pointing at the global file, not a copy.
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    expect(realpathNode(seeded)).toBe(realpathNode(globalAuth))
+    // Reading through the link yields the global token.
     expect(JSON.parse(readNode(seeded, 'utf8')).tokens.access_token).toBe('global')
   })
 
-  it('does not clobber an existing per-agent auth.json (refreshed token survives resume)', () => {
-    const { writeFileSync: writeNode, readFileSync: readNode, mkdirSync: mkdirNode } = require('node:fs')
-    writeNode(join(ctx.codexHome, 'auth.json'), '{"tokens":{"access_token":"global-stale"}}')
+  it('migrates an existing stale regular-file auth.json copy to the symlink (PAN-2285/PAN-2639)', () => {
+    const { writeFileSync: writeNode, readFileSync: readNode, mkdirSync: mkdirNode, lstatSync: lstatNode } = require('node:fs')
+    const globalAuth = join(ctx.codexHome, 'auth.json')
+    writeNode(globalAuth, '{"tokens":{"access_token":"global-fresh"}}')
 
-    const codexDir = join(ctx.agentsHome, 'agent-init-auth-resume')
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-migrate')
     mkdirNode(codexDir, { recursive: true })
-    writeNode(join(codexDir, 'auth.json'), '{"tokens":{"access_token":"home-fresh"}}')
+    // A pre-PAN-2285 deployed home has a stale regular-file copy (the revoked
+    // token family that wedged the agent).
+    writeNode(join(codexDir, 'auth.json'), '{"tokens":{"access_token":"home-stale-revoked"}}')
 
-    initCodexHome(codexDir) // resume — must not overwrite the home's own token
+    initCodexHome(codexDir) // resume — must migrate the stale copy to the symlink
 
-    expect(JSON.parse(readNode(join(codexDir, 'auth.json'), 'utf8')).tokens.access_token).toBe('home-fresh')
+    const seeded = join(codexDir, 'auth.json')
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    // Now resolves to the fresh global token — the wedge is healed.
+    expect(JSON.parse(readNode(seeded, 'utf8')).tokens.access_token).toBe('global-fresh')
+  })
+
+  it('leaves the home without auth.json when the global ~/.codex has none (onboarding prompts)', () => {
+    const { existsSync: existsNode, rmSync: rmNode } = require('node:fs')
+    // Ensure no global credential exists.
+    rmNode(join(ctx.codexHome, 'auth.json'), { force: true })
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-none')
+    initCodexHome(codexDir)
+
+    expect(existsNode(join(codexDir, 'auth.json'))).toBe(false)
+  })
+
+  it('is idempotent — a second init leaves the existing symlink in place (PAN-2285)', () => {
+    const { writeFileSync: writeNode, lstatSync: lstatNode, realpathSync: realpathNode } = require('node:fs')
+    const globalAuth = join(ctx.codexHome, 'auth.json')
+    writeNode(globalAuth, '{"tokens":{"access_token":"global"}}')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-auth-idem')
+    initCodexHome(codexDir)
+    initCodexHome(codexDir)
+
+    const seeded = join(codexDir, 'auth.json')
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    expect(realpathNode(seeded)).toBe(realpathNode(globalAuth))
   })
 
   it('always rewrites config.toml so permission-mode changes apply on resume', () => {

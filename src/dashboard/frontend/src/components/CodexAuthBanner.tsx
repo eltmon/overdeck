@@ -41,6 +41,11 @@ export function CodexAuthBanner() {
         {authStatus.email && (
           <span className="font-normal ml-1 opacity-80">(<SensitiveText value={authStatus.email} className="text-sm" />)</span>
         )}
+        {authStatus.affectedAgents && authStatus.affectedAgents.length > 0 && (
+          <span className="font-normal ml-1 opacity-80">
+            — {authStatus.affectedAgents.length} agent{authStatus.affectedAgents.length === 1 ? '' : 's'} wedged on a revoked token
+          </span>
+        )}
       </p>
       <button
         onClick={handleReauth}
