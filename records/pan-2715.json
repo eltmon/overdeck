@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T14:10:17.851Z",
+  "updated": "2026-07-15T14:11:54.223Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "dod-rows-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2715",
         "agentId": "agent-pan-2715",
         "pid": 639358,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:10:17.851Z"
+        "claimedAt": "2026-07-15T14:10:17.851Z",
+        "itemId": "dod-rows-module",
+        "outcome": "completed",
+        "reason": "Added the shared eight-row DoD definition, override flag derivation, gate result types, and passing unit coverage",
+        "releasedAt": "2026-07-15T14:11:54.223Z"
+      }
+    ],
+    "statusReasons": {
+      "dod-rows-module": {
+        "reason": "Added the shared eight-row DoD definition, override flag derivation, gate result types, and passing unit coverage",
+        "updatedAt": "2026-07-15T14:11:54.223Z"
       }
     }
   },
   "statusOverrides": {
-    "dod-rows-module": "running"
+    "dod-rows-module": "completed",
+    "dod-rows-module.dod-rows-module.ac1": "completed",
+    "dod-rows-module.dod-rows-module.ac2": "completed",
+    "dod-rows-module.dod-rows-module.ac3": "completed"
   }
 }
