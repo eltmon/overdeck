@@ -11,33 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T09:36:49.933Z",
+  "updated": "2026-07-15T09:37:57.181Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T09:36:49.895Z",
-    "inspectNotes": "Inspecting item crews-module"
+    "updatedAt": "2026-07-15T09:37:57.110Z",
+    "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 166873,
-            "output": 1041,
-            "cacheRead": 137472,
+            "input": 353182,
+            "output": 1565,
+            "cacheRead": 318592,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 1976957,
-            "output": 7875,
-            "cacheRead": 1877760,
+            "input": 2976208,
+            "output": 8996,
+            "cacheRead": 2859008,
             "cacheWrite": 0
           }
         },
@@ -48,19 +48,27 @@
             "cacheRead": 2173030,
             "cacheWrite": 148897
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 6,
+            "output": 4846,
+            "cacheRead": 275169,
+            "cacheWrite": 106144
+          }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 166873,
-          "output": 1041,
-          "cacheRead": 137472,
+          "input": 353182,
+          "output": 1565,
+          "cacheRead": 318592,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 1976957,
-          "output": 7875,
-          "cacheRead": 1877760,
+          "input": 2976208,
+          "output": 8996,
+          "cacheRead": 2859008,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -68,11 +76,17 @@
           "output": 28213,
           "cacheRead": 2173030,
           "cacheWrite": 148897
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 6,
+          "output": 4846,
+          "cacheRead": 275169,
+          "cacheWrite": 106144
         }
       },
       "costAtCloseOut": {
-        "usd": 7.118592,
-        "pricingAsOf": "2026-07-15T09:36:49.924Z"
+        "usd": 8.101728,
+        "pricingAsOf": "2026-07-15T09:37:57.166Z"
       }
     },
     "merges": [],
