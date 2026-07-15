@@ -54,15 +54,7 @@
       "timestamp": "2026-07-15T15:55:22.377Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T15:55:22Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2568\n\n# Review Synthesis — PAN-2568 — 2026-07-15T15:55:00-04:00\n\n## Verdict: CHANGES REQUESTED — empty idle prompt is incorrectly classified as successful submission\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/context.json\n- Branch: feature/pan-2568\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568\n- HEAD reviewed: 6efc93aa4e5dcf41bdf88ed89dcb0944870c8389\n- Cycle number: 2\n- Prior cycle SHA: 68a5bd4e664e45e7a1a733b9abb992a7d5aa0a1a\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Empty idle prompt is incorrectly treated as successful submission — `src/lib/overdeck/conversation-forks.ts:350`\nThe cycle's fix returns `submitted` whenever the verification marker is absent from the pane after runtime confirmation reports `still-idle` or `unknown`. Marker absence is ambiguous: it can mean Enter cleared a submitted prompt, but it can also mean the startup TUI dropped the paste. In the affirmative `still-idle` case, an empty composer provides no evidence that the summary was accepted. The unconditional return makes the second outer delivery attempt and its startup-drop warning unreachable, so a fork can be marked active with its status cleared even though it never received the summary or handoff instructions. This line is in both the PR diff and the one-commit cycle diff. Preserve the no-duplicate invariant using an independent acceptance signal, and when acceptance cannot be proven, surface an ambiguous/stranded result rather than silently claiming success. Add a regression test for `still-idle` plus an empty pane that proves the prompt is not reported submitted without independent acceptance evidence, and remove or restore the unreachable retry path.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2568 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -95,18 +87,18 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T16:04:51.555Z",
+  "updated": "2026-07-15T16:04:53.336Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:04:51.477Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-15T16:04:51.851Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
     "lastVerifiedCommit": "b71dee5eaf694510bb959e2367b2074fb4a8185c",
@@ -232,7 +224,7 @@
       },
       "costAtCloseOut": {
         "usd": 46.205571,
-        "pricingAsOf": "2026-07-15T16:04:51.540Z"
+        "pricingAsOf": "2026-07-15T16:04:52.238Z"
       }
     },
     "merges": [
