@@ -6,6 +6,7 @@
  */
 
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { Effect } from 'effect';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -17,7 +18,7 @@ import { closeOut, type WorkflowResult } from '../../lib/lifecycle/index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
-import { DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
+import { acceptFlagFor, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -45,6 +46,21 @@ function renderDodGate(result: WorkflowResult): void {
     console.log(chalk.yellow(`Row ${row.num} (${row.id}) blocks close-out; ${`--accept-${row.id}`} records an explicit override.`));
   }
   console.log();
+}
+
+export function registerCloseCommand(program: Command): void {
+  const command = program
+    .command('close <id>')
+    .description('Verify, clean up, and close issue on tracker')
+    .option('--force', 'Skip confirmation prompt')
+    .option('--json', 'Output as JSON');
+  for (const row of DOD_ROWS.filter(candidate => candidate.overridable)) {
+    command.option(
+      acceptFlagFor(row),
+      `Accept a missed DoD row ${row.num} (${row.title}) — recorded as an explicit override in the close-out record`,
+    );
+  }
+  command.action((id, options) => closeOutCommand(id, options));
 }
 
 function getGitHubConfig(): { owner: string; repo: string; prefix: string } | null {
