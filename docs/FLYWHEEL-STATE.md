@@ -3559,3 +3559,68 @@ Find it by reading its pane; do not wait for a signal.
 
 **Everything else in the tick-15 priority list stands** — PAN-2710 strike is still the highest-value
 open substrate item, then the stalled cohort, then Phase 2 release readiness (operator cuts, never tag).
+
+## RUN-63 tick 17 (2026-07-15 ~12:00 local / 16:00Z) — strike-pan-2692 BLOCKED on the file-size ratchet; FINAL HANDOVER
+
+**strike-pan-2692 is BLOCKED and CANNOT be landed as-is. The next run must resolve this — I cannot
+(the flywheel never edits files).**
+
+Its fix is otherwise **good**, reviewed and gates-verified by me:
+- New `src/cli/durable-write-drain.ts` — drains `flushReviewStatusJournalWrites()` **then**
+  `flushAllPendingAutoCommits()`. Ordering is deliberate and correct (a completing journal write can
+  enqueue a state-worktree auto-commit; draining the other way still strands it).
+- `src/cli/index.ts` — wraps `await program.parseAsync()` in `try { … } finally { await
+  drainPendingDurableWrites(); }`, so it drains on **both** success and error paths. Correct.
+- Focused test 1/1 passed; **typecheck green**. (Likely also fixes the
+  `Warning: Detected unsettled top-level await` that `pan close` has been printing all run.)
+- Rebased onto main by me — **trap #3 fired AGAIN**: its un-rebased diff would have reverted **44
+  lines of this file**. The rebase dropped it. That trap has now hit 2 of 4 strikes today.
+
+**THE BLOCKER — file-size ratchet (a REAL gate, not a workspace artifact):**
+
+```
+✖ src/cli/index.ts grew to 1455 lines (baseline 1449) — god files must shrink, not grow.
+file-size guard failed. Shrink the file, or manually edit the baseline in an issue-referenced commit
+to accept audited growth.
+```
+
+`npm run lint` fails and **`git push` is refused by the pre-push hook** (`scripts/lint-file-size.sh`).
+The +8 lines in `index.ts` (import + try/finally) trip a baselined god file. Two legitimate paths, both
+requiring a code edit the strike (not the flywheel) must make:
+1. **Shrink `index.ts`** — e.g. move the try/finally into a small `main()` in
+   `durable-write-drain.ts` or another module so `index.ts` nets zero/negative; or
+2. **Raise the baseline in an issue-referenced commit** — the audited-growth path the guard itself
+   names. `PAN-2692` in the subject satisfies the ratchet audit.
+
+**SUBSTRATE SMELL WORTH FILING (I did not — out of context budget):** the file-size ratchet is
+**incentivizing worse code**. PAN-2704 (landed today, `f24335bb68`) chained **four `.option()` calls
+onto a single line** in this same `src/cli/index.ts` — style-inconsistent with every neighbor — and
+that is almost certainly why it passed the ratchet. The guard counts LINES, so it rewards line-packing
+over readability on exactly the god files it is trying to improve. Two strikes in one day bent their
+diffs around it. Consider: count statements/AST nodes rather than lines, or exempt
+import+wiring lines, or make the audited-growth path less friction than line-packing.
+
+### FINAL STATE — RUN-63
+**15 merged, 15 closed out, nothing stranded. MAIN CI GREEN** (`274a18bd`, `e30341f7`, `4da779ec`,
+`fbd9bf66`). Live server deployed on `e30341f78e` (pid 714049, systemd, :3011, health 200, deacon=on).
+`pan review pending --ready` empty; `merge-blockers` []. **Two substrate fixes proven in production
+this session: PAN-2712 (merge-gate trap) and PAN-2716 (close-out trap).**
+
+### NEXT RUN — priority order
+1. **strike-pan-2692** — resolve the ratchet (above), then land: rebase → `git diff origin/main..HEAD
+   --stat` (check deletions!) → `bun install` → gates → push → PR → CI green → `gh pr merge --squash`
+   → `pan close PAN-2692 --force` → **DEPLOY** (build + `pan restart --dashboard --health-timeout
+   180000`; check freshness with `date -u -r`, NOT `ls --time-style`).
+2. **STRIKE PAN-2710** — highest-value open substrate item; the remaining half of the merge-gate trap
+   (nothing re-triggers poisoned feature PR checks on red→green; only manual `gh run rerun --failed`
+   breaks it today).
+3. **Cohort** — judge each with `pan sync-main`, NOT `git merge-tree`: PAN-2597 (43/47, 4 real
+   conflicts, review=FAILED, PR #2601 — restart-vs-salvage is a real cost call), PAN-2598 (27/246,
+   PR #2631), PAN-1234 (13/319, PR #2606), PAN-1491 (28, no PR), PAN-2568 (4, no PR).
+   PAN-2619 = 0 commits (never started). PAN-1232 = no workspace.
+4. **PAN-2709** (likely two faults — split?), **PAN-2706**, **PAN-2713**, **PAN-2715**, **PAN-2699**
+   (open despite `a9abceec` on main — `Closes PAN-2699` ≠ `Closes #2699`).
+5. **File the ratchet-incentive smell** (above).
+6. **Phase 2 release readiness** once the cohort quiesces → report + suggest. **OPERATOR CUTS; NEVER TAG.**
+7. **HELD:** order book (A13=PAN-2445, B10=PAN-2232, B11=PAN-2233, B12=PAN-2190, B13=PAN-2189),
+   PAN-2377 (Phase 3 CANCELLED), PAN-2702 (awaiting operator review). **NO new intake.**
