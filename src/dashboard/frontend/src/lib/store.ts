@@ -57,7 +57,7 @@ export interface DashboardStore extends DashboardState {
    */
   seedRecentActivity(entries: unknown[]): void
   openIssue(issueId: string, tab?: string): void
-  openIssueFromRoute(issueId: string, parentPath: string): void
+  openIssueFromRoute(issueId: string, parentPath: string, routePath: string): void
   closeIssue(): void
   setDrawerTab(tab: string): void
   syncDrawerFromUrl(): void
@@ -127,7 +127,7 @@ function readDrawerFromUrl(): DrawerState {
   }
 }
 
-let directIssueParentPath: string | null = null
+let directIssueRoute: { parentPath: string; routePath: string } | null = null
 
 export const useDashboardStore = create<DashboardStore>((set) => ({
   ...initialState,
@@ -161,23 +161,24 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     }),
 
   openIssue: (issueId, tab = 'overview') => {
-    directIssueParentPath = null
+    directIssueRoute = null
     const drawer = { issueId, tab }
     replaceDrawerUrl(drawer)
     set({ drawer })
   },
 
-  openIssueFromRoute: (issueId, parentPath) => {
-    directIssueParentPath = parentPath
+  openIssueFromRoute: (issueId, parentPath, routePath) => {
+    directIssueRoute = { parentPath, routePath }
     set({ drawer: { issueId, tab: 'overview' } })
   },
 
   closeIssue: () => {
     const drawer = { issueId: null, tab: 'overview' }
-    if (typeof window !== 'undefined' && directIssueParentPath) {
-      window.history.replaceState(null, '', directIssueParentPath)
-      directIssueParentPath = null
+    if (typeof window !== 'undefined' && directIssueRoute?.routePath === window.location.pathname) {
+      window.history.replaceState(null, '', directIssueRoute.parentPath)
+      directIssueRoute = null
     } else {
+      directIssueRoute = null
       replaceDrawerUrl(drawer)
     }
     set({ drawer })
@@ -192,7 +193,7 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
 
   syncDrawerFromUrl: () =>
     set(() => {
-      directIssueParentPath = null
+      directIssueRoute = null
       return { drawer: readDrawerFromUrl() }
     }),
 }))

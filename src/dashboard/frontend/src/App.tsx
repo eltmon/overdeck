@@ -403,7 +403,7 @@ export default function App() {
     if (activeTab !== targetTab) {
       setActiveTabState(targetTab);
     }
-    openIssueFromRoute(issueId, TAB_PATHS[targetTab]);
+    openIssueFromRoute(issueId, TAB_PATHS[targetTab], window.location.pathname);
   }, [activeTab, openIssueFromRoute]);
 
   // PAN-1234: handle direct navigation to /issues/:id on initial load and on

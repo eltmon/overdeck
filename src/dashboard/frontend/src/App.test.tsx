@@ -435,7 +435,7 @@ describe('App primary routing', () => {
 
     expect(window.location.pathname).toBe('/issues/PAN-1234');
     expect(window.location.search).toBe('');
-    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-1234', '/pipeline'));
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-1234', '/pipeline', '/issues/PAN-1234'));
   });
 
   it('defaults /issues/:id to Pipeline when no last tab is stored', () => {
@@ -462,7 +462,7 @@ describe('App primary routing', () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
 
     expect(window.location.pathname).toBe('/issues/PAN-999');
-    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-999', '/pipeline'));
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-999', '/pipeline', '/issues/PAN-999'));
   });
 
   it('redirects direct experimental routes to Home when experimental features are off', async () => {
