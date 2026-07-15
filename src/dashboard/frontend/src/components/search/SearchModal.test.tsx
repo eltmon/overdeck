@@ -133,4 +133,23 @@ describe('SearchModal', () => {
     expect(screen.getByText('Searching...')).toBeInTheDocument();
     expect(screen.queryByText('No issues found')).not.toBeInTheDocument();
   });
+
+  it('places the tracker group with the strongest match first', () => {
+    mockUseSearch.mockReturnValue({
+      groupedResults: {
+        github: [{ ...searchResult, score: 50, matchType: 'title', issue: { ...searchResult.issue, id: '2', identifier: 'PAN-2467', source: 'github' } }],
+        linear: [{ ...searchResult, score: 100, matchType: 'identifier', issue: { ...searchResult.issue, identifier: 'MIN-857' } }],
+      },
+      isSearching: false,
+      hasResults: true,
+      resultCount: 2,
+    });
+
+    render(<SearchModal isOpen onClose={vi.fn()} onSelectIssue={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('Search all issues…'), { target: { value: 'MIN-857' } });
+
+    const items = screen.getAllByRole('option');
+    expect(items[0]).toHaveTextContent('MIN-857');
+    expect(items[1]).toHaveTextContent('PAN-2467');
+  });
 });

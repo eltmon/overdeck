@@ -38,7 +38,13 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export function SearchResults({ groupedResults, onSelect, onExternalLink }: SearchResultsProps) {
-  const sources = Object.keys(groupedResults).sort();
+  // Preserve tracker headings without letting alphabetical source order bury
+  // an exact identifier match below a weaker title/description match.
+  const sources = Object.keys(groupedResults).sort((a, b) => {
+    const bestA = Math.max(...groupedResults[a].map((result) => result.score));
+    const bestB = Math.max(...groupedResults[b].map((result) => result.score));
+    return bestB - bestA || a.localeCompare(b);
+  });
 
   return (
     <>
