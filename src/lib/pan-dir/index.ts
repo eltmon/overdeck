@@ -32,6 +32,7 @@ export {
   readSpec,
   updateSpecStatus,
   writeSpec,
+  writeSpecDocument,
   writeSpecForIssue,
   buildPanSpecFilename,
   buildPanSpecPath,
