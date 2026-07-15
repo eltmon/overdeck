@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T10:08:40.630Z",
+  "updated": "2026-07-15T10:08:46.963Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "pending",
@@ -243,5 +243,26 @@
     "docs-update": "completed",
     "docs-update.docs-update.ac1": "completed",
     "docs-update.docs-update.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+      "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+      "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts"
+    ],
+    "recordedAt": "2026-07-15T10:08:46.962Z"
   }
 }
