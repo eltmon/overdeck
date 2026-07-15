@@ -33,18 +33,27 @@ export async function listPrHeadFailingRuns(
   headRef: string,
   headSha: string,
 ): Promise<WorkflowRun[]> {
+  const result = await probePrHeadFailingRuns(repo, headRef, headSha);
+  return result.ok ? result.runs : [];
+}
+
+export async function probePrHeadFailingRuns(
+  repo: string,
+  headRef: string,
+  headSha: string,
+): Promise<{ ok: true; runs: WorkflowRun[] } | { ok: false }> {
   try {
     const runs = JSON.parse(await execGh([
       'run', 'list', '--repo', repo, '--branch', headRef, '--commit', headSha,
       '--status', 'completed', '--limit', '100', '--json', RUN_FIELDS,
     ])) as WorkflowRun[];
-    return runs.filter((run) =>
+    return { ok: true, runs: runs.filter((run) =>
       run.headSha === headSha
       && run.status.toLowerCase() === 'completed'
-      && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase()));
+      && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase())) };
   } catch (error) {
     warn(`list failing runs for ${headRef}`, error);
-    throw error;
+    return { ok: false };
   }
 }
 
