@@ -4467,3 +4467,56 @@ reach it** — the same terminal latch as PAN-2598. Clearing `stuck` may be requ
 open PAN-2735 question of whether `stuck` should gate *review* recovery at all.
 
 **Filed (9):** PAN-2733/2734/2735(landed+proven)/2738/2739/2741/2742/2743(reopened)/+#2744 merged.
+
+## RUN-63 tick 35 (2026-07-15 ~16:15 local / 20:15Z) — PAN-2743 REAL fix landed+deployed. PAN-2710 NOT MERGED — its "pass" is a BYPASS.
+
+**RUN-63: 30 merge commits / 29 issues merged; 27 closed out. PAN-2710 still open — DELIBERATELY.**
+
+### 🚨 I ALMOST MERGED AN UNREVIEWED PIPELINE-CRITICAL CHANGE. Monitor caught it. → PAN-2746 filed.
+PAN-2710's `review_status=passed, ready_for_merge=1` is **NOT a review** — it is the infra-failure
+escape hatch (`deacon.ts:1541`):
+```
+[deacon] Bypassed review for PAN-2710: verification passed, review infra failed
+[cloister] PAN-2710: no role for issue state 'shipping'
+```
+**The bug authorised its own blocker:** PAN-2743 broke convoy re-dispatch → review infra "failed" 20×
+→ bypass fired → the change that fixes pipeline machinery sailed through **unreviewed**.
+**The tell I found: `review_notes = NULL`.** A real verdict carries notes. `passed` + NULL notes =
+bypass — and that absence is the ONLY distinguishing mark. Every consumer reading
+`reviewStatus === 'passed'` or `ready_for_merge` sees an approval. **DO NOT MERGE PAN-2710 on this.**
+
+### ✅ PAN-2743 REAL fix LANDED + DEPLOYED + verified in bundle
+`309432514c` (#2745). pid **923476**, health 200, systemd-parented, dist 19:58:47Z (24s after merge).
+Compiled probe confirmed live in `review-agent-ByGzqr-o.js`:
+```js
+reportWritten = existsSync(selfReviewReportPath(reviewDir)) || existsSync(reviewSynthesisPath(reviewDir));
+```
+**Falsifiable test PASSES: `Idempotency guard … skipping spawn` = 0 occurrences** (was 56/deploy).
+That gate is genuinely fixed. **I did NOT use "retry counter stopped" this time** — that was the
+tick-34 false positive (it had merely LATCHED at stuck=1).
+
+### ⚠️ I HELD #2745's first push — operator said "gates green", LINT WAS RED
+`✖ new circular dependencies found: review-agent.ts > review-convoy-liveness.ts > review-status.ts`
+— a NEW cycle (0 baseline entries), caused by **my own PAN-2735 module's type-only `import type
+{ ReviewStatus }`** (madge counts type edges). **Refused to baseline it** — circular ESM is exactly
+what Node strict-ESM rejects at dashboard boot. Strike broke the cycle at source (inlined
+`string | number`); ratchet now `✓ passed (77 baselined cycles; no new cycles)` with NO baseline edit.
+**Verify gates yourself — "gates green" from a strike is a claim, not evidence.**
+
+### ❌ STILL BROKEN: cannot obtain a genuine verdict for PAN-2710
+`pan review restart PAN-2710` → reports **"✓ Review restarted / Convoy review resumed"**, log shows
+`[agents] Resumed agent-pan-2710-review-{correctness,performance,requirements,security} with Claude
+session …`, agent rows all `status=running` — **and ZERO tmux sessions exist.** Status stays
+`passed/ready=1`; restart never reset it to `reviewing`. **A THIRD false-success in this same path**
+(after PAN-2706's `testTaskDelivered=true` and the guard's `success:true`). Reviewers "resume" into
+nothing.
+
+### Deacon reaped my strikes on a STALE cache (cost ~2 strike attempts)
+`[deacon] Reaped strike-pan-2743 — parent issue PAN-2743 is closed` — while GitHub said **OPEN**
+(`closedAt=null`). `issue-closed.ts`: `TRACKER_CLOSED_CACHE_TTL_MS = 5*60*1000`, and
+`clearIssueClosedCache()` **exists but nothing calls it on reopen**. Reopen → strike → reaped.
+**Workaround: restart the dashboard** (cache is in-process). Worth filing if it recurs.
+
+**Filed (10):** PAN-2733/2734/2735(landed+proven)/2738/2739/2741/2742/2743(landed)/2746 + #2744,#2745.
+**NEXT:** PAN-2710 needs a REAL verdict on working infra, or an explicit operator decision to accept
+the bypass. **I will not merge it silently.** Phase 2 otherwise ready: v0.45.19 + 62 commits ⇒ **0.45.20**.
