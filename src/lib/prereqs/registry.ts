@@ -70,6 +70,10 @@ export async function isToolInstalled(tool: PrereqTool): Promise<boolean> {
       await checkCommand("ttyd", ["--version"]) || existsSync(join(homedir(), "bin", "ttyd"))
     );
   }
+  if (tool === "tmux") {
+    // tmux has no --version; it only accepts -V (and exits 1 on --version).
+    return checkCommand("tmux", ["-V"]);
+  }
   return checkCommand(tool);
 }
 
