@@ -127,6 +127,23 @@ Bundled skills always reach every supported Overdeck agent harness; this is not 
 | Claude Code | `~/.claude/skills/` | Claude Code |
 | Agent Skills standard | `~/.agents/skills/` | Codex, Pi, Oh My Pi |
 
+## Bundled Claude Code Plugins
+
+Some capabilities ship as Claude Code marketplace plugins rather than
+file-copied skills (e.g. `codex@openai-codex` from `openai/codex-plugin-cc`,
+which adds `/codex:review` and Codex task delegation). These are declared in
+Overdeck's bundled `sync-sources/plugins.json` and installed by a `pan sync`
+step through the `claude plugin` CLI:
+
+- Missing marketplaces are added (`claude plugin marketplace add`), then the
+  plugin is installed at user scope (`claude plugin install <id> --scope user`).
+- Already-installed plugins are left untouched (delta operation).
+- If the `claude` binary is missing or the network install fails, sync prints
+  a warning and continues — plugin provisioning never fails a sync.
+
+Verify with `claude plugin list`. Plugins load in **new** Claude Code
+sessions, like all sync output.
+
 ## Conflict Handling
 
 A conflict occurs when an Overdeck-managed skill file was modified after installation. A pre-existing skill that Overdeck does not own is preserved.
