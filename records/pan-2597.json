@@ -257,6 +257,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T01:51:16.185Z"
+    },
+    {
+      "timestamp": "2026-07-15T01:58:05.327Z",
+      "reason": "end",
+      "note": "Resolved repeated main-sync conflict in Codex runtime imports; focused runtime tests, typecheck, and full lint pass"
     }
   ],
   "feedback": [],
@@ -386,30 +391,47 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T01:58:04.404Z",
+  "updated": "2026-07-15T01:58:05.940Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T01:56:24.952Z",
+    "updatedAt": "2026-07-15T01:58:05.447Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2597-review already running. Use 'pan tell' to message it.",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/runtimes/codex.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
-    "reviewRequestedAt": "2026-07-15T01:56:23.388Z",
+    "reviewRequestedAt": "2026-07-15T01:58:05.341Z",
     "reviewSpawnedAt": "2026-07-15T01:56:24.950Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
+        "scripts/circular-deps-baseline.txt",
+        "scripts/source-introspection-baseline.txt",
+        "src/cli/commands/__tests__/review-mode.test.ts",
+        "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+        "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+        "src/dashboard/server/routes/http-handler.ts",
+        "src/dashboard/server/services/__tests__/agent-spawner.test.ts",
+        "src/dashboard/server/services/__tests__/agent-spawner.unit.test.ts",
         "src/dashboard/server/services/codex-conversation-parser.ts",
+        "src/dashboard/server/services/typed-errors.ts",
+        "src/lib/cloister/verification-runner.ts",
+        "src/lib/cloister/verification-types.ts",
+        "src/lib/cloister/verification-worker-supervisor.ts",
         "src/lib/config-yaml/defaults.ts",
         "src/lib/config-yaml/merge.ts",
+        "src/lib/config-yaml/roles.ts",
         "src/lib/config-yaml/schema.ts",
-        "sync-sources/hooks/record-cost-event.js"
+        "src/lib/runtimes/tmux-cli.ts",
+        "src/lib/state-plane.ts",
+        "sync-sources/hooks/record-cost-event.js",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
+        "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+        "tests/unit/lib/pan-dir/cutover-behavioral.test.ts"
       ],
       "declaredScopeUntouched": [
         "docs/ROLES.md",
@@ -462,7 +484,16 @@
         "docs/AGENT-STATE-PLANES.md",
         "docs/CODEX-APP-SERVER-PROTOCOL.md",
         "packages/contracts/src/harness-behavior.ts",
+        "scripts/circular-deps-baseline.txt",
+        "scripts/source-introspection-baseline.txt",
+        "src/cli/commands/__tests__/review-mode.test.ts",
+        "src/dashboard/frontend/src/App/hooks/usePendingInputDialogs.ts",
+        "src/dashboard/server/routes/__tests__/conversations-supervisor.test.ts",
+        "src/dashboard/server/routes/http-handler.ts",
+        "src/dashboard/server/services/__tests__/agent-spawner.test.ts",
+        "src/dashboard/server/services/__tests__/agent-spawner.unit.test.ts",
         "src/dashboard/server/services/codex-conversation-parser.ts",
+        "src/dashboard/server/services/typed-errors.ts",
         "src/lib/__tests__/launcher-generator.test.ts",
         "src/lib/agents/__tests__/delivery.test.ts",
         "src/lib/agents/__tests__/resume.test.ts",
@@ -471,6 +502,9 @@
         "src/lib/agents/recovery.ts",
         "src/lib/agents/runtime-command.ts",
         "src/lib/agents/spawn.ts",
+        "src/lib/cloister/verification-runner.ts",
+        "src/lib/cloister/verification-types.ts",
+        "src/lib/cloister/verification-worker-supervisor.ts",
         "src/lib/codex/__fixtures__/app-server-schema.json",
         "src/lib/codex/__tests__/app-server-host.test.ts",
         "src/lib/codex/__tests__/app-server-manager.test.ts",
@@ -479,6 +513,7 @@
         "src/lib/codex/app-server-manager.ts",
         "src/lib/config-yaml/defaults.ts",
         "src/lib/config-yaml/merge.ts",
+        "src/lib/config-yaml/roles.ts",
         "src/lib/config-yaml/schema.ts",
         "src/lib/cost-parsers/codex-parser.ts",
         "src/lib/launcher-generator.ts",
@@ -487,10 +522,15 @@
         "src/lib/overdeck/conversation-runtime.ts",
         "src/lib/runtimes/behavior.ts",
         "src/lib/runtimes/codex.ts",
+        "src/lib/runtimes/tmux-cli.ts",
+        "src/lib/state-plane.ts",
         "sync-sources/hooks/record-cost-event.js",
+        "tests/playwright/conversation-supervisor-uat.test.ts",
+        "tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts",
+        "tests/unit/lib/pan-dir/cutover-behavioral.test.ts",
         "tsdown.config.ts"
       ],
-      "recordedAt": "2026-07-12T19:53:15.419Z"
+      "recordedAt": "2026-07-15T01:58:04.401Z"
     }
   },
   "closeOut": {
@@ -510,9 +550,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 28605701,
-            "output": 33093,
-            "cacheRead": 27814400,
+            "input": 30760689,
+            "output": 39424,
+            "cacheRead": 29678592,
             "cacheWrite": 0
           }
         },
@@ -555,9 +595,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 28605701,
-          "output": 33093,
-          "cacheRead": 27814400,
+          "input": 30760689,
+          "output": 39424,
+          "cacheRead": 29678592,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -574,8 +614,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 172.431661,
-        "pricingAsOf": "2026-07-15T01:56:25.136Z"
+        "usd": 175.007667,
+        "pricingAsOf": "2026-07-15T01:58:05.713Z"
       }
     },
     "merges": [
