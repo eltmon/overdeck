@@ -344,37 +344,28 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   if (!ready) {
     console.warn(`[${caller}] ready signal not detected for ${conv.name} within 60s — delivering and confirming anyway`);
   }
-  const MAX_ATTEMPTS = 2;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
-    const outcome = await self.confirmForkPromptAccepted(conv.tmuxSession, 8000);
-    if (outcome === 'accepted') return 'submitted';
+  await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
+  const outcome = await self.confirmForkPromptAccepted(conv.tmuxSession, 8000);
+  if (outcome === 'accepted') return 'submitted';
 
-    const verify = deliveryVerifyLine(summary).slice(0, 40);
-    let composerStillFull = false;
-    for (let nudge = 1; nudge <= 2; nudge++) {
-      const pane = await capturePaneText(conv.tmuxSession, 40);
-      composerStillFull = verify.length >= 3 && pane.includes(verify);
-      // A cleared composer is affirmative submission evidence even when the
-      // runtime mirror still lags. Re-delivering here can duplicate the full
-      // summary into a live successor; wrapped pane text can also make the
-      // raw verification substring absent while the first delivery succeeded.
-      if (!composerStillFull) return 'submitted';
-
-      console.warn(`[${caller}] ${conv.name} still has the delivered summary in its composer — sending standalone Enter (${nudge}/2)`);
-      await sendKeysAsync(conv.tmuxSession, 'C-m', `${caller}:enter-nudge`);
-      if (await self.confirmForkPromptAccepted(conv.tmuxSession, 8000) === 'accepted') return 'submitted';
-
-      const paneAfterNudge = await capturePaneText(conv.tmuxSession, 40);
-      if (!paneAfterNudge.includes(verify)) return 'submitted';
+  const verify = deliveryVerifyLine(summary).slice(0, 40);
+  for (let nudge = 1; nudge <= 2; nudge++) {
+    const pane = await capturePaneText(conv.tmuxSession, 40);
+    const composerStillFull = verify.length >= 3 && pane.includes(verify);
+    if (!composerStillFull) {
+      // `still-idle` is affirmative evidence that the first turn did not land;
+      // without independent acceptance evidence, surface the ambiguity rather
+      // than re-delivering or silently declaring success. `unknown` can mean a
+      // successful Enter cleared the composer before the runtime mirror caught up.
+      return outcome === 'unknown' ? 'submitted' : 'stranded';
     }
-    if (composerStillFull) return 'stranded';
 
-    if (attempt < MAX_ATTEMPTS) {
-      console.warn(`[${caller}] ${conv.name} still idle 8s after delivery (attempt ${attempt}/${MAX_ATTEMPTS}) — TUI likely dropped the paste during startup, re-delivering`);
-    } else {
-      console.warn(`[${caller}] could not confirm brief delivery for ${conv.name} after ${MAX_ATTEMPTS} attempts — successor may be sitting at an empty prompt`);
-    }
+    console.warn(`[${caller}] ${conv.name} still has the delivered summary in its composer — sending standalone Enter (${nudge}/2)`);
+    await sendKeysAsync(conv.tmuxSession, 'C-m', `${caller}:enter-nudge`);
+    if (await self.confirmForkPromptAccepted(conv.tmuxSession, 8000) === 'accepted') return 'submitted';
+
+    const paneAfterNudge = await capturePaneText(conv.tmuxSession, 40);
+    if (!paneAfterNudge.includes(verify)) return 'submitted';
   }
   return 'stranded';
 }
