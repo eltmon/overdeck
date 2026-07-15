@@ -15,7 +15,6 @@ import {
   WorkspaceNotFound,
   WorkspaceCreateError,
   AgentAlreadyRunning,
-  TasksNotInitialized,
   AgentStartError,
 } from '../typed-errors.js';
 
@@ -149,12 +148,6 @@ describe('Typed errors — Effect channel propagation', () => {
 
     const err = await runProgramFail(combined);
     expect((err as any)._tag).toBe('IssueNotFound');
-  });
-
-  it('TasksNotInitialized has correct structure', () => {
-    const err = new TasksNotInitialized({ workspace: '/path/to/workspace' });
-    expect(err._tag).toBe('TasksNotInitialized');
-    expect(err.workspace).toBe('/path/to/workspace');
   });
 
   it('errors are distinguishable via instanceof', () => {

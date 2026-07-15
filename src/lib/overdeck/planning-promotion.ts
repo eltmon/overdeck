@@ -16,7 +16,7 @@ import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { getAgentStateSync, saveAgentStateSync } from '../agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
-import { checkPrdGateSync, asPanSpecDocument, findSpecByIssue, writeSpec, writeSpecForIssue } from '../pan-dir/index.js';
+import { checkPrdGateSync, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
 import { isStateMigrated } from '../state-home.js';
@@ -167,7 +167,7 @@ export async function completePlanningArtifacts(options: {
     proposed = existingSpec
       ? await (async () => {
           const nextDoc = asPanSpecDocument(workspaceDoc, 'proposed');
-          await Effect.runPromise(writeSpec(existingSpec.path, nextDoc));
+          await Effect.runPromise(writeSpecDocument(projectPath, existingSpec.path, nextDoc));
           return { path: existingSpec.path, filename: existingSpec.filename };
         })()
       : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));

@@ -33,6 +33,8 @@ import {
   setAutoMerge,
 } from '../../../../lib/review-status.js';
 import { getAgentRuntimeStateSync } from '../../../../lib/agents.js';
+import { normalizeModelOverrideSync } from '../../../../lib/model-validation.js';
+import { resolveModel } from '../../../../lib/config-yaml.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -44,6 +46,14 @@ import {
 } from '../workspaces.js';
 
 const execAsync = promisify(exec);
+
+function resolveConfiguredReviewModel(): string | null {
+  try {
+    return resolveModel('review');
+  } catch {
+    return null;
+  }
+}
 
 export type ResetReviewResult =
   | { httpStatus: 400; body: { success: false; error: string } }
@@ -620,8 +630,8 @@ const getReviewConfigRoute = HttpRouter.add(
       const record = project ? readIssueRecordSync(project, issueId) : null;
       return {
         issueId,
-        override: { reviewMode: record?.reviewMode ?? null, reReviewScope: record?.reReviewScope ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId) },
+        override: { reviewMode: record?.reviewMode ?? null, reReviewScope: record?.reReviewScope ?? null, reviewModel: record?.reviewModel ?? null },
+        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record?.reviewModel ?? resolveConfiguredReviewModel() },
       };
     });
     return jsonResponse(result);
@@ -637,17 +647,26 @@ const postReviewConfigRoute = HttpRouter.add(
     if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const body = (yield* readJsonBody) as { reviewMode?: string | null; reReviewScope?: string | null };
+    const body = (yield* readJsonBody) as { reviewMode?: string | null; reReviewScope?: string | null; reviewModel?: string | null };
     const hasMode = Object.prototype.hasOwnProperty.call(body ?? {}, 'reviewMode');
     const hasScope = Object.prototype.hasOwnProperty.call(body ?? {}, 'reReviewScope');
-    if (!hasMode && !hasScope) {
-      return jsonResponse({ error: 'Provide reviewMode and/or reReviewScope (null clears the override)' }, { status: 400 });
+    const hasModel = Object.prototype.hasOwnProperty.call(body ?? {}, 'reviewModel');
+    if (!hasMode && !hasScope && !hasModel) {
+      return jsonResponse({ error: 'Provide reviewMode, reReviewScope, and/or reviewModel (null clears the override)' }, { status: 400 });
     }
     if (hasMode && body.reviewMode !== null && body.reviewMode !== 'quick' && body.reviewMode !== 'full' && body.reviewMode !== 'none') {
       return jsonResponse({ error: "reviewMode must be quick, full, none, or null" }, { status: 400 });
     }
     if (hasScope && body.reReviewScope !== null && body.reReviewScope !== 'all' && body.reReviewScope !== 'changed' && body.reReviewScope !== 'blockers') {
       return jsonResponse({ error: "reReviewScope must be all, changed, blockers, or null" }, { status: 400 });
+    }
+    let reviewModel: string | undefined;
+    if (hasModel && body.reviewModel !== null) {
+      try {
+        reviewModel = normalizeModelOverrideSync(body.reviewModel);
+      } catch (error) {
+        return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+      }
     }
     const result = yield* Effect.promise(async () => {
       const { resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
@@ -663,12 +682,16 @@ const postReviewConfigRoute = HttpRouter.add(
           if (body.reReviewScope === null) delete current.reReviewScope;
           else current.reReviewScope = body.reReviewScope as 'all' | 'changed' | 'blockers';
         }
+        if (hasModel) {
+          if (body.reviewModel === null) delete current.reviewModel;
+          else current.reviewModel = reviewModel;
+        }
       });
       return {
         success: true,
         issueId,
-        override: { reviewMode: record.reviewMode ?? null, reReviewScope: record.reReviewScope ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId) },
+        override: { reviewMode: record.reviewMode ?? null, reReviewScope: record.reReviewScope ?? null, reviewModel: record.reviewModel ?? null },
+        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record.reviewModel ?? resolveConfiguredReviewModel() },
       };
     });
     return jsonResponse(result);

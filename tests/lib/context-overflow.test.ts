@@ -16,8 +16,8 @@ describe('buildCompactRecoverySeedMessage', () => {
 
     expect(message).toContain('PAN-TEST');
     expect(message).toContain('.pan/continue.json');
-    expect(message).toContain('bd ready');
-    expect(message).toContain('bd show <id>');
+    expect(message).toContain('pan task next');
+    expect(message).toContain('pan task show <issue> <item>');
     expect(message).toContain('git status');
     expect(message).toContain('git diff');
     expect(message).toMatch(/Do NOT start over/);

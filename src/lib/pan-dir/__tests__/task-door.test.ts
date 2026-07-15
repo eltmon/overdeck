@@ -2,8 +2,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 
-vi.mock('../auto-commit.js', () => ({ queueAutoCommit: vi.fn() }));
+vi.mock('../auto-commit.js', () => ({
+  queueAutoCommit: vi.fn(),
+  flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+}));
 
 import type { ProjectConfig } from '../../projects.js';
 import { readIssueRecordSync } from '../record.js';

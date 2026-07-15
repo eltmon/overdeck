@@ -26058,7 +26058,11 @@ let serializer = Promise.resolve();
 /** Run a git subcommand. Fails with GitError on non-zero exit. */
 function runGit(args, cwd) {
 	return gen(function* () {
-		const handle = yield* make$1("git", [...args], { cwd });
+		const handle = yield* make$1("git", [...args], {
+			cwd,
+			env: { HUSKY: "0" },
+			extendEnv: true
+		});
 		const stdoutBuf = yield* runFold(handle.stdout, () => Buffer.alloc(0), (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]));
 		const stderrBuf = yield* runFold(handle.stderr, () => Buffer.alloc(0), (acc, chunk) => Buffer.concat([acc, Buffer.from(chunk)]));
 		const exitCode = yield* handle.exitCode;
@@ -26185,6 +26189,7 @@ function doCommit(projectRoot, batch) {
 			onSuccess: (r) => succeed(r.stdout.trim()),
 			onFailure: (err) => succeed({
 				committed: false,
+				errored: true,
 				reason: `branch check failed: ${err.stderr || err._tag}`
 			})
 		}));
@@ -26218,6 +26223,7 @@ function doCommit(projectRoot, batch) {
 				console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
 				return succeed({
 					committed: false,
+					errored: true,
 					reason: err.stderr || err._tag
 				});
 			}
@@ -26248,6 +26254,7 @@ function doCommit(projectRoot, batch) {
 				console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
 				return succeed({
 					committed: false,
+					errored: true,
 					reason: err.stderr || err._tag
 				});
 			}
@@ -26693,7 +26700,7 @@ async function updateIssueRecord(project, issueId, mutator, options = {}) {
 	const normalizedIssueId = issueId.toUpperCase();
 	const recordPath = getIssueRecordPath(project, normalizedIssueId);
 	const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
-	let commitRoot = null;
+	const commit = { flush: void 0 };
 	const record = await withRecordFsLock(project, normalizedIssueId, {
 		writerId,
 		recordPath
@@ -26701,11 +26708,11 @@ async function updateIssueRecord(project, issueId, mutator, options = {}) {
 		const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
 		const next = await mutator(current) ?? current;
 		const path = writeIssueRecordSync(project, normalizedIssueId, next);
-		if (options.autoCommit !== false) commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
+		if (options.autoCommit !== false) commit.flush = runPromise(flushAutoCommits(queueIssueRecordCommit(project, normalizedIssueId, path)));
 		return readIssueRecordSync(project, normalizedIssueId) ?? next;
 	});
-	if (commitRoot) {
-		const flushed = await runPromise(flushAutoCommits(commitRoot));
+	if (commit.flush) {
+		const flushed = await commit.flush;
 		if (flushed.pushed === false) throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? "unknown push failure"}`);
 		if (!flushed.committed && !["no diff", "no pending"].includes(flushed.reason ?? "")) throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? "unknown commit failure"}`);
 	}

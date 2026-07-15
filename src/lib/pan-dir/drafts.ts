@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { Effect, FileSystem, Option } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
-import { queueAutoCommit } from './auto-commit.js'
+import { flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 
 import { getProjectPanPaths, ensurePanDirs } from './specs.js'
 
@@ -62,6 +62,21 @@ export function writeIssueDraft(
       paths: [path],
       subject: `chore(state): update PRD draft for ${issueId.toUpperCase()}`,
     })
+    // Commit+push synchronously through the door. queueAutoCommit alone defers
+    // via setTimeout(0), which a short-lived CLI (e.g. a planning agent that
+    // writes the draft and exits) never fires, stranding the draft as a dirty
+    // state-worktree file (PAN-2677). Mirror the spec door: fail loudly if a
+    // configured origin did not accept the push.
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.errored || flushed.pushed === false) {
+      return yield* Effect.fail(
+        new FsError({
+          path,
+          operation: 'pushDraft',
+          cause: new Error(flushed.reason ?? 'PRD draft commit was not pushed'),
+        }),
+      )
+    }
     return path
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }

@@ -19,8 +19,6 @@ describe('docs RAG configuration', () => {
           'workspace',
           'specialist',
           'harness',
-          'bd',
-          'tasks',
           'vbrief',
           'workhorse',
         ],

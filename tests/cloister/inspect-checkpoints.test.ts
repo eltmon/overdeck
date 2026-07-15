@@ -73,7 +73,7 @@ describe('inspect-checkpoints', () => {
       const data = {
         issueId: 'MIN-796',
         checkpoints: [
-          { taskId: 'myn-80', commitSha: 'abc123', passedAt: '2026-03-22T10:00:00Z' },
+          { itemId: 'myn-80', commitSha: 'abc123', passedAt: '2026-03-22T10:00:00Z' },
         ],
       };
       writeFileSync(join(dir, 'MIN-796.json'), JSON.stringify(data));
@@ -81,7 +81,7 @@ describe('inspect-checkpoints', () => {
       const result = loadCheckpoints(projectKey, issueId);
       expect(result).not.toBeNull();
       expect(result!.checkpoints).toHaveLength(1);
-      expect(result!.checkpoints[0].taskId).toBe('myn-80');
+      expect(result!.checkpoints[0].itemId).toBe('myn-80');
     });
   });
 
@@ -97,7 +97,7 @@ describe('inspect-checkpoints', () => {
 
       const last = getLastCheckpoint(projectKey, issueId);
       expect(last).not.toBeNull();
-      expect(last!.taskId).toBe('myn-81');
+      expect(last!.itemId).toBe('myn-81');
       expect(last!.commitSha).toBe('def456');
     });
   });
@@ -106,7 +106,7 @@ describe('inspect-checkpoints', () => {
     it('creates checkpoint file if it does not exist', () => {
       const checkpoint = saveCheckpoint(projectKey, issueId, 'myn-80', 'abc123');
 
-      expect(checkpoint.taskId).toBe('myn-80');
+      expect(checkpoint.itemId).toBe('myn-80');
       expect(checkpoint.commitSha).toBe('abc123');
       expect(checkpoint.passedAt).toBeTruthy();
 
@@ -121,7 +121,7 @@ describe('inspect-checkpoints', () => {
 
       const data = loadCheckpoints(projectKey, issueId);
       expect(data!.checkpoints).toHaveLength(3);
-      expect(data!.checkpoints[2].taskId).toBe('myn-82');
+      expect(data!.checkpoints[2].itemId).toBe('myn-82');
     });
   });
 

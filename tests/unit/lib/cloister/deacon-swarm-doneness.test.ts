@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   spawnReviewRoleForIssue: vi.fn(),
 }));
 
+vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
+  queueAutoCommit: vi.fn(),
+  flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   listProjectsSync: mocks.listProjectsSync,
   findProjectByPathSync: () => null,

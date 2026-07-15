@@ -112,7 +112,7 @@ describe('buildCompactRecoverySeed (PAN-1781)', () => {
 
     expect(result.summarized).toBe(false);
     expect(result.seed).toContain('.pan/continue.json');
-    expect(result.seed).toContain('bd ready');
+    expect(result.seed).toContain('pan task next');
     expect(result.seed).toContain('Do NOT start over');
   });
 

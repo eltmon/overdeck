@@ -153,7 +153,7 @@ function getCommitSubjects(repoRoot: string, range: string): string[] {
 
 /** Commit subjects that are pure pipeline bookkeeping — never user-facing. */
 const RELEASE_NOTE_NOISE: RegExp[] = [
-  /^chore\((records|state|beads)\)/,
+  /^chore\((records|state|beads|tasks)\)/,
   /^chore: (reconcile|integrate)/,
   /^chore\(state\): update spec/,
   /^docs: run-\d+/,

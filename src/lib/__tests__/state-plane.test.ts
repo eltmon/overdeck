@@ -76,9 +76,7 @@ describe('isStatePlaneOnlyDiff', () => {
 
   it('returns true when the diff touches only state-plane paths', async () => {
     mkdirSync(join(root, '.pan', 'records'), { recursive: true });
-    mkdirSync(join(root, '.tasks'), { recursive: true });
     writeFileSync(join(root, '.pan', 'records', 'pan-2375.json'), '{}\n');
-    writeFileSync(join(root, '.tasks', 'issues.jsonl'), '{"id":"PAN-2375"}\n');
     const tip = commitAll(root, 'state only');
 
     await expect(isStatePlaneOnlyDiff(base, tip, root)).resolves.toBe(true);

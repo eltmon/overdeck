@@ -25,6 +25,7 @@ import { findPlanSync, readWorkspacePlanSync } from '../../lib/vbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
 import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
 import {
   buildStartPlanningBody,
   printPlanningConnectionError,
@@ -741,8 +742,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   const normalizedId = id.toLowerCase();
   const agentId = `agent-${normalizedId}`;
   const existingAgentState = getAgentStateSync(agentId);
-  const spawnModel = resolveSpawnModel(options.model, options.fresh, existingAgentState?.model);
-
+  const spawnModel = resolveSpawnModel(options.model ?? resolveIssueWorkModel(id.toUpperCase()), options.fresh, existingAgentState?.model);
   // PAN-636 — validate only an explicit --harness flag up front. Flagless
   // spawns intentionally forward undefined so spawnAgent's resolveHarness()
   // applies role/provider defaults after model resolution.

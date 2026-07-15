@@ -90,6 +90,14 @@ export interface FlushResult {
   committed: boolean;
   /** True only when the new commit is confirmed on origin. */
   pushed?: boolean;
+  /**
+   * True when a git operation actually errored (branch resolution, `git add`,
+   * or `git commit` exited non-zero) as opposed to a benign no-op such as
+   * "no diff" or "not on main". Door writers that await the flush surface this
+   * loudly so a failed commit never silently leaves the state worktree dirty
+   * (PAN-2677).
+   */
+  errored?: boolean;
   reason?: string;
 }
 
@@ -108,7 +116,20 @@ function runGit(
   cwd: string,
 ): Effect.Effect<GitResult, GitError> {
   return Effect.gen(function* () {
-    const handle = yield* ChildProcess.make('git', [...args], { cwd });
+    // HUSKY=0 disables client-side git hooks for the door's own commits.
+    // A migrated state worktree shares `core.hooksPath` with the code repo's
+    // `.husky/_`, so a `git commit` here would run the code repo's pre-commit
+    // hooks with cwd = the state worktree. Those hook scripts don't exist on
+    // the `overdeck-state` orphan branch and exit 127, failing the commit and
+    // stranding the worktree dirty (PAN-2677). HUSKY=0 is husky's native
+    // disable, not a `--no-verify` bypass of the door's own guarantees — the
+    // state branch has no hooks of its own, and the door is a trusted
+    // single-writer with its own verified-write + push guarantees.
+    const handle = yield* ChildProcess.make('git', [...args], {
+      cwd,
+      env: { HUSKY: '0' },
+      extendEnv: true,
+    });
     const stdoutBuf = yield* Stream.runFold(
       handle.stdout,
       () => Buffer.alloc(0),
@@ -331,6 +352,7 @@ function doCommit(
         onFailure: (err) =>
           Effect.succeed({
             committed: false as const,
+            errored: true as const,
             reason: `branch check failed: ${err.stderr || err._tag}`,
           } satisfies FlushResult),
       }),
@@ -375,6 +397,7 @@ function doCommit(
           console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
           return Effect.succeed({
             committed: false as const,
+            errored: true as const,
             reason: err.stderr || err._tag,
           } satisfies FlushResult);
         },
@@ -412,6 +435,7 @@ function doCommit(
           console.warn(`[pan-dir/auto-commit] failed for ${branch}: ${err.stderr || err._tag}`);
           return Effect.succeed({
             committed: false as const,
+            errored: true as const,
             reason: err.stderr || err._tag,
           } satisfies FlushResult);
         },

@@ -23,6 +23,7 @@ import type { VBriefDocument } from '../vbrief/types';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
+import { IssuePolicyStrip } from '../IssuePolicyStrip';
 
 const ACTIVITY_PHASE_DOT_CLASSES = {
   work: 'bg-primary',
@@ -294,6 +295,10 @@ export function IssueDrawer() {
                 <PhaseTimeline />
                 {drawer.issueId && <UatEnvironmentPanel issueId={drawer.issueId} />}
                 <DrawerPickupSection issueId={drawer.issueId} />
+                <section className="rounded-[var(--radius)] border border-border bg-card p-[14px]" aria-label="Issue policies">
+                  <IssuePolicyStrip issueId={drawer.issueId} />
+                </section>
+                {/* Retained until the PAN-2499 no-loss audit explicitly retires this older, expanded swarm surface. */}
                 <DrawerSwarmPolicy issueId={drawer.issueId} />
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <DrawerActiveAgent />

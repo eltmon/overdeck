@@ -27,7 +27,7 @@ trigger route, host auto-dispatch, and every Deacon re-dispatch site honor it:
 
 | Scope | Where it lives | How to set it |
 | --- | --- | --- |
-| **Per-issue** (wins) | the per-issue record (`reviewMode`) | `pan review mode <id> <quick\|full\|none>`, the issue-cockpit **review:** selector, or `POST /api/review/:id/config` |
+| **Per-issue** (wins) | the per-issue record (`reviewMode`, `reviewModel`) | `pan review mode <id> <quick\|full\|none>` or the issue policy strip. `reviewModel` applies one explicit model to the synthesis parent and every reviewer in the next convoy. |
 | **Per-project** | `.pan.yaml` → `roles.review.mode` | edit the project config (merged over global by `mergeConfigs()`) |
 | **Global** | `~/.overdeck/config.yaml` → `roles.review.mode` | Settings → Roles → Review → *Review mode* selector |
 

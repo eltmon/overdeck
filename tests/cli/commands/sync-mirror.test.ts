@@ -16,7 +16,7 @@ const mockCheckDevrootDeprecation = vi.fn().mockReturnValue(null);
 const mockLoadConfig = vi.fn().mockReturnValue({ sync: {} });
 const mockPlanSync = vi.fn().mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
 const mockExecuteSync = vi.fn().mockReturnValue({ created: [], updated: [], adopted: [], skipped: [], conflicts: [], diffs: [] });
-const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [] });
+const mockSyncContextLayers = vi.fn().mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
 const mockRefreshCache = vi.fn().mockReturnValue({ skills: { copied: 0 }, agents: { copied: 0 }, rules: { copied: 0 } });
 const mockMigrateStalePersonalContent = vi.fn().mockReturnValue({ removedSymlinks: [], preservedUserContent: [] });
 const mockRemoveLegacySkills070 = vi.fn().mockReturnValue([]);
@@ -125,6 +125,7 @@ vi.mock('../../../src/lib/paths.js', () => ({
   SYNC_TARGET: { skills: '/tmp/skills', commands: '/tmp/commands', agents: '/tmp/agents' },
   SYNC_SOURCES: { gitHooks: '/tmp/git-hooks', hooks: '/tmp/hooks', skills: '/tmp/src-skills' },
   SKILLS_DIR: '/tmp/pan-skills',
+  AGENT_SKILLS_DIR: '/tmp/agent-skills',
   isDevMode: vi.fn().mockReturnValue(false),
   AGENTS_DIR: '/tmp/agents',
 }));
@@ -151,7 +152,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
     mockLoadConfig.mockReturnValue({ sync: {} });
     mockListProjects.mockReturnValue([]);
     mockPlanSync.mockReturnValue({ skills: [], commands: [], agents: [], rules: [], devSkills: [] });
-    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [] });
+    mockSyncContextLayers.mockReturnValue({ globalWritten: false, globalStubCreated: false, projectsWritten: [], errors: [], firstInjections: [], legacyBeadsCleanups: [] });
     mockCleanupAgentDirectories.mockReturnValue(Effect.succeed({ totalOrphaned: 0, removed: [], protected: [], wouldRemove: [] }));
     mockStartupSyncNeeded.mockReturnValue({ needed: true, reason: 'test' });
     mockProvisionClaudeHooks.mockResolvedValue({

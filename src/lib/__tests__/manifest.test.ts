@@ -201,9 +201,9 @@ describe('collectSourceFiles', () => {
     const paths = files.map(f => f.relativePath).sort();
 
     expect(paths).toEqual([
-      'skills/tasks/SKILL.md',
       'skills/pan-help/README.md',
       'skills/pan-help/SKILL.md',
+      'skills/tasks/SKILL.md',
     ]);
   });
 

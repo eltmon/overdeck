@@ -19,6 +19,10 @@ import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
 import { readIssueRecordSync } from '../../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
+import { loadConfigSync } from '../../../lib/config-yaml.js';
+import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
+import { resolveTieredExecutionEnabledForIssue } from '../../../lib/agents/tier-table.js';
+import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
@@ -720,6 +724,47 @@ const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/s
   return jsonResponse({ configured: body.value ?? null, resolved: resolveSwarmPolicy(issueId) });
 })));
 
+function getIssueStaffingPayload(project: NonNullable<ReturnType<typeof getProjectSync>>, issueId: string) {
+  const record = readIssueRecordSync(project, issueId);
+  const config = loadConfigSync().config;
+  const tiered = resolveTieredExecutionEnabledForIssue(config.tieredExecution, issueId);
+  const implicit = resolveImplicitStaffing(config, `work:${issueId.toLowerCase()}`);
+  return {
+    override: { workModel: record?.workModel ?? null },
+    resolved: {
+      model: record?.workModel ?? implicit.model,
+      tiered,
+      source: record?.workModel ? 'issue' : 'default',
+      recordedModel: record?.model ?? null,
+    },
+  };
+}
+
+const getIssueStaffingRoute = HttpRouter.add('GET', '/api/issues/:issueId/staffing', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  return jsonResponse(getIssueStaffingPayload(project, issueId));
+})));
+
+const postIssueStaffingRoute = HttpRouter.add('POST', '/api/issues/:issueId/staffing', httpHandler(Effect.gen(function* () {
+  const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();
+  const body = (yield* readProjectJsonBody) as { workModel?: unknown };
+  const resolved = resolveProjectFromIssueSync(issueId);
+  const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
+  if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
+  if (!readIssueRecordSync(project, issueId)) return jsonResponse({ error: 'Issue record not found' }, { status: 404 });
+  let workModel: string | undefined;
+  try {
+    workModel = normalizeModelOverrideSync(body.workModel);
+  } catch (error) {
+    return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
+  }
+  yield* Effect.promise(() => updateIssueRecord(project, issueId, (record) => { record.workModel = workModel; }));
+  return jsonResponse(getIssueStaffingPayload(project, issueId));
+})));
+
 // ─── Home-boundary guard (shared by POST /api/projects and GET /api/fs/list-dirs) ──
 
 async function buildHomeGuard(): Promise<(p: string) => boolean> {
@@ -900,6 +945,8 @@ export const projectsRouteLayer = Layer.mergeAll(
   postProjectSwarmPolicyRoute,
   getIssueSwarmPolicyRoute,
   postIssueSwarmPolicyRoute,
+  getIssueStaffingRoute,
+  postIssueStaffingRoute,
   postProjectsRoute,
 );
 

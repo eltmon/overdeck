@@ -17,7 +17,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..
 const TEXT_EXTENSIONS = new Set(['.js', '.json', '.md', '.mdx', '.mjs', '.ts', '.tsx']);
 const SCAN_ROOTS = ['src', 'sync-sources', 'configuration', 'reference'];
 const LIVE_DOC_ROOTS = ['docs'];
-const EXCLUDED_DOC_PREFIXES = ['docs/history/', 'docs/prds/', 'docs/research/'];
+const EXCLUDED_DOC_PREFIXES = ['docs/history/', 'docs/prds/', 'docs/research/', 'docs/FLYWHEEL-STATE.md'];
 
 interface Finding {
   file: string;

@@ -85,11 +85,8 @@ const WORKSPACE = '/projects/myapp/workspaces/feature-pan-1';
 describe('AgentSpawner Effect service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: workspace exists, tasks exist, no running agent
-    mockExistsSync.mockImplementation((path: string) => {
-      if (path.includes('.tasks')) return true;
-      return true; // workspace exists
-    });
+    // Default: workspace exists and no agent is running.
+    mockExistsSync.mockReturnValue(true);
     mockGetAgentState.mockReturnValue(Effect.succeed(null));
     mockReadWorkspacePlanSync.mockReturnValue({ plan: { items: [{ id: 'wi-1' }] } });
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
@@ -140,7 +137,6 @@ describe('AgentSpawner Effect service', () => {
       const err = await runProgramFail(program);
       expect((err as any)._tag).toBe('PlanEmpty');
     });
-
     it('fails with AgentAlreadyRunning when agent status is running', async () => {
       mockGetAgentState.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
 
