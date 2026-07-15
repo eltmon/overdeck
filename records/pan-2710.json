@@ -439,15 +439,7 @@
       "timestamp": "2026-07-15T18:18:48.948Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T18:18:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T18:58:00-04:00\n\n## Verdict: CHANGES REQUESTED — all four convoy reviewers failed before producing usable reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ae5cd253/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: ae5cd253bf15f72c1d6bdc39b3f730d32285525d\n- Cycle number: 9\n- Prior cycle SHA: 6e671999e3b912a26767004f0e69af721d5bbe27\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | failed | — | infrastructure failure |\n| performance | failed | — | infrastructure failure |\n| requirements | failed | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-security already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n### [correctness] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-correctness already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n### [performance] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-performance already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n### [requirements] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-requirements already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\nNone; no reviewer produced a usable report this cycle.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ae5cd253/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -474,7 +466,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T18:22:57.376Z",
+  "updated": "2026-07-15T18:22:57.705Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
