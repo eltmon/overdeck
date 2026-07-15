@@ -3,9 +3,18 @@ import type { Harness } from "./types"
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
 
-export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui"
-export type HarnessDeliveryKind = "pty-supervisor" | "rpc-fifo" | "codex-exec-resume" | "tmux-paste"
-export type HarnessReadinessKind = "claude-session-signal" | "ohmypi-ready-file" | "codex-tui-prompt"
+export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server"
+export type HarnessDeliveryKind =
+  | "pty-supervisor"
+  | "rpc-fifo"
+  | "codex-exec-resume"
+  | "codex-app-server-rpc"
+  | "tmux-paste"
+export type HarnessReadinessKind =
+  | "claude-session-signal"
+  | "ohmypi-ready-file"
+  | "codex-tui-prompt"
+  | "codex-app-server-ready"
 export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl"
 export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id"
 export type HarnessContextLayerKind = "claude" | "pi" | "codex"
@@ -29,7 +38,7 @@ export interface HarnessBehavior {
   readonly usesRpcFifo: boolean
   readonly usesCodexHome: boolean
   readonly injectsPromptTimeMemory: boolean
-  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui"
+  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server"
   readonly readyTimeoutSeconds: number
 }
 

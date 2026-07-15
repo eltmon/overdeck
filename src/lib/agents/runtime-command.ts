@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statfsSync, statSync, writeFileSync } from 'fs';
 import { mkdir, rename as renameAsync, stat as statAsync, writeFile } from 'fs/promises';
 import { exec } from 'child_process';
+import { request as httpRequest } from 'node:http';
 import { randomUUID } from 'crypto';
 import { homedir } from 'os';
 import { basename, dirname, join, resolve } from 'path';
@@ -176,12 +177,13 @@ export async function getOhmypiLauncherFields(agentId: string, model: string): P
 
 export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
   harness: 'codex';
-  codexMode: 'work-tui';
+  codexMode: 'app-server' | 'work-tui';
   codexHome: string;
   codexSessionDir: string;
   model: string;
 } {
   const codexHome = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
+  const codexConfig = loadYamlConfig().config.codex;
   // PAN-1803: codex work agents must inherit the user's configured codex
   // permission level (Settings → Permissions → Codex) and pre-trust the
   // workspace, EXACTLY like the conversation path
@@ -189,7 +191,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   // folder-trust / "load project-local config?" wizard and blocks the pane.
   // Without the permission mapping, work agents ignore the Settings choice
   // and run hardcoded never+workspace-write.
-  const codexPermMode = loadYamlConfig().config.codex?.permissionMode ?? 'workspace';
+  const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
   const approvalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
   const sandboxMode =
     codexPermMode === 'full-access' ? 'danger-full-access'
@@ -204,7 +206,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
   });
   return {
     harness: 'codex',
-    codexMode: 'work-tui',
+    codexMode: codexConfig?.transport === 'tui' ? 'work-tui' : 'app-server',
     codexHome,
     codexSessionDir: join(codexHome, 'sessions'),
     model,
@@ -297,8 +299,131 @@ async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<b
   return false;
 }
 
+interface CodexAppServerStatus {
+  state?: string;
+}
+
+interface CodexAppServerReadyDeps {
+  sessionExists?: (agentId: string) => Promise<boolean>;
+  readStatus?: (agentId: string) => Promise<CodexAppServerStatus>;
+  sleep?: (ms: number) => Promise<void>;
+  now?: () => number;
+}
+
+function readAppServerToken(agentId: string): string | null {
+  const tokenPath = join(getAgentDir(agentId), 'appserver-token');
+  if (!existsSync(tokenPath)) return null;
+  try {
+    return readFileSync(tokenPath, 'utf-8').trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+async function postAppServerStatus(agentId: string): Promise<CodexAppServerStatus> {
+  const socketPath = join(getOverdeckHome(), 'sockets', `appserver-${agentId}.sock`);
+  const token = readAppServerToken(agentId);
+  if (!existsSync(socketPath)) throw new Error(`app-server socket missing for ${agentId}`);
+  if (!token) throw new Error(`app-server token missing for ${agentId}`);
+  const payload = JSON.stringify({ op: 'status' });
+
+  return new Promise((resolveStatus, reject) => {
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      req.destroy(new Error(`app-server status op timed out after 2000ms`));
+      reject(new Error(`app-server status op timed out after 2000ms`));
+    }, 2_000);
+    const finishErr = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      reject(error);
+    };
+    const finishOk = (status: CodexAppServerStatus) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolveStatus(status);
+    };
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'X-Overdeck-Bridge-Token': token,
+        },
+      },
+      (res) => {
+        let body = '';
+        res.setEncoding('utf-8');
+        res.on('data', (chunk) => { body += chunk; });
+        res.on('end', () => {
+          const status = res.statusCode ?? 0;
+          if (status < 200 || status >= 300) {
+            finishErr(new Error(`app-server status op returned HTTP ${status}`));
+            return;
+          }
+          try {
+            finishOk(JSON.parse(body) as CodexAppServerStatus);
+          } catch (error) {
+            finishErr(new Error(`app-server status op returned invalid JSON: ${error instanceof Error ? error.message : String(error)}`));
+          }
+        });
+      },
+    );
+    req.on('error', finishErr);
+    req.write(payload);
+    req.end();
+  });
+}
+
+export async function waitForCodexAppServerReady(
+  agentId: string,
+  timeoutSec = 30,
+  deps: CodexAppServerReadyDeps = {},
+): Promise<void> {
+  const now = deps.now ?? (() => Date.now());
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
+  const sessionExistsForAgent = deps.sessionExists ?? (async (id: string) => Effect.runPromise(sessionExists(id)));
+  const readStatus = deps.readStatus ?? postAppServerStatus;
+  const deadline = now() + timeoutSec * 1000;
+  let lastState = 'unknown';
+  let lastError = '';
+
+  while (now() < deadline) {
+    if (!(await sessionExistsForAgent(agentId))) {
+      throw new Error(`Codex app-server session ${agentId} exited before readiness.`);
+    }
+    try {
+      const status = await readStatus(agentId);
+      lastState = status.state ?? 'unknown';
+      if (lastState === 'ready') return;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await sleep(500);
+  }
+
+  const detail = lastError ? ` Last status error: ${lastError}` : ` Last state: ${lastState}.`;
+  throw new Error(`Timed out waiting for Codex app-server readiness for ${agentId}.${detail}`);
+}
+
 export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
-  if (getHarnessBehavior(harness).readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
+  const readinessKind =
+    harness === 'codex' && loadYamlConfig().config.codex?.transport !== 'tui'
+      ? 'codex-app-server-ready'
+      : getHarnessBehavior(harness).readinessKind;
+  if (readinessKind === 'codex-app-server-ready') {
+    await waitForCodexAppServerReady(agentId, timeoutSec);
+    return true;
+  }
+  if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
 

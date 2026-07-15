@@ -8,7 +8,7 @@ import { dirname, join, resolve } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
-import { isTldrEnabledSync } from '../config-yaml.js';
+import { isTldrEnabledSync, loadConfigSync } from '../config-yaml.js';
 import { createConversation, getConversationByName, reactivateConversationForSpawn } from '../overdeck/conversations.js';
 import { startWorkSync } from '../cv.js';
 import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../hooks.js';
@@ -19,6 +19,7 @@ import { resolveHarness } from '../harness-resolve.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
 import { createActiveSlice } from '../vbrief/dag.js';
@@ -787,7 +788,11 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   // (PAN-1805). Non-blocking — codex writes its rollout only after the kickoff
   // prompt lands, so a blocking wait here would stall spawn. The latest-rollout
   // fallback covers sessions whose first turn lands after this window.
-  if (resolvedHarness === 'codex') {
+  if (
+    resolvedHarness === 'codex'
+    && loadConfigSync().config.codex?.transport === 'tui'
+    && getHarnessBehavior(resolvedHarness).readinessKind === 'codex-tui-prompt'
+  ) {
     const codexHomeForAgent = join(homedir(), '.overdeck', 'agents', agentId, 'codex-home');
     void (async () => {
       try {

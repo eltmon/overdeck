@@ -12,7 +12,7 @@ that runs in tmux. The **model** is what the binary calls. They are picked
 independently per spawn.
 
 <Info>
-**Supported today:** `claude-code` (default) and `ohmypi`. For the wider field of
+**Supported today:** `claude-code` (default), `ohmypi`, and `codex`. For the wider field of
 coding-agent harnesses Overdeck could adopt next — and how each one handles
 skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-landscape).
 </Info>
@@ -21,6 +21,7 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 | --- | --- | --- | --- |
 | `claude-code` | [Anthropic Claude Code](https://github.com/anthropics/claude-code) | All workflows | Default if you don't pick. Required for Anthropic-subscription users. |
 | `ohmypi` | [oh-my-pi](https://github.com/oh-my-pi/pi-coding-agent) (`omp`) | Multi-provider work, large workspaces | Adds oh-my-pi RPC over a named pipe; reads `~/.claude/skills` for skill parity. |
+| `codex` | [OpenAI Codex CLI](https://github.com/openai/codex) (`codex`) | OpenAI-model work | Uses persistent `codex app-server` sessions by default; requires Codex CLI `0.144.0` or newer. |
 
 ## Supported harnesses
 
@@ -51,8 +52,15 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
 - First-party OpenAI agent loop for the GPT model family (GPT-5.6 Sol/Terra/Luna,
   GPT-5.5, GPT-5.4, GPT-5.3-Codex, …) with ChatGPT-subscription or API-key auth.
 - `gpt-5.6-sol` is the default OpenAI model surfaced by this harness.
-- Work agents run as live, attachable TUI sessions (`codexMode: work-tui`)
-  under the PTY supervisor — never one-shot `codex exec`.
+- Work agents use a persistent `codex app-server` child by default. Overdeck
+  talks newline-delimited JSON-RPC over stdio, so message delivery, approvals,
+  readiness, and interruption are structured protocol events rather than TUI
+  keystrokes.
+- Set `codex.transport: tui` as a temporary escape hatch to the legacy live,
+  attachable TUI path (`codexMode: work-tui`) under the PTY supervisor.
+  Both transports are persistent sessions — never one-shot `codex exec`.
+- The app-server transport requires Codex CLI `0.144.0` or newer. Upgrade with
+  your normal Codex CLI install method, then verify with `codex --version`.
 - Runtime adapter at `src/lib/runtimes/codex.ts`; per-agent thread-id pinning
   enables session introspection and cost parsing
   (`src/lib/cost-parsers/codex-parser.ts`).
@@ -219,6 +227,13 @@ heartbeat (&lt;60s old) → JSONL session mtime → tmux session created timesta
 If your dashboard shows a stale heartbeat, check
 `~/.overdeck/heartbeats/<id>.json` — omp writes there on every
 `tool_execution_end`.
+
+### Codex app-server is unavailable or too old
+
+Run `codex --version`. The app-server transport requires Codex CLI `0.144.0`
+or newer and the `codex app-server` subcommand. If the version is too old,
+upgrade Codex CLI and start a fresh session. To keep work moving during a
+rollout, set `codex.transport: tui` to use the legacy TUI transport temporarily.
 
 ## Tradeoffs
 

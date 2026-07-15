@@ -143,8 +143,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
   });
 
-  it('wraps Codex TUI conversations with the PTY supervisor and waits for its socket', async () => {
-    createSupervisorSocket = true;
+  it('launches Codex app-server conversations without the PTY supervisor', async () => {
     const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
@@ -162,13 +161,14 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-codex-supervisor-test'");
     expect(launcher).toContain(`export CODEX_HOME='${join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'codex-home')}'`);
     expect(launcher).toContain("node '");
-    expect(launcher).toContain("/dist/pty-supervisor.js' codex");
-    expect(existsSync(join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'pty-token'))).toBe(true);
-    expect((statSync(join(overdeckHome, 'sockets', 'pty-conv-codex-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
+    expect(launcher).toContain("/dist/codex-app-server-host.js'");
+    expect(launcher).not.toContain('pty-supervisor.js');
+    expect(existsSync(join(overdeckHome, 'agents', 'conv-codex-supervisor-test', 'pty-token'))).toBe(false);
+    expect(existsSync(join(overdeckHome, 'sockets', 'pty-conv-codex-supervisor-test.sock'))).toBe(false);
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
   });
 
-  it('resumes Codex TUI conversations with the persisted thread id', async () => {
+  it('resumes Codex app-server conversations with the persisted thread id', async () => {
     createSupervisorSocket = true;
     const session = 'conv-codex-resume-supervisor-test';
     const threadId = '019eaaec-4dfa-7ab1-90ba-9104d16534d1';
@@ -191,7 +191,8 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     );
 
     const launcher = launcherFor(session);
-    expect(launcher).toContain(`/dist/pty-supervisor.js' codex resume -c project_doc_max_bytes=0 '${threadId}'`);
+    expect(launcher).toContain(`/dist/codex-app-server-host.js' --model 'gpt-5.5' --resume '${threadId}'`);
+    expect(launcher).not.toContain('pty-supervisor.js');
     expect(launcher).not.toContain('codex exec resume');
   });
 

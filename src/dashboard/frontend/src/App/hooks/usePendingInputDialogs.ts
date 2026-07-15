@@ -382,7 +382,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
   });
 
   const codexApprovalMutation = useMutation({
-    mutationFn: async ({ id, optionNumber }: {
+    mutationFn: async ({ id, optionNumber, toolUseId }: {
       id: string;
       optionNumber: number;
       label?: string;
@@ -391,7 +391,7 @@ export function usePendingInputDialogs({ agents, issues }: UsePendingInputDialog
       const res = await fetchWithTimeout(`/api/conversations/${encodeURIComponent(id)}/codex-approval`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ optionNumber }),
+        body: JSON.stringify({ optionNumber, toolUseId }),
       });
       if (!res.ok) {
         let message = `Failed to send approval (${res.status})`;

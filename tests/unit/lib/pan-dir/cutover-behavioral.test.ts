@@ -50,7 +50,6 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
         decisions: [],
         hazards: [],
         resumePoint: null,
-        tasksMapping: {},
         statusOverrides: {},
         sessionHistory: [],
         feedback: [],
@@ -78,7 +77,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
+        decisions: [], hazards: [], resumePoint: null,
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -99,7 +98,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
+        decisions: [], hazards: [], resumePoint: null,
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -120,7 +119,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
+        decisions: [], hazards: [], resumePoint: null,
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -141,7 +140,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
+        decisions: [], hazards: [], resumePoint: null,
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -163,7 +162,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
+        decisions: [], hazards: [], resumePoint: null,
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -187,7 +186,7 @@ describe('PAN-1919: behavioral no-loss — all fields land in record, not contin
       const now = new Date().toISOString();
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
+        decisions: [], hazards: [], resumePoint: null,
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
@@ -221,7 +220,6 @@ describe('PAN-1919: cross-machine resume — record is the sole source of truth'
         decisions: [{ id: 'D1', summary: 'Use record writer', recordedAt: now }],
         hazards: [],
         resumePoint: { description: 'Resume at task-3', taskId: 'task-3' },
-        tasksMapping: {},
         statusOverrides: { 'item-1': 'completed', 'item-2': 'in-progress' },
         sessionHistory: [],
         feedback: [],
@@ -257,7 +255,7 @@ describe('PAN-1919: cross-machine resume — record is the sole source of truth'
       writeIssueRecordSync(project, ISSUE_ID, {
         issueId: ISSUE_ID, schemaVersion: 2, created: now, updated: now,
         harness: 'pi', model: 'kimi-k2.7-code',
-        decisions: [], hazards: [], resumePoint: null, tasksMapping: {},
+        decisions: [], hazards: [], resumePoint: null,
         statusOverrides: {}, sessionHistory: [], feedback: [], pipeline: null, closeOut: null,
       });
 
