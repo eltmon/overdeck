@@ -11,20 +11,36 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:34:50.393Z",
+  "updated": "2026-07-15T09:34:57.456Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T09:29:10.626Z"
+    "updatedAt": "2026-07-15T09:34:57.419Z",
+    "inspectNotes": "Inspecting item staffing-tiered-block"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 233459,
+            "output": 1224,
+            "cacheRead": 179200,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 1761868,
+            "output": 4858,
+            "cacheRead": 1661696,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 1111,
@@ -35,6 +51,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 233459,
+          "output": 1224,
+          "cacheRead": 179200,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1761868,
+          "output": 4858,
+          "cacheRead": 1661696,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 1111,
           "output": 27404,
@@ -43,15 +71,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 6.276161,
-        "pricingAsOf": "2026-07-15T09:29:10.667Z"
+        "usd": 7.753609,
+        "pricingAsOf": "2026-07-15T09:34:57.448Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "reviewMode": "full",
   "reReviewScope": "changed",
