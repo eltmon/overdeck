@@ -4,17 +4,17 @@
     "created": "2026-07-13T13:55:01Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2499: feat(dashboard): unify the three issue views into one progressive-density Issue View (rail · cockpit · console)",
-    "updated": "2026-07-14T16:19:23.370Z"
+    "updated": "2026-07-15T14:30:33.258Z"
   },
   "plan": {
     "id": "pan-2499",
     "title": "feat(dashboard): unify the three issue views into one progressive-density Issue View (rail · cockpit · console)",
-    "status": "running",
+    "status": "approved",
     "uid": "3eb72615-9698-44ba-b8df-52f4d107c9b4",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-13T13:55:01Z",
-    "updated": "2026-07-14T16:19:23.370Z",
+    "updated": "2026-07-15T14:30:33.258Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2499",
