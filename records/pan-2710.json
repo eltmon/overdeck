@@ -226,7 +226,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:40:15.085Z",
+  "updated": "2026-07-15T17:40:17.728Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
@@ -236,7 +236,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:40:10.591Z",
+    "updatedAt": "2026-07-15T17:40:17.678Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "Commit 97ec41d2 is an empty merge commit (main->feature/pan-2710) touching only docs/FLYWHEEL-STATE.md. No red-window-classifier module, computeRedWindows, or selectRerunCandidates implementation exists anywhere in the repo history yet — none of the 4 acceptance criteria are addressed. Needs the actual pure-classifier implementation committed before this bead can pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
@@ -305,7 +305,7 @@
       },
       "costAtCloseOut": {
         "usd": 75.90639900000001,
-        "pricingAsOf": "2026-07-15T17:40:10.655Z"
+        "pricingAsOf": "2026-07-15T17:40:17.723Z"
       }
     },
     "merges": [
