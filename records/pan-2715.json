@@ -184,17 +184,16 @@
     "recordedAt": "2026-07-15T16:38:20.246Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T17:37:45.775Z",
+  "updated": "2026-07-15T17:37:48.203Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:48:31.313Z",
+    "updatedAt": "2026-07-15T17:37:48.181Z",
     "reviewNotes": "[correctness] Journal-backed verification passes without the required verified commit — `src/lib/lifecycle/dod-gate.ts:241`",
     "verificationNotes": "Verification FAILED at lint (23777ms):\n\n                                                                                                                                                                    ──────────┬──────────  \n \u001b[38;5;240m  │\u001b[0m                                                                                                                                                                                                         ╰──────────── No such file or directory (os error 2)\n\u001b[38;5;246m───╯\u001b[0m\n\n    at aggregateBindingErrorsIntoJsError (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/error-DL-e8-oE.mjs:48:18)\n    at unwrapBindingResult (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/error-DL-e8-oE.mjs:18:128)\n    at #build (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/rolldown-build-DSxL8qiP.mjs:3317:34)\n    at async build (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/index.mjs:42:22)\n    at async Promise.all (index 0)\n    at async buildSingle (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:760:19)\n    at async Promise.all (index 0)\n    at async buildWithConfigs (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:716:18)\n    at async CAC.<anonymous> (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:25:2)\n    at async runCLI (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:49:3)\n\n",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
@@ -258,7 +257,9 @@
         "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
       ],
       "recordedAt": "2026-07-15T16:10:43.479Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T17:37:48.181Z"
   },
   "closeOut": {
     "usage": {
@@ -336,7 +337,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2732"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-15T17:37:48.200Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 30a6d2b34ca1dbea69c2224ea03708bcd3eda522",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2732 MERGED at 2026-07-15T16:48:16Z",
+          "status": "pass",
+          "mergedAt": "2026-07-15T16:48:16Z",
+          "mergeCommit": "10200b21d39eb1b9799aa3d8d3985b95bb3a27c0"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 10200b21d39eb1b9799aa3d8d3985b95bb3a27c0",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-15T17:36:08.000Z, dist built 2026-07-15T17:35:46.516Z, merge 2026-07-15T16:48:16.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 9 agent state directories; No strike branch strike/pan-2715 found; Pruned 41 checkpoint ref(s) for agent-pan-2715, planning-pan-2715, strike-pan-2715; No specialist registry entries for PAN-2715"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",

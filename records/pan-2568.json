@@ -172,17 +172,16 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T16:47:31.893Z",
+  "updated": "2026-07-15T17:37:23.196Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:47:31.782Z",
+    "updatedAt": "2026-07-15T17:37:23.176Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
@@ -219,7 +218,9 @@
         "src/lib/tmux.ts"
       ],
       "recordedAt": "2026-07-15T15:47:00.777Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T17:37:23.176Z"
   },
   "closeOut": {
     "usage": {
@@ -315,7 +316,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2729"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-15T17:37:23.195Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 8f7e211e4c68285b3e3761825ce5bfef37c131aa",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2729 MERGED at 2026-07-15T16:47:24Z",
+          "status": "pass",
+          "mergedAt": "2026-07-15T16:47:24Z",
+          "mergeCommit": "293bf44ed57aa6da1c85849738e83ae405ff00ff"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 293bf44ed57aa6da1c85849738e83ae405ff00ff",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-15T17:36:08.000Z, dist built 2026-07-15T17:35:46.516Z, merge 2026-07-15T16:47:24.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 11 agent state directories; No strike branch strike/pan-2568 found; Pruned 20 checkpoint ref(s) for agent-pan-2568, planning-pan-2568, strike-pan-2568; No specialist registry entries for PAN-2568"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
