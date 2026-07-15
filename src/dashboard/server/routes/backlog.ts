@@ -49,8 +49,8 @@ const getBacklogSequenceRoute = HttpRouter.add(
   'GET',
   '/api/backlog/sequence',
   httpHandler(Effect.gen(function* () {
-    return yield* Effect.try({
-      try: () => {
+    return yield* Effect.tryPromise({
+      try: async () => {
         const projectRoot = process.cwd();
 
         // Read nodes from cache (primary path), seeding it from sequence.md if needed.

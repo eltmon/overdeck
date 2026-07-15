@@ -64,7 +64,7 @@ export function classifyStreamLine(line: string): StreamLineKind {
   return 'neutral';
 }
 
-function formatSpend(cost: number | undefined) {
+export function formatSpend(cost: number | undefined) {
   if (cost === undefined) return 'loading';
   if (cost >= 100) return `$${cost.toFixed(0)}`;
   if (cost >= 10) return `$${cost.toFixed(1)}`;
