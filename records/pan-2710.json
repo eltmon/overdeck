@@ -109,20 +109,21 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:04:54.071Z",
+  "updated": "2026-07-15T17:08:10.017Z",
   "pipeline": {
     "issueId": "PAN-2710",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:04:54.001Z",
+    "updatedAt": "2026-07-15T17:08:09.959Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Item red-window-classifier ack: computeRedWindows/selectRerunCandidates are pure, correctly implement fail/success window pairing (trailing-fail=>null), half-open [start,end) window membership, and all four skip reasons (main-still-red, no-red-window-match, attempt-exceeded, missing-attempt); FAILING_CHECK_CONCLUSIONS imported from webhook-handlers.ts (not duplicated); no I/O in module; all ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
-    "lastVerifiedCommit": "b8852d83252a82f579417f7079d2f603619a848a",
+    "lastVerifiedCommit": "4a038d8dcff6295fa355342d8c74f8c0d92c6e9a",
     "reviewSpawnedAt": "2026-07-15T16:56:41.977Z"
   },
   "closeOut": {
@@ -130,15 +131,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2773499,
-            "output": 5288,
-            "cacheRead": 2445184,
+            "input": 2988277,
+            "output": 5517,
+            "cacheRead": 2653696,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 54623816,
-            "output": 69053,
-            "cacheRead": 53564928,
+            "input": 62096179,
+            "output": 70880,
+            "cacheRead": 61007872,
             "cacheWrite": 0
           }
         },
@@ -161,15 +162,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2773499,
-          "output": 5288,
-          "cacheRead": 2445184,
+          "input": 2988277,
+          "output": 5517,
+          "cacheRead": 2653696,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 54623816,
-          "output": 69053,
-          "cacheRead": 53564928,
+          "input": 62096179,
+          "output": 70880,
+          "cacheRead": 61007872,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -186,8 +187,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 42.855435,
-        "pricingAsOf": "2026-07-15T17:04:54.058Z"
+        "usd": 46.778812,
+        "pricingAsOf": "2026-07-15T17:08:10.001Z"
       }
     },
     "merges": [
