@@ -4,17 +4,17 @@
     "created": "2026-07-15T15:20:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2710: Feature PRs keep stale failed checks after red main clears — nothing re-triggers them, so they stay out of the merge gate until manually re-run",
-    "updated": "2026-07-15T15:22:09.311Z"
+    "updated": "2026-07-15T15:22:11.387Z"
   },
   "plan": {
     "id": "pan-2710",
     "title": "Feature PRs keep stale failed checks after red main clears — nothing re-triggers them, so they stay out of the merge gate until manually re-run",
-    "status": "approved",
+    "status": "running",
     "uid": "ea88807f-5881-4da0-82ed-805bb8e64e56",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-15T15:20:00.000Z",
-    "updated": "2026-07-15T15:22:09.311Z",
+    "updated": "2026-07-15T15:22:11.387Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2710",
