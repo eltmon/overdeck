@@ -114,15 +114,7 @@
       "timestamp": "2026-07-15T16:23:29.682Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T16:23:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2568\n\n# Review Synthesis — PAN-2568 — 2026-07-15T16:24:00-04:00\n\n## Verdict: CHANGES REQUESTED — fire-and-forget delivery logging creates an unbounded I/O and payload-retention queue\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6ba72c99/context.json\n- Branch: feature/pan-2568\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568\n- HEAD reviewed: 6ba72c99abbb55523a2e7dd6592829e1b6096cfc\n- Cycle number: 4\n- Prior cycle SHA: b71dee5eaf694510bb959e2367b2074fb4a8185c\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6ba72c99/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6ba72c99/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6ba72c99/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6ba72c99/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Fire-and-forget delivery logging creates an unbounded I/O queue — `src/lib/channels/pty-supervisor.ts:336`\nThe cycle changes successful delivery logging from an awaited operation to `void appendSocketWriteLog(agentId, payload)`. Every successful request can now start another independent `mkdir` and `appendFile` operation without serialization, concurrency limits, or a bounded queue. The helper awaits `mkdir` before extracting the small metadata record, so each pending promise retains the complete payload, which can be up to 262,144 characters. A slow or stalled log filesystem therefore causes outstanding filesystem work and retained message memory to grow with delivery count; 1,000 maximum-size pending messages retain roughly 250 MiB before promise and request overhead. This exact change is in the current cycle diff, so the finding survives the cycle-4 convergence gate. It could not have been raised in cycle 1 because fire-and-forget logging was introduced only now to fix the prior cycle's unbounded response-path wait. Keep delivery completion independent of logging, but materialize a small metadata-only record synchronously and route it through a size-bounded, serialized queue that drops or coalesces best-effort records when full. Add a regression test proving stalled logging cannot accumulate unbounded work or retain full payload objects.\n\n## Non-blocking Findings\n\n### [correctness] TUI border glyphs can still break wrapped composer verification — `src/lib/overdeck/conversation-forks.ts:351`\nThe new normalization strips whitespace but not box-drawing characters, so a verification prefix split across bordered TUI rows can still fail matching. This code changed in the current cycle, but the reviewer classified the narrow bordered-row case as advisory rather than release-blocking. Align normalization with the supervisor's existing box-drawing removal and add a capture containing a vertical border glyph when addressing the next fork-recovery change.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6ba72c99/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2568 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -155,18 +147,18 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T16:33:26.332Z",
+  "updated": "2026-07-15T16:33:28.022Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:33:26.255Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
+    "updatedAt": "2026-07-15T16:33:26.440Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
     "lastVerifiedCommit": "8f7e211e4c68285b3e3761825ce5bfef37c131aa",
@@ -292,7 +284,7 @@
       },
       "costAtCloseOut": {
         "usd": 60.781714,
-        "pricingAsOf": "2026-07-15T16:33:26.321Z"
+        "pricingAsOf": "2026-07-15T16:33:27.199Z"
       }
     },
     "merges": [
