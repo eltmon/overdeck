@@ -49,6 +49,7 @@ import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
+import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { type ReReviewScope } from './review-rerun-scope.js';
@@ -818,10 +819,24 @@ export function isReviewSessionForIssue(sessionName: string, projectKey: string 
  * fallible step; any failure here is fatal and propagates via Effect's defect
  * channel through `Effect.promise`.
  */
+// PAN-2695: dispatch has multiple legitimate callers (request route, deacon
+// reconcile, dispatch reconcile) that can fire near-simultaneously. An
+// uncoalesced second invocation sees the first's milliseconds-old agent state,
+// takes the PAN-1862 resume path against a parent that is still booting, and
+// kills it with the synthesis kickoff undelivered. Coalesce per issue: a
+// concurrent caller awaits the in-flight dispatch's result instead of re-entering.
+const reviewDispatchCoalescer = createPromiseCoalescer<{ success: boolean; message: string; error?: string; gated?: boolean }>();
+
 export const spawnReviewRoleForIssue = (
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
-  Effect.promise(() => spawnReviewRoleForIssuePromise(opts));
+  Effect.promise(() => {
+    const key = opts.issueId.toUpperCase();
+    if (reviewDispatchCoalescer.isInFlight(key)) {
+      console.log(`[review-agent] Review dispatch already in flight for ${key} — coalescing concurrent dispatch (PAN-2695)`);
+    }
+    return reviewDispatchCoalescer.run(key, () => spawnReviewRoleForIssuePromise(opts));
+  });
 
 /**
  * Effect variant of {@link killAllReviewerSessions}. Session-kill failures are
