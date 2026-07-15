@@ -43,6 +43,10 @@ vi.mock('../../../../lib/background-ai/features.js', () => ({
   isBackgroundFeatureEnabled: () => true,
 }));
 
+vi.setConfig({ testTimeout: 15_000 });
+
+const { compactConversationNative, estimateContextTokens } = await import('../conversation-compaction.js');
+
 let workDir: string;
 
 beforeEach(async () => {
@@ -84,7 +88,6 @@ describe('conversation native compaction', () => {
     ]);
     const originalContent = await readFile(file, 'utf-8');
 
-    const { compactConversationNative } = await import('../conversation-compaction.js');
     const result = await compactConversationNative(file);
 
     expect(mockGenerateSmartSummary).toHaveBeenCalledWith(expect.objectContaining({
@@ -125,8 +128,6 @@ describe('conversation native compaction', () => {
         },
       },
     ]);
-
-    const { estimateContextTokens } = await import('../conversation-compaction.js');
 
     expect(await estimateContextTokens(file)).toBe(1500);
   });

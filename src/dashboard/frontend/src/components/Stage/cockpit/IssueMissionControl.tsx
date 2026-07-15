@@ -433,7 +433,13 @@ function IssueTreeLane({
   }), [actions.state.hasTasks, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
 
   const feature = projectFeature.data ?? fallbackFeature
-  const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
+  const renderedSessions = useMemo(() => {
+    const treeSessions = feature.sessions ?? []
+    // When the resource-allocated feature resolves but its session-trees payload
+    // is empty, fall back to the activity-derived sessions so a live planning
+    // agent (or other activity-only session) is still visible in the issue tree.
+    return treeSessions.length > 0 ? treeSessions : sessions
+  }, [feature.sessions, sessions])
 
   // Stale-review detection (PAN-1866): quick review — the current hardcoded mode —
   // produces a single `review` parent and NO `reviewer` sub-sessions. So any reviewer
@@ -683,9 +689,13 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
+  const activity = useActivityQuery(issueId)
   const headerActions = useIssueActions(issueId)
   const phase = phaseStatus(review.data)
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
+  const workRunning = activity.data?.sections.some(
+    (s) => s.type === 'work' && s.status === 'running',
+  ) ?? false
   const selectTab = (tab: MissionTab) => {
     setActiveTab(tab)
     setTreeContext(null)
@@ -775,7 +785,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           <StatusNarrative
             issueId={issueId}
             hasPlan={headerActions.state.hasPlan}
-            workRunning={phase === 'pending'}
+            workRunning={workRunning}
             cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
             onStageClick={handleStageClick}
           />

@@ -63,14 +63,36 @@ export function HappenedFeed({ issueId }: { issueId: string }) {
     const who = compactModelName(section.model)
     const startMs = new Date(section.startedAt).getTime()
     lines.push({ at: clock(section.startedAt), atMs: startMs, text: `${who} ${verbs.doing}`, tone: 'info' })
-    if (section.duration !== null && Number.isFinite(startMs)) {
-      const endMs = startMs + (section.duration ?? 0)
-      const failed = /fail|blocked|error/i.test(section.status ?? '')
+
+    if (section.awaitingInput) {
       lines.push({
-        at: clock(new Date(endMs).toISOString()),
+        at: '',
+        atMs: Number.MAX_SAFE_INTEGER - 3,
+        text: 'Waiting on you to answer a question',
+        tone: 'bad',
+      })
+    }
+
+    if (section.endedAt) {
+      const endMs = new Date(section.endedAt).getTime()
+      const failed = /fail|blocked|error/i.test(section.status ?? '')
+      let text: string
+      let tone: FeedLine['tone']
+      if (section.type === 'planning' && !section.planningComplete) {
+        text = `${who} stopped planning`
+        tone = 'info'
+      } else if (failed) {
+        text = `${who} hit a problem — ${section.type} needs another pass`
+        tone = 'bad'
+      } else {
+        text = `${who} ${verbs.done}`
+        tone = 'ok'
+      }
+      lines.push({
+        at: clock(section.endedAt),
         atMs: endMs,
-        text: failed ? `${who} hit a problem — ${section.type} needs another pass` : `${who} ${verbs.done}`,
-        tone: failed ? 'bad' : 'ok',
+        text,
+        tone,
       })
     }
   }

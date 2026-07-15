@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const agentMocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
@@ -26,14 +26,16 @@ const isQualifiedAgentIdForTest = (input: string): boolean => {
   const lower = input.toLowerCase();
   return SINGLETON_AGENT_IDS.has(lower) || AGENT_PREFIXES.some(p => lower.startsWith(p));
 };
-const resolveAgentTargetSyncForTest = (input: string): string | null => {
-  if (isQualifiedAgentIdForTest(input)) return input.toLowerCase();
-  return /^pan-\d+$/i.test(input) ? `agent-${input.toLowerCase()}` : null;
+
+const resolveAgentTargetSyncForTest = (target: string): string => {
+  const lower = target.toLowerCase();
+  if (SINGLETON_AGENT_IDS.has(lower)) return lower;
+  if (isQualifiedAgentIdForTest(target)) return lower;
+  return `agent-${lower}`;
 };
 
-// Keep the real targeting semantics for normalizeAgentId / isQualifiedAgentId / resolveAgentTargetSync —
-// the PAN-1760 regression was these commands bypassing them with a naive
-// `agent-` prefix, which made strike-/inspect- sessions unaddressable.
+let actualResolveAgentTargetSync: ((target: string) => string) | undefined;
+
 vi.mock('../../../lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../lib/agents.js')>();
   return {
@@ -91,6 +93,10 @@ vi.mock('fs', async (importOriginal) => {
 
 const STOPPED_STATE = { issueId: 'PAN-1723', status: 'stopped' };
 
+beforeAll(async () => {
+  ({ resolveAgentTargetSync: actualResolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js'));
+});
+
 beforeEach(() => {
   vi.clearAllMocks();
   FAKE_AGENTS_DIR_LISTING.entries = [];
@@ -100,25 +106,21 @@ beforeEach(() => {
 
 describe('resolveAgentTargetSync (PAN-1760)', () => {
   it('preserves strike-/inspect- prefixed agent IDs', async () => {
-    const { resolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js');
-    expect(resolveAgentTargetSync('strike-pan-1723')).toBe('strike-pan-1723');
-    expect(resolveAgentTargetSync('inspect-pan-1744-workspace-flccb')).toBe('inspect-pan-1744-workspace-flccb');
+    expect(actualResolveAgentTargetSync!('strike-pan-1723')).toBe('strike-pan-1723');
+    expect(actualResolveAgentTargetSync!('inspect-pan-1744-workspace-flccb')).toBe('inspect-pan-1744-workspace-flccb');
   });
 
   it('lowercases qualified agent IDs to match on-disk state dirs', async () => {
-    const { resolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js');
-    expect(resolveAgentTargetSync('STRIKE-PAN-1723')).toBe('strike-pan-1723');
-    expect(resolveAgentTargetSync('agent-PAN-1190-ship')).toBe('agent-pan-1190-ship');
+    expect(actualResolveAgentTargetSync!('STRIKE-PAN-1723')).toBe('strike-pan-1723');
+    expect(actualResolveAgentTargetSync!('agent-PAN-1190-ship')).toBe('agent-pan-1190-ship');
   });
 
   it('preserves singleton IDs', async () => {
-    const { resolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js');
-    expect(resolveAgentTargetSync('flywheel-orchestrator')).toBe('flywheel-orchestrator');
+    expect(actualResolveAgentTargetSync!('flywheel-orchestrator')).toBe('flywheel-orchestrator');
   });
 
   it('prefixes bare issue IDs with agent-', async () => {
-    const { resolveAgentTargetSync } = await vi.importActual<typeof import('../../../lib/agents.js')>('../../../lib/agents.js');
-    expect(resolveAgentTargetSync('PAN-1148')).toBe('agent-pan-1148');
+    expect(actualResolveAgentTargetSync!('PAN-1148')).toBe('agent-pan-1148');
   });
 });
 

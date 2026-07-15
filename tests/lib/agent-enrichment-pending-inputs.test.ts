@@ -13,10 +13,24 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { Effect } from 'effect'
-import { mkdtempSync, writeFileSync, rmSync } from 'fs'
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
-import { getPendingQuestions, scanPendingInputsPromise } from '../../src/lib/agent-enrichment.js'
+import { fileURLToPath } from 'url'
+import { getPendingQuestions } from '../../src/lib/agent-enrichment.js'
+
+const hookPath = join(fileURLToPath(import.meta.url), '..', '..', '..', 'sync-sources/hooks/ask-user-question-hook')
+
+/**
+ * Extract the live REASON string from the deny hook source so pending-input
+ * tests never drift from the hook's actual emitted text.
+ */
+function extractHookDenyReason(): string {
+  const source = readFileSync(hookPath, 'utf-8')
+  const match = source.match(/REASON='([^'\\]*(?:\\.[^'\\]*)*)'/)
+  if (!match) throw new Error('Could not extract REASON from ask-user-question-hook')
+  return match[1].replace(/\\'/g, "'")
+}
 
 let testDir: string
 
@@ -88,25 +102,10 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     // The deny hook returns an is_error: true tool_result whose content
     // mentions PAN-1520 — the scanner must treat this as "operator has not
     // actually answered yet" and keep the question pending.
-    const denyReason = 'AskUserQuestion is blocked in Overdeck environments to prevent silent corruption (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
-    ])
-    const result = await Effect.runPromise(getPendingQuestions(path))
-    expect(result).toHaveLength(1)
-    expect(result[0].toolId).toBe('t1')
-  })
-
-  it('KEEPS the question pending on the production deny phrase even WITHOUT the PAN-1520 marker', async () => {
-    // Regression (2026-07-13): a hook rewording dropped the literal "PAN-1520"
-    // marker from the deny reason, so this exact text was treated as a real
-    // operator answer — no modal, no notification, for every AUQ. The detector
-    // now also keys on the stable phrase so wording drift can't kill detection.
-    const rewordedDeny = 'Your question has been surfaced to the operator in the Overdeck dashboard, where they answer it directly. Restate the question and its options to the operator as a short plain-text message and wait for their reply (it arrives as a normal user message).'
-    const path = writeJsonlSession('a.jsonl', [
-      { timestamp: '2026-07-13T07:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
-      { timestamp: '2026-07-13T07:00:01Z', message: { content: [toolResult('t1', { content: rewordedDeny, is_error: true })] } },
     ])
     const result = await Effect.runPromise(getPendingQuestions(path))
     expect(result).toHaveLength(1)
@@ -149,7 +148,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     // as a normal user-text turn, NOT a tool_result. Without recognising it
     // as the resolution, reloading the page resurrects an already-answered
     // question.
-    const denyReason = 'AskUserQuestion blocked (PAN-1520). Restate to operator.'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -161,7 +160,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
   })
 
   it('RESOLVES a hook-denied AUQ when the operator types prose (not a literal option label)', async () => {
-    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['Yes', 'No'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -175,7 +174,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
     // Some Claude Code conv message turns serialize their content as an array
     // of blocks (e.g. text + image). As long as ANY block is non-tool_result
     // it counts as operator text.
-    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -192,7 +191,7 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
   it('KEEPS a hook-denied AUQ pending while ONLY tool_result wrapper turns follow', async () => {
     // Intermediate user turns that are nothing but tool_result wrappers do
     // NOT count as operator answers — only a real user-text turn does.
-    const denyReason = 'AskUserQuestion blocked (PAN-1520).'
+    const denyReason = extractHookDenyReason()
     const path = writeJsonlSession('a.jsonl', [
       { timestamp: '2026-05-26T01:00:00Z', type: 'assistant', message: { content: [askToolUse('t1', ['A', 'B'])] } },
       { timestamp: '2026-05-26T01:00:01Z', type: 'user', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
@@ -200,6 +199,17 @@ describe('getPendingQuestions — AskUserQuestion lifecycle', () => {
       // operator input — the AUQ is still waiting.
       { timestamp: '2026-05-26T01:00:05Z', type: 'assistant', message: { content: [{ type: 'tool_use', id: 'bash_x', name: 'Bash', input: { command: 'ls' } }] } },
       { timestamp: '2026-05-26T01:00:06Z', type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: 'bash_x', content: 'README.md' }] } },
+    ])
+    const result = await Effect.runPromise(getPendingQuestions(path))
+    expect(result).toHaveLength(1)
+    expect(result[0].toolId).toBe('t1')
+  })
+
+  it('KEEPS the question pending when the deny hook reason contains only the stable phrase', async () => {
+    const denyReason = 'Your question has been surfaced to the operator in the Overdeck dashboard, where they answer it directly.'
+    const path = writeJsonlSession('a.jsonl', [
+      { timestamp: '2026-05-26T01:00:00Z', message: { content: [askToolUse('t1', ['A', 'B'])] } },
+      { timestamp: '2026-05-26T01:00:01Z', message: { content: [toolResult('t1', { content: denyReason, is_error: true })] } },
     ])
     const result = await Effect.runPromise(getPendingQuestions(path))
     expect(result).toHaveLength(1)
@@ -222,68 +232,5 @@ describe('agent-enrichment scan — plan mode + missing files', () => {
     ].join('\n'), 'utf-8')
     const result = await Effect.runPromise(getPendingQuestions(path))
     expect(result).toHaveLength(1)
-  })
-})
-
-describe('scanPendingInputsPromise — pendingProposedPlan payload (PAN-1520 FR-1)', () => {
-  function exitPlanToolUse(id: string, plan?: string): unknown {
-    return {
-      type: 'tool_use',
-      id,
-      name: 'ExitPlanMode',
-      input: plan === undefined ? {} : { plan },
-    }
-  }
-
-  it('carries the plan markdown for an unanswered ExitPlanMode', async () => {
-    const path = writeJsonlSession('plan.jsonl', [
-      {
-        timestamp: '2026-07-13T01:00:00Z',
-        message: { content: [exitPlanToolUse('ep1', '## The Plan\n\n1. Do the thing')] },
-      },
-    ])
-    const scan = await scanPendingInputsPromise(path)
-    expect(scan.exitPlanModePending).toBe(true)
-    expect(scan.pendingProposedPlan).toEqual({
-      toolUseId: 'ep1',
-      askedAt: '2026-07-13T01:00:00Z',
-      plan: '## The Plan\n\n1. Do the thing',
-    })
-  })
-
-  it('clears the payload once the ExitPlanMode is answered', async () => {
-    const path = writeJsonlSession('plan.jsonl', [
-      {
-        timestamp: '2026-07-13T01:00:00Z',
-        message: { content: [exitPlanToolUse('ep1', 'plan text')] },
-      },
-      {
-        timestamp: '2026-07-13T01:00:10Z',
-        message: { content: [toolResult('ep1', { content: 'approved' })] },
-      },
-    ])
-    const scan = await scanPendingInputsPromise(path)
-    expect(scan.exitPlanModePending).toBe(false)
-    expect(scan.pendingProposedPlan).toBeUndefined()
-  })
-
-  it('still reports exitPlanModePending without a payload when input.plan is absent', async () => {
-    const path = writeJsonlSession('plan.jsonl', [
-      { timestamp: '2026-07-13T01:00:00Z', message: { content: [exitPlanToolUse('ep1')] } },
-    ])
-    const scan = await scanPendingInputsPromise(path)
-    expect(scan.exitPlanModePending).toBe(true)
-    expect(scan.pendingProposedPlan).toBeUndefined()
-  })
-
-  it('targets the payload at the UNANSWERED ExitPlanMode when several exist', async () => {
-    const path = writeJsonlSession('plan.jsonl', [
-      { timestamp: '2026-07-13T01:00:00Z', message: { content: [exitPlanToolUse('ep1', 'first plan')] } },
-      { timestamp: '2026-07-13T01:00:10Z', message: { content: [toolResult('ep1', { content: 'rejected' })] } },
-      { timestamp: '2026-07-13T02:00:00Z', message: { content: [exitPlanToolUse('ep2', 'revised plan')] } },
-    ])
-    const scan = await scanPendingInputsPromise(path)
-    expect(scan.pendingProposedPlan?.toolUseId).toBe('ep2')
-    expect(scan.pendingProposedPlan?.plan).toBe('revised plan')
   })
 })

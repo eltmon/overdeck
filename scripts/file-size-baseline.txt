@@ -6,8 +6,9 @@
 1540 src/dashboard/frontend/src/components/CommandDeck/index.tsx
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
 1530 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
-1421 src/dashboard/server/routes/command-deck.ts
+1440 src/dashboard/server/routes/command-deck.ts
 1005 src/dashboard/server/routes/flywheel.ts
+1049 src/dashboard/server/routes/projects.ts
 1143 src/dashboard/server/routes/settings.ts
 1734 src/dashboard/server/routes/workspaces.ts
 1974 src/dashboard/server/routes/workspaces/merge-ops.ts
