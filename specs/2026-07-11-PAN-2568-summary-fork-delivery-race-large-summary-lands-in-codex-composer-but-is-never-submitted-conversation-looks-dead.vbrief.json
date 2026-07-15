@@ -4,17 +4,17 @@
     "created": "2026-07-11T17:47:17Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2568: Summary fork delivery race: large summary lands in codex composer but is never submitted; conversation looks dead",
-    "updated": "2026-07-15T14:48:07.577Z"
+    "updated": "2026-07-15T14:48:09.441Z"
   },
   "plan": {
     "id": "pan-2568",
     "title": "Summary fork delivery race: large summary lands in codex composer but is never submitted; conversation looks dead",
-    "status": "approved",
+    "status": "running",
     "uid": "7e38ccd3-aec3-4a2d-ba87-d60bcafe642c",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-11T17:47:17Z",
-    "updated": "2026-07-15T14:48:07.577Z",
+    "updated": "2026-07-15T14:48:09.441Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2568",
