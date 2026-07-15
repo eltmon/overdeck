@@ -1,0 +1,697 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-15T13:51:11.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2713: Deploy is missing from the Definition of Done — merged dashboard/server changes run stale until someone remembers pan reload",
+    "updated": "2026-07-15T13:58:15.898Z"
+  },
+  "plan": {
+    "id": "pan-2713",
+    "title": "Deploy is missing from the Definition of Done — merged dashboard/server changes run stale until someone remembers pan reload",
+    "status": "proposed",
+    "uid": "0daeef14-8c59-4716-9ee2-64c6ad8beeb7",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-15T13:51:11.000Z",
+    "updated": "2026-07-15T13:58:15.898Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2713",
+        "label": "PAN-2713",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2713.md",
+        "label": "PRD draft",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "deploy",
+      "deacon",
+      "definition-of-done",
+      "dashboard",
+      "cloister"
+    ],
+    "narratives": {
+      "Problem": "Merged dashboard/server changes run stale in production until someone manually rebuilds and restarts. A per-merge deploy (Step 0 of postMergeLifecycle → scripts/post-merge-deploy.sh) exists but is event-driven with no reconciliation: it is skipped by the close-out guard (verified live: 'PAN-2684 is closed out (spec completed) — skipping post-merge lifecycle'), by every skipDeploy:true reconciliation caller, and by merges whose lifecycle ran on a since-dead server. Nothing detects the resulting staleness — no build commit is stamped anywhere and /api/health reports only {status, repoRoot, mode} — so a missed deploy stays missed until an operator asks.",
+      "Proposal": "Make deploy a mechanically owned DoD step in two complementary pieces. Visibility: stamp the build commit into the server/deacon bundles at build time (tsdown define), expose it on /api/health, compute 'behind origin/main by N commits touching build inputs' in a shared staleness module, surface it on /api/system/health and as a header chip. Mechanics: a deploy-window guard (verification running / merge specialist live / pending post-merge / restart lock / pan dev) plus a debounced deacon staleness patrol that spawns the bundled `pan reload --health-timeout 120000` detached as the reconciliation backstop; gate the existing Step 0 on the same staleness + guard so safe merges still deploy immediately while unsafe or unnecessary restarts fall through to the in-process lifecycle. Config deploy.auto_deploy (default true) and deploy.debounce_minutes (default 5).",
+      "NonGoals": "- No external/CI deployment or release-engine changes (triggerPostMergeReleaseIfConfigured untouched).\n- No auto-deploy for projects other than the overdeck repo the server runs from.\n- No removal or restructuring of Step 0 / pending-post-merge.json / processPendingLifecycle machinery, and no changes to the PAN-328 idempotency guards.\n- No change to flywheel doctrine or authority (it remains the deployer when running).\n- No auto-close-out or automation of other DoD rows (PAN-2715 owns the gate).\n- No fix for pre-existing orphaned/duplicate dashboard server processes (PAN-2318 territory)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Reconciliation patrol over more event hooks: the mechanical deploy is a deacon patrol comparing the running build commit to origin/main.",
+        "rationale": "Root cause shows event hooks provably miss paths (close-out guard, skipDeploy reconcilers, dead-server lifecycles); a state-based patrol catches all of them by construction."
+      },
+      {
+        "summary": "Build commit stamped via tsdown define in both server and root configs, with a dist/build-info.json build-step fallback if define replacement fails.",
+        "rationale": "Define embeds the stamp inside the bundle so it survives the atomic dist swap; typeof-guarded accessor keeps unbundled runs (vitest/tsx) safe."
+      },
+      {
+        "summary": "Patrol deploys by spawning the bundled `pan reload --health-timeout 120000` detached rather than generalizing scripts/post-merge-deploy.sh.",
+        "rationale": "pan reload already owns the restart lock, pan-dev SIGUSR2 hot path, pristine origin/main worktree build, dist swap, and identity-checked health gate — one deploy door instead of two."
+      },
+      {
+        "summary": "Step 0 changes are gating-only; skipped deploys fall through to the existing in-process lifecycle path.",
+        "rationale": "That path is exercised daily by every skipDeploy:true caller; restructuring the delicate PAN-328/PAN-1723 machinery is unnecessary risk."
+      },
+      {
+        "summary": "Debounce = origin/main quiet period (newest commit older than deploy.debounce_minutes, default 5).",
+        "rationale": "A merge train keeps resetting the clock, yielding exactly one deploy after the train settles — the issue's stated requirement."
+      },
+      {
+        "summary": "deploy.auto_deploy defaults to true.",
+        "rationale": "The mechanical path exists to cover flywheel-down periods; collisions with a running flywheel are harmless (restart lock + staleness re-check). auto_deploy:false keeps detection-only mode."
+      },
+      {
+        "summary": "Staleness 'unknown' (unstamped legacy dist) preserves today's Step 0 deploy behavior.",
+        "rationale": "The first deployment of this feature must not be blocked by its own missing stamp."
+      }
+    ],
+    "items": [
+      {
+        "id": "build-commit-stamp",
+        "title": "Stamp build commit into bundles and expose it on /api/health",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2713",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "health-staleness-surface",
+            "deploy-patrol",
+            "step0-deploy-gating"
+          ],
+          "files_scope": [
+            "src/dashboard/server/tsdown.config.ts",
+            "tsdown.config.ts",
+            "src/lib/deploy/build-info.ts",
+            "src/dashboard/server/identity.ts",
+            "tests/unit/lib/deploy/build-info.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/deploy/build-info.test.ts",
+            "npm run build && node -e \"const s=require('node:child_process').execSync;const out=s('grep -c \\\"__OVERDECK\\\" dist/dashboard/server.js || true').toString();process.exit(0)\""
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "build-info.test.ts passes: getBuildInfo() returns nulls when globals are undefined",
+            "after npm run build, GET /api/health on a booted dist returns buildCommit equal to git rev-parse HEAD of the build checkout"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W1/D2: add define: { __OVERDECK_BUILD_COMMIT__, __OVERDECK_BUILD_TIME__ } to BOTH src/dashboard/server/tsdown.config.ts and the root tsdown.config.ts, computed at config-eval time with sync git (build-time only — the no-execSync rule applies to server-reachable code, not build configs). Create src/lib/deploy/build-info.ts exporting getBuildInfo(): { buildCommit: string|null, builtAt: string|null } with typeof guards (declare const; unstamped runs return nulls, no ReferenceError). Spread getBuildInfo() into getDashboardIdentity() (src/dashboard/server/identity.ts:16-21); /api/health (server.ts:113-119) already spreads identity so no route change. Implementation checkpoint: if tsdown define does not replace the identifiers, fall back to a build step writing dist/build-info.json read once at module init (readFileSync at module scope is acceptable — one-time, not per-request)."
+        },
+        "items": [
+          {
+            "id": "build-commit-stamp.ac1",
+            "title": "Given a checkout, when npm run build runs, then dist/dashboard/server.js embeds the checkout's git rev-parse HEAD and a booted server returns it as buildCommit on GET /api/health",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-commit-stamp.ac2",
+            "title": "getBuildInfo() returns { buildCommit: null, builtAt: null } without throwing when the build-time globals are undefined (vitest/tsx runs)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "build-commit-stamp.ac3",
+            "title": "GET /api/health preserves the existing status/repoRoot/mode fields and additionally returns builtAt as a build-time ISO timestamp on stamped bundles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "staleness-module",
+        "title": "Shared build-staleness module (behind origin/main by N, filtered to build inputs)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2713",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "health-staleness-surface",
+            "deploy-patrol",
+            "step0-deploy-gating"
+          ],
+          "files_scope": [
+            "src/lib/deploy/staleness.ts",
+            "tests/unit/lib/deploy/staleness.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/deploy/staleness.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "staleness.test.ts passes covering fresh/stale/unknown/fetch-throttle/fetch-failure paths"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W2: create src/lib/deploy/staleness.ts exporting BUILD_INPUT_PATHS = ['src','packages','package.json','bun.lock','tsdown.config.ts'] and computeBuildStaleness({ repoRoot, buildCommit, exec?, fetchMinIntervalMs? }) → BuildStaleness { status: 'fresh'|'stale'|'unknown', buildCommit, originMainSha, behindTotal, behindBuildInputs, originMainLastCommitAt (epoch ms), computedAt, reason? }. Mechanics: module-level throttled `git fetch origin main` (default min interval 120000 ms; failure degrades to last-fetched refs, never rejects); `git rev-parse origin/main`; `git rev-list --count <buildCommit>..origin/main` total and with `-- <BUILD_INPUT_PATHS>`; `git log -1 --format=%ct origin/main`. buildCommit null or unknown to the repo → status 'unknown' with reason. ALL exec promisified async (no execSync — server-reachable code). Export _resetForTests() for the throttle. Tests use injected exec and vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "staleness-module.ac1",
+            "title": "Given origin/main has N commits touching BUILD_INPUT_PATHS after buildCommit, computeBuildStaleness returns status 'stale' with behindBuildInputs === N and behindTotal >= N",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staleness-module.ac2",
+            "title": "Given buildCommit contains origin/main, computeBuildStaleness returns status 'fresh' with behindBuildInputs === 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staleness-module.ac3",
+            "title": "Given buildCommit is null or unknown to the repo, computeBuildStaleness returns status 'unknown' with a populated reason and does not reject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staleness-module.ac4",
+            "title": "A second call within fetchMinIntervalMs skips git fetch (verified via injected exec call log under fake timers) and still returns counts from local refs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "staleness-module.ac5",
+            "title": "A git fetch failure degrades to computing against the last-fetched origin/main and returns a result instead of rejecting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "health-staleness-surface",
+        "title": "Expose deployStaleness on /api/system/health with TTL caching",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-2713",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/system-health-service.ts",
+            "src/dashboard/server/services/__tests__/system-health-service.test.ts",
+            "src/dashboard/frontend/src/types.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/services/__tests__/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "system-health service tests pass including the deployStaleness null-on-error case"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W3: add deployStaleness: BuildStaleness | null to SystemHealthSnapshot (src/dashboard/server/services/system-health-service.ts:110) and populate it in getSystemHealthSnapshot (:748) using getDashboardIdentity().repoRoot + getBuildInfo().buildCommit, cached in the service with a 60s TTL (the frontend polls /api/system/health every 15s). Any staleness error is caught and yields deployStaleness: null — the snapshot must never fail because of git. Mirror the field on the frontend SystemHealthSnapshot type (follow where the existing snapshot type lives for useSystemHealth)."
+        },
+        "items": [
+          {
+            "id": "health-staleness-surface.ac1",
+            "title": "GET /api/system/health returns deployStaleness with buildCommit, originMainSha, behindTotal, and behindBuildInputs when computation succeeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-staleness-surface.ac2",
+            "title": "When staleness computation throws, the snapshot still returns HTTP 200 with deployStaleness: null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-staleness-surface.ac3",
+            "title": "Given repeated snapshot calls within 60 seconds, the service returns the cached staleness result without invoking the compute again (fake timers plus a spied compute)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stale-build-chip",
+        "title": "Header chip: 'build stale ×N' when the running build is behind on build inputs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2713",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/StaleBuildChip.tsx",
+            "src/dashboard/frontend/src/components/StaleBuildChip.test.tsx",
+            "src/dashboard/frontend/src/App/AppChrome.tsx",
+            "src/dashboard/frontend/src/hooks/useSystemHealth.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/StaleBuildChip.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "StaleBuildChip.test.tsx passes: renders stale state, renders nothing for fresh/unknown/null"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W4: create StaleBuildChip.tsx modeled on SystemHealthPill.tsx (src/dashboard/frontend/src/components/SystemHealthPill.tsx:121) reading deployStaleness via useSystemHealth(). Render NOTHING unless deployStaleness?.status === 'stale' && behindBuildInputs >= 1; otherwise render text 'build stale ×N' in the warning tone with a title tooltip naming the short build commit, short origin/main commit, and behindTotal. Mount in AppChrome.tsx beside <SystemHealthPill /> (:219). Follow /pan-style-guide: color is signal only, no pill badges, monospace-leaning; no click action in this issue. Browser verification (test role) must use an isolated Playwright browser instance/profile and assert conditionally on the API's reported staleness — the chip is legitimately absent on a fresh deploy."
+        },
+        "items": [
+          {
+            "id": "stale-build-chip.ac1",
+            "title": "Renders 'build stale ×N' in the warning tone when deployStaleness.status === 'stale' and behindBuildInputs >= 1",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-build-chip.ac2",
+            "title": "Renders nothing when deployStaleness is null or its status is 'fresh' or 'unknown'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stale-build-chip.ac3",
+            "title": "The chip shows the short build commit and short origin/main commit in its title/tooltip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-window-guard",
+        "title": "getDeployBlockReason(): the shared deploy safety-window guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2713",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deploy/deploy-window.ts",
+            "tests/unit/lib/deploy/deploy-window.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/deploy/deploy-window.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deploy-window.test.ts passes covering all five block reasons and the all-clear case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W5/D8: create src/lib/deploy/deploy-window.ts exporting getDeployBlockReason(deps?): Promise<string | null> with injectable deps. Ordered checks, first match wins, human-readable reasons (operator-facing sentences): (1) 'verification in flight for <issueIds>' — any review-status row with verificationStatus === 'running' via the review-status read door (loadReviewStatuses); (2) 'merge specialist session active' — isMergeAgentRunning() from src/lib/cloister/merge-agent.ts:1119; (3) 'post-merge lifecycle pending' — ~/.overdeck/pending-post-merge.json exists; (4) 'restart already in progress (pid N, caller)' — readRestartLockHolder() (src/lib/restart-lock.ts:150) non-null; (5) 'pan dev session owns the dashboard' — readDevSupervisorMarker() (src/lib/dev-supervisor.ts) non-null. Returns null when all clear. Async fs/exec only."
+        },
+        "items": [
+          {
+            "id": "deploy-window-guard.ac1",
+            "title": "Returns a verification block reason naming the issue ids when any review-status row has verificationStatus === 'running'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-window-guard.ac2",
+            "title": "Returns a merge block reason when isMergeAgentRunning() is true or pending-post-merge.json exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-window-guard.ac3",
+            "title": "Returns a restart-lock block reason when readRestartLockHolder() reports a holder, and a dev-session reason when the pan dev supervisor marker exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-window-guard.ac4",
+            "title": "Returns null when no verification is running, no merge is active, no pending file exists, the restart lock is free, and no dev supervisor marker exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-patrol",
+        "title": "Deacon staleness patrol: observe, debounce, and auto-deploy via detached pan reload",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2713",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deploy-patrol.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/config.ts",
+            "tests/unit/lib/cloister/deploy-patrol.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/deploy-patrol.test.ts",
+            "npx vitest run tests/unit/lib/cloister/in-flight-guard.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "deploy-patrol.test.ts passes all decision-path cases under fake timers",
+            "in-flight-guard.test.ts still passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "FR-8",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W6/D3/D5/D7: (1) add deploy: { auto_deploy: boolean, debounce_minutes: number } to CloisterConfig (src/lib/cloister/config.ts:330) with defaults { auto_deploy: true, debounce_minutes: 5 } in DEFAULT_CLOISTER_CONFIG (:354). (2) Create src/lib/cloister/deploy-patrol.ts exporting runDeployPatrol(ctx) with injectable deps (computeStaleness, getBlockReason, spawnReload, emitEntry, emitTts, config, now). (3) Call it from runPatrol() in deacon.ts following the sibling pattern at :2895-2897, on a sub-cadence of every 5th patrol cycle (~5 min at the 60s patrolIntervalMs). Decision flow per run: compute staleness for the deacon's own repo root + getBuildInfo().buildCommit; 'unknown' → log once and return; 'fresh' → clear module state and return; 'stale' → emit a THROTTLED activity observation via emitActivityEntrySync (src/lib/activity-logger.ts:109) — on first detection, then at most every 30 min or when N changes — with an operator-facing sentence stating N, the short shas, and what happens next; if !auto_deploy return (signal-only); if originMainLastCommitAt is younger than debounce_minutes return (merge train settling); if getDeployBlockReason() non-null emit a throttled deferral entry naming the reason and return; otherwise spawn detached `node <repoRoot>/dist/cli/index.js reload --health-timeout 120000` (process.execPath, detached: true, stdio to an appended fd on ~/.overdeck/logs/auto-deploy.log, unref()) — the CLI path per package.json bin (pan → ./dist/cli/index.js) — emit an activity entry plus emitActivityTtsSync announcement, record lastDeploySpawnAt in module state, and skip further spawns for 10 minutes. Implementation checkpoint (D3): pan reload does not write dashboard-restarting.json (src/dashboard/server/pending-lifecycle.ts:20); if boot reconciliation flags the restart as unplanned, write that RESTART_MARKER with reason 'auto-deploy' before spawning. All timing tests use vi.useFakeTimers()."
+        },
+        "items": [
+          {
+            "id": "deploy-patrol.ac1",
+            "title": "Given status 'stale', quiet origin/main (older than debounce_minutes), a null block reason, and auto_deploy true, the patrol spawns exactly one detached reload with --health-timeout 120000 and emits an activity entry and a TTS announcement",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol.ac2",
+            "title": "Given getDeployBlockReason returns a reason, the patrol spawns nothing and emits a throttled deferral entry containing that reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol.ac3",
+            "title": "Given the newest origin/main commit is younger than debounce_minutes, the patrol defers without spawning (verified with fake timers)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol.ac4",
+            "title": "Given auto_deploy is false, the patrol emits the staleness observation but never spawns a reload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-patrol.ac5",
+            "title": "Given a reload was spawned less than 10 minutes ago, a second patrol run spawns nothing; 'fresh' and 'unknown' statuses likewise trigger no reload and no repeated observation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "step0-deploy-gating",
+        "title": "Gate postMergeLifecycle Step 0 on staleness and the deploy window",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2713",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "tests/unit/lib/cloister/merge-agent-step0.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/merge-agent-step0.test.ts",
+            "npx vitest run tests/unit/lib/cloister/in-flight-guard.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "step0 gating tests pass all four branch cases",
+            "in-flight-guard.test.ts passes unchanged"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W7/D4: inside postMergeLifecycle's `if (!options?.skipDeploy)` block (src/lib/cloister/merge-agent.ts:378-426), hoist the existing repoRoot resolution (:387-397) above new checks, then before writing the pending file: compute staleness (dynamic import of ../deploy/staleness.js with getBuildInfo().buildCommit); if status 'fresh' → log 'Running build already contains origin/main build inputs — skipping deploy restart' and fall through to the in-process lifecycle; else if status 'stale' and getDeployBlockReason() returns a reason → log 'Deploy window unsafe (<reason>) — deferring deploy to the staleness patrol' and fall through; else (stale+clear, or 'unknown' to preserve today's behavior for unstamped legacy dists) → existing pending-file write + detached spawn + return, byte-for-byte unchanged. Do NOT touch _completedPostMerge, _postMergeInFlight, Guard 2, verifyMergedBeforeLifecycle, or processPendingLifecycle. tests/unit/lib/cloister/in-flight-guard.test.ts must stay green. Deliberate side effect to assert in a test: a non-overdeck project merge with a fresh overdeck build no longer restarts the dashboard."
+        },
+        "items": [
+          {
+            "id": "step0-deploy-gating.ac1",
+            "title": "Given staleness 'fresh', Step 0 skips the deploy spawn and the in-process lifecycle steps still execute (labels, verifying_on_main transition, agent pause)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "step0-deploy-gating.ac2",
+            "title": "Given staleness 'stale' and a non-null block reason, Step 0 skips the spawn, logs the reason, and the in-process lifecycle proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "step0-deploy-gating.ac3",
+            "title": "Given staleness 'stale' and a null block reason, Step 0 writes pending-post-merge.json, spawns the deploy script detached, and returns before the in-process steps (existing behavior preserved)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "step0-deploy-gating.ac4",
+            "title": "Given staleness 'unknown', Step 0 preserves today's behavior and spawns the deploy script",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "step0-deploy-gating.ac5",
+            "title": "tests/unit/lib/cloister/in-flight-guard.test.ts passes without modification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "deploy-docs",
+        "title": "Docs: DoD row 7 gains its mechanical owner; SOP documents auto-deploy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:51:11.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2713",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/DEFINITION-OF-DONE.md",
+            "docs/OVERDECK_DEV_SOP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'PAN-2713' docs/DEFINITION-OF-DONE.md",
+            "grep -n 'auto_deploy' docs/OVERDECK_DEV_SOP.md"
+          ],
+          "expected_outputs": [
+            "DoD row 7 no longer reads 'GAP — PAN-2713' and instead documents the staleness patrol + gated Step 0 as owner with /api/health buildCommit + chip as the visible surface",
+            "OVERDECK_DEV_SOP.md documents deploy.auto_deploy and deploy.debounce_minutes defaults, the auto-deploy log path, and pan reload as the manual door"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD W8: update docs/DEFINITION-OF-DONE.md row 7 — replace 'GAP — PAN-2713' with the new mechanical owner: 'staleness-gated Step 0 (merge-agent.ts) + deacon deploy patrol (deploy-patrol.ts), guarded by getDeployBlockReason' and visible-at: '/api/health buildCommit + stale-build chip'; adjust any 'Rules of the table' sentence that references the gap while keeping the 2026-07-15 incident history intact. Add an auto-deploy section to docs/OVERDECK_DEV_SOP.md: how staleness detection works (build stamp vs origin/main on build inputs), the deploy.auto_deploy / deploy.debounce_minutes config keys and defaults, the ~/.overdeck/logs/auto-deploy.log file, how to disable (auto_deploy: false = signal-only), and that pan reload remains the manual deploy door. Leave sync-sources/rules/definition-of-done.md unchanged (it records the incident as WHY; history stays)."
+        },
+        "items": [
+          {
+            "id": "deploy-docs.ac1",
+            "title": "docs/DEFINITION-OF-DONE.md row 7 contains the staleness patrol plus gated Step 0 as the mechanical owner and shows /api/health buildCommit plus the stale-build chip as the visible surface, with the 'GAP — PAN-2713' marker removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deploy-docs.ac2",
+            "title": "docs/OVERDECK_DEV_SOP.md contains an auto-deploy section that records deploy.auto_deploy (default true), deploy.debounce_minutes (default 5), the auto-deploy log location, and the signal-only disable mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "build-commit-stamp",
+        "to": "health-staleness-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "staleness-module",
+        "to": "health-staleness-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "health-staleness-surface",
+        "to": "stale-build-chip",
+        "type": "blocks"
+      },
+      {
+        "from": "build-commit-stamp",
+        "to": "deploy-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "staleness-module",
+        "to": "deploy-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-window-guard",
+        "to": "deploy-patrol",
+        "type": "blocks"
+      },
+      {
+        "from": "build-commit-stamp",
+        "to": "step0-deploy-gating",
+        "type": "blocks"
+      },
+      {
+        "from": "staleness-module",
+        "to": "step0-deploy-gating",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-window-guard",
+        "to": "step0-deploy-gating",
+        "type": "blocks"
+      },
+      {
+        "from": "deploy-patrol",
+        "to": "deploy-docs",
+        "type": "informs"
+      },
+      {
+        "from": "step0-deploy-gating",
+        "to": "deploy-docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-15-PAN-2713-deploy-is-missing-from-the-definition-of-done-merged-dashboard-server-changes-run-stale-until-someone-remembers-pan-reload.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
