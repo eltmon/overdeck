@@ -17,6 +17,7 @@ vi.mock('../../../../lib/cloister/stale-check-github.js', () => ({
 
 import {
   __tickOnceForTests,
+  shouldStartStaleCheckRetriggerService,
   startStaleCheckRetriggerService,
   stopStaleCheckRetriggerService,
 } from '../stale-check-retrigger-service.js';
@@ -179,6 +180,27 @@ it('evicts departed failed-run state when GitHub proves the PR head changed', as
   await __tickOnceForTests();
 
   expect(mocks.rerun).toHaveBeenCalledTimes(2);
+});
+
+it('evicts departed failed-run state when GitHub reports no failing runs', async () => {
+  mocks.rerun.mockResolvedValue(false);
+  await __tickOnceForTests();
+
+  mocks.candidates.mockReturnValue([]);
+  mocks.prRuns.mockResolvedValue([]);
+  vi.advanceTimersByTime(10 * 60_000);
+  await __tickOnceForTests();
+
+  mocks.candidates.mockReturnValue([candidate()]);
+  mocks.prRuns.mockResolvedValue([run()]);
+  await __tickOnceForTests();
+
+  expect(mocks.rerun).toHaveBeenCalledTimes(2);
+});
+
+it('does not start the mutating service in a read-only peer dashboard', () => {
+  expect(shouldStartStaleCheckRetriggerService({ OVERDECK_DISABLE_DEACON: '1' })).toBe(false);
+  expect(shouldStartStaleCheckRetriggerService({})).toBe(true);
 });
 
 it('tracks failed attempts by exact run ID regardless of response order', async () => {

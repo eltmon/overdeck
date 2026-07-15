@@ -44,7 +44,7 @@ export async function listPrHeadFailingRuns(
       && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase()));
   } catch (error) {
     warn(`list failing runs for ${headRef}`, error);
-    return [];
+    throw error;
   }
 }
 
