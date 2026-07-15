@@ -314,10 +314,10 @@
       "tests/unit/dashboard/server/routes/projects.test.ts",
       "tests/unit/lib/cloister/feedback-target.test.ts"
     ],
-    "recordedAt": "2026-07-15T16:02:40.720Z"
+    "recordedAt": "2026-07-15T16:04:48.597Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T16:04:37.186Z",
+  "updated": "2026-07-15T16:04:48.599Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
