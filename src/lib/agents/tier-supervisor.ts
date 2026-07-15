@@ -172,7 +172,7 @@ const execFileAsync = promisify(execFile);
 /** One commit-review event as delivered to the standing supervisor. */
 export interface SupervisorReviewEvent {
   issueId: string;
-  /** Beads-tracker id the verdict must reference ("Item <itemId> ..."). */
+  /** vBRIEF item id receiving the verdict. */
   itemId: string;
   itemTitle: string;
   /** Full commit sha being reviewed. */
@@ -188,7 +188,7 @@ export interface SupervisorReviewEvent {
 }
 
 export interface SupervisorVerdict {
-  /** Bead id parsed from the inspect-status notes prefix. */
+  /** vBRIEF item id receiving the verdict. */
   itemId: string;
   /** Supervisor ack clears prior blocking findings; failed/blocked records one. */
   status: 'passed' | 'ack' | 'failed' | 'blocked';
@@ -203,7 +203,7 @@ export interface DeliverCommitForReviewOptions {
   /** The vBRIEF item the commit implements. */
   item: VBriefItem;
   sha: string;
-  /** Beads id for the verdict prefix; defaults to the vBRIEF item id. */
+  /** Item id receiving the verdict; defaults to the vBRIEF item id. */
   itemId?: string;
   /**
    * PRD draft markdown to source traced FR text from. When omitted and the
@@ -383,22 +383,18 @@ ${event.diff}
 
 ## Verdict (REQUIRED — post exactly one)
 
-Land your verdict on the existing inspect-status surface. Your notes MUST begin with "Item ${event.itemId}" — the server extracts the bead id from that prefix.
+Land your verdict on the existing inspect-status surface. Pass the item ID structurally; notes are free-form evidence.
 
 If the diff satisfies the acceptance criteria, post an ack (this persists inspectStatus and saves the bead checkpoint):
 
 \`\`\`bash
-curl -X POST ${event.apiUrl}/api/specialists/done \\
-  -H "Content-Type: application/json" \\
-  -d '{"specialist":"inspect","issueId":"${event.issueId}","status":"passed","notes":"Item ${event.itemId} ack: <one-line summary>"}'
+pan admin specialists done inspect ${event.issueId} --item ${event.itemId} --status passed --notes "<one-line summary>"
 \`\`\`
 
 If any acceptance criterion is not met, post a blocking finding with specific, actionable violations ([file:line] + what is wrong):
 
 \`\`\`bash
-curl -X POST ${event.apiUrl}/api/specialists/done \\
-  -H "Content-Type: application/json" \\
-  -d '{"specialist":"inspect","issueId":"${event.issueId}","status":"failed","notes":"Item ${event.itemId} BLOCKED: <specific violations and required fixes>"}'
+pan admin specialists done inspect ${event.issueId} --item ${event.itemId} --status failed --notes "<specific violations and required fixes>"
 \`\`\`
 
 Rules:
