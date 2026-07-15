@@ -143,7 +143,7 @@
     }
   ],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:13:18.587Z",
+  "updated": "2026-07-15T15:13:59.320Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "pending",
@@ -152,9 +152,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:13:18.491Z",
+    "updatedAt": "2026-07-15T15:13:59.211Z",
     "reviewNotes": "Verification failed at lint",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
+    "reviewRequestedAt": "2026-07-15T15:13:58.776Z",
     "reviewSpawnedAt": "2026-07-15T14:52:41.885Z"
   },
   "closeOut": {
@@ -162,9 +163,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 864802,
-            "output": 2630,
-            "cacheRead": 763520,
+            "input": 946416,
+            "output": 2907,
+            "cacheRead": 839552,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -174,9 +175,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 13295266,
-            "output": 28463,
-            "cacheRead": 12776448,
+            "input": 14496303,
+            "output": 29372,
+            "cacheRead": 13969920,
             "cacheWrite": 0
           }
         },
@@ -191,9 +192,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 864802,
-          "output": 2630,
-          "cacheRead": 763520,
+          "input": 946416,
+          "output": 2907,
+          "cacheRead": 839552,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -203,9 +204,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 13295266,
-          "output": 28463,
-          "cacheRead": 12776448,
+          "input": 14496303,
+          "output": 29372,
+          "cacheRead": 13969920,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -216,8 +217,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 55.125869,
-        "pricingAsOf": "2026-07-15T15:13:18.578Z"
+        "usd": 55.7877,
+        "pricingAsOf": "2026-07-15T15:13:59.273Z"
       }
     },
     "merges": [
