@@ -13,7 +13,9 @@
  * passed through unchanged. The supervisor proxies stdin/stdout/resize between
  * tmux and Claude, and listens on `${OVERDECK_HOME}/sockets/pty-<agentId>.sock`
  * for authenticated HTTP-on-unix POSTs. Socket-injected messages echo to stdout
- * by default so the tmux transcript shows what Cloister sent. Permission relay
+ * by default so the tmux transcript shows what Cloister sent. Accepted payloads
+ * never exceed the shared purge cap, preserving the invariant that an
+ * unconfirmed write is fully erased before retry. Permission relay
  * is intentionally out of scope; existing Channels MCP remains the bidirectional
  * permission path for agents that opt into it.
  */

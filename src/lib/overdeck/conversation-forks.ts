@@ -325,6 +325,12 @@ export async function ensureForkSessionReady(
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
 
+/**
+ * Deliver and submit the first fork turn. `submitted` means the runtime mirror
+ * accepted it or pane evidence shows the composer cleared; `stranded` means the
+ * composer stayed full after two standalone-Enter nudges and must be surfaced as
+ * a failed fork without re-delivering duplicate text.
+ */
 export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<'submitted' | 'stranded'> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);

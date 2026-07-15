@@ -1,6 +1,7 @@
 /**
  * Payload-size-aware injection budget shared between the PTY supervisor and
- * its delivery client. Keeping both sides' timeouts in one leaf module makes
+ * its delivery client. This is the single timing source for both sides of the
+ * protocol; keeping their waits in one leaf module makes
  * mid-injection abandonment structurally impossible: the client always waits
  * strictly longer than the supervisor's worst-case internal path.
  *
