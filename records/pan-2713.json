@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:27:54.572Z",
+  "updated": "2026-07-15T14:32:32.511Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "deploy-patrol": {
-        "writerId": "agent-pan-2713",
-        "agentId": "agent-pan-2713",
-        "pid": 958515,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:27:54.572Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -146,6 +138,17 @@
         "outcome": "completed",
         "reason": "Added the ordered shared deploy safety-window guard over canonical verification, merge, lifecycle, restart-lock, and dev-session readers with complete coverage.",
         "releasedAt": "2026-07-15T14:27:42.419Z"
+      },
+      {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 958515,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:27:54.572Z",
+        "itemId": "deploy-patrol",
+        "outcome": "completed",
+        "reason": "Added five-cycle staleness reconciliation with throttled signals, merge debounce, shared safety guard, restart marker, detached Node reload, and cooldown; moved the scheduler wrapper out of ratcheted deacon.ts after the file-size hook blocked the first push.",
+        "releasedAt": "2026-07-15T14:32:32.511Z"
       }
     ],
     "statusReasons": {
@@ -168,6 +171,10 @@
       "deploy-window-guard": {
         "reason": "Added the ordered shared deploy safety-window guard over canonical verification, merge, lifecycle, restart-lock, and dev-session readers with complete coverage.",
         "updatedAt": "2026-07-15T14:27:42.419Z"
+      },
+      "deploy-patrol": {
+        "reason": "Added five-cycle staleness reconciliation with throttled signals, merge debounce, shared safety guard, restart marker, detached Node reload, and cooldown; moved the scheduler wrapper out of ratcheted deacon.ts after the file-size hook blocked the first push.",
+        "updatedAt": "2026-07-15T14:32:32.511Z"
       }
     }
   },
@@ -195,6 +202,11 @@
     "deploy-window-guard.deploy-window-guard.ac2": "completed",
     "deploy-window-guard.deploy-window-guard.ac3": "completed",
     "deploy-window-guard.deploy-window-guard.ac4": "completed",
-    "deploy-patrol": "running"
+    "deploy-patrol": "completed",
+    "deploy-patrol.deploy-patrol.ac1": "completed",
+    "deploy-patrol.deploy-patrol.ac2": "completed",
+    "deploy-patrol.deploy-patrol.ac3": "completed",
+    "deploy-patrol.deploy-patrol.ac4": "completed",
+    "deploy-patrol.deploy-patrol.ac5": "completed"
   }
 }
