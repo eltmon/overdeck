@@ -3937,3 +3937,53 @@ second confirmation that a stale inventory manufactures fake decisions.** Re-der
 **NEXT:** drive PAN-2597/2598/2713 review→test→merge; PAN-2710 (operator-released) to merged;
 PAN-2568/2715 to verdict. **Do NOT touch PAN-2499 (operator-stop) or PAN-1491 (needs-you).**
 Phase 2 release readiness once these quiesce → report + suggest; **operator cuts, never tag.**
+
+## RUN-63 tick 24 (2026-07-15 ~12:45 local / 16:45Z) — planning-pan-2702 MYSTERY SOLVED; [PAN-2727] struck; PAN-2702 HELD (gate fails)
+
+**planning-pan-2702 explained (monitor conv, operator-directed).** It was NOT the operator's and NOT
+orphaned: it **finished planning at 08:58 but could not promote** — it hit the dashboard outage window
+and exhausted 5 retries, leaving a complete plan stranded workspace-local. The monitor promoted it:
+spec now on the state branch (`2026-07-15-PAN-2702-…vbrief.json`, status=proposed, 5 items),
+`planning` label cleared, `planned` applied. Session is gone. **My two escalations were right to flag
+it — it was a real stranded artifact, just not a policy violation.**
+
+### 🚨 THE OUTAGE CAUSE IS SEVERE — a WORK AGENT killed the host dashboard
+
+`agent-pan-2598` ran `pan restart` **from its workspace cwd** and took down `:3011`. That outage is
+what stranded PAN-2702's promotion. **Verified at code level** (`src/cli/commands/restart.ts`):
+
+```ts
+async function runFullRestart(...) {
+  // ── Stop phase ──
+  await Effect.runPromise(stopDashboard(config));      // ← :310, NO cwd validation. Kills the HOST.
+```
+The `expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' }` guard exists **only at lines 235
+and 352 — both BOOT-time**, i.e. *after* the dashboard is already dead. So any agent in any workspace
+running `pan restart` kills the host server, and the guard then refuses the rebind → **outage until
+the watchdog recovers (~2min).** Fix: validate cwd is primary BEFORE `stopDashboard`.
+**[PAN-2727] labeled `blocks-main` + STRUCK** (`strike-pan-2727`). **I OWN ITS MERGE.**
+(Matches the pre-existing memory note `project_restart_guard_is_boot_time_only`.)
+
+### PAN-2702 — HELD. Not started. The gate decides this, not preference.
+
+The monitor said *"PAN-2702 is yours to drive whenever you want it… that is your call."* **It is not.**
+Labels are `enhancement, planned` — **no `ready`, no `released`.** The pickup gate is:
+
+    ready && planned && (released || auto_pickup_backlog) && !parked && !vetoed && !objection && !inPipeline && !epic
+
+`auto_pickup_backlog=false`, so `released` is required — and **`released` is operator-only; I must
+never apply it myself.** The predicate fails on two clauses. This also matches the operator's own
+standing order: *"PAN-2702 … awaiting operator review — do NOT plan or start it."* A monitor conv is
+operator-**directed**, not the operator; it deferred to me rather than relaying a release decision.
+Contrast PAN-2710, which the operator released **explicitly and personally** — that is what a release
+looks like. **Surfaced to the operator; starting it needs their word.**
+(If released later: its workspace docker stack needs a rebuild first — `pan plan done` reported
+`Work agent not started: stack-unhealthy`, and `docker ps -a` shows no `feature-pan-2702` containers.)
+
+**Deploy independently verified by the monitor:** pid 2443704, systemd-parented, single host server,
+health 200. Matches my own check — good cross-confirmation of the PAN-2725 deploy.
+
+**RUN-63: 20 merged, 20 closed out.** Main GREEN on `847414f5`.
+**NEXT:** shepherd strike-pan-2727 → merge → deploy. Drive PAN-2597/2598/2713 (all `reviewing`) →
+test → merge. PAN-2710 (released) to merged. **Do NOT touch: PAN-2702 (gate fails), PAN-2499
+(`stoppedByUser`), PAN-1491 (needs-you).**
