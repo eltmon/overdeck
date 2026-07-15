@@ -4,17 +4,17 @@
     "created": "2026-07-15T06:32:42Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2684: refactor(dashboard): redesign Tiered Execution settings — routing ladder, overrides-only kinds, advanced disclosures, restore compaction_reroute",
-    "updated": "2026-07-15T09:31:33.618Z"
+    "updated": "2026-07-15T09:31:35.365Z"
   },
   "plan": {
     "id": "pan-2684",
     "title": "refactor(dashboard): redesign Tiered Execution settings — routing ladder, overrides-only kinds, advanced disclosures, restore compaction_reroute",
-    "status": "approved",
+    "status": "running",
     "uid": "7b19661a-68bb-4c56-ab8e-3fa8a370fdee",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-15T06:32:42Z",
-    "updated": "2026-07-15T09:31:33.618Z",
+    "updated": "2026-07-15T09:31:35.365Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2684",
