@@ -12,6 +12,7 @@ import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { loadConfigSync } from '../config-yaml.js';
+import { shouldRestartForPostMerge } from './merge-agent-step0.js';
 
 const execAsync = promisify(exec);
 
@@ -375,13 +376,7 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
     }
 
-    // Step 0: Write pending lifecycle file and spawn detached deploy script.
-    // The deploy script rebuilds dist/, kills this server, and starts a fresh process.
-    // The fresh process reads the pending file on startup and runs the lifecycle steps
-    // with correct module chunk references (no ERR_MODULE_NOT_FOUND after merge).
-    //
-    // Skip this step when we ARE the fresh process (called from processPendingLifecycle) —
-    // dynamic imports already resolve correctly and spawning again would create an infinite loop.
+    // Step 0: restart only when the running build is stale and the deploy window is safe.
     if (!options?.skipDeploy) {
       const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
       let repoRoot = __dirname.includes('/src/')
@@ -397,7 +392,7 @@ export async function postMergeLifecycle(
       }
       const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
-      try {
+      if (await shouldRestartForPostMerge(repoRoot)) try {
         const pendingData = JSON.stringify({
           issueId,
           projectPath,
