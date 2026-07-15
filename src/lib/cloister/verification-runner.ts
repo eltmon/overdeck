@@ -20,6 +20,11 @@ import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { isVerificationWorkerActive, runSupervisedVerification } from './verification-worker-supervisor.js';
+import type {
+  VerificationRunnerOptions,
+  VerificationRunnerOutcome,
+  WorkspaceInfo,
+} from './verification-types.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
@@ -35,22 +40,7 @@ const execAsync = promisify(exec);
 export const VERIFICATION_MAX_CYCLES = 3;
 const NO_PROGRESS_REPEAT_THRESHOLD = 2;
 
-export type VerificationRunnerOutcome =
-  | { outcome: 'passed' }
-  | { outcome: 'skipped'; reason: string }
-  | { outcome: 'failed'; failedCheck: string; cycleCount: number; maxCycles: number }
-  | { outcome: 'error'; message: string };
-
-export interface WorkspaceInfo {
-  isRemote: boolean;
-  vmName?: string;
-}
-
-export interface VerificationRunnerOptions {
-  syncTargetBranch?: boolean;
-  /** PAN-2487: receives human-readable gate progress lines (ship-log mirror). */
-  onGateLog?: (line: string) => void;
-}
+export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
 interface SyncResult {
   repoDir: string;
