@@ -1,12 +1,9 @@
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { defineConfig } from 'tsdown';
 
-const buildCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
-  cwd: resolve(import.meta.dirname, '../../..'),
-  encoding: 'utf8',
-}).trim();
-const builtAt = new Date().toISOString();
+const execFileAsync = promisify(execFile);
 
 function configYamlSingleChunkAssertion() {
   return {
@@ -33,57 +30,66 @@ function configYamlSingleChunkAssertion() {
   };
 }
 
-export default defineConfig({
-  entry: {
-    server: 'main.ts',
-    deacon: 'deacon-main.ts',
-    'dashboard-db-worker': 'services/dashboard-db-worker.ts',
-    'checkpoint-worker': '../../lib/memory/checkpoint-worker.ts',
-    'memory-fts-worker': '../../lib/memory/fts-worker.ts',
-  },
-  outDir: '../../../dist/dashboard',
-  format: 'esm',
-  platform: 'node',
-  shims: true,
-  define: {
-    __OVERDECK_BUILD_COMMIT__: JSON.stringify(buildCommit),
-    __OVERDECK_BUILD_TIME__: JSON.stringify(builtAt),
-  },
-  clean: false,
-  sourcemap: true,
-  outExtensions: () => ({ js: '.js' }),
-  alias: {
-    '@overdeck/contracts': resolve(import.meta.dirname, '../../../packages/contracts/src/index.ts'),
-  },
-  outputOptions: {
-    codeSplitting: {
-      groups: [
-        {
-          name: 'config-yaml',
-          test: (moduleId: string) => moduleId.replaceAll('\\', '/').endsWith('/src/lib/config-yaml.ts'),
-          priority: 10,
-        },
+export default defineConfig(async () => {
+  const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
+    cwd: resolve(import.meta.dirname, '../../..'),
+    encoding: 'utf8',
+  });
+  const buildCommit = stdout.trim();
+  const builtAt = new Date().toISOString();
+
+  return {
+    entry: {
+      server: 'main.ts',
+      deacon: 'deacon-main.ts',
+      'dashboard-db-worker': 'services/dashboard-db-worker.ts',
+      'checkpoint-worker': '../../lib/memory/checkpoint-worker.ts',
+      'memory-fts-worker': '../../lib/memory/fts-worker.ts',
+    },
+    outDir: '../../../dist/dashboard',
+    format: 'esm',
+    platform: 'node',
+    shims: true,
+    define: {
+      __OVERDECK_BUILD_COMMIT__: JSON.stringify(buildCommit),
+      __OVERDECK_BUILD_TIME__: JSON.stringify(builtAt),
+    },
+    clean: false,
+    sourcemap: true,
+    outExtensions: () => ({ js: '.js' }),
+    alias: {
+      '@overdeck/contracts': resolve(import.meta.dirname, '../../../packages/contracts/src/index.ts'),
+    },
+    outputOptions: {
+      codeSplitting: {
+        groups: [
+          {
+            name: 'config-yaml',
+            test: (moduleId: string) => moduleId.replaceAll('\\', '/').endsWith('/src/lib/config-yaml.ts'),
+            priority: 10,
+          },
+        ],
+      },
+    },
+    plugins: [configYamlSingleChunkAssertion()],
+    deps: {
+      alwaysBundle: [/^@overdeck\//],
+      neverBundle: [
+        '@homebridge/node-pty-prebuilt-multiarch',
+        'ssh2',
+        // PAN-1645: playwright is loaded only via a runtime `await import('playwright')`
+        // (artifact thumbnails). Bundling it pulls in playwright-core's prebundled
+        // coreBundle.js, which has an internal `require("chromium-bidi/...")` for a
+        // package playwright does not ship — emitting UNRESOLVED_IMPORT warnings that
+        // the workspace docker `init` guard turns into exit 1 (forcing --host).
+        // Externalizing it keeps it resolved from node_modules at runtime and drops
+        // a 5.6 MB browser chunk from the server bundle.
+        'playwright',
+        'playwright-core',
+        /^chromium-bidi/,
+        /^bun:/,
+        /^@effect\/platform-bun/,
       ],
     },
-  },
-  plugins: [configYamlSingleChunkAssertion()],
-  deps: {
-    alwaysBundle: [/^@overdeck\//],
-    neverBundle: [
-      '@homebridge/node-pty-prebuilt-multiarch',
-      'ssh2',
-      // PAN-1645: playwright is loaded only via a runtime `await import('playwright')`
-      // (artifact thumbnails). Bundling it pulls in playwright-core's prebundled
-      // coreBundle.js, which has an internal `require("chromium-bidi/...")` for a
-      // package playwright does not ship — emitting UNRESOLVED_IMPORT warnings that
-      // the workspace docker `init` guard turns into exit 1 (forcing --host).
-      // Externalizing it keeps it resolved from node_modules at runtime and drops
-      // a 5.6 MB browser chunk from the server bundle.
-      'playwright',
-      'playwright-core',
-      /^chromium-bidi/,
-      /^bun:/,
-      /^@effect\/platform-bun/,
-    ],
-  },
+  };
 });

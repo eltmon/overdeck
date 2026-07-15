@@ -3,7 +3,6 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 
-import { isMergeAgentRunning } from '../cloister/merge-agent.js';
 import {
   readDevSupervisorMarker,
   type DevSupervisorMarker,
@@ -11,6 +10,7 @@ import {
 import { getOverdeckHome } from '../paths.js';
 import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
 import { readRestartLockHolder, type RestartLockHolder } from '../restart-lock.js';
+import { sessionExists } from '../tmux.js';
 
 interface DeployWindowDependencies {
   readonly loadReviewStatuses: () => Record<string, ReviewStatus>;
@@ -22,7 +22,7 @@ interface DeployWindowDependencies {
 
 const defaultDependencies: DeployWindowDependencies = {
   loadReviewStatuses,
-  isMergeAgentRunning,
+  isMergeAgentRunning: () => Effect.runPromise(sessionExists('specialist-merge-agent')),
   pendingPostMergeExists: async () => {
     try {
       await access(join(getOverdeckHome(), 'pending-post-merge.json'));
