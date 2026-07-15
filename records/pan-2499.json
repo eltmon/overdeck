@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T23:52:48.098Z",
+  "updated": "2026-07-15T23:52:49.551Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -325,5 +325,6 @@
         "updatedAt": "2026-07-15T15:12:49.168Z"
       }
     }
-  }
+  },
+  "workModel": "gpt-5.6-sol"
 }
