@@ -421,23 +421,23 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T13:44:05.411Z",
+  "updated": "2026-07-15T13:44:06.370Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T13:44:05.333Z",
+    "updatedAt": "2026-07-15T13:44:06.216Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-15T13:43:27.668Z",
-    "reviewSpawnedAt": "2026-07-15T13:43:31.370Z",
+    "reviewSpawnedAt": "2026-07-15T13:44:06.216Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/circular-deps-baseline.txt",
@@ -646,7 +646,7 @@
       },
       "costAtCloseOut": {
         "usd": 191.191313,
-        "pricingAsOf": "2026-07-15T13:44:05.378Z"
+        "pricingAsOf": "2026-07-15T13:44:06.344Z"
       }
     },
     "merges": [
