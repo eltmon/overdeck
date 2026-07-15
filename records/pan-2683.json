@@ -12,6 +12,11 @@
       "timestamp": "2026-07-15T09:57:54.343Z",
       "reason": "end",
       "note": "Initial sandboxed full-test run could not create required Git worktrees/state paths/Unix sockets and was discarded; the unrestricted rerun passed 984 root files (9,115 tests) plus 3 frontend files (32 tests). No implementation deviations. The required foundation inspection briefly stalled on an API retry, then recovered and passed. Delivered the staffing tieredExecution resolution block, Standing crew Policies control/chip/reset flows, crew-routing suspension messaging, conditional label lock, and docs."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T10:02:32.128Z"
     }
   ],
   "feedback": [],
@@ -37,7 +42,7 @@
     "recordedAt": "2026-07-15T09:57:51.722Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T10:02:31.406Z",
+  "updated": "2026-07-15T10:02:32.129Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "reviewing",
