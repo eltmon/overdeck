@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  decideDeaconBootGate,
   ensureAutomaticStateMigration,
   formatAutomaticStateMigrationBlock,
   type AutomaticStateMigrationDependencies,
+  type AutomaticStateMigrationResult,
 } from '../state-auto-migrate.js';
+
+const ready = (projectKey: string): AutomaticStateMigrationResult =>
+  ({ status: 'ready', projectKey, worktree: 'healthy' });
+const blocked = (projectKey: string, reason: string): AutomaticStateMigrationResult =>
+  ({ status: 'blocked', projectKey, reason });
 
 const project = { name: 'Fixture', path: '/tmp/fixture' };
 
@@ -14,6 +21,7 @@ function dependencies(overrides: Partial<AutomaticStateMigrationDependencies> = 
     ensureWorktree: vi.fn(async () => ({ status: 'healthy', path: '/tmp/state' })),
     migrate: vi.fn(async () => undefined),
     clearCache: vi.fn(),
+    isGitWorkTree: vi.fn(async () => true),
     ...overrides,
   };
 }
@@ -64,5 +72,75 @@ describe('automatic state migration coordinator', () => {
       expect(formatAutomaticStateMigrationBlock(result)).toContain('will not start pipeline work');
     }
     expect(deps.ensureWorktree).not.toHaveBeenCalled();
+  });
+
+  it('blocks a polyrepo container root that is not a git repository with a clear reason (PAN-2676)', async () => {
+    const polyrepoProject = { name: 'Auricle', path: '/tmp/auricle', workspace: { type: 'polyrepo' as const } };
+    const deps = dependencies({
+      inspect: vi.fn(async () => ({ migrated: false, migrationInProgress: false, remoteTip: null })),
+      isGitWorkTree: vi.fn(async () => false),
+    });
+    const result = await ensureAutomaticStateMigration('auricle', polyrepoProject, deps);
+    expect(result).toMatchObject({ status: 'blocked', projectKey: 'auricle' });
+    if (result.status === 'blocked') {
+      expect(result.reason).toContain('polyrepo');
+      expect(result.reason).not.toContain('Command failed');
+    }
+    expect(deps.migrate).not.toHaveBeenCalled();
+  });
+
+  it('blocks a non-git project path with a clear reason instead of a raw git error (PAN-2676)', async () => {
+    const deps = dependencies({
+      inspect: vi.fn(async () => ({ migrated: false, migrationInProgress: false, remoteTip: null })),
+      isGitWorkTree: vi.fn(async () => false),
+    });
+    const result = await ensureAutomaticStateMigration('not-a-repo', project, deps);
+    expect(result.status).toBe('blocked');
+    if (result.status === 'blocked') {
+      expect(result.reason).toContain('not a git repository');
+      expect(result.reason).not.toContain('Command failed');
+    }
+    expect(deps.migrate).not.toHaveBeenCalled();
+  });
+});
+
+describe('decideDeaconBootGate (PAN-2676)', () => {
+  it('starts the Deacon when at least one project is usable, excluding blocked ones', () => {
+    const gate = decideDeaconBootGate([
+      ready('overdeck'),
+      blocked('puzzdom', 'The canonical overdeck-state worktree is dirty: 1 uncommitted file'),
+      ready('myn'),
+    ]);
+    expect(gate.startDeacon).toBe(true);
+    expect(gate.usableProjects).toEqual(['overdeck', 'myn']);
+    expect(gate.blockedProjects).toHaveLength(1);
+    expect(gate.blockedProjects[0].projectKey).toBe('puzzdom');
+    // Each blocked project carries its human-readable prerequisite text.
+    expect(gate.blockedProjects[0].notice).toContain('State migration for puzzdom is blocked');
+    expect(gate.blockedProjects[0].notice).toContain('will not start pipeline work');
+  });
+
+  it('refuses to start when every project is blocked', () => {
+    const gate = decideDeaconBootGate([
+      blocked('alpha', 'dirty state worktree'),
+      blocked('beta', 'git status failed'),
+    ]);
+    expect(gate.startDeacon).toBe(false);
+    expect(gate.usableProjects).toEqual([]);
+    expect(gate.blockedProjects.map((b) => b.projectKey)).toEqual(['alpha', 'beta']);
+  });
+
+  it('starts on a fresh install with no registered projects', () => {
+    const gate = decideDeaconBootGate([]);
+    expect(gate.startDeacon).toBe(true);
+    expect(gate.blockedProjects).toEqual([]);
+    expect(gate.usableProjects).toEqual([]);
+  });
+
+  it('starts cleanly when all projects are usable', () => {
+    const gate = decideDeaconBootGate([ready('overdeck'), ready('myn')]);
+    expect(gate.startDeacon).toBe(true);
+    expect(gate.blockedProjects).toEqual([]);
+    expect(gate.usableProjects).toEqual(['overdeck', 'myn']);
   });
 });
