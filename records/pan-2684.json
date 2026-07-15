@@ -59,15 +59,7 @@
       "timestamp": "2026-07-15T11:34:54.488Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T11:34:54Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2684\n\n# Review Synthesis — PAN-2684 — 2026-07-15\n\n## Verdict: CHANGES REQUESTED — kind-only crew handling can emit invalid configuration or silently delete routed work\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2684/.pan/review/agent-pan-2684-review-5975f975/context.json`\n- Branch: `feature/pan-2684`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2684`\n- HEAD reviewed: `5975f975e47524c4553d6159c295b7ea013adfac`\n- Cycle number: 2\n- Prior cycle SHA: `41e765d47cc9fc0581089f40ef9a9468da5483c5`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 3 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 4 |\n\n## Blocking Findings\n\n### [correctness, requirements] Kind-only crew handling emits invalid configuration and permits silent route loss — `src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts:109`\n\nThe cycle-2 fix preserves a crew referenced only by `by_kind` by serializing a generated `kind-*` tier with `difficulties: []`, but the unchanged runtime validator rejects every empty difficulty list. The related removal contract still passes only difficulty ownership to `CrewRow`, so a crew referenced solely by a kind route can be removed and its override silently lost. Both paths are inside the PR diff and violate FR-3. The UI must prevent a crew from losing its final difficulty or being removed while kind overrides reference it, require those overrides to be moved or removed explicitly, and cover both interactions with regression tests.\n\n### [correctness, requirements] Alias-only `byKind` routing is erased during normalization — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:101`\n\n`defaultTieredExecution()` injects an empty canonical `by_kind` before `importCrews` sees the input. For a supported alias-only configuration, `config.by_kind ?? config.byKind` therefore chooses the injected empty object and silently discards every alias route on the next edit. This is an in-PR-scope FR-1 losslessness failure. Normalize the alias before adding defaults, and add a component regression test that preserves alias-only routes across an unrelated edit.\n\n### [correctness, requirements] Omitted supervisor inspection ownership resolves from true to false — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:172`\n\nThe unchanged runtime and existing documentation resolve omitted `supervisor.owns_inspection` to `true`, while the new summary, switch, and patch builder use `?? false`. An unrelated supervisor edit consequently changes routing semantics by persisting an explicit false. This is an in-PR-scope FR-4 failure. The UI must display and preserve effective true while retaining an explicit false, with a regression test for an existing supervisor whose field is omitted.\n\n### [requirements] Documentation omits generated names for kind-only crews — `docs/TIERED-EXECUTION.md:70`\n\nThe revised serializer and tests introduce deterministic `kind-<sorted-kinds>` names, but the required Settings UI documentation describes only difficulty-derived names. This is classified `in_pr_scope` under FR-10. If kind-only tiers remain part of the corrected design, document their naming rule and an example; if the invalid kind-only serialization is removed, update the documentation to describe the resulting ownership constraint instead.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security\n- Performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2684/.pan/review/agent-pan-2684-review-5975f975/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2684 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -90,7 +82,7 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:48:11.938Z",
+  "updated": "2026-07-15T11:48:12.280Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "pending",
