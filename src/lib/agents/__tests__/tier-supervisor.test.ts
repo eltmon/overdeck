@@ -9,11 +9,30 @@ vi.mock('../spawn.js', () => ({
 import { spawnRun } from '../spawn.js';
 import {
   DEFAULT_SUPERVISOR_SAMPLE_RATE,
+  buildSupervisorReviewMessage,
   shouldSupervise,
   spawnTierSupervisor,
   supervisorAgentId,
   SUPERVISOR_SUB_ROLE,
 } from '../tier-supervisor.js';
+
+describe('buildSupervisorReviewMessage', () => {
+  it('passes the exact item id structurally instead of encoding it in notes', () => {
+    const message = buildSupervisorReviewMessage({
+      issueId: 'PAN-2724',
+      itemId: 'issue-view-model',
+      itemTitle: 'Issue view model',
+      sha: '1234567890abcdef',
+      acceptanceCriteria: [],
+      diff: 'diff --git a/a b/a',
+      apiUrl: 'http://localhost:3011',
+    });
+
+    expect(message).toContain('pan admin specialists done inspect PAN-2724 --item issue-view-model --status passed');
+    expect(message).toContain('notes are free-form evidence');
+    expect(message).not.toContain('server extracts the bead id');
+  });
+});
 
 function task(id: string, requiresInspection?: boolean) {
   return {
