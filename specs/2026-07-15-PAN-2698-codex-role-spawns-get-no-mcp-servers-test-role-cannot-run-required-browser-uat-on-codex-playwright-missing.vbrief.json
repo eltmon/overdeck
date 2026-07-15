@@ -1,0 +1,420 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-15T13:13:34Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2698: Codex role spawns get no MCP servers — test role cannot run required browser UAT on codex (Playwright missing)",
+    "updated": "2026-07-15T13:16:28.834Z"
+  },
+  "plan": {
+    "id": "pan-2698",
+    "title": "Codex role spawns get no MCP servers — test role cannot run required browser UAT on codex (Playwright missing)",
+    "status": "proposed",
+    "uid": "dc95558b-699b-4060-abb5-20583085027a",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-15T13:13:34Z",
+    "updated": "2026-07-15T13:16:28.834Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2698",
+        "label": "PAN-2698",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2683",
+        "label": "PAN-2683 (incident run)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "codex",
+      "mcp",
+      "harness",
+      "test-role",
+      "playwright"
+    ],
+    "narratives": {
+      "Problem": "roles/test.md declares Playwright as a role MCP server in frontmatter (roles/test.md:14-20). The claude-code launcher provisions it via roleSystemPromptInjectionSync (src/lib/agents/runtime-command.ts:613-633 → --mcp-config), but the codex launcher never translates role MCP config into the per-agent codex-home/config.toml: initCodexHome (src/lib/runtimes/codex.ts:178-254) writes no [mcp_servers] section. Any UAT-required issue therefore auto-fails testing whenever the test role routes to codex — role MCP declarations are silently dropped for every codex-harness role spawn (observed on the PAN-2683 test run, 2026-07-15).",
+      "Proposal": "Extract the role-frontmatter mcpServers parser into a shared helper; have initCodexHome accept an mcpServers option and emit [mcp_servers.<name>] TOML sections (codex-cli 0.144.4 supports this natively); thread the role through getCodexLauncherFields at all 5 role-spawn call sites (fresh spawn, spawn-prep, resume, recovery, planning) so the always-rewritten config.toml keeps MCP on relaunch; warn when a role declaring MCP servers spawns on ohmypi, which cannot provision them; document per-harness provisioning.",
+      "NonGoals": "- No MCP provisioning for ohmypi/pi harness (warning only)\n- No hard routing gate refusing to spawn MCP-declaring roles on non-provisioning harnesses\n- No revert of the operator's roles.test.model pin in ~/.overdeck/config.yaml (operator-owned config; fix makes it unnecessary)\n- No sweep for the stale .pan/records-expectation secondary observation (issue defers it unless it recurs)\n- No MCP provisioning for codex conversation sessions (conversation-runtime.ts) — conversations have no role\n- No change to codex sandbox/approval policy for browser launches"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose the issue's primary fix direction (provision role MCP servers into codex-home/config.toml) over the alternative harness-routing gate.",
+        "rationale": "The issue names config.toml provisioning first and frames routing awareness as 'alternatively (or additionally)'; provisioning restores full harness freedom for the test role, while a routing gate would keep codex second-class."
+      },
+      {
+        "summary": "Non-provisioning harnesses (ohmypi) get a spawn-time console warning, not a hard refusal.",
+        "rationale": "A hard gate could block pipeline spawns on a soft dependency; the incident's harm was silence, which a named warning fixes cheaply."
+      },
+      {
+        "summary": "Sub-role spawns resolve MCP servers from the parent role file (roleAgentDefinitionPath single-arg overload).",
+        "rationale": "Sub-roles are prompt templates, not standalone roles; roles/review.md declares no MCP servers today so behavior is unchanged, and inheriting the parent is the only consistent rule."
+      },
+      {
+        "summary": "Only stdio-shaped MCP entries (string command) are emitted into codex config.toml; anything else is skipped with a warning.",
+        "rationale": "Codex fails config load entirely on malformed config (initCodexHome's [model]-as-table note), which would brick every codex spawn — skip-and-warn is the only safe degradation."
+      }
+    ],
+    "items": [
+      {
+        "id": "extract-role-mcp-parser",
+        "title": "Extract shared parseRoleMcpServersSync helper from roleSystemPromptInjectionSync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:13:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2698",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/__tests__/role-mcp-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/role-mcp-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "role-mcp-parser.test.ts passes, asserting the flattened playwright entry parsed from roles/test.md frontmatter"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents/runtime-command.ts, extract the mcpServers frontmatter flattening currently inlined in roleSystemPromptInjectionSync (lines 613-633: YAML list of single-key maps → one name→def record) into an exported helper `parseRoleMcpServersSync(definitionPath: string): Record<string, RoleMcpServerDef>` with `export interface RoleMcpServerDef { type?: string; command?: string; args?: string[]; env?: Record<string, string> }` (a permissive passthrough of the frontmatter object; unknown keys may be ignored). The helper reads the file, parses frontmatter with the existing parseYaml pattern, returns {} on missing file, missing frontmatter, malformed YAML, or absent mcpServers. Refactor roleSystemPromptInjectionSync to call the helper so the claude-code --mcp-config artifact and --allowedTools mcp__<name> suffixes are produced from the same parsed record — identical output to today. Add src/lib/agents/__tests__/role-mcp-parser.test.ts using a temp-dir role file mirroring roles/test.md frontmatter.",
+          "Rationale": "Both harness paths must read one parser or they will drift; this also gives the ohmypi warning item a cheap way to ask 'does this role declare MCP servers?'."
+        },
+        "items": [
+          {
+            "id": "extract-role-mcp-parser.ac1",
+            "title": "Given a role file with roles/test.md's frontmatter, parseRoleMcpServersSync returns { playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@latest'] } }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-role-mcp-parser.ac2",
+            "title": "Given a role file without mcpServers frontmatter or a nonexistent path, the helper returns an empty record and throws nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extract-role-mcp-parser.ac3",
+            "title": "After the refactor, roleSystemPromptInjectionSync for a test-role definition still produces a --mcp-config flag pointing at a .mcp.json containing mcpServers.playwright and an --allowedTools value containing mcp__playwright",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "codex-config-mcp-servers",
+        "title": "initCodexHome emits [mcp_servers.<name>] sections from a new InitCodexHomeOpts.mcpServers option",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:13:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2698",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "thread-role-mcp-spawns"
+          ],
+          "files_scope": [
+            "src/lib/runtimes/codex.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "codex.test.ts passes including new cases asserting the exact [mcp_servers.playwright] TOML lines, the skip-with-warn path, and the no-option byte-compat path"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/runtimes/codex.ts, add `mcpServers?: Record<string, RoleMcpServerDef>` (import the type from src/lib/agents/runtime-command.ts — if that import would create a cycle, define the structural type locally in codex.ts and have runtime-command.ts satisfy it) to InitCodexHomeOpts. In initCodexHome's config.toml assembly, after the [projects.\"<dir>\"] trust block, for each entry whose def has a non-empty string `command`: emit a blank line, `[mcp_servers.<name>]`, `command = \"<command>\"`, then `args = [\"a\", \"b\"]` when def.args is a non-empty array of strings, then `env = { \"K\" = \"v\", ... }` when def.env has entries. Escape every emitted string value and key with the same TOML basic-string escaping used for trustedDir (codex.ts:218 — backslash then double-quote). Server names must be emitted as quoted keys if they contain characters outside [A-Za-z0-9_-] (use `[mcp_servers.\"<escaped>\"]`). Entries without a string command (e.g. url-based servers) are skipped with console.warn('[codex] skipping MCP server \"<name>\" — only stdio command servers are provisioned into codex config'). When opts.mcpServers is absent or empty, the emitted config.toml must be byte-identical to today's output. Restate: codex refuses to boot on malformed config.toml, so a bad emission bricks every codex spawn — the unit tests must assert exact emitted lines, including an escaping case (an arg containing a double-quote and a backslash).",
+          "Rationale": "This is the missing half of the claude-code parity: codex-cli 0.144.4 natively loads [mcp_servers.<name>] with command/args/env for stdio servers."
+        },
+        "items": [
+          {
+            "id": "codex-config-mcp-servers.ac1",
+            "title": "Given mcpServers with the playwright stdio entry, initCodexHome produces a config.toml containing [mcp_servers.playwright] with command = \"npx\" and args = [\"-y\", \"@playwright/mcp@latest\"]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-config-mcp-servers.ac2",
+            "title": "Given an entry without a string command, initCodexHome omits it from config.toml and logs a console.warn naming the skipped server",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-config-mcp-servers.ac3",
+            "title": "When opts.mcpServers is absent, initCodexHome produces config.toml output identical to the pre-change output (no [mcp_servers] text anywhere)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-config-mcp-servers.ac4",
+            "title": "Given a command or arg value containing a double-quote or backslash, the emitted TOML escapes it (\\\" and \\\\) and the section remains parseable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "codex-config-mcp-servers.ac5",
+            "title": "Given def.env entries, initCodexHome emits env = { \"KEY\" = \"value\" } inside the server's section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "thread-role-mcp-spawns",
+        "title": "Thread role through getCodexLauncherFields into initCodexHome at all five role-spawn call sites",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T13:13:34Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2698",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/spawn.ts",
+            "src/lib/agents/spawn-prep.ts",
+            "src/lib/agents/messaging.ts",
+            "src/lib/agents/recovery.ts",
+            "src/lib/planning/spawn-planning-session.ts",
+            "src/lib/runtimes/__tests__/codex.test.ts",
+            "src/lib/agents/__tests__/role-mcp-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/runtimes/__tests__/codex.test.ts src/lib/agents/__tests__/role-mcp-parser.test.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests pass, including a case where a second initCodexHome rewrite with the same mcpServers preserves the [mcp_servers.playwright] section",
+            "lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an optional trailing `role?: Role` parameter to getCodexLauncherFields (src/lib/agents/runtime-command.ts:177). When role is provided, resolve the top-level role definition via roleAgentDefinitionPath(role) (single-arg overload — sub-roles inherit the parent role file), call parseRoleMcpServersSync on it, and pass the result as initCodexHome's mcpServers option. Update every role-spawn call site to pass the role it already has in scope: src/lib/agents/spawn.ts:255 (`role`), src/lib/agents/spawn-prep.ts:481 (`launchRole`), src/lib/agents/messaging.ts:244 (`resumeRole`), src/lib/agents/recovery.ts:350 (`recoveryRole`), src/lib/planning/spawn-planning-session.ts:664 (the planning role, 'plan'). Leave the direct initCodexHome call in src/lib/overdeck/conversation-runtime.ts:575 unchanged — conversations have no role. Restate the hazard this item exists for: initCodexHome always rewrites config.toml, so a resume or recovery relaunch that omits the role would silently wipe the MCP section the fresh spawn wrote; that is why all five sites must pass it, not just spawn.ts.",
+          "Rationale": "Completes FR-1 end-to-end for fresh spawns and FR-2 for resume/recovery, restoring test-role browser UAT on codex."
+        },
+        "items": [
+          {
+            "id": "thread-role-mcp-spawns.ac1",
+            "title": "Given role 'test', getCodexLauncherFields produces a codex-home config.toml containing [mcp_servers.playwright]",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thread-role-mcp-spawns.ac2",
+            "title": "When getCodexLauncherFields runs a second time for the same agent (resume/recovery rewrite) with role 'test', the rewritten config.toml preserves the [mcp_servers.playwright] section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thread-role-mcp-spawns.ac3",
+            "title": "Given a role whose definition declares no mcpServers (e.g. 'work'), the emitted config.toml contains no [mcp_servers] text and the spawn path throws nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "thread-role-mcp-spawns.ac4",
+            "title": "All five call sites (spawn.ts, spawn-prep.ts, messaging.ts, recovery.ts, spawn-planning-session.ts) pass their in-scope role to getCodexLauncherFields — grep for 'getCodexLauncherFields(' shows a role argument at every non-test call site",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "warn-ohmypi-mcp-drop",
+        "title": "Warn at spawn when a role declaring MCP servers routes to a harness that cannot provision them",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:13:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2698",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/runtime-command.ts",
+            "src/lib/agents/__tests__/role-mcp-parser.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/agents/__tests__/role-mcp-parser.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "test asserting the ohmypi warning text (role, harness, server names) passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In getRoleRuntimeBaseCommand (src/lib/agents/runtime-command.ts:650-666), in the `launchCommandKind === 'ohmypi-rpc'` branch before returning: resolve roleAgentDefinitionPath(role), call parseRoleMcpServersSync, and if the record is non-empty emit console.warn(`[spawn] role '${role}' declares MCP servers (${names.join(', ')}) but harness 'ohmypi' does not provision MCP — those tools will be unavailable`). Do not warn on the codex or claude-code branches (both provision after this issue), and do not block or alter the returned command in any branch — this is observability only, per the recorded auto-decision against a hard routing gate.",
+          "Rationale": "The incident's cost came from silence: the test agent ran a full green suite before discovering its required tools were missing. A named warning at spawn surfaces the mismatch immediately in agent logs."
+        },
+        "items": [
+          {
+            "id": "warn-ohmypi-mcp-drop.ac1",
+            "title": "Given role 'test' and harness 'ohmypi', getRoleRuntimeBaseCommand logs a warning containing the role name, 'ohmypi', and 'playwright'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "warn-ohmypi-mcp-drop.ac2",
+            "title": "Given harness 'ohmypi' with a role declaring no mcpServers, or role 'test' on claude-code/codex, getRoleRuntimeBaseCommand logs no such warning and returns the same command as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-role-mcp-provisioning",
+        "title": "Document per-harness role MCP provisioning",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T13:13:34Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2698",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ROLES.md",
+            "configuration/harnesses.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"mcp_servers\" docs/ROLES.md configuration/harnesses.mdx"
+          ],
+          "expected_outputs": [
+            "grep shows the new provisioning sections referencing [mcp_servers] in both files"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ],
+          "acJustification": "Docs item verified by content presence; two criteria cover both touched files."
+        },
+        "narrative": {
+          "Action": "Add a 'Role MCP servers' section to docs/ROLES.md that covers: the frontmatter shape (mcpServers as a YAML list of single-key maps, citing roles/test.md), and per-harness provisioning — claude-code renders a generated --mcp-config JSON plus mcp__<name> --allowedTools entries (PAN-2090); codex writes [mcp_servers.<name>] into the per-agent codex-home/config.toml at spawn and on every resume/recovery rewrite (PAN-2698); ohmypi does not provision and logs a spawn-time warning. In configuration/harnesses.mdx, add a sentence to the codex harness section stating that role-declared MCP servers (for example Playwright for the test role) are provisioned into the per-agent Codex config so browser UAT runs on codex. Follow each file's existing tone and heading conventions.",
+          "Rationale": "The provisioning asymmetry was undocumented, which is why the gap survived until an incident; the docs item is required by the PRD-authoring rule."
+        },
+        "items": [
+          {
+            "id": "docs-role-mcp-provisioning.ac1",
+            "title": "docs/ROLES.md contains a Role MCP servers section that covers the frontmatter shape and names all three harness behaviors (claude-code --mcp-config, codex [mcp_servers], ohmypi warn-and-drop)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-role-mcp-provisioning.ac2",
+            "title": "configuration/harnesses.mdx contains a codex-section sentence stating role-declared MCP servers are provisioned into the per-agent Codex config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "extract-role-mcp-parser",
+        "to": "codex-config-mcp-servers",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-role-mcp-parser",
+        "to": "thread-role-mcp-spawns",
+        "type": "blocks"
+      },
+      {
+        "from": "codex-config-mcp-servers",
+        "to": "thread-role-mcp-spawns",
+        "type": "blocks"
+      },
+      {
+        "from": "extract-role-mcp-parser",
+        "to": "warn-ohmypi-mcp-drop",
+        "type": "blocks"
+      },
+      {
+        "from": "thread-role-mcp-spawns",
+        "to": "docs-role-mcp-provisioning",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-15-PAN-2698-codex-role-spawns-get-no-mcp-servers-test-role-cannot-run-required-browser-uat-on-codex-playwright-missing.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
