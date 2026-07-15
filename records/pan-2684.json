@@ -60,17 +60,17 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:20:43.302Z",
+  "updated": "2026-07-15T11:29:44.516Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T11:20:43.250Z",
+    "updatedAt": "2026-07-15T11:29:44.468Z",
     "reviewNotes": "Reassigning a crew's final difficulty silently deletes its kind overrides.",
     "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2694",
@@ -104,15 +104,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1915896,
-            "output": 4193,
-            "cacheRead": 1492992,
+            "input": 2091680,
+            "output": 4619,
+            "cacheRead": 1612800,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 38698739,
-            "output": 59411,
-            "cacheRead": 37893376,
+            "input": 40975660,
+            "output": 62353,
+            "cacheRead": 39989248,
             "cacheWrite": 0
           }
         },
@@ -135,15 +135,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1915896,
-          "output": 4193,
-          "cacheRead": 1492992,
+          "input": 2091680,
+          "output": 4619,
+          "cacheRead": 1612800,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 38698739,
-          "output": 59411,
-          "cacheRead": 37893376,
+          "input": 40975660,
+          "output": 62353,
+          "cacheRead": 39989248,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -160,8 +160,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 30.603663,
-        "pricingAsOf": "2026-07-15T11:20:43.287Z"
+        "usd": 32.645104,
+        "pricingAsOf": "2026-07-15T11:29:44.509Z"
       }
     },
     "merges": [
