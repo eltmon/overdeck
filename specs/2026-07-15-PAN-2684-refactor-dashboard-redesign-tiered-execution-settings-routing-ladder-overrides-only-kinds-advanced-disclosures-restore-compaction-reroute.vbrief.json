@@ -1,0 +1,598 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-15T06:32:42Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2684: refactor(dashboard): redesign Tiered Execution settings — routing ladder, overrides-only kinds, advanced disclosures, restore compaction_reroute",
+    "updated": "2026-07-15T06:36:44.643Z"
+  },
+  "plan": {
+    "id": "pan-2684",
+    "title": "refactor(dashboard): redesign Tiered Execution settings — routing ladder, overrides-only kinds, advanced disclosures, restore compaction_reroute",
+    "status": "proposed",
+    "uid": "7b19661a-68bb-4c56-ab8e-3fa8a370fdee",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-15T06:32:42Z",
+    "updated": "2026-07-15T06:36:44.643Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2684",
+        "label": "PAN-2684",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2684.md",
+        "label": "PRD (drafts/pan-2684.md on overdeck-state)",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/design/mockups/tiered-execution-redesign-pan-2684.html",
+        "label": "BINDING mockup v2 (operator-approved 2026-07-14)",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "settings",
+      "tiered-execution",
+      "refactor"
+    ],
+    "narratives": {
+      "Problem": "Settings → Tiered Execution (TieredExecutionSection.tsx, 851 lines) edits the difficulty→tier total function as N:M per-tier checkboxes (invalid states reachable, errors surface far from the cause), renders tiers as unordered look-alike cards with no cost signal, shows nine kind selects even when nothing is overridden, gives full cards to all-default Feed/Escalation/Replay, has NO control for compaction_reroute despite it being in the schema, defaults, live config, and docs, and silently accepts harness/provider mismatches (the PAN-1865 CLIProxy trap).",
+      "Proposal": "Rebuild the panel per the BINDING operator-approved mockup v2: crews replace tier names entirely on the operator surface. A pure mapping module (tiered-crews.ts) converts TieredExecutionConfig ⇄ crews (identical staffing merges on import per D-2; tier names derived from owned difficulties on save per D-3; by_kind rewritten in the same save). The board makes difficulty→crew assignment a total function (coverage errors unrepresentable). Crew rows expand to single-model or weighted-mix editors with a PAN-1865 warning chip and harness-auto form state (file keeps concrete harness, D-4). Supervisor, kind overrides (overrides-only), Commit feed, Escalation, Session replay (adds the missing compaction_reroute select), and a YAML preview render as collapsed disclosures with plain-language resolution summaries. A no-loss inventory test gates deletion of the old render. Server-side schema, validation, and runtime resolution are untouched (D-1/NFR-1).",
+      "NonGoals": "- No server/schema/runtime changes: src/lib/settings-api-tiered-execution.ts, src/lib/agents/tier-table.ts, and all resolution paths stay byte-identical (NFR-1)\n- Do NOT ship the mockup's 'Preview a state' scenario buttons — they are mockup-only pedagogy (D-9)\n- No merge-on-save dedup of identical crews; identical crews serialize as two tiers and merge on next load (D-8)\n- No 'auto' value stored in config: harness in the file is always a concrete Harness value; auto is a form state only (D-4)\n- No per-issue tiered-execution override UI (PAN-2383 — tracked separately as PAN-2683)\n- No new dependencies; no YAML library — the preview uses a ~30-line local serializer (NFR-4, D-10)\n- No new Mintlify user-facing page: configuration/*.mdx has no tiered-execution page today (verified 2026-07-14 in the PRD), so only docs/TIERED-EXECUTION.md is updated\n- No change to TieredExecutionSection props, DEFAULT_MODEL/DEFAULT_SUPERVISOR_MODEL exports, or the SettingsPage.tsx:549 mount (NFR-2)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "No interactive questions asked; the PRD's D-1…D-10 decisions plus the operator-approved binding mockup answer every discovery question.",
+        "rationale": "The issue links a PRD written 2026-07-14 with a Decisions section explicitly 'made here, not by the executor', and the mockup is marked BINDING and operator-approved; auto mode instructs choosing documented decisions over asking."
+      },
+      {
+        "summary": "Pre-resolved the D-4 implementation checkpoint: provider_harnesses exists on the frontend SettingsConfig at src/dashboard/frontend/src/components/Settings/types.ts:45 (Partial<Record<Provider, HarnessOverride>>); providerDefaultHarness() reads it and falls back to the built-in table (anthropic→claude-code, openai→codex, else→ohmypi) mirroring getBuiltInDefaultHarness in src/lib/providers.ts:249.",
+        "rationale": "The PRD marked this as an implementation checkpoint with a stated fallback; verifying it at planning time removes a judgment call from the work agent."
+      },
+      {
+        "summary": "Split PRD work item 4 into two vBRIEF items: supervisor + kind overrides (FR-4/FR-5) and advanced disclosures + YAML preview (FR-6/FR-7).",
+        "rationale": "They are independent FR groups with separately testable acceptance criteria; smaller diffs review better and the task-granularity rule says split when the title needs 'and' across unrelated surfaces."
+      },
+      {
+        "summary": "Items 2–6 are serialized (readiness: sequential) rather than parallel-dispatchable.",
+        "rationale": "They all rebuild the same file (TieredExecutionSection.tsx) incrementally; parallel dispatch would conflict on every edit. Item 1 (pure module) is the only independently dispatchable foundation."
+      },
+      {
+        "summary": "Verify commands invoke the frontend vitest suite explicitly via npm --prefix ./src/dashboard/frontend run test -- <files>.",
+        "rationale": "Root package.json:119 'npm test' runs only three pinned frontend test files (issueActions*), so new Settings tests would silently not run under the root gate alone."
+      }
+    ],
+    "items": [
+      {
+        "id": "crews-module",
+        "title": "Pure crews mapping module: TieredExecutionConfig ⇄ crews (tiered-crews.ts) with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T06:32:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2684",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "board-header",
+            "crew-rows",
+            "supervisor-kinds",
+            "advanced-disclosures",
+            "no-loss-audit"
+          ],
+          "parallelSafeReason": "New standalone pure module plus its own new test file; it touches no existing files, so it cannot conflict with any other work.",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tiered-crews.test.ts passes with all cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts — pure functions only, no React, no new dependencies. Exports: importCrews(config) → { crews, assign, rest } grouping tiers with identical staffing into one crew per D-2 (single: same model+harness; mix: same {model, harness, weight} triples after sorting entries by model id) owning the union of their difficulties; serializeCrews(crews, assign, rest) → TieredExecutionConfig writing derived tier names per D-3 (owned difficulties in ladder order trivial→expert joined with '-'), preserving the PAN-2391 representative entry rule (top-level model/harness mirror the max-weight distribution entry), and rewriting by_kind values to derived names in the same save; deriveTierName(diffs); crewLabel(crew) ('Kimi K2.7 Code' for single, '4-model mix' style for mixes); blendedCost(crew, catalog) using costPer1MTokens from MODELS_BY_PROVIDER (modelCatalog.ts:14) — weight-blended over entries that have a cost, null when none do (render as '—', never $0); providerDefaultHarness(modelId, settings) reading settings provider_harnesses (types.ts:45) with the built-in fallback table (anthropic→claude-code, openai→codex, else→ohmypi; comment names src/lib/providers.ts getBuiltInDefaultHarness as source); renderYamlPreview(config) — ~30-line local serializer for the tiered_execution object, no YAML lib (D-10). Read rule: consume config.by_kind ?? config.byKind (both exist in types.ts) but always write the canonical by_kind key. Write __tests__/tiered-crews.test.ts with a fixture matching the operator's live shape: kimi solo tier + two identical 4-entry mix tiers → 2 crews."
+        },
+        "items": [
+          {
+            "id": "crews-module.ac1",
+            "title": "Given the live-config fixture (kimi solo + two identical 4-entry mixes over medium/complex/expert), importCrews returns exactly 2 crews, the merged crew owning the union of the two tiers' difficulties",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crews-module.ac2",
+            "title": "serializeCrews(importCrews(x)) round-trip preserves semantics: derived names correct for single ('medium'), contiguous ('trivial-simple'), and non-contiguous ('trivial-expert') ownership; representative entry preserved; by_kind values rewritten to derived names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crews-module.ac3",
+            "title": "blendedCost returns the weight-blended average over entries that carry costPer1MTokens and returns null (rendered '—', never $0) when no entry has a cost",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crews-module.ac4",
+            "title": "providerDefaultHarness resolves from provider_harnesses when present on the settings payload and falls back to anthropic→claude-code / openai→codex / else→ohmypi when absent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crews-module.ac5",
+            "title": "renderYamlPreview produces the exact tiered_execution object the next save would send for a fixture config, with no YAML dependency added to package.json",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "board-header",
+        "title": "Board (five difficulty columns, total-function crew assignment) + header row with state chip",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T06:32:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2684",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "TieredExecutionSection.test.tsx passes including the untouched never-frontier test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-8",
+            "NFR-2",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Rebuild TieredExecutionSection.tsx in place (keep the file, the props formData/saveErrorMessage/saveStatus/onSettingsChange, and the DEFAULT_MODEL/DEFAULT_SUPERVISOR_MODEL exports per NFR-2). Replace the difficulty-routing readout box and all per-tier difficulty checkboxes with the board: five difficulty columns (trivial→expert, mockup subtitles verbatim per D-9), each with a crew select listing existing crews by crewLabel plus '+ new crew…', a staffing summary, cost chip (cyan = money only), and crew-colored top border. '+ new crew…' creates a claude-haiku-4-5 single-model crew (never-frontier default) and opens its editor. Add the header row: title, plain-language explainer including the per-issue override chain sentence, state chip (Off / On · valid / Invalid — <reason>), enable switch. Delete inputDifficultyMap and the difficulty-coverage branches of validationReason (unrepresentable now); keep the mix-total and supervisor-required client checks and the existing serverTieredError derivation (TieredExecutionSection.tsx:182-195) routing into the red chip state per D-6. State uses crews from importCrews; all writes go through onSettingsChange with serializeCrews output — never a direct fetch."
+        },
+        "items": [
+          {
+            "id": "board-header.ac1",
+            "title": "The board renders exactly five difficulty columns with mockup subtitle copy, and changing a column's crew select emits the reassigned config through onSettingsChange",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-header.ac2",
+            "title": "No UI path produces an unmapped or double-mapped difficulty: each column is a required single select and no difficulty checkbox surface remains in the rendered panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-header.ac3",
+            "title": "'+ new crew…' creates a claude-haiku-4-5 single-model crew and opens its editor; the pre-existing never-frontier test (asserting DEFAULT_MODEL/DEFAULT_SUPERVISOR_MODEL) passes without modification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "board-header.ac4",
+            "title": "The header state chip renders 'Off' when disabled, 'On · valid' when clean, and a red 'Invalid — <reason>' for a mix totaling ≠100% and for a server saveErrorMessage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "crew-rows",
+        "title": "Crew roster rows with expandable single-model and weighted-mix editors, PAN-1865 chip, remove guard",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T06:32:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2684",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "crew-row tests pass: warning chip, remove guard, representative rule, total-100 error",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement 'The crews' list: one expandable row per crew showing color dot, composition label (crewLabel), mix summary, amber PAN-1865 warning chip when the stored harness differs from providerDefaultHarness (D-4), owned-difficulties line ('handles trivial · simple' / 'handles nothing — assign it on the board or remove it'), and cost chip. Expanded: single-model editor (model select + harness select whose first option is 'auto (<provider default>)' — picking auto writes the provider default concrete value at save time) or mix editor (weighted bar, per-entry model/harness/weight/remove rows, running total with red state when ≠100, 'Add model'), plus 'Use one model'/'Use a weighted mix' toggle applying the representative rule on collapse (max-weight entry becomes top-level model/harness), and 'Remove crew' blocked with an explanatory message while the crew owns any difficulty. Re-express today's handleDistributionPatch/Add/Remove/Toggle semantics (TieredExecutionSection.tsx:285-320) over crew state. Extract a sibling CrewRow.tsx only if TieredExecutionSection.tsx exceeds ~500 lines. Rows and disclosure headers keyboard-operable: Enter/Space toggles, visible focus state (NFR-5). Two identical crews may coexist while editing — no live dedup (D-8)."
+        },
+        "items": [
+          {
+            "id": "crew-rows.ac1",
+            "title": "Given a crew with kimi model and stored harness claude-code, the amber PAN-1865 chip renders ('⚠ harness overrides provider default — PAN-1865') and disappears when the harness select is set to auto",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crew-rows.ac2",
+            "title": "'Remove crew' on a crew owning difficulties renders an explanatory blocked message and does not mutate config; on a crew owning none it removes the crew from the outgoing config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crew-rows.ac3",
+            "title": "Toggling mix→single applies the representative rule: the max-weight entry's model/harness become the crew's single staffing in the emitted config",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crew-rows.ac4",
+            "title": "The mix editor renders per-entry model/harness/weight/remove plus 'Add model', and a weights total ≠100 renders the inline red total error and flips the header chip to Invalid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crew-rows.ac5",
+            "title": "When focused, a crew row header toggles expansion via Enter and via Space and renders a visible focus state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "supervisor-kinds",
+        "title": "Supervisor sentence disclosure + overrides-only kind overrides with chips",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T06:32:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2684",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "supervisor and kind-override tests pass (chips render only overrides; derived names serialized)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Supervisor (FR-4): a disclosure whose collapsed summary is a sentence built from current state ('Standing reviewer — reviews every commit · Claude Sonnet 5 · owns inspection' style, mockup copy verbatim per D-9); expanded controls: model select, harness select (with auto option per D-4), subscribe select with the mockup's plain-language option labels, owns-inspection switch. Supervisor-required-when-tiers-exist stays server-enforced; keep the existing client check surfaced through the header chip. Kind overrides (FR-5): overrides-only rendering — default line 'All kinds follow difficulty routing.' (or 'N kinds overridden; …' when any exist), one chip per actual override with an ✕ that clears it, and an add row with kind + crew pickers and an 'Add override' button. Serialization writes by_kind with derived tier names via serializeCrews (reads by_kind ?? byKind, writes by_kind). The nine always-rendered selects are deleted in this item's diff (their write path is replaced by the chip UI; the no-loss test in no-loss-audit still asserts all 9 kinds remain available through the add-override picker)."
+        },
+        "items": [
+          {
+            "id": "supervisor-kinds.ac1",
+            "title": "The supervisor disclosure's collapsed summary renders the mockup sentence reflecting current model/subscribe/owns_inspection state, and expanding it exposes model, harness, subscribe, and owns-inspection controls that emit changes through onSettingsChange",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-kinds.ac2",
+            "title": "With zero kind overrides the section renders only the default line 'All kinds follow difficulty routing.' and no per-kind selects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-kinds.ac3",
+            "title": "Adding an override via the kind + crew pickers persists by_kind with the crew's derived tier name in the save payload, and the ✕ on a chip deletes that kind from by_kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "supervisor-kinds.ac4",
+            "title": "The add-override kind picker renders all nine VBriefItemKind values as selectable options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "advanced-disclosures",
+        "title": "Advanced disclosures: Commit feed, Escalation, Session replay (+ compaction_reroute), YAML preview",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T06:32:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2684",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "disclosure tests pass including compaction_reroute round-trip under fake timers",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the Advanced group as disclosures with one-line resolution summaries (mockup copy verbatim per D-9; e.g. escalation off → 'off — failures never change crews'). Commit feed: keep callouts select, max_diff_bytes, exclude and exclude_subjects CSV fields with the existing csvToList/listToCsv parsing and { debounce: true } save options. Escalation: keep enabled, retries_at_tier, max_promotions, and the flounder_budget_minutes five-input grid with current parse behavior. Session replay: keep replay_threshold and ADD the compaction_reroute select (D-7, restores the missing control): options rendered as the mockup's plain-language sentences ('bring back the same session as before' = off / 're-plan remaining work; retire crews no longer needed' = on); do NOT ship the mockup's 'new — in config, missing from today's UI' annotation tag. YAML preview (FR-7/D-10): a 'What this writes to config.yaml' disclosure rendering renderYamlPreview of the exact outgoing config; its collapsed summary lists the derived tier names. Debounce-related tests use vi.useFakeTimers() + advanceTimersByTimeAsync per the repo fake-timers rule."
+        },
+        "items": [
+          {
+            "id": "advanced-disclosures.ac1",
+            "title": "Each advanced disclosure's collapsed summary reflects current resolution state (escalation disabled renders 'off — failures never change crews'), and expanding preserves every existing field with its current parse behavior and { debounce: true } save options",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "advanced-disclosures.ac2",
+            "title": "The compaction_reroute select renders both plain-language options and a change round-trips into the save payload as 'off'/'on' (verified under vi.useFakeTimers for the debounced save)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "advanced-disclosures.ac3",
+            "title": "The YAML preview disclosure renders the exact tiered_execution object the next save would send and its summary line lists the derived tier names",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "advanced-disclosures.ac4",
+            "title": "When edited, the flounder_budget_minutes five-input grid and the feed CSV fields (exclude, exclude_subjects) produce parsed values in the save payload identical to the pre-refactor behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit",
+        "title": "No-loss inventory test gating deletion of the old render",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T06:32:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2684",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
+            "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "describe('no-loss inventory') passes enumerating every legacy control",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend __tests__/TieredExecutionSection.test.tsx with a single describe('no-loss inventory') asserting, against the rendered new panel, the presence AND write path of every legacy control: enable toggle · state chip · difficulty→crew assignment ×5 · crew model/harness selects · mix entries + weights + total-100 error · add/remove crew · single↔mix toggle · supervisor model/harness/subscribe/owns_inspection · kind override add/clear with all 9 kinds available · feed callouts/max_diff_bytes/exclude/exclude_subjects · escalation enabled/retries_at_tier/max_promotions/flounder budgets ×5 · replay_threshold · compaction_reroute · YAML preview presence. In the SAME commit, delete any remaining old-render code (difficulty readout box, per-tier difficulty checkboxes, legacy tier cards, the nine-select kind grid) so the inventory test is the gate for the swap. The old validationReason difficulty-coverage branches and inputDifficultyMap must be gone from the file."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit.ac1",
+            "title": "describe('no-loss inventory') exists, enumerates every item in the PRD WI-5 inventory list, and passes against the new panel",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac2",
+            "title": "The commit adding the inventory test also deletes the legacy render: grep of TieredExecutionSection.tsx finds no inputDifficultyMap and no per-tier difficulty checkbox rendering",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit.ac3",
+            "title": "After the deletion, npm run typecheck and npm run lint each exits 0, and the frontend Settings test files run green under the frontend vitest project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Rewrite docs/TIERED-EXECUTION.md Settings UI section for crews, board, disclosures, compaction_reroute",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T06:32:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2684",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/TIERED-EXECUTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors; doc section matches shipped panel behavior"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ],
+          "acJustification": "Docs-only item; two criteria cover the full doc surface this issue changes."
+        },
+        "narrative": {
+          "Action": "Rewrite the 'Settings UI' section of docs/TIERED-EXECUTION.md in crews language: the board (difficulty→crew total function), crew roster with single/mix editors, supervisor sentence disclosure, overrides-only kind chips, advanced disclosures, YAML preview. The doc's existing claim that the panel includes compaction_reroute becomes true — describe the control and its two plain-language options. Document D-2 (tiers with identical staffing merge into one crew on load; next save writes the merged form; runtime behavior identical) and D-3 (tier names are derived from owned difficulties on save; hand-authored names in hand-edited YAML are honored on read and replaced by derived names on the next UI save). Reference docs/design/mockups/tiered-execution-redesign-pan-2684.html as the design record. No Mintlify page is created or updated — configuration/*.mdx has no tiered-execution page (verified in the PRD 2026-07-14)."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "docs/TIERED-EXECUTION.md 'Settings UI' section contains an accurate description of the shipped crews/board/disclosure panel including the compaction_reroute control, so the doc's existing compaction-reroute claim becomes true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "The doc contains the D-2 merge-on-load and D-3 derived-name behaviors (hand-authored names honored on read, replaced on next UI save) and contains a reference to the mockup file as the design record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "crews-module",
+        "to": "board-header",
+        "type": "blocks"
+      },
+      {
+        "from": "board-header",
+        "to": "crew-rows",
+        "type": "blocks"
+      },
+      {
+        "from": "crew-rows",
+        "to": "supervisor-kinds",
+        "type": "blocks"
+      },
+      {
+        "from": "supervisor-kinds",
+        "to": "advanced-disclosures",
+        "type": "blocks"
+      },
+      {
+        "from": "advanced-disclosures",
+        "to": "no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-audit",
+        "to": "docs-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-15-PAN-2684-refactor-dashboard-redesign-tiered-execution-settings-routing-ladder-overrides-only-kinds-advanced-disclosures-restore-compaction-reroute.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
