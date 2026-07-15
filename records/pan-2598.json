@@ -352,7 +352,7 @@
     "recordedAt": "2026-07-15T16:04:48.597Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T17:47:49.716Z",
+  "updated": "2026-07-15T17:48:02.811Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "passed",
@@ -360,9 +360,9 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:47:49.646Z",
+    "updatedAt": "2026-07-15T17:48:02.737Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -544,7 +544,7 @@
       },
       "costAtCloseOut": {
         "usd": 115.020294,
-        "pricingAsOf": "2026-07-15T17:47:49.703Z"
+        "pricingAsOf": "2026-07-15T17:48:02.772Z"
       }
     },
     "merges": [
@@ -552,8 +552,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-fable-5",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
