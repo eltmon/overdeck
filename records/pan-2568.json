@@ -16,22 +16,36 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:33:10.373Z",
+  "updated": "2026-07-15T15:33:19.373Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T07:12:39.396Z",
-    "inspectNotes": "Bead size-scaled-waits BLOCKED: AC1 requires a 30 KB payload whose echo appears at t=6s to confirm on attempt 1 without purging. The shipped echoConfirmTimeoutMs formula in src/lib/channels/injection-budget.ts (2500 + ceil(len/1024)*100, capped 15000) yields 5500ms for a literal 30 KB payload (30720 or 30000 bytes) — an echo at t=6000ms arrives 500ms AFTER that deadline, so attempt 1 would still time out and trigger purge+retry, reproducing the exact bug this bead exists to fix. The new test in src/lib/channels/__tests__/pty-supervisor.test.ts (\"scales the echo-confirm window so a large payload confirms without purging\") does not test this: it substitutes a 36 KB payload (comment: \"36 KiB => echoConfirmTimeoutMs = 2500 + 36*100 = 6100ms\"), which does clear the 6s mark but silently avoids the 30 KB figure AC1 specifies. Required fix: either raise the ms-per-KB coefficient (or floor) in echoConfirmTimeoutMs so a literal 30 KB payload yields >=6000ms, or add/replace the test with the literal 30 KB/t=6s case from AC1 and confirm it actually passes against the real formula — do not substitute a larger payload to make the assertion pass. AC2 (0.5KB/2.5s) and AC3 (inputSettleMs pre-Enter sleep + computed-value warn log) are satisfied and not in question."
+    "updatedAt": "2026-07-15T15:33:19.129Z",
+    "inspectNotes": "Inspecting item injection-budget"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 1353774,
+            "output": 3194,
+            "cacheRead": 1165312,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 19629724,
+            "output": 27252,
+            "cacheRead": 19170560,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 15117,
@@ -42,10 +56,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16036,
-            "output": 5985,
-            "cacheRead": 599805,
-            "cacheWrite": 98815
+            "input": 16038,
+            "output": 7705,
+            "cacheRead": 726123,
+            "cacheWrite": 100556
           }
         },
         "work": {
@@ -56,14 +70,26 @@
             "cacheWrite": 0
           },
           "custom/kimi-k2.7-code": {
-            "input": 1072427,
-            "output": 158620,
-            "cacheRead": 23329792,
+            "input": 2887425,
+            "output": 184360,
+            "cacheRead": 32643072,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 1353774,
+          "output": 3194,
+          "cacheRead": 1165312,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 19629724,
+          "output": 27252,
+          "cacheRead": 19170560,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 15117,
           "output": 31127,
@@ -71,10 +97,10 @@
           "cacheWrite": 148063
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16036,
-          "output": 5985,
-          "cacheRead": 599805,
-          "cacheWrite": 98815
+          "input": 16038,
+          "output": 7705,
+          "cacheRead": 726123,
+          "cacheWrite": 100556
         },
         "custom/MiniMax-M3": {
           "input": 248850,
@@ -83,22 +109,22 @@
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
-          "input": 1072427,
-          "output": 158620,
-          "cacheRead": 23329792,
+          "input": 2887425,
+          "output": 184360,
+          "cacheRead": 32643072,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.01117,
-        "pricingAsOf": "2026-07-13T07:12:39.449Z"
+        "usd": 29.353378,
+        "pricingAsOf": "2026-07-15T15:33:19.342Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "injection-budget": "completed",
     "size-scaled-waits": "completed",
