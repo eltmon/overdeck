@@ -7,7 +7,7 @@ import { getBuildInfo } from '../deploy/build-info.js';
 import { getDeployBlockReason } from '../deploy/deploy-window.js';
 import { computeBuildStaleness, type BuildStaleness } from '../deploy/staleness.js';
 import { OVERDECK_HOME } from '../paths.js';
-import type { DeployConfig } from './config.js';
+import { loadCloisterConfigSync, type DeployConfig } from './config.js';
 
 const OBSERVATION_INTERVAL_MS = 30 * 60 * 1000;
 const DEPLOY_SPAWN_COOLDOWN_MS = 10 * 60 * 1000;
@@ -180,4 +180,16 @@ export async function runDeployPatrol(context: DeployPatrolContext): Promise<voi
 
 export function _resetDeployPatrolForTests(): void {
   clearState();
+}
+
+export async function runScheduledDeployPatrol(): Promise<void> {
+  try {
+    await runDeployPatrol({
+      repoRoot: process.cwd(),
+      config: loadCloisterConfigSync().deploy,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[deacon] Automatic deploy patrol failed: ${message}`);
+  }
 }
