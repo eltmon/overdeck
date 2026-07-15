@@ -253,10 +253,10 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T14:49:33.357Z",
+  "updated": "2026-07-15T14:52:01.995Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -264,7 +264,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-15T14:49:16.895Z",
+    "updatedAt": "2026-07-15T14:52:01.955Z",
+    "reviewNotes": "[performance] Synchronous plan discovery and parsing added to the activity polling route — `src/dashboard/server/routes/command-deck.ts:277`",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "reviewSpawnedAt": "2026-07-15T14:49:16.893Z",
@@ -334,6 +335,28 @@
         "tests/unit/lib/cloister/feedback-target.test.ts"
       ],
       "recordedAt": "2026-07-13T10:56:03.885Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/.pan/review/agent-pan-2598-review-349caea7/security.md",
+        "atCommit": "349caea7a3c94c674d4f4b619293807fa7d542e2"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/.pan/review/agent-pan-2598-review-349caea7/correctness.md",
+        "atCommit": "349caea7a3c94c674d4f4b619293807fa7d542e2"
+      },
+      "performance": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/.pan/review/agent-pan-2598-review-349caea7/performance.md",
+        "atCommit": "349caea7a3c94c674d4f4b619293807fa7d542e2"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/.pan/review/agent-pan-2598-review-349caea7/requirements.md",
+        "atCommit": "349caea7a3c94c674d4f4b619293807fa7d542e2"
+      }
     }
   },
   "closeOut": {
@@ -344,6 +367,12 @@
             "input": 9207551,
             "output": 35278,
             "cacheRead": 8226560,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 3054521,
+            "output": 14428,
+            "cacheRead": 2749184,
             "cacheWrite": 0
           }
         },
@@ -395,6 +424,12 @@
           "cacheRead": 8226560,
           "cacheWrite": 0
         },
+        "openai/gpt-5.6-sol": {
+          "input": 3054521,
+          "output": 14428,
+          "cacheRead": 2749184,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 15520,
           "output": 63672,
@@ -421,8 +456,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 71.190303,
-        "pricingAsOf": "2026-07-15T14:49:17.185Z"
+        "usd": 74.52442,
+        "pricingAsOf": "2026-07-15T14:52:01.988Z"
       }
     },
     "merges": [
@@ -431,7 +466,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
