@@ -2,17 +2,11 @@
  * pan update - Update Overdeck to latest version
  */
 
-import { execFile } from 'child_process';
 import chalk from 'chalk';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { loadConfigSync } from '../../lib/config.js';
-import { syncCommand } from './sync.js';
-import { promisify } from 'util';
 import { UpdateManager } from '../../lib/update-manager.js';
-
-const execFileAsync = promisify(execFile);
 
 // Get current installed version
 function getCurrentVersion(): string {
@@ -41,9 +35,9 @@ export async function updateCommand(options: {
   let latestVersion: string;
   try {
     console.log(chalk.dim('Checking npm for latest version...'));
-    manager = new UpdateManager({ currentVersion, installMode: 'npm-global' });
-    const snapshot = await manager.check();
-    if (snapshot.phase === 'error' || !snapshot.targetVersion) throw new Error(snapshot.error ?? 'No published version found');
+    manager = new UpdateManager({ currentVersion, installMode: 'npm' });
+    const snapshot = await manager.check({ forceRefresh: true });
+    if (snapshot.phase === 'error' || !snapshot.targetVersion) throw new Error(snapshot.error?.message ?? 'No published version found');
     latestVersion = snapshot.targetVersion;
     console.log(`Latest version:  ${chalk.cyan(latestVersion)}`);
   } catch (error) {
@@ -73,24 +67,19 @@ export async function updateCommand(options: {
   console.log(chalk.dim('\nUpdating Overdeck...'));
 
   try {
-    await execFileAsync('npm', ['install', '--global', `@overdeck/core@${latestVersion}`]);
+    manager.install({ force: options.force });
+    const result = await manager.waitForInstall();
+    if (result.phase === 'error') throw new Error(result.error?.message ?? 'Update failed');
 
     console.log(chalk.green(`\n✓ Updated to ${latestVersion}`));
     console.log(chalk.dim('Installed package: @overdeck/core'));
     console.log(chalk.dim('If you previously installed overdeck or @eltmon/panctl, npm now resolves to the renamed package.'));
 
-    // Auto-sync if enabled
-    const config = loadConfigSync();
-    if (config.sync.auto_sync) {
-      console.log(chalk.dim('\nRunning auto-sync...'));
-      await syncCommand({});
-    }
-
     console.log(chalk.dim('\nRestart any running agents to use the new version.'));
   } catch (error) {
     console.error(chalk.red('\nUpdate failed'));
     console.error(
-      chalk.dim('Try running with sudo: sudo npm install -g @overdeck/core@latest')
+      chalk.dim(`Try running with sudo: sudo npm install -g @overdeck/core@${latestVersion}`)
     );
     console.error(
       chalk.dim('If you were on overdeck or @eltmon/panctl, rerun the install command above to migrate to @overdeck/core.')

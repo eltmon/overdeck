@@ -44,7 +44,7 @@ interface OverdeckBridge {
   getUpdateStatus(): Promise<import('@overdeck/contracts').UpdateSnapshot>;
   checkForUpdates(): Promise<import('@overdeck/contracts').UpdateSnapshot>;
   downloadUpdate(): Promise<import('@overdeck/contracts').UpdateSnapshot>;
-  quitAndInstall(): void;
+  restartAndInstallUpdate(): void;
   onUpdateStatus(listener: (status: import('@overdeck/contracts').UpdateSnapshot) => void): () => void;
 }
 

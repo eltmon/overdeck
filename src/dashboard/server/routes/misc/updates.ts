@@ -10,7 +10,7 @@ let managerPromise: Promise<UpdateManager> | null = null;
 async function getManager(): Promise<UpdateManager> {
   managerPromise ??= readPackageVersion().then((currentVersion) => new UpdateManager({
     currentVersion,
-    installMode: overdeckDevMode ? 'development' : 'npm-global',
+    installMode: overdeckDevMode ? 'development' : 'npm',
   }));
   return managerPromise;
 }
@@ -24,7 +24,7 @@ const getUpdateStatusRoute = HttpRouter.add(
 const postUpdateCheckRoute = HttpRouter.add(
   'POST',
   '/api/update/check',
-  Effect.promise(async () => jsonResponse(await (await getManager()).check())),
+  Effect.promise(async () => jsonResponse(await (await getManager()).check({ forceRefresh: true }))),
 );
 
 const postUpdateInstallRoute = HttpRouter.add(

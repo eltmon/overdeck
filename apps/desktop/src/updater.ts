@@ -11,7 +11,7 @@ const OVERDECK_DASHBOARD_PROTOCOL_VERSION = 1;
 const OVERDECK_AGENT_PROTOCOL_VERSION = 1;
 
 const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
-const DOWNLOAD_RETRY_MS = [0, 1_000, 4_000] as const;
+const DOWNLOAD_RETRY_MS = [0, 2_000, 4_000] as const;
 const RELEASES_URL = 'https://api.github.com/repos/eltmon/overdeck/releases';
 
 let checkIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -24,18 +24,13 @@ export let currentStatus: UpdateSnapshot = {
   channel: 'stable',
   currentVersion: app.getVersion(),
   targetVersion: null,
-  releaseName: null,
   releaseNotes: null,
   releaseUrl: null,
-  publishedAt: null,
-  progressPercent: null,
+  releaseDate: null,
+  progress: null,
   error: null,
   lastCheckedAt: null,
-  compatibility: 'unknown',
-  currentDashboardProtocol: OVERDECK_DASHBOARD_PROTOCOL_VERSION,
-  currentAgentProtocol: OVERDECK_AGENT_PROTOCOL_VERSION,
-  targetDashboardProtocol: null,
-  targetAgentProtocol: null,
+  compatibility: { status: 'unknown', currentDashboardProtocol: OVERDECK_DASHBOARD_PROTOCOL_VERSION, currentAgentProtocol: OVERDECK_AGENT_PROTOCOL_VERSION, targetDashboardProtocol: null, targetAgentProtocol: null },
 };
 
 type UpdateStatusCallback = (status: UpdateSnapshot) => void;
@@ -53,7 +48,7 @@ function publish(patch: Partial<UpdateSnapshot>): void {
   currentStatus = { ...currentStatus, ...patch };
   for (const callback of statusCallbacks) callback(currentStatus);
   for (const win of BrowserWindow.getAllWindows()) {
-    if (!win.isDestroyed()) win.webContents.send('update-status', currentStatus);
+    if (!win.isDestroyed()) win.webContents.send('pan:update-status', currentStatus);
   }
 }
 
@@ -88,13 +83,10 @@ async function configureExactReleaseFeed(): Promise<void> {
   const agentProtocol = Number(manifestText.match(/^overdeckAgentProtocol:\s*(\d+)/m)?.[1]) || null;
 
   publish({
-    releaseName: release.name ?? `Overdeck ${release.tag_name}`,
     releaseNotes: release.body ?? 'Release notes are not available for this release.',
     releaseUrl: release.html_url ?? null,
-    publishedAt: release.published_at ?? null,
-    targetDashboardProtocol: dashboardProtocol,
-    targetAgentProtocol: agentProtocol,
-    compatibility: dashboardProtocol === OVERDECK_DASHBOARD_PROTOCOL_VERSION && agentProtocol === OVERDECK_AGENT_PROTOCOL_VERSION ? 'compatible' : 'unknown',
+    releaseDate: release.published_at ?? null,
+    compatibility: { ...currentStatus.compatibility, targetDashboardProtocol: dashboardProtocol, targetAgentProtocol: agentProtocol, status: dashboardProtocol === OVERDECK_DASHBOARD_PROTOCOL_VERSION && agentProtocol === OVERDECK_AGENT_PROTOCOL_VERSION ? 'compatible' : 'unknown' },
   });
   autoUpdater.setFeedURL({
     provider: 'generic',
@@ -109,22 +101,22 @@ export function initializeAutoUpdater(requestedChannel: string = 'latest'): void
   channel = requestedChannel === 'canary' || requestedChannel === 'beta' ? 'canary' : 'stable';
   publish({ channel });
   autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on('checking-for-update', () => publish({ phase: 'checking', error: null }));
   autoUpdater.on('update-available', (info: UpdateInfo) => publish({
-    phase: 'available', targetVersion: info.version, progressPercent: null, error: null, lastCheckedAt: new Date().toISOString(),
+    phase: 'available', targetVersion: info.version, progress: null, error: null, lastCheckedAt: new Date().toISOString(),
   }));
   autoUpdater.on('update-not-available', (info: UpdateInfo) => publish({
-    phase: 'current', targetVersion: info.version, progressPercent: null, error: null, lastCheckedAt: new Date().toISOString(),
+    phase: 'current', targetVersion: info.version, progress: null, error: null, lastCheckedAt: new Date().toISOString(),
   }));
   autoUpdater.on('download-progress', (progress) => publish({
-    phase: 'downloading', progressPercent: Math.round(progress.percent * 10) / 10,
+    phase: 'downloading', progress: { percent: Math.round(progress.percent * 10) / 10, transferred: progress.transferred, total: progress.total },
   }));
   autoUpdater.on('update-downloaded', (info: UpdateInfo) => publish({
-    phase: 'ready', targetVersion: info.version, progressPercent: 100, error: null,
+    phase: 'ready', targetVersion: info.version, progress: currentStatus.progress ? { ...currentStatus.progress, percent: 100 } : null, error: null,
   }));
-  autoUpdater.on('error', (error: Error) => publish({ phase: 'error', error: error.message }));
+  autoUpdater.on('error', (error: Error) => publish({ phase: 'error', error: { code: 'DESKTOP_UPDATE_FAILED', message: error.message, retryable: true } }));
 
   setTimeout(() => { void checkForUpdates(); }, 5_000);
   startPeriodicChecks();
@@ -140,13 +132,13 @@ export function stopPeriodicChecks(): void {
 }
 
 export async function checkForUpdates(): Promise<UpdateSnapshot> {
-  if (currentStatus.phase === 'checking') return getUpdateStatus();
+  if (['checking', 'downloading', 'ready', 'installing'].includes(currentStatus.phase)) return getUpdateStatus();
   publish({ phase: 'checking', error: null });
   try {
     await configureExactReleaseFeed();
     await autoUpdater.checkForUpdates();
   } catch (error) {
-    publish({ phase: 'error', error: error instanceof Error ? error.message : String(error), lastCheckedAt: new Date().toISOString() });
+    publish({ phase: 'error', error: { code: 'UPDATE_CHECK_FAILED', message: error instanceof Error ? error.message : String(error), retryable: true }, lastCheckedAt: new Date().toISOString() });
   }
   return getUpdateStatus();
 }
@@ -157,12 +149,12 @@ export async function downloadUpdate(): Promise<UpdateSnapshot> {
     const delay = DOWNLOAD_RETRY_MS[attempt] ?? 0;
     if (delay > 0) await new Promise((resolve) => setTimeout(resolve, delay));
     try {
-      publish({ phase: 'downloading', error: null, progressPercent: 0 });
+      publish({ phase: 'downloading', error: null, progress: { percent: 0, transferred: 0, total: 0 } });
       await autoUpdater.downloadUpdate();
       return getUpdateStatus();
     } catch (error) {
       if (attempt === DOWNLOAD_RETRY_MS.length - 1) {
-        publish({ phase: 'error', error: error instanceof Error ? error.message : String(error) });
+        publish({ phase: 'error', error: { code: 'DOWNLOAD_FAILED', message: error instanceof Error ? error.message : String(error), retryable: true } });
       }
     }
   }

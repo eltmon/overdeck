@@ -108,7 +108,7 @@ export interface OverdeckBridge {
   getUpdateStatus(): Promise<UpdateSnapshot>;
   checkForUpdates(): Promise<UpdateSnapshot>;
   downloadUpdate(): Promise<UpdateSnapshot>;
-  quitAndInstall(): void;
+  restartAndInstallUpdate(): void;
   onUpdateStatus(listener: (status: UpdateSnapshot) => void): () => void;
 }
 
@@ -164,11 +164,11 @@ const bridge: OverdeckBridge = {
   getUpdateStatus: () => ipcRenderer.invoke(IPC.GET_UPDATE_STATUS) as Promise<UpdateSnapshot>,
   checkForUpdates: () => ipcRenderer.invoke(IPC.CHECK_FOR_UPDATES) as Promise<UpdateSnapshot>,
   downloadUpdate: () => ipcRenderer.invoke(IPC.DOWNLOAD_UPDATE) as Promise<UpdateSnapshot>,
-  quitAndInstall: () => { ipcRenderer.send(IPC.QUIT_AND_INSTALL); },
+  restartAndInstallUpdate: () => { ipcRenderer.send(IPC.QUIT_AND_INSTALL); },
   onUpdateStatus: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, status: UpdateSnapshot) => listener(status);
-    ipcRenderer.on('update-status', wrapped);
-    return () => ipcRenderer.removeListener('update-status', wrapped);
+    ipcRenderer.on('pan:update-status', wrapped);
+    return () => ipcRenderer.removeListener('pan:update-status', wrapped);
   },
 };
 

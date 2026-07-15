@@ -326,6 +326,9 @@ jobs:
           fi
           echo "Using committed release notes: $notes"
 
+      - name: Verify updater manifests and payload checksums
+        run: node scripts/check-release-artifacts.mjs artifacts "${GITHUB_REF_NAME#v}"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:

@@ -12,8 +12,8 @@ interface UpdateDialogProps {
 
 async function requestSnapshot(path: string, method: 'GET' | 'POST'): Promise<UpdateSnapshot> {
   const response = await fetch(path, { method });
-  const payload = await response.json() as UpdateSnapshot & { error?: string };
-  if (!response.ok) throw new Error(payload.error ?? `Update request failed (${response.status})`);
+  const payload = await response.json() as UpdateSnapshot & { error?: { message?: string } };
+  if (!response.ok) throw new Error(payload.error?.message ?? `Update request failed (${response.status})`);
   return payload;
 }
 
@@ -28,7 +28,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
     try {
       setSnapshot(bridge ? await bridge.checkForUpdates() : await requestSnapshot('/api/update/check', 'POST'));
     } catch (error) {
-      setSnapshot((current) => current ? { ...current, phase: 'error', error: error instanceof Error ? error.message : String(error) } : current);
+      setSnapshot((current) => current ? { ...current, phase: 'error', error: { code: 'UPDATE_CHECK_FAILED', message: error instanceof Error ? error.message : String(error), retryable: true } } : current);
     } finally {
       setActionPending(false);
     }
@@ -73,8 +73,8 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
   if (!isOpen) return null;
 
   const phase = snapshot?.phase ?? 'checking';
-  const incompatibleAgents = snapshot?.targetAgentProtocol != null
-    && snapshot.targetAgentProtocol !== snapshot.currentAgentProtocol
+  const incompatibleAgents = snapshot?.compatibility.targetAgentProtocol != null
+    && snapshot.compatibility.targetAgentProtocol !== snapshot.compatibility.currentAgentProtocol
     && runningAgentCount > 0;
   const isDesktop = snapshot?.installMode === 'desktop' || bridge?.isDesktopApp() === true;
   const actionLabel = phase === 'available'
@@ -91,7 +91,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
     if (phase === 'current' || phase === 'error') return check();
     if (phase === 'ready') {
       if (incompatibleAgents) return;
-      if (bridge) bridge.quitAndInstall();
+      if (bridge) bridge.restartAndInstallUpdate();
       else await fetch('/api/system/restart-dashboard', { method: 'POST' });
       return;
     }
@@ -109,7 +109,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
     : phase === 'ready'
       ? 'The update is ready. Restart Overdeck when you are ready.'
       : phase === 'error'
-        ? snapshot?.error ?? 'Overdeck could not check for updates.'
+        ? snapshot?.error?.message ?? 'Overdeck could not check for updates.'
         : phase === 'available'
           ? 'A new version of Overdeck is available.'
           : phase === 'installing'
@@ -144,7 +144,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
           </div>
 
           {(phase === 'checking' || phase === 'downloading' || phase === 'installing') && (
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full w-1/2 animate-pulse rounded-full bg-primary" /></div>
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Update progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={snapshot?.progress?.percent}><div className="h-full rounded-full bg-primary motion-safe:transition-[width] motion-safe:duration-200" style={{ width: `${snapshot?.progress?.percent ?? 50}%` }} /></div>
           )}
 
           {incompatibleAgents && (

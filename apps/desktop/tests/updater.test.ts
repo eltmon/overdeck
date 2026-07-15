@@ -63,7 +63,7 @@ describe('desktop updater', () => {
       provider: 'generic',
       url: 'https://github.com/eltmon/overdeck/releases/download/v1.2.4',
     });
-    expect(getUpdateStatus().compatibility).toBe('compatible');
+    expect(getUpdateStatus().compatibility.status).toBe('compatible');
   });
 
   it('registers the complete update lifecycle', () => {
@@ -81,7 +81,7 @@ describe('desktop updater', () => {
       .mockResolvedValueOnce(undefined);
 
     const resultPromise = downloadUpdate();
-    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.advanceTimersByTimeAsync(6_000);
     await resultPromise;
     expect(autoUpdater.downloadUpdate).toHaveBeenCalledTimes(3);
   });
