@@ -76,21 +76,44 @@
     "recordedAt": "2026-07-15T14:50:52.626Z"
   },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:52:00.346Z",
+  "updated": "2026-07-15T14:54:55.734Z",
   "pipeline": {
     "issueId": "PAN-2713",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:52:00.052Z",
+    "updatedAt": "2026-07-15T14:54:55.643Z",
+    "reviewNotes": "[requirements] Deacon can deploy while the flywheel is running — NonGoal 4",
     "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2721",
     "reviewRequestedAt": "2026-07-15T14:51:58.635Z",
-    "reviewSpawnedAt": "2026-07-15T14:52:00.051Z"
+    "reviewSpawnedAt": "2026-07-15T14:52:00.051Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-d5f48b48/security.md",
+        "atCommit": "d5f48b48342d0479980fc4b5b6af0df3ea2378e7"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-d5f48b48/correctness.md",
+        "atCommit": "d5f48b48342d0479980fc4b5b6af0df3ea2378e7"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-d5f48b48/performance.md",
+        "atCommit": "d5f48b48342d0479980fc4b5b6af0df3ea2378e7"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-d5f48b48/requirements.md",
+        "atCommit": "d5f48b48342d0479980fc4b5b6af0df3ea2378e7"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -103,9 +126,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 33165795,
-            "output": 50265,
-            "cacheRead": 32715008,
+            "input": 34883457,
+            "output": 59958,
+            "cacheRead": 34182144,
             "cacheWrite": 0
           }
         },
@@ -134,9 +157,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 33165795,
-          "output": 50265,
-          "cacheRead": 32715008,
+          "input": 34883457,
+          "output": 59958,
+          "cacheRead": 34182144,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -153,8 +176,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 34.947528,
-        "pricingAsOf": "2026-07-15T14:52:00.215Z"
+        "usd": 37.224516,
+        "pricingAsOf": "2026-07-15T14:54:55.718Z"
       }
     },
     "merges": [
