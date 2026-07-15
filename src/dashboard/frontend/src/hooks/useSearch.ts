@@ -45,7 +45,10 @@ export function useSearch(query: string, filters: SearchFilters, options: UseSea
 
   // Get issues from React Query cache — search across all cached issue sets
   // so completed issues are findable even if the kanban isn't showing them
-  const cachedIssues = useMemo(() => {
+  // Read on every render. SearchModal subscribes to the matching query's
+  // fetch count, so a completed prefetch causes a render; memoizing only by
+  // query text left this snapshot permanently empty after cold-open search.
+  const cachedIssues = (() => {
     const seen = new Set<string>();
     const all: Issue[] = [];
     const cache = queryClient.getQueriesData<Issue[]>({ queryKey: ['issues'] });
@@ -59,7 +62,7 @@ export function useSearch(query: string, filters: SearchFilters, options: UseSea
       }
     }
     return all;
-  }, [queryClient, debouncedQuery]);
+  })();
 
   // Search and score results
   const results = useMemo(() => {

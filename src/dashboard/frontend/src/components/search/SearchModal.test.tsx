@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import type { SearchResult } from '../../hooks/useSearch';
 import { SearchModal } from './SearchModal';
 
@@ -11,6 +11,7 @@ HTMLCanvasElement.prototype.getContext = vi.fn(() => null) as any;
 
 vi.mock('@tanstack/react-query', () => ({
   useQueryClient: vi.fn(),
+  useIsFetching: vi.fn(),
 }));
 
 vi.mock('../../hooks/useSearch', () => ({
@@ -41,6 +42,7 @@ describe('SearchModal', () => {
     vi.mocked(useQueryClient).mockReturnValue({
       prefetchQuery: mockPrefetchQuery,
     } as any);
+    vi.mocked(useIsFetching).mockReturnValue(0);
 
     mockUseSearch.mockImplementation((query: string) => {
       if (query.length < 2) {
@@ -117,5 +119,18 @@ describe('SearchModal', () => {
     );
     expect(onSelectIssue).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('does not claim there are no issues while the issue cache is loading', () => {
+    vi.mocked(useIsFetching).mockReturnValue(1);
+    mockUseSearch.mockReturnValue({
+      groupedResults: {}, isSearching: false, hasResults: false, resultCount: 0,
+    });
+
+    render(<SearchModal isOpen onClose={vi.fn()} onSelectIssue={vi.fn()} />);
+    fireEvent.change(screen.getByPlaceholderText('Search all issues…'), { target: { value: 'MIN-857' } });
+
+    expect(screen.getByText('Searching...')).toBeInTheDocument();
+    expect(screen.queryByText('No issues found')).not.toBeInTheDocument();
   });
 });
