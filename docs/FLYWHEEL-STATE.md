@@ -3515,3 +3515,47 @@ nudging. Neither would have been found by reading panes.
 8. **HELD per operator standing order (2026-07-15):** order book A13=PAN-2445, B10=PAN-2232,
    B11=PAN-2233, B12=PAN-2190, B13=PAN-2189; **PAN-2377 (Phase 3 CANCELLED)**; PAN-2702 (awaiting
    operator review — do NOT plan/start). **NO new intake.**
+
+## RUN-63 tick 16 (2026-07-15 ~11:50 local / 15:50Z) — MAIN CI GREEN VERIFIED; strike-pan-2692 handed to the next run
+
+**MAIN CI GREEN — all of today's work verified:** `274a18bd` ✅, `e30341f7` (PAN-2716) ✅,
+`4da779ec` ✅. Live server deployed on `e30341f78e`, pid 714049, systemd-parented, :3011, health 200,
+deacon=on. `pan review pending --ready` empty; `merge-blockers` []. **RUN-63: 15 merged, 15 closed
+out, nothing stranded.**
+
+### ⚠️ OPEN ITEM FOR THE NEXT RUN — strike-pan-2692 (operator-flagged, land it)
+
+Operator (2026-07-15 ~15:48Z): *"New strike in flight: strike-pan-2692 (PAN-2692 — drain stranded
+state auto-commits before CLI exit; it blocked pipeline starts four times today). Same handling as the
+others: when it signals readiness with green gates, review and land promptly."*
+
+**Status at handover:** spawned, ~2m in, **no commit yet** (`origin/main..HEAD` empty). Untracked
+`src/cli/durable-write-drain.ts` in progress. **I did NOT land it — I am at ~89% context, past the
+85% handover threshold, and landing needs review + gates + PR + a ~10-minute CI wait. Starting that
+here risks stranding it mid-merge. The next run owns it.**
+
+**It is already hitting documented trap #5:** its pane shows `TS2688 Cannot find type definition file
+for 'node'` — that is the **fresh-strike-workspace `node_modules` artifact, NOT a real type error.**
+Run `bun install` in `workspaces/feature-pan-2692-strike` (~400ms) before believing any gate failure
+there. Same for `madge not found` on lint.
+
+**Landing checklist for PAN-2692 (the pattern that worked 8× today):**
+1. `git -C workspaces/feature-pan-2692-strike fetch origin main && git rebase origin/main`
+2. **`git diff origin/main..HEAD --stat` — CHECK FOR UNEXPECTED DELETIONS** (trap #3: strike-pan-2712's
+   un-rebased branch would have reverted 142 lines of this file).
+3. `bun install` → focused tests → `npm run typecheck` → `npm run lint`. Verify yourself; do not
+   trust the readiness signal.
+4. `git push -u origin strike/pan-2692` → `gh pr create` → wait for CI green → `gh pr merge --squash`.
+5. `pan close PAN-2692 --force` (needs `--force`; bare blocks on y/N).
+6. **DEPLOY** — `npm run build` from primary main → `pan restart --dashboard --health-timeout 180000`
+   → verify new pid binds :3011, systemd-parented, health 200. **Per the DoD rule a merged fix is
+   inert until the server runs it — this bit us today.** Check freshness with `date -u -r <file>`
+   (trap #2: `ls --time-style` prints LOCAL time, 4h off).
+
+**Also note:** the strike will likely be unable to notify the flywheel (PAN-2709) and its
+`git rebase origin/main` may be **denied by the permission reviewer** (that happened to
+strike-pan-2712) — in which case it commits but cannot push, and the flywheel must rebase/push by hand.
+Find it by reading its pane; do not wait for a signal.
+
+**Everything else in the tick-15 priority list stands** — PAN-2710 strike is still the highest-value
+open substrate item, then the stalled cohort, then Phase 2 release readiness (operator cuts, never tag).
