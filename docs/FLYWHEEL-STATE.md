@@ -3453,3 +3453,65 @@ remaining half — **worth striking next run.**
 deacon. PID 3026350→375845 (systemd) owns :3011; the other is a workspace devcontainer peer under
 `containerd-shim` with `PORT=3013` and `OVERDECK_DISABLE_DEACON=1` — exactly what the single-deacon
 invariant requires.
+
+## RUN-63 tick 15 (2026-07-15 ~11:35 local / 15:35Z) — PAN-2716 LANDED + LIVE-VERIFIED; PAN-2683 CLOSED OUT; pipeline QUIESCENT
+
+**PAN-2716 MERGED → `e30341f78e` (PR #2719), DEPLOYED, CLOSED OUT.** Second live-verified fix of the
+session:
+- Built from primary main at `e30341f78e` (used `date -u -r <file>` to check freshness — avoids the
+  local-time trap from tick 13). `pan restart --dashboard --health-timeout 180000`.
+- New pid **714049**, systemd-parented (ppid 2052), :3011, health 200.
+- **LIVE PROOF:** `pan close PAN-2683 --force` — which had deterministically REFUSED on head-commit
+  equality — now **succeeds**. The containment check let it through and reclaimed the leak: worktree,
+  workspace, **9 agent state directories**, 22 checkpoint refs, GitHub close, closed-out label,
+  pipeline terminal, review status cleared.
+- **PAN-2683 CLOSED OUT** ✅ — no longer stranded, no longer in `pan review pending --ready`.
+
+### RUN-63 FINAL SCOREBOARD
+**Merged (15):** PAN-2611, 2229, 2596, 2602, 2616, 2643, 2703, 2684, 2701, 2690, 2704, 2712, 2683, 2716.
+**Closed out (15) — ALL of them. Nothing stranded.**
+**This session alone: 8 merged + closed out** (2703, 2684, 2701, 2690, 2704, 2712, 2683, 2716).
+**Substrate filed this session (6 new):** PAN-2703(fixed+deployed), PAN-2706, PAN-2709, PAN-2710,
+PAN-2712(fixed+deployed), PAN-2716(fixed+deployed) + occurrence comments on PAN-2702 and PAN-2709.
+
+### PIPELINE STATE AT HANDOVER — QUIESCENT
+- `pan review pending --ready` → **empty**. `pan flywheel merge-blockers --json` → **[]**.
+- Main CI **GREEN** on `4da779ec`; `e30341f7` (PAN-2716) running — **VERIFY IT GOES GREEN next run.**
+- Live server deployed on `e30341f78e`, healthy, deacon=on.
+- No in-flight work agents. Capacity ~1/20.
+
+### TWO SUBSTRATE FIXES PROVEN IN PRODUCTION THIS SESSION
+1. **PAN-2712** — the merge-gate trap. PAN-2683's `failing_checks` blocker, frozen since 13:08:19Z
+   through every prior poll, cleared within ONE poll of the deploy: `ready_for_merge` 0→1.
+2. **PAN-2716** — the close-out trap. `pan close PAN-2683` went from deterministic refusal to full
+   success on the same inputs.
+Both were found by chasing "why is this issue not moving?" to the exact `file:line` rather than
+nudging. Neither would have been found by reading panes.
+
+### REMAINING WORK FOR THE NEXT RUN — priority order
+1. **VERIFY main CI green on `e30341f7`** (was in_progress at handover). If red → P0, strike first.
+2. **STRIKE PAN-2710** — the remaining half of the merge-gate trap: nothing re-triggers poisoned
+   feature PR checks on red→green. PAN-2712 fixed the *reconciler*; PAN-2710 is the *trigger*. Today
+   only a manual `gh run rerun <id> --failed` broke it. **This is the highest-value open substrate item.**
+3. **Cohort** (all STOPPED, no live agents, capacity free). Judge each with `pan sync-main` — NOT
+   `git merge-tree` (it under-reports; see trap #1 in tick 14):
+   - PAN-2597 — 43 ahead / 47 behind, **4 real conflicts** (`review-mode.test.ts`, `codex-auth.test.ts`,
+     `verification-runner.ts`, `verification-types.ts`), review=FAILED, PR #2601. Startup triage says
+     RESTART, but it re-plans a large feature (codex app-server adoption). **A genuine cost call —
+     decide with fresh context.**
+   - PAN-2598 (27/246, PR #2631), PAN-1234 (13/319, PR #2606 — 319 behind, likely restart),
+     PAN-1491 (28 ahead, no PR), PAN-2568 (4 ahead, no PR).
+   - PAN-2619 = **0 commits** (never started, not stalled). PAN-1232 = **no workspace**.
+4. **PAN-2709** — likely TWO faults, consider splitting: (a) no resumable session when the run is
+   stopped; (b) **liveness misreport** (strike-pan-2712 said flywheel "wasn't running" while it WAS;
+   strike-pan-2704's message succeeded — same harness/host/day).
+5. **PAN-2706** (leaked/ghost test sessions — latent trap), **PAN-2713** (deploy step has no
+   mechanical owner; flywheel is interim), **PAN-2715** (`pan close` DoD gate).
+6. **PAN-2699** still OPEN though `a9abceec` is on main — trailer says `Closes PAN-2699`; GitHub only
+   auto-closes on `Closes #2699`. Repo-wide convention gap worth one issue.
+7. **Phase 2 — RELEASE READINESS.** The pipeline is now quiescent apart from the cohort. Once the
+   cohort is drained/parked: verify main green, deploy, then **REPORT readiness to the operator and
+   SUGGEST the cut. THE OPERATOR CUTS RELEASES — NEVER TAG.**
+8. **HELD per operator standing order (2026-07-15):** order book A13=PAN-2445, B10=PAN-2232,
+   B11=PAN-2233, B12=PAN-2190, B13=PAN-2189; **PAN-2377 (Phase 3 CANCELLED)**; PAN-2702 (awaiting
+   operator review — do NOT plan/start). **NO new intake.**
