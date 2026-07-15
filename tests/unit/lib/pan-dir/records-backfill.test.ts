@@ -53,9 +53,16 @@ import {
 describe('backfillIssueRecords', () => {
   let projectRoot: string;
   let infraRepo: string;
+  let remoteRepo: string;
+  let testHome: string;
+  let originalHome: string | undefined;
 
   beforeEach(() => {
     infraRepo = mkdtempSync(join(tmpdir(), 'pan-records-backfill-infra-'));
+    remoteRepo = mkdtempSync(join(tmpdir(), 'pan-records-backfill-origin-'));
+    testHome = mkdtempSync(join(tmpdir(), 'pan-records-backfill-home-'));
+    originalHome = process.env.OVERDECK_HOME;
+    process.env.OVERDECK_HOME = testHome;
     projectRoot = infraRepo; // For these tests the project root is also the infra repo.
 
     // Seed infra repo
@@ -67,7 +74,9 @@ describe('backfillIssueRecords', () => {
     execSync('git add README.md', { cwd: infraRepo });
     execSync('git commit -q -m init', { cwd: infraRepo });
     execSync('git branch -M main', { cwd: infraRepo });
-    execSync('git remote add origin .', { cwd: infraRepo });
+    execSync('git init --bare -q', { cwd: remoteRepo });
+    execSync(`git remote add origin ${remoteRepo}`, { cwd: infraRepo });
+    execSync('git push -q -u origin main', { cwd: infraRepo });
 
     mockGetMergeSetSync.mockReturnValue(null);
     mockListOverdeckAgentStatesSync.mockReturnValue([]);
@@ -106,6 +115,10 @@ describe('backfillIssueRecords', () => {
 
   afterEach(() => {
     rmSync(infraRepo, { recursive: true, force: true });
+    rmSync(remoteRepo, { recursive: true, force: true });
+    rmSync(testHome, { recursive: true, force: true });
+    if (originalHome === undefined) delete process.env.OVERDECK_HOME;
+    else process.env.OVERDECK_HOME = originalHome;
   });
 
   it('produces one record per in-flight issue combining continue and review_status data', async () => {
@@ -195,6 +208,7 @@ describe('backfillIssueRecords', () => {
 
     const result = await backfillIssueRecords();
     expect(result.processed).toBe(1);
+    expect(result.failed, JSON.stringify(result.details)).toBe(0);
     const log = execSync('git log --oneline -1', { cwd: infraRepo, encoding: 'utf-8' });
     expect(log).toContain('PAN-1908');
   });
