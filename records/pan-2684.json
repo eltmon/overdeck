@@ -57,6 +57,11 @@
       "reason": "feedback",
       "note": "[2026-07-15T11:34Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-15T11:34:54.488Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T11:48:13.817Z"
     }
   ],
   "feedback": [],
@@ -82,23 +87,23 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:48:12.280Z",
+  "updated": "2026-07-15T11:48:13.817Z",
   "pipeline": {
     "issueId": "PAN-2684",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T11:48:11.898Z",
+    "updatedAt": "2026-07-15T11:48:12.292Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed frontend-typecheck",
     "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2694",
     "lastVerifiedCommit": "3a142de8150351c3102897ad1168a7239d717b98",
     "reviewRequestedAt": "2026-07-15T10:08:49.814Z",
-    "reviewSpawnedAt": "2026-07-15T11:31:51.827Z",
+    "reviewSpawnedAt": "2026-07-15T11:48:12.292Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -183,7 +188,7 @@
       },
       "costAtCloseOut": {
         "usd": 39.28515,
-        "pricingAsOf": "2026-07-15T11:48:11.934Z"
+        "pricingAsOf": "2026-07-15T11:48:12.359Z"
       }
     },
     "merges": [
