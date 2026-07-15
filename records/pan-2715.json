@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:10:34.828Z",
+  "updated": "2026-07-15T16:10:43.482Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -352,5 +352,61 @@
     "skill-doc-update.skill-doc-update.ac1": "completed",
     "skill-doc-update.skill-doc-update.ac2": "completed",
     "skill-doc-update.skill-doc-update.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
+      "src/dashboard/frontend/src/components/CloseOutIssueButton.test.tsx",
+      "src/lib/lifecycle/index.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "src/cli/commands/__tests__/close.test.ts",
+      "src/cli/commands/close.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CloseOutIssueButton.tsx",
+      "src/dashboard/server/routes/__tests__/issues-close-out.test.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/lifecycle/types.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "src/lib/overdeck/issue-close-out.ts",
+      "src/lib/pan-dir/record.ts",
+      "sync-sources/skills/pan-close/SKILL.md",
+      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/dod.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts",
+      "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
+      "src/cli/commands/__tests__/close.test.ts",
+      "src/cli/commands/close.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CloseOutIssueButton.test.tsx",
+      "src/dashboard/frontend/src/components/CloseOutIssueButton.tsx",
+      "src/dashboard/server/routes/__tests__/issues-close-out.test.ts",
+      "src/dashboard/server/routes/issues.ts",
+      "src/lib/lifecycle/dod-gate.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/lifecycle/index.ts",
+      "src/lib/lifecycle/types.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "src/lib/overdeck/issue-close-out.ts",
+      "src/lib/pan-dir/record.ts",
+      "sync-sources/skills/pan-close/SKILL.md",
+      "tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+      "tests/unit/lib/lifecycle/dod-gate.test.ts",
+      "tests/unit/lib/lifecycle/dod.test.ts",
+      "tests/unit/lib/lifecycle/workflows.test.ts",
+      "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
+    ],
+    "recordedAt": "2026-07-15T16:10:43.479Z"
   }
 }
