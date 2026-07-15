@@ -128,7 +128,7 @@
     }
   ],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T14:58:33.574Z",
+  "updated": "2026-07-15T15:06:28.860Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "blocked",
@@ -137,7 +137,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-12T22:39:37.230Z",
     "updatedAt": "2026-07-15T14:57:01.105Z",
     "reviewNotes": "[correctness] Closing a direct-linked drawer leaves the issue route active — `src/dashboard/frontend/src/App.tsx:395`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
