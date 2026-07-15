@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:15:40.259Z",
+  "updated": "2026-07-15T15:16:04.090Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,8 +100,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "gate-assemble-wire": {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1819877,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:16:04.090Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -211,6 +219,10 @@
       "gate-deploy-row": {
         "reason": "Implemented build-commit and timestamp deploy evidence; 22 tests and typecheck passed; pushed d5e07d0ebf",
         "updatedAt": "2026-07-15T15:15:40.259Z"
+      },
+      "gate-assemble-wire": {
+        "reason": "All row checkers complete; assemble close-out gate",
+        "updatedAt": "2026-07-15T15:16:04.090Z"
       }
     }
   },
@@ -244,6 +256,7 @@
     "gate-deploy-row.gate-deploy-row.ac1": "completed",
     "gate-deploy-row.gate-deploy-row.ac2": "completed",
     "gate-deploy-row.gate-deploy-row.ac3": "completed",
-    "gate-deploy-row.gate-deploy-row.ac4": "completed"
+    "gate-deploy-row.gate-deploy-row.ac4": "completed",
+    "gate-assemble-wire": "running"
   }
 }
