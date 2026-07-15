@@ -4048,3 +4048,48 @@ red→green re-trigger feature (classify stale checks → gh adapter → retrigg
   checkouts are, correctly. Gates: 2 passed, typecheck, lint.
 - Main CI **GREEN** on `df457876`, `fab2a69e`, `4d9ddfc2`, `1baca050`.
 - PAN-2568 `review=blocked` (agent live, working 9m); PAN-2715 working 13m; PAN-2597/2598 `reviewing`.
+
+## RUN-63 tick 26 (2026-07-15 ~13:20 local / 17:20Z) — PAN-2727 LANDED + LIVE-VERIFIED. Outage class CLOSED.
+
+**PAN-2727 MERGED → `41ef651624` (PR #2730), DEPLOYED, CLOSED OUT. RUN-63: 22 merged, 22 closed out.**
+Deploy: built from main → `pan restart --dashboard --health-timeout 180000` → pid **3039531**,
+systemd-parented, health 200. **My own restart from the primary checkout was NOT refused — no false
+positive.**
+
+### ✅ LIVE PRODUCTION VERIFICATION — the guard fires, and the dashboard survives
+Ran the exact command that caused today's outage, from a workspace cwd:
+```
+$ cd workspaces/feature-pan-2568 && pan restart --dashboard
+Refusing to restart the host dashboard from workspace checkout
+  /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568.
+  Run this command from the primary checkout at /home/eltmon/Projects/overdeck.
+
+health BEFORE: 200   pid BEFORE: 3039531
+health AFTER:  200   pid AFTER:  3039531   ✅ same pid — dashboard untouched
+```
+**The outage class that stranded planning-pan-2702 this morning is CLOSED.** (agent-pan-2598 ran this
+same command from its workspace and killed `:3011`; PAN-2702's planning then exhausted 5 promote
+retries and stranded a complete plan workspace-local.) Third substrate fix live-verified this run,
+after PAN-2712 (merge-gate) and PAN-2716 (close-out).
+
+### Third live-verified fix — the pattern that works
+For each: root-cause to `file:line` → strike → **rebase + re-run gates myself** → PR → CI green →
+merge → **deploy** → **prove it in production**. Merged-and-closed is NOT done; deployed-and-observed is.
+
+**RUN-63 substrate fixes landed + deployed + proven:** PAN-2712 (failing_checks never re-checked →
+merge gate froze), PAN-2716 (close-out head-equality → completed work stranded), PAN-2727 (restart
+killed host dashboard from any workspace). Plus PAN-2703 (red main), PAN-2701/2725 (codex delivery),
+PAN-2690, PAN-2722 (state-worktree race), PAN-2724, PAN-2692, PAN-2713, PAN-1234, PAN-2684, PAN-2683.
+
+**STILL OPEN / NEXT:**
+- **PAN-2731 (`blocks-main`, filed tick 25)** — state.json write-only fields for codex ⇒ doctrine's
+  liveness check calls healthy agents ghosts and routes to `pan kill`. **I nearly destroyed
+  agent-pan-2710 with it.** Strike-worthy; arguably the highest-value open item now.
+- **PAN-2710** — HEALTHY and working (3 commits: classify stale checks → gh adapter → retrigger).
+  Operator-released. Shepherd to merged.
+- PAN-2597 / PAN-2598 `reviewing`; PAN-2568 `review=blocked` (agent live); PAN-2715 working.
+- PAN-2720 (ratchet rewards line-packing), PAN-2706 (ghost test sessions — **re-verify against work
+  product; its method was the unsound one from tick 25**), PAN-2709 (2 faults?), PAN-2715/2713 done.
+- **HELD, do not touch:** PAN-2702 (pickup gate fails: no `ready`, no `released` — operator-only),
+  PAN-2499 (`stoppedByUser`), PAN-1491 (needs-you), order book (A13/B10–B13), PAN-2377.
+- Phase 2 release readiness once the cohort quiesces → report + suggest. **OPERATOR CUTS; NEVER TAG.**
