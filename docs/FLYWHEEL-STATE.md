@@ -3161,3 +3161,68 @@ verdicts lost — fire-and-forget journal write). PAN-2583 (the fallback itself)
 - **Close-out tail:** PAN-2699 still OPEN; fix `a9abceec` is on main. Trailer says `Closes PAN-2699`,
   but GitHub only auto-closes on `Closes #2699` — repo-wide convention gap.
 - HELD per operator: order book (A13/B10–B13), PAN-2377, PAN-2702. No new intake.
+
+## RUN-63 tick 11 (2026-07-15 ~09:55 local / 13:55Z) — PAN-2712 found + struck (merge-gate blocker); PAN-2704 landed into review
+
+**[PAN-2712] FILED + STRUCK — the most important find of this run.** This is the *second half* of the
+red-main trap and it makes PAN-2710 permanently unrecoverable. Struck under the doctrine emergency
+override (pipeline-blockers — broken spawning/review/test/merge/close-out — are emergencies, and
+`auto_pickup_backlog=false` restricts only ROUTINE backlog filling, never emergency repair). Labeled
+`blocks-main`; strike-pan-2712 on codex/gpt-5.6-sol, branch strike/pan-2712. **I OWN ITS MERGE.**
+
+### The defect (verified at code level — do not re-derive)
+
+`merge-blocker-reconcile-service.ts:41` — the backstop poller that exists SPECIFICALLY to clear stale
+GitHub-native blockers when no webhook arrives:
+
+```ts
+const MERGEABILITY_BLOCKERS = new Set(['merge_conflict', 'not_mergeable']);   // failing_checks NOT here
+```
+
+`reconcileOnce` (`:66-90`) has exactly two paths and a `failing_checks` row falls through BOTH:
+
+```ts
+if (hasMergeabilityBlocker(...)) { ...10-min recheck...; continue; }  // false → falls through
+if (!candidate.readyForMerge) continue;                               // ← blocker pinned it to 0 → SKIPPED
+if ((candidate.blockerReasons?.length ?? 0) > 0) continue;            // "non-mergeability blockers stay skipped"
+```
+
+**The circularity is the bug:** the `failing_checks` blocker itself sets `readyForMerge=false`
+(`review-status.ts:401-407`, PAN-905), which disqualifies the row from the ONLY other polling path.
+The blocker guarantees its own un-reconcilability. Webhooks are the sole clearing mechanism, and they
+do not arrive on a localhost dashboard → the state is **terminal**.
+
+Evidence: PAN-2683 sat `review/test/inspect/verification = passed`, `merge=pending`,
+`ready_for_merge=0`, `blocker detectedAt 13:08:19Z`, `updated_at` frozen at `13:08:36Z` for 30+ min —
+even AFTER I re-ran its CI and PR #2693 went all-SUCCESS. Dashboard healthy (`/api/health` 200),
+service running, so not a dead-service artifact. Suggested fix is in the issue: add `failing_checks`
+to the slow-recheck set, or (better) decouple the recheck path from `readyForMerge` since it is
+derived from the blocker.
+
+**PAN-2710 + PAN-2712 together = the full trap:** red main poisons every feature PR's check → blocker
+latched → nothing re-runs the check (2710) → and nothing ever re-examines the row (2712) → issue is
+permanently out of the merge gate while the dashboard shows all gates passed and the gate reads as
+legitimately empty. At scale this silently freezes the WHOLE Command Deck.
+
+**PAN-2704 landed into review** — PR #2711. An operator-authored `enhancement` (NOT order-book) whose
+strike was spawned ~08:51 and finished green; draining it is consistent with the standing order
+("everything currently open in the pipeline lands"). It is also the ONE strike today whose flywheel
+notification SUCCEEDED — because this run happened to be live (contrast PAN-2709).
+Verified gates myself: 5/5 focused tests, typecheck, lint (incl. the skills lint that cross-checks
+flags against `pan start --help`); SKILL.md updated in the same commit per the skills↔CLI convention.
+Nits accepted, not blocked on: it deletes an adjacent comment in `start.ts` and chains 4 `.option()`
+calls onto one line against file style (Karpathy surgical-changes nits; lint green).
+
+**Investigated and dismissed — do NOT re-chase:** two `dist/dashboard/server.js` processes are NOT a
+dueling-deacon incident. PID 3026350 (systemd-parented) owns :3011; PID 2996986 is a workspace
+devcontainer peer under `containerd-shim`, `PORT=3013`, `OVERDECK_DISABLE_DEACON=1` — exactly what the
+single-deacon invariant requires. Left alone.
+
+**Main CI GREEN on `534e549f`**; `bb2d478f` (PAN-2701) + `8ceac512` (PAN-2690) still running.
+Capacity healthy: 1/20 active agents, RAM 23.8G/64G.
+
+**NEXT TICK:** (1) shepherd strike PAN-2712 → review diff → gates → merge → unblocks PAN-2683;
+(2) merge PR #2711 (PAN-2704) when green + close out; (3) PAN-2683 merge + close once its blocker
+clears; (4) THEN the stalled cohort (capacity is available — 1/20): PAN-1234 (PR #2606), PAN-2598
+(PR #2631), PAN-2597 (PR #2601, review=FAILED), PAN-1491, PAN-2568 via `pan review request|restart`
+after judging divergence; PAN-2619 has 0 commits and PAN-1232 has no workspace — triage separately.
