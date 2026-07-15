@@ -1,3 +1,10 @@
 #!/bin/sh
 
+# The overdeck-state worktree shares this repo's core.hooksPath but the
+# orphan state branch carries none of the hook tooling (scripts/, commitlint).
+# Running there, the guard script is missing and the hook dies with 127 —
+# which strands the state write door's commits (PAN-2677). Code-repo guards
+# only apply to code checkouts; skip when the tooling is absent.
+[ -f scripts/guard-flywheel-orchestrator-commit.sh ] || exit 0
+
 bash scripts/guard-flywheel-orchestrator-commit.sh </dev/null
