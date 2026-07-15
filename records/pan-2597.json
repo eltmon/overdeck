@@ -424,7 +424,7 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T13:43:26.769Z",
+  "updated": "2026-07-15T13:43:28.095Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -434,12 +434,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T13:43:26.107Z",
+    "updatedAt": "2026-07-15T13:43:28.020Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2597-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
-    "reviewRequestedAt": "2026-07-15T02:23:16.588Z",
+    "reviewRequestedAt": "2026-07-15T13:43:27.668Z",
     "reviewSpawnedAt": "2026-07-15T02:23:19.867Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -649,7 +649,7 @@
       },
       "costAtCloseOut": {
         "usd": 189.929732,
-        "pricingAsOf": "2026-07-15T13:43:26.164Z"
+        "pricingAsOf": "2026-07-15T13:43:28.051Z"
       }
     },
     "merges": [
