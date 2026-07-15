@@ -60,7 +60,7 @@ import { sessionFilePath } from '../paths.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getAgentRuntimeStateSync as getAgentRuntimeStateSyncFromAgents } from '../agents.js';
-import { isHarnessProcessAlive, sessionExists } from '../tmux.js';
+import { capturePaneText, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsync, sessionExists } from '../tmux.js';
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
@@ -325,14 +325,14 @@ export async function ensureForkSessionReady(
   await forkWaitForTmuxSession(conv.tmuxSession);
 }
 
-export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<void> {
+export async function injectForkSummary(conv: Conversation, summary: string, caller: string): Promise<'submitted' | 'stranded'> {
   updateForkStatus(conv.name, 'injecting');
   const method = resolveConversationDeliveryMethod(conv);
   const behavior = getHarnessBehavior(conv.harness);
   if (behavior.transcriptKind === 'ohmypi-jsonl') {
     await waitForPiTuiReady(conv.tmuxSession, 60000);
     await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
-    return;
+    return 'submitted';
   }
   const ready = await waitForReadySignal(conv.tmuxSession, 60);
   if (!ready) {
@@ -341,18 +341,32 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   const MAX_ATTEMPTS = 2;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     await deliverAgentMessage(conv.tmuxSession, summary, caller, method);
-    const outcome = await confirmForkPromptAccepted(conv.tmuxSession, 8000);
-    if (outcome === 'accepted') return;
-    if (outcome === 'unknown') {
-      console.warn(`[${caller}] delivery to ${conv.name} could not be confirmed (runtime mirror silent) — not retrying`);
-      return;
+    const outcome = await self.confirmForkPromptAccepted(conv.tmuxSession, 8000);
+    if (outcome === 'accepted') return 'submitted';
+
+    const verify = deliveryVerifyLine(summary).slice(0, 40);
+    let composerStillFull = false;
+    for (let nudge = 1; nudge <= 2; nudge++) {
+      const pane = await capturePaneText(conv.tmuxSession, 40);
+      composerStillFull = verify.length >= 3 && pane.includes(verify);
+      if (!composerStillFull) break;
+
+      console.warn(`[${caller}] ${conv.name} still has the delivered summary in its composer — sending standalone Enter (${nudge}/2)`);
+      await sendKeysAsync(conv.tmuxSession, 'C-m', `${caller}:enter-nudge`);
+      if (await self.confirmForkPromptAccepted(conv.tmuxSession, 8000) === 'accepted') return 'submitted';
+
+      const paneAfterNudge = await capturePaneText(conv.tmuxSession, 40);
+      if (!paneAfterNudge.includes(verify)) return 'submitted';
     }
+    if (composerStillFull) return 'stranded';
+
     if (attempt < MAX_ATTEMPTS) {
       console.warn(`[${caller}] ${conv.name} still idle 8s after delivery (attempt ${attempt}/${MAX_ATTEMPTS}) — TUI likely dropped the paste during startup, re-delivering`);
     } else {
       console.warn(`[${caller}] could not confirm brief delivery for ${conv.name} after ${MAX_ATTEMPTS} attempts — successor may be sitting at an empty prompt`);
     }
   }
+  return 'stranded';
 }
 
 export function handleForkPipelineFailure(name: string, err: unknown): void {
