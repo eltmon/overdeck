@@ -4,17 +4,17 @@
     "created": "2026-07-12T16:59:51Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2597: Adopt `codex app-server` (JSON-RPC over stdio) as the Codex transport — retire TUI keystroke injection",
-    "updated": "2026-07-14T22:10:56.847Z"
+    "updated": "2026-07-15T17:36:38.229Z"
   },
   "plan": {
     "id": "pan-2597",
     "title": "Adopt `codex app-server` (JSON-RPC over stdio) as the Codex transport — retire TUI keystroke injection",
-    "status": "running",
+    "status": "completed",
     "uid": "0c40da89-7cf4-40b5-8b6d-ecb8906bb888",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-12T16:59:51Z",
-    "updated": "2026-07-14T22:10:56.847Z",
+    "updated": "2026-07-15T17:36:38.229Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2597",
@@ -1199,5 +1199,5 @@
       "canonicalFilename": "2026-07-12-PAN-2597-adopt-codex-app-server-json-rpc-over-stdio-as-the-codex-transport-retire-tui-keystroke-injection.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
