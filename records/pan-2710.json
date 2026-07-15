@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:00:28.111Z",
+  "updated": "2026-07-15T16:00:43.105Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
@@ -95,8 +95,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "gh-run-adapter": {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 2731738,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T16:00:43.105Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2710",
@@ -122,6 +130,7 @@
     "red-window-classifier.red-window-classifier.ac1": "completed",
     "red-window-classifier.red-window-classifier.ac2": "completed",
     "red-window-classifier.red-window-classifier.ac3": "completed",
-    "red-window-classifier.red-window-classifier.ac4": "completed"
+    "red-window-classifier.red-window-classifier.ac4": "completed",
+    "gh-run-adapter": "running"
   }
 }
