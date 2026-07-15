@@ -129,19 +129,50 @@ function payloadCaller(payload: PtySupervisorPayload): string | undefined {
   return payload.caller ?? payload.meta?.caller;
 }
 
-async function appendSocketWriteLog(agentId: string, payload: PtySupervisorPayload): Promise<void> {
+export interface SocketWriteLogRecord {
+  agentId: string;
+  contentLength: number;
+  caller?: string;
+}
+
+export function createSocketWriteLogQueue(
+  write: (record: SocketWriteLogRecord) => Promise<void>,
+  maxPending = 64,
+): { enqueue: (agentId: string, payload: PtySupervisorPayload) => boolean } {
+  let pending = 0;
+  let tail: Promise<void> = Promise.resolve();
+
+  return {
+    enqueue(agentId, payload) {
+      if (pending >= maxPending) return false;
+      const caller = payloadCaller(payload);
+      const record: SocketWriteLogRecord = {
+        agentId,
+        contentLength: payload.content.length,
+        ...(caller ? { caller } : {}),
+      };
+      pending += 1;
+      tail = tail
+        .then(() => write(record))
+        .catch(() => undefined)
+        .finally(() => { pending -= 1; });
+      return true;
+    },
+  };
+}
+
+async function appendSocketWriteLog(record: SocketWriteLogRecord): Promise<void> {
   try {
-    const logPath = getPtySupervisorLogPath(agentId);
+    const logPath = getPtySupervisorLogPath(record.agentId);
     await mkdir(join(getOverdeckHome(), 'logs'), { recursive: true, mode: 0o700 });
-    const caller = payloadCaller(payload);
     await appendFile(
       logPath,
       `${JSON.stringify({
         ts: new Date().toISOString(),
-        agentId,
+        agentId: record.agentId,
         kind: 'socket_write',
-        contentLength: payload.content.length,
-        ...(caller ? { caller } : {}),
+        contentLength: record.contentLength,
+        ...(record.caller ? { caller: record.caller } : {}),
       })}\n`,
       'utf8',
     );
@@ -149,6 +180,8 @@ async function appendSocketWriteLog(agentId: string, payload: PtySupervisorPaylo
     // non-critical
   }
 }
+
+const socketWriteLogQueue = createSocketWriteLogQueue(appendSocketWriteLog);
 
 /**
  * Record what the PTY actually showed when echo confirmation failed — without
@@ -333,7 +366,7 @@ export async function injectPtyMessage(
     // Delivery is complete once the standalone Enter is written. Logging is
     // best-effort observability and must not hold the supervisor response open
     // past the shared client deadline after the message has already submitted.
-    void appendSocketWriteLog(agentId, payload);
+    socketWriteLogQueue.enqueue(agentId, payload);
   } finally {
     subscription.dispose();
   }

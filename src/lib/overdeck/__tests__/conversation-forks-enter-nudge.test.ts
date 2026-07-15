@@ -63,11 +63,11 @@ describe('injectForkSummary standalone Enter recovery', () => {
     );
   });
 
-  it('nudges when the verification prefix wraps before Enter recovery', async () => {
+  it('nudges when the verification prefix wraps across bordered rows before Enter recovery', async () => {
     vi.spyOn(forks, 'confirmForkPromptAccepted')
       .mockResolvedValueOnce('unknown')
       .mockResolvedValueOnce('accepted');
-    mocks.capturePaneText.mockResolvedValue('summary veri\nfy line');
+    mocks.capturePaneText.mockResolvedValue('summary veri\n│fy line');
 
     await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
       .resolves.toBe('submitted');

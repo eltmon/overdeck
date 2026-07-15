@@ -348,7 +348,9 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   const outcome = await self.confirmForkPromptAccepted(conv.tmuxSession, 8000);
   if (outcome === 'accepted') return 'submitted';
 
-  const normalizePaneVerification = (value: string): string => value.replace(/\s+/g, '');
+  const normalizePaneVerification = (value: string): string => value
+    .replace(/[─-╿]/g, '')
+    .replace(/\s+/g, '');
   const verify = normalizePaneVerification(deliveryVerifyLine(summary).slice(0, 40));
   for (let nudge = 1; nudge <= 2; nudge++) {
     const pane = await capturePaneText(conv.tmuxSession, 40);

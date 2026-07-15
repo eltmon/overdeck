@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../../pty-token.js';
-import { createPtySupervisorServer, injectPtyMessage } from '../pty-supervisor.js';
+import { createPtySupervisorServer, createSocketWriteLogQueue, injectPtyMessage } from '../pty-supervisor.js';
 import { INPUT_PURGE_MAX_CHARS, echoConfirmTimeoutMs, purgeSettleMs } from '../injection-budget.js';
 
 const REPO_ROOT = process.cwd();
@@ -17,6 +17,27 @@ let tmpHome: string;
 let proc: ChildProcess | null;
 let stdout = '';
 let stderr = '';
+
+describe('socket write log queue', () => {
+  it('bounds stalled logging and retains metadata instead of full payloads', async () => {
+    const stalledWrite = vi.fn(() => new Promise<void>(() => undefined));
+    const queue = createSocketWriteLogQueue(stalledWrite, 2);
+    const payload = { content: 'x'.repeat(INPUT_PURGE_MAX_CHARS), caller: 'queue-test' };
+
+    expect(queue.enqueue('agent-one', payload)).toBe(true);
+    expect(queue.enqueue('agent-two', payload)).toBe(true);
+    expect(queue.enqueue('agent-three', payload)).toBe(false);
+    await Promise.resolve();
+
+    expect(stalledWrite).toHaveBeenCalledOnce();
+    expect(stalledWrite).toHaveBeenCalledWith({
+      agentId: 'agent-one',
+      contentLength: INPUT_PURGE_MAX_CHARS,
+      caller: 'queue-test',
+    });
+    expect(stalledWrite.mock.calls[0]?.[0]).not.toHaveProperty('content');
+  });
+});
 
 function startSupervisor(agentId: string, command: string, args: string[] = []): ChildProcess {
   proc = spawn(process.execPath, [SUPERVISOR_ENTRY, command, ...args], {
@@ -417,8 +438,9 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     await waitForProcessOutput(() => stdout.includes(content), 'supervisor did not echo posted content');
     expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(1);
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-echo.log');
-    await vi.waitFor(() => expect(existsSync(logPath)).toBe(true));
-    expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
+    await vi.waitFor(() => {
+      expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
+    });
   });
 
   it('returns non-2xx after one retry when child PTY output never reflects the input', async () => {
