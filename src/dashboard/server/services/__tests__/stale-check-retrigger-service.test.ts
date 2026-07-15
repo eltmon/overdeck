@@ -165,6 +165,22 @@ it('does not retry a failed rerun when its candidate disappears for over 24 hour
   expect(mocks.rerun).toHaveBeenCalledTimes(1);
 });
 
+it('evicts departed failed-run state when GitHub proves the PR head changed', async () => {
+  mocks.rerun.mockResolvedValue(false);
+  await __tickOnceForTests();
+
+  mocks.candidates.mockReturnValue([]);
+  mocks.prHead.mockResolvedValue({ headRefName: 'feature/pan-2710', headRefOid: 'new-sha' });
+  vi.advanceTimersByTime(10 * 60_000);
+  await __tickOnceForTests();
+
+  mocks.candidates.mockReturnValue([candidate()]);
+  mocks.prHead.mockResolvedValue({ headRefName: 'feature/pan-2710', headRefOid: 'sha' });
+  await __tickOnceForTests();
+
+  expect(mocks.rerun).toHaveBeenCalledTimes(2);
+});
+
 it('tracks failed attempts by exact run ID regardless of response order', async () => {
   mocks.rerun.mockResolvedValue(false);
   mocks.prRuns.mockResolvedValue([

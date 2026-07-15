@@ -10,7 +10,12 @@ import {
 
 interface PrRef { repo: string; number: number }
 interface CachedWindows { probedAt: number; windows: Map<string, RedWindow[]> }
-interface FailedRuns { runIds: Set<number> }
+interface FailedRuns {
+  runIds: Set<number>;
+  ref: PrRef;
+  headRefOid: string;
+  lastProbedAt: number;
+}
 interface ServiceState {
   timer: ReturnType<typeof setInterval> | null;
   repoWindows: Map<string, CachedWindows>;
@@ -52,6 +57,27 @@ function pruneState(state: ServiceState, issueIds: Set<string>, repos: Set<strin
   }
 }
 
+async function pruneDepartedFailedRuns(state: ServiceState, issueIds: Set<string>, now: number): Promise<void> {
+  for (const [issueId, failedRuns] of state.failedRunsByIssue) {
+    if (issueIds.has(issueId)) continue;
+    if (now - failedRuns.lastProbedAt < EVAL_INTERVAL_MS) continue;
+    failedRuns.lastProbedAt = now;
+    const head = await getPrHead(failedRuns.ref.repo, failedRuns.ref.number);
+    if (!head) continue;
+    if (head.headRefOid !== failedRuns.headRefOid) {
+      state.failedRunsByIssue.delete(issueId);
+      continue;
+    }
+    const runs = await listPrHeadFailingRuns(failedRuns.ref.repo, head.headRefName, head.headRefOid);
+    if (runs.length === 0) continue;
+    const currentRunIds = new Set(runs.map((run) => run.databaseId));
+    for (const runId of failedRuns.runIds) {
+      if (!currentRunIds.has(runId)) failedRuns.runIds.delete(runId);
+    }
+    if (failedRuns.runIds.size === 0) state.failedRunsByIssue.delete(issueId);
+  }
+}
+
 function parsePrUrl(url: string | undefined | null): PrRef | null {
   if (!url) return null;
   const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/);
@@ -75,12 +101,14 @@ async function tickOnce(state: ServiceState): Promise<void> {
       return ref && failing ? [{ candidate, ref }] : [];
     });
     const now = Date.now();
+    const issueIds = new Set(candidates.map(({ candidate }) => candidate.issueId));
     pruneState(
       state,
-      new Set(candidates.map(({ candidate }) => candidate.issueId)),
+      issueIds,
       new Set(candidates.map(({ ref }) => ref.repo)),
       now,
     );
+    await pruneDepartedFailedRuns(state, issueIds, now);
     if (candidates.length === 0) return;
 
     let retriggered = 0;
@@ -105,6 +133,7 @@ async function tickOnce(state: ServiceState): Promise<void> {
         for (const runId of failedRuns.runIds) {
           if (!currentRunIds.has(runId)) failedRuns.runIds.delete(runId);
         }
+        if (failedRuns.runIds.size === 0) state.failedRunsByIssue.delete(candidate.issueId);
       }
       const selection = selectRerunCandidates(runs, windows);
 
@@ -134,7 +163,11 @@ async function tickOnce(state: ServiceState): Promise<void> {
           console.log(`[stale-check-retrigger] re-ran run ${run.databaseId} (${run.workflowName}) for ${candidate.issueId} PR #${ref.number}: failed at ${run.createdAt} inside main red window ${window.start} → ${window.end}`);
         } else {
           const issueFailedRuns = state.failedRunsByIssue.get(candidate.issueId)
-            ?? { runIds: new Set<number>() };
+            ?? {
+              runIds: new Set<number>(), ref,
+              headRefOid: head.headRefOid,
+              lastProbedAt: now,
+            };
           issueFailedRuns.runIds.add(run.databaseId);
           state.failedRunsByIssue.set(candidate.issueId, issueFailedRuns);
           skipped++;
