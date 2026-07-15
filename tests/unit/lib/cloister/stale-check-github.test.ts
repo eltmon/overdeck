@@ -79,11 +79,11 @@ describe('listPrHeadFailingRuns', () => {
     await expect(listPrHeadFailingRuns('repo', 'branch', 'current')).resolves.toEqual([]);
   });
 
-  it('returns an empty list and warns on malformed output', async () => {
+  it('rejects and warns on malformed output so failure is distinct from no runs', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     respond('not json');
 
-    await expect(listPrHeadFailingRuns('repo', 'branch', 'sha')).resolves.toEqual([]);
+    await expect(listPrHeadFailingRuns('repo', 'branch', 'sha')).rejects.toThrow();
     expect(warn).toHaveBeenCalledOnce();
   });
 });

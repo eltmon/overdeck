@@ -14,7 +14,11 @@ import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
-import { startStaleCheckRetriggerService, stopStaleCheckRetriggerService } from './services/stale-check-retrigger-service.js';
+import {
+  shouldStartStaleCheckRetriggerService,
+  startStaleCheckRetriggerService,
+  stopStaleCheckRetriggerService,
+} from './services/stale-check-retrigger-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
@@ -170,8 +174,10 @@ console.log('[overdeck] AgentOutputService started');
 // Awaiting-Merge queue (and its live MERGE button) before any click.
 startMergeBlockerReconcileService();
 console.log('[overdeck] MergeBlockerReconcileService started');
-startStaleCheckRetriggerService();
-console.log('[overdeck] StaleCheckRetriggerService started');
+if (shouldStartStaleCheckRetriggerService()) {
+  startStaleCheckRetriggerService();
+  console.log('[overdeck] StaleCheckRetriggerService started');
+}
 
 // Desktop installs never run `pan install`, so provision the Claude Code hook
 // bundle (auto-approve, heartbeat, cost, lifecycle) at boot (PAN-2595).

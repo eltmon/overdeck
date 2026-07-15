@@ -69,7 +69,10 @@ async function pruneDepartedFailedRuns(state: ServiceState, issueIds: Set<string
       continue;
     }
     const runs = await listPrHeadFailingRuns(failedRuns.ref.repo, head.headRefName, head.headRefOid);
-    if (runs.length === 0) continue;
+    if (runs.length === 0) {
+      state.failedRunsByIssue.delete(issueId);
+      continue;
+    }
     const currentRunIds = new Set(runs.map((run) => run.databaseId));
     for (const runId of failedRuns.runIds) {
       if (!currentRunIds.has(runId)) failedRuns.runIds.delete(runId);
@@ -129,7 +132,9 @@ async function tickOnce(state: ServiceState): Promise<void> {
       const runs = await listPrHeadFailingRuns(ref.repo, head.headRefName, head.headRefOid);
       const currentRunIds = new Set(runs.map((run) => run.databaseId));
       const failedRuns = state.failedRunsByIssue.get(candidate.issueId);
-      if (failedRuns && currentRunIds.size > 0) {
+      if (failedRuns && currentRunIds.size === 0) {
+        state.failedRunsByIssue.delete(candidate.issueId);
+      } else if (failedRuns) {
         for (const runId of failedRuns.runIds) {
           if (!currentRunIds.has(runId)) failedRuns.runIds.delete(runId);
         }
@@ -196,6 +201,12 @@ export function startStaleCheckRetriggerService(): void {
   if (serviceState.timer !== null) return;
   serviceState.timer = setInterval(() => void runTickIfIdle(serviceState), POLL_INTERVAL_MS);
   serviceState.timer.unref?.();
+}
+
+export function shouldStartStaleCheckRetriggerService(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.OVERDECK_DISABLE_DEACON !== '1';
 }
 
 export function stopStaleCheckRetriggerService(): void {
