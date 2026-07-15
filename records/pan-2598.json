@@ -287,17 +287,17 @@
     "recordedAt": "2026-07-15T15:35:35.783Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:42:28.068Z",
+  "updated": "2026-07-15T15:45:45.978Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:41:02.479Z",
+    "updatedAt": "2026-07-15T15:45:45.793Z",
     "reviewNotes": "Agent re-review request (1/25): Resolved target branch sync conflicts",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
@@ -371,9 +371,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1826311,
-            "output": 3625,
-            "cacheRead": 1606912,
+            "input": 1908938,
+            "output": 3752,
+            "cacheRead": 1686528,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -383,9 +383,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 52669168,
-            "output": 44143,
-            "cacheRead": 51915520,
+            "input": 54611305,
+            "output": 45613,
+            "cacheRead": 53840896,
             "cacheWrite": 0
           }
         },
@@ -432,9 +432,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1826311,
-          "output": 3625,
-          "cacheRead": 1606912,
+          "input": 1908938,
+          "output": 3752,
+          "cacheRead": 1686528,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -444,9 +444,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 52669168,
-          "output": 44143,
-          "cacheRead": 51915520,
+          "input": 54611305,
+          "output": 45613,
+          "cacheRead": 53840896,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -475,8 +475,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 102.240593,
-        "pricingAsOf": "2026-07-15T15:41:02.566Z"
+        "usd": 103.331186,
+        "pricingAsOf": "2026-07-15T15:45:45.892Z"
       }
     },
     "merges": [
@@ -485,7 +485,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
