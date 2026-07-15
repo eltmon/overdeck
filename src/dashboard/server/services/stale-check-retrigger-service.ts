@@ -3,8 +3,8 @@ import { getMergeBlockerReconcileCandidates } from '../../../lib/overdeck/review
 import { computeRedWindows, selectRerunCandidates, type RedWindow } from '../../../lib/cloister/stale-check-classifier.js';
 import {
   getPrHead,
-  listRecentMainRuns,
   probePrHeadFailingRuns,
+  probeRecentMainRuns,
   rerunFailedRun,
 } from '../../../lib/cloister/stale-check-github.js';
 
@@ -89,10 +89,12 @@ function parsePrUrl(url: string | undefined | null): PrRef | null {
   return match ? { repo: `${match[1]}/${match[2]}`, number: Number(match[3]) } : null;
 }
 
-async function windowsForRepo(state: ServiceState, repo: string, now: number): Promise<Map<string, RedWindow[]>> {
+async function windowsForRepo(state: ServiceState, repo: string, now: number): Promise<Map<string, RedWindow[]> | null> {
   const cached = state.repoWindows.get(repo);
   if (cached && now - cached.probedAt < MAIN_PROBE_INTERVAL_MS) return cached.windows;
-  const windows = computeRedWindows(await listRecentMainRuns(repo));
+  const result = await probeRecentMainRuns(repo);
+  if (!result.ok) return null;
+  const windows = computeRedWindows(result.runs);
   state.repoWindows.set(repo, { probedAt: now, windows });
   return windows;
 }
@@ -126,6 +128,7 @@ async function tickOnce(state: ServiceState): Promise<void> {
       if (now - last < EVAL_INTERVAL_MS) continue;
 
       const windows = await windowsForRepo(state, ref.repo, now);
+      if (!windows) continue;
       const head = await getPrHead(ref.repo, ref.number);
       if (!head) {
         state.lastEvaluated.set(candidate.issueId, now);

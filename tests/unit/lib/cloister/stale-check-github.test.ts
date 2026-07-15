@@ -4,6 +4,7 @@ import {
   getPrHead,
   listPrHeadFailingRuns,
   listRecentMainRuns,
+  probeRecentMainRuns,
   rerunFailedRun,
 } from '../../../../src/lib/cloister/stale-check-github.js';
 
@@ -43,6 +44,15 @@ describe('listRecentMainRuns', () => {
 
     await expect(listRecentMainRuns('eltmon/overdeck')).resolves.toEqual([]);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('Failed to list recent main runs'), 'offline');
+  });
+
+  it('distinguishes a failed main-history probe from a successful empty result', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    respond('', new Error('offline'));
+    respond('[]');
+
+    await expect(probeRecentMainRuns('eltmon/overdeck')).resolves.toEqual({ ok: false });
+    await expect(probeRecentMainRuns('eltmon/overdeck')).resolves.toEqual({ ok: true, runs: [] });
   });
 });
 
