@@ -97,3 +97,15 @@ describe("scripts/build-for-publish.mjs", () => {
     expect(FS.existsSync(p)).toBe(true);
   });
 });
+
+describe("scripts/stamp-update-manifests.mjs", () => {
+  it("converts the dist file URL before joining manifest paths", () => {
+    const script = FS.readFileSync(
+      Path.join(desktopDir, "scripts/stamp-update-manifests.mjs"),
+      "utf8",
+    );
+
+    expect(script).toContain("fileURLToPath(new URL('../dist/', import.meta.url))");
+    expect(script).not.toContain("distDir.pathname");
+  });
+});
