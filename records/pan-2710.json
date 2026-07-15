@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T15:22:53.528Z",
+  "updated": "2026-07-15T15:26:27.560Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
@@ -79,18 +79,33 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "red-window-classifier": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2710",
         "agentId": "agent-pan-2710",
         "pid": 1956518,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:22:53.528Z"
+        "claimedAt": "2026-07-15T15:22:53.528Z",
+        "itemId": "red-window-classifier",
+        "outcome": "completed",
+        "reason": "Added pure per-workflow red-window classification and exhaustive synchronous candidate-selection tests",
+        "releasedAt": "2026-07-15T15:26:27.559Z"
+      }
+    ],
+    "statusReasons": {
+      "red-window-classifier": {
+        "reason": "Added pure per-workflow red-window classification and exhaustive synchronous candidate-selection tests",
+        "updatedAt": "2026-07-15T15:26:27.559Z"
       }
     }
   },
   "statusOverrides": {
-    "red-window-classifier": "running"
+    "red-window-classifier": "completed",
+    "red-window-classifier.red-window-classifier.ac1": "completed",
+    "red-window-classifier.red-window-classifier.ac2": "completed",
+    "red-window-classifier.red-window-classifier.ac3": "completed",
+    "red-window-classifier.red-window-classifier.ac4": "completed"
   }
 }
