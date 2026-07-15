@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:37:51.700Z",
+  "updated": "2026-07-15T15:38:34.153Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -128,7 +128,7 @@
   "statusOverrides": {
     "injection-budget": "completed",
     "size-scaled-waits": "completed",
-    "full-length-purge": "running",
+    "full-length-purge": "blocked",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
     "size-scaled-waits.size-scaled-waits.ac2": "completed",
     "size-scaled-waits.size-scaled-waits.ac3": "completed",
@@ -164,7 +164,7 @@
     }
   },
   "tasks": {
-    "sequence": 12,
+    "sequence": 13,
     "claims": {},
     "claimHistory": [
       {
@@ -243,6 +243,11 @@
       "delivery-race-test": {
         "reason": "Added fake-timer regression coverage proving 30 KB payloads receive the derived timeout and remain on the supervisor tier when completion occurs just under budget.",
         "updatedAt": "2026-07-15T15:37:51.700Z"
+      },
+      "full-length-purge": {
+        "reason": "Recover malformed running state with missing claim owner after agent restart; implementation is already committed and pushed.",
+        "updatedAt": "2026-07-15T15:38:34.153Z",
+        "forced": true
       }
     }
   }
