@@ -76,17 +76,17 @@
     "recordedAt": "2026-07-15T14:50:52.626Z"
   },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:50:55.831Z",
+  "updated": "2026-07-15T14:50:57.369Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:50:55.715Z",
+    "updatedAt": "2026-07-15T14:50:57.298Z",
     "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2721"
   },
@@ -152,7 +152,7 @@
       },
       "costAtCloseOut": {
         "usd": 34.644626,
-        "pricingAsOf": "2026-07-15T14:50:55.798Z"
+        "pricingAsOf": "2026-07-15T14:50:57.354Z"
       }
     },
     "merges": [
