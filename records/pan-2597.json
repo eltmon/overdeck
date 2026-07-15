@@ -297,6 +297,26 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T13:44:08.117Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T13:44:12.986Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T13:44:13.002Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T13:44:13.021Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T13:44:13.048Z"
     }
   ],
   "feedback": [],
@@ -426,7 +446,7 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T13:44:08.117Z",
+  "updated": "2026-07-15T13:44:13.048Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "reviewing",
