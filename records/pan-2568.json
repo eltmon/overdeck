@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:27:00.602Z",
+  "updated": "2026-07-15T15:32:44.294Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -100,7 +100,7 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "statusOverrides": {
-    "injection-budget": "running",
+    "injection-budget": "blocked",
     "size-scaled-waits": "completed",
     "full-length-purge": "running",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
@@ -131,7 +131,7 @@
     }
   },
   "tasks": {
-    "sequence": 6,
+    "sequence": 7,
     "claims": {},
     "claimHistory": [
       {
@@ -180,6 +180,11 @@
       "fork-stranded-status": {
         "reason": "Run-fork pipeline now records actionable failed status for stranded submissions while preserving the live session; submitted forks still clear status",
         "updatedAt": "2026-07-15T14:57:44.283Z"
+      },
+      "injection-budget": {
+        "reason": "Recover malformed running state with missing claim owner after agent restart; implementation is already pushed.",
+        "updatedAt": "2026-07-15T15:32:44.294Z",
+        "forced": true
       }
     }
   }
