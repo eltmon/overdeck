@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:41:37.293Z",
+  "updated": "2026-07-15T14:41:50.987Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:41:37.227Z",
-    "inspectNotes": "Inspecting item issue-view-model"
+    "updatedAt": "2026-07-15T14:41:50.901Z",
+    "inspectNotes": "Inspection error for bead issue-view-model: tmux session inspect-pan-2499-issue-view-model exited before producing a verdict. No verdict was produced."
   },
   "closeOut": {
     "usage": {
@@ -108,7 +108,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.621602,
-        "pricingAsOf": "2026-07-15T14:41:37.279Z"
+        "pricingAsOf": "2026-07-15T14:41:50.965Z"
       }
     },
     "merges": [],
