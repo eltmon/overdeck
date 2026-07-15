@@ -42,9 +42,18 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
       fetch(`/api/issues/${encoded}/swarm-policy`),
       fetch('/api/settings/available-models'),
     ]);
-    if (reviewRes.ok) setReview(await reviewRes.json() as ReviewConfigResponse);
-    if (staffingRes.ok) setStaffing(await staffingRes.json() as StaffingResponse);
-    if (swarmRes.ok) setSwarm(await swarmRes.json() as SwarmResponse);
+    if (reviewRes.ok) {
+      const value = await reviewRes.json() as Partial<ReviewConfigResponse>;
+      if (value.override && value.resolved) setReview(value as ReviewConfigResponse);
+    }
+    if (staffingRes.ok) {
+      const value = await staffingRes.json() as Partial<StaffingResponse>;
+      if (value.override && value.resolved) setStaffing(value as StaffingResponse);
+    }
+    if (swarmRes.ok) {
+      const value = await swarmRes.json() as Partial<SwarmResponse>;
+      if (value.resolved) setSwarm(value as SwarmResponse);
+    }
     if (modelsRes.ok) setAvailableModels(await modelsRes.json() as AvailableModelsResponse);
   }, [issueId]);
 
