@@ -407,9 +407,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T18:11:02.067Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T18:11Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T18:11:57.960Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T18:11:57Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T18:10:59.883Z\n\n## Verdict: CHANGES REQUESTED — all four convoy reviewers failed to produce usable reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ae5cd253/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: ae5cd253bf15f72c1d6bdc39b3f730d32285525d\n- Cycle number: 9\n- Prior cycle SHA: 6e671999e3b912a26767004f0e69af721d5bbe27\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed: role run already running | — | infrastructure failure |\n| correctness | failed: role run already running | — | infrastructure failure |\n| performance | failed: role run already running | — | infrastructure failure |\n| requirements | failed: role run already running | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer failed\nThe security reviewer signaled `REVIEWER_FAILED`: `Role run agent-pan-2710-review-security already running. Use 'pan tell' to message it.` No usable security report was produced for this cycle.\n\n### [correctness] Reviewer failed\nThe correctness reviewer signaled `REVIEWER_FAILED`: `Role run agent-pan-2710-review-correctness already running. Use 'pan tell' to message it.` No usable correctness report was produced for this cycle.\n\n### [performance] Reviewer failed\nThe performance reviewer signaled `REVIEWER_FAILED`: `Role run agent-pan-2710-review-performance already running. Use 'pan tell' to message it.` No usable performance report was produced for this cycle.\n\n### [requirements] Reviewer failed\nThe requirements reviewer signaled `REVIEWER_FAILED`: `Role run agent-pan-2710-review-requirements already running. Use 'pan tell' to message it.` No usable requirements report was produced for this cycle.\n\n## Non-blocking Findings\nNone. No reviewer produced a ready report to synthesize.\n\n## Clean Sub-roles\nNone. Every sub-role failed before producing a usable report.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ae5cd253/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -436,7 +449,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T18:11:02.067Z",
+  "updated": "2026-07-15T18:11:57.960Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
