@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:01:13.631Z",
+  "updated": "2026-07-15T15:03:04.675Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "dod-doc-drift-guard": {
-        "writerId": "flywheel-orchestrator",
-        "agentId": "flywheel-orchestrator",
-        "pid": 1001008,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:31:42.009Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -121,12 +113,29 @@
         "outcome": "completed",
         "reason": "Added the shared eight-row DoD definition, override flag derivation, gate result types, and passing unit coverage",
         "releasedAt": "2026-07-15T14:11:54.223Z"
+      },
+      {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 1001008,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:31:42.009Z",
+        "itemId": "dod-doc-drift-guard",
+        "outcome": "completed",
+        "reason": "Resumed stale flywheel-orchestrator claim; verified commit 2d08eb153b and pushed feature/pan-2715",
+        "forced": true,
+        "releasedAt": "2026-07-15T15:03:04.675Z"
       }
     ],
     "statusReasons": {
       "dod-rows-module": {
         "reason": "Added the shared eight-row DoD definition, override flag derivation, gate result types, and passing unit coverage",
         "updatedAt": "2026-07-15T14:11:54.223Z"
+      },
+      "dod-doc-drift-guard": {
+        "reason": "Resumed stale flywheel-orchestrator claim; verified commit 2d08eb153b and pushed feature/pan-2715",
+        "updatedAt": "2026-07-15T15:03:04.675Z",
+        "forced": true
       }
     }
   },
@@ -135,6 +144,8 @@
     "dod-rows-module.dod-rows-module.ac1": "completed",
     "dod-rows-module.dod-rows-module.ac2": "completed",
     "dod-rows-module.dod-rows-module.ac3": "completed",
-    "dod-doc-drift-guard": "running"
+    "dod-doc-drift-guard": "completed",
+    "dod-doc-drift-guard.dod-doc-drift-guard.ac1": "completed",
+    "dod-doc-drift-guard.dod-doc-drift-guard.ac2": "completed"
   }
 }
