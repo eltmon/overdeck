@@ -14,19 +14,23 @@ import App, {
   parseConversationViewModes,
   serializeConversationViewModes,
 } from './App';
+import { useDashboardStore } from './lib/store';
 
 const {
   mockDashboardState,
   mockOpenIssue,
+  mockOpenIssueFromRoute,
   mockRefreshDashboardState,
   mockToastError,
   mockToastInfo,
   mockToastSuccess,
 } = vi.hoisted(() => {
   const mockOpenIssue = vi.fn();
+  const mockOpenIssueFromRoute = vi.fn();
 
   return {
     mockOpenIssue,
+    mockOpenIssueFromRoute,
     mockDashboardState: {
       agents: [],
       agentsById: {},
@@ -37,6 +41,8 @@ const {
       agentsWithPendingProposedPlan: [],
       drawer: { issueId: null, tab: 'overview' },
       openIssue: mockOpenIssue,
+      openIssueFromRoute: mockOpenIssueFromRoute,
+      syncDrawerFromUrl: vi.fn(),
     },
     mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
     mockToastError: vi.fn(),
@@ -111,12 +117,15 @@ vi.mock('sonner', () => ({
   },
 }));
 vi.mock('./lib/store', () => ({
-  useDashboardStore: vi.fn((selector?: unknown) => {
-    if (typeof selector === 'function') {
-      return selector(mockDashboardState);
-    }
-    return [];
-  }),
+  useDashboardStore: Object.assign(
+    vi.fn((selector?: unknown) => {
+      if (typeof selector === 'function') {
+        return selector(mockDashboardState);
+      }
+      return [];
+    }),
+    { setState: vi.fn() },
+  ),
   selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
@@ -188,12 +197,17 @@ beforeEach(() => {
   mockDashboardState.agentsWithPendingProposedPlan = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockDashboardState.openIssue = mockOpenIssue
+  mockDashboardState.openIssueFromRoute = mockOpenIssueFromRoute
+  mockDashboardState.syncDrawerFromUrl.mockClear()
   mockOpenIssue.mockClear()
+  mockOpenIssueFromRoute.mockClear()
   mockRefreshDashboardState.mockClear()
   mockToastError.mockClear()
   mockToastInfo.mockClear()
   mockToastSuccess.mockClear()
+  useDashboardStore.setState.mockClear()
   window.localStorage.removeItem(SESSION_FEED_SIDEBAR_OPEN_STORAGE_KEY)
+  window.localStorage.removeItem('overdeck:last-tab')
 })
 
 describe('conversation route helpers', () => {
@@ -415,6 +429,42 @@ describe('App primary routing', () => {
     expect(screen.getByTestId('context-page')).toBeInTheDocument();
   });
 
+  it('opens the issue drawer on /issues/:id without rewriting the URL', async () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(window.location.pathname).toBe('/issues/PAN-1234');
+    expect(window.location.search).toBe('');
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-1234', '/pipeline', '/issues/PAN-1234'));
+  });
+
+  it('defaults /issues/:id to Pipeline when no last tab is stored', () => {
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(screen.getByTestId('pipeline-view')).toBeInTheDocument();
+  });
+
+  it('restores the last surface on /issues/:id', () => {
+    window.localStorage.setItem('overdeck:last-tab', 'kanban');
+    window.history.replaceState(null, '', '/issues/PAN-1234');
+    renderApp();
+
+    expect(screen.getByText('Open issue')).toBeInTheDocument();
+  });
+
+  it('handles browser back/forward to /issues/:id', async () => {
+    window.history.replaceState(null, '', '/pipeline');
+    renderApp();
+    useDashboardStore.setState.mockClear();
+
+    window.history.pushState(null, '', '/issues/PAN-999');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+
+    expect(window.location.pathname).toBe('/issues/PAN-999');
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-999', '/pipeline', '/issues/PAN-999'));
+  });
+
   it('redirects direct experimental routes to Home when experimental features are off', async () => {
     window.history.replaceState(null, '', '/agents');
     renderApp();
@@ -573,3 +623,70 @@ describe('App channel permission requests', () => {
     expect(mockToastSuccess).toHaveBeenCalledWith('Denied permission request for agent-987')
   })
 })
+
+describe('App global lens chord shortcuts', () => {
+  beforeEach(() => {
+    window.history.replaceState(null, '', '/');
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/version') {
+        return new Response(JSON.stringify({ version: '0.5.0' }), { status: 200 });
+      }
+      if (url === '/api/tracker-status') {
+        return new Response(JSON.stringify({ primary: 'github', configured: [] }), { status: 200 });
+      }
+      if (url === '/api/confirmations') {
+        return new Response(JSON.stringify([]), { status: 200 });
+      }
+      return new Response(JSON.stringify([]), { status: 200 });
+    }));
+  });
+
+  it('navigates to Pipeline with g p', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'p' });
+    expect(window.location.pathname).toBe('/pipeline');
+  });
+
+  it('navigates to Board with g b', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'b' });
+    expect(window.location.pathname).toBe('/board');
+  });
+
+  it('navigates to Agents with g a', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'a' });
+    expect(window.location.pathname).toBe('/agents');
+  });
+
+  it('navigates to Command Deck with g c', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'c' });
+    expect(window.location.pathname).toBe('/command-deck');
+  });
+
+  it('does not trigger the chord when focus is inside an input', () => {
+    renderApp();
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: 'g' });
+    fireEvent.keyDown(input, { key: 'p' });
+    expect(window.location.pathname).toBe('/');
+    document.body.removeChild(input);
+  });
+
+  it('cancels the chord on an unbound second key', () => {
+    renderApp();
+    fireEvent.keyDown(document, { key: 'g' });
+    fireEvent.keyDown(document, { key: 'q' });
+    expect(window.location.pathname).toBe('/');
+    fireEvent.keyDown(document, { key: 'p' });
+    expect(window.location.pathname).toBe('/');
+  });
+});

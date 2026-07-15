@@ -6,6 +6,7 @@ import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
+import { hasActualPendingQuestion } from '../../../lib/pipeline-state';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
 import { IssueActionMenu, useIssueActions } from '../../IssueActionMenu';
@@ -542,6 +543,8 @@ interface IssueCardProps {
   cost?: IssueCost;
   costsLoading?: boolean;
   isSelected: boolean;
+  /** PAN-1234: keyboard navigation focus indicator. */
+  isFocused?: boolean;
   onSelect: () => void;
   onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
   onViewTasks?: (issue: Issue) => void;
@@ -552,7 +555,7 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, isFocused = false, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [actionOpenSignal, setActionOpenSignal] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -562,10 +565,10 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const hasEnabledIssueAction = issueActions.all.some((view) => view.enabled);
 
   useEffect(() => {
-    if (isSelected && cardRef.current) {
+    if ((isSelected || isFocused) && cardRef.current) {
       cardRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [isSelected]);
+  }, [isSelected, isFocused]);
 
   const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
   const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
@@ -574,6 +577,9 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
+  // PAN-1234: an issue is in INPUT phase when any assigned agent has an actual
+  // pending operator question (count or prompt).
+  const hasPendingInput = [...issueWorkAgents, ...specialists].some(hasActualPendingQuestion);
   const canonical = issue.state ?? STATUS_LABELS[issue.status] ?? 'backlog';
   const issueActionPhase = deriveIssueActionPhase({
     reviewStatus,
@@ -583,6 +589,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     hasTasks: planningState?.hasTasks ?? issue.hasTasks ?? false,
     issueCanonicalState: canonical,
     isMerged,
+    hasPendingInput,
   });
   const isPipelineStuck = issueActionPhase === 'STUCK';
   const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
@@ -652,6 +659,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       issueId={issue.identifier}
       priority={issue.priority}
       selected={isSelected}
+      focused={isFocused}
       bulkSelected={isBulkSelected}
       stuckCard={isStackUnhealthy || isPipelineStuck}
       pausedCard={!!pausedAgent}

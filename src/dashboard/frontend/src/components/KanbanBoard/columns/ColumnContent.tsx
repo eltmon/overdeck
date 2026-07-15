@@ -13,6 +13,7 @@ export function ColumnContent({
   issueCosts,
   costsLoading,
   selectedIssue,
+  focusedIssueId,
   onSelectIssue,
   onOpenIssue,
   onPlan,
@@ -33,6 +34,8 @@ export function ColumnContent({
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
+  /** PAN-1234: keyboard navigation focus target. */
+  focusedIssueId?: string | null;
   onSelectIssue: (id: string | null) => void;
   onOpenIssue: (id: string) => void;
   onPlan: (issue: Issue, autoStart?: boolean) => void;
@@ -71,6 +74,7 @@ export function ColumnContent({
         cost={issueCosts[issue.identifier.toLowerCase()]}
         costsLoading={costsLoading}
         isSelected={selectedIssue === issue.identifier}
+        isFocused={focusedIssueId === issue.identifier}
         onSelect={() => onOpenIssue(issue.identifier)}
         onPlan={(autoStart) => onPlan(issue, autoStart)}
         onViewTasks={(i) => onViewTasks(i)}
