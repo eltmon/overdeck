@@ -409,17 +409,17 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T02:12:22.970Z",
+  "updated": "2026-07-15T02:15:08.698Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T02:12:22.892Z",
+    "updatedAt": "2026-07-15T02:15:08.542Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (456189ms):\n\n5\u001b[22m\u001b[39m\n    \u001b[90m 98|\u001b[39m\n    \u001b[90m 99|\u001b[39m     \u001b[34mexpect\u001b[39m(result\u001b[33m.\u001b[39mstatus)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[34m200\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m100|\u001b[39m     \u001b[34mexpect\u001b[39m(result\u001b[33m.\u001b[39mbody)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m({\n    \u001b[90m   |\u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m101|\u001b[39m       status\u001b[33m:\u001b[39m \u001b[32m'burned'\u001b[39m\u001b[33m,\u001b[39m\n    \u001b[90m102|\u001b[39m       email\u001b[33m:\u001b[39m \u001b[33mEMAIL\u001b[39m\u001b[33m,\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯\u001b[22m\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/codex-auth.test.ts\u001b[2m > \u001b[22mGET /api/settings/codex-auth\u001b[2m > \u001b[22mreturns valid for the same future-expiring JWT when the log tail has no burn lines\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/codex-auth.test.ts\u001b[2m > \u001b[22mGET /api/settings/codex-auth\u001b[2m > \u001b[22mreturns valid for the same future-expiring JWT when the log tail has no burn lines\n\u001b[31m\u001b[1mAssertionError\u001b[22m: expected { status: 'valid', …(3) } to deeply equal { status: 'valid', …(2) }\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[2m  {\u001b[22m\n\u001b[32m-   \"email\": \"user@example.com\",\u001b[39m\n\u001b[32m-   \"expiresAt\": \"2026-06-02T04:40:00.000Z\",\u001b[39m\n\u001b[31m+   \"email\": \"edward.becker@gmail.com\",\u001b[39m\n\u001b[31m+   \"expiresAt\": \"2026-07-23T13:49:33.000Z\",\u001b[39m\n\u001b[31m+   \"source\": \"native\",\u001b[39m\n\u001b[2m    \"status\": \"valid\",\u001b[22m\n\u001b[2m  }\u001b[22m\n\n\u001b[36m \u001b[2m❯\u001b[22m src/dashboard/server/routes/__tests__/codex-auth.test.ts:\u001b[2m113:25\u001b[22m\u001b[39m\n    \u001b[90m111|\u001b[39m\n    \u001b[90m112|\u001b[39m     \u001b[34mexpect\u001b[39m(result\u001b[33m.\u001b[39mstatus)\u001b[33m.\u001b[39m\u001b[34mtoBe\u001b[39m(\u001b[34m200\u001b[39m)\u001b[33m;\u001b[39m\n    \u001b[90m113|\u001b[39m     \u001b[34mexpect\u001b[39m(result\u001b[33m.\u001b[39mbody)\u001b[33m.\u001b[39m\u001b[34mtoEqual\u001b[39m({\n    \u001b[90m   |\u001b[39m                         \u001b[31m^\u001b[39m\n    \u001b[90m114|\u001b[39m       status\u001b[33m:\u001b[39m \u001b[32m'valid'\u001b[39m\u001b[33m,\u001b[39m\n    \u001b[90m115|\u001b[39m       email\u001b[33m:\u001b[39m \u001b[33mEMAIL\u001b[39m\u001b[33m,\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯\u001b[22m\u001b[39m\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
@@ -557,9 +557,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 21875237,
-            "output": 23997,
-            "cacheRead": 20340224,
+            "input": 22026265,
+            "output": 24206,
+            "cacheRead": 20475520,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -569,9 +569,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 36881107,
-            "output": 57169,
-            "cacheRead": 35505664,
+            "input": 38032041,
+            "output": 58088,
+            "cacheRead": 36647424,
             "cacheWrite": 0
           }
         },
@@ -602,9 +602,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 21875237,
-          "output": 23997,
-          "cacheRead": 20340224,
+          "input": 22026265,
+          "output": 24206,
+          "cacheRead": 20475520,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -614,9 +614,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 36881107,
-          "output": 57169,
-          "cacheRead": 35505664,
+          "input": 38032041,
+          "output": 58088,
+          "cacheRead": 36647424,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -633,8 +633,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 179.920283,
-        "pricingAsOf": "2026-07-15T02:12:22.963Z"
+        "usd": 180.564603,
+        "pricingAsOf": "2026-07-15T02:15:08.633Z"
       }
     },
     "merges": [
