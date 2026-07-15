@@ -9,6 +9,37 @@ import { ThemedImage } from "/snippets/themed-image.mdx";
 
 Solutions to common problems and issues with Overdeck.
 
+## PR stuck with stale failed checks after main recovers
+
+A pull request may remain `UNSTABLE` with a failed `test` check and
+`ready_for_merge=0` even though its review, test, and verification stages passed
+and `main` is green. `ready_for_merge=0` means the merge gate is deliberately
+holding the pull request out of the merge queue because GitHub still reports a
+required check failure.
+
+This happens when the pull request's check ran while `main` was failing and
+GitHub did not run it again after `main` recovered. The dashboard's stale-check
+re-trigger service detects these inherited failures and re-runs them once. A
+**red window** is the period from a completed failing run on `main` until the
+next completed successful run of the same workflow. The service only acts on a
+pull request run created inside a closed red window, never while that workflow
+is still failing on `main`.
+
+The service also requires the GitHub workflow run to have `attempt: 1`. This
+once-only attempt guard means a run that Overdeck already retriggered, including
+one that failed again, is not put into a retry loop. Decisions and actions are
+logged with the `[stale-check-retrigger]` prefix.
+
+If the dashboard is down, the run predates the available `main` history, or the
+run is already on attempt 2 or later, re-run the failed jobs manually:
+
+```bash
+gh run rerun <run-id> --failed
+```
+
+After GitHub reports the new result, the existing merge-blocker reconciliation
+poll clears the stale blocker within about 10 minutes.
+
 ## WSL2 Stability Issues (Windows Users)
 
 WSL2 can experience crashes and networking issues, especially under heavy AI agent workloads. Here are recommended `.wslconfig` settings to improve stability.
