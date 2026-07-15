@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issue actions — one registry, every surface (PAN-1610)</title>
+</head>
+<body>
+<style>
+  :root {
+    --pan-scheme: light;
+    --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8; --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c;
+    --warning-foreground: #b45309; --success-foreground: #047857;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5; --warning-foreground: #fbbf24; --success-foreground: #34d399;
+    --shadow-card: none;
+  } }
+  :root[data-theme="dark"] {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5; --warning-foreground: #fbbf24; --success-foreground: #34d399;
+    --shadow-card: none;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light; --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8; --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c; --warning-foreground: #b45309; --success-foreground: #047857;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.55; color-scheme: var(--pan-scheme); }
+  .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+  .page { max-width: 980px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  h1 { font-size: 21px; font-weight: 500; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 36px; max-width: 68ch; }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted-foreground); margin: 44px 0 12px; }
+  p.note { color: var(--muted-foreground); font-size: 13px; max-width: 70ch; margin: 10px 0; }
+  p.note strong { color: var(--foreground); font-weight: 500; }
+  button.theme-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  .scenarios { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
+  .scenarios span { font-size: 11px; color: var(--muted-foreground); align-self: center; margin-right: 2px; }
+  .scenarios button { border: 1px solid var(--border); background: none; border-radius: 5px; color: var(--muted-foreground); font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
+  .scenarios button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  .hub { text-align: center; margin: 6px 0 10px; }
+  .hub .reg { display: inline-block; border: 1.5px solid color-mix(in srgb, var(--primary) 55%, transparent); border-radius: 9px; padding: 8px 18px; background: color-mix(in srgb, var(--primary) 6%, transparent); }
+  .hub .reg b { font-size: 13px; }
+  .hub .reg .sub { font-size: 10.5px; color: var(--muted-foreground); }
+  .spokes { text-align: center; color: var(--muted-foreground); font-size: 11px; margin: 4px 0 10px; }
+
+  .quad { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .quad { grid-template-columns: 1fr; } }
+  .surf { border: 1px solid var(--border); border-radius: 10px; background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
+  .surf .shead { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  .surf .shead b { font-size: 12px; }
+  .surf .shead .mono { font-size: 9.5px; color: var(--muted-foreground); }
+  .surf .sbody { padding: 10px 12px; font-size: 11.5px; min-height: 118px; }
+  .pill { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 4px; font-size: 10.5px; margin: 0 4px 4px 0;
+    border: 1px solid var(--border); background: var(--card-2); cursor: pointer; }
+  .pill.pri { border-color: color-mix(in srgb, var(--primary) 40%, transparent); background: color-mix(in srgb, var(--primary) 8%, transparent); }
+  .gline { font-size: 10.5px; color: var(--muted-foreground); margin: 3px 0; }
+  .gline b { color: var(--foreground); font-weight: 500; }
+  .gline .red { color: var(--destructive-foreground); }
+  .drift { font-size: 10px; color: var(--warning-foreground); border-top: 1px dashed var(--border); margin-top: 8px; padding-top: 6px; }
+  .drift.gone { color: var(--success-foreground); }
+
+  table.mx { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 6px; }
+  table.mx th, table.mx td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.mx th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted-foreground); }
+  table.mx td.bad { color: var(--destructive-foreground); }
+  table.mx td.ok { color: var(--success-foreground); }
+  .frame { background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-card); padding: 14px 16px; }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Issue actions — one registry, every surface</h1>
+    <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  </header>
+  <p class="doc-sub">PAN-1610. All four issue surfaces already call the same <span class="mono">useIssueActions</span> hook — the drift is in <em>presentation</em>: the cockpit invented its own grouping, the rail flattens everything and hardcodes extras, the board and drawer share a third "hybrid toolbar" shape. This proposal makes the registry own grouping + ordering + surface extras, and reduces each surface to a declared <strong>presentation mode</strong>. Change the phase below and watch all four update from the single source.</p>
+
+  <h2>Proposed — the contract</h2>
+  <div class="hub">
+    <div class="reg"><b>ISSUE_ACTIONS registry</b><div class="sub mono">items · gating · groups · order · confirm flows · surface extras</div></div>
+    <div class="spokes">↓ one source, four declared presentations ↓</div>
+  </div>
+  <div class="scenarios">
+    <span>Issue phase:</span>
+    <button data-ph="backlog">Backlog</button>
+    <button data-ph="working" class="on">Working</button>
+    <button data-ph="reviewing">Reviewing</button>
+    <button data-ph="merged">Merged</button>
+    <span style="margin-left:14px">Show:</span>
+    <button id="modeToday">Today's drift</button>
+    <button id="modeProposed" class="on">Proposed</button>
+  </div>
+  <div class="quad">
+    <div class="surf">
+      <div class="shead"><b>Cockpit header</b><span class="mono">mode="grouped-panel" · IssueMissionControl</span></div>
+      <div class="sbody" id="s-cockpit"></div>
+    </div>
+    <div class="surf">
+      <div class="shead"><b>Rail row (right-click)</b><span class="mono">mode="grouped-context" · FeatureItem</span></div>
+      <div class="sbody" id="s-rail"></div>
+    </div>
+    <div class="surf">
+      <div class="shead"><b>Board card</b><span class="mono">mode="primary-strip" · KanbanCards</span></div>
+      <div class="sbody" id="s-board"></div>
+    </div>
+    <div class="surf">
+      <div class="shead"><b>Drawer action bar</b><span class="mono">mode="primary-strip" + pinned · DrawerActionBar</span></div>
+      <div class="sbody" id="s-drawer"></div>
+    </div>
+  </div>
+
+  <h2>What the registry gains (and surfaces lose)</h2>
+  <p class="note"><strong>Grouping and order move into the registry.</strong> <span class="mono">GROUP_ORDER</span>/<span class="mono">GROUP_LABELS</span> leave <span class="mono">IssueMissionControl.tsx:86-108</span> (delivered by PAN-2661) so every presentation renders the same sections in the same order. A surface declares only its mode: <span class="mono">grouped-panel</span>, <span class="mono">grouped-context</span>, or <span class="mono">primary-strip</span> (phase-primary buttons + a grouped overflow), plus optional pinned actions (the drawer pins Merge).</p>
+  <p class="note"><strong>Surface extras become registry entries with a surface tag.</strong> Open State Dir / View JSONL / the duplicate Deep Wipe stop being hardcoded JSX in <span class="mono">FeatureItem.tsx:734-755</span>; they register with <span class="mono">surfaces: ['rail-session']</span>, inherit confirm flows, and appear in the parity test like everything else.</p>
+  <p class="note"><strong>Drift becomes a red test, not a bug report.</strong> A parity test renders each mode against the registry and asserts: identical item sets, identical gating, destructive-last, and no surface-local action definitions outside the registry module. The flat/grouped split that motivated this issue can't quietly return.</p>
+
+  <h2>Parity matrix — today vs proposed</h2>
+  <div class="frame">
+    <table class="mx">
+      <tr><th>Dimension</th><th>Cockpit panel</th><th>Rail context menu</th><th>Board card</th><th>Drawer bar</th></tr>
+      <tr><td>Item source</td><td class="ok">registry ✓</td><td class="ok">registry ✓</td><td class="ok">registry ✓</td><td class="ok">registry ✓</td></tr>
+      <tr><td>Grouping</td><td class="bad">local GROUP_ORDER copy</td><td class="bad">none — flat dump</td><td class="bad">hybrid (primary + flat overflow)</td><td class="bad">hybrid (primary + flat overflow)</td></tr>
+      <tr><td>Destructive separation</td><td class="bad">Danger group, inline</td><td class="bad">scattered red</td><td class="bad">in overflow, mixed</td><td class="bad">in overflow, mixed</td></tr>
+      <tr><td>Surface extras</td><td>—</td><td class="bad">hardcoded ×3 (incl. duplicate Deep Wipe)</td><td>—</td><td class="bad">MergeButton bolted beside menu</td></tr>
+      <tr><td><b>Proposed</b></td><td class="ok">grouped-panel from registry</td><td class="ok">grouped-context from registry (PAN-2661)</td><td class="ok">primary-strip from registry</td><td class="ok">primary-strip + pinned:merge from registry</td></tr>
+      <tr><td><b>Enforcement</b></td><td colspan="4" class="ok">one parity test over all four modes: same items, same gates, danger collapsed &amp; last, zero out-of-registry actions</td></tr>
+    </table>
+  </div>
+
+  <h2>Scope note</h2>
+  <p class="note">This lands after PAN-2499 (one IssueView family = fewer mounts to convert) and after PAN-2661 (which moves grouping into the registry and ships the grouped context menu). What remains here: convert the cockpit panel to consume the registry grouping, re-express the board/drawer hybrid as <span class="mono">primary-strip</span> mode, registry-register the surface extras, and add the parity test. The action set, gating predicates, dialogs host, and confirm flows do not change anywhere in this work.</p>
+</div>
+
+<script>
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+
+  const GROUPS = [['planning','Planning'],['work','Work'],['review','Review & Test'],['agent','Agent'],['workspace','Workspace'],['artifacts','Artifacts'],['navigation','Navigation'],['danger','Danger']];
+  // Compact registry: [group, label, destructive, phases-enabled]
+  const A = [
+    ['planning','Plan',0,['backlog']],['planning','Auto-plan',0,['backlog']],
+    ['work','Start agent',0,['backlog']],['work','Done — start review',0,['working']],['work','Reset to planned',1,['working','reviewing']],
+    ['review','Request review',0,['working']],['review','Re-run review',0,['reviewing']],['review','Remove review sessions & reset',1,['reviewing']],
+    ['agent','Tell agent',0,['working','reviewing']],['agent','Stop agent',0,['working','reviewing']],['agent','Pause agent',0,['working','reviewing']],['agent','Restart agent',1,['working','reviewing']],
+    ['workspace','Sync main',0,['working','reviewing']],['workspace','Create workspace',0,['backlog']],
+    ['artifacts','Tasks',0,['working','reviewing','merged']],['artifacts','Transcripts',0,['working','reviewing','merged']],
+    ['navigation','Open',0,['working','reviewing','merged']],['navigation','View PR',0,['reviewing','merged']],
+    ['danger','Close out',1,['merged']],['danger','Wipe',1,['backlog','working','reviewing','merged']],['danger','Reset issue',1,['backlog','working','reviewing','merged']],
+  ];
+  const PRIMARY = { backlog:['Plan','Auto-plan','Start agent'], working:['Tell agent','Done — start review','Stop agent'], reviewing:['Re-run review','View PR'], merged:['Close out','Open'] };
+  let phase = 'working', proposed = true;
+
+  const on = (a) => a[3].includes(phase);
+  function groupedLines(compact) {
+    return GROUPS.map(([gid, gl]) => {
+      const items = A.filter(a => a[0]===gid && on(a));
+      if (!items.length) return '';
+      const names = items.map(a => a[2] ? `<span class="red">${a[1]}</span>` : a[1]).join(' · ');
+      return `<div class="gline"><b>${gl}</b> — ${names}</div>`;
+    }).join('') || '<div class="gline">no actions in this phase</div>';
+  }
+  function primaryStrip(pinned) {
+    const prim = (PRIMARY[phase]||[]).filter(l => A.some(a=>a[1]===l&&on(a)));
+    const overflowCount = A.filter(a => on(a) && !prim.includes(a[1])).length;
+    return prim.map(l=>`<span class="pill pri">${l}</span>`).join('')
+      + (pinned ? `<span class="pill" style="border-color:color-mix(in srgb, var(--success-foreground) 45%, transparent)">Merge</span>` : '')
+      + `<span class="pill">⋯ ${overflowCount} more (grouped)</span>`;
+  }
+  function flatDump() {
+    const names = A.map(a => a[2] ? `<span class="red">${a[1]}</span>` : a[1]);
+    return `<div class="gline">${names.join(' · ')}</div><div class="gline"><b>+ hardcoded:</b> Open State Dir · View JSONL · <span class="red">Deep Wipe (duplicate)</span></div>`;
+  }
+  function render() {
+    document.getElementById('s-cockpit').innerHTML = groupedLines() +
+      (proposed ? '<div class="drift gone">✓ grouping consumed from the registry (local copy deleted)</div>'
+                : '<div class="drift">drift: grouping defined locally in IssueMissionControl.tsx:86-108</div>');
+    document.getElementById('s-rail').innerHTML = (proposed ? groupedLines() : flatDump()) +
+      (proposed ? '<div class="drift gone">✓ grouped-context mode (PAN-2661) · extras registered with surface tag · duplicate Deep Wipe deleted</div>'
+                : '<div class="drift">drift: flat 44-item dump + 3 hardcoded extras (FeatureItem.tsx:711-755)</div>');
+    document.getElementById('s-board').innerHTML = primaryStrip(false) +
+      (proposed ? '<div class="drift gone">✓ primary-strip mode; overflow opens the same grouped menu</div>'
+                : '<div class="drift">drift: hybrid toolbar with flat, ungrouped overflow</div>');
+    document.getElementById('s-drawer').innerHTML = primaryStrip(true) +
+      (proposed ? '<div class="drift gone">✓ primary-strip + pinned:merge declared in the mode, not bolted-on JSX</div>'
+                : '<div class="drift">drift: hybrid toolbar + MergeButton composed ad-hoc in DrawerActionBar.tsx</div>');
+  }
+  document.querySelectorAll('[data-ph]').forEach(b => b.onclick = () => {
+    phase = b.dataset.ph;
+    document.querySelectorAll('[data-ph]').forEach(x => x.classList.toggle('on', x===b));
+    render();
+  });
+  document.getElementById('modeToday').onclick = () => { proposed = false; document.getElementById('modeToday').classList.add('on'); document.getElementById('modeProposed').classList.remove('on'); render(); };
+  document.getElementById('modeProposed').onclick = () => { proposed = true; document.getElementById('modeProposed').classList.add('on'); document.getElementById('modeToday').classList.remove('on'); render(); };
+  render();
+</script>
+</body>
+</html>

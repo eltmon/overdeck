@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issue actions context menu — grouped redesign (PAN-2661)</title>
+</head>
+<body>
+<style>
+  :root {
+    --pan-scheme: light;
+    --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8; --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264); --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c;
+    --warning: #f59e0b; --warning-foreground: #b45309;
+    --success: #10b981; --success-foreground: #047857;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5; --warning-foreground: #fbbf24;
+    --success-foreground: #34d399; --shadow-card: none;
+  } }
+  :root[data-theme="dark"] {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5; --warning-foreground: #fbbf24;
+    --success-foreground: #34d399; --shadow-card: none;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light; --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8; --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c; --warning-foreground: #b45309;
+    --success-foreground: #047857; --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.55; color-scheme: var(--pan-scheme); }
+  .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
+  .page { max-width: 960px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  h1 { font-size: 21px; font-weight: 500; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 36px; max-width: 66ch; }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted-foreground); margin: 44px 0 12px; }
+  p.note { color: var(--muted-foreground); font-size: 13px; max-width: 68ch; margin: 10px 0; }
+  p.note strong { color: var(--foreground); font-weight: 500; }
+  button.theme-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  .callouts { margin: 14px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 70ch; display: grid; gap: 7px; }
+  .callouts li { padding-left: 22px; position: relative; }
+  .callouts li::before { content: attr(data-n); position: absolute; left: 0; top: 2px; width: 15px; height: 15px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--destructive) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+    color: var(--destructive-foreground); }
+  .callouts strong { color: var(--foreground); font-weight: 500; }
+
+  .duo { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
+
+  .menu { background: var(--popover); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow-card); padding: 6px; font-size: 12px; }
+  .menu .mlabel { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); padding: 6px 9px 3px; }
+  .mi { display: flex; align-items: center; gap: 7px; padding: 4px 9px; border-radius: 5px; cursor: pointer; }
+  .mi:hover { background: var(--muted); }
+  .mi.dis { color: var(--muted-foreground); opacity: .55; cursor: default; }
+  .mi.dis:hover { background: none; }
+  .mi.red { color: var(--destructive-foreground); }
+  .msep { height: 1px; background: var(--border); margin: 5px 4px; }
+  .menu .ellipsis { color: var(--muted-foreground); font-size: 11px; padding: 3px 9px; }
+
+  .scenarios { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+  .scenarios span { font-size: 11px; color: var(--muted-foreground); align-self: center; margin-right: 2px; }
+  .scenarios button { border: 1px solid var(--border); background: none; border-radius: 5px; color: var(--muted-foreground); font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
+  .scenarios button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+  .counts { font-size: 11px; color: var(--muted-foreground); padding: 4px 9px 6px; }
+  .phasechip { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 3px; font-size: 10px; letter-spacing: .05em;
+    background: color-mix(in srgb, var(--primary) 8%, transparent); border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); }
+  .dangerhead { display: flex; align-items: center; gap: 6px; padding: 5px 9px; cursor: pointer; color: var(--destructive-foreground); font-size: 11px; border-radius: 5px; }
+  .dangerhead:hover { background: color-mix(in srgb, var(--destructive) 6%, transparent); }
+  .kbd { font-size: 9px; border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; color: var(--muted-foreground); margin-left: auto; }
+
+  table.naming { border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+  table.naming th, table.naming td { text-align: left; padding: 5px 22px 5px 0; border-bottom: 1px solid var(--border); font-weight: 500; }
+  table.naming th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+  table.naming td.old { color: var(--muted-foreground); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--destructive) 55%, transparent); }
+  table.audit { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 6px; }
+  table.audit th, table.audit td { text-align: left; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.audit th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+  .frame { background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-card); padding: 16px 18px; }
+  .sidepane { position: sticky; top: 14px; }
+  .explain { font-size: 12px; color: var(--muted-foreground); border-left: 2px solid var(--border); padding-left: 12px; margin-top: 12px; }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Issue actions — grouped context menu</h1>
+    <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  </header>
+  <p class="doc-sub">PAN-2661. The rail's right-click menu dumps all 44 registry actions in declaration order under one "Issue actions" label (<span class="mono">FeatureItem.tsx:711-714</span> flattens primary+secondary+overflow). The registry already carries group metadata, and the cockpit's ⌘&nbsp;Actions panel already renders it grouped — this proposal gives the context menu the same taxonomy. The proposed menu is interactive: switch phases and watch it regate.</p>
+
+  <h2>Current — what ships today</h2>
+  <div class="duo">
+    <div class="menu" aria-hidden="true">
+      <div class="mlabel">Issue actions</div>
+      <div class="mi dis">Plan</div>
+      <div class="mi dis">Auto-plan</div>
+      <div class="mi dis">Watch planning</div>
+      <div class="mi">Done planning</div>
+      <div class="mi dis">Start agent</div>
+      <div class="mi dis">Start without planning</div>
+      <div class="mi">Tell agent</div>
+      <div class="mi">Done — mark work complete &amp; start review</div>
+      <div class="mi dis">Request review</div>
+      <div class="mi dis">Re-run review on latest commit</div>
+      <div class="mi dis">Reset stalled review state</div>
+      <div class="mi red dis">Remove review sessions &amp; reset</div>
+      <div class="mi">Stop agent</div>
+      <div class="mi">Pause agent</div>
+      <div class="mi dis">Unpause agent</div>
+      <div class="mi dis">Clear troubled gate</div>
+      <div class="mi dis">Recover agent</div>
+      <div class="mi dis">Resume session</div>
+      <div class="mi">Sync main</div>
+      <div class="mi">Rebuild &amp; start</div>
+      <div class="mi">Inspect task</div>
+      <div class="mi dis">Reopen</div>
+      <div class="mi red dis">Close out</div>
+      <div class="mi red">Wipe</div>
+      <div class="mi red">Destroy workspace</div>
+      <div class="ellipsis">… 19 more in declaration order (Open, Reset issue, Reset to planned, View PR, Cancel issue, Tasks, Inference, …) …</div>
+      <div class="msep"></div>
+      <div class="mi">Open State Dir</div>
+      <div class="mi">View JSONL</div>
+      <div class="mi red">Deep Wipe</div>
+    </div>
+    <ul class="callouts">
+      <li data-n="1"><strong>44 items, one label, declaration order.</strong> Planning, agent recovery, artifacts, and destruction interleave in whatever order they were registered in <span class="mono">issueActions.ts</span> — you scan the whole list every time, and the group metadata that could organize it is thrown away by the flatten.</li>
+      <li data-n="2"><strong>Destructive actions are scattered, not last.</strong> "Remove review sessions &amp; reset" sits between review and agent items; "Wipe" and "Destroy workspace" sit mid-list with "Open" right below them. Red styling is the only separation.</li>
+      <li data-n="3"><strong>Deep Wipe exists twice.</strong> The registry's "Wipe" AND a hardcoded surface extra at the bottom (<span class="mono">FeatureItem.tsx:750-755</span>) — same irreversible operation, two entries, different confirm flows.</li>
+      <li data-n="4"><strong>Mostly-disabled noise.</strong> In any given phase roughly two-thirds of items are gray. They're kept (correctly — disabled-with-reason is good UX) but with no grouping the gray majority buries the few live actions.</li>
+      <li data-n="5"><strong>An orphan ships in the list.</strong> <span class="mono">reviewTest</span> (group "preserved") is a legacy compat entry surfaced nowhere deliberately — it needs a disposition, not a menu slot.</li>
+    </ul>
+  </div>
+
+  <h2>Proposed — the cockpit's taxonomy, phase-first</h2>
+  <p class="note">One registry, one grouping. The menu opens with <strong>For this phase</strong> — the same phase-primary actions <span class="mono">useIssueActions</span> already computes — then the registry groups in cockpit order. Disabled items stay visible and keep their reason tooltips (hover them). Danger is separated, last, and collapsed behind one row so a fast scan can't end in an irreversible click.</p>
+  <div class="scenarios">
+    <span>Issue phase:</span>
+    <button data-ph="backlog">Backlog</button>
+    <button data-ph="planning">Planning</button>
+    <button data-ph="working" class="on">Working</button>
+    <button data-ph="reviewing">Reviewing</button>
+    <button data-ph="ready">Ready</button>
+    <button data-ph="merged">Merged</button>
+  </div>
+  <div class="duo">
+    <div class="menu" id="pmenu" role="menu" aria-label="Issue actions (proposed)"></div>
+    <div class="sidepane">
+      <div class="frame">
+        <p class="note" style="margin-top:0"><strong>What you're seeing.</strong> The item set, gating, and confirm flows are untouched — this is the same 44-action registry (<span class="mono">ISSUE_ACTIONS</span>), rendered with the group metadata it already carries plus the cockpit's <span class="mono">GROUP_ORDER</span>. Empty groups hide. The phase chip and counts keep you oriented; keyboard: <span class="kbd">↑↓</span> move, <span class="kbd">⏎</span> run, type to filter (spec'd, not mocked).</p>
+        <p class="note"><strong>Surface extras become a labeled section.</strong> "This session" carries Open State Dir / View JSONL. The hardcoded Deep Wipe is deleted — the registry's Wipe in Danger is the single entry (one confirm flow).</p>
+        <p class="note"><strong>Danger is a disclosure.</strong> Collapsed by default with a count; expanding shows the destructive set, red, with their existing typed-confirm gates. Reopen (safe) stays in the group but unstyled.</p>
+      </div>
+      <div class="explain" id="hoverwhy">Hover a grayed item to see its disabled reason here (mirrors today's tooltips).</div>
+    </div>
+  </div>
+
+  <h2>What changed, and why</h2>
+  <p class="note"><strong>The grouping already existed — it was just discarded.</strong> Every action in <span class="mono">issueActions.ts</span> declares a group; the cockpit's ⌘ Actions panel renders those groups; the context menu flattens them away. The fix is to move <span class="mono">GROUP_ORDER</span>/<span class="mono">GROUP_LABELS</span> from <span class="mono">IssueMissionControl.tsx:86-108</span> into the registry module and have BOTH presentations consume it — which is also the first half of PAN-1610 (one registry, no drift).</p>
+  <p class="note"><strong>Phase-first beats alphabet-first.</strong> The hook already computes phase-primary actions; putting them at the top means the two or three things you actually came for are under the cursor, while the full grouped set stays one scan away. Disabled items remain visible with reasons — discoverability is a feature; noise was the bug, and grouping fixes the noise.</p>
+  <p class="note"><strong>Exactly one way to destroy things.</strong> Danger collapsed + the duplicate hardcoded Deep Wipe removed = every irreversible action lives in one labeled place with one confirm flow.</p>
+  <table class="naming">
+    <tr><th>Today</th><th>Proposed</th></tr>
+    <tr><td class="old">One "Issue actions" label, 44 items in declaration order</td><td>For this phase → Planning → Work → Review &amp; Test → Agent → Workspace → Artifacts → Navigation → This session → Danger</td></tr>
+    <tr><td class="old">Destructive items scattered mid-list</td><td>All destructive items in Danger, collapsed, last</td></tr>
+    <tr><td class="old">Hardcoded Deep Wipe duplicate (FeatureItem.tsx:750-755)</td><td>Deleted — registry Wipe is the single entry</td></tr>
+    <tr><td class="old">reviewTest ("preserved") rendered in the flat dump</td><td>Not rendered; dispositioned in the no-loss audit (retire or re-home)</td></tr>
+    <tr><td class="old">Grouping metadata cockpit-only (IssueMissionControl.tsx:86-108)</td><td>Lives in the registry; both cockpit panel and context menu consume it</td></tr>
+  </table>
+
+  <h2>No-loss audit</h2>
+  <table class="audit">
+    <tr><th>Surface item</th><th>Disposition</th></tr>
+    <tr><td>All 44 <span class="mono">ISSUE_ACTIONS</span> entries (incl. every destructive item and its typed-confirm gate)</td><td>Rendered via registry groups; item set, gating predicates, confirm flows byte-identical. A parity test asserts context-menu items ≡ registry.</td></tr>
+    <tr><td>Disabled-with-reason semantics + tooltips</td><td>Preserved (visible, dimmed, reason on hover)</td></tr>
+    <tr><td>Phase-primary ordering (useIssueActions primary)</td><td>Preserved as the "For this phase" section</td></tr>
+    <tr><td>Open State Dir · View JSONL (surface extras)</td><td>Re-homed to "This session" section</td></tr>
+    <tr><td>Hardcoded Deep Wipe (FeatureItem.tsx:750-755)</td><td>Deleted as duplicate of registry Wipe — explicit removal, counted here</td></tr>
+    <tr><td><span class="mono">reviewTest</span> (group "preserved")</td><td>Disposition required at implementation: retire the entry or re-home it — never silently dropped</td></tr>
+    <tr><td>Cockpit ⌘ Actions panel</td><td>Unchanged in this issue (adopts the moved registry grouping; presentation untouched) — full convergence is PAN-1610</td></tr>
+  </table>
+</div>
+
+<script>
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
+
+  // Registry model — labels/groups/kinds from issueActions.ts; phase gates are
+  // honest simplifications of the useIssueActions predicates for demo purposes.
+  const P = ['backlog','planning','working','reviewing','ready','merged'];
+  const A = [
+    ['plan','Plan','planning',0,['backlog'],'agent running or plan already exists'],
+    ['autoPlan','Auto-plan','planning',0,['backlog'],'agent running or plan already exists'],
+    ['watchPlanning','Watch planning','planning',0,['planning'],'no active planning session'],
+    ['donePlanning','Done planning','planning',0,['planning'],'no finished planning agent'],
+    ['startAgent','Start agent','work',0,['backlog','planning'],'needs a plan + tasks, agent stopped'],
+    ['startSkipPlanning','Start without planning','work',0,['backlog'],'issue already has a plan'],
+    ['doneWork','Done — mark work complete & start review','work',0,['working'],'no live work agent'],
+    ['resetToPlanned','Reset to planned','work',1,['working','reviewing','ready'],'no workspace'],
+    ['requestReview','Request review','review',0,['working','reviewing'],'review already active or no workspace'],
+    ['restartReview','Re-run review on latest commit','review',0,['reviewing','ready'],'no review to re-run'],
+    ['recoverReview','Reset stalled review state','review',0,['reviewing'],'review is not stalled'],
+    ['purgeReview','Remove review sessions & reset','review',1,['reviewing','ready'],'no review sessions'],
+    ['inspectTask','Inspect task','review',0,['planning','working','reviewing'],'no tasks to inspect'],
+    ['tell','Tell agent','agent',0,['working','reviewing'],'no live agent'],
+    ['stopAgent','Stop agent','agent',0,['working','reviewing'],'no live agent'],
+    ['pause','Pause agent','agent',0,['working','reviewing'],'no live agent'],
+    ['unpause','Unpause agent','agent',0,[],'agent is not paused'],
+    ['untroubled','Clear troubled gate','agent',0,[],'agent is not troubled'],
+    ['recoverAgent','Recover agent','agent',0,[],'nothing to recover'],
+    ['resumeSession','Resume session','agent',0,['working','reviewing','ready'],'no resumable session'],
+    ['resetSession','Reset session','agent',1,['working','reviewing','ready'],'no resumable session'],
+    ['restartAgent','Restart agent','agent',1,['working','reviewing'],'no agent, or issue merged'],
+    ['syncMain','Sync main','workspace',0,['working','reviewing','ready'],'no workspace'],
+    ['rebuildAndStart','Rebuild & start','workspace',0,['working','reviewing'],'no workspace'],
+    ['createWorkspace','Create workspace','workspace',0,['backlog','planning'],'workspace already exists'],
+    ['copySettings','Copy settings','workspace',0,['working','reviewing','ready'],'no workspace'],
+    ['tasks','Tasks','artifacts',0,['planning','working','reviewing','ready','merged'],'no tasks or plan yet'],
+    ['inference','Inference','artifacts',0,['working','reviewing','ready','merged'],'no inference artifact'],
+    ['discussions','Discussions','artifacts',0,['working','reviewing','ready','merged'],'no discussions'],
+    ['transcripts','Transcripts','artifacts',0,['working','reviewing','ready','merged'],'no transcripts'],
+    ['upload','Upload transcript','artifacts',0,P,''],
+    ['syncDiscussions','Sync discussions','artifacts',0,P,''],
+    ['statusReview','Status review','artifacts',0,P,''],
+    ['open','Open','navigation',0,['working','reviewing','ready','merged'],'no workspace'],
+    ['viewPr','View PR','navigation',0,['reviewing','ready','merged'],'no PR yet'],
+    ['reopen','Reopen','danger',0,['merged'],'issue is not done/canceled'],
+    ['closeOut','Close out','danger',1,['merged'],'issue is not merged/verifying'],
+    ['wipe','Wipe','danger',1,P,''],
+    ['destroyWorkspace','Destroy workspace','danger',1,['working','reviewing','ready','merged'],'no workspace'],
+    ['resetIssue','Reset issue','danger',1,P,''],
+    ['cancel','Cancel issue','danger',1,['backlog','planning','working'],'issue already terminal'],
+    ['completeWorkReset','Complete work reset','danger',1,['working','reviewing','ready'],'no agent, or merged'],
+    ['restartFromPlan','Restart from plan','danger',1,['working','reviewing','ready'],'no plan, or merged'],
+  ];
+  const GROUPS = [['phase','For this phase'],['planning','Planning'],['work','Work'],['review','Review & Test'],['agent','Agent'],['workspace','Workspace'],['artifacts','Artifacts'],['navigation','Navigation'],['session','This session'],['danger','Danger']];
+  const PRIMARY = { backlog:['plan','autoPlan','startSkipPlanning'], planning:['watchPlanning','donePlanning'], working:['tell','doneWork','stopAgent'], reviewing:['restartReview','recoverReview'], ready:['viewPr','syncMain'], merged:['closeOut','reopen'] };
+  let phase = 'working', dangerOpen = false;
+
+  function render() {
+    const enabled = (a) => a[4].includes(phase);
+    const items = A.map(a => ({ key:a[0], label:a[1], group:a[2], destr:a[3]===1, on:enabled(a), why:a[5] }));
+    const availableCount = items.filter(i=>i.on).length;
+    const menu = document.getElementById('pmenu');
+    let html = `<div class="mlabel" style="display:flex;align-items:center;gap:8px">Issue actions <span class="phasechip">${phase}</span></div>`;
+    html += `<div class="counts">${availableCount} available now · ${items.length - availableCount} gated (dimmed)</div>`;
+    for (const [gid, glabel] of GROUPS) {
+      if (gid === 'phase') {
+        const prim = (PRIMARY[phase]||[]).map(k => items.find(i=>i.key===k)).filter(Boolean).filter(i=>i.on);
+        if (!prim.length) continue;
+        html += `<div class="mlabel">${glabel}</div>` + prim.map(i => `<div class="mi" role="menuitem">${i.label}</div>`).join('');
+        html += '<div class="msep"></div>';
+        continue;
+      }
+      if (gid === 'session') {
+        html += `<div class="mlabel">${glabel}</div><div class="mi" role="menuitem">Open state dir</div><div class="mi" role="menuitem">View JSONL</div><div class="msep"></div>`;
+        continue;
+      }
+      if (gid === 'danger') {
+        const dItems = items.filter(i=>i.group==='danger');
+        const dOn = dItems.filter(i=>i.on).length;
+        html += `<div class="dangerhead" id="dhead" role="button" tabindex="0">${dangerOpen?'▾':'▸'} Danger (${dOn} available)</div>`;
+        if (dangerOpen) html += dItems.map(i => `<div class="mi ${i.destr?'red':''} ${i.on?'':'dis'}" role="menuitem" data-why="${i.on?'':i.why}">${i.label}</div>`).join('');
+        continue;
+      }
+      const gItems = items.filter(i=>i.group===gid);
+      if (!gItems.length) continue;
+      html += `<div class="mlabel">${glabel}</div>` + gItems.map(i =>
+        `<div class="mi ${i.destr?'red':''} ${i.on?'':'dis'}" role="menuitem" data-why="${i.on?'':i.why}">${i.label}</div>`).join('');
+    }
+    menu.innerHTML = html;
+    const dh = document.getElementById('dhead');
+    if (dh) { dh.onclick = () => { dangerOpen = !dangerOpen; render(); };
+      dh.onkeydown = (e) => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); dangerOpen=!dangerOpen; render(); } }; }
+    menu.querySelectorAll('.mi.dis').forEach(el => el.addEventListener('mouseenter', () => {
+      document.getElementById('hoverwhy').textContent = `"${el.textContent}" is gated: ${el.dataset.why || 'not available in this phase'}.`;
+    }));
+  }
+  document.querySelectorAll('[data-ph]').forEach(b => b.onclick = () => {
+    phase = b.dataset.ph; dangerOpen = false;
+    document.querySelectorAll('[data-ph]').forEach(x => x.classList.toggle('on', x===b));
+    render();
+  });
+  render();
+</script>
+</body>
+</html>
