@@ -156,19 +156,19 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:19:39.847Z",
+  "updated": "2026-07-15T17:20:00.933Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:19:39.804Z",
+    "updatedAt": "2026-07-15T17:20:00.610Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
-    "inspectNotes": "Inspecting item red-window-classifier",
+    "inspectNotes": "Commit 97ec41d2 is an empty merge commit (main->feature/pan-2710) touching only docs/FLYWHEEL-STATE.md. No red-window-classifier module, computeRedWindows, or selectRerunCandidates implementation exists anywhere in the repo history yet — none of the 4 acceptance criteria are addressed. Needs the actual pure-classifier implementation committed before this bead can pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
     "lastVerifiedCommit": "97ec41d2d63059ea8789c4b15386d7bbe9d87e05",
     "reviewSpawnedAt": "2026-07-15T17:18:30.037Z"
@@ -200,10 +200,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 14,
-            "output": 5093,
-            "cacheRead": 648893,
-            "cacheWrite": 220806
+            "input": 18,
+            "output": 5382,
+            "cacheRead": 797360,
+            "cacheWrite": 316876
           }
         }
       },
@@ -227,15 +227,15 @@
           "cacheWrite": 166964
         },
         "anthropic/claude-sonnet-5": {
-          "input": 14,
-          "output": 5093,
-          "cacheRead": 648893,
-          "cacheWrite": 220806
+          "input": 18,
+          "output": 5382,
+          "cacheRead": 797360,
+          "cacheWrite": 316876
         }
       },
       "costAtCloseOut": {
-        "usd": 59.824986,
-        "pricingAsOf": "2026-07-15T17:19:39.837Z"
+        "usd": 60.097752,
+        "pricingAsOf": "2026-07-15T17:20:00.774Z"
       }
     },
     "merges": [
