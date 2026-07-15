@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:43:44.137Z",
+  "updated": "2026-07-15T09:45:02.245Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
@@ -99,16 +99,8 @@
   "reReviewScope": "changed",
   "reviewModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "work-model-suspension-copy": {
-        "writerId": "agent-pan-2683",
-        "agentId": "agent-pan-2683",
-        "pid": 1844378,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T09:43:44.137Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2683",
@@ -131,6 +123,17 @@
         "outcome": "completed",
         "reason": "Added Standing crew policy row, override-only chip, PATCH persistence, row/reset-all clearing, and source-aware component coverage",
         "releasedAt": "2026-07-15T09:43:40.909Z"
+      },
+      {
+        "writerId": "agent-pan-2683",
+        "agentId": "agent-pan-2683",
+        "pid": 1844378,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T09:43:44.137Z",
+        "itemId": "work-model-suspension-copy",
+        "outcome": "completed",
+        "reason": "Added conditional crew-routing suspension helper and chip suffix with enabled/disabled/no-override coverage",
+        "releasedAt": "2026-07-15T09:45:02.245Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "standing-crew-row": {
         "reason": "Added Standing crew policy row, override-only chip, PATCH persistence, row/reset-all clearing, and source-aware component coverage",
         "updatedAt": "2026-07-15T09:43:40.909Z"
+      },
+      "work-model-suspension-copy": {
+        "reason": "Added conditional crew-routing suspension helper and chip suffix with enabled/disabled/no-override coverage",
+        "updatedAt": "2026-07-15T09:45:02.245Z"
       }
     }
   },
@@ -155,6 +162,9 @@
     "standing-crew-row.standing-crew-row.ac2": "completed",
     "standing-crew-row.standing-crew-row.ac3": "completed",
     "standing-crew-row.standing-crew-row.ac4": "completed",
-    "work-model-suspension-copy": "running"
+    "work-model-suspension-copy": "completed",
+    "work-model-suspension-copy.work-model-suspension-copy.ac1": "completed",
+    "work-model-suspension-copy.work-model-suspension-copy.ac2": "completed",
+    "work-model-suspension-copy.work-model-suspension-copy.ac3": "completed"
   }
 }
