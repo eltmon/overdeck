@@ -45,11 +45,13 @@ import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
+import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
 import { createPromiseCoalescer } from './in-flight-guard.js';
+import { providerDefaultHarnessSync } from '../agents/staffing.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { type ReReviewScope } from './review-rerun-scope.js';
@@ -570,9 +572,20 @@ async function spawnReviewRoleForIssuePromise(
     // agent is the resume target, and model routing (not config) usually picks the
     // harness. Falling through to the 'claude-code' literal put codex parents into
     // discovery mode, where they stand by forever for a fork that can never happen.
+    // PAN-2697: first reviews have no saved state, so resolve the provider-default
+    // harness from the review model instead of ever defaulting to the literal.
     const savedReviewHarness = getAgentStateSync(`agent-${opts.issueId.toLowerCase()}-review`)?.harness;
+    const modelDefaultHarness = (() => {
+      try {
+        const cfg = loadYamlConfig().config;
+        const reviewModel = opts.model ?? resolveModel('review', undefined, cfg, `review:${opts.issueId.toLowerCase()}`);
+        return reviewModel ? providerDefaultHarnessSync(reviewModel, cfg) : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
     const discoveryForkMode = fullReview
-      && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? 'claude-code') === 'claude-code';
+      && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? modelDefaultHarness ?? 'claude-code') === 'claude-code';
 
     const prompt = fullReview
       ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
@@ -870,15 +883,20 @@ export {
 
 /**
  * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
- * prior cycle? Quick-review — the current hardcoded mode — only ever creates the single
- * `agent-<id>-review` parent, so any `agent-<id>-review-<subRole>` is a stale ghost
- * (e.g. PAN-1866's `-correctness/-security/-performance/-requirements` from an old run).
- *
- * Seam for when extended review returns: this becomes a reviewRunId-mismatch check — a
- * sub-reviewer is stale only when its run differs from the active review run.
+ * prior cycle? PAN-2697: full-convoy review runs today, so "any sub-reviewer exists"
+ * (the old quick-mode assumption) false-flagged every legitimate convoy — and the
+ * always-on review supervisor matched the prefix too. A sub-reviewer is stale only
+ * when its reviewRunId differs from the parent's active run.
  */
 export function isReviewStaleSync(issueId: string): boolean {
-  return listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review-`).length > 0;
+  const issueLower = issueId.toLowerCase();
+  const prefix = `agent-${issueLower}-review-`;
+  const parentRunId = getAgentStateFileSync(`agent-${issueLower}-review`)?.reviewRunId;
+  return listAgentIdsByPrefixSync(prefix).some((id) => {
+    const subRole = id.slice(prefix.length);
+    if (!(REVIEW_SUB_ROLES as readonly string[]).includes(subRole)) return false;
+    return !parentRunId || getAgentStateFileSync(id)?.reviewRunId !== parentRunId;
+  });
 }
 
 export function resolveReviewMode(issueId?: string): ReviewMode {
