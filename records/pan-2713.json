@@ -166,7 +166,7 @@
     "recordedAt": "2026-07-15T14:50:52.626Z"
   },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T15:44:31.009Z",
+  "updated": "2026-07-15T15:44:53.850Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "reviewing",
@@ -176,7 +176,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:44:21.220Z",
+    "updatedAt": "2026-07-15T15:44:51.922Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2721",
@@ -195,9 +195,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 76205021,
-            "output": 93265,
-            "cacheRead": 75073536,
+            "input": 76429856,
+            "output": 93296,
+            "cacheRead": 75297536,
             "cacheWrite": 0
           }
         },
@@ -226,9 +226,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 76205021,
-          "output": 93265,
-          "cacheRead": 75073536,
+          "input": 76429856,
+          "output": 93296,
+          "cacheRead": 75297536,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -245,8 +245,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 60.820282,
-        "pricingAsOf": "2026-07-15T15:44:21.331Z"
+        "usd": 60.937387,
+        "pricingAsOf": "2026-07-15T15:44:52.342Z"
       }
     },
     "merges": [
