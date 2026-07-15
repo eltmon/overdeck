@@ -463,6 +463,7 @@ export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileC
     WHERE ready_for_merge = 1
       OR blocker_reasons LIKE '%merge_conflict%'
       OR blocker_reasons LIKE '%not_mergeable%'
+      OR blocker_reasons LIKE '%failing_checks%'
   `).all() as Array<{
     issue_id: string;
     pr_url: string | null;
