@@ -138,17 +138,17 @@
     }
   ],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:08:37.649Z",
+  "updated": "2026-07-15T15:08:40.416Z",
   "pipeline": {
     "issueId": "PAN-1234",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:08:37.368Z",
-    "reviewNotes": "[correctness] Closing a direct-linked drawer leaves the issue route active — `src/dashboard/frontend/src/App.tsx:395`",
+    "updatedAt": "2026-07-15T15:08:40.262Z",
+    "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (70044ms):\n\nt-no-coderabbit-merge-gate.sh\n\n✓ no CodeRabbit references in merge-gate files\n\n> @overdeck/core@0.45.19 lint:circular\n> bash scripts/lint-circular-deps.sh\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/merge-agent.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (51%)\n  - tsdown:deps (44%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ new circular dependencies found — these must be removed, not baselined:\n    src/dashboard/frontend/src/App/routes.ts > src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx > src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx > src/dashboard/frontend/src/lib/store.ts\n    src/dashboard/frontend/src/App/routes.ts > src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx > src/dashboard/frontend/src/lib/store.ts\n    src/dashboard/frontend/src/App/routes.ts > src/dashboard/frontend/src/components/chat/ConversationPanel.tsx > src/dashboard/frontend/src/lib/store.ts\n\ncircular-dependency guard failed. Break the cycle, or manually edit the baseline in an issue-referenced commit to accept audited growth.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
     "reviewSpawnedAt": "2026-07-15T14:52:41.885Z"
@@ -213,7 +213,7 @@
       },
       "costAtCloseOut": {
         "usd": 52.574635,
-        "pricingAsOf": "2026-07-15T15:08:37.454Z"
+        "pricingAsOf": "2026-07-15T15:08:40.368Z"
       }
     },
     "merges": [
