@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:25:45.096Z",
+  "updated": "2026-07-15T14:25:58.256Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,8 +81,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "deploy-window-guard": {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 923240,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:25:58.256Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -166,6 +174,7 @@
     "stale-build-chip": "completed",
     "stale-build-chip.stale-build-chip.ac1": "completed",
     "stale-build-chip.stale-build-chip.ac2": "completed",
-    "stale-build-chip.stale-build-chip.ac3": "completed"
+    "stale-build-chip.stale-build-chip.ac3": "completed",
+    "deploy-window-guard": "running"
   }
 }
