@@ -32,6 +32,11 @@
       "timestamp": "2026-07-15T16:12:41.645Z",
       "reason": "end",
       "note": "ANOMALIES FIRST: the prior completion succeeded but its post-success overdeck-state push lost a concurrent ref race and used the durable workspace verdict fallback; subsequent Deacon and compact-recovery nudges were stale, while the canonical task writer confirmed every vBRIEF item completed at sequence 24. The origin/main documentation conflict was resolved as a no-loss merge preserving PAN-2715 gate IDs and PAN-2713 deploy ownership. Final verification passed 9,171 backend tests and 32 frontend action-parity tests with 50 expected backend skips; focused tests, typecheck, lint, circular-dependency guard, push guards, clean tree, and local/remote SHA parity passed at 2b26ba74ad."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T16:13Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T16:13:26.629Z"
     }
   ],
   "feedback": [],
@@ -92,22 +97,22 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:13:25.768Z",
+  "updated": "2026-07-15T16:13:27.752Z",
   "pipeline": {
     "issueId": "PAN-2715",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:13:25.704Z",
+    "updatedAt": "2026-07-15T16:13:27.446Z",
     "reviewNotes": "Close-out can certify verification without a commit and succeed without persisting the required DoD audit",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
     "reviewRequestedAt": "2026-07-15T16:13:25.318Z",
-    "reviewSpawnedAt": "2026-07-15T16:10:48.213Z",
+    "reviewSpawnedAt": "2026-07-15T16:13:27.445Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -163,24 +168,6 @@
         "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
       ],
       "recordedAt": "2026-07-15T16:10:43.479Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      }
     }
   },
   "closeOut": {
@@ -245,7 +232,7 @@
       },
       "costAtCloseOut": {
         "usd": 48.467357,
-        "pricingAsOf": "2026-07-15T16:13:25.734Z"
+        "pricingAsOf": "2026-07-15T16:13:27.576Z"
       }
     },
     "merges": [
