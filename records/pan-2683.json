@@ -107,9 +107,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T11:26:17.995Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T11:28Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T11:28:07.302Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T11:28:07.362Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T11:28:07Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2683\n\n# Review Synthesis — PAN-2683 — 2026-07-15T10:46:00-04:00\n\n## Verdict: CHANGES REQUESTED — the branch now changes a spawn-path surface prohibited by NFR-1\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/context.json`\n- Branch: `feature/2683` (workspace HEAD is `feature/pan-2683`)\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683`\n- HEAD reviewed: `a30ce0dd6f2523d0419da931283a3f546cb3797e`\n- Cycle number: 3\n- Prior cycle SHA: `5f460ca4e455e84d3d525b34ef616344b8f9f867`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] Spawn-path files changed despite the byte-for-byte non-goal — `src/lib/agents/runtime-command.ts:638`\n\nNFR-1 explicitly requires spawn paths to remain byte-for-byte unchanged, but the current PR changes role runtime command construction from `mcp__<server>` to `mcp__<server>__*` and updates `src/lib/__tests__/agent-state-role.test.ts` accordingly. This is a behavior-changing expansion of the strict role allow-list in a spawn-path surface, and it is unrelated to the issue-policy staffing UI delivered by PAN-2683.\n\nThe finding survives the cycle-three convergence gate: these lines differ from the prior approved HEAD and appear in the new top commit, `a30ce0dd6f` (`fix: expose specialist MCP tools (PAN-2683)`). Remove both runtime-command and associated test changes from this PR, then land that independently required behavior under its own issue and requirements.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security found no vulnerabilities or advisories, including in the new MCP wildcard behavior.\n- Correctness found no functional defects in the changed implementation.\n- Performance found no material latency, memory, concurrency, or scaling regressions.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-a30ce0dd/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2683 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/__tests__/agent-state-role.test.ts",
@@ -137,7 +155,7 @@
     "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T11:26:17.995Z",
+  "updated": "2026-07-15T11:28:07.363Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "reviewing",
