@@ -217,6 +217,8 @@ Specialist agents have left feedback that you MUST address:
 
 **After addressing ALL feedback:** commit your fixes, then invoke the `/rebase-and-submit` skill — it will run `pan review request {{ISSUE_ID}} -m "Addressed feedback: <summary>"` for you (the correct re-review entry point; `pan done` is only for the first submission).
 
+`pan review request` can take several minutes while verification runs. A yielded exec result, session ID, or "background terminal running" notice means the command is still running — it is not success. Set a long enough exec yield when possible; otherwise poll that same background terminal until it exits and inspect its real exit code. After exit code 0, run `pan show {{ISSUE_ID}}` or `pan review pending` and confirm the issue actually entered the review pipeline before reporting completion. If the command exits non-zero or the pipeline state did not change, keep working and reconcile the failure.
+
 Do NOT `curl` any `/api/review/...` or `/api/workspaces/.../review` endpoint — those routes are for specialist/system use only, not for direct agent invocation. The `pan review request` CLI command is the only supported path. Do NOT poll specialist APIs or wait for results — the pipeline is event-driven.
 {{/PENDING_FEEDBACK}}
 

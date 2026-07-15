@@ -20,7 +20,7 @@ vi.mock('../../lib/wsTransport', () => ({
 }));
 
 import { useDashboardStore } from '../../lib/store';
-import type { Issue } from '../../types';
+import type { Agent, Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { IssueDrawer } from './IssueDrawer';
 import { resetDrawerIssueSubscriptionForTest } from './useDrawerData';
@@ -182,6 +182,83 @@ describe('IssueDrawer', () => {
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'files' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=files');
     expect(screen.getByTestId('drawer-tab-panel-files')).toBeInTheDocument();
+  });
+
+  it('Files tab renders the branch-vs-main DiffPanel scoped to the work agent when a workspace branch exists (AC-34)', async () => {
+    // AC-34 requires the diff to be scoped to feature/<issue-id> vs main. The
+    // diff route is agent-scoped (/api/agents/:id/diffs/vs-main resolves the
+    // agent's workspace branch), so a real work agent must drive the fetch.
+    const workAgent: Agent = {
+      id: 'agent-pan-1-work',
+      issueId: 'PAN-1',
+      runtime: 'claude-code',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-05-22T00:00:00.000Z',
+      consecutiveFailures: 0,
+      killCount: 0,
+      role: 'work',
+      workspace: '/tmp/pan-1',
+    };
+    useDashboardStore.setState({ agentsById: { [workAgent.id]: workAgent } });
+    const fetchSpy = mockFetch();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    useDashboardStore.getState().openIssue('PAN-1', 'files');
+
+    renderDrawer();
+
+    expect(await screen.findByTestId('drawer-tab-panel-files')).toBeInTheDocument();
+
+    // The vs-main fetch is scoped to the actual work agent — not an empty
+    // agent id (/api/agents//diffs/vs-main) and not the all-turns /diffs/full.
+    await waitFor(() => {
+      expect(
+        fetchSpy.mock.calls.some(([url]) => String(url) === `/api/agents/${workAgent.id}/diffs/vs-main`),
+      ).toBe(true);
+    });
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/diffs/full'))).toBe(false);
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/agents//diffs'))).toBe(false);
+  });
+
+  it('Files tab does not inherit stale ?diff URL state from other surfaces', async () => {
+    // Simulate a diff session left open by another surface (e.g. the
+    // conversation side panel): ?diff=1&diffTurnId=<stale-turn> is in the URL.
+    // replaceDrawerUrl preserves those params when switching tabs, so without
+    // isolation the Files tab would inherit the stale turn selection.
+    window.history.replaceState({}, '', '/?diff=1&diffTurnId=stale-turn-42');
+
+    const workAgent: Agent = {
+      id: 'agent-pan-1-work',
+      issueId: 'PAN-1',
+      runtime: 'claude-code',
+      model: 'claude-sonnet-4-6',
+      status: 'running',
+      startedAt: '2026-05-22T00:00:00.000Z',
+      consecutiveFailures: 0,
+      killCount: 0,
+      role: 'work',
+      workspace: '/tmp/pan-1',
+    };
+    useDashboardStore.setState({ agentsById: { [workAgent.id]: workAgent } });
+
+    const fetchSpy = mockFetch();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    useDashboardStore.getState().openIssue('PAN-1', 'files');
+
+    renderDrawer();
+
+    expect(await screen.findByTestId('drawer-tab-panel-files')).toBeInTheDocument();
+
+    // isolateSelection: the Files tab opens on branch-vs-main, ignoring the
+    // stale diffTurnId — it never fetches the stale turn.
+    await waitFor(() => {
+      expect(
+        fetchSpy.mock.calls.some(([url]) => String(url) === `/api/agents/${workAgent.id}/diffs/vs-main`),
+      ).toBe(true);
+    });
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('stale-turn-42'))).toBe(false);
   });
 
   it('renders the artifacts tab with artifact cards and quick actions', async () => {
@@ -754,6 +831,7 @@ describe('IssueDrawer', () => {
           "issue-action-destroyWorkspace",
           "issue-action-open",
           "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
           "issue-action-cancel",
           "issue-action-tasks",
           "issue-action-upload",
@@ -775,6 +853,7 @@ describe('IssueDrawer', () => {
           "issue-action-destroyWorkspace",
           "issue-action-open",
           "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
           "issue-action-cancel",
           "issue-action-tasks",
           "issue-action-upload",

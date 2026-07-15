@@ -21,6 +21,9 @@ function makeHookFixture(): { root: string; hook: string } {
   writeFileSync(join(root, 'scripts', 'guard-state-plane-branches.sh'), '#!/usr/bin/env bash\nexit 0\n', {
     mode: 0o755,
   });
+  writeFileSync(join(root, 'scripts', 'guard-hook-bundle-freshness.sh'), '#!/usr/bin/env bash\nexit 0\n', {
+    mode: 0o755,
+  });
   return { root, hook };
 }
 

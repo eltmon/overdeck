@@ -166,7 +166,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   });
   // PAN-2285: never launch a fresh Codex agent when native Codex auth is
   // missing/expired/burned — it would wedge silently in a 401 loop.
-  assertCodexNativeAuthForSpawn(resolvedHarness);
+  assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
 
   if (
@@ -501,7 +501,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   });
   // PAN-2285: never launch a fresh Codex agent when native Codex auth is
   // missing/expired/burned — it would wedge silently in a 401 loop.
-  assertCodexNativeAuthForSpawn(resolvedHarness);
+  assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   // Create state
   const state: AgentState = {

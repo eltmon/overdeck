@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { checkCodexAuthStatus } from '../../../lib/codex-auth.js';
+import { listAgentStates } from '../../../lib/agents/queries.js';
 import { bridgeCodexAuthToCliproxy, getCliproxyAuthDir } from '../../../lib/cliproxy.js';
 import { createSession, sessionExists, listSessionNames } from '../../../lib/tmux.js';
 import { getDashboardApiUrlSync } from '../../../lib/config.js';
@@ -101,7 +102,7 @@ const getCodexAuthRoute = HttpRouter.add(
   '/api/settings/codex-auth',
   httpHandler(
     Effect.gen(function* () {
-      const status = yield* checkCodexAuthStatus();
+      const status = yield* checkCodexAuthStatus({ agentStates: listAgentStates() });
       return jsonResponse(status);
     }),
   ),
@@ -186,9 +187,10 @@ const postCodexReauthStatusRoute = HttpRouter.add(
         (beforeCredential.accessToken !== null && afterCredential.accessToken !== beforeCredential.accessToken) ||
         (afterCredential.mtimeMs !== null && afterCredential.mtimeMs >= session.createdAt)
       );
-      const authStatus = yield* checkCodexAuthStatus(
-        refreshedCredential ? { ignoreBurnBefore: session.createdAt } : undefined,
-      );
+      const authStatus = yield* checkCodexAuthStatus({
+        ...(refreshedCredential ? { ignoreBurnBefore: session.createdAt } : {}),
+        agentStates: listAgentStates(),
+      });
       if (!refreshedCredential || authStatus.status !== 'valid') {
         return jsonResponse({
           completed: true,

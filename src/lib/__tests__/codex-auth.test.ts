@@ -210,10 +210,12 @@ describe('evaluateBurnedFromLog', () => {
 import {
   classifyNativeCodexAuth,
   paneShowsCodexAuthBurn,
-  flagCodexAgentAuthBurned,
-  clearCodexAgentAuthBurned,
-  getActiveBurnedCodexAgents,
+  applyCodexAuthBurnFlag,
+  codexAuthBurnFlaggedAtMs,
+  filterCodexAuthBurnedAgentIds,
   combineCodexAuthStatuses,
+  CODEX_AUTH_BURNED_REASON_PREFIX,
+  type CodexAuthBurnFlagState,
 } from '../codex-auth.js';
 
 function makeJwt(payload: Record<string, unknown>): string {
@@ -275,28 +277,65 @@ describe('paneShowsCodexAuthBurn (PAN-2285)', () => {
   });
 });
 
-describe('codex burn registry (PAN-2285)', () => {
-  afterEach(() => {
-    clearCodexAgentAuthBurned('agent-a');
-    clearCodexAgentAuthBurned('agent-b');
+describe('persisted codex burn flag (PAN-2285)', () => {
+  const FLAG_NOW = ms('2026-07-15T02:00:00Z');
+
+  it('applyCodexAuthBurnFlag flags a fresh state (troubled + stamped reason) once', () => {
+    const state: CodexAuthBurnFlagState = {};
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW)).toBe(true);
+    expect(state.troubled).toBe(true);
+    expect(state.troubledAt).toBe('2026-07-15T02:00:00.000Z');
+    expect(state.lastFailureReason).toMatch(/^codex-auth-burned\[2026-07-15T02:00:00\.000Z\]/);
+    expect(state.lastFailureAt).toBe('2026-07-15T02:00:00.000Z');
+    // Second flag is a no-op — the writer patrol must not re-stamp every tick.
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW + 60_000)).toBe(false);
+    expect(state.lastFailureReason).toContain('2026-07-15T02:00:00.000Z');
   });
 
-  it('flags an agent once (returns true first, false after)', () => {
-    expect(flagCodexAgentAuthBurned('agent-a')).toBe(true);
-    expect(flagCodexAgentAuthBurned('agent-a')).toBe(false);
+  it('applyCodexAuthBurnFlag preserves an earlier troubledAt (agent already troubled for another reason)', () => {
+    const state: CodexAuthBurnFlagState = { troubled: true, troubledAt: '2026-07-14T00:00:00.000Z', lastFailureReason: 'resume failed' };
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW)).toBe(true);
+    expect(state.troubledAt).toBe('2026-07-14T00:00:00.000Z');
+    // …which is exactly why the flag time is stamped into the reason instead.
+    expect(codexAuthBurnFlaggedAtMs(state)).toBe(FLAG_NOW);
   });
 
-  it('prunes flags recorded before the native store was last written', () => {
-    flagCodexAgentAuthBurned('agent-a'); // flaggedAt ≈ now
-    // A native write strictly in the future heals the family → the flag is stale.
-    expect(getActiveBurnedCodexAgents(Date.now() + 60_000)).not.toContain('agent-a');
-    // The stale entry was pruned, so it stays gone even against mtime 0.
-    expect(getActiveBurnedCodexAgents(0)).not.toContain('agent-a');
+  it('codexAuthBurnFlaggedAtMs returns null once the agent is untroubled (flag must not linger)', () => {
+    const state: CodexAuthBurnFlagState = {};
+    applyCodexAuthBurnFlag(state, FLAG_NOW);
+    // pan untroubled / resume → applyAgentUntroubled clears troubled + failure fields.
+    delete state.troubled;
+    delete state.troubledAt;
+    delete state.lastFailureReason;
+    delete state.lastFailureAt;
+    expect(codexAuthBurnFlaggedAtMs(state)).toBeNull();
+    // And the agent can be flagged again on a later, genuine re-burn.
+    expect(applyCodexAuthBurnFlag(state, FLAG_NOW + 1000)).toBe(true);
   });
 
-  it('keeps flags recorded at/after the native write time', () => {
-    flagCodexAgentAuthBurned('agent-b');
-    expect(getActiveBurnedCodexAgents(0)).toContain('agent-b');
+  it('codexAuthBurnFlaggedAtMs falls back to troubledAt for legacy unstamped reasons', () => {
+    const state: CodexAuthBurnFlagState = {
+      troubled: true,
+      troubledAt: '2026-07-15T01:56:55.000Z',
+      lastFailureReason: `${CODEX_AUTH_BURNED_REASON_PREFIX}: Codex refresh token was revoked — re-authenticate`,
+    };
+    expect(codexAuthBurnFlaggedAtMs(state)).toBe(ms('2026-07-15T01:56:55Z'));
+  });
+
+  it('codexAuthBurnFlaggedAtMs ignores troubled agents with unrelated failure reasons', () => {
+    expect(codexAuthBurnFlaggedAtMs({ troubled: true, lastFailureReason: 'resume failed 3x' })).toBeNull();
+    expect(codexAuthBurnFlaggedAtMs({ troubled: true })).toBeNull();
+  });
+
+  it('filterCodexAuthBurnedAgentIds keeps flags at/after the native write and drops stale ones (re-login heals)', () => {
+    const burned: CodexAuthBurnFlagState & { id: string } = { id: 'agent-a' };
+    applyCodexAuthBurnFlag(burned, FLAG_NOW);
+    const healthy: CodexAuthBurnFlagState & { id: string } = { id: 'agent-b' };
+
+    // Native store untouched since the flag → active.
+    expect(filterCodexAuthBurnedAgentIds([burned, healthy], FLAG_NOW - 60_000)).toEqual(['agent-a']);
+    // Native store rewritten AFTER the flag (global `codex login`) → stale, banner clears.
+    expect(filterCodexAuthBurnedAgentIds([burned, healthy], FLAG_NOW + 60_000)).toEqual([]);
   });
 });
 

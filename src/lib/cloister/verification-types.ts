@@ -1,3 +1,4 @@
+/** Shared verification contracts used by the runner and its process supervisor. */
 export type VerificationRunnerOutcome =
   | { outcome: 'passed' }
   | { outcome: 'skipped'; reason: string }

@@ -21,7 +21,7 @@ import { readIssueRecordSync } from '../../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
-import { resolveTieredExecutionEnabledForIssue } from '../../../lib/agents/tier-table.js';
+import { resolveTieredExecutionBlock } from '../../../lib/agents/tier-table.js';
 import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -47,6 +47,7 @@ import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
+import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
@@ -724,18 +725,31 @@ const postIssueSwarmPolicyRoute = HttpRouter.add('POST', '/api/issues/:issueId/s
   return jsonResponse({ configured: body.value ?? null, resolved: resolveSwarmPolicy(issueId) });
 })));
 
-function getIssueStaffingPayload(project: NonNullable<ReturnType<typeof getProjectSync>>, issueId: string) {
+function getIssueStaffingPayload(
+  project: NonNullable<ReturnType<typeof getProjectSync>>,
+  issueId: string,
+  planMetadata: { [key: string]: unknown } | undefined,
+) {
   const record = readIssueRecordSync(project, issueId);
   const config = loadConfigSync().config;
-  const tiered = resolveTieredExecutionEnabledForIssue(config.tieredExecution, issueId);
+  const block = resolveTieredExecutionBlock(
+    config.tieredExecution,
+    planMetadata,
+    record?.tieredExecutionOverride ?? null,
+  );
   const implicit = resolveImplicitStaffing(config, `work:${issueId.toLowerCase()}`);
+  // PAN-2686: recordedModel reflects the most recent work-agent run, so prefer
+  // the live agent state over the permanent record (which can lag a
+  // restart-fresh respawn). The mid-spawn placeholder is not authoritative.
+  const liveModel = getAgentStateSync(`agent-${issueId.toLowerCase()}`)?.model;
   return {
     override: { workModel: record?.workModel ?? null },
+    tieredExecution: block,
     resolved: {
       model: record?.workModel ?? implicit.model,
-      tiered,
+      tiered: block.effective,
       source: record?.workModel ? 'issue' : 'default',
-      recordedModel: record?.model ?? null,
+      recordedModel: (liveModel && liveModel !== 'pending-work-spawn' ? liveModel : undefined) ?? record?.model ?? null,
     },
   };
 }
@@ -745,7 +759,10 @@ const getIssueStaffingRoute = HttpRouter.add('GET', '/api/issues/:issueId/staffi
   const resolved = resolveProjectFromIssueSync(issueId);
   const project = resolved ? getProjectSync(resolved.projectKey) : undefined;
   if (!project) return jsonResponse({ error: 'Issue project not found' }, { status: 404 });
-  return jsonResponse(getIssueStaffingPayload(project, issueId));
+  const spec = yield* findSpecByIssue(project.path, issueId).pipe(
+    Effect.catch(() => Effect.succeed(null)),
+  );
+  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
 })));
 
 const postIssueStaffingRoute = HttpRouter.add('POST', '/api/issues/:issueId/staffing', httpHandler(Effect.gen(function* () {
@@ -762,7 +779,10 @@ const postIssueStaffingRoute = HttpRouter.add('POST', '/api/issues/:issueId/staf
     return jsonResponse({ error: error instanceof Error ? error.message : String(error) }, { status: 400 });
   }
   yield* Effect.promise(() => updateIssueRecord(project, issueId, (record) => { record.workModel = workModel; }));
-  return jsonResponse(getIssueStaffingPayload(project, issueId));
+  const spec = yield* findSpecByIssue(project.path, issueId).pipe(
+    Effect.catch(() => Effect.succeed(null)),
+  );
+  return jsonResponse(getIssueStaffingPayload(project, issueId, spec?.document.plan.metadata));
 })));
 
 // ─── Home-boundary guard (shared by POST /api/projects and GET /api/fs/list-dirs) ──

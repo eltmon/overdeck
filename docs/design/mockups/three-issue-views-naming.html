@@ -293,15 +293,17 @@
       <ul style="margin:0;padding-left:15px;font-size:11.5px;line-height:1.8">
         <li><b>DrawerActionBar</b> — Issue↗ link, close ✕, Actions</li>
         <li><b>PhaseTimeline</b> — dated Triaged→Merged band</li>
-        <li><b>DrawerTabs</b> — Overview·Plan·Beads·Conversation·Terminal·Activity·Files·Artifacts</li>
+        <li><b>DrawerTabs</b> — Overview·Plan·Tasks·Conversation·Terminal·Activity·Files·Artifacts — all REAL content except Files (placeholder) (tasks rename · PAN-2648)</li>
         <li><b>DrawerPickupSection / PickupGateControls</b> — Plan→Release, Ready/Blocks-main/Park (PAN-2059)</li>
         <li><b>DrawerWorkspaceSection</b> — workspace path + open-in picker</li>
         <li><b>UatEnvironmentPanel</b> — feature-URL link + container stack, top of Overview (FR-10 · shipped 2026-07-14)</li>
+        <li><b>IssuePolicyStrip / PoliciesControl</b> — "Issue policies" card: overrides-only Policies button + chips + Review/Work popover + restart-pending (PAN-2674/2681 · shipped 2026-07-15)</li>
+        <li><b>DrawerSwarmPolicy</b> — legacy "Swarming" select (PAN-2530); now duplicates PoliciesControl's Swarm — retire at console density via THIS audit, never silently</li>
         <li class="lovecell"><b>★ DrawerActiveAgent</b> — live output stream + "Tell this agent"/Resume</li>
         <li><b>DrawerPausedBanner</b> — paused/needs-you banner</li>
         <li><b>DrawerVerificationGates</b> — typecheck/lint/test/uat cards</li>
         <li><b>DrawerReviewSpecialists</b> — review convoy sub-agents</li>
-        <li><b>DrawerBeadsList</b> — beads</li>
+        <li><b>DrawerTasksList</b> — task checklist (renamed from DrawerBeadsList · PAN-2648)</li>
         <li><b>DrawerPlanPanel / VBriefViewer</b> — the vBRIEF plan</li>
         <li><b>DrawerArtifactsPanel</b> — artifacts</li>
         <li><b>DrawerActivityRail / DrawerActivityPanel</b> — Live Activity feed</li>
@@ -314,22 +316,26 @@
       <div style="font:600 13px 'Space Grotesk';color:#c4b5fd;margin-bottom:2px">View 2 · Issue Cockpit</div>
       <div class="mono" style="font-size:10px;color:var(--faint);margin-bottom:10px">Stage/cockpit/IssueMissionControl.tsx · a Command Deck tab</div>
       <ul style="margin:0;padding-left:15px;font-size:11.5px;line-height:1.8">
-        <li><b>Header bar</b> — title, PENDING badge, HeaderStat (branch/PR/CI/cost), Merge button, IssueActionMegaMenu (Actions)</li>
+        <li><b>Header bar</b> — title, PENDING badge, HeaderStat (branch/PR/CI/cost), MergeCta (merged badge / gated merge), <b>IssuePolicyStrip</b> (Policies · PAN-2681), IssueActionMegaMenu (Actions)</li>
+        <li><b>Stale-review warning</b> — "⚠ Stale review state" + Remove-review-sessions reset (IssueTreeLane)</li>
         <li><b>StatusNarrative</b> — plain-English "what's happening" + $ spent</li>
         <li><b>Pipeline Band</b> — Planned/Building/Reviewing/Testing/Shipping + substatus line</li>
-        <li><b>AgentsLane</b> (left) — Plan·Work·Review·Verification·Test·Ship rows w/ spinner+verdict+cost</li>
+        <li><b>AgentsLane</b> (left) — Plan·Work·Knowledge·Review·Verification·Test·Ship rows w/ spinner+verdict+cost; Lint/build-gate node with LIVE per-gate progress + failure breakdown (PAN-2665); issue-linked conversation nodes (PAN-2602)</li>
+        <li><b>SessionPanel</b> — session overlay via IssueTreeContextPanel, resume-session button in header (PAN-1985)</li>
         <li><b>StackDrawer</b> (left, collapsed) — containers, PRs, git ahead/behind, actions</li>
         <li><b>Tabs</b>: Overview·Code·PRD/Plan·Timeline·Discussion·Costs·Artifacts·Ship·Conversation·Files·Terminal</li>
         <li>Overview → <b>CrewStage</b> ("The crew" avatars + spend-glow + commit stream)</li>
         <li>Overview → <b>UatEnvironmentPanel</b> — feature-URL link + container stack (FR-10 · shipped 2026-07-14)</li>
         <li>Overview → <b>HappenedFeed</b> ("What just happened")</li>
+        <li>Overview → <b>NowPanel</b> — status dot + next action + diff stat + quick links</li>
+        <li>Overview → <b>PickupGateCard</b> — pickup-gate summary (PAN-2059 family)</li>
         <li>Overview → <b>PlanMapCard</b> ("the plan, as a map" DAG)</li>
         <li>Overview → <b>IssueBlockerSpotlight</b> (when blocked)</li>
         <li>Code → <b>GitHubCiPanel + ChangedFilesView</b> (PR, CI checks, diff)</li>
-        <li>PRD → <b>PlanMissionTab</b> · Timeline → <b>ActivityTab</b> · Discussion → <b>DiscussionsTab</b></li>
+        <li>PRD → <b>PlanMissionTab</b> · Timeline → <b>StatusHistoryTab + ActivityTab</b> · Discussion → <b>DiscussionsTab</b></li>
         <li>Costs → <b>CostsTab</b> · Artifacts → <b>DrawerArtifactsPanel</b> · Ship → <b>ShipTab</b> (live door log)</li>
         <li>Conversation → <b>ConversationTab</b> · Files/Terminal → open-pane cards</li>
-        <li><b>BeadsRail / BeadsTab</b> (right) — plan progress bar + completed list</li>
+        <li><b>TasksRail / TasksTab</b> (right) — plan progress bar + completed list (renamed from Beads · PAN-2648)</li>
         <li><b>Awareness rail</b> (far right) — Needs-you + activity feed</li>
       </ul>
     </div>
@@ -349,6 +355,7 @@
         <li><b>SessionNode context menu</b> — Stop·Pause·Unpause·Resume·Restart(model/harness)·Deep-wipe·Open state dir·View JSONL·View terminal</li>
         <li><b>ReviewGroup</b> — nested review convoy sub-agents</li>
         <li><b>ShipDoorTreeRow</b> — live server-side merge (PAN-2487)</li>
+        <li><b>Conversation rows</b> — issue-linked conversations as /conv links under the issue (PAN-2602)</li>
         <li><b>StackDrawer / UatStackTreeGroup</b> — workspace stack, per-container status, URLs, actions</li>
         <li><b>ResourcesGroup</b> — orphaned-resource cleanup</li>
         <li><b>ModelResolutionCard</b> — resolved model + harness (on expand)</li>
@@ -356,7 +363,7 @@
     </div>
 
   </div>
-  <div style="font-size:11px;color:var(--faint);margin-top:12px">~ = a lighter equivalent exists · Source-read 2026-07-08 · if a component ships after this date, add it here before any unify work begins (this is the surface-lock).</div>
+  <div style="font-size:11px;color:var(--faint);margin-top:12px">~ = a lighter equivalent exists · Source-read 2026-07-08 · <b>refreshed 2026-07-15</b> (full three-surface sweep): tasks rename (PAN-2648), PoliciesControl (PAN-2674/2681), UAT panels, NowPanel, PickupGateCard, Lint gate node (PAN-2665), stale-review warning, SessionPanel resume, conversation nodes (PAN-2602), DrawerSwarmPolicy (retire-at-console candidate). New totals: Console 17 · Cockpit 21 · Rail 14. <b>Reserved rows (land before final sync):</b> StartAgentCta (FR-9), PAN-1232 Files tab + drawer header meta row + stream verb-line colors, PAN-2683 Standing-crew knob inside PoliciesControl. If a component ships after this date, add it here before any unify work begins (this is the surface-lock).</div>
 </div>
 
 <!-- ═══════════ PROBLEM & WAY OUT ═══════════ -->

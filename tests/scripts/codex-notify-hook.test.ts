@@ -174,3 +174,86 @@ describe('codex-notify-hook REVIEWER_READY signal (PAN-2675)', () => {
     expect(existsSync(tmuxLog)).toBe(false)
   })
 })
+
+describe('codex-notify-hook queued mail drain (PAN-2701)', () => {
+  let tempRoot: string
+  let overdeckHome: string
+  let mockBin: string
+  let hookPath: string
+  let tmuxLog: string
+  let agentDir: string
+
+  function runHook(sendExit = 0): void {
+    writeFileSync(
+      join(mockBin, 'tmux'),
+      `#!/bin/bash\nprintf '%s\\n' "$*" >> "$MOCK_TMUX_LOG"\n` +
+        `if [ "$3" = "load-buffer" ]; then cat "$4" >> "$MOCK_TMUX_LOG"; printf '\\n' >> "$MOCK_TMUX_LOG"; fi\n` +
+        `case "$*" in *send-keys*) exit ${sendExit};; esac\nexit 0\n`,
+      'utf-8',
+    )
+    chmodSync(join(mockBin, 'tmux'), 0o755)
+    spawnSync('node', [hookPath], {
+      input: '{}',
+      env: {
+        ...process.env,
+        OVERDECK_HOME: overdeckHome,
+        OVERDECK_AGENT_ID: 'agent-pan-2701',
+        MOCK_TMUX_LOG: tmuxLog,
+        PATH: `${mockBin}:${process.env.PATH ?? ''}`,
+      },
+      timeout: 10_000,
+    })
+  }
+
+  beforeEach(() => {
+    tempRoot = mkdtempSync(join(tmpdir(), 'codex-mail-drain-'))
+    overdeckHome = join(tempRoot, 'home')
+    mockBin = join(tempRoot, 'bin')
+    hookPath = join(tempRoot, 'codex-notify-hook')
+    tmuxLog = join(tempRoot, 'tmux.log')
+    agentDir = join(overdeckHome, 'agents', 'agent-pan-2701')
+    mkdirSync(join(agentDir, 'mail'), { recursive: true })
+    mkdirSync(mockBin, { recursive: true })
+    copyFileSync(SOURCE_HOOK, hookPath)
+    chmodSync(hookPath, 0o755)
+  })
+
+  afterEach(() => {
+    rmSync(tempRoot, { recursive: true, force: true })
+  })
+
+  it('submits only the oldest queued message and deletes it after confirmed submit', () => {
+    const oldest = join(agentDir, 'mail', '2026-07-15T11-17-00-000Z.pending.md')
+    const newest = join(agentDir, 'mail', '2026-07-15T11-28-00-000Z.pending.md')
+    writeFileSync(oldest, '# Message\n\nfirst feedback\n')
+    writeFileSync(newest, '# Message\n\nsecond feedback\n')
+
+    runHook()
+
+    const log = readFileSync(tmuxLog, 'utf-8')
+    expect(log).toContain('first feedback')
+    expect(log).toContain('paste-buffer -t agent-pan-2701')
+    expect(log).toContain('send-keys -t agent-pan-2701 C-m')
+    expect(existsSync(oldest)).toBe(false)
+    expect(existsSync(newest)).toBe(true)
+  })
+
+  it('keeps queued mail when submit fails so the next turn can retry', () => {
+    const mail = join(agentDir, 'mail', '2026-07-15T11-17-00-000Z.pending.md')
+    writeFileSync(mail, '# Message\n\nretry me\n')
+
+    runHook(1)
+
+    expect(existsSync(mail)).toBe(true)
+  })
+
+  it('does not replay ordinary backup mail that may already have landed', () => {
+    const backup = join(agentDir, 'mail', '2026-07-15T11-17-00-000Z.md')
+    writeFileSync(backup, '# Message\n\nalready delivered\n')
+
+    runHook()
+
+    expect(existsSync(tmuxLog)).toBe(false)
+    expect(existsSync(backup)).toBe(true)
+  })
+})

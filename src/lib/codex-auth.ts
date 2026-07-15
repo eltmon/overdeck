@@ -56,6 +56,7 @@ export type CodexAuthStatus = CodexAuthValid | CodexAuthExpired | CodexAuthBurne
 
 interface CheckCodexAuthOptions {
   ignoreBurnBefore?: number;
+  agentStates?: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>;
 }
 
 interface CliproxyCodexCredentials {
@@ -159,17 +160,23 @@ function nativeCodexAuthMtimeSync(): number {
   }
 }
 
-// ─── Pane-burn registry (PAN-2285) ─────────────────────────────────────────────
+// ─── Pane-burn flag, persisted in agent state (PAN-2285) ───────────────────────
 //
 // A revoked refresh token is invisible statically: the codex CLI keeps a valid
 // (unexpired) access-token JWT while its refresh token is dead, and the failure
 // never lands in the rollout JSONL — only in the live TUI pane. The deacon pane
-// patrol greps for the burn markers and flags the agent here; the status
-// endpoint and spawn gate consult this registry so the CodexAuthBanner fires and
-// new codex spawns are refused. Both the patrol and the HTTP route run in the
-// same dashboard server process, so a module singleton is the shared surface.
-
-const burnedCodexAgents = new Map<string, number>();
+// patrols grep for the burn markers and flag the agent; the status endpoint and
+// spawn gate consult the flags so the CodexAuthBanner fires and new codex spawns
+// are refused.
+//
+// CRITICAL: the writers (deacon patrols) run in the deacon CHILD process while
+// the readers (the /api/settings/codex-auth endpoint and the spawn gate) run in
+// the dashboard server process — module memory does NOT cross that boundary. The
+// flag is therefore persisted in the agent's own state (troubled +
+// lastFailureReason prefixed `codex-auth-burned[<ISO flag time>]`), written
+// through saveAgentStateSync — which mirrors into the shared SQLite agents
+// table — and read back through the agents-table door
+// (listOverdeckAgentStatesSync). No new store, no in-memory registry.
 
 /** The revoked-token markers that appear in a burned codex agent's pane. */
 const CODEX_AUTH_BURN_MARKERS = [
@@ -187,43 +194,100 @@ export function paneShowsCodexAuthBurn(paneText: string): boolean {
   return CODEX_AUTH_BURN_MARKERS.some((marker) => paneText.includes(marker));
 }
 
+/** lastFailureReason prefix that marks an agent as codex-auth-burned. */
+export const CODEX_AUTH_BURNED_REASON_PREFIX = 'codex-auth-burned';
+
 /**
- * Record that an agent's pane showed the revoked-token burn. Idempotent; returns
- * true only on the first flag for this agent so callers can emit a single
- * operator notice instead of one per patrol.
+ * Minimal structural slice of AgentState the burn flag lives in. Declared
+ * structurally (rather than importing AgentState) so the flag helpers stay pure
+ * and this module adds no import edge toward the agents barrel (which exports
+ * spawn.ts — a module that imports this one).
  */
-export function flagCodexAgentAuthBurned(agentId: string): boolean {
-  if (burnedCodexAgents.has(agentId)) return false;
-  burnedCodexAgents.set(agentId, Date.now());
+export interface CodexAuthBurnFlagState {
+  troubled?: boolean;
+  troubledAt?: string;
+  lastFailureReason?: string;
+  lastFailureAt?: string;
+}
+
+/**
+ * Mark an agent state as codex-auth-burned (PAN-2285). Pure mutation — the
+ * caller persists via the agent-state write door (saveAgentStateSync), which
+ * mirrors into the shared agents table so the flag crosses the deacon/server
+ * process boundary. Returns true only when the state was newly flagged
+ * (idempotent: an already-flagged state is left untouched), so callers can emit
+ * a single operator notice instead of one per patrol tick. The flag time is
+ * embedded in the reason (`codex-auth-burned[<ISO>]`) because the agents table
+ * has no dedicated column for it and `troubledAt` may predate the burn when the
+ * agent was already troubled for another reason.
+ */
+export function applyCodexAuthBurnFlag(state: CodexAuthBurnFlagState, nowMs: number = Date.now()): boolean {
+  if (state.troubled && state.lastFailureReason?.startsWith(CODEX_AUTH_BURNED_REASON_PREFIX)) {
+    return false;
+  }
+  const nowIso = new Date(nowMs).toISOString();
+  state.troubled = true;
+  if (!state.troubledAt) state.troubledAt = nowIso;
+  state.lastFailureReason =
+    `${CODEX_AUTH_BURNED_REASON_PREFIX}[${nowIso}]: Codex refresh token was revoked — ` +
+    're-authenticate (dashboard Codex-auth banner has a Re-authenticate button, or run `codex login`)';
+  state.lastFailureAt = nowIso;
   return true;
 }
 
-/** Clear a burn flag (e.g. when the agent is untroubled after re-auth). */
-export function clearCodexAgentAuthBurned(agentId: string): void {
-  burnedCodexAgents.delete(agentId);
+/**
+ * When (epoch ms) a state was flagged codex-auth-burned, or null if it is not
+ * currently flagged. Requires the troubled gate to still be set — `pan
+ * untroubled` / resume clears troubled and the failure fields, which retires the
+ * flag. Parses the ISO stamp embedded in the reason; falls back to `troubledAt`
+ * for flags written by builds that predate the embedded stamp.
+ */
+export function codexAuthBurnFlaggedAtMs(state: CodexAuthBurnFlagState): number | null {
+  if (!state.troubled) return null;
+  const reason = state.lastFailureReason;
+  if (!reason?.startsWith(CODEX_AUTH_BURNED_REASON_PREFIX)) return null;
+  const embedded = reason.match(/^codex-auth-burned\[([^\]]+)\]/)?.[1];
+  const fromReason = embedded ? Date.parse(embedded) : Number.NaN;
+  if (Number.isFinite(fromReason)) return fromReason;
+  const fromTroubledAt = state.troubledAt ? Date.parse(state.troubledAt) : Number.NaN;
+  return Number.isFinite(fromTroubledAt) ? fromTroubledAt : 0;
 }
 
 /**
- * Burn flags recorded strictly before the native store's last write are stale: a
- * global `codex login` rewrites ~/.codex/auth.json (bumping its mtime) and heals
- * every agent through the shared symlink, so those burns no longer apply. Prune
- * them and return the agents still burned since that write.
+ * Pure filter: which of these agent states are burned AND still current? Flags
+ * recorded strictly before the native store's last write are stale: a global
+ * `codex login` rewrites ~/.codex/auth.json (bumping its mtime) and heals every
+ * agent through the shared symlink, so those burns no longer apply (the flag
+ * itself is retired when the agent is untroubled/resumed).
  */
-export function getActiveBurnedCodexAgents(nativeMtimeMs: number): string[] {
+export function filterCodexAuthBurnedAgentIds(
+  states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
+  nativeMtimeMs: number,
+): string[] {
   const active: string[] = [];
-  for (const [agentId, flaggedAt] of burnedCodexAgents.entries()) {
-    if (flaggedAt >= nativeMtimeMs) {
-      active.push(agentId);
-    } else {
-      burnedCodexAgents.delete(agentId);
-    }
+  for (const state of states) {
+    const flaggedAt = codexAuthBurnFlaggedAtMs(state);
+    if (flaggedAt !== null && flaggedAt >= nativeMtimeMs) active.push(state.id);
   }
   return active;
 }
 
+/**
+ * Agents currently flagged codex-auth-burned. Callers supply states read through
+ * the agent resolver so this pure auth module does not create a spawn-time cycle.
+ */
+export function listCodexAuthBurnedAgentsSync(
+  nativeMtimeMs: number,
+  states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
+): string[] {
+  return filterCodexAuthBurnedAgentIds(states, nativeMtimeMs);
+}
+
 /** Sync convenience for the spawn gate: are any agents still burned right now? */
-export function hasActiveBurnedCodexAgentsSync(): boolean {
-  return getActiveBurnedCodexAgents(nativeCodexAuthMtimeSync()).length > 0;
+export function hasActiveBurnedCodexAgentsSync(
+  states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
+): boolean {
+  return listCodexAuthBurnedAgentsSync(nativeCodexAuthMtimeSync(), states).length > 0;
 }
 
 // ─── Combined status (native ⊕ cliproxy ⊕ pane-burn) ───────────────────────────
@@ -276,8 +340,9 @@ async function checkCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}):
 
   // Live pane-burn is the strongest signal for the native store: the JWT can
   // still be unexpired while the refresh token is revoked, so it beats the
-  // static probe.
-  const activeBurned = getActiveBurnedCodexAgents(native.mtimeMs);
+  // static probe. Flags are read from the shared agents table — the deacon
+  // child process wrote them there via saveAgentStateSync.
+  const activeBurned = listCodexAuthBurnedAgentsSync(native.mtimeMs, options.agentStates ?? []);
   if (activeBurned.length > 0) {
     return {
       status: 'burned',
@@ -298,7 +363,10 @@ async function checkCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}):
  * the symlink migration in initCodexHome heals a stale home on relaunch. Throws
  * a clear, remedy-naming error, mirroring the harness-policy ToS gate.
  */
-export function assertCodexNativeAuthForSpawn(harness: string | undefined): void {
+export function assertCodexNativeAuthForSpawn(
+  harness: string | undefined,
+  agentStates: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
+): void {
   if (harness !== 'codex') return;
   const native = probeNativeCodexAuthSync();
   const reason =
@@ -306,7 +374,7 @@ export function assertCodexNativeAuthForSpawn(harness: string | undefined): void
       ? 'not signed in (~/.codex/auth.json is missing)'
       : native.status === 'expired'
         ? 'expired (~/.codex/auth.json access token has lapsed)'
-        : hasActiveBurnedCodexAgentsSync()
+        : hasActiveBurnedCodexAgentsSync(agentStates)
           ? 'revoked (a running codex agent hit a revoked refresh token — the shared token family is dead)'
           : null;
   if (reason === null) return;
@@ -513,7 +581,7 @@ export function evaluateBurnedFromLog(
  * (i.e., not from the documented "missing/unknown" branches).
  */
 export const checkCodexAuthStatus = (
-  options: { ignoreBurnBefore?: number } = {},
+  options: CheckCodexAuthOptions = {},
 ): Effect.Effect<CodexAuthStatus, CodexAuthCheckError> =>
   Effect.tryPromise({
     try: () => checkCodexAuthStatusPromise(options),

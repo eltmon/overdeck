@@ -57,6 +57,7 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
           bash scripts/guard-agent-main-push.sh --range "$base..$local_sha" </dev/null
         fi
         bash scripts/lint-ratchet-audit.sh --range "$base..$local_sha" </dev/null
+        bash scripts/guard-hook-bundle-freshness.sh "$base..$local_sha" </dev/null
       else
         if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "" </dev/null

@@ -89,7 +89,7 @@ import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../l
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
-
+import { applyStartPolicyOptions } from './start-policy-overrides.js';
 interface IssueOptions {
   model: string;
   /** PAN-636 — explicit coding-agent harness override. Omit to use resolver defaults. */
@@ -844,8 +844,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
       spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
       await requireAutomaticStateMigration(resolved);
+      await applyStartPolicyOptions(resolved, id, options, options.dryRun === true);
     }
-    // Find workspace (local or remote based on preference)
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
     // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no

@@ -8,6 +8,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const mockCliproxy = vi.hoisted(() => ({
   authDir: '',
   logPath: '',
+  homeDir: '',
+}));
+
+vi.mock('os', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('os')>()),
+  homedir: () => mockCliproxy.homeDir,
 }));
 
 vi.mock('../../../../lib/cliproxy.js', async () => {
@@ -28,6 +34,10 @@ vi.mock('../../../../lib/cliproxy.js', async () => {
   };
 });
 
+vi.mock('../../../../lib/agents/queries.js', () => ({
+  listAgentStates: () => [],
+}));
+
 import { codexAuthRouteLayer } from '../codex-auth.js';
 
 const EMAIL = 'user@example.com';
@@ -44,16 +54,14 @@ const reusedCodeBurnBlock = (ts: string) =>
   `    "code": "refresh_token_reused"\n  }`;
 
 let tmpRoot = '';
-let originalHome: string | undefined;
 
 beforeEach(async () => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(NOW));
   tmpRoot = await mkdtemp(join(tmpdir(), 'pan-codex-auth-route-'));
+  mockCliproxy.homeDir = tmpRoot;
   mockCliproxy.authDir = join(tmpRoot, 'auth');
   mockCliproxy.logPath = join(tmpRoot, 'cliproxy.log');
-  originalHome = process.env.HOME;
-  process.env.HOME = tmpRoot;
 });
 
 afterEach(async () => {
@@ -62,8 +70,7 @@ afterEach(async () => {
   tmpRoot = '';
   mockCliproxy.authDir = '';
   mockCliproxy.logPath = '';
-  if (originalHome === undefined) delete process.env.HOME;
-  else process.env.HOME = originalHome;
+  mockCliproxy.homeDir = '';
 });
 
 const writeCodexFixture = async (logLines: string[] = []) => {

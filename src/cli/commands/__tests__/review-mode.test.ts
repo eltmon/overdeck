@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -44,6 +45,7 @@ describe('reviewModeCommand', () => {
 
     expect(record.issueId).toBe('PAN-1982');
     expect(record.reviewMode).toBe('full');
+    expect(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: workspacePath, encoding: 'utf-8' })).toContain('PAN-1982');
   });
 
   it('rejects invalid review modes before writing a record', async () => {

@@ -352,6 +352,12 @@ export async function buildReviewerNodes(
         : false;
       const inProgressThisRound = isLive && latestReviewRunDir !== null && !latestRunOutputExists;
 
+      // PAN-2690 — codex reviewers stay alive at their prompt after the notify
+      // hook signals REVIEWER_READY. The marker is cleared before every new
+      // convoy round, so its presence means this live session is warm-idle for
+      // the current round rather than actively reviewing.
+      const isWarmIdle = isLive && existsSync(join(agentsRoot, sessionId, 'reviewer-signaled'));
+
       // Determine if the reviewer is genuinely working or just a zombie session.
       // A reviewer is a zombie when: tmux is alive, the latest archived round
       // artifact says completed/failed, AND no newer round directory has
@@ -383,7 +389,7 @@ export async function buildReviewerNodes(
       if (hasApiError) {
         presence = 'idle';
       } else if (isLive && !isZombie) {
-        presence = (opts.status === 'running' || inProgressThisRound) ? 'active' : 'idle';
+        presence = !isWarmIdle && (opts.status === 'running' || inProgressThisRound) ? 'active' : 'idle';
       } else {
         // Zombie or dead — treat as ended so terminal won't try to connect
         presence = isZombie ? 'idle' : 'ended';

@@ -97,11 +97,15 @@ into the single worst state the banner reacts to (`burned` > `expired` > `valid`
 A **revoked refresh token** is invisible statically: the codex CLI keeps an
 unexpired access-token JWT while its refresh token is dead, and the failure
 (`token_invalidated` / "your refresh token was revoked") never lands in the
-rollout JSONL — only in the live TUI pane. The deacon pane patrol greps each
-codex agent's pane for those markers; on a match it marks the agent **troubled**
-(never auto-killed or auto-respawned) and flags the native store so the endpoint
-reports `burned` with the affected agent ids. A global `codex login` clears the
-flags (the native file's newer write prunes them).
+rollout JSONL — only in the live TUI pane. The deacon pane patrols grep each
+codex agent's pane for those markers; on a match the agent is marked **troubled**
+(never auto-killed or auto-respawned) with a `codex-auth-burned[<flag time>]`
+failure reason persisted in its agent state. The patrols run in the deacon child
+process while the status endpoint and spawn gate run in the dashboard server, so
+the flag crosses that boundary through the shared agents table — never module
+memory. The endpoint then reports `burned` with the affected agent ids. A global
+`codex login` heals: the native file's newer mtime makes older flags stale, and
+`pan untroubled` / resume clears an agent's flag outright.
 
 ---
 

@@ -446,11 +446,11 @@ export function setReviewStatusSync(
     })();
   }
 
-  // PAN-1908 + PAN-1988: the journal record is the SOURCE OF TRUTH for the verdict; the
-  // SQLite row is a rebuildable cache. Write the journal FIRST — it is workspace-local
-  // (<workspace>/.pan/records/<issue>.json), so it succeeds even for a sandboxed agent
-  // (codex workspace-write) that cannot reach ~/.overdeck. Fire-and-forget; queueAutoCommit
-  // debounces bursts into one commit. Do NOT mirror into canonical vBRIEF specs (PAN-1124).
+  // PAN-1908 + PAN-1988: the journal record is the SOURCE OF TRUTH for the verdict; the SQLite
+  // row is a rebuildable cache. Write the journal FIRST. Since PAN-2541 it lives in
+  // ${OVERDECK_HOME}/state/<project>/records/ — unwritable in a sandbox, so the writer falls back
+  // to <workspace>/.overdeck/pipeline-verdict.json (PAN-2583). Fire-and-forget: a short-lived CLI
+  // MUST drain via flushReviewStatusJournalWrites() before exit (PAN-2689). No vBRIEF mirror (PAN-1124).
   updateIssueRecordForReviewStatusSync(issueId, updated);
 
   // The DB cache write is best-effort. A sandboxed agent's write throws SQLITE_READONLY, but

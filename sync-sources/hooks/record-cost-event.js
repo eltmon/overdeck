@@ -13003,7 +13003,7 @@ const packageRoot = resolvePackageRootForDir(currentDir);
 * nothing in the repo layout signalled which dirs were sync sources.
 */
 const SYNC_SOURCES_ROOT = join(packageRoot, "sync-sources");
-join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(SYNC_SOURCES_ROOT, "agents"), join(SYNC_SOURCES_ROOT, "rules"), join(SYNC_SOURCES_ROOT, "hooks"), join(SYNC_SOURCES_ROOT, "hooks", "git-hooks"), join(SYNC_SOURCES_ROOT, "templates"), join(SYNC_SOURCES_ROOT, "templates", "traefik"), join(SYNC_SOURCES_ROOT, "templates", "claude-md", "sections");
+join(SYNC_SOURCES_ROOT, "skills"), join(SYNC_SOURCES_ROOT, "dev-skills"), join(SYNC_SOURCES_ROOT, "agents"), join(SYNC_SOURCES_ROOT, "rules"), join(SYNC_SOURCES_ROOT, "hooks"), join(SYNC_SOURCES_ROOT, "hooks", "git-hooks"), join(SYNC_SOURCES_ROOT, "templates"), join(SYNC_SOURCES_ROOT, "plugins.json"), join(SYNC_SOURCES_ROOT, "templates", "traefik"), join(SYNC_SOURCES_ROOT, "templates", "claude-md", "sections");
 join(OVERDECK_HOME, "agent-definitions");
 join(OVERDECK_HOME, "rules");
 join(OVERDECK_HOME, ".manifest.json");

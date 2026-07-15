@@ -35,6 +35,7 @@ import { runMultiToolSyncSync, resolveAlsoSyncToolsSync } from '../../lib/multi-
 import { ensurePlaywrightIsolationSync, ensureExcalidrawMcpSync } from '../../lib/claude-mcp.js';
 import { resolveProjectContextFile } from '../../lib/context-layers/layers.js';
 import { provisionClaudeHooks } from '../../lib/claude-hooks-provision.js';
+import { provisionClaudePlugins } from '../../lib/claude-plugins-provision.js';
 import { ensureAutomaticStateMigration, formatAutomaticStateMigrationBlock } from '../../lib/state-auto-migrate.js';
 
 // Bundled git hooks distributed to registered projects (PAN-1201: sync-sources/).
@@ -399,6 +400,25 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     hookRegistrationSpinner.succeed(`Registered ${hookProvision.registered.length} Claude Code hook(s)`);
   } else {
     hookRegistrationSpinner.info('Claude Code hooks already registered');
+  }
+
+  // Bundled Claude Code plugins (sync-sources/plugins.json) install through
+  // the `claude plugin` CLI — they are marketplace bundles, not copyable files.
+  const pluginSpinner = ora('Provisioning Claude Code plugins...').start();
+  const pluginProvision = await timeAsync('provision-claude-plugins', () => provisionClaudePlugins());
+  if (!pluginProvision.ok) {
+    pluginSpinner.warn(`Claude Code plugins unavailable: ${pluginProvision.reason}`);
+  } else if (pluginProvision.errors.length > 0) {
+    pluginSpinner.warn(`Installed ${pluginProvision.installed.length} Claude Code plugin(s), ${pluginProvision.errors.length} error(s)`);
+    for (const error of pluginProvision.errors) {
+      console.log(chalk.red(`  ✗ ${error}`));
+    }
+  } else if (pluginProvision.installed.length > 0) {
+    pluginSpinner.succeed(`Installed Claude Code plugin(s): ${pluginProvision.installed.join(', ')}`);
+  } else if (pluginProvision.alreadyInstalled.length > 0) {
+    pluginSpinner.info('Claude Code plugins already installed');
+  } else {
+    pluginSpinner.info('No bundled Claude Code plugins declared');
   }
 
   const projects = listProjectsSync();

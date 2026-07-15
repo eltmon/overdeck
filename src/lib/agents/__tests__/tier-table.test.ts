@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mergeConfigs } from '../../config-yaml.js';
 import {
   TieredExecutionConfigError,
+  resolveTieredExecutionBlock,
   validateTieredExecutionConfig,
   type TieredExecutionConfig,
 } from '../tier-table.js';
@@ -37,6 +38,46 @@ function validConfig(overrides: Partial<TieredExecutionConfig> = {}): TieredExec
 }
 
 describe('tiered execution tier table', () => {
+  describe('resolveTieredExecutionBlock', () => {
+    it.each([
+      ['on', true],
+      ['off', false],
+    ] as const)('uses the issue override %s before every other source', (override, effective) => {
+      expect(resolveTieredExecutionBlock(
+        { enabled: !effective },
+        { tiered_execution: 'maybe' },
+        override,
+      )).toEqual({ effective, source: 'issue-override', override });
+    });
+
+    it.each([
+      ['on', true],
+      ['off', false],
+    ] as const)('uses the plan metadata value %s when there is no issue override', (value, effective) => {
+      expect(resolveTieredExecutionBlock(
+        { enabled: !effective },
+        { tiered_execution: value },
+        null,
+      )).toEqual({ effective, source: 'plan-metadata', override: null });
+    });
+
+    it('falls through to the global setting when no override is present', () => {
+      expect(resolveTieredExecutionBlock({ enabled: true }, undefined, undefined)).toEqual({
+        effective: true,
+        source: 'global',
+        override: null,
+      });
+    });
+
+    it('rejects malformed plan metadata when no issue override supersedes it', () => {
+      expect(() => resolveTieredExecutionBlock(
+        { enabled: false },
+        { tiered_execution: 'maybe' },
+        null,
+      )).toThrow(TieredExecutionConfigError);
+    });
+  });
+
   it('rejects a difficulty that maps to zero tiers', () => {
     expect(() => validateTieredExecutionConfig(validConfig({
       tiers: {

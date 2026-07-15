@@ -3,8 +3,8 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { getAgentDir, getAgentRuntimeStateSync, getAgentStateSync, markAgentTroubled, saveAgentRuntimeState, saveAgentStateSync, setAgentPausedSync } from '../agents.js';
-import { flagCodexAgentAuthBurned, paneShowsCodexAuthBurn } from '../codex-auth.js';
+import { getAgentDir, getAgentRuntimeStateSync, getAgentStateSync, saveAgentRuntimeState, saveAgentStateSync, setAgentPausedSync } from '../agents.js';
+import { applyCodexAuthBurnFlag, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { sessionFilePath } from '../paths.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -214,19 +214,16 @@ export async function checkApiErrorAgents(): Promise<string[]> {
     if (agentState?.harness === 'codex') {
       // PAN-2285: a revoked refresh token surfaces ONLY in the live pane (never
       // in the rollout JSONL) and leaves the agent looking "running" while it
-      // 401-loops. Trip the troubled gate so it stops silently sitting, and flag
-      // the native auth as burned so the CodexAuthBanner fires. Do NOT auto-kill
-      // or auto-respawn — the shared token family is dead until re-auth.
+      // 401-loops. Trip the troubled gate so it stops silently sitting, and
+      // persist the burn flag in agent state — this patrol runs in the deacon
+      // CHILD process, so the flag must cross to the dashboard server (banner
+      // endpoint + spawn gate) through the shared agents table, not module
+      // memory. Do NOT auto-kill or auto-respawn — the shared token family is
+      // dead until re-auth.
       if (paneShowsCodexAuthBurn(tmuxOutput)) {
-        const newlyFlagged = flagCodexAgentAuthBurned(sessionName);
+        const newlyFlagged = applyCodexAuthBurnFlag(agentState);
         if (newlyFlagged) {
-          markAgentTroubled(sessionName);
-          const reason = 'codex-auth-burned: Codex refresh token was revoked — re-authenticate (dashboard Codex-auth banner or `codex login`)';
-          const st = getAgentStateSync(sessionName);
-          if (st) {
-            st.lastFailureReason = reason;
-            saveAgentStateSync(st);
-          }
+          saveAgentStateSync(agentState);
           emitActivityEntrySync({
             source: 'cloister',
             level: 'error',
