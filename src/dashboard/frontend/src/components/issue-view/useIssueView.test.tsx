@@ -16,6 +16,7 @@ import {
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
 import { useDashboardStore } from '../../lib/store';
 import { buildIssueViewModel, useIssueView } from './useIssueView';
+import { isAgentRunning, mergeStep, readyForMerge, stuckReason } from './index';
 
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries');
 vi.mock('../../lib/store');
@@ -98,6 +99,13 @@ function makeReviewStatus(overrides: Partial<ReviewStatusData> = {}): ReviewStat
 }
 
 describe('buildIssueViewModel', () => {
+  it('exports the four canonical issue-view derivations from the component family', () => {
+    expect(isAgentRunning).toBeTypeOf('function');
+    expect(readyForMerge).toBeTypeOf('function');
+    expect(mergeStep).toBeTypeOf('function');
+    expect(stuckReason).toBeTypeOf('function');
+  });
+
   it('produces all ten sub-objects', () => {
     const model = buildIssueViewModel('PAN-2499', 'Title', 'feature/pan-2499', 'overdeck', undefined, undefined, undefined, undefined, {});
     expect(model.header).toBeDefined();
