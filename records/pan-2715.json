@@ -130,7 +130,8 @@
       "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/bare-numeric-id-resolution.test.ts",
       "src/dashboard/frontend/src/components/CloseOutIssueButton.test.tsx",
-      "src/lib/lifecycle/index.ts"
+      "src/lib/lifecycle/index.ts",
+      "src/lib/overdeck/pull-requests.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -171,6 +172,7 @@
       "src/lib/lifecycle/types.ts",
       "src/lib/lifecycle/workflows.ts",
       "src/lib/overdeck/issue-close-out.ts",
+      "src/lib/overdeck/pull-requests.ts",
       "src/lib/pan-dir/record.ts",
       "sync-sources/skills/pan-close/SKILL.md",
       "tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
@@ -179,10 +181,10 @@
       "tests/unit/lib/lifecycle/workflows.test.ts",
       "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
     ],
-    "recordedAt": "2026-07-15T16:12:40.858Z"
+    "recordedAt": "2026-07-15T16:38:20.246Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:38:13.891Z",
+  "updated": "2026-07-15T16:38:20.247Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "passed",
