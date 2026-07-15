@@ -1,10 +1,67 @@
 /**
  * Issue-view no-loss inventory (PAN-2499).
  *
- * The FR-0 surface-lock gate asserts that every named section in this manifest
- * appears as a `data-section` attribute on at least one rendered element across
- * the three issue-view densities. Add a section here BEFORE rendering it.
+ * ISSUE_VIEW_INVENTORY is the FR-0 surface lock for every legacy issue-view
+ * section. The render-section constants below support the shared components
+ * that progressively take ownership of those legacy sections.
  */
+
+export type IssueViewDensity = 'console' | 'cockpit' | 'rail';
+
+export interface IssueViewInventoryEntry {
+  section: string;
+  view: IssueViewDensity;
+  home: string;
+}
+
+export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
+  { section: 'DrawerActionBar', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx' },
+  { section: 'PhaseTimeline', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/PhaseTimeline.tsx' },
+  { section: 'DrawerTabs', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerTabs.tsx' },
+  { section: 'DrawerPickupSection / PickupGateControls', view: 'console', home: 'src/dashboard/frontend/src/components/backlog/PickupGateControls.tsx' },
+  { section: 'DrawerWorkspaceSection', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx' },
+  { section: 'DrawerActiveAgent', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/ActiveAgentPanel.tsx' },
+  { section: 'DrawerPausedBanner', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx' },
+  { section: 'DrawerVerificationGates', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/VerificationGates.tsx' },
+  { section: 'DrawerReviewSpecialists', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerReviewSpecialists.tsx' },
+  { section: 'DrawerBeadsList', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerBeadsList.tsx' },
+  { section: 'DrawerPlanPanel / VBriefViewer', view: 'console', home: 'src/dashboard/frontend/src/components/vbrief/VBriefViewer.tsx' },
+  { section: 'DrawerArtifactsPanel', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerArtifactsPanel.tsx' },
+  { section: 'DrawerActivityRail / DrawerActivityPanel', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerActivityRail.tsx' },
+  { section: 'DrawerAgentSession', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx' },
+
+  { section: 'Header bar', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
+  { section: 'StatusNarrative', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
+  { section: 'Pipeline Band', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
+  { section: 'AgentsLane', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },
+  { section: 'StackDrawer', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },
+  { section: 'Detail Tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
+  { section: 'CrewStage', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/CrewStage.tsx' },
+  { section: 'HappenedFeed', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx' },
+  { section: 'PlanMapCard', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/PlanMapCard.tsx' },
+  { section: 'IssueBlockerSpotlight', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueBlockerSpotlight.tsx' },
+  { section: 'Code tab', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/ChangedFilesView.tsx' },
+  { section: 'PRD / Timeline / Discussion tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/ActivityTab.tsx' },
+  { section: 'Costs / Artifacts / Ship tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/CostsTab.tsx' },
+  { section: 'Conversation / Files / Terminal tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx' },
+  { section: 'BeadsRail / BeadsTab', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/BeadsRail.tsx' },
+  { section: 'Awareness rail', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
+  { section: 'ReviewPolicyControl', view: 'cockpit', home: 'src/dashboard/frontend/src/components/ReviewPolicyControl.tsx' },
+
+  { section: 'Filter bar', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'Feature (issue) row', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'Badges', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'MergeButton', view: 'rail', home: 'src/dashboard/frontend/src/components/MergeButton.tsx' },
+  { section: 'Pipeline pips', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'ResourceStrip', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'SessionNode', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx' },
+  { section: 'SessionNode context menu', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx' },
+  { section: 'ReviewGroup', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'ShipDoorTreeRow', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'StackDrawer / UatStackTreeGroup', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/UatStackTreeGroup.tsx' },
+  { section: 'ResourcesGroup', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ResourcesGroup.tsx' },
+  { section: 'ModelResolutionCard', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx' },
+];
 
 export const AGENT_ROW_SECTIONS = [
   'agent-row-caret',
