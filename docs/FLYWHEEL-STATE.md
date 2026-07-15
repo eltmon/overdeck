@@ -4375,3 +4375,49 @@ across cycles 5-8 (eviction ↔ idempotency tension), but findings are real and 
 - **DO NOT TAG.** Report + suggest only. `pan release stable --version X.Y.Z` is the operator's call.
 
 **Filed this session:** PAN-2733, PAN-2734, PAN-2735 (LANDED+PROVEN), PAN-2738, PAN-2739, PAN-2741, PAN-2742.
+
+## RUN-63 tick 33 (2026-07-15 ~14:50 local / 18:50Z) — 🎯 ROOT CAUSE of the last blocker: PAN-2743 convoy DEADLOCK. Struck.
+
+**RUN-63: 28 merge commits / 27 issues merged; 27 closed out. PAN-2710 is the ONLY issue left.**
+
+### 🔴 PAN-2743 (`blocks-main`, STRIKE LAUNCHED) — why PAN-2710 can't finish. `review_retry_count = 18`.
+**A convoy cannot re-dispatch to an idle-but-alive sub-reviewer. Two doors, both shut:**
+```
+Resuming convoy sub-reviewer correctness for PAN-2710 — preserving context (PAN-1862)
+Convoy sub-reviewer correctness resume failed; falling back to a fresh session:
+  Cannot resume agent-pan-2710-review-correctness: it appears healthy
+  (tmux session up, harness process alive) — there is nothing to resume.
+  Stop it first if you intend to restart it.          ← NOTHING EVER DOES THE STOP
+Convoy launched for PAN-2710, but 4 reviewer(s) failed to spawn
+auto-dispatched review for PAN-2710 from durable journal intent (host-side)   ← and around we go
+```
+1. **resume** refuses — "appears healthy, nothing to resume"
+2. **fresh-spawn** fallback then fails — session already exists
+⇒ the reviewer is **permanently un-re-dispatchable**, parked at the codex default prompt.
+**The loop:** no prompt delivered → no reports → synthesis cries "infrastructure failure" (PAN-2742) →
+`review=failed` → deacon resets → auto-dispatch → **×18**, each burning a cycle (2710 at cycle 10).
+**The error message names its own fix** ("Stop it first") and no code path performs it. The operator's
+PAN-2725 guidance is the same prescription: *cycle the session so queued mail replays at spawn.*
+
+### 🧬 THE THROUGH-LINE OF THIS ENTIRE RUN — one root, four faces
+**Codex idle-liveness is unmaintained, and every consumer trusts it as ground truth:**
+| Issue | Direction of the lie | Consequence |
+| --- | --- | --- |
+| **PAN-2731** | healthy agent looks DEAD (frozen `lastActivity`) | doctrine routed me to `pan kill` — **near-miss ×4 this run** |
+| **PAN-2735** | dead reviewers look ALIVE (latched `status=running`) | disabled the only `reviewing` recovery |
+| **PAN-2725** | idle agent looks reachable | mail dead-letters |
+| **PAN-2743** | idle agent looks HEALTHY | can't resume AND can't respawn ⇒ deadlock |
+**These should be fixed at the source — ONE maintained liveness oracle for codex sessions, reconciled
+against tmux + work product — not four patched consumers.** PAN-2735 proved the pattern works
+(shared `review-convoy-liveness.ts`); the same consolidation is owed to spawn/resume/delivery.
+
+### Not resources — ruled out with evidence
+46G RAM free, 16 tmux sessions, memory governor silent. Not capacity. Also seen (secondary, in issue):
+`overdeck-feature-pan-2710-init-1 init exited non-zero (1)` ⇒ review auto-fell back to host.
+**Nested-error noise masked the cause:** `Failed to signal <subrole> spawn failure to
+agent-pan-2710-review: Agent … not running` — signalling a failure to a DEAD coordinator throws and
+buries the real error. That's why this took so long; called out in the issue.
+
+**Filed this session (8):** PAN-2733, PAN-2734, PAN-2735 (LANDED+PROVEN), PAN-2738, PAN-2739, PAN-2741,
+PAN-2742, PAN-2743. **Phase 2 prep done:** v0.45.19 + **62 commits** (19 fix / 1 feat / 25 chore) ⇒
+suggest **0.45.20** patch. **DO NOT TAG — report + suggest only.**
