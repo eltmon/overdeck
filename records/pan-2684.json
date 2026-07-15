@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T09:32:45.303Z",
+  "updated": "2026-07-15T09:36:39.360Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "pending",
@@ -54,18 +54,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "crews-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2684",
         "agentId": "agent-pan-2684",
         "pid": 1788006,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T09:32:45.303Z"
+        "claimedAt": "2026-07-15T09:32:45.303Z",
+        "itemId": "crews-module",
+        "outcome": "completed",
+        "reason": "Added pure crew import/serialization, naming, cost, harness-default, and YAML-preview helpers with focused unit coverage",
+        "releasedAt": "2026-07-15T09:36:39.360Z"
+      }
+    ],
+    "statusReasons": {
+      "crews-module": {
+        "reason": "Added pure crew import/serialization, naming, cost, harness-default, and YAML-preview helpers with focused unit coverage",
+        "updatedAt": "2026-07-15T09:36:39.360Z"
       }
     }
   },
   "statusOverrides": {
-    "crews-module": "running"
+    "crews-module": "completed",
+    "crews-module.crews-module.ac1": "completed",
+    "crews-module.crews-module.ac2": "completed",
+    "crews-module.crews-module.ac3": "completed",
+    "crews-module.crews-module.ac4": "completed",
+    "crews-module.crews-module.ac5": "completed"
   }
 }
