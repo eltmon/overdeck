@@ -10,12 +10,12 @@ import {
 
 interface PrRef { repo: string; number: number }
 interface CachedWindows { probedAt: number; windows: Map<string, RedWindow[]> }
-interface AttemptedRun { recordedAt: number; issueId: string; commandFailed: boolean }
 interface ServiceState {
   timer: ReturnType<typeof setInterval> | null;
   repoWindows: Map<string, CachedWindows>;
   lastEvaluated: Map<string, number>;
-  attemptedRunIds: Map<number, AttemptedRun>;
+  successfulRunIds: Map<number, number>;
+  failedRunHighWatermarks: Map<string, number>;
   loggedSkips: Map<number, number>;
   inFlight: boolean;
 }
@@ -30,7 +30,8 @@ const serviceState: ServiceState = {
   timer: null,
   repoWindows: new Map(),
   lastEvaluated: new Map(),
-  attemptedRunIds: new Map(),
+  successfulRunIds: new Map(),
+  failedRunHighWatermarks: new Map(),
   loggedSkips: new Map(),
   inFlight: false,
 };
@@ -42,11 +43,8 @@ function pruneState(state: ServiceState, issueIds: Set<string>, repos: Set<strin
   for (const repo of state.repoWindows.keys()) {
     if (!repos.has(repo)) state.repoWindows.delete(repo);
   }
-  for (const [runId, attempt] of state.attemptedRunIds) {
-    if (!issueIds.has(attempt.issueId)
-      || (!attempt.commandFailed && now - attempt.recordedAt >= RUN_STATE_RETENTION_MS)) {
-      state.attemptedRunIds.delete(runId);
-    }
+  for (const [runId, recordedAt] of state.successfulRunIds) {
+    if (now - recordedAt >= RUN_STATE_RETENTION_MS) state.successfulRunIds.delete(runId);
   }
   for (const [runId, recordedAt] of state.loggedSkips) {
     if (now - recordedAt >= RUN_STATE_RETENTION_MS) state.loggedSkips.delete(runId);
@@ -111,28 +109,24 @@ async function tickOnce(state: ServiceState): Promise<void> {
 
       let deferred = false;
       for (const run of selection.rerun) {
-        if (state.attemptedRunIds.has(run.databaseId)) continue;
+        const failedRunHighWatermark = state.failedRunHighWatermarks.get(candidate.issueId) ?? 0;
+        if (state.successfulRunIds.has(run.databaseId) || run.databaseId <= failedRunHighWatermark) continue;
         if (retriggered >= MAX_RERUNS_PER_TICK) {
           deferred = true;
           break;
         }
         const window = windows.get(run.workflowName)?.find(({ start, end }) =>
           end !== null && start <= run.createdAt && run.createdAt < end);
-        state.attemptedRunIds.set(run.databaseId, {
-          recordedAt: now,
-          issueId: candidate.issueId,
-          commandFailed: true,
-        });
         const succeeded = await rerunFailedRun(ref.repo, run.databaseId);
         if (succeeded && window?.end) {
-          state.attemptedRunIds.set(run.databaseId, {
-            recordedAt: now,
-            issueId: candidate.issueId,
-            commandFailed: false,
-          });
+          state.successfulRunIds.set(run.databaseId, now);
           retriggered++;
           console.log(`[stale-check-retrigger] re-ran run ${run.databaseId} (${run.workflowName}) for ${candidate.issueId} PR #${ref.number}: failed at ${run.createdAt} inside main red window ${window.start} → ${window.end}`);
         } else {
+          state.failedRunHighWatermarks.set(
+            candidate.issueId,
+            Math.max(failedRunHighWatermark, run.databaseId),
+          );
           skipped++;
         }
       }
@@ -166,7 +160,8 @@ export function stopStaleCheckRetriggerService(): void {
   serviceState.timer = null;
   serviceState.repoWindows.clear();
   serviceState.lastEvaluated.clear();
-  serviceState.attemptedRunIds.clear();
+  serviceState.successfulRunIds.clear();
+  serviceState.failedRunHighWatermarks.clear();
   serviceState.loggedSkips.clear();
 }
 
