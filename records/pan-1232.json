@@ -1135,20 +1135,20 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-15T06:16:29.097Z",
+  "updated": "2026-07-15T06:18:30.986Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T06:16:29.052Z",
+    "updatedAt": "2026-07-15T06:18:30.943Z",
     "reviewNotes": "Agent re-review request (1/25): Re-requesting: verification passed at 04:53:48 but review dispatch was lost to a dashboard restart (supervisor fiber died)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "reviewedAtCommit": "37d87f14146fc97f44c74d7be3257e4190b2f687",
-    "lastVerifiedCommit": "37d87f14146fc97f44c74d7be3257e4190b2f687",
+    "lastVerifiedCommit": "87b54bfd3fa98c2af6d63a2abc55fb1dedd20604",
     "reviewSpawnedAt": "2026-07-15T05:05:23.670Z"
   },
   "closeOut": {
@@ -1156,9 +1156,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1032511,
-            "output": 3754,
-            "cacheRead": 839808,
+            "input": 1176062,
+            "output": 4124,
+            "cacheRead": 979200,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -1168,9 +1168,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 14131157,
-            "output": 32141,
-            "cacheRead": 13418240,
+            "input": 15007599,
+            "output": 32918,
+            "cacheRead": 14290432,
             "cacheWrite": 0
           }
         },
@@ -1193,9 +1193,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1032511,
-          "output": 3754,
-          "cacheRead": 839808,
+          "input": 1176062,
+          "output": 4124,
+          "cacheRead": 979200,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -1205,9 +1205,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 14131157,
-          "output": 32141,
-          "cacheRead": 13418240,
+          "input": 15007599,
+          "output": 32918,
+          "cacheRead": 14290432,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -1218,8 +1218,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 58.430524,
-        "pricingAsOf": "2026-07-15T06:16:29.090Z"
+        "usd": 58.91118,
+        "pricingAsOf": "2026-07-15T06:18:30.980Z"
       }
     },
     "merges": [
