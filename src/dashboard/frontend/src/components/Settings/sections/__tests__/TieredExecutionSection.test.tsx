@@ -377,3 +377,60 @@ describe('frontier models are never the default', () => {
     expect(mod.DEFAULT_SUPERVISOR_MODEL).not.toMatch(/fable|opus/i);
   });
 });
+
+describe('no-loss inventory', () => {
+  it('keeps every legacy control and its settings write path on the crews surface', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: {
+        solo: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        mix: {
+          model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'],
+          distribution: [
+            { model: 'claude-sonnet-5', harness: 'claude-code', weight: 60 },
+            { model: 'gpt-5.6-terra', harness: 'codex', weight: 40 },
+          ],
+        },
+      },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged', owns_inspection: true },
+      by_kind: {},
+      feed: { callouts: 'off', max_diff_bytes: null, exclude: [], exclude_subjects: [] },
+      escalation: { enabled: false, retries_at_tier: 0, max_promotions: 0, flounder_budget_minutes: {} },
+      replay_threshold: 0.5, compaction_reroute: 'off',
+    } })} onSettingsChange={onSettingsChange} />);
+
+    expect(screen.getByRole('switch', { name: 'Enable tiered execution' })).toBeTruthy();
+    expect(screen.getByText('On · valid')).toBeTruthy();
+    expect(screen.getAllByLabelText(/^crew for /)).toHaveLength(5);
+    expect(screen.getAllByRole('option', { name: '+ new crew…' })).toHaveLength(5);
+    expect(screen.getAllByLabelText(/^Model/).length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByLabelText(/^Harness/).length).toBeGreaterThanOrEqual(3);
+    expect(screen.getAllByLabelText(/^Weight/)).toHaveLength(2);
+    expect(screen.getByText('Total: 100%')).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /Use (one model|a weighted mix)/ })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: 'Remove crew' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Add model' })).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /^Remove model/ })).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('button', { name: /Standing reviewer/ }));
+    expect(screen.getByLabelText('Subscribe')).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Supervisor owns inspection' })).toBeTruthy();
+    expect(screen.getByLabelText('Kind to override').querySelectorAll('option')).toHaveLength(9);
+    expect(screen.getByLabelText('Crew for kind override')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add override' })).toBeTruthy();
+
+    for (const label of ['Call-outs', 'Max diff bytes', 'Exclude paths', 'Exclude subjects', 'Retries at tier', 'Max promotions', 'Replay threshold', 'Compaction reroute']) {
+      expect(screen.getByLabelText(label)).toBeTruthy();
+    }
+    expect(screen.getByRole('switch', { name: 'Enable tier escalation' })).toBeTruthy();
+    for (const difficulty of ['trivial', 'simple', 'medium', 'complex', 'expert']) expect(screen.getByLabelText(`Flounder budget ${difficulty}`)).toBeTruthy();
+    expect(screen.getByText(/What this writes to config.yaml/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Call-outs'), { target: { value: 'notify' } });
+    fireEvent.change(screen.getByLabelText('Compaction reroute'), { target: { value: 'on' } });
+    expect(onSettingsChange.mock.calls.some((call) => call[0].tiered_execution.feed.callouts === 'notify')).toBe(true);
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.compaction_reroute).toBe('on');
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  });
+});

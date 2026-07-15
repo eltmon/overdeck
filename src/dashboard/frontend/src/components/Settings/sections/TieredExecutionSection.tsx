@@ -534,6 +534,7 @@ export function TieredExecutionSection({
                   <label key={difficulty} className="space-y-1.5">
                     <span className="text-xs font-medium text-foreground">{difficulty}</span>
                     <input
+                      aria-label={`Flounder budget ${difficulty}`}
                       type="number"
                       min="1"
                       value={config?.escalation?.flounder_budget_minutes?.[difficulty] ?? ''}
