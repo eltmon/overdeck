@@ -324,6 +324,11 @@ export interface OrphanProposedReconcilerConfig {
   minAttemptIntervalMs: number;
 }
 
+export interface DeployConfig {
+  auto_deploy: boolean;
+  debounce_minutes: number;
+}
+
 /**
  * Complete Cloister configuration
  */
@@ -346,6 +351,7 @@ export interface CloisterConfig {
   retention?: RetentionConfig;
   close_out?: CloseOutConfig;
   orphanProposedReconciler?: OrphanProposedReconcilerConfig;
+  deploy: DeployConfig;
 }
 
 /**
@@ -381,6 +387,10 @@ export const DEFAULT_CLOISTER_CONFIG: CloisterConfig = {
   monitoring: {
     check_interval: 60, // 1 minute
     heartbeat_sources: ['jsonl_mtime', 'tmux_activity', 'git_activity'],
+  },
+  deploy: {
+    auto_deploy: true,
+    debounce_minutes: 5,
   },
   concurrency: {
     max_work_agents: 6,

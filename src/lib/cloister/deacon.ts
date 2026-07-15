@@ -2792,6 +2792,19 @@ export async function runPatrol(): Promise<PatrolResult> {
     console.warn(`[deacon] Failed to process pending lifecycle: ${err.message}`);
   }
 
+  if (state.patrolCycle % 5 === 0) {
+    try {
+      const { runDeployPatrol } = await import('./deploy-patrol.js');
+      await runDeployPatrol({
+        repoRoot: process.cwd(),
+        config: loadCloisterConfigSync().deploy,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      addLog('warn', `Automatic deploy patrol failed: ${message}`, state.patrolCycle);
+    }
+  }
+
   /* PAN-378: Global specialist patrol removed. All specialist work now goes through
    * per-project ephemeral specialists via spawnEphemeralSpecialist(). The global
    * merge-agent, review-agent, and test-agent singletons are no longer used.
