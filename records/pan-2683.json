@@ -172,7 +172,7 @@
     "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T12:29:57.411Z",
+  "updated": "2026-07-15T12:30:02.208Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "reviewing",
@@ -182,7 +182,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T12:29:53.515Z",
+    "updatedAt": "2026-07-15T12:30:02.131Z",
     "reviewNotes": "Agent re-review request (1/25): Removed out-of-scope spawn-path change",
     "testNotes": "npm run typecheck passed; npm run lint passed; unrestricted npm test passed 984 root files/9,119 tests plus 3 frontend files/32 tests; npm run build:dashboard passed; workspace-built Node 22 dashboard booted on isolated port 3013 and /api/health confirmed repoRoot=/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683. Browser UAT required for Policies panel Standing crew control/chip/reset/helper-copy flows but no Playwright MCP tools are exposed to this test role, so those paths could not be exercised. Required canonical .pan/records/pan-2683.json and .pan/specs/ vBRIEF are also absent from the workspace; retired local continue/spec files were not used as canonical inputs.",
     "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
@@ -261,7 +261,7 @@
       },
       "costAtCloseOut": {
         "usd": 74.393304,
-        "pricingAsOf": "2026-07-15T12:29:53.581Z"
+        "pricingAsOf": "2026-07-15T12:30:02.176Z"
       }
     },
     "merges": [
