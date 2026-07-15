@@ -3084,3 +3084,80 @@ close-out pending. Main CI re-running on `e00f7992e3`.
 PAN-2598 (PR #2631), PAN-2568 (no PR), PAN-2597 (PR #2601), PAN-1234 (PR #2606), PAN-2619 (no PR).
 **Close-out tail:** PAN-2699 still OPEN — its fix `a9abceec` is on main. Likely cause: the trailer reads
 `Closes PAN-2699`, and GitHub only auto-closes on `Closes #2699`. Repo-wide convention gap worth noting.
+
+## RUN-63 tick 10 (2026-07-15 ~09:35 local / 13:35Z) — merge chain drained: PAN-2701 + PAN-2690 landed; new doctrine applied live
+
+**DOCTRINE UPDATE ADOPTED MID-RUN** (`roles/flywheel.md`, commit `534e549f`, operator-confirmed live):
+*backstop interventions are symptoms — drive the recovery AND file the primary-path bug, one issue
+per defect CLASS, searching open issues first and commenting occurrences on existing ones.*
+
+**MERGED + CLOSED OUT this tick:**
+- **PAN-2701** → `bb2d478f3f` (PR #2707). Codex mid-turn mail drain.
+- **PAN-2690** → `8ceac512ff` (PR #2708). Reviewer warm-idle rendering.
+
+**RUN-63 total drained: 10** — PAN-2611, PAN-2229, PAN-2596, PAN-2602, PAN-2616, PAN-2643, PAN-2703,
+PAN-2684, PAN-2701, PAN-2690.
+
+### Backstop-as-symptom filings (applying the new doctrine to my OWN interventions)
+
+I made three backstop interventions today; each got its primary-path bug filed or an occurrence appended:
+
+1. **I hand-landed two finished strikes** → occurrence appended to **PAN-2702** (deacon-owned strike
+   merge handoff, already open, operator-gated — do NOT plan/start). Key addition: the handoff must
+   cover not just "strike ready → merge" but "strike blocked on a gate → gate clears → re-drive".
+   A strike parked behind red main is invisible to every automated path; both PAN-2701 and PAN-2690
+   sat finished+green+stale, still reporting `origin/main` at `aa65f505` long after it moved.
+2. **Strikes could not notify me at all** → filed **[PAN-2709]**. `flywheel-orchestrator` is treated
+   as a resumable agent but has no session.id/sessions.json, so
+   `Resume failed ... no resumable session id found` **always** fires when the run is stopped. The
+   orchestrator mailbox is structurally write-only; the issue-comment fallback is the only thing that
+   works and is the sole reason today's work wasn't lost. Suggested: durable queue + drain pending
+   signals on a run's first tick.
+3. **I manually re-ran a poisoned feature PR's CI** → filed **[PAN-2710]**, and it is the most
+   valuable find of the tick. See the causal chain below.
+
+### PAN-2710 — the red→green re-trigger gap (traced end-to-end; do NOT lose this)
+
+Red main's blast radius **latches into the review DB**, it is not just a stale badge:
+
+- PAN-2683 had `review=passed test=passed inspect=passed verification=passed merge=pending` — every
+  clause of `reviewGatesPassedSync` (`src/lib/review-status.ts:149-161`) satisfied — yet
+  `ready_for_merge=0`.
+- Cause: `blocker_reasons = [{"type":"failing_checks","summary":"Required checks are failing",
+  "detectedAt":"2026-07-15T13:08:19.652Z"}]` — detected INSIDE the red window, from the INHERITED
+  failure, not from its own diff. `src/lib/review-status.ts:401-407` makes any GitHub-native blocker
+  an absolute override (PAN-905).
+- **The backstop exists and still cannot converge.** `merge-blocker-reconcile-service.ts` polls
+  `refreshMergeStateFromGitHub` on a slow cadence precisely so stale flags clear without webhooks —
+  but it rebuilds blockers from `pr.statusCheckRollup` (`webhook-handlers.ts:270-295`), i.e. **the same
+  stale failed check**. Nothing re-runs the check → reconciler re-observes `fail` → re-affirms the
+  blocker → forever. Self-sustaining loop; every component behaving correctly.
+- Proof: `gh run rerun 29414663205 --failed` on PR #2693 → same suite **passes** against green main.
+  The failure was purely inherited, and the re-trigger is the ONLY thing that breaks the loop.
+- **Scale warning:** today this bit one PR because the drain had emptied the queue. With a saturated
+  Command Deck, red main silently holds EVERY in-flight issue out of the merge gate, and the gate
+  reads as legitimately empty rather than artificially blocked.
+
+**Method note that paid off twice:** check the authoritative `review_status` row BEFORE writing an
+impact claim. It caught my over-claim on PAN-2706 (ghost test sessions — PAN-2683's test was already
+`passed`, so it's a session leak + latent trap, not a live blocker; corrected on the issue), and it is
+what exposed the PAN-2710 blocker chain. The pane and the workspace fallback file are NOT the source
+of truth — the DB row is.
+
+**Also verified, so nobody re-investigates:** the journal-write failure that pushed PAN-2683's verdict
+to `.overdeck/pipeline-verdict.json` is already covered by open **PAN-2689** (sandboxed codex reviewer
+verdicts lost — fire-and-forget journal write). PAN-2583 (the fallback itself) is CLOSED and working.
+
+**IN FLIGHT / NEXT:**
+- Main CI running on `8ceac512ff` (+ `bb2d478f3f`, `534e549f`) — confirm GREEN.
+- **PAN-2683**: all gates passed; blocked ONLY by the stale `failing_checks` blocker. Its CI now
+  passes, so the reconcile service has a changed input and should clear it → `ready_for_merge=1` →
+  merge + close out. If it does not clear within a few passes, that is a PAN-2710 follow-on.
+- **Stalled cohort, no live agents, review=pending since 07-13** — all have committed work on the
+  right branch, clean trees: PAN-1234 (13 commits ahead, PR #2606), PAN-1491 (28, no PR), PAN-2568
+  (4, no PR), PAN-2598 (27, PR #2631), PAN-2597 (43, PR #2601, review=FAILED 07-15 02:23).
+  PAN-2619 has 0 commits (no work done). PAN-1232 has NO workspace. Shepherd via
+  `pan review request|restart` after judging divergence per startup-triage doctrine.
+- **Close-out tail:** PAN-2699 still OPEN; fix `a9abceec` is on main. Trailer says `Closes PAN-2699`,
+  but GitHub only auto-closes on `Closes #2699` — repo-wide convention gap.
+- HELD per operator: order book (A13/B10–B13), PAN-2377, PAN-2702. No new intake.
