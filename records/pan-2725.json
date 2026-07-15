@@ -2,13 +2,16 @@
   "issueId": "PAN-2725",
   "schemaVersion": 2,
   "created": "2026-07-15T15:16:47.715Z",
-  "updated": "2026-07-15T15:16:47.715Z",
+  "updated": "2026-07-15T15:46:05.852Z",
   "pipeline": {
     "issueId": "PAN-2725",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:16:47.715Z"
+    "updatedAt": "2026-07-15T15:46:05.852Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T15:46:05.852Z",
+    "mergeStatus": "merged"
   },
   "closeOut": {
     "usage": {
