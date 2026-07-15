@@ -7,6 +7,7 @@ import { loadReviewStatuses, setReviewStatusSync, type ReviewStatus } from '../r
 import { getAllProjectSpecialistStatuses, getTmuxSessionName } from './specialists.js';
 import { isPaneDead, sessionExistsSync } from '../tmux.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';
+import { evaluateReviewConvoyLiveness, reviewTimestampMs } from './review-convoy-liveness.js';
 
 // ============================================================================
 // Stuck review detection (PAN-733)
@@ -53,18 +54,11 @@ export async function checkStuckReviewing(): Promise<string[]> {
         activeReviewIssues.add(rState.currentIssue.toUpperCase());
       }
     }
-    // Detect active review runs: agent-<id>-review (synthesis) and
-    // agent-<id>-review-<subRole> (PAN-1059 convoy).
+    // Detect active review runs through the same liveness oracle used by
+    // orphan reconciliation. A row latched to `running` is not sufficient.
+    let reviewAgents: Parameters<typeof evaluateReviewConvoyLiveness>[2] = [];
     try {
-      const { listRunningAgents } = await import('../agents.js');
-      const agents = await Effect.runPromise(listRunningAgents());
-      for (const agent of agents) {
-        if (agent.status === 'stopped' || agent.status === 'error') continue;
-        const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : null);
-        if (role !== 'review') continue;
-        const issueId = (agent.issueId ?? '').trim().toUpperCase();
-        if (issueId) activeReviewIssues.add(issueId);
-      }
+      reviewAgents = await Effect.runPromise(listRunningAgents());
     } catch {
       // Non-fatal: fall back to specialist-only detection
     }
@@ -72,9 +66,11 @@ export async function checkStuckReviewing(): Promise<string[]> {
     for (const [issueId, status] of Object.entries(statuses)) {
       if (status.reviewStatus !== 'reviewing') continue;
       if (!status.reviewSpawnedAt) continue;
-      if (activeReviewIssues.has(issueId.toUpperCase())) continue;
+      const convoy = evaluateReviewConvoyLiveness(issueId, status, reviewAgents, now);
+      if (activeReviewIssues.has(issueId.toUpperCase()) || convoy.active) continue;
 
-      const spawnedAt = new Date(status.reviewSpawnedAt).getTime();
+      const spawnedAt = reviewTimestampMs(status.reviewSpawnedAt);
+      if (!Number.isFinite(spawnedAt)) continue;
       if (now - spawnedAt < REVIEW_STUCK_THRESHOLD_MS) continue;
 
       setReviewStatusSync(issueId, {
@@ -127,7 +123,7 @@ export function isSynthesisForActiveReviewRun(
 ): boolean {
   if (!status.reviewSpawnedAt) return true;
 
-  const spawnedAtMs = Date.parse(status.reviewSpawnedAt);
+  const spawnedAtMs = reviewTimestampMs(status.reviewSpawnedAt);
   if (!Number.isFinite(spawnedAtMs)) return true;
   if (synthesisMtimeMs < spawnedAtMs) return false;
 
@@ -265,5 +261,3 @@ export async function checkCompletedButUnsignaledReviews(): Promise<string[]> {
 
   return actions;
 }
-
-

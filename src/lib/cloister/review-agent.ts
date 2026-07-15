@@ -398,7 +398,7 @@ async function spawnReviewRoleForIssuePromise(
           // racing the verdict (the PAN-399 shape) — skip below and leave the
           // verdict alone rather than re-entering 'reviewing'.
           const newerRequest = !!status?.reviewRequestedAt
-            && (!status.reviewSpawnedAt || status.reviewRequestedAt > status.reviewSpawnedAt);
+            && (!status.reviewSpawnedAt || Date.parse(status.reviewRequestedAt) > new Date(status.reviewSpawnedAt).getTime());
           // PAN-2584: a lost verdict leaves the status non-terminal while the
           // reviewer already wrote its report for this exact HEAD — that session
           // is finished, not reviewing. Report-on-disk for the current runId is

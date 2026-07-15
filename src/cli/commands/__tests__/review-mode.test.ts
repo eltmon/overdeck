@@ -1,13 +1,19 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { reviewModeCommand } from '../review-mode.js';
+import {
+  cleanupGitRecordRoot,
+  initGitRecordRoot,
+  removeGitRecordRemote,
+} from '../../../../tests/helpers/git-record-fixture.js';
 
 describe('reviewModeCommand', () => {
   let workspacePath: string;
+  let recordRemote: string;
   let originalCwd: string;
   let exitSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
@@ -15,12 +21,7 @@ describe('reviewModeCommand', () => {
   beforeEach(() => {
     originalCwd = process.cwd();
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-review-mode-'));
-    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: workspacePath });
-    execFileSync('git', ['config', 'user.email', 'test@overdeck.local'], { cwd: workspacePath });
-    execFileSync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: workspacePath });
-    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: workspacePath });
-    execFileSync('git', ['commit', '--allow-empty', '-q', '-m', 'chore: seed test repository'], { cwd: workspacePath });
-    execFileSync('git', ['remote', 'add', 'origin', '.'], { cwd: workspacePath });
+    recordRemote = initGitRecordRoot(workspacePath);
     process.chdir(workspacePath);
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit');
@@ -29,10 +30,11 @@ describe('reviewModeCommand', () => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     process.chdir(originalCwd);
     vi.restoreAllMocks();
-    rmSync(workspacePath, { recursive: true, force: true });
+    await cleanupGitRecordRoot(workspacePath);
+    removeGitRecordRemote(recordRemote);
   });
 
   it("persists reviewMode='full' through the per-issue record write door", async () => {

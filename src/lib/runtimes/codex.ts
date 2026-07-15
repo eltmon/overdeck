@@ -13,12 +13,14 @@
  * kill-agent, cost-parser, notify-heartbeat).
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
-import { join, basename } from 'node:path'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
+import { dirname, join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
 import { exec } from 'node:child_process'
+import { request as httpRequest } from 'node:http'
 import { Effect } from 'effect'
+import yaml from 'js-yaml'
 import type {
   AgentRuntime,
   AgentRuntimeSync,
@@ -32,7 +34,7 @@ import type {
   Agent,
 } from './types.js'
 import { CODEX_BEHAVIOR } from './behavior.js'
-import { sessionExists, killSession, listSessionsSync, createSession } from '../tmux.js'
+import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
 
@@ -54,8 +56,116 @@ function agentDirFor(agentId: string): string {
   return join(agentsDir(), agentId)
 }
 
+function appServerSocketPathFor(agentId: string): string {
+  return join(overdeckDir(), 'sockets', `appserver-${agentId}.sock`)
+}
+
+function appServerTokenPathFor(agentId: string): string {
+  return join(agentDirFor(agentId), 'appserver-token')
+}
+
 function threadIdPathFor(agentId: string): string {
   return join(agentDirFor(agentId), 'codex-thread-id')
+}
+
+function readAppServerToken(agentId: string): string | null {
+  const tokenPath = appServerTokenPathFor(agentId)
+  if (!existsSync(tokenPath)) return null
+  try {
+    return readFileSync(tokenPath, 'utf-8').trim() || null
+  } catch {
+    return null
+  }
+}
+
+async function postAppServerInterrupt(agentId: string): Promise<void> {
+  const socketPath = appServerSocketPathFor(agentId)
+  const token = readAppServerToken(agentId)
+  if (!existsSync(socketPath) || !token) return
+  const payload = JSON.stringify({ op: 'interrupt' })
+  await new Promise<void>((resolve, reject) => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      req.destroy(new Error(`app-server interrupt timed out after 2000ms`))
+      reject(new Error(`app-server interrupt timed out after 2000ms`))
+    }, 2_000)
+    const finishErr = (error: Error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      reject(error)
+    }
+    const finishOk = () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      resolve()
+    }
+    const req = httpRequest(
+      {
+        socketPath,
+        path: '/',
+        method: 'POST',
+        agent: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload),
+          'X-Overdeck-Bridge-Token': token,
+        },
+      },
+      (res) => {
+        res.resume()
+        res.on('end', () => {
+          const status = res.statusCode ?? 0
+          if (status >= 200 && status < 300) finishOk()
+          else finishErr(new Error(`app-server interrupt returned HTTP ${status}`))
+        })
+      },
+    )
+    req.on('error', finishErr)
+    req.write(payload)
+    req.end()
+  })
+}
+
+function codexTransport(): 'app-server' | 'tui' {
+  return readCodexTransportFromConfig() === 'tui' ? 'tui' : 'app-server'
+}
+
+function readCodexTransportFromConfig(): unknown {
+  const configs = [
+    join(homedir(), '.overdeck', 'config.yaml'),
+    ...projectConfigPaths(),
+  ]
+  for (let index = configs.length - 1; index >= 0; index -= 1) {
+    const transport = readCodexTransportFromYaml(configs[index]!)
+    if (transport === 'app-server' || transport === 'tui') return transport
+  }
+  return undefined
+}
+
+function projectConfigPaths(): string[] {
+  let currentDir = process.cwd()
+  while (true) {
+    if (existsSync(join(currentDir, '.git'))) {
+      return [join(currentDir, '.overdeck.yaml'), join(currentDir, '.pan.yaml')]
+    }
+    const parent = dirname(currentDir)
+    if (parent === currentDir) return []
+    currentDir = parent
+  }
+}
+
+function readCodexTransportFromYaml(filePath: string): unknown {
+  if (!existsSync(filePath)) return undefined
+  try {
+    const parsed = yaml.load(readFileSync(filePath, 'utf-8')) as { codex?: { transport?: unknown } } | null
+    return parsed?.codex?.transport
+  } catch {
+    return undefined
+  }
 }
 
 /** Resolve $CODEX_HOME: env var → ~/.codex fallback. */
@@ -500,20 +610,6 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
       }
     }
 
-    // Tier 3: tmux session creation time.
-    try {
-      const sess = listSessionsSync().find(s => s.name === agentId)
-      if (sess) {
-        return {
-          timestamp: sess.created,
-          agentId,
-          source: 'tmux',
-          confidence: 'low',
-        }
-      }
-    } catch {
-      // ignore
-    }
     return null
   }
 
@@ -558,7 +654,8 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   /**
    * Kill a Codex agent via a SIGTERM→SIGKILL escalation ladder.
    *
-   *   1. Send Ctrl-C to the tmux pane (interrupt running task).
+   *   1. App-server transport: POST interrupt to the host socket. TUI transport:
+   *      send Ctrl-C to the tmux pane.
    *   2. Wait up to 2s for the session to disappear.
    *   3. SIGTERM the codex process group via pkill.
    *   4. Wait up to 5s for the session to disappear.
@@ -568,11 +665,20 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
    * JSONL-is-sacred rule.
    */
   async killAgent(agentId: string): Promise<void> {
-    // Step 1: interrupt the running task.
-    try {
-      await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
-    } catch {
-      // ignore
+    // Step 1: interrupt the running task. App-server has a structured
+    // interrupt op; the C-c keystroke is only for the legacy TUI escape hatch.
+    if (codexTransport() === 'app-server') {
+      try {
+        await postAppServerInterrupt(agentId)
+      } catch {
+        // Best effort: the SIGTERM ladder below still tears down the session.
+      }
+    } else {
+      try {
+        await execAsync(`tmux -L overdeck send-keys -t ${shellQuote(agentId)} C-c 2>/dev/null || true`)
+      } catch {
+        // ignore
+      }
     }
 
     // Step 2: poll up to 2s.
@@ -596,8 +702,8 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     if (await pollUntilSessionGone(agentId, 5_000)) return
 
     // Step 5: SIGKILL via kill-session.
-    if (await Effect.runPromise(sessionExists(agentId))) {
-      await Effect.runPromise(killSession(agentId))
+    if (await tmuxSessionExists(agentId)) {
+      await tmuxKillSession(agentId)
     }
   }
 
@@ -622,12 +728,10 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
     const fullCmd = `CODEX_HOME=${shellQuote(codexHomeDir)} ${tokens.join(' ')}`
 
     // 3. Launch the tmux session on the overdeck socket.
-    await Effect.runPromise(createSession(agentId, config.workspace, fullCmd, {
-      env: {
-        OVERDECK_AGENT_ID: agentId,
-        CODEX_HOME: codexHomeDir,
-      },
-    }))
+    await tmuxCreateSession(agentId, config.workspace, fullCmd, {
+      OVERDECK_AGENT_ID: agentId,
+      CODEX_HOME: codexHomeDir,
+    })
 
     // 4. Wait for the rollout JSONL to appear (readiness signal).
     const rolloutPath = await waitForCodexRollout(codexHomeDir, SPAWN_READY_TIMEOUT_MS)
@@ -660,14 +764,14 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   }
 
   async isRunning(agentId: string): Promise<boolean> {
-    return await Effect.runPromise(sessionExists(agentId))
+    return await tmuxSessionExists(agentId)
   }
 }
 
 async function pollUntilSessionGone(agentId: string, timeoutMs: number): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
-    if (!(await Effect.runPromise(sessionExists(agentId)))) return true
+    if (!(await tmuxSessionExists(agentId))) return true
     await new Promise(r => setTimeout(r, 100))
   }
   return false

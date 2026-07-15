@@ -20,6 +20,11 @@ import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { isVerificationWorkerActive, runSupervisedVerification } from './verification-worker-supervisor.js';
+import type {
+  VerificationRunnerOptions,
+  VerificationRunnerOutcome,
+  WorkspaceInfo,
+} from './verification-types.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
@@ -29,20 +34,13 @@ import { getVBriefACStatusSync } from '../vbrief/acceptance-criteria.js';
 import { VBriefMergeConflictError } from '../vbrief/io.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
-import type { VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
-
-export type { VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
 const execAsync = promisify(exec);
 
 export const VERIFICATION_MAX_CYCLES = 3;
 const NO_PROGRESS_REPEAT_THRESHOLD = 2;
 
-export interface VerificationRunnerOptions {
-  syncTargetBranch?: boolean;
-  /** PAN-2487: receives human-readable gate progress lines (ship-log mirror). */
-  onGateLog?: (line: string) => void;
-}
+export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
 interface SyncResult {
   repoDir: string;

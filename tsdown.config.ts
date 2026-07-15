@@ -14,6 +14,7 @@ export default defineConfig({
     'index': 'src/index.ts',
     'supervisor/server': 'src/supervisor/server.ts',
     'pty-supervisor': 'src/lib/channels/pty-supervisor.ts',
+    'codex-app-server-host': 'src/lib/codex/app-server-host.ts',
     'verification-worker': 'src/lib/cloister/verification-worker.ts',
     'lib/memory/fts-worker': 'src/lib/memory/fts-worker.ts',
   },

@@ -103,7 +103,7 @@ git push origin v0.9.4
 
 ## Harnesses
 
-Overdeck supports three coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), and `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family; work agents run as live TUI sessions via `codexMode: work-tui`, runtime adapter at `src/lib/runtimes/codex.ts`). The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+Overdeck supports three coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), and `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family; Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path). The Codex runtime adapter remains `src/lib/runtimes/codex.ts`. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
 
 See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Overdeck could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 

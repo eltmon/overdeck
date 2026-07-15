@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { request as httpRequest } from 'node:http';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
@@ -30,7 +30,7 @@ import {
 
 export type DeliveryResult = {
   ok: boolean;
-  path: 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
   failure?: string;
 };
 
@@ -66,9 +66,10 @@ function overdeckHomeForChannels(): string {
 async function appendChannelDeliveryLog(
   agentId: string,
   entry: {
-    path: 'supervisor' | 'channel' | 'tmux';
+    path: 'app-server' | 'supervisor' | 'channel' | 'tmux';
     reason?: string;
     caller?: string;
+    appServer?: string;
     'pty-supervisor'?: string;
     channels?: string;
   },
@@ -89,6 +90,17 @@ async function appendChannelDeliveryLog(
     );
   } catch {
     // Non-critical
+  }
+}
+
+function readAppServerTokenSync(agentId: string): string | null {
+  try {
+    const tokenPath = join(overdeckHomeForSockets(), 'agents', agentId, 'appserver-token');
+    if (!existsSync(tokenPath)) return null;
+    const token = readFileSync(tokenPath, 'utf-8').trim();
+    return token || null;
+  } catch {
+    return null;
   }
 }
 
@@ -188,8 +200,9 @@ export async function deliverAgentMessage(
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
+  let state: AgentState | null = null;
   try {
-    const state = await Effect.runPromise(getAgentState(normalizedId));
+    state = await Effect.runPromise(getAgentState(normalizedId));
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
   } catch {
@@ -200,6 +213,33 @@ export async function deliverAgentMessage(
     await assertTmuxTargetCanReceive(normalizedId, caller);
     await Effect.runPromise(sendKeys(normalizedId, message));
     return { ok: true, path: 'tmux' };
+  }
+
+  let appServerFailure: string | undefined;
+  if (resolvedMethod === 'auto') {
+    const appServerSocketPath = join(overdeckHomeForSockets(), 'sockets', `appserver-${normalizedId}.sock`);
+    if (existsSync(appServerSocketPath)) {
+      const appServerToken = readAppServerTokenSync(normalizedId);
+      if (!appServerToken) {
+        appServerFailure = 'appserver-token-missing';
+      } else {
+        try {
+          const appServerBody: Record<string, unknown> = { op: 'message', content: message, meta: { caller } };
+          if (state?.model) appServerBody.model = state.model;
+          await postUnixSocketJson(
+            appServerSocketPath,
+            appServerBody,
+            8_000,
+            appServerToken,
+          );
+          await appendChannelDeliveryLog(normalizedId, { path: 'app-server', caller });
+          return { ok: true, path: 'app-server' };
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          appServerFailure = `socket-post-failed: ${reason}`;
+        }
+      }
+    }
   }
 
   let supervisorFailure: string | undefined;
@@ -276,6 +316,7 @@ export async function deliverAgentMessage(
       path: 'tmux',
       reason: channelFailure,
       caller,
+      ...(appServerFailure ? { appServer: appServerFailure } : {}),
       ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
       ...(channelFailure ? { channels: channelFailure } : {}),
     });
