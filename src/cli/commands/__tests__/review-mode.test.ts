@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,6 +15,12 @@ describe('reviewModeCommand', () => {
   beforeEach(() => {
     originalCwd = process.cwd();
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-review-mode-'));
+    execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: workspacePath });
+    execFileSync('git', ['config', 'user.email', 'test@overdeck.local'], { cwd: workspacePath });
+    execFileSync('git', ['config', 'user.name', 'Overdeck Test'], { cwd: workspacePath });
+    execFileSync('git', ['config', 'commit.gpgsign', 'false'], { cwd: workspacePath });
+    execFileSync('git', ['commit', '--allow-empty', '-q', '-m', 'chore: seed test repository'], { cwd: workspacePath });
+    execFileSync('git', ['remote', 'add', 'origin', '.'], { cwd: workspacePath });
     process.chdir(workspacePath);
     exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
       throw new Error('process.exit');
@@ -36,6 +43,7 @@ describe('reviewModeCommand', () => {
 
     expect(record.issueId).toBe('PAN-1982');
     expect(record.reviewMode).toBe('full');
+    expect(execFileSync('git', ['log', '-1', '--format=%s'], { cwd: workspacePath, encoding: 'utf-8' })).toContain('PAN-1982');
   });
 
   it('rejects invalid review modes before writing a record', async () => {

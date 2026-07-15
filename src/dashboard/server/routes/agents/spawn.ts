@@ -10,6 +10,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { saveAgentStateSync, determineModel, getProviderAuthMode, getAgentState } from '../../../../lib/agents.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
+import { listAgentStates } from '../../../../lib/agents/queries.js';
 import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
@@ -314,7 +315,7 @@ export const postAgentsRoute = HttpRouter.add(
     }
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* checkCodexAuthStatus();
+      const codexAuth = yield* checkCodexAuthStatus({ agentStates: listAgentStates() });
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
           success: false,

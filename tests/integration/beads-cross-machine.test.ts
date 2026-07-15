@@ -11,6 +11,15 @@ function run(cwd: string, file: string, args: string[], env: NodeJS.ProcessEnv =
 function git(cwd: string, ...args: string[]): string { return run(cwd, 'git', args); }
 function bd(cwd: string, ...args: string[]): string { return run(cwd, 'bd', args); }
 
+const hasBd = (() => {
+  try {
+    execFileSync('bd', ['--version'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+})();
+
 function clone(remote: string, target: string): void {
   run(join(target, '..'), 'git', ['clone', '-q', remote, target]);
   git(target, 'config', 'user.name', 'Cross Machine Test');
@@ -18,7 +27,7 @@ function clone(remote: string, target: string): void {
   git(target, 'config', 'tasks.role', 'maintainer');
 }
 
-describe('Dolt cross-machine tasks authority', () => {
+describe.skipIf(!hasBd)('Dolt cross-machine tasks authority', () => {
   const roots: string[] = [];
   afterEach(() => roots.splice(0).forEach((root) => rmSync(root, { recursive: true, force: true })));
 

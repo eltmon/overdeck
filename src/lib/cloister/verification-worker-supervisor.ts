@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 import { getOverdeckHome, packageRoot } from '../paths.js';
-import type { VerificationRunnerOutcome, WorkspaceInfo } from './verification-runner.js';
+import type { VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
 type WorkerState = {
   runId: string;

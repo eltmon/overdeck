@@ -4,7 +4,6 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { Effect, Data } from 'effect';
 import { decodeJwtPayload, getCliproxyAuthDir, getCliproxyLogPath } from './cliproxy.js';
-import { listOverdeckAgentStatesSync } from './overdeck/agent-state-sync.js';
 
 /**
  * Which store a codex auth status came from (PAN-2285). 'native' = the codex
@@ -57,6 +56,7 @@ export type CodexAuthStatus = CodexAuthValid | CodexAuthExpired | CodexAuthBurne
 
 interface CheckCodexAuthOptions {
   ignoreBurnBefore?: number;
+  agentStates?: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>;
 }
 
 interface CliproxyCodexCredentials {
@@ -273,21 +273,21 @@ export function filterCodexAuthBurnedAgentIds(
 }
 
 /**
- * Agents currently flagged codex-auth-burned, read from the shared agents table
- * (the runtime registry) so flags written by the deacon child process are
- * visible here in the dashboard server process.
+ * Agents currently flagged codex-auth-burned. Callers supply states read through
+ * the agent resolver so this pure auth module does not create a spawn-time cycle.
  */
-export function listCodexAuthBurnedAgentsSync(nativeMtimeMs: number): string[] {
-  try {
-    return filterCodexAuthBurnedAgentIds(listOverdeckAgentStatesSync(), nativeMtimeMs);
-  } catch {
-    return [];
-  }
+export function listCodexAuthBurnedAgentsSync(
+  nativeMtimeMs: number,
+  states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
+): string[] {
+  return filterCodexAuthBurnedAgentIds(states, nativeMtimeMs);
 }
 
 /** Sync convenience for the spawn gate: are any agents still burned right now? */
-export function hasActiveBurnedCodexAgentsSync(): boolean {
-  return listCodexAuthBurnedAgentsSync(nativeCodexAuthMtimeSync()).length > 0;
+export function hasActiveBurnedCodexAgentsSync(
+  states: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
+): boolean {
+  return listCodexAuthBurnedAgentsSync(nativeCodexAuthMtimeSync(), states).length > 0;
 }
 
 // ─── Combined status (native ⊕ cliproxy ⊕ pane-burn) ───────────────────────────
@@ -342,7 +342,7 @@ async function checkCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}):
   // still be unexpired while the refresh token is revoked, so it beats the
   // static probe. Flags are read from the shared agents table — the deacon
   // child process wrote them there via saveAgentStateSync.
-  const activeBurned = listCodexAuthBurnedAgentsSync(native.mtimeMs);
+  const activeBurned = listCodexAuthBurnedAgentsSync(native.mtimeMs, options.agentStates ?? []);
   if (activeBurned.length > 0) {
     return {
       status: 'burned',
@@ -363,7 +363,10 @@ async function checkCodexAuthStatusPromise(options: CheckCodexAuthOptions = {}):
  * the symlink migration in initCodexHome heals a stale home on relaunch. Throws
  * a clear, remedy-naming error, mirroring the harness-policy ToS gate.
  */
-export function assertCodexNativeAuthForSpawn(harness: string | undefined): void {
+export function assertCodexNativeAuthForSpawn(
+  harness: string | undefined,
+  agentStates: ReadonlyArray<CodexAuthBurnFlagState & { id: string }>,
+): void {
   if (harness !== 'codex') return;
   const native = probeNativeCodexAuthSync();
   const reason =
@@ -371,7 +374,7 @@ export function assertCodexNativeAuthForSpawn(harness: string | undefined): void
       ? 'not signed in (~/.codex/auth.json is missing)'
       : native.status === 'expired'
         ? 'expired (~/.codex/auth.json access token has lapsed)'
-        : hasActiveBurnedCodexAgentsSync()
+        : hasActiveBurnedCodexAgentsSync(agentStates)
           ? 'revoked (a running codex agent hit a revoked refresh token — the shared token family is dead)'
           : null;
   if (reason === null) return;
@@ -578,7 +581,7 @@ export function evaluateBurnedFromLog(
  * (i.e., not from the documented "missing/unknown" branches).
  */
 export const checkCodexAuthStatus = (
-  options: { ignoreBurnBefore?: number } = {},
+  options: CheckCodexAuthOptions = {},
 ): Effect.Effect<CodexAuthStatus, CodexAuthCheckError> =>
   Effect.tryPromise({
     try: () => checkCodexAuthStatusPromise(options),
