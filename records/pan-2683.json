@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:42:00.130Z",
+  "updated": "2026-07-15T09:43:40.910Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
@@ -99,16 +99,8 @@
   "reReviewScope": "changed",
   "reviewModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "standing-crew-row": {
-        "writerId": "agent-pan-2683",
-        "agentId": "agent-pan-2683",
-        "pid": 1834485,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T09:42:00.130Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2683",
@@ -120,12 +112,27 @@
         "outcome": "completed",
         "reason": "Added non-throwing tiered resolution block, surfaced spec metadata in staffing routes, and covered precedence/fallback cases",
         "releasedAt": "2026-07-15T09:34:47.056Z"
+      },
+      {
+        "writerId": "agent-pan-2683",
+        "agentId": "agent-pan-2683",
+        "pid": 1834485,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T09:42:00.130Z",
+        "itemId": "standing-crew-row",
+        "outcome": "completed",
+        "reason": "Added Standing crew policy row, override-only chip, PATCH persistence, row/reset-all clearing, and source-aware component coverage",
+        "releasedAt": "2026-07-15T09:43:40.909Z"
       }
     ],
     "statusReasons": {
       "staffing-tiered-block": {
         "reason": "Added non-throwing tiered resolution block, surfaced spec metadata in staffing routes, and covered precedence/fallback cases",
         "updatedAt": "2026-07-15T09:34:47.056Z"
+      },
+      "standing-crew-row": {
+        "reason": "Added Standing crew policy row, override-only chip, PATCH persistence, row/reset-all clearing, and source-aware component coverage",
+        "updatedAt": "2026-07-15T09:43:40.909Z"
       }
     }
   },
@@ -135,6 +142,10 @@
     "staffing-tiered-block.staffing-tiered-block.ac2": "completed",
     "staffing-tiered-block.staffing-tiered-block.ac3": "completed",
     "staffing-tiered-block.staffing-tiered-block.ac4": "completed",
-    "standing-crew-row": "running"
+    "standing-crew-row": "completed",
+    "standing-crew-row.standing-crew-row.ac1": "completed",
+    "standing-crew-row.standing-crew-row.ac2": "completed",
+    "standing-crew-row.standing-crew-row.ac3": "completed",
+    "standing-crew-row.standing-crew-row.ac4": "completed"
   }
 }
