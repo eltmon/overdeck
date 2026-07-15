@@ -81,13 +81,14 @@ function eventStoreLayerFor(appendedEvents: Record<string, unknown>[]) {
   });
 }
 
-async function postCloseOut(issueId: string, headers: Record<string, string> = {}) {
+async function postCloseOut(issueId: string, headers: Record<string, string> = {}, body?: Record<string, unknown>) {
   const appendedEvents: Record<string, unknown>[] = [];
   const eventStoreLayer = eventStoreLayerFor(appendedEvents);
 
   const request = HttpServerRequest.fromWeb(new Request(`http://localhost/api/issues/${issueId}/close-out`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', [INTERNAL_TOKEN_HEADER]: 'test-token', ...headers },
+    body: body ? JSON.stringify(body) : undefined,
   }));
 
   const response = await Effect.runPromise(
@@ -197,7 +198,7 @@ describe('POST /api/issues/:id/close-out', () => {
       projectName: 'overdeck',
       projectPath: '/tmp/overdeck',
       github: { owner: 'eltmon', repo: 'overdeck', number: 1190 },
-    });
+    }, { dodAcceptedRows: [], dodAcceptedBy: 'dashboard-operator' });
     expect(issueDataServiceMock.patchIssue).toHaveBeenCalledWith('PAN-1190', {
       status: 'Done',
       state: 'done',
@@ -218,6 +219,38 @@ describe('POST /api/issues/:id/close-out', () => {
         },
       }),
     ]);
+  });
+
+  it('passes accepted rows and attribution into closeOut', async () => {
+    const result = await postCloseOut('PAN-1190', {}, { acceptedRows: ['deploy'], acceptedBy: 'operator' });
+    expect(result.status).toBe(200);
+    expect(closeOutMock).toHaveBeenCalledWith(expect.anything(), {
+      dodAcceptedRows: ['deploy'],
+      dodAcceptedBy: 'operator',
+    });
+  });
+
+  it('rejects invalid accepted row ids with the valid list', async () => {
+    const result = await postCloseOut('PAN-1190', {}, { acceptedRows: ['teardown'] });
+    expect(result.status).toBe(400);
+    expect(result.body.error).toContain('Invalid acceptedRows');
+    expect(result.body.validRows).toContain('deploy');
+    expect(closeOutMock).not.toHaveBeenCalled();
+  });
+
+  it('returns gate rows and misses in the 422 payload', async () => {
+    closeOutMock.mockReturnValueOnce(Effect.succeed({
+      workflow: 'close-out', issueId: 'PAN-1190', success: false, duration: 2,
+      steps: [{ step: 'close-out:dod-gate', success: false, skipped: false, error: 'blocked' }],
+      dodGate: {
+        passed: false, misses: ['deploy'], accepted: [],
+        rows: [{ id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge', observed: 'server stale', status: 'miss' }],
+      },
+    }));
+    const result = await postCloseOut('PAN-1190');
+    expect(result.status).toBe(422);
+    expect(result.body.dodGate).toMatchObject({ misses: ['deploy'] });
+    expect(result.body.dodGate.rows[0]).toMatchObject({ id: 'deploy', observed: 'server stale', status: 'miss' });
   });
 
   it('returns a successful no-op when close-out is repeated', async () => {

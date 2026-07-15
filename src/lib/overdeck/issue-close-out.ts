@@ -7,6 +7,7 @@ import { getSharedIssueService } from '../../dashboard/server/services/issue-ser
 import { EventStoreService } from '../../dashboard/server/services/domain-services.js';
 import { getRallyConfig } from '../../dashboard/server/services/tracker-config.js';
 import type { LifecycleContext, StepResult, WorkflowResult } from '../lifecycle/types.js';
+import type { DodRowId } from '../lifecycle/dod.js';
 import { withConcurrencyLimit } from '../concurrency.js';
 import { getAgentState, normalizeAgentId } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -98,7 +99,7 @@ function closeOutAlreadyCompletedResult(issueId: string): WorkflowResult {
   };
 }
 
-export function closeOutIssue(id: string) {
+export function closeOutIssue(id: string, opts: { acceptedRows?: DodRowId[]; acceptedBy?: string } = {}) {
   return Effect.gen(function* () {
     const ctx = buildCloseOutContext(id);
     if (!ctx) {
@@ -128,7 +129,10 @@ export function closeOutIssue(id: string) {
       try {
         const { closeOut } = await import('../lifecycle/index.js');
         // PAN-1249: closeOut returns Effect<WorkflowResult>; bridge to Promise.
-        const result = await Effect.runPromise(closeOut(ctx));
+        const result = await Effect.runPromise(closeOut(ctx, {
+          dodAcceptedRows: opts.acceptedRows,
+          dodAcceptedBy: opts.acceptedBy ?? 'dashboard-operator',
+        }));
         return { ok: true as const, result };
       } catch (error) {
         return { ok: false as const, error };
