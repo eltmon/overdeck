@@ -19,15 +19,18 @@ import { useDashboardStore } from './lib/store';
 const {
   mockDashboardState,
   mockOpenIssue,
+  mockOpenIssueFromRoute,
   mockRefreshDashboardState,
   mockToastError,
   mockToastInfo,
   mockToastSuccess,
 } = vi.hoisted(() => {
   const mockOpenIssue = vi.fn();
+  const mockOpenIssueFromRoute = vi.fn();
 
   return {
     mockOpenIssue,
+    mockOpenIssueFromRoute,
     mockDashboardState: {
       agents: [],
       agentsById: {},
@@ -38,6 +41,7 @@ const {
       agentsWithPendingProposedPlan: [],
       drawer: { issueId: null, tab: 'overview' },
       openIssue: mockOpenIssue,
+      openIssueFromRoute: mockOpenIssueFromRoute,
       syncDrawerFromUrl: vi.fn(),
     },
     mockRefreshDashboardState: vi.fn().mockResolvedValue(undefined),
@@ -193,8 +197,10 @@ beforeEach(() => {
   mockDashboardState.agentsWithPendingProposedPlan = []
   mockDashboardState.drawer = { issueId: null, tab: 'overview' }
   mockDashboardState.openIssue = mockOpenIssue
+  mockDashboardState.openIssueFromRoute = mockOpenIssueFromRoute
   mockDashboardState.syncDrawerFromUrl.mockClear()
   mockOpenIssue.mockClear()
+  mockOpenIssueFromRoute.mockClear()
   mockRefreshDashboardState.mockClear()
   mockToastError.mockClear()
   mockToastInfo.mockClear()
@@ -429,11 +435,7 @@ describe('App primary routing', () => {
 
     expect(window.location.pathname).toBe('/issues/PAN-1234');
     expect(window.location.search).toBe('');
-    await waitFor(() =>
-      expect(useDashboardStore.setState).toHaveBeenCalledWith({
-        drawer: { issueId: 'PAN-1234', tab: 'overview' },
-      }),
-    );
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-1234', '/pipeline'));
   });
 
   it('defaults /issues/:id to Pipeline when no last tab is stored', () => {
@@ -460,11 +462,7 @@ describe('App primary routing', () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
 
     expect(window.location.pathname).toBe('/issues/PAN-999');
-    await waitFor(() =>
-      expect(useDashboardStore.setState).toHaveBeenCalledWith({
-        drawer: { issueId: 'PAN-999', tab: 'overview' },
-      }),
-    );
+    await waitFor(() => expect(mockOpenIssueFromRoute).toHaveBeenCalledWith('PAN-999', '/pipeline'));
   });
 
   it('redirects direct experimental routes to Home when experimental features are off', async () => {

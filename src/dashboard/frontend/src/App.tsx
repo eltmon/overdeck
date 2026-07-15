@@ -226,6 +226,7 @@ export default function App() {
   const drawerIssueId = useDashboardStore((state) => state.drawer.issueId);
   const drawerOpen = drawerIssueId !== null;
   const openIssue = useDashboardStore((state) => state.openIssue);
+  const openIssueFromRoute = useDashboardStore((state) => state.openIssueFromRoute);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
 
   // Dashboard lifecycle state from event store (restart events)
@@ -402,8 +403,8 @@ export default function App() {
     if (activeTab !== targetTab) {
       setActiveTabState(targetTab);
     }
-    useDashboardStore.setState({ drawer: { issueId, tab: 'overview' } });
-  }, [activeTab]);
+    openIssueFromRoute(issueId, TAB_PATHS[targetTab]);
+  }, [activeTab, openIssueFromRoute]);
 
   // PAN-1234: handle direct navigation to /issues/:id on initial load and on
   // browser back/forward. Keep the URL unchanged (no ?issue= rewrite).

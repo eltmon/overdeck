@@ -47,20 +47,6 @@ export function describePendingInput(kinds: ReadonlyArray<string> | undefined): 
  * that branched on only one of these drifted; everyone should use this.
  */
 /**
- * AskUserQuestion-specific predicate for issue-level verb badges. Excludes plan
- * agents because their blocking surface is plan approval, not an operator
- * question (PAN-1234).
- */
-export function hasPendingAskUserQuestion(
-  agent: { role?: string; pendingAskUserQuestion?: unknown; pendingInputKinds?: ReadonlyArray<string> } | null | undefined,
-): boolean {
-  if (!agent || agent.role === 'plan') return false;
-  return (
-    agent.pendingAskUserQuestion != null || agent.pendingInputKinds?.includes('askUserQuestion') === true
-  );
-}
-
-/**
  * The single "is this agent waiting on the operator?" predicate. PAN-1520.
  *
  * The server's `hasPendingQuestion` is the SUPERSET signal — it's true whenever

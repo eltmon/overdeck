@@ -383,7 +383,9 @@ beforeAll(async () => {
       name: 'styleguide-empty-index-css',
       enforce: 'pre',
       transform(_code: string, id: string) {
-        return id.endsWith('/src/index.css') ? { code: '', map: null } : null;
+        return id.endsWith('/src/index.css')
+          ? { code: '.font-display { font-family: "Space Grotesk", system-ui, sans-serif; }', map: null }
+          : null;
       },
     }],
     server: { host: '127.0.0.1', port: 0, watch: null },
@@ -561,11 +563,15 @@ describe('styleguide rendered surface conformance', () => {
     const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
     const drawerTitle = drawer.page.locator('[data-testid="issue-drawer"] h2');
     await expect.poll(() => drawerTitle.count(), renderPoll).toBe(1);
-    const drawerTitleClass = await drawerTitle.getAttribute('class');
-    expect(drawerTitleClass).toContain('font-display');
-    // PAN-1234: a computed font-family assertion is aspirational here because
-    // the styleguide-empty-index-css plugin strips Tailwind-generated CSS; the
-    // class-name assertion above proves the token contract is wired.
+    const drawerFont = await drawerTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
+    expect(drawerFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
     await drawer.context.close();
+
+    const commandDeck = await openRoute('/command-deck');
+    const treeTitle = commandDeck.page.getByTestId('command-deck-tree-title').first();
+    await expect.poll(() => treeTitle.count(), renderPoll).toBe(1);
+    const treeTitleFont = await treeTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
+    expect(treeTitleFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
+    await commandDeck.context.close();
   }, 45_000);
 });

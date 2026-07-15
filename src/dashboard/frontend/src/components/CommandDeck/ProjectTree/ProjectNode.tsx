@@ -231,7 +231,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
             size={14}
           />
         </span>
-        <span className={`${styles.projectName} font-display`}>{name}</span>
+        <span data-testid="command-deck-tree-title" className={`${styles.projectName} font-display`}>{name}</span>
         <span className={styles.featureCount}>{visibleFeatures.length}</span>
         {onNewConversation && (
           <span
