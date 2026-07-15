@@ -195,23 +195,24 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:35:55.546Z",
+  "updated": "2026-07-15T15:51:09.199Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-15T15:35:55.381Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-15T15:47:27.198Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed lint",
     "testNotes": "Reconciled from green GitHub Actions CI on 81e24a9e: test (https://github.com/eltmon/overdeck/actions/runs/29427575419/job/87393878280)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
     "reviewedAtCommit": "81e24a9e6ca2eef1359f91c20aefe2ebd6e9b5ee",
     "lastVerifiedCommit": "b51bbe2f5c16b4f6c0521fd7e0a9d4b5610721a6",
     "reviewRequestedAt": "2026-07-15T15:13:58.776Z",
-    "reviewSpawnedAt": "2026-07-15T15:25:37.144Z"
+    "reviewSpawnedAt": "2026-07-15T15:25:37.144Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T15:47:27.198Z"
   },
   "closeOut": {
     "usage": {
@@ -282,7 +283,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "conformance-test-strengthen": "completed",
     "conformance-test-strengthen.ac1": "completed",
