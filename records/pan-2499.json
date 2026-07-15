@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:50:46.164Z",
+  "updated": "2026-07-15T14:51:04.497Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -148,7 +148,11 @@
     "beads-panel.beads-panel.ac1": "completed",
     "beads-panel.beads-panel.ac2": "completed",
     "beads-panel.beads-panel.ac3": "completed",
-    "active-agent-panel": "running"
+    "active-agent-panel": "completed",
+    "active-agent-panel.active-agent-panel.ac1": "completed",
+    "active-agent-panel.active-agent-panel.ac2": "completed",
+    "active-agent-panel.active-agent-panel.ac3": "completed",
+    "active-agent-panel.active-agent-panel.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -174,16 +178,8 @@
     }
   },
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "active-agent-panel": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1275016,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:50:46.164Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -261,6 +257,17 @@
         "outcome": "completed",
         "reason": "Created shared BeadsPanel with full progress/list and compact rail density, adopted it in console/cockpit/rail, deleted duplicate DrawerBeadsList and moved BeadsRail implementation, and removed the superseded rail beads chip; tests, no-loss, typecheck, lint, and file-size guard pass.",
         "releasedAt": "2026-07-15T14:50:43.703Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1275016,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:50:46.164Z",
+        "itemId": "active-agent-panel",
+        "outcome": "completed",
+        "reason": "Verified existing pushed ActiveAgentPanel across console, cockpit conversation/crew, and expanded rail nodes; 13 focused tests cover live lines, tell/resume endpoints, density, and collapsed-node zero-consumer behavior; full gates pass.",
+        "releasedAt": "2026-07-15T14:51:04.496Z"
       }
     ],
     "statusReasons": {
@@ -291,6 +298,10 @@
       "beads-panel": {
         "reason": "Created shared BeadsPanel with full progress/list and compact rail density, adopted it in console/cockpit/rail, deleted duplicate DrawerBeadsList and moved BeadsRail implementation, and removed the superseded rail beads chip; tests, no-loss, typecheck, lint, and file-size guard pass.",
         "updatedAt": "2026-07-15T14:50:43.703Z"
+      },
+      "active-agent-panel": {
+        "reason": "Verified existing pushed ActiveAgentPanel across console, cockpit conversation/crew, and expanded rail nodes; 13 focused tests cover live lines, tell/resume endpoints, density, and collapsed-node zero-consumer behavior; full gates pass.",
+        "updatedAt": "2026-07-15T14:51:04.496Z"
       }
     }
   }
