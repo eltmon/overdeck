@@ -139,21 +139,21 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:16:06.106Z",
+  "updated": "2026-07-15T17:18:29.428Z",
   "pipeline": {
     "issueId": "PAN-2710",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:16:06.018Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-15T17:18:29.385Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Inspection error for bead red-window-classifier: tmux session inspect-pan-2710-red-window-classifier exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
-    "lastVerifiedCommit": "4a038d8dcff6295fa355342d8c74f8c0d92c6e9a",
+    "lastVerifiedCommit": "97ec41d2d63059ea8789c4b15386d7bbe9d87e05",
     "reviewSpawnedAt": "2026-07-15T17:08:10.731Z"
   },
   "closeOut": {
@@ -167,9 +167,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 76868378,
-            "output": 84988,
-            "cacheRead": 75646464,
+            "input": 81624376,
+            "output": 85913,
+            "cacheRead": 80385792,
             "cacheWrite": 0
           }
         },
@@ -198,9 +198,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 76868378,
-          "output": 84988,
-          "cacheRead": 75646464,
+          "input": 81624376,
+          "output": 85913,
+          "cacheRead": 80385792,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -217,8 +217,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 55.490447,
-        "pricingAsOf": "2026-07-15T17:16:06.098Z"
+        "usd": 57.971211000000004,
+        "pricingAsOf": "2026-07-15T17:18:29.423Z"
       }
     },
     "merges": [
