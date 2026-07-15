@@ -614,6 +614,116 @@ describe('KanbanBoard drawer wiring', () => {
   });
 });
 
+describe('KanbanBoard j/k card navigation', () => {
+  function createBoardIssue(overrides: Partial<Issue> = {}): Issue {
+    return {
+      id: overrides.identifier ?? 'PAN-1',
+      identifier: overrides.identifier ?? 'PAN-1',
+      title: overrides.title ?? 'Board issue',
+      status: overrides.status ?? 'Todo',
+      state: overrides.state ?? 'todo',
+      priority: overrides.priority ?? 3,
+      labels: overrides.labels ?? [],
+      url: `https://example.com/${overrides.identifier ?? 'PAN-1'}`,
+      createdAt: '2026-05-18T00:00:00.000Z',
+      updatedAt: '2026-05-18T00:00:00.000Z',
+      ...overrides,
+    };
+  }
+
+  function renderBoard(props: Partial<ComponentProps<typeof KanbanBoard>> = {}) {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    return render(
+      <QueryClientProvider client={queryClient}>
+        <DialogProvider>
+          <KanbanBoard {...props} />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn((input: string | URL | Request) => {
+      const url = input.toString();
+      if (url === '/api/registered-projects') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) } as Response);
+      }
+      return Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve('{}'),
+        json: () => Promise.resolve({ issues: [], workspaces: [] }),
+      } as Response);
+    }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('moves j/k across columns and Enter opens the focused card', async () => {
+    const onSelectIssue = vi.fn();
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [
+        createBoardIssue({ identifier: 'PAN-1', title: 'First todo', status: 'Todo', state: 'todo' }),
+        createBoardIssue({ identifier: 'PAN-2', title: 'Second todo', status: 'Todo', state: 'todo' }),
+        createBoardIssue({ identifier: 'PAN-3', title: 'In progress', status: 'In Progress', state: 'in_progress' }),
+      ],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderBoard({ selectedIssue: null, onSelectIssue });
+
+    const card1 = await screen.findByTestId('issue-card-PAN-1');
+    const card2 = await screen.findByTestId('issue-card-PAN-2');
+    const card3 = await screen.findByTestId('issue-card-PAN-3');
+
+    // Initial focus: j selects first board card.
+    fireEvent.keyDown(document, { key: 'j' });
+    await waitFor(() => expect(card1.className).toContain('ring-primary'));
+    expect(card2.className).not.toContain('ring-primary');
+    expect(card3.className).not.toContain('ring-primary');
+
+    // j moves down within the Todo column.
+    fireEvent.keyDown(document, { key: 'j' });
+    await waitFor(() => expect(card2.className).toContain('ring-primary'));
+    expect(card1.className).not.toContain('ring-primary');
+
+    // j crosses from Todo to the first card of In Progress.
+    fireEvent.keyDown(document, { key: 'j' });
+    await waitFor(() => expect(card3.className).toContain('ring-primary'));
+    expect(card2.className).not.toContain('ring-primary');
+
+    // k crosses back to the last card of the previous non-empty column.
+    fireEvent.keyDown(document, { key: 'k' });
+    await waitFor(() => expect(card2.className).toContain('ring-primary'));
+
+    // Enter opens the focused card.
+    fireEvent.keyDown(document, { key: 'Enter' });
+    await waitFor(() => expect(onSelectIssue).toHaveBeenCalledWith('PAN-2'));
+  });
+
+  it('does not move focus when keyboardShortcutsDisabled is true', async () => {
+    useDashboardStore.setState({
+      drawer: { issueId: null, tab: 'overview' },
+      issuesRaw: [createBoardIssue({ identifier: 'PAN-1' })],
+      agentsById: {},
+      reviewStatusByIssueId: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderBoard({ selectedIssue: null, onSelectIssue: vi.fn(), keyboardShortcutsDisabled: true });
+
+    fireEvent.keyDown(document, { key: 'j' });
+
+    const card = await screen.findByTestId('issue-card-PAN-1');
+    expect(card.className).not.toContain('ring-primary');
+  });
+});
+
 describe('IssueCard', () => {
   const createMockIssue = (overrides: Partial<Issue> = {}): Issue => ({
     id: 'issue-1',
@@ -777,6 +887,58 @@ describe('IssueCard', () => {
     expect(badge.getAttribute('title')).toContain('pan untroubled TEST-123');
     // Unlike Unpause, clearing troubled requires investigation — no card button.
     expect(screen.queryByTestId('card-untroubled-TEST-123')).toBeNull();
+  });
+
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (count > 0)', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionCount: 1,
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('surfaces an INPUT verb badge when an agent has an actual pending question (prompt)', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionCount: 0,
+        pendingQuestionPrompt: 'Which approach?',
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).toHaveAttribute('data-variant', 'INPUT');
+  });
+
+  it('does not surface INPUT when hasPendingQuestion is true but count is zero and prompt is empty', () => {
+    renderIssueCard({
+      issue: createMockIssue({ status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true }),
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        hasPendingQuestion: true,
+        pendingQuestionCount: 0,
+      }),
+    });
+
+    const card = screen.getByTestId('issue-card-TEST-123');
+    const badge = card.querySelector('[data-component="verb-badge"]') as HTMLElement;
+    expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
   });
 
   it('opens the hybrid Board action overflow menu on right-click', async () => {

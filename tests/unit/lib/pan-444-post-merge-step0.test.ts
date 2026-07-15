@@ -32,6 +32,7 @@ const mockSetReviewStatusSync = vi.hoisted(() => vi.fn());
 const mockLoadConfigSync = vi.hoisted(() => vi.fn(() => ({ config: { knowledge: { postMergeAutoRetro: false } } })));
 const mockIsGitHubAppConfigured = vi.hoisted(() => vi.fn(() => false));
 const mockListPullRequestsForHead = vi.hoisted(() => vi.fn(() => Effect.succeed([])));
+const mockShouldRestartForPostMerge = vi.hoisted(() => vi.fn(async () => true));
 const mockExec = vi.hoisted(() => vi.fn((cmd: string, optionsOrCb?: any, maybeCb?: any) => {
   const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCb;
   if (typeof callback === 'function') {
@@ -116,6 +117,10 @@ vi.mock('../../../src/lib/cloister/specialists.js', () => ({
   isRunning: vi.fn().mockResolvedValue(false),
 }));
 
+vi.mock('../../../src/lib/cloister/merge-agent-step0.js', () => ({
+  shouldRestartForPostMerge: mockShouldRestartForPostMerge,
+}));
+
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn().mockReturnValue(null),
   resolveProjectFromIssueSync: vi.fn().mockReturnValue(null),
@@ -172,6 +177,7 @@ describe('postMergeLifecycle — step 0 deploy handoff', () => {
     mockExecAsync.mockImplementation(defaultExecAsync);
     mockIsGitHubAppConfigured.mockReturnValue(false);
     mockListPullRequestsForHead.mockReturnValue(Effect.succeed([]));
+    mockShouldRestartForPostMerge.mockResolvedValue(true);
     resetPostMergeState(ISSUE_ID);
     mockWriteFile.mockResolvedValue(undefined);
     mockSpawn.mockReturnValue(mockSpawnChild);

@@ -3,7 +3,7 @@
 An Overdeck issue is **done** when every row in this table is green — not when the PR merges,
 and not when the tracker issue closes. Each row names its **mechanical owner**: the code that
 performs it and the surface where its result is visible. A row with no live owner is a pipeline
-gap — file an issue for it (that is how PAN-2713 exists). "Is anything missed?" is answered by
+gap — file an issue for it. "Is anything missed?" is answered by
 the `pan close` DoD gate (PAN-2715), never by reasoning from memory. The shared row definition
 lives in `src/lib/lifecycle/dod.ts`; `tests/unit/lib/lifecycle/dod-doc-drift.test.ts` prevents
 this table and that module from drifting silently.
@@ -16,7 +16,7 @@ this table and that module from drifting silently.
 | 4 | `merged` | Merged to main (squash PR, revertible history) | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`) | PR `MERGED`, `mergeStatus: merged` |
 | 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard) | issue labels, agent states |
 | 6 | `main-verify` | Verified on main (post-merge verification of the merged commit) | deacon verify-on-main flow | `verifying_on_main` → verified |
-| 7 | `deploy` | **Deployed: the live dashboard runs a build that includes the merge** | `pan close` gate: build-commit ancestry when exposed; otherwise server-start + dist-mtime staleness check (best effort). PAN-2713 owns the durable build-commit signal. | live `/api/version`, dashboard process start, `dist/dashboard/server.js` mtime |
+| 7 | `deploy` | **Deployed: the live dashboard runs a build that includes the merge** | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit` + stale-build chip |
 | 8 | `teardown` | Close-out: worktree removed, branches per `close_out` config, vBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
 
 ## Rules of the table
@@ -26,7 +26,7 @@ this table and that module from drifting silently.
   closed-out while the live server ran a build from three merges earlier — every fix inert.
 - **Every row must name a live owner.** Doctrine ("the flywheel usually does X") is not an
   owner; only code with a trigger is. When you find an ownerless step, drive it manually for
-  velocity AND file the gap issue — same discipline as the flywheel's backstop-as-symptom rule
+  velocity and file the gap issue — the flywheel follows the same backstop-as-symptom rule
   (`roles/flywheel.md`).
 - **Enforcement is the gate, not this doc.** `pan close` enumerates rows from
   `src/lib/lifecycle/dod.ts`, verifies them mechanically (PAN-2715), and reports any miss

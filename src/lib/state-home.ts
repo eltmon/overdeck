@@ -237,17 +237,16 @@ export async function ensureStateWorktree(
   }
 
   let branch: string;
-  let dirty: string;
   try {
     branch = await git(path, ['branch', '--show-current']);
-    dirty = await git(path, ['status', '--porcelain']);
   } catch (error) {
     return { status: 'error', path, detail: error instanceof Error ? error.message : String(error) };
   }
-  if (dirty) return { status: 'dirty', path, detail: 'state worktree has uncommitted changes; refusing destructive repair' };
   if (branch === STATE_BRANCH) return { status: 'healthy', path };
 
   try {
+    const dirty = await git(path, ['status', '--porcelain']);
+    if (dirty) return { status: 'dirty', path, detail: 'state worktree has uncommitted changes; refusing destructive repair' };
     await git(repoPath, ['worktree', 'remove', path]);
     await rm(path, { recursive: true, force: true });
     await addStateWorktree(repoPath, path);

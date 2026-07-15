@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { ensureCompatibleNode } from './node-preflight.js';
+import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendingDurableWrites } from './durable-write-drain.js';
 
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
@@ -1440,5 +1440,5 @@ if (process.argv.length === 2) {
   process.argv.push('serve');
 }
 
-// Parse and execute
-await program.parseAsync();
+// Short-lived commands must drain durable state writes before exit (PAN-2692).
+await program.parseAsync().finally(drainPendingDurableWrites);

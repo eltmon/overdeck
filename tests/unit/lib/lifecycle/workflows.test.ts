@@ -402,6 +402,12 @@ describe('workflows', () => {
         if (command.startsWith('git rev-parse feature/pan-100')) {
           return { stdout: 'newer-branch-tip\n', stderr: '' };
         }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'unmerged-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor unmerged-commit origin/main') {
+          throw new Error('commit is not on main');
+        }
         if (command.startsWith('git diff --name-only')) {
           // PAN-2406 predicate: report a real source file so the state-plane
           // exemption does NOT apply and the strict rejection is exercised.
@@ -422,7 +428,49 @@ describe('workflows', () => {
 
       expect(verifyStep.step).toBe('close-out:verify-merged');
       expect(verifyStep.success).toBe(false);
-      expect(verifyStep.error).toBe('feature/pan-100 does not match the head commit of merged PR #2182; inspect before closing out.');
+      expect(verifyStep.error).toBe('feature/pan-100 has 1 commit(s) after merged PR #2182 that are not on origin/main: unmerged-commit');
+    });
+
+    it('accepts a squash-merged PR when the branch later merged commits already on main', async () => {
+      mockExecAsync.mockImplementation(async (command: string) => {
+        if (command.startsWith('git branch --list')) {
+          return { stdout: '  feature/pan-100\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor feature/pan-100 main')) {
+          throw new Error('not an ancestor after squash merge');
+        }
+        if (command.startsWith('git diff main...feature/pan-100')) {
+          return { stdout: 'diff --git a/src/example.ts b/src/example.ts\n', stderr: '' };
+        }
+        if (command.startsWith('gh pr list')) {
+          return {
+            stdout: '[{"number":2182,"mergedAt":"2026-07-02T12:00:00Z","headRefOid":"merged-head","url":"https://github.com/eltmon/overdeck/pull/2182"}]',
+            stderr: '',
+          };
+        }
+        if (command.startsWith('git rev-parse feature/pan-100')) {
+          return { stdout: 'local-tip-after-main-merge\n', stderr: '' };
+        }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'main-commit-a\nmain-commit-b\n', stderr: '' };
+        }
+        if (command.startsWith('git merge-base --is-ancestor main-commit-')) {
+          return { stdout: '', stderr: '' };
+        }
+        return { stdout: '', stderr: '' };
+      });
+
+      const ctx = {
+        issueId: 'PAN-100',
+        projectPath: testDir,
+        github: { owner: 'eltmon', repo: 'overdeck', number: 100 },
+      };
+      const verifyStep = await Effect.runPromise(__testInternals.verifyBranchMerged(ctx));
+
+      expect(verifyStep.success).toBe(true);
+      expect(verifyStep.details).toEqual([
+        'PR #2182 is squash-merged; all 2 post-PR non-merge commit(s) on feature/pan-100 are already on origin/main',
+      ]);
     });
 
     it('rejects local squash-merge success when the remote branch has advanced past the merged PR head', async () => {
@@ -461,6 +509,12 @@ describe('workflows', () => {
         if (command.startsWith('git rev-parse origin/feature/pan-100')) {
           return { stdout: 'advanced-remote-head\n', stderr: '' };
         }
+        if (command.startsWith('git log --no-merges')) {
+          return { stdout: 'remote-unmerged-commit\n', stderr: '' };
+        }
+        if (command === 'git merge-base --is-ancestor remote-unmerged-commit origin/main') {
+          throw new Error('commit is not on main');
+        }
         if (command.startsWith('git log main..origin/feature/pan-100')) {
           throw new Error('should fail immediately on mismatched remote merged PR head');
         }
@@ -476,7 +530,7 @@ describe('workflows', () => {
 
       expect(verifyStep.step).toBe('close-out:verify-merged');
       expect(verifyStep.success).toBe(false);
-      expect(verifyStep.error).toBe('origin/feature/pan-100 does not match the head commit of merged PR #2182; inspect before closing out.');
+      expect(verifyStep.error).toBe('origin/feature/pan-100 has 1 commit(s) after merged PR #2182 that are not on origin/main: remote-unmerged-commit');
     });
 
     it('should abort if archive fails', async () => {

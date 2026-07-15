@@ -117,11 +117,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { specialist, issueId, status, notes } = body as {
+    const { specialist, issueId, status, notes, itemId } = body as {
       specialist: string;
       issueId: string;
       status: string;
       notes?: string;
+      itemId?: string;
     };
 
     // Validate specialist type
@@ -147,6 +148,18 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     }
 
     const normalizedIssueId = issueId.toUpperCase();
+
+    if (specialist === 'inspect' && status === 'passed') {
+      if (!itemId) {
+        return jsonResponse({ error: 'itemId is required for a passed inspect verdict' }, { status: 400 });
+      }
+      const project = resolveProjectFromIssueSync(normalizedIssueId);
+      const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+      const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
+      if (!plan?.plan.items.some(item => item.id === itemId)) {
+        return jsonResponse({ error: `Item "${itemId}" does not exist in the vBRIEF for ${normalizedIssueId}` }, { status: 400 });
+      }
+    }
     console.log(`[specialists/done] ${specialist} signaling ${status} for ${normalizedIssueId}`);
 
     // Resolve any pending specialist completion waiters (PAN-632: event-driven completion).
@@ -302,9 +315,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       yield* Effect.promise(async () => {
         try {
           const { onInspectComplete } = await import('../../../../lib/cloister/inspect-agent.js');
-          // Extract taskId from notes (format: "Task <taskId> matches spec...")
-          const taskMatch = notes?.match(/[Bb]ead\s+(\S+)/);
-          const taskId = taskMatch?.[1] || 'unknown';
           // Resolve project to get workspace path
           const project = resolveProjectFromIssueSync(normalizedIssueId);
           if (project) {
@@ -314,7 +324,7 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              (await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, taskId, 'passed', workspacePath)));
+              await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, itemId!, 'passed', workspacePath));
 
             }
           }

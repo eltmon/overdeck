@@ -46,6 +46,15 @@ export function describePendingInput(kinds: ReadonlyArray<string> | undefined): 
  * (pane/runtime detections aren't JSONL-derived so they carry no kind). Surfaces
  * that branched on only one of these drifted; everyone should use this.
  */
+/**
+ * The single "is this agent waiting on the operator?" predicate. PAN-1520.
+ *
+ * The server's `hasPendingQuestion` is the SUPERSET signal — it's true whenever
+ * any blocking surface is detected (AskUserQuestion, plan-mode, pane-detected
+ * wait, runtime waiting-on-human), even when `pendingInputKinds` is empty
+ * (pane/runtime detections aren't JSONL-derived so they carry no kind). Surfaces
+ * that branched on only one of these drifted; everyone should use this.
+ */
 export function isAwaitingInput(
   agent: { id?: string; hasPendingQuestion?: boolean; pendingInputCount?: number } | null | undefined,
   /**
