@@ -396,22 +396,22 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T01:58:18.622Z",
+  "updated": "2026-07-15T01:58:22.523Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T01:58:08.566Z",
+    "updatedAt": "2026-07-15T01:58:22.261Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2597-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-15T01:58:05.341Z",
-    "reviewSpawnedAt": "2026-07-15T01:58:08.564Z",
+    "reviewSpawnedAt": "2026-07-15T01:58:09.325Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/circular-deps-baseline.txt",
@@ -620,7 +620,7 @@
       },
       "costAtCloseOut": {
         "usd": 175.007667,
-        "pricingAsOf": "2026-07-15T01:58:11.139Z"
+        "pricingAsOf": "2026-07-15T01:58:22.426Z"
       }
     },
     "merges": [
