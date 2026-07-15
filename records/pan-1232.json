@@ -1135,16 +1135,16 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-15T06:27:43.908Z",
+  "updated": "2026-07-15T06:27:56.773Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T06:27:43.868Z",
+    "updatedAt": "2026-07-15T06:27:56.722Z",
     "reviewNotes": "Agent re-review request (1/25): Re-requesting: verification passed at 04:53:48 but review dispatch was lost to a dashboard restart (supervisor fiber died)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
     "reviewedAtCommit": "37d87f14146fc97f44c74d7be3257e4190b2f687",
@@ -1219,7 +1219,7 @@
       },
       "costAtCloseOut": {
         "usd": 58.91118,
-        "pricingAsOf": "2026-07-15T06:27:43.904Z"
+        "pricingAsOf": "2026-07-15T06:27:56.762Z"
       }
     },
     "merges": [
