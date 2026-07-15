@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T14:48:58.939Z",
+  "updated": "2026-07-15T14:52:40.108Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -101,7 +101,10 @@
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
     "size-scaled-waits.size-scaled-waits.ac2": "completed",
     "size-scaled-waits.size-scaled-waits.ac3": "completed",
-    "tmux-verify-helpers": "running"
+    "tmux-verify-helpers": "completed",
+    "tmux-verify-helpers.tmux-verify-helpers.ac1": "completed",
+    "tmux-verify-helpers.tmux-verify-helpers.ac2": "completed",
+    "tmux-verify-helpers.tmux-verify-helpers.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -114,14 +117,25 @@
     }
   },
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "tmux-verify-helpers": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2568",
         "agentId": "agent-pan-2568",
         "pid": 1232721,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:48:58.939Z"
+        "claimedAt": "2026-07-15T14:48:58.939Z",
+        "itemId": "tmux-verify-helpers",
+        "outcome": "completed",
+        "reason": "Exported capturePaneText and extracted deliveryVerifyLine without changing sendKeys verification behavior; typecheck and lint pass",
+        "releasedAt": "2026-07-15T14:52:40.107Z"
+      }
+    ],
+    "statusReasons": {
+      "tmux-verify-helpers": {
+        "reason": "Exported capturePaneText and extracted deliveryVerifyLine without changing sendKeys verification behavior; typecheck and lint pass",
+        "updatedAt": "2026-07-15T14:52:40.107Z"
       }
     }
   }
