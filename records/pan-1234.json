@@ -133,7 +133,7 @@
     }
   ],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:07:53.845Z",
+  "updated": "2026-07-15T15:07:55.193Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "pending",
@@ -142,7 +142,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:07:53.254Z",
+    "updatedAt": "2026-07-15T15:07:55.146Z",
     "reviewNotes": "[correctness] Closing a direct-linked drawer leaves the issue route active — `src/dashboard/frontend/src/App.tsx:395`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
     "reviewSpawnedAt": "2026-07-15T14:52:41.885Z"
@@ -207,7 +207,7 @@
       },
       "costAtCloseOut": {
         "usd": 52.574635,
-        "pricingAsOf": "2026-07-15T15:07:53.396Z"
+        "pricingAsOf": "2026-07-15T15:07:55.189Z"
       }
     },
     "merges": [
