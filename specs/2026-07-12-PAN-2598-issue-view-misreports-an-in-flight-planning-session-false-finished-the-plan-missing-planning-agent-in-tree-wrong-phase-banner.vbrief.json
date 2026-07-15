@@ -4,17 +4,17 @@
     "created": "2026-07-12T17:29:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2598: Issue view misreports an in-flight planning session: false \"finished the plan\", missing planning agent in tree, wrong phase banner",
-    "updated": "2026-07-15T14:49:22.489Z"
+    "updated": "2026-07-15T17:59:03.347Z"
   },
   "plan": {
     "id": "pan-2598",
     "title": "Issue view misreports an in-flight planning session: false \"finished the plan\", missing planning agent in tree, wrong phase banner",
-    "status": "running",
+    "status": "completed",
     "uid": "1f04872a-b849-49e2-a28a-d203efb1663f",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-12T17:29:57Z",
-    "updated": "2026-07-15T14:49:22.489Z",
+    "updated": "2026-07-15T17:59:03.347Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2598",
@@ -728,5 +728,5 @@
       "canonicalFilename": "2026-07-12-PAN-2598-issue-view-misreports-an-in-flight-planning-session-false-finished-the-plan-missing-planning-agent-in-tree-wrong-phase-banner.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
