@@ -2,7 +2,7 @@
   "issueId": "PAN-1223",
   "schemaVersion": 2,
   "created": "2026-07-15T03:43:14.242Z",
-  "updated": "2026-07-15T03:48:31.829Z",
+  "updated": "2026-07-15T03:48:48.755Z",
   "pipeline": {
     "issueId": "PAN-1223",
     "reviewStatus": "pending",
@@ -23,6 +23,6 @@
       "mode": "auto"
     }
   },
-  "reviewModel": "claude-opus-4-8",
+  "reviewModel": "gpt-5.6-sol",
   "reviewMode": "full"
 }
