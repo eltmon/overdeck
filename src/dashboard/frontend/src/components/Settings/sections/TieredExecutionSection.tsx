@@ -14,6 +14,7 @@ import {
   type CrewAssignments,
   type CrewRest,
 } from './tiered-crews';
+import { CrewRow } from './CrewRow';
 
 interface TieredExecutionSectionProps {
   formData: SettingsConfig;
@@ -333,12 +334,16 @@ export function TieredExecutionSection({
             <span className="text-[11px] text-muted-foreground">click a crew to edit · new crews start on Haiku 4.5, never a frontier model</span>
           </div>
           {crews.length > 0 ? crews.map((crew) => (
-            <details key={crew.id} open={openCrewId === crew.id} className="rounded-lg border border-border/70 px-4 py-3">
-              <summary className="cursor-pointer text-xs font-medium text-foreground" onClick={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}>
-                {crewLabel(crew)} · handles {DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id).join(' · ')}
-              </summary>
-              <p className="mt-2 text-xs text-muted-foreground">Crew editing controls appear here.</p>
-            </details>
+            <CrewRow
+              key={crew.id}
+              crew={crew}
+              owned={DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id)}
+              settings={formData}
+              open={openCrewId === crew.id}
+              onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
+              onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
+              onRemove={() => writeCrews(crews.filter((entry) => entry.id !== crew.id), assign)}
+            />
           )) : (
             <div className="px-4 py-3 rounded-lg border border-border/70 text-xs text-muted-foreground">
               Choose “+ new crew…” on the board to create the first crew.

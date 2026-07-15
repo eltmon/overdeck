@@ -138,7 +138,47 @@ describe('TieredExecutionSection', () => {
         onSettingsChange={onSettingsChange}
       />,
     );
-    expect(screen.getByText('Crew editing controls appear here.').closest('details')).toHaveAttribute('open');
+    expect(screen.getAllByLabelText('Model')[0].closest('details')).toHaveAttribute('open');
+  });
+
+  it('warns on a provider harness mismatch and auto writes the provider default', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({
+      models: { ...baseSettings().models, providers: { ...baseSettings().models.providers, kimi: true } },
+      tiered_execution: {
+        enabled: true,
+        tiers: { all: { model: 'kimi-k2.7-code', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+        supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+        by_kind: {}, replay_threshold: 0.5,
+      },
+    })} onSettingsChange={onSettingsChange} />);
+
+    const warning = screen.getByText('⚠ harness overrides provider default — PAN-1865');
+    fireEvent.click(warning.closest('summary')!);
+    fireEvent.change(screen.getAllByLabelText('Harness')[0], { target: { value: 'auto' } });
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['trivial-simple-medium-complex-expert'].harness).toBe('ohmypi');
+  });
+
+  it('blocks removal while a crew owns difficulties and surfaces invalid mix totals', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: { all: {
+        model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+        distribution: [
+          { model: 'claude-sonnet-5', harness: 'claude-code', weight: 70 },
+          { model: 'gpt-5.6-terra', harness: 'codex', weight: 20 },
+        ],
+      } },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      by_kind: {}, replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    expect(screen.getByText(/Invalid — .*weights must total exactly 100/)).toBeTruthy();
+    fireEvent.click(screen.getAllByText('2-model mix').find((element) => element.closest('summary'))!.closest('summary')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew' }));
+    expect(screen.getByText('Assign these difficulties to another crew before removing it.')).toBeTruthy();
+    expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
   it('edits supervisor fields through onSettingsChange', () => {
