@@ -2,9 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import { verificationSatisfied } from '../../../../src/lib/review-status.js';
 
-const { mockSetReviewStatus, mockDeliverReviewVerdictFeedback } = vi.hoisted(() => ({
+const { mockSetReviewStatus, mockDeliverReviewVerdictFeedback, mockResolveProject, mockReadWorkspacePlan } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
+  mockResolveProject: vi.fn(),
+  mockReadWorkspacePlan: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
@@ -20,6 +22,14 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
 
 vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
   deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
+}));
+
+vi.mock('../../../../src/lib/projects.js', () => ({
+  resolveProjectFromIssueSync: mockResolveProject,
+}));
+
+vi.mock('../../../../src/lib/vbrief/io.js', () => ({
+  readWorkspacePlanSync: mockReadWorkspacePlan,
 }));
 
 describe('specialists done command', () => {
@@ -42,6 +52,11 @@ describe('specialists done command', () => {
       prCommentPosted: true,
       agentMessageSent: true,
     }));
+    mockResolveProject.mockReturnValue({ projectPath: '/project' });
+    mockReadWorkspacePlan.mockReturnValue({
+      plan: { items: [{ id: 'issue-view-model' }] },
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
   });
 
   afterEach(() => {
@@ -133,6 +148,35 @@ describe('specialists done command', () => {
 
     expect(mockSetReviewStatus).toHaveBeenCalled();
     expect(exit).toHaveBeenCalledWith(0);
+  });
+
+  it('requires an exact vBRIEF item for inspect verdicts', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await expect(doneCommand('inspect', 'pan-1059', { status: 'passed' }))
+      .rejects.toThrow('--item is required for inspect verdicts');
+    await expect(doneCommand('inspect', 'pan-1059', { status: 'passed', item: 'missing' }))
+      .rejects.toThrow('Item "missing" does not exist in the vBRIEF for PAN-1059');
+
+    await doneCommand('inspect', 'pan-1059', {
+      status: 'passed',
+      item: 'issue-view-model',
+      notes: 'This predates this bead and is correct',
+    });
+
+    expect(mockReadWorkspacePlan).toHaveBeenCalledWith('/project/workspaces/feature-pan-1059');
+    expect(fetch).toHaveBeenCalledWith('http://localhost:3011/api/specialists/done', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        specialist: 'inspect',
+        issueId: 'PAN-1059',
+        itemId: 'issue-view-model',
+        status: 'passed',
+        notes: 'This predates this bead and is correct',
+      }),
+    });
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 
   it('verificationSatisfied is true after passed override even from failed state (AC10/AC27)', () => {

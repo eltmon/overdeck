@@ -8,6 +8,8 @@ export type IssueCardProps = {
   issueId: string;
   priority: IssueCardPriority;
   selected?: boolean;
+  /** PAN-1234: keyboard navigation focus — same token classes as Pipeline row focus. */
+  focused?: boolean;
   bulkSelected?: boolean;
   stuckCard?: boolean;
   mergeReadyCard?: boolean;
@@ -35,6 +37,7 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
   issueId,
   priority,
   selected = false,
+  focused = false,
   bulkSelected = false,
   stuckCard = false,
   mergeReadyCard = false,
@@ -73,17 +76,19 @@ const IssueCard = forwardRef<HTMLDivElement, IssueCardProps>(function IssueCard(
       className={cn(
         'group relative overflow-hidden rounded-2xl border cursor-pointer issue-card-surface shadow-sm transition-all',
         sessionLostCard && 'border-warning/50',
-        selected
-          ? 'ring-2 ring-warning/70 shadow-lg'
-          : unhealthyCard || stuckCard
-            ? 'border-destructive/60 bg-destructive/10 shadow-md'
-            : pausedCard
-              ? 'border-warning/50 bg-warning/8 shadow-md'
-              : mergeReadyCard
-              ? 'badge-border-success bg-success/10 shadow-md'
-              : bulkSelected
-                ? 'border-primary/50 bg-primary/10 shadow-sm'
-                : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-md',
+        focused
+          ? 'ring-2 ring-primary shadow-lg'
+          : selected
+            ? 'ring-2 ring-warning/70 shadow-lg'
+            : unhealthyCard || stuckCard
+              ? 'border-destructive/60 bg-destructive/10 shadow-md'
+              : pausedCard
+                ? 'border-warning/50 bg-warning/8 shadow-md'
+                : mergeReadyCard
+                ? 'badge-border-success bg-success/10 shadow-md'
+                : bulkSelected
+                  ? 'border-primary/50 bg-primary/10 shadow-sm'
+                  : 'hover:-translate-y-0.5 border-border/70 hover:border-border hover:shadow-md',
         className,
       )}
     >

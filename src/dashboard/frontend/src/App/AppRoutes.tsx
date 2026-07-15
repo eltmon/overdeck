@@ -62,6 +62,8 @@ interface AppRoutesProps {
   onPlanDialogChange: (issueId: string | null) => void;
   onSelectAgent: (agentId: string | null) => void;
   onBacklogIssueAction: (issueId: string, mode: 'browser' | 'modal' | 'panel') => void;
+  /** PAN-1234: suppress j/k/Enter shortcuts in Pipeline/Board while search/command palette is open. */
+  keyboardShortcutsDisabled?: boolean;
 }
 
 export function AppRoutes({
@@ -88,6 +90,7 @@ export function AppRoutes({
   onPlanDialogChange,
   onSelectAgent,
   onBacklogIssueAction,
+  keyboardShortcutsDisabled = false,
 }: AppRoutesProps) {
   return (
     <>
@@ -117,7 +120,7 @@ export function AppRoutes({
       {activeTab === 'pipeline' && (
         <BootstrapGate fallback={<PipelineSkeleton />}>
           <div className="w-full h-full overflow-hidden">
-            <PipelineView onSearchOpen={onSearchOpen} onTabChange={(tab) => onTabChange(tab as Tab)} />
+            <PipelineView onSearchOpen={onSearchOpen} onTabChange={(tab) => onTabChange(tab as Tab)} keyboardShortcutsDisabled={keyboardShortcutsDisabled} />
           </div>
         </BootstrapGate>
       )}
@@ -141,6 +144,7 @@ export function AppRoutes({
                   if (issueId) onOpenIssue(issueId);
                 }}
                 onPlanDialogChange={onPlanDialogChange}
+                keyboardShortcutsDisabled={keyboardShortcutsDisabled}
               />
             </div>
           </>
