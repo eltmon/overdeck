@@ -282,9 +282,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T02:23:21.208Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T13:43Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-15T13:43:26.769Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-15T13:43:26Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-2597 (attempt 3/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-2597 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/circular-deps-baseline.txt",
@@ -411,19 +424,19 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T13:43:25.749Z",
+  "updated": "2026-07-15T13:43:26.769Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T13:43:25.691Z",
+    "updatedAt": "2026-07-15T13:43:26.107Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2597-review already running. Use 'pan tell' to message it.",
-    "verificationNotes": "Verification FAILED at test (419516ms):\n\nes/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel \u001b[90m(file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2323:10\u001b[90m)\u001b[39m\n    at \u001b[90mfile:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout \u001b[90m(file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2272:10\u001b[90m)\u001b[39m\n    at \u001b[90mfile:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2955:64\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts\u001b[2m > \u001b[22m\u001b[2mhandleForkPipelineFailure\u001b[2m > \u001b[22m\u001b[2mmarks the fork failed and ended for a non-Error rejection value\n\u001b[22m\u001b[39m[fork-pipeline] Failed for fork-2: string failure\n\n\u001b[90mstderr\u001b[2m | src/lib/config-yaml/__tests__/tiered-invalid-degradation.test.ts\u001b[2m > \u001b[22m\u001b[2minvalid tiered_execution degrades instead of poisoning config load (PAN-2395)\u001b[2m > \u001b[22m\u001b[2mmergeConfigs does not throw and disables tiered staffing with the reason surfaced\n\u001b[22m\u001b[39m[config] tiered_execution is INVALID — tiered staffing disabled until fixed: tiered_execution.feed.callouts must be one of off, notify, corroborate\n\n\u001b[90mstderr\u001b[2m | tests/unit/lib/cloister/postmerge-release-isolation.test.ts\u001b[2m > \u001b[22m\u001b[2mtriggerPostMergeReleaseIfConfigured\u001b[2m > \u001b[22m\u001b[2mpersists releaseStatus failed and does not corrupt mergeStatus when runRelease throws\n\u001b[22m\u001b[39m[merge-agent] Post-merge release trigger failed for PAN-399: release engine blew up\n\n",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewRequestedAt": "2026-07-15T02:23:16.588Z",
@@ -636,7 +649,7 @@
       },
       "costAtCloseOut": {
         "usd": 189.929732,
-        "pricingAsOf": "2026-07-15T13:43:25.740Z"
+        "pricingAsOf": "2026-07-15T13:43:26.164Z"
       }
     },
     "merges": [
