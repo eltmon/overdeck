@@ -421,18 +421,18 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T13:43:43.680Z",
+  "updated": "2026-07-15T13:44:05.411Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T13:43:31.371Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-2597-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-15T13:44:05.333Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
@@ -589,10 +589,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 182,
-            "output": 50153,
-            "cacheRead": 48420995,
-            "cacheWrite": 85356
+            "input": 186,
+            "output": 51310,
+            "cacheRead": 49608786,
+            "cacheWrite": 86628
           }
         },
         "plan": {
@@ -632,10 +632,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 18628,
-          "output": 104759,
-          "cacheRead": 53263920,
-          "cacheWrite": 383175
+          "input": 18632,
+          "output": 105916,
+          "cacheRead": 54451711,
+          "cacheWrite": 384447
         },
         "anthropic/claude-sonnet-5": {
           "input": 14217,
@@ -645,8 +645,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 189.929732,
-        "pricingAsOf": "2026-07-15T13:43:31.418Z"
+        "usd": 191.191313,
+        "pricingAsOf": "2026-07-15T13:44:05.378Z"
       }
     },
     "merges": [
