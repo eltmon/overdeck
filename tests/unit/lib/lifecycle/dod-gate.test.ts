@@ -4,6 +4,7 @@ import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.
 import {
   checkMergedRow,
   checkMainVerifyRow,
+  checkDeployRow,
   checkPostMergeRow,
   checkReviewRow,
   checkTestsRow,
@@ -245,5 +246,73 @@ describe('Definition-of-Done main-verification row', () => {
       readCheckRuns: async () => { throw new Error('rate limited'); },
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('rate limited') });
+  });
+});
+
+describe('Definition-of-Done deploy row', () => {
+  const ctx = { issueId, projectPath: '/repo/overdeck' };
+  const merge = { mergedAt: '2026-07-15T12:00:00Z', mergeCommit: 'abcdef123456' };
+  const baseDeps = {
+    dashboardUrl: () => 'http://localhost:3011',
+    readJson: async (url: string) => url.endsWith('/api/health')
+      ? { repoRoot: '/repo/overdeck' }
+      : {},
+    commitContains: async () => true,
+    serverStartedAt: async () => new Date('2026-07-15T12:02:00Z'),
+    distMtime: async () => new Date('2026-07-15T12:01:00Z'),
+  };
+
+  it('passes when the live build commit contains the merge commit', async () => {
+    const row = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      readJson: async url => url.endsWith('/api/health')
+        ? { repoRoot: '/repo/overdeck' }
+        : { buildCommit: 'fedcba654321' },
+      commitContains: async (repoRoot, mergeCommit, buildCommit) => {
+        expect([repoRoot, mergeCommit, buildCommit]).toEqual(['/repo/overdeck', 'abcdef123456', 'fedcba654321']);
+        return true;
+      },
+    });
+    expect(row).toMatchObject({ status: 'pass', observed: 'build commit fedcba65 contains merge abcdef12' });
+  });
+
+  it('misses when the live build does not contain the merge', async () => {
+    const row = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      readJson: async url => url.endsWith('/api/health')
+        ? { repoRoot: '/repo/overdeck' }
+        : { commit: 'fedcba654321' },
+      commitContains: async () => false,
+    });
+    expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('does not contain') });
+  });
+
+  it('uses timestamp evidence only when both process and build are newer than the merge', async () => {
+    const fresh = await checkDeployRow(ctx, merge, baseDeps);
+    const staleProcess = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      serverStartedAt: async () => new Date('2026-07-15T11:59:00Z'),
+    });
+    const staleDist = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      distMtime: async () => new Date('2026-07-15T11:58:00Z'),
+    });
+    expect(fresh).toMatchObject({ status: 'pass', observed: expect.stringContaining('best-effort') });
+    expect(fresh.observed).toContain('PAN-2713');
+    expect(staleProcess).toMatchObject({ status: 'miss', observed: expect.stringContaining('11:59:00.000Z') });
+    expect(staleDist).toMatchObject({ status: 'miss', observed: expect.stringContaining('11:58:00.000Z') });
+  });
+
+  it('skips another project and misses an unreachable dashboard', async () => {
+    const otherProject = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      readJson: async () => ({ repoRoot: '/repo/other' }),
+    });
+    const unreachable = await checkDeployRow(ctx, merge, {
+      ...baseDeps,
+      readJson: async () => { throw new Error('connection refused'); },
+    });
+    expect(otherProject).toMatchObject({ status: 'skip', observed: expect.stringContaining('not this project') });
+    expect(unreachable).toMatchObject({ status: 'miss', observed: expect.stringContaining('dashboard not reachable') });
   });
 });

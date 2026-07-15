@@ -1,9 +1,12 @@
 /** Mechanical Definition-of-Done row checks. */
 
 import { execFile } from 'node:child_process';
+import { stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
 import { listRunningAgentsSync, type AgentState } from '../agents.js';
+import { getDashboardApiUrlSync } from '../config.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import {
   getProjectConfigFromWorkspacePath,
@@ -100,6 +103,51 @@ const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
     ], { encoding: 'utf-8', timeout: 10000 });
     return JSON.parse(stdout);
   },
+};
+
+interface DeployRowDeps {
+  dashboardUrl: () => string;
+  readJson: (url: string) => Promise<Record<string, unknown>>;
+  commitContains: (repoRoot: string, mergeCommit: string, buildCommit: string) => Promise<boolean>;
+  serverStartedAt: (port: number) => Promise<Date>;
+  distMtime: (repoRoot: string) => Promise<Date>;
+}
+
+const defaultDeployRowDeps: DeployRowDeps = {
+  dashboardUrl: getDashboardApiUrlSync,
+  readJson: async url => {
+    const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    return response.json() as Promise<Record<string, unknown>>;
+  },
+  commitContains: async (repoRoot, mergeCommit, buildCommit) => {
+    try {
+      await execFileAsync('git', ['merge-base', '--is-ancestor', mergeCommit, buildCommit], {
+        cwd: repoRoot,
+        encoding: 'utf-8',
+        timeout: 10000,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+  serverStartedAt: async port => {
+    const { stdout: pidOutput } = await execFileAsync('lsof', ['-ti', `tcp:${port}`, '-sTCP:LISTEN'], {
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const pid = pidOutput.trim().split('\n')[0];
+    if (!pid) throw new Error(`no dashboard process owns port ${port}`);
+    const { stdout } = await execFileAsync('ps', ['-o', 'lstart=', '-p', pid], {
+      encoding: 'utf-8',
+      timeout: 10000,
+    });
+    const startedAt = new Date(stdout.trim());
+    if (Number.isNaN(startedAt.getTime())) throw new Error(`could not parse dashboard process start time: ${stdout.trim()}`);
+    return startedAt;
+  },
+  distMtime: async repoRoot => new Date((await stat(resolve(repoRoot, 'dist/dashboard/server.js'))).mtime),
 };
 
 const defaultDeps: DodStatusRowDeps = {
@@ -266,5 +314,55 @@ export async function checkMainVerifyRow(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return result('main-verify', 'miss', `could not read merge-commit check-runs: ${message}`);
+  }
+}
+
+export async function checkDeployRow(
+  ctx: LifecycleContext,
+  merge: { mergedAt?: string; mergeCommit?: string },
+  deps: DeployRowDeps = defaultDeployRowDeps,
+): Promise<DodRowResult> {
+  const baseUrl = deps.dashboardUrl().replace(/\/$/, '');
+  let health: Record<string, unknown>;
+  try {
+    health = await deps.readJson(`${baseUrl}/api/health`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return result('deploy', 'miss', `dashboard not reachable at ${baseUrl} — a merged fix is not live if no server is serving it: ${message}`);
+  }
+
+  const repoRoot = typeof health.repoRoot === 'string' ? health.repoRoot : '';
+  if (!repoRoot) return result('deploy', 'miss', `dashboard at ${baseUrl} did not report repoRoot`);
+  if (resolve(repoRoot) !== resolve(ctx.projectPath)) {
+    return result('deploy', 'skip', `live dashboard serves ${repoRoot}, not this project — deploy semantics undefined for ${ctx.projectPath}`);
+  }
+
+  try {
+    let version: Record<string, unknown> = {};
+    try {
+      version = await deps.readJson(`${baseUrl}/api/version`);
+    } catch {
+      // Older servers do not expose version metadata; use the timestamp fallback.
+    }
+    const buildCommit = typeof version.buildCommit === 'string'
+      ? version.buildCommit
+      : typeof version.commit === 'string' ? version.commit : undefined;
+    if (buildCommit && merge.mergeCommit) {
+      const contains = await deps.commitContains(repoRoot, merge.mergeCommit, buildCommit);
+      const observed = `build commit ${buildCommit.slice(0, 8)} ${contains ? 'contains' : 'does not contain'} merge ${merge.mergeCommit.slice(0, 8)}`;
+      return result('deploy', contains ? 'pass' : 'miss', observed);
+    }
+
+    if (!merge.mergedAt) return result('deploy', 'miss', 'cannot resolve merge time for best-effort deploy check');
+    const mergedAt = new Date(merge.mergedAt);
+    if (Number.isNaN(mergedAt.getTime())) return result('deploy', 'miss', `cannot parse merge time ${merge.mergedAt}`);
+    const port = Number(new URL(baseUrl).port || (new URL(baseUrl).protocol === 'https:' ? 443 : 80));
+    const [startedAt, builtAt] = await Promise.all([deps.serverStartedAt(port), deps.distMtime(repoRoot)]);
+    const fresh = startedAt > mergedAt && builtAt > mergedAt;
+    const observed = `best-effort — build commit not exposed (PAN-2713): server started ${startedAt.toISOString()}, dist built ${builtAt.toISOString()}, merge ${mergedAt.toISOString()}`;
+    return result('deploy', fresh ? 'pass' : 'miss', observed);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return result('deploy', 'miss', `deploy evidence unavailable: ${message}`);
   }
 }
