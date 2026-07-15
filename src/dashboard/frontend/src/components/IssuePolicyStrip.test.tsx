@@ -145,6 +145,35 @@ describe('IssuePolicyStrip', () => {
     })));
   });
 
+  it('explains when a work-model override replaces crew routing', async () => {
+    fixtures.staffing.override.workModel = 'gpt-5.5';
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+
+    const strip = await screen.findByTestId('issue-policy-strip');
+    expect(within(strip).getByRole('button', { name: /work · GPT 5.5 · replaces crews/i })).toBeInTheDocument();
+    fireEvent.click(within(strip).getByRole('button', { name: 'Issue policies' }));
+    expect(screen.getByText('Overrides crew routing — every item on this issue runs this model.')).toBeInTheDocument();
+  });
+
+  it('does not show crew-suspension copy without a work-model override', async () => {
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    expect(screen.queryByText('Overrides crew routing — every item on this issue runs this model.')).not.toBeInTheDocument();
+    expect(screen.queryByText(/replaces crews/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps the plain work-model chip when crew routing is disabled', async () => {
+    fixtures.staffing.override.workModel = 'gpt-5.5';
+    fixtures.staffing.tieredExecution.effective = false;
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+
+    const strip = await screen.findByTestId('issue-policy-strip');
+    expect(within(strip).getByRole('button', { name: /work · GPT 5.5$/i })).toBeInTheDocument();
+    fireEvent.click(within(strip).getByRole('button', { name: 'Issue policies' }));
+    expect(screen.queryByText('Overrides crew routing — every item on this issue runs this model.')).not.toBeInTheDocument();
+  });
+
   it('preserves every affordance from the five-select policy strip', async () => {
     fixtures.review.override = { reviewMode: 'full', reReviewScope: 'all', reviewModel: 'gpt-5.5' };
     fixtures.staffing.override.workModel = 'claude-sonnet-5';

@@ -174,6 +174,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
   const needsRestart = Boolean(
     staffing.override.workModel && staffing.override.workModel !== staffing.resolved.recordedModel,
   );
+  const crewSuspended = staffing.tieredExecution.effective && Boolean(staffing.override.workModel);
   const effectiveReviewMode = review.override.reviewMode ?? review.resolved.reviewMode;
 
   const modelName = (modelId: string) => models.find((model) => model.id === modelId)?.name ?? modelId;
@@ -181,7 +182,11 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
     review.override.reviewMode && { key: 'review', label: 'review', value: review.override.reviewMode },
     review.override.reReviewScope && { key: 're-review', label: 're-review', value: review.override.reReviewScope },
     review.override.reviewModel && { key: 'review-model', label: 'review model', value: modelName(review.override.reviewModel) },
-    staffing.override.workModel && { key: 'work', label: 'work', value: modelName(staffing.override.workModel) },
+    staffing.override.workModel && {
+      key: 'work',
+      label: 'work',
+      value: `${modelName(staffing.override.workModel)}${crewSuspended ? ' · replaces crews' : ''}`,
+    },
     swarm.configured?.mode && { key: 'swarm', label: 'swarm', value: swarm.configured.mode },
     staffing.tieredExecution.override && { key: 'crew', label: 'crew', value: staffing.tieredExecution.override },
   ].filter((override): override is { key: string; label: string; value: string } => Boolean(override));
@@ -299,12 +304,15 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             <span className={`${rowLabelClass} ${staffing.override.workModel ? 'text-foreground' : 'text-muted-foreground'}`}>
               <span className={`h-[5px] w-[5px] rounded-full bg-primary ${staffing.override.workModel ? 'opacity-100' : 'opacity-0'}`} /> Model
             </span>
-            <div className={controlCellClass}>
-              <select aria-label="Work model for this issue" className={selectClass} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
-                <option value="">Default · {workDefault}</option>
-                {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-              </select>
-              {staffing.override.workModel && <button type="button" aria-label="Reset work model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button>}
+            <div className="min-w-0">
+              <div className={controlCellClass}>
+                <select aria-label="Work model for this issue" className={selectClass} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
+                  <option value="">Default · {workDefault}</option>
+                  {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+                </select>
+                {staffing.override.workModel && <button type="button" aria-label="Reset work model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button>}
+              </div>
+              {crewSuspended && <div className="mt-1 text-[11px] text-muted-foreground">Overrides crew routing — every item on this issue runs this model.</div>}
             </div>
           </div>
 
