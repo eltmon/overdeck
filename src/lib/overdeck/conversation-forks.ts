@@ -510,8 +510,16 @@ export async function runForkPipeline(
   }
   updateForkStatus(convName, 'spawning');
   await self.ensureForkSessionReady(conv, sessionId, false);
-  await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
+  const injection = await self.injectForkSummary(conv, summary, effectiveForkMode === 'handoff' ? 'handoff' : 'summary-fork');
   markConversationActive(convName);
+  if (injection === 'stranded') {
+    updateForkStatus(
+      convName,
+      'failed',
+      'Summary was delivered to the terminal but never submitted. Open the Terminal tab and press Enter to submit it; the session is alive.',
+    );
+    return;
+  }
   updateForkStatus(convName, null);
 }
 
