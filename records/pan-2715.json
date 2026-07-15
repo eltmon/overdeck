@@ -27,6 +27,11 @@
       "timestamp": "2026-07-15T16:10:47.198Z",
       "reason": "end",
       "note": "ANOMALIES RESOLVED: initial pan done found a concurrent main conflict in docs/DEFINITION-OF-DONE.md; merge 2b26ba74ad preserves PAN-2715 gate IDs/drift enforcement and PAN-2713's newer deploy patrol owner, with both focused tests green. Earlier, the first captured npm test rerun exposed one stale closeOut mock expectation; 9106b60e52 corrected it. One intermediate runner was externally terminated with exit 143, then the final full rerun passed 9,171 backend tests and 32 frontend action-parity tests, with 50 expected backend skips. Prior focused tests, typecheck, lint, circular-dependency guard, push guards, clean worktree, and local/remote SHA parity passed."
+    },
+    {
+      "timestamp": "2026-07-15T16:12:41.645Z",
+      "reason": "end",
+      "note": "ANOMALIES FIRST: the prior completion succeeded but its post-success overdeck-state push lost a concurrent ref race and used the durable workspace verdict fallback; subsequent Deacon and compact-recovery nudges were stale, while the canonical task writer confirmed every vBRIEF item completed at sequence 24. The origin/main documentation conflict was resolved as a no-loss merge preserving PAN-2715 gate IDs and PAN-2713 deploy ownership. Final verification passed 9,171 backend tests and 32 frontend action-parity tests with 50 expected backend skips; focused tests, typecheck, lint, circular-dependency guard, push guards, clean tree, and local/remote SHA parity passed at 2b26ba74ad."
     }
   ],
   "feedback": [],
@@ -87,17 +92,17 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:12:40.859Z",
+  "updated": "2026-07-15T16:12:41.800Z",
   "pipeline": {
     "issueId": "PAN-2715",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:10:49.453Z",
+    "updatedAt": "2026-07-15T16:12:41.740Z",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
     "reviewRequestedAt": "2026-07-15T16:10:47.225Z",
@@ -164,15 +169,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6385806,
-            "output": 9572,
-            "cacheRead": 5656448,
+            "input": 6438678,
+            "output": 9733,
+            "cacheRead": 5705472,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 49390313,
-            "output": 81959,
-            "cacheRead": 48440064,
+            "input": 51051074,
+            "output": 86732,
+            "cacheRead": 49873408,
             "cacheWrite": 0
           }
         },
@@ -195,15 +200,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6385806,
-          "output": 9572,
-          "cacheRead": 5656448,
+          "input": 6438678,
+          "output": 9733,
+          "cacheRead": 5705472,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 49390313,
-          "output": 81959,
-          "cacheRead": 48440064,
+          "input": 51051074,
+          "output": 86732,
+          "cacheRead": 49873408,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -220,8 +225,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 44.949774,
-        "pricingAsOf": "2026-07-15T16:10:49.515Z"
+        "usd": 46.946721000000004,
+        "pricingAsOf": "2026-07-15T16:12:41.794Z"
       }
     },
     "merges": [
