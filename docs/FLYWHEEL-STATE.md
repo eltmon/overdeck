@@ -3794,3 +3794,109 @@ liveness). No blockers on any row. **Main CI GREEN** on `19f6989b` + `ebceddd2`;
 **NEXT:** land PR #2723 → close out → deploy. Then `pan start PAN-2710` when planning finalizes.
 Then drive the blocked-review trio to verdict. PAN-1491 stays PAUSED (needs-you: verification stuck
 3/3 — operator gate, do not force).
+
+## RUN-63 tick 21 (2026-07-15 ~11:45 local / 15:45Z) — PAN-2722 LANDED+DEPLOYED; PAN-2569 fired on PAN-2710 (caught+fixed); PAN-2724 in CI
+
+**PAN-2722 MERGED → `8d3ecd404d` (PR #2723), DEPLOYED, CLOSED OUT.** Build from main at `8d3ecd404d`
+(freshness checked with `date -u -r`), `pan restart --dashboard --health-timeout 180000` → pid
+**1857792**, systemd-parented, health 200. **RUN-63: 17 merged, 17 closed out.**
+
+### ⚠️ PAN-2569 FIRED — exactly as flagged in tick 20. Caught ONLY by a manual sweep.
+
+`pan plan PAN-2710 --auto` **finalized successfully** — spec written to `overdeck-state`
+(`2026-07-15-PAN-2710-feature-prs-keep-stale-failed-checks…vbrief.json`), `planning-pan-2710` pane
+gone — and **NO work agent spawned.** `review_status` = `('pending','pending',0)`; the only pan-2710
+session was the dead `strike-pan-2710`. No error, no needs-you, no trace. **It would have sat at
+`planned` forever**, on the critical path, on an operator-RELEASED issue.
+
+`pan start PAN-2710` → started immediately, clean, **5 checklist items** — proving nothing was wrong
+with the issue, plan, or capacity. The auto-start step simply never fired.
+**Occurrence recorded on PAN-2569** with full evidence, and cross-linked to PAN-2691 (auto-planned
+issues park silently when the post-finalize spawn is gated — same silence, possibly same root).
+**STANDING LESSON: after ANY `pan plan --auto` finalizes, VERIFY a work agent exists. Do not assume.**
+
+**PAN-2724 → PR #2726, CI running. I OWN THIS MERGE.** Replaces the beads-era `"Item <id> …"` notes
+regex with a structured `--item` flag for inspect verdicts. Verified myself: 21 tests passed (3 files),
+typecheck, lint; diff stat clean.
+**Checked the risky part** — `--item` is now REQUIRED for inspect, which would break every caller that
+omits it. Confirmed the ONLY callers are the standing-supervisor prompts
+(`tier-supervisor.ts:391/397`) and **the strike updated both to emit `--item` in the same change**, and
+registered the flag on the CLI (`specialists/index.ts`). No caller left on the old shape. It also
+validates the item against the vBRIEF and fails loudly on an unknown id rather than mis-attributing.
+
+**strike-pan-2725 IN FLIGHT** — committed `73eafbdefd` (fix(cloister): deliver messages to idle codex
+agents), still writing tests. Operator: *"until it lands, `pan tell` to IDLE codex agents dead-letters;
+if an agent doesn't react, cycle its session (kill + stack rebuild + start) so queued mail replays at
+spawn."* **Low impact on me — the flywheel never uses `pan tell` (forbidden by doctrine)** — but it
+explains why finished strikes could not reach me all day (PAN-2709 occurrences 1–4).
+
+**Live now:** PAN-2597 (reviewing), PAN-2499, PAN-2568, PAN-2598 (review=blocked, working feedback),
+PAN-1234 (review=blocked, working), PAN-2713 (review=blocked, working), PAN-2715, **PAN-2710 (work
+agent, 5 items)**, planning-pan-2702 (not mine), strike-pan-2724 (PR #2726), strike-pan-2725.
+**Main CI:** `244aa59f` GREEN; `8d3ecd40` in progress. PAN-1491 stays PAUSED (needs-you, operator gate).
+
+**NEXT:** land PR #2726 → close → deploy. Land PAN-2725 on green. Drive the blocked-review trio.
+Shepherd PAN-2710 (operator-released) to merged.
+
+## RUN-63 tick 22 (2026-07-15 ~12:05 local / 16:05Z) — PAN-2724 LANDED; PAN-2725 in CI (strike's "red suite" was a STALE-BASE artifact)
+
+**PAN-2724 MERGED → `847414f572` (PR #2726) + CLOSED OUT. RUN-63: 18 merged, 18 closed out.**
+Structured `--item` flag replacing the beads-era `"Item <id> …"` notes regex for inspect verdicts.
+Verified the risky part myself: `--item` is now REQUIRED, which would break any caller omitting it —
+the ONLY callers are the supervisor prompts (`tier-supervisor.ts:391/397`) and the strike updated both
+in the same change. It also validates the id against the vBRIEF and fails loudly on unknown rather
+than mis-attributing.
+
+### ⚠️ STRIKE PUSH-BACK OVERTURNED BY VERIFICATION — a repeatable pattern, do not take "orthogonal" on faith
+
+`strike-pan-2725` refused to push: *"full suite is pre-existing RED on unrelated supervisor
+expectation drift plus Linear tests making unauthenticated live API calls… need main green or
+explicit authorization."*
+
+**Both claims investigated rather than accepted:**
+- **Main was already GREEN** (`5f5f6ab0`, `8d3ecd40`) — its premise was wrong.
+- **The "supervisor expectation drift" was its own STALE BASE.** Its branch predated `847414f572`
+  (PAN-2724), which I had merged minutes earlier and which *changes `tier-supervisor.ts`*. After I
+  rebased onto current main, `src/lib/agents/__tests__/tier-supervisor.test.ts` → **11/11 passed.**
+  Not orthogonal, not pre-existing — an artifact of the strike never rebasing.
+- The Linear "live API calls" claim: no test files at the cited path; CI is the authoritative gate.
+
+**LESSON (recurring — this is the 3rd variant today): a strike's read of the world is only as fresh as
+its base.** Strikes have now reported (a) stale `origin/main` while blocked on red main (2701/2690),
+(b) un-rebased diffs that would REVERT FLYWHEEL-STATE.md (2712, 2692), and (c) a "pre-existing red
+suite" that was really their own stale base (2725). **Always rebase FIRST, then re-run the gates
+yourself, before believing any strike's claim about the world.**
+
+**PAN-2725 → PR #2728, CI running. I OWN THIS MERGE.** Gates on the rebased branch: 4 passed
+(message-agent), 11 passed (tier-supervisor), typecheck, lint. The fix composes correctly with
+PAN-2701 (landed earlier today): for an IDLE codex agent `waitForAgentIdle` returns false (codex has
+no claude-code hook mirror, PAN-1594) → PAN-2701 queued it as turn-end `.pending.md` → **an idle agent
+has no next turn, so it never drained → dead-letter.** `claimCodexIdleTurn` unlinks the notify hook's
+`turn-completed` marker: claim succeeds → idle → deliver directly; claim fails → mid-turn → queue for
+PAN-2701's drain. Claiming makes the signal one-shot so a concurrent message cannot also read "idle".
+
+### PAN-2499 — STOPPED BY OPERATOR GATE, deliberately NOT re-driven
+`agent-pan-2499` vanished from the live set. `state.json`: `status=stopped`, **`stoppedByUser=True`**,
+`costSoFar=0`, `lastActivity`=`startedAt`+4s. Issue OPEN, `review=pending`, workspace holds **2 real
+commits** (`f7feaf6311`, `da79d3e3bd`). Doctrine: the operator-stop gate **blocks autonomous re-drive**;
+explicit operator start is what clears `stoppedByUser`. **Left alone and surfaced to the operator** —
+re-driving it would defeat the gate's whole purpose.
+
+### Pipeline status (re-derived this tick)
+| Issue | review | test | note |
+| --- | --- | --- | --- |
+| PAN-1234 | **passed** | pending | test should dispatch → watch it |
+| PAN-2597 | reviewing | pending | convoy |
+| PAN-2598 | reviewing | pending | recovered from `blocked` — agent fixed feedback, re-review running |
+| PAN-2713 | **blocked** | pending | work agent live, addressing feedback |
+| PAN-2710 | pending | pending | operator-released; work agent + review-supervisor live |
+| PAN-2715 | pending | pending | work + review-supervisor live |
+| PAN-2568 | pending | pending | work + review-supervisor live |
+| PAN-2499 | pending | pending | **operator-stop gate — do not re-drive** |
+| PAN-1491 | — | — | **PAUSED needs-you** (verification stuck 3/3) — operator gate |
+
+**PAN-2727 checked — does NOT affect me:** "pan restart from a workspace cwd kills the host dashboard
+before the guard refuses". I always deploy from the primary main worktree (`/home/eltmon/Projects/overdeck`),
+never a workspace cwd. The flywheel is the sanctioned single deployer.
+
+**Main CI:** `5f5f6ab0` GREEN; `847414f5` in progress. Ready set empty; no blockers anywhere.

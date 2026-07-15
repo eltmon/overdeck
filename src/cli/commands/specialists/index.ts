@@ -58,6 +58,7 @@ export function registerSpecialistsCommands(program: Command): void {
     .command('done <type> <issueId>')
     .description('Signal specialist completion (deterministic status update)')
     .requiredOption('--status <status>', 'Result status: passed, failed, or review-only blocked')
+    .option('--item <itemId>', 'vBRIEF item ID (required for inspect verdicts)')
     .option('--notes <notes>', 'Optional notes about the result')
     .option('--reviewers <verdicts>', 'PAN-1862 (review only): per-reviewer verdicts, e.g. "security=passed,correctness=blocked"')
     .action(doneAndExitCommand);
