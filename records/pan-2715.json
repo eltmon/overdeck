@@ -184,7 +184,7 @@
     "recordedAt": "2026-07-15T16:38:20.246Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:38:20.247Z",
+  "updated": "2026-07-15T16:38:21.250Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "passed",
@@ -194,7 +194,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:38:13.801Z",
+    "updatedAt": "2026-07-15T16:38:21.155Z",
     "reviewNotes": "[correctness] Journal-backed verification passes without the required verified commit — `src/lib/lifecycle/dod-gate.ts:241`",
     "verificationNotes": "Verification FAILED at lint (23777ms):\n\n                                                                                                                                                                    ──────────┬──────────  \n \u001b[38;5;240m  │\u001b[0m                                                                                                                                                                                                         ╰──────────── No such file or directory (os error 2)\n\u001b[38;5;246m───╯\u001b[0m\n\n    at aggregateBindingErrorsIntoJsError (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/error-DL-e8-oE.mjs:48:18)\n    at unwrapBindingResult (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/error-DL-e8-oE.mjs:18:128)\n    at #build (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/rolldown-build-DSxL8qiP.mjs:3317:34)\n    at async build (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/index.mjs:42:22)\n    at async Promise.all (index 0)\n    at async buildSingle (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:760:19)\n    at async Promise.all (index 0)\n    at async buildWithConfigs (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:716:18)\n    at async CAC.<anonymous> (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:25:2)\n    at async runCLI (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:49:3)\n\n",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
@@ -330,7 +330,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.924158,
-        "pricingAsOf": "2026-07-15T16:38:13.885Z"
+        "pricingAsOf": "2026-07-15T16:38:21.240Z"
       }
     },
     "merges": [
