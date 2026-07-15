@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:15:03.363Z",
+  "updated": "2026-07-15T14:17:07.798Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "staleness-module": {
-        "writerId": "agent-pan-2713",
-        "agentId": "agent-pan-2713",
-        "pid": 738458,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:15:03.363Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Stamped root and dashboard bundles with Git HEAD/build time, exposed guarded metadata through dashboard identity and /api/health, and added identity coverage.",
         "releasedAt": "2026-07-15T14:14:51.012Z"
+      },
+      {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 738458,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:15:03.363Z",
+        "itemId": "staleness-module",
+        "outcome": "completed",
+        "reason": "Added async Git-based build staleness computation with filtered build-input counts, fetch throttling/fallback, unknown degradation, and fake-timer coverage.",
+        "releasedAt": "2026-07-15T14:17:07.798Z"
       }
     ],
     "statusReasons": {
       "build-commit-stamp": {
         "reason": "Stamped root and dashboard bundles with Git HEAD/build time, exposed guarded metadata through dashboard identity and /api/health, and added identity coverage.",
         "updatedAt": "2026-07-15T14:14:51.012Z"
+      },
+      "staleness-module": {
+        "reason": "Added async Git-based build staleness computation with filtered build-input counts, fetch throttling/fallback, unknown degradation, and fake-timer coverage.",
+        "updatedAt": "2026-07-15T14:17:07.798Z"
       }
     }
   },
@@ -88,6 +95,11 @@
     "build-commit-stamp.build-commit-stamp.ac1": "completed",
     "build-commit-stamp.build-commit-stamp.ac2": "completed",
     "build-commit-stamp.build-commit-stamp.ac3": "completed",
-    "staleness-module": "running"
+    "staleness-module": "completed",
+    "staleness-module.staleness-module.ac1": "completed",
+    "staleness-module.staleness-module.ac2": "completed",
+    "staleness-module.staleness-module.ac3": "completed",
+    "staleness-module.staleness-module.ac4": "completed",
+    "staleness-module.staleness-module.ac5": "completed"
   }
 }
