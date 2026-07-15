@@ -92,20 +92,21 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:12:50.795Z",
+  "updated": "2026-07-15T16:13:25.768Z",
   "pipeline": {
     "issueId": "PAN-2715",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:12:50.698Z",
+    "updatedAt": "2026-07-15T16:13:25.704Z",
+    "reviewNotes": "Close-out can certify verification without a commit and succeed without persisting the required DoD audit",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
-    "reviewRequestedAt": "2026-07-15T16:10:47.225Z",
+    "reviewRequestedAt": "2026-07-15T16:13:25.318Z",
     "reviewSpawnedAt": "2026-07-15T16:10:48.213Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -162,6 +163,24 @@
         "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
       ],
       "recordedAt": "2026-07-15T16:10:43.479Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
+      }
     }
   },
   "closeOut": {
@@ -226,7 +245,7 @@
       },
       "costAtCloseOut": {
         "usd": 48.467357,
-        "pricingAsOf": "2026-07-15T16:12:50.776Z"
+        "pricingAsOf": "2026-07-15T16:13:25.734Z"
       }
     },
     "merges": [
