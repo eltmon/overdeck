@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T09:47:18.379Z",
+  "updated": "2026-07-15T09:50:21.722Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "pending",
@@ -96,16 +96,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "crew-rows": {
-        "writerId": "agent-pan-2684",
-        "agentId": "agent-pan-2684",
-        "pid": 1879644,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T09:47:18.379Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2684",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Replaced tier-name and checkbox routing with the five-column crew board and standalone state header",
         "releasedAt": "2026-07-15T09:47:14.732Z"
+      },
+      {
+        "writerId": "agent-pan-2684",
+        "agentId": "agent-pan-2684",
+        "pid": 1879644,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T09:47:18.379Z",
+        "itemId": "crew-rows",
+        "outcome": "completed",
+        "reason": "Added expandable single/mix crew editors, provider-default harness warnings, costs, weight validation, and guarded removal",
+        "releasedAt": "2026-07-15T09:50:21.722Z"
       }
     ],
     "statusReasons": {
@@ -138,6 +141,10 @@
       "board-header": {
         "reason": "Replaced tier-name and checkbox routing with the five-column crew board and standalone state header",
         "updatedAt": "2026-07-15T09:47:14.732Z"
+      },
+      "crew-rows": {
+        "reason": "Added expandable single/mix crew editors, provider-default harness warnings, costs, weight validation, and guarded removal",
+        "updatedAt": "2026-07-15T09:50:21.722Z"
       }
     }
   },
@@ -153,6 +160,11 @@
     "board-header.board-header.ac2": "completed",
     "board-header.board-header.ac3": "completed",
     "board-header.board-header.ac4": "completed",
-    "crew-rows": "running"
+    "crew-rows": "completed",
+    "crew-rows.crew-rows.ac1": "completed",
+    "crew-rows.crew-rows.ac2": "completed",
+    "crew-rows.crew-rows.ac3": "completed",
+    "crew-rows.crew-rows.ac4": "completed",
+    "crew-rows.crew-rows.ac5": "completed"
   }
 }
