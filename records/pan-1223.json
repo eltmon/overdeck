@@ -2,7 +2,7 @@
   "issueId": "PAN-1223",
   "schemaVersion": 2,
   "created": "2026-07-15T03:43:14.242Z",
-  "updated": "2026-07-15T03:45:13.613Z",
+  "updated": "2026-07-15T03:45:18.079Z",
   "pipeline": {
     "issueId": "PAN-1223",
     "reviewStatus": "pending",
@@ -19,9 +19,5 @@
     "ranOn": "eltmon-z790"
   },
   "reviewMode": "quick",
-  "swarm": {
-    "policy": {
-      "mode": "off"
-    }
-  }
+  "swarm": {}
 }
