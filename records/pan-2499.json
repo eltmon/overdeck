@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:46:45.340Z",
+  "updated": "2026-07-15T14:50:43.703Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -144,7 +144,10 @@
     "verification-gates.verification-gates.ac1": "completed",
     "verification-gates.verification-gates.ac2": "completed",
     "verification-gates.verification-gates.ac3": "completed",
-    "beads-panel": "running"
+    "beads-panel": "completed",
+    "beads-panel.beads-panel.ac1": "completed",
+    "beads-panel.beads-panel.ac2": "completed",
+    "beads-panel.beads-panel.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -170,16 +173,8 @@
     }
   },
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "beads-panel": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1196734,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:46:45.340Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -246,6 +241,17 @@
         "outcome": "completed",
         "reason": "Verified existing pushed shared VerificationGates adoption in console and cockpit: 4 focused state tests pass, legacy drawer component is deleted, and the restored no-loss re-home gate passes.",
         "releasedAt": "2026-07-15T14:46:42.956Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1196734,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:46:45.340Z",
+        "itemId": "beads-panel",
+        "outcome": "completed",
+        "reason": "Created shared BeadsPanel with full progress/list and compact rail density, adopted it in console/cockpit/rail, deleted duplicate DrawerBeadsList and moved BeadsRail implementation, and removed the superseded rail beads chip; tests, no-loss, typecheck, lint, and file-size guard pass.",
+        "releasedAt": "2026-07-15T14:50:43.703Z"
       }
     ],
     "statusReasons": {
@@ -272,6 +278,10 @@
       "verification-gates": {
         "reason": "Verified existing pushed shared VerificationGates adoption in console and cockpit: 4 focused state tests pass, legacy drawer component is deleted, and the restored no-loss re-home gate passes.",
         "updatedAt": "2026-07-15T14:46:42.956Z"
+      },
+      "beads-panel": {
+        "reason": "Created shared BeadsPanel with full progress/list and compact rail density, adopted it in console/cockpit/rail, deleted duplicate DrawerBeadsList and moved BeadsRail implementation, and removed the superseded rail beads chip; tests, no-loss, typecheck, lint, and file-size guard pass.",
+        "updatedAt": "2026-07-15T14:50:43.703Z"
       }
     }
   }
