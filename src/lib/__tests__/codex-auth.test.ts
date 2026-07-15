@@ -63,6 +63,7 @@ const jwtWithClaims = (claims: Record<string, unknown>) =>
   `${base64urlJson({ alg: 'none', typ: 'JWT' })}.${base64urlJson(claims)}.signature`;
 
 let tmpRoot = '';
+let originalHome: string | undefined;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -70,6 +71,11 @@ beforeEach(async () => {
   tmpRoot = await mkdtemp(join(tmpdir(), 'pan-codex-auth-'));
   mockCliproxy.authDir = join(tmpRoot, 'auth');
   mockCliproxy.logPath = join(tmpRoot, 'cliproxy.log');
+  // PAN-2285: the merged status also probes the native ~/.codex/auth.json.
+  // Point HOME at the (empty) temp root so these cliproxy-store tests are not
+  // polluted by the developer's real native credential.
+  originalHome = process.env.HOME;
+  process.env.HOME = tmpRoot;
 });
 
 afterEach(async () => {
@@ -78,6 +84,8 @@ afterEach(async () => {
   tmpRoot = '';
   mockCliproxy.authDir = '';
   mockCliproxy.logPath = '';
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
 });
 
 const writeCodexFixture = async (logLines: string[] = []) => {
@@ -98,14 +106,14 @@ const writeCodexFixture = async (logLines: string[] = []) => {
 const readCodexStatus = () => Effect.runPromise(checkCodexAuthStatus());
 
 describe('checkCodexAuthStatus', () => {
-  it('reports missing when the cliproxy codex credential file is absent', async () => {
-    await expect(readCodexStatus()).resolves.toEqual({ status: 'missing' });
+  it('reports missing when both the cliproxy and native codex credential files are absent', async () => {
+    await expect(readCodexStatus()).resolves.toMatchObject({ status: 'missing' });
   });
 
   it('reports valid for a future-expiring JWT when the log shows no auth failures', async () => {
     await writeCodexFixture();
 
-    await expect(readCodexStatus()).resolves.toEqual({
+    await expect(readCodexStatus()).resolves.toMatchObject({
       status: 'valid',
       email: EMAIL,
       expiresAt: '2026-06-02T04:40:00.000Z',
@@ -194,5 +202,125 @@ describe('evaluateBurnedFromLog', () => {
 
     const stale = evalLog([reusedCodeBurnBlock('2026-06-02 01:00:00')], { now: ms('2026-06-02T03:40:00Z') });
     expect(stale.status).toBe('valid'); // > 1h old, no cutoff → staleness backstop
+  });
+});
+
+// ─── PAN-2285: native store probe, pane-burn classifier, registry, combine ─────
+
+import {
+  classifyNativeCodexAuth,
+  paneShowsCodexAuthBurn,
+  flagCodexAgentAuthBurned,
+  clearCodexAgentAuthBurned,
+  getActiveBurnedCodexAgents,
+  combineCodexAuthStatuses,
+} from '../codex-auth.js';
+
+function makeJwt(payload: Record<string, unknown>): string {
+  const enc = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+  return `${enc({ alg: 'none', typ: 'JWT' })}.${enc(payload)}.sig`;
+}
+
+describe('classifyNativeCodexAuth (PAN-2285)', () => {
+  const now = ms('2026-07-14T00:00:00Z');
+
+  it('reports missing when the file is absent (raw === null)', () => {
+    expect(classifyNativeCodexAuth(null, now).status).toBe('missing');
+  });
+
+  it('reports unknown on malformed JSON', () => {
+    expect(classifyNativeCodexAuth('{not json', now).status).toBe('unknown');
+  });
+
+  it('reports valid for a future-exp access token and extracts email from the id token', () => {
+    const raw = JSON.stringify({
+      last_refresh: '2026-07-13T13:49:33Z',
+      tokens: {
+        access_token: makeJwt({ exp: Math.floor(now / 1000) + 3600 }),
+        id_token: makeJwt({ email: 'user@example.com' }),
+      },
+    });
+    const res = classifyNativeCodexAuth(raw, now);
+    expect(res.status).toBe('valid');
+    expect(res.email).toBe('user@example.com');
+    expect(res.lastRefresh).toBe('2026-07-13T13:49:33Z');
+  });
+
+  it('reports expired for a past-exp access token', () => {
+    const raw = JSON.stringify({
+      tokens: { access_token: makeJwt({ exp: Math.floor(now / 1000) - 60 }) },
+    });
+    expect(classifyNativeCodexAuth(raw, now).status).toBe('expired');
+  });
+
+  it('treats API-key mode (OPENAI_API_KEY set, no OAuth tokens) as valid', () => {
+    const raw = JSON.stringify({ OPENAI_API_KEY: 'sk-abc', tokens: {} });
+    expect(classifyNativeCodexAuth(raw, now).status).toBe('valid');
+  });
+
+  it('reports unknown when there is neither an OAuth token nor an API key', () => {
+    expect(classifyNativeCodexAuth(JSON.stringify({ tokens: {} }), now).status).toBe('unknown');
+  });
+});
+
+describe('paneShowsCodexAuthBurn (PAN-2285)', () => {
+  it('matches each revoked-token marker', () => {
+    expect(paneShowsCodexAuthBurn('… could not be refreshed because your refresh token was revoked')).toBe(true);
+    expect(paneShowsCodexAuthBurn('MCP error 401: token_invalidated')).toBe(true);
+    expect(paneShowsCodexAuthBurn('error: token_revoked')).toBe(true);
+  });
+
+  it('does not match a clean pane', () => {
+    expect(paneShowsCodexAuthBurn('❯ working on the task, all good')).toBe(false);
+  });
+});
+
+describe('codex burn registry (PAN-2285)', () => {
+  afterEach(() => {
+    clearCodexAgentAuthBurned('agent-a');
+    clearCodexAgentAuthBurned('agent-b');
+  });
+
+  it('flags an agent once (returns true first, false after)', () => {
+    expect(flagCodexAgentAuthBurned('agent-a')).toBe(true);
+    expect(flagCodexAgentAuthBurned('agent-a')).toBe(false);
+  });
+
+  it('prunes flags recorded before the native store was last written', () => {
+    flagCodexAgentAuthBurned('agent-a'); // flaggedAt ≈ now
+    // A native write strictly in the future heals the family → the flag is stale.
+    expect(getActiveBurnedCodexAgents(Date.now() + 60_000)).not.toContain('agent-a');
+    // The stale entry was pruned, so it stays gone even against mtime 0.
+    expect(getActiveBurnedCodexAgents(0)).not.toContain('agent-a');
+  });
+
+  it('keeps flags recorded at/after the native write time', () => {
+    flagCodexAgentAuthBurned('agent-b');
+    expect(getActiveBurnedCodexAgents(0)).toContain('agent-b');
+  });
+});
+
+describe('combineCodexAuthStatuses (PAN-2285)', () => {
+  const valid = { status: 'valid', email: '', expiresAt: '' } as CodexAuthStatus;
+  const expired = { status: 'expired', email: '', expiresAt: '' } as CodexAuthStatus;
+  const burned = { status: 'burned', email: '', expiresAt: '' } as CodexAuthStatus;
+  const missing = { status: 'missing' } as CodexAuthStatus;
+
+  it('native valid + cliproxy missing → valid', () => {
+    expect(combineCodexAuthStatuses(valid, missing).status).toBe('valid');
+  });
+
+  it('native expired + cliproxy valid → expired (banner fires)', () => {
+    expect(combineCodexAuthStatuses(expired, valid).status).toBe('expired');
+  });
+
+  it('native missing + cliproxy burned → burned (gpt-5.5 path preserved)', () => {
+    const res = combineCodexAuthStatuses(missing, burned);
+    expect(res.status).toBe('burned');
+    expect(res.source).toBe('cliproxy');
+  });
+
+  it('both missing → missing (no banner)', () => {
+    expect(combineCodexAuthStatuses(missing, missing).status).toBe('missing');
   });
 });

@@ -13,7 +13,7 @@
  * kill-agent, cost-parser, notify-heartbeat).
  */
 
-import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync, readdirSync, mkdirSync, copyFileSync, chmodSync, openSync, readSync, closeSync, lstatSync, readlinkSync, symlinkSync, unlinkSync } from 'node:fs'
 import { dirname, join, basename } from 'node:path'
 import { homedir } from 'node:os'
 import { promisify } from 'node:util'
@@ -333,20 +333,21 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   }
 
   // Seed auth so Codex skips its blocking sign-in onboarding on a fresh home.
-  // Copy the global ~/.codex/auth.json once, only when this home has none —
-  // Codex keeps its own copy refreshed thereafter, so on resume we must not
-  // clobber a newer token with a staler global one. Best-effort: if the user
-  // has never signed in to Codex globally there is nothing to copy, and the
-  // onboarding will (correctly) prompt for a real first-time login.
+  // PAN-2285: symlink the per-agent auth.json to the global ~/.codex/auth.json
+  // instead of copying it. A copy forks the OAuth refresh-token family — OpenAI
+  // rotates refresh tokens on every refresh, so once the global side rotates
+  // (re-login or natural refresh) every stale per-agent copy is revoked and its
+  // agent wedges forever in a 401 `token_invalidated` loop (PAN-2285/PAN-2639).
+  // The codex CLI persists a refresh in place (open+truncate+write via
+  // FileAuthStorage::save in codex-rs/login/src/auth/storage.rs — no temp-file
+  // rename), so writing through the symlink updates the global file and the
+  // symlink survives: all agents share one refresh chain and a global
+  // `codex login` heals everyone. Best-effort: if the user has never signed in
+  // to Codex globally there is nothing to link, and onboarding will (correctly)
+  // prompt for a real first-time login.
   const homeAuthPath = join(codexHomeDir, 'auth.json')
-  if (!existsSync(homeAuthPath)) {
-    const globalAuthPath = join(homedir(), '.codex', 'auth.json')
-    if (existsSync(globalAuthPath)) {
-      copyFileSync(globalAuthPath, homeAuthPath)
-      // auth.json holds OAuth access/refresh tokens — keep it private.
-      try { chmodSync(homeAuthPath, 0o600) } catch { /* best-effort */ }
-    }
-  }
+  const globalAuthPath = join(homedir(), '.codex', 'auth.json')
+  seedCodexAuthSymlink(homeAuthPath, globalAuthPath)
 
   const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
   if (!existsSync(agentsMdPath)) {
@@ -359,6 +360,57 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     } else {
       writeFileSync(agentsMdPath, '# Overdeck Agent Instructions\n\n<!-- run `pan sync` to populate -->\n', { mode: 0o644 })
     }
+  }
+}
+
+/**
+ * Point a per-agent CODEX_HOME/auth.json at the global ~/.codex/auth.json via a
+ * symlink so every agent shares one OAuth refresh-token family (PAN-2285).
+ *
+ * Idempotent and migration-safe:
+ *   - global auth.json missing        → do nothing (onboarding prompts, as before)
+ *   - home auth.json already the right → nothing
+ *     symlink to global
+ *   - home auth.json a regular-file    → remove the stale disposable copy and
+ *     copy or a wrong symlink            replace it with the symlink (this is the
+ *                                        in-place migration for already-deployed
+ *                                        homes; removing a per-agent copy loses
+ *                                        nothing — the global file is the source
+ *                                        of truth)
+ *
+ * Exported for unit testing over temp dirs. Privacy: a symlink's permissions
+ * follow its target (the global file is 0600), so no chmod is needed here.
+ */
+export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: string): void {
+  if (!existsSync(globalAuthPath)) return
+
+  // If the home path is already a symlink pointing at the global file, we're done.
+  let currentLink: string | null = null
+  try {
+    if (lstatSync(homeAuthPath).isSymbolicLink()) {
+      currentLink = readlinkSync(homeAuthPath)
+    }
+  } catch {
+    currentLink = null
+  }
+  if (currentLink === globalAuthPath) return
+
+  // Anything else present at homeAuthPath (a stale copy or a wrong symlink) is a
+  // disposable per-agent artifact — remove it so we can install the symlink.
+  try {
+    if (existsSync(homeAuthPath) || currentLink !== null) {
+      unlinkSync(homeAuthPath)
+    }
+  } catch {
+    // If we cannot remove it, fall through: the symlink create below will throw
+    // and we swallow it, leaving the existing file in place (no worse than today).
+  }
+
+  try {
+    symlinkSync(globalAuthPath, homeAuthPath)
+  } catch {
+    // Best-effort: if the symlink cannot be created (permissions, race), leave the
+    // home without auth.json — codex onboarding prompts, which is the safe default.
   }
 }
 
