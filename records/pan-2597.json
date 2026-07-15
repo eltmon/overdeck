@@ -227,6 +227,26 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-15T01:45:56.999Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T01:46:03.563Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T01:46:03.623Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T01:46:03.642Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T01:46:03.665Z"
     }
   ],
   "feedback": [],
@@ -356,7 +376,7 @@
     "recordedAt": "2026-07-14T22:38:30.578Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T01:45:57.021Z",
+  "updated": "2026-07-15T01:46:03.693Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "reviewing",
@@ -554,7 +574,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "docs-appserver": "completed",
     "docs-appserver.ac1": "completed",
