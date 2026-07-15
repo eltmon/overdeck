@@ -446,17 +446,17 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T14:07:09.681Z",
+  "updated": "2026-07-15T14:07:28.925Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:05:31.357Z",
+    "updatedAt": "2026-07-15T14:07:28.876Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "testNotes": "BLOCKED before gates could run cleanly: workspace has an in-progress, uncommitted `git merge origin/main` (MERGE_HEAD=ac998a91b01b16a7b8963855808a6590ace37122, which is origin/main's current tip). 4 files carry unresolved literal conflict markers: src/cli/commands/__tests__/review-mode.test.ts, src/dashboard/server/routes/__tests__/codex-auth.test.ts, src/lib/cloister/verification-runner.ts, src/lib/cloister/verification-types.ts. Ran `npm run typecheck`: fails with 9x TS1185 'Merge conflict marker encountered' in verification-runner.ts and verification-types.ts, confirming the broken tree (contracts build step succeeded; tsc --noEmit failed). Did not proceed to lint/test/UAT since the tree cannot compile. The reviewed commit (eb12cf2f82, matches pipeline.reviewedAtCommit) is clean by itself — this is a workspace-state issue from a stuck main-sync attempt, not a defect in the reviewed diff. Test role boundaries forbid resolving merge conflicts, editing code, or committing, so this cannot be fixed here. REQUIRED FIX: a work/sync agent must run `git merge --abort` (if recoverable) or properly re-run `pan sync-main PAN-2597`, resolve the 4 conflicted files, commit, and push before test verification can proceed. Per-issue vBRIEF confirms no browser UAT is required — narratives.NonGoals explicitly states 'No dashboard frontend changes for pane visibility' and all 15 plan items are kind:backend/api/docs/spike with unit-test-only verify_commands.",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
@@ -596,9 +596,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 22277123,
-            "output": 24779,
-            "cacheRead": 20674944,
+            "input": 22673370,
+            "output": 25306,
+            "cacheRead": 21048064,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -608,9 +608,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 51092637,
-            "output": 98356,
-            "cacheRead": 48825088,
+            "input": 52859214,
+            "output": 100345,
+            "cacheRead": 50577152,
             "cacheWrite": 0
           }
         },
@@ -640,18 +640,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 52,
-            "output": 13569,
-            "cacheRead": 3800320,
-            "cacheWrite": 177980
+            "input": 60,
+            "output": 15464,
+            "cacheRead": 4520521,
+            "cacheWrite": 182597
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 22277123,
-          "output": 24779,
-          "cacheRead": 20674944,
+          "input": 22673370,
+          "output": 25306,
+          "cacheRead": 21048064,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -661,9 +661,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 51092637,
-          "output": 98356,
-          "cacheRead": 48825088,
+          "input": 52859214,
+          "output": 100345,
+          "cacheRead": 50577152,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -673,15 +673,15 @@
           "cacheWrite": 411302
         },
         "anthropic/claude-sonnet-5": {
-          "input": 14269,
-          "output": 18889,
-          "cacheRead": 5469146,
-          "cacheWrite": 669755
+          "input": 14277,
+          "output": 20784,
+          "cacheRead": 6189347,
+          "cacheWrite": 674372
         }
       },
       "costAtCloseOut": {
-        "usd": 216.694479,
-        "pricingAsOf": "2026-07-15T14:05:31.431Z"
+        "usd": 217.877296,
+        "pricingAsOf": "2026-07-15T14:07:28.917Z"
       }
     },
     "merges": [
@@ -689,8 +689,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "docs-appserver": "completed",
     "docs-appserver.ac1": "completed",
