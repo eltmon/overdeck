@@ -141,9 +141,11 @@ export function resolveTieredExecutionBlock(
   source: 'issue-override' | 'plan-metadata' | 'global';
   override: 'on' | 'off' | null;
 } {
+  const effective = resolveTieredExecutionEnabled(config, planMetadata, recordOverride);
+
   if (recordOverride === 'on' || recordOverride === 'off') {
     return {
-      effective: recordOverride === 'on',
+      effective,
       source: 'issue-override',
       override: recordOverride,
     };
@@ -152,14 +154,14 @@ export function resolveTieredExecutionBlock(
   const planValue = planMetadata?.tiered_execution;
   if (planValue === 'on' || planValue === 'off') {
     return {
-      effective: planValue === 'on',
+      effective,
       source: 'plan-metadata',
       override: null,
     };
   }
 
   return {
-    effective: config.enabled ?? false,
+    effective,
     source: 'global',
     override: null,
   };

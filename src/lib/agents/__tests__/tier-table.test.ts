@@ -45,7 +45,7 @@ describe('tiered execution tier table', () => {
     ] as const)('uses the issue override %s before every other source', (override, effective) => {
       expect(resolveTieredExecutionBlock(
         { enabled: !effective },
-        { tiered_execution: effective ? 'off' : 'on' },
+        { tiered_execution: 'maybe' },
         override,
       )).toEqual({ effective, source: 'issue-override', override });
     });
@@ -69,12 +69,12 @@ describe('tiered execution tier table', () => {
       });
     });
 
-    it('falls through to the global setting for malformed plan metadata', () => {
-      expect(resolveTieredExecutionBlock(
+    it('rejects malformed plan metadata when no issue override supersedes it', () => {
+      expect(() => resolveTieredExecutionBlock(
         { enabled: false },
         { tiered_execution: 'maybe' },
         null,
-      )).toEqual({ effective: false, source: 'global', override: null });
+      )).toThrow(TieredExecutionConfigError);
     });
   });
 
