@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:24:37.216Z",
+  "updated": "2026-07-15T16:24:39.783Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
@@ -95,8 +95,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "docs-troubleshooting": {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 3158569,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T16:24:39.782Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2710",
@@ -181,6 +189,7 @@
     "retrigger-service.retrigger-service.ac5": "completed",
     "wire-boot": "completed",
     "wire-boot.wire-boot.ac1": "completed",
-    "wire-boot.wire-boot.ac2": "completed"
+    "wire-boot.wire-boot.ac2": "completed",
+    "docs-troubleshooting": "running"
   }
 }
