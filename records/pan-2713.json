@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:10:21.479Z",
+  "updated": "2026-07-15T14:14:51.013Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "build-commit-stamp": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2713",
         "agentId": "agent-pan-2713",
         "pid": 643857,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:10:21.479Z"
+        "claimedAt": "2026-07-15T14:10:21.479Z",
+        "itemId": "build-commit-stamp",
+        "outcome": "completed",
+        "reason": "Stamped root and dashboard bundles with Git HEAD/build time, exposed guarded metadata through dashboard identity and /api/health, and added identity coverage.",
+        "releasedAt": "2026-07-15T14:14:51.012Z"
+      }
+    ],
+    "statusReasons": {
+      "build-commit-stamp": {
+        "reason": "Stamped root and dashboard bundles with Git HEAD/build time, exposed guarded metadata through dashboard identity and /api/health, and added identity coverage.",
+        "updatedAt": "2026-07-15T14:14:51.012Z"
       }
     }
   },
   "statusOverrides": {
-    "build-commit-stamp": "running"
+    "build-commit-stamp": "completed",
+    "build-commit-stamp.build-commit-stamp.ac1": "completed",
+    "build-commit-stamp.build-commit-stamp.ac2": "completed",
+    "build-commit-stamp.build-commit-stamp.ac3": "completed"
   }
 }
