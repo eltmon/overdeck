@@ -12,11 +12,16 @@
       "timestamp": "2026-07-15T23:52:48.096Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T23:53:39.293Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T23:52:49.551Z",
+  "updated": "2026-07-15T23:53:39.314Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -119,8 +124,8 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "no-loss-manifest": "completed",
     "no-loss-manifest.no-loss-manifest.ac1": "completed",
