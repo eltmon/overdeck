@@ -515,6 +515,34 @@ optional:
       })
     );
 
+    it.effect('requires observing review request completion after an exec yield', () =>
+      Effect.gen(function* () {
+        const out = yield* renderPrompt({
+          name: 'work',
+          vars: {
+            ISSUE_ID: 'PAN-611',
+            ISSUE_ID_LOWER: 'pan-611',
+            BRANCH_NAME: 'feature/pan-611',
+            WORKSPACE_PATH: '/workspace',
+            LOCAL: true,
+            REMOTE: false,
+            PROJECT_ROOT: '/project',
+            STITCH_DESIGNS: '',
+            POLYREPO_CONTEXT: '',
+            PENDING_FEEDBACK: 'Fix the failed test.',
+            NEW_TRACKER_CONTEXT: '',
+            TLDR_AVAILABLE: false,
+          },
+        });
+
+        expect(out).toContain('A yielded exec result');
+        expect(out).toContain('poll that same background terminal until it exits');
+        expect(out).toContain('inspect its real exit code');
+        expect(out).toContain('pan show PAN-611');
+        expect(out).toContain('pan review pending');
+      })
+    );
+
     it.effect('renders per-task push instruction for local and remote work prompts', () =>
       Effect.gen(function* () {
         const baseVars = {

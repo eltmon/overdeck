@@ -2077,10 +2077,10 @@ export async function checkDeadEndAgents(): Promise<string[]> {
         const nudgeMessage = status.reviewStatus === 'failed'
           ? `Review verification failed for ${issueId}.${feedbackPart}\n\nCommon cause: merge conflict markers in .pan/spec.vbrief.json — fix by resolving conflicts in that file, then run: pan review request ${issueId} -m "Fixed verification error"`
           : isReviewBlocked
-            ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". Do NOT stop until pan review request completes successfully.`
+            ? `The review agent found issues in your code.${feedbackPart}\n\nFix every issue listed, commit all changes, then run: pan review request ${issueId} -m "Fixed review issues". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`
             : isVerificationFailed
-              ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". Do NOT stop until pan review request completes successfully.`
-              : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". Do NOT stop until pan review request completes successfully.`;
+              ? `Verification failed for ${issueId} while review is pending.${feedbackPart}\n\nFix the failing verification check, commit every change, push your branch, then request a new review with: pan review request ${issueId} -m "Fixed verification failure". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`
+              : `Tests failed for your changes.${feedbackPart}\n\nFix the failures, commit, then run: pan review request ${issueId} -m "Fixed test failures". If the exec yields, poll the same background terminal until it exits. Require exit code 0 and confirm pan show ${issueId} or pan review pending shows re-entry before declaring success.`;
 
         await Effect.runPromise(sendKeys(agentSessionName, nudgeMessage));
         actions.push(`Dead-end recovery: nudged ${agentSessionName} (${statusType}, idle for ${Math.round((now - new Date(status.updatedAt || '').getTime()) / 60000)}m)`);
