@@ -351,7 +351,7 @@
     "recordedAt": "2026-07-14T22:38:30.578Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T01:45:17.154Z",
+  "updated": "2026-07-15T01:45:51.592Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "pending",
@@ -361,12 +361,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T01:45:17.007Z",
+    "updatedAt": "2026-07-15T01:45:51.495Z",
     "reviewNotes": "Verification failed at sync-target-branch",
     "verificationNotes": "Verification FAILED at lint (85588ms):\n\nrompt-change-trailer.sh\n\nprompt-trailer: no roles/*.md or docs/flywheel-brief.md changes; ok\n\n> @overdeck/core@0.45.16 lint:file-size\n> bash scripts/lint-file-size.sh\n\n✓ file-size guard passed (no new god files; no baselined file grew)\n\n> @overdeck/core@0.45.16 lint:source-introspection\n> bash scripts/lint-source-introspection.sh\n\n✗ stale baseline: src/lib/agents/__tests__/tier-escalation.test.ts no longer has source-introspection reads — run: bash scripts/lint-source-introspection.sh --update\n\nsource-introspection guard found stale baseline entries. Update the baseline:\n  bash scripts/lint-source-introspection.sh --update\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (80%)\n  - rolldown-plugin-dts:fake-js (14%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/merge-agent.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (56%)\n  - tsdown:deps (41%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
-    "reviewRequestedAt": "2026-07-15T01:27:53.702Z",
+    "reviewRequestedAt": "2026-07-15T01:45:51.134Z",
     "reviewSpawnedAt": "2026-07-15T01:28:28.186Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -475,9 +475,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 21146712,
-            "output": 28180,
-            "cacheRead": 20600576,
+            "input": 21351019,
+            "output": 28395,
+            "cacheRead": 20804096,
             "cacheWrite": 0
           }
         },
@@ -520,9 +520,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21146712,
-          "output": 28180,
-          "cacheRead": 20600576,
+          "input": 21351019,
+          "output": 28395,
+          "cacheRead": 20804096,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -539,8 +539,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 167.451534,
-        "pricingAsOf": "2026-07-15T01:45:17.090Z"
+        "usd": 167.563679,
+        "pricingAsOf": "2026-07-15T01:45:51.549Z"
       }
     },
     "merges": [
