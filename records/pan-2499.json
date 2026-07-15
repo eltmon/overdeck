@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:38:19.625Z",
+  "updated": "2026-07-15T14:38:53.240Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -121,7 +121,12 @@
     "no-loss-manifest.no-loss-manifest.ac1": "completed",
     "no-loss-manifest.no-loss-manifest.ac2": "completed",
     "no-loss-manifest.no-loss-manifest.ac3": "completed",
-    "issue-view-model": "running"
+    "issue-view-model": "completed",
+    "issue-view-model.issue-view-model.ac1": "completed",
+    "issue-view-model.issue-view-model.ac2": "completed",
+    "issue-view-model.issue-view-model.ac3": "completed",
+    "issue-view-model.issue-view-model.ac4": "completed",
+    "issue-view-model.issue-view-model.ac5": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -147,16 +152,8 @@
     }
   },
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "issue-view-model": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1066686,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:38:19.625Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -168,12 +165,27 @@
         "outcome": "completed",
         "reason": "Restored the typed 44-entry legacy surface manifest alongside newer shared-component section constants; re-homed extracted ActiveAgentPanel and VerificationGates; focused gate test and typecheck pass.",
         "releasedAt": "2026-07-15T14:38:00.534Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1066686,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:38:19.625Z",
+        "itemId": "issue-view-model",
+        "outcome": "completed",
+        "reason": "Verified existing pushed implementation: IssueViewModel exposes all ten sub-objects, composes only existing query hooks and agentsById, centralizes derivations, and covers active/merged/troubled fixtures; 20 focused frontend tests and typecheck pass.",
+        "releasedAt": "2026-07-15T14:38:53.240Z"
       }
     ],
     "statusReasons": {
       "no-loss-manifest": {
         "reason": "Restored the typed 44-entry legacy surface manifest alongside newer shared-component section constants; re-homed extracted ActiveAgentPanel and VerificationGates; focused gate test and typecheck pass.",
         "updatedAt": "2026-07-15T14:38:00.534Z"
+      },
+      "issue-view-model": {
+        "reason": "Verified existing pushed implementation: IssueViewModel exposes all ten sub-objects, composes only existing query hooks and agentsById, centralizes derivations, and covers active/merged/troubled fixtures; 20 focused frontend tests and typecheck pass.",
+        "updatedAt": "2026-07-15T14:38:53.240Z"
       }
     }
   }
