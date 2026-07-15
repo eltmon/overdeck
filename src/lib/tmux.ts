@@ -1123,11 +1123,7 @@ export async function sendEscapeKeyAsync(sessionName: string, times = 1): Promis
   }
 }
 
-export function deliveryVerifyLine(content: string): string {
-  const lines = content.split('\n');
-  return ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
-}
-
+export function deliveryVerifyLine(content: string): string { const lines = content.split('\n'); return ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? ''; }
 export const sendKeys = (
   sessionName: string,
   keys: string,
