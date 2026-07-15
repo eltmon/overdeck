@@ -1,5 +1,12 @@
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { defineConfig } from 'tsdown';
+
+const buildCommit = execFileSync('git', ['rev-parse', 'HEAD'], {
+  cwd: resolve(import.meta.dirname, '../../..'),
+  encoding: 'utf8',
+}).trim();
+const builtAt = new Date().toISOString();
 
 function configYamlSingleChunkAssertion() {
   return {
@@ -38,6 +45,10 @@ export default defineConfig({
   format: 'esm',
   platform: 'node',
   shims: true,
+  define: {
+    __OVERDECK_BUILD_COMMIT__: JSON.stringify(buildCommit),
+    __OVERDECK_BUILD_TIME__: JSON.stringify(builtAt),
+  },
   clean: false,
   sourcemap: true,
   outExtensions: () => ({ js: '.js' }),
