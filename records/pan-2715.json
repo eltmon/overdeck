@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:32:38.375Z",
+  "updated": "2026-07-15T15:34:06.405Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "skill-doc-update": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 2189431,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:32:38.375Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -232,6 +224,17 @@
         "outcome": "completed",
         "reason": "Validated dashboard acceptedRows, returned 422 gate payloads, rendered frontend misses; server/frontend tests and typecheck passed; pushed 9b6bfc2c20",
         "releasedAt": "2026-07-15T15:32:25.413Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 2189431,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:32:38.375Z",
+        "itemId": "skill-doc-update",
+        "outcome": "completed",
+        "reason": "Documented gate table, all seven accepts, force semantics, deploy evidence, and Deacon behavior; full lint passed; pushed 17f915a1bf",
+        "releasedAt": "2026-07-15T15:34:06.405Z"
       }
     ],
     "statusReasons": {
@@ -281,8 +284,8 @@
         "updatedAt": "2026-07-15T15:32:25.413Z"
       },
       "skill-doc-update": {
-        "reason": "Complete final documentation and skill contract item",
-        "updatedAt": "2026-07-15T15:32:38.375Z"
+        "reason": "Documented gate table, all seven accepts, force semantics, deploy evidence, and Deacon behavior; full lint passed; pushed 17f915a1bf",
+        "updatedAt": "2026-07-15T15:34:06.405Z"
       }
     }
   },
@@ -335,6 +338,9 @@
     "route-accepted-rows.route-accepted-rows.ac1": "completed",
     "route-accepted-rows.route-accepted-rows.ac2": "completed",
     "route-accepted-rows.route-accepted-rows.ac3": "completed",
-    "skill-doc-update": "running"
+    "skill-doc-update": "completed",
+    "skill-doc-update.skill-doc-update.ac1": "completed",
+    "skill-doc-update.skill-doc-update.ac2": "completed",
+    "skill-doc-update.skill-doc-update.ac3": "completed"
   }
 }
