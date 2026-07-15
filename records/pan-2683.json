@@ -172,21 +172,22 @@
     "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T14:13:10.375Z",
+  "updated": "2026-07-15T14:13:13.006Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T13:52:31.068Z",
+    "updatedAt": "2026-07-15T14:13:13.005Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2693",
     "reviewedAtCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c",
     "lastVerifiedCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c",
-    "reviewSpawnedAt": "2026-07-15T12:29:53.515Z"
+    "reviewSpawnedAt": "2026-07-15T12:29:53.515Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-15T14:13:13.005Z"
   },
   "closeOut": {
     "usage": {
