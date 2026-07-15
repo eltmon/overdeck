@@ -16,7 +16,7 @@
 
 import { join } from 'node:path';
 import { homedir, tmpdir } from 'node:os';
-import { writeFileSync, mkdirSync, existsSync, readFileSync, statSync, unlinkSync, appendFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync, statSync, unlinkSync, appendFileSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 
 const agentId = process.env.OVERDECK_AGENT_ID;
@@ -62,6 +62,40 @@ try {
 try {
   writeFileSync(join(agentDir, 'turn-completed'), timestamp + '\n');
 } catch { /* ignore */ }
+
+// PAN-2701: a paste sent while Codex is mid-turn remains unsubmitted in its
+// input box. messageAgent therefore queues busy-turn messages in mail/. At the
+// idle boundary, submit the oldest message and delete it only after both tmux
+// operations succeed. One message per turn keeps ordering deterministic; the
+// next turn completion drains the next file.
+try {
+  const mailDir = join(agentDir, 'mail');
+  const mailFile = readdirSync(mailDir)
+    .filter((name) => name.endsWith('.pending.md'))
+    .sort()[0];
+  if (mailFile) {
+    const mailPath = join(mailDir, mailFile);
+    const queued = readFileSync(mailPath, 'utf8').replace(/^# Message\r?\n\r?\n/, '').replace(/\r?\n$/, '');
+    const tmpFile = join(tmpdir(), `codex-mail-${agentId}-${process.pid}-${Date.now()}`);
+    let delivered = false;
+    try {
+      writeFileSync(tmpFile, queued);
+      const load = spawnSync('tmux', ['-L', 'overdeck', 'load-buffer', tmpFile], { stdio: 'ignore' });
+      const paste = load.status === 0
+        ? spawnSync('tmux', ['-L', 'overdeck', 'paste-buffer', '-t', agentId], { stdio: 'ignore' })
+        : undefined;
+      if (paste?.status === 0) {
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+        const submit = spawnSync('tmux', ['-L', 'overdeck', 'send-keys', '-t', agentId, 'C-m'], { stdio: 'ignore' });
+        delivered = submit.status === 0;
+      }
+    } catch { /* best-effort */ }
+    try { unlinkSync(tmpFile); } catch { /* ignore */ }
+    if (delivered) {
+      try { unlinkSync(mailPath); } catch { /* retry on the next turn */ }
+    }
+  }
+} catch { /* no queue or best-effort failure — never crash the hook */ }
 
 // PAN-2675: interactive convoy reviewer (codex harness) finished a turn. If it
 // wrote its report and hasn't signaled yet, deliver REVIEWER_READY to the
