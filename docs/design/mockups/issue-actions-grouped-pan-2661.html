@@ -10,8 +10,7 @@
   :root {
     --pan-scheme: light;
     --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8; --popover: #ffffff;
-    --primary: oklch(0.488 0.217 264); --primary-foreground: #ffffff;
-    --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
     --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
     --destructive: #ef4444; --destructive-foreground: #b91c1c;
     --warning: #f59e0b; --warning-foreground: #b45309;
@@ -43,12 +42,12 @@
   body { margin: 0; background: var(--background); color: var(--foreground);
     font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; font-weight: 500; font-size: 14px; line-height: 1.55; color-scheme: var(--pan-scheme); }
   .mono { font-family: ui-monospace, 'SF Mono', Menlo, monospace; }
-  .page { max-width: 960px; margin: 0 auto; padding: 40px 24px 96px; }
+  .page { max-width: 1020px; margin: 0 auto; padding: 40px 24px 96px; }
   header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
   h1 { font-size: 21px; font-weight: 500; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
-  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 36px; max-width: 66ch; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 36px; max-width: 68ch; }
   h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted-foreground); margin: 44px 0 12px; }
-  p.note { color: var(--muted-foreground); font-size: 13px; max-width: 68ch; margin: 10px 0; }
+  p.note { color: var(--muted-foreground); font-size: 13px; max-width: 70ch; margin: 10px 0; }
   p.note strong { color: var(--foreground); font-weight: 500; }
   button.theme-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
   .callouts { margin: 14px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 70ch; display: grid; gap: 7px; }
@@ -60,40 +59,45 @@
     color: var(--destructive-foreground); }
   .callouts strong { color: var(--foreground); font-weight: 500; }
 
-  .duo { display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start; }
-  @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
-
+  .duo { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 780px) { .duo { grid-template-columns: 1fr; } }
   .menu { background: var(--popover); border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow-card); padding: 6px; font-size: 12px; }
   .menu .mlabel { font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); padding: 6px 9px 3px; }
-  .mi { display: flex; align-items: center; gap: 7px; padding: 4px 9px; border-radius: 5px; cursor: pointer; }
+  .mi { padding: 4px 9px; border-radius: 5px; cursor: pointer; }
   .mi:hover { background: var(--muted); }
   .mi.dis { color: var(--muted-foreground); opacity: .55; cursor: default; }
   .mi.dis:hover { background: none; }
   .mi.red { color: var(--destructive-foreground); }
+  .mi .desc { display: none; font-size: 10.5px; color: var(--muted-foreground); font-weight: 500; }
+  .mi .verb { display: none; font-size: 9px; margin-left: 6px; border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; color: var(--muted-foreground); vertical-align: 1px; }
+  .menu.explain .mi .desc, .menu.explain .mi .verb { display: inline; }
+  .menu.explain .mi .desc { display: block; }
   .msep { height: 1px; background: var(--border); margin: 5px 4px; }
   .menu .ellipsis { color: var(--muted-foreground); font-size: 11px; padding: 3px 9px; }
-
-  .scenarios { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
-  .scenarios span { font-size: 11px; color: var(--muted-foreground); align-self: center; margin-right: 2px; }
-  .scenarios button { border: 1px solid var(--border); background: none; border-radius: 5px; color: var(--muted-foreground); font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
-  .scenarios button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
   .counts { font-size: 11px; color: var(--muted-foreground); padding: 4px 9px 6px; }
-  .phasechip { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 3px; font-size: 10px; letter-spacing: .05em;
+  .phasechip { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: 3px; font-size: 10px; letter-spacing: .04em;
     background: color-mix(in srgb, var(--primary) 8%, transparent); border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); }
   .dangerhead { display: flex; align-items: center; gap: 6px; padding: 5px 9px; cursor: pointer; color: var(--destructive-foreground); font-size: 11px; border-radius: 5px; }
   .dangerhead:hover { background: color-mix(in srgb, var(--destructive) 6%, transparent); }
-  .kbd { font-size: 9px; border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; color: var(--muted-foreground); margin-left: auto; }
+
+  .scenarios { display: flex; gap: 5px; margin: 0 0 12px; flex-wrap: wrap; }
+  .scenarios span { font-size: 11px; color: var(--muted-foreground); align-self: center; margin-right: 2px; }
+  .scenarios button { border: 1px solid var(--border); background: none; border-radius: 5px; color: var(--muted-foreground); font: inherit; font-size: 10.5px; padding: 2px 8px; cursor: pointer; }
+  .scenarios button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+  .explaintog { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted-foreground); margin-left: 10px; cursor: pointer; user-select: none; }
 
   table.naming { border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
   table.naming th, table.naming td { text-align: left; padding: 5px 22px 5px 0; border-bottom: 1px solid var(--border); font-weight: 500; }
   table.naming th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
   table.naming td.old { color: var(--muted-foreground); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--destructive) 55%, transparent); }
-  table.audit { width: 100%; border-collapse: collapse; font-size: 11.5px; margin-top: 6px; }
-  table.audit th, table.audit td { text-align: left; padding: 5px 10px 5px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
-  table.audit th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
-  .frame { background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-card); padding: 16px 18px; }
+  table.spec { width: 100%; border-collapse: collapse; font-size: 10.5px; margin-top: 6px; }
+  table.spec th, table.spec td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  table.spec th { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted-foreground); }
+  table.spec td.red { color: var(--destructive-foreground); }
+  .specwrap { overflow-x: auto; }
+  .frame { background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-card); padding: 14px 16px; }
   .sidepane { position: sticky; top: 14px; }
-  .explain { font-size: 12px; color: var(--muted-foreground); border-left: 2px solid var(--border); padding-left: 12px; margin-top: 12px; }
+  .explainbox { font-size: 12px; color: var(--muted-foreground); border-left: 2px solid var(--border); padding-left: 12px; margin-top: 12px; min-height: 34px; }
 </style>
 
 <div class="page">
@@ -101,7 +105,7 @@
     <h1>Issue actions — grouped context menu</h1>
     <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
   </header>
-  <p class="doc-sub">PAN-2661. The rail's right-click menu dumps all 44 registry actions in declaration order under one "Issue actions" label (<span class="mono">FeatureItem.tsx:711-714</span> flattens primary+secondary+overflow). The registry already carries group metadata, and the cockpit's ⌘&nbsp;Actions panel already renders it grouped — this proposal gives the context menu the same taxonomy. The proposed menu is interactive: switch phases and watch it regate.</p>
+  <p class="doc-sub">PAN-2661 · v2 (implementation-grade). The gating below is not an approximation: the eleven phases are the real <span class="mono">PipelinePhase</span> values, the top section is the real <span class="mono">PHASE_PRIMARY_KEYS</span> map, and every enable/disable decision runs the registry's own predicates (<span class="mono">canPlan</span>, <span class="mono">canRestartReview</span>, …) re-implemented verbatim against a representative issue state per phase. The spec appendix at the bottom is generated from the same data this menu renders — the mockup and the spec cannot drift.</p>
 
   <h2>Current — what ships today</h2>
   <div class="duo">
@@ -126,73 +130,83 @@
       <div class="mi dis">Recover agent</div>
       <div class="mi dis">Resume session</div>
       <div class="mi">Sync main</div>
-      <div class="mi">Rebuild &amp; start</div>
+      <div class="mi dis">Rebuild &amp; start</div>
       <div class="mi">Inspect task</div>
       <div class="mi dis">Reopen</div>
       <div class="mi red dis">Close out</div>
       <div class="mi red">Wipe</div>
       <div class="mi red">Destroy workspace</div>
-      <div class="ellipsis">… 19 more in declaration order (Open, Reset issue, Reset to planned, View PR, Cancel issue, Tasks, Inference, …) …</div>
+      <div class="ellipsis">… 19 more in declaration order (Open, Reset issue, Reset to planned, View PR, Cancel issue, Tasks, …) …</div>
       <div class="msep"></div>
       <div class="mi">Open State Dir</div>
       <div class="mi">View JSONL</div>
       <div class="mi red">Deep Wipe</div>
     </div>
     <ul class="callouts">
-      <li data-n="1"><strong>44 items, one label, declaration order.</strong> Planning, agent recovery, artifacts, and destruction interleave in whatever order they were registered in <span class="mono">issueActions.ts</span> — you scan the whole list every time, and the group metadata that could organize it is thrown away by the flatten.</li>
-      <li data-n="2"><strong>Destructive actions are scattered, not last.</strong> "Remove review sessions &amp; reset" sits between review and agent items; "Wipe" and "Destroy workspace" sit mid-list with "Open" right below them. Red styling is the only separation.</li>
-      <li data-n="3"><strong>Deep Wipe exists twice.</strong> The registry's "Wipe" AND a hardcoded surface extra at the bottom (<span class="mono">FeatureItem.tsx:750-755</span>) — same irreversible operation, two entries, different confirm flows.</li>
-      <li data-n="4"><strong>Mostly-disabled noise.</strong> In any given phase roughly two-thirds of items are gray. They're kept (correctly — disabled-with-reason is good UX) but with no grouping the gray majority buries the few live actions.</li>
-      <li data-n="5"><strong>An orphan ships in the list.</strong> <span class="mono">reviewTest</span> (group "preserved") is a legacy compat entry surfaced nowhere deliberately — it needs a disposition, not a menu slot.</li>
+      <li data-n="1"><strong>44 items, one label, declaration order.</strong> <span class="mono">FeatureItem.tsx:711-714</span> flattens primary+secondary+overflow, discarding the group metadata every action already declares in <span class="mono">issueActions.ts</span>.</li>
+      <li data-n="2"><strong>Destructive actions are scattered, not last.</strong> "Remove review sessions &amp; reset" sits mid-list; "Wipe" and "Destroy workspace" have "Open" directly beneath them. Red text is the only separation.</li>
+      <li data-n="3"><strong>Deep Wipe exists twice</strong> — the registry's "Wipe" and a hardcoded extra at <span class="mono">FeatureItem.tsx:750-755</span>, with different confirm flows.</li>
+      <li data-n="4"><strong>Mostly-disabled noise.</strong> In a typical phase two-thirds of items are gray; without grouping the gray buries the live few.</li>
+      <li data-n="5"><strong>An orphan ships in the list</strong> — <span class="mono">reviewTest</span> (group "preserved") is a legacy compat entry that needs a disposition, not a menu slot.</li>
+      <li data-n="6"><strong>Nothing explains itself.</strong> Labels assume you already know Overdeck's pipeline; a newcomer can't tell "Reset stalled review state" from "Remove review sessions &amp; reset" without reading source.</li>
     </ul>
   </div>
 
-  <h2>Proposed — the cockpit's taxonomy, phase-first</h2>
-  <p class="note">One registry, one grouping. The menu opens with <strong>For this phase</strong> — the same phase-primary actions <span class="mono">useIssueActions</span> already computes — then the registry groups in cockpit order. Disabled items stay visible and keep their reason tooltips (hover them). Danger is separated, last, and collapsed behind one row so a fast scan can't end in an irreversible click.</p>
+  <h2>Proposed — phase-first, grouped, self-explaining</h2>
+  <p class="note">The menu opens with <strong>For this phase</strong> (the registry's own <span class="mono">PHASE_PRIMARY_KEYS</span>), then the groups in cockpit order. Disabled items stay visible with their reason on hover. <strong>Danger is collapsed, last.</strong> The <em>Explain</em> toggle is the newcomer layer: every action grows a one-line plain-language description and its <span class="mono">pan</span> verb — proposed as a required <span class="mono">description</span> field on the registry so all surfaces (and the docs) share one copy.</p>
   <div class="scenarios">
-    <span>Issue phase:</span>
-    <button data-ph="backlog">Backlog</button>
-    <button data-ph="planning">Planning</button>
-    <button data-ph="working" class="on">Working</button>
-    <button data-ph="reviewing">Reviewing</button>
-    <button data-ph="ready">Ready</button>
-    <button data-ph="merged">Merged</button>
+    <span>Phase (real <span class="mono">PipelinePhase</span>):</span>
+    <button data-ph="QUEUED_FOR_PLAN">Queued for plan</button>
+    <button data-ph="PLANNING">Planning</button>
+    <button data-ph="PLANNED_IDLE">Planned · idle</button>
+    <button data-ph="WORK_RUNNING" class="on">Work running</button>
+    <button data-ph="INPUT">Needs input</button>
+    <button data-ph="REVIEW_RUNNING">Review running</button>
+    <button data-ph="CHANGES_REQUESTED">Changes requested</button>
+    <button data-ph="STUCK">Stuck</button>
+    <button data-ph="READY_TO_MERGE">Ready to merge</button>
+    <button data-ph="SHIP_RUNNING">Ship running</button>
+    <button data-ph="MERGED">Merged</button>
+    <label class="explaintog"><input type="checkbox" id="explain"> Explain (for newcomers)</label>
   </div>
   <div class="duo">
     <div class="menu" id="pmenu" role="menu" aria-label="Issue actions (proposed)"></div>
     <div class="sidepane">
       <div class="frame">
-        <p class="note" style="margin-top:0"><strong>What you're seeing.</strong> The item set, gating, and confirm flows are untouched — this is the same 44-action registry (<span class="mono">ISSUE_ACTIONS</span>), rendered with the group metadata it already carries plus the cockpit's <span class="mono">GROUP_ORDER</span>. Empty groups hide. The phase chip and counts keep you oriented; keyboard: <span class="kbd">↑↓</span> move, <span class="kbd">⏎</span> run, type to filter (spec'd, not mocked).</p>
-        <p class="note"><strong>Surface extras become a labeled section.</strong> "This session" carries Open State Dir / View JSONL. The hardcoded Deep Wipe is deleted — the registry's Wipe in Danger is the single entry (one confirm flow).</p>
-        <p class="note"><strong>Danger is a disclosure.</strong> Collapsed by default with a count; expanding shows the destructive set, red, with their existing typed-confirm gates. Reopen (safe) stays in the group but unstyled.</p>
+        <p class="note" style="margin-top:0"><strong>Fidelity contract.</strong> Same 44 registry entries, same predicates, same confirm flows, same dialog routing. Presentation changes only: grouping (already declared per action), phase-primary on top (already computed by <span class="mono">useIssueActions</span>), Danger collapsed &amp; last, surface extras under "This session", duplicate hardcoded Deep Wipe deleted.</p>
+        <p class="note"><strong>New for newcomers (the only registry change):</strong> a required <span class="mono">description</span> string per action — one plain sentence, no pipeline jargon — rendered by the Explain toggle here, as tooltips on the cockpit panel, and reusable in docs. Copy for all 44 is in the spec appendix and is BINDING.</p>
       </div>
-      <div class="explain" id="hoverwhy">Hover a grayed item to see its disabled reason here (mirrors today's tooltips).</div>
+      <div class="explainbox" id="hoverwhy">Hover a grayed item to see its disabled reason here (today's tooltip strings).</div>
     </div>
   </div>
 
   <h2>What changed, and why</h2>
-  <p class="note"><strong>The grouping already existed — it was just discarded.</strong> Every action in <span class="mono">issueActions.ts</span> declares a group; the cockpit's ⌘ Actions panel renders those groups; the context menu flattens them away. The fix is to move <span class="mono">GROUP_ORDER</span>/<span class="mono">GROUP_LABELS</span> from <span class="mono">IssueMissionControl.tsx:86-108</span> into the registry module and have BOTH presentations consume it — which is also the first half of PAN-1610 (one registry, no drift).</p>
-  <p class="note"><strong>Phase-first beats alphabet-first.</strong> The hook already computes phase-primary actions; putting them at the top means the two or three things you actually came for are under the cursor, while the full grouped set stays one scan away. Disabled items remain visible with reasons — discoverability is a feature; noise was the bug, and grouping fixes the noise.</p>
-  <p class="note"><strong>Exactly one way to destroy things.</strong> Danger collapsed + the duplicate hardcoded Deep Wipe removed = every irreversible action lives in one labeled place with one confirm flow.</p>
+  <p class="note"><strong>The grouping already existed — it was discarded at render time.</strong> Move <span class="mono">GROUP_ORDER</span>/<span class="mono">GROUP_LABELS</span> from <span class="mono">IssueMissionControl.tsx:86-108</span> into <span class="mono">issueActions.ts</span> and render the context menu from it. That's also the first half of PAN-1610.</p>
+  <p class="note"><strong>Phase-first beats scan-everything.</strong> The phase → primary-actions map already exists in the registry (<span class="mono">PHASE_PRIMARY_KEYS</span>, 11 phases). Surfacing it as the top section puts the two-or-three things you came for under the cursor; note INPUT, STUCK, and CHANGES_REQUESTED are phases too — the menu leads with <em>recovery</em> actions exactly when an issue needs rescuing.</p>
+  <p class="note"><strong>Exactly one way to destroy things.</strong> Danger collapsed + hardcoded Deep Wipe deleted = every irreversible action in one labeled place with one typed-confirm flow.</p>
   <table class="naming">
     <tr><th>Today</th><th>Proposed</th></tr>
-    <tr><td class="old">One "Issue actions" label, 44 items in declaration order</td><td>For this phase → Planning → Work → Review &amp; Test → Agent → Workspace → Artifacts → Navigation → This session → Danger</td></tr>
-    <tr><td class="old">Destructive items scattered mid-list</td><td>All destructive items in Danger, collapsed, last</td></tr>
-    <tr><td class="old">Hardcoded Deep Wipe duplicate (FeatureItem.tsx:750-755)</td><td>Deleted — registry Wipe is the single entry</td></tr>
-    <tr><td class="old">reviewTest ("preserved") rendered in the flat dump</td><td>Not rendered; dispositioned in the no-loss audit (retire or re-home)</td></tr>
-    <tr><td class="old">Grouping metadata cockpit-only (IssueMissionControl.tsx:86-108)</td><td>Lives in the registry; both cockpit panel and context menu consume it</td></tr>
+    <tr><td class="old">One "Issue actions" label, declaration order</td><td>For this phase → Planning → Work → Review &amp; Test → Agent → Workspace → Artifacts → Navigation → This session → Danger</td></tr>
+    <tr><td class="old">Destructive scattered mid-list</td><td>Danger group collapsed &amp; last; kind:destructive outside Danger (purgeReview, resetToPlanned, resetSession, restartAgent) stay in their group, red, confirm-gated</td></tr>
+    <tr><td class="old">Hardcoded Deep Wipe duplicate</td><td>Deleted — registry <span class="mono">wipe</span> is the single entry</td></tr>
+    <tr><td class="old"><span class="mono">reviewTest</span> ("preserved") rendered</td><td>Not rendered; dispositioned in the no-loss audit</td></tr>
+    <tr><td class="old">No descriptions anywhere</td><td>Required <span class="mono">description</span> field; Explain toggle + tooltips render it</td></tr>
   </table>
 
+  <h2>Spec appendix — generated from this page's data (BINDING)</h2>
+  <p class="note">Key · label · group · kind · the real gate predicate · phases where primary · <span class="mono">pan</span> verb · newcomer description. An implementing agent should diff this table against <span class="mono">ISSUE_ACTIONS</span> before writing code; any mismatch is a bug in the mockup, not a license to improvise.</p>
+  <div class="specwrap frame"><table class="spec" id="spectable"></table></div>
+
   <h2>No-loss audit</h2>
-  <table class="audit">
+  <table class="naming">
     <tr><th>Surface item</th><th>Disposition</th></tr>
-    <tr><td>All 44 <span class="mono">ISSUE_ACTIONS</span> entries (incl. every destructive item and its typed-confirm gate)</td><td>Rendered via registry groups; item set, gating predicates, confirm flows byte-identical. A parity test asserts context-menu items ≡ registry.</td></tr>
-    <tr><td>Disabled-with-reason semantics + tooltips</td><td>Preserved (visible, dimmed, reason on hover)</td></tr>
-    <tr><td>Phase-primary ordering (useIssueActions primary)</td><td>Preserved as the "For this phase" section</td></tr>
-    <tr><td>Open State Dir · View JSONL (surface extras)</td><td>Re-homed to "This session" section</td></tr>
-    <tr><td>Hardcoded Deep Wipe (FeatureItem.tsx:750-755)</td><td>Deleted as duplicate of registry Wipe — explicit removal, counted here</td></tr>
-    <tr><td><span class="mono">reviewTest</span> (group "preserved")</td><td>Disposition required at implementation: retire the entry or re-home it — never silently dropped</td></tr>
-    <tr><td>Cockpit ⌘ Actions panel</td><td>Unchanged in this issue (adopts the moved registry grouping; presentation untouched) — full convergence is PAN-1610</td></tr>
+    <tr><td>All 44 ISSUE_ACTIONS (labels, gates, confirm flows, dialog routing)</td><td>Rendered via registry groups, byte-identical behavior; parity test: context-menu items ≡ registry</td></tr>
+    <tr><td>Disabled-with-reason semantics</td><td>Preserved (visible, dimmed, reason on hover)</td></tr>
+    <tr><td>Phase-primary ordering (useIssueActions)</td><td>Preserved as "For this phase" (real 11-phase map)</td></tr>
+    <tr><td>Open State Dir · View JSONL</td><td>Re-homed to "This session"</td></tr>
+    <tr><td>Hardcoded Deep Wipe (FeatureItem.tsx:750-755)</td><td>Deleted as duplicate — explicit, counted here</td></tr>
+    <tr><td>reviewTest ("preserved")</td><td>Disposition required at implementation — never silently dropped</td></tr>
+    <tr><td>Cockpit ⌘ Actions panel</td><td>Unchanged here; adopts the moved grouping (full convergence = PAN-1610)</td></tr>
   </table>
 </div>
 
@@ -203,103 +217,167 @@
     root.dataset.theme = dark ? 'light' : 'dark';
   });
 
-  // Registry model — labels/groups/kinds from issueActions.ts; phase gates are
-  // honest simplifications of the useIssueActions predicates for demo purposes.
-  const P = ['backlog','planning','working','reviewing','ready','merged'];
+  // ── Real phase-primary map (issueActions.ts PHASE_PRIMARY_KEYS) ──
+  const PHASE_PRIMARY = {
+    QUEUED_FOR_PLAN: ['plan','startAgent'], PLANNING: ['watchPlanning','donePlanning'], PLANNED_IDLE: ['startAgent'],
+    WORK_RUNNING: ['tell','doneWork'], INPUT: ['open','tell'], REVIEW_RUNNING: ['tell','recoverAgent'],
+    SHIP_RUNNING: ['tell','recoverAgent'], CHANGES_REQUESTED: ['open','requestReview'], STUCK: ['recoverAgent','tell'],
+    READY_TO_MERGE: ['viewPr'], MERGED: ['closeOut'],
+  };
+  // ── Representative IssueActionState per phase ──
+  const ST = {
+    QUEUED_FOR_PLAN:  { art:false, agent:null, ws:false, plan:false, tasks:false, canonical:'todo', review:null, merged:false, pr:false, resumable:false, paused:false, troubled:false, planningActive:false },
+    PLANNING:         { art:false, agent:{status:'running',role:'plan'}, ws:true, plan:false, tasks:false, canonical:'planning', review:null, merged:false, pr:false, resumable:false, paused:false, troubled:false, planningActive:true },
+    PLANNED_IDLE:     { art:false, agent:{status:'stopped',role:'plan'}, ws:true, plan:true, tasks:true, canonical:'todo', review:null, merged:false, pr:false, resumable:true, paused:false, troubled:false, planningActive:false },
+    WORK_RUNNING:     { art:true, agent:{status:'running',role:'work'}, ws:true, plan:true, tasks:true, canonical:'in_progress', review:null, merged:false, pr:false, resumable:false, paused:false, troubled:false, planningActive:false },
+    INPUT:            { art:true, agent:{status:'running',role:'work'}, ws:true, plan:true, tasks:true, canonical:'in_progress', review:null, merged:false, pr:false, resumable:false, paused:false, troubled:false, planningActive:false },
+    REVIEW_RUNNING:   { art:true, agent:{status:'running',role:'review'}, ws:true, plan:true, tasks:true, canonical:'in_review', review:{reviewStatus:'reviewing'}, merged:false, pr:true, resumable:false, paused:false, troubled:false, planningActive:false },
+    CHANGES_REQUESTED:{ art:true, agent:{status:'stopped',role:'work'}, ws:true, plan:true, tasks:true, canonical:'in_review', review:{reviewStatus:'blocked'}, merged:false, pr:true, resumable:true, paused:false, troubled:false, planningActive:false },
+    STUCK:            { art:true, agent:{status:'stuck',role:'work'}, ws:true, plan:true, tasks:true, canonical:'in_progress', review:null, merged:false, pr:false, resumable:false, paused:false, troubled:true, planningActive:false },
+    READY_TO_MERGE:   { art:true, agent:{status:'stopped',role:'work'}, ws:true, plan:true, tasks:true, canonical:'in_review', review:{reviewStatus:'passed',readyForMerge:true}, merged:false, pr:true, resumable:true, paused:false, troubled:false, planningActive:false },
+    SHIP_RUNNING:     { art:true, agent:{status:'running',role:'ship'}, ws:true, plan:true, tasks:true, canonical:'in_review', review:{reviewStatus:'passed',mergeStatus:'merging'}, merged:false, pr:true, resumable:false, paused:false, troubled:false, planningActive:false },
+    MERGED:           { art:true, agent:{status:'stopped',role:'work'}, ws:true, plan:true, tasks:true, canonical:'merged', review:{mergeStatus:'merged'}, merged:true, pr:true, resumable:true, paused:false, troubled:false, planningActive:false },
+  };
+  // ── The registry predicates, re-implemented verbatim (issueActions.ts:137-195) ──
+  const live = s => !!s.agent && !['stopped','failed','dead','error','stuck'].includes(s.agent.status);
+  const stopped = s => !live(s);
+  const doneOrCanceled = s => s.canonical==='done'||s.canonical==='canceled';
+  const merged = s => s.merged===true || s.review?.mergeStatus==='merged';
+  const G = {
+    always: () => true,
+    hasAgent: s => !!s.agent,
+    hasWorkspace: s => s.ws,
+    hasLiveAgent: live,
+    hasResumableSession: s => stopped(s) && s.resumable,
+    canInspectTask: s => s.tasks,
+    isPaused: s => s.paused, isTroubled: s => s.troubled,
+    isDoneOrCanceled: doneOrCanceled,
+    canPlan: s => stopped(s) && !s.plan && !merged(s) && !doneOrCanceled(s),
+    canFinalizePlanning: s => s.plan && s.agent?.role==='plan' && stopped(s) && !merged(s),
+    canStartAgent: s => stopped(s) && s.plan && s.tasks && !merged(s) && !doneOrCanceled(s),
+    canRebuildAndStart: s => s.ws && G.canStartAgent(s),
+    canStartWithoutPlanning: s => stopped(s) && !s.plan && (s.canonical==='todo'||s.canonical==='backlog') && !merged(s),
+    canRequestReview: s => s.ws && stopped(s) && !s.review && !merged(s) && !doneOrCanceled(s),
+    canRestartReview: s => ['reviewing','blocked','failed'].includes(s.review?.reviewStatus) || ['testing','failed','dispatch_failed'].includes(s.review?.testStatus) || ['merging','failed'].includes(s.review?.mergeStatus),
+    hasReviewFailure: s => s.review?.reviewStatus==='blocked' || s.review?.reviewStatus==='failed',
+    canPurgeReview: s => G.canRestartReview(s) || G.hasReviewFailure(s),
+    canRecoverAgent: s => ['stopped','stuck','failed','dead','error'].includes(s.agent?.status),
+    hasPrTarget: s => s.pr || s.review?.readyForMerge===true,
+    canCloseOut: s => s.canonical==='verifying_on_main' || s.canonical==='verifying' || merged(s),
+    canCancelIssue: s => !['verifying_on_main','verifying'].includes(s.canonical) && !merged(s) && !doneOrCanceled(s),
+    isPlanningPhase: s => s.planningActive,
+    liveAndWorkRunning: (s, ph) => live(s) && ph==='WORK_RUNNING',
+    liveNotPaused: s => live(s) && !s.paused,
+    hasTasksOrPlan: s => s.tasks || s.plan,
+    hasInference: s => s.art, hasDiscussions: s => s.art, hasTranscripts: s => s.art,
+    noWorkspace: s => !s.ws,
+    agentNotMerged: s => !!s.agent && !merged(s),
+    planNotMerged: s => s.plan && !merged(s),
+  };
+  // key,label,group,kind,gateName,panVerb,description
   const A = [
-    ['plan','Plan','planning',0,['backlog'],'agent running or plan already exists'],
-    ['autoPlan','Auto-plan','planning',0,['backlog'],'agent running or plan already exists'],
-    ['watchPlanning','Watch planning','planning',0,['planning'],'no active planning session'],
-    ['donePlanning','Done planning','planning',0,['planning'],'no finished planning agent'],
-    ['startAgent','Start agent','work',0,['backlog','planning'],'needs a plan + tasks, agent stopped'],
-    ['startSkipPlanning','Start without planning','work',0,['backlog'],'issue already has a plan'],
-    ['doneWork','Done — mark work complete & start review','work',0,['working'],'no live work agent'],
-    ['resetToPlanned','Reset to planned','work',1,['working','reviewing','ready'],'no workspace'],
-    ['requestReview','Request review','review',0,['working','reviewing'],'review already active or no workspace'],
-    ['restartReview','Re-run review on latest commit','review',0,['reviewing','ready'],'no review to re-run'],
-    ['recoverReview','Reset stalled review state','review',0,['reviewing'],'review is not stalled'],
-    ['purgeReview','Remove review sessions & reset','review',1,['reviewing','ready'],'no review sessions'],
-    ['inspectTask','Inspect task','review',0,['planning','working','reviewing'],'no tasks to inspect'],
-    ['tell','Tell agent','agent',0,['working','reviewing'],'no live agent'],
-    ['stopAgent','Stop agent','agent',0,['working','reviewing'],'no live agent'],
-    ['pause','Pause agent','agent',0,['working','reviewing'],'no live agent'],
-    ['unpause','Unpause agent','agent',0,[],'agent is not paused'],
-    ['untroubled','Clear troubled gate','agent',0,[],'agent is not troubled'],
-    ['recoverAgent','Recover agent','agent',0,[],'nothing to recover'],
-    ['resumeSession','Resume session','agent',0,['working','reviewing','ready'],'no resumable session'],
-    ['resetSession','Reset session','agent',1,['working','reviewing','ready'],'no resumable session'],
-    ['restartAgent','Restart agent','agent',1,['working','reviewing'],'no agent, or issue merged'],
-    ['syncMain','Sync main','workspace',0,['working','reviewing','ready'],'no workspace'],
-    ['rebuildAndStart','Rebuild & start','workspace',0,['working','reviewing'],'no workspace'],
-    ['createWorkspace','Create workspace','workspace',0,['backlog','planning'],'workspace already exists'],
-    ['copySettings','Copy settings','workspace',0,['working','reviewing','ready'],'no workspace'],
-    ['tasks','Tasks','artifacts',0,['planning','working','reviewing','ready','merged'],'no tasks or plan yet'],
-    ['inference','Inference','artifacts',0,['working','reviewing','ready','merged'],'no inference artifact'],
-    ['discussions','Discussions','artifacts',0,['working','reviewing','ready','merged'],'no discussions'],
-    ['transcripts','Transcripts','artifacts',0,['working','reviewing','ready','merged'],'no transcripts'],
-    ['upload','Upload transcript','artifacts',0,P,''],
-    ['syncDiscussions','Sync discussions','artifacts',0,P,''],
-    ['statusReview','Status review','artifacts',0,P,''],
-    ['open','Open','navigation',0,['working','reviewing','ready','merged'],'no workspace'],
-    ['viewPr','View PR','navigation',0,['reviewing','ready','merged'],'no PR yet'],
-    ['reopen','Reopen','danger',0,['merged'],'issue is not done/canceled'],
-    ['closeOut','Close out','danger',1,['merged'],'issue is not merged/verifying'],
-    ['wipe','Wipe','danger',1,P,''],
-    ['destroyWorkspace','Destroy workspace','danger',1,['working','reviewing','ready','merged'],'no workspace'],
-    ['resetIssue','Reset issue','danger',1,P,''],
-    ['cancel','Cancel issue','danger',1,['backlog','planning','working'],'issue already terminal'],
-    ['completeWorkReset','Complete work reset','danger',1,['working','reviewing','ready'],'no agent, or merged'],
-    ['restartFromPlan','Restart from plan','danger',1,['working','reviewing','ready'],'no plan, or merged'],
+    ['plan','Plan','planning','dialog','canPlan','plan','Have an AI planner interview you and write the implementation plan for this issue.'],
+    ['autoPlan','Auto-plan','planning','dialog','canPlan','plan --auto','Write the plan automatically, no questions asked. Good for well-understood work.'],
+    ['watchPlanning','Watch planning','planning','dialog','isPlanningPhase',null,'Open the live planning session to watch or steer it.'],
+    ['donePlanning','Done planning','planning','safe','canFinalizePlanning','plan finalize','Accept the finished plan so work can start.'],
+    ['startAgent','Start agent','work','dialog','canStartAgent','start','Start an AI agent implementing this issue from its plan.'],
+    ['startSkipPlanning','Start without planning','work','dialog','canStartWithoutPlanning','start --auto','Skip planning: generate a minimal plan from the issue text and start immediately.'],
+    ['doneWork','Done — mark work complete & start review','work','safe','liveAndWorkRunning','done','Tell the agent to wrap up; code review starts automatically.'],
+    ['resetToPlanned','Reset to planned','work','destructive','hasWorkspace','reset-to-planned','Throw away progress but keep the workspace, branch, and plan — start implementation over.'],
+    ['requestReview','Request review','review','safe','canRequestReview','review request','Send the current code out for AI review.'],
+    ['restartReview','Re-run review on latest commit','review','safe','canRestartReview','review restart','Review again from the newest commit (e.g. after pushing fixes).'],
+    ['recoverReview','Reset stalled review state','review','safe','hasReviewFailure','review reset','Un-wedge a review that stopped moving; nothing is deleted.'],
+    ['purgeReview','Remove review sessions & reset','review','destructive','canPurgeReview',null,'Kill every reviewer session and clear review state — the "review is haunted" fix.'],
+    ['inspectTask','Inspect task','review','dialog','canInspectTask','inspect --task','Have an inspector verify one plan task against the actual diff.'],
+    ['tell','Tell agent','agent','dialog','hasLiveAgent','tell','Send the running agent a message — feedback, direction, a question.'],
+    ['stopAgent','Stop agent','agent','safe','hasLiveAgent','kill','Stop the running agent. Its work, branch, and session are kept.'],
+    ['pause','Pause agent','agent','dialog','liveNotPaused','pause','Pause the agent (optionally with a reason). Resume anytime.'],
+    ['unpause','Unpause agent','agent','safe','isPaused','unpause','Let a paused agent continue.'],
+    ['untroubled','Clear troubled gate','agent','safe','isTroubled','untroubled','Clear the "kept failing, gave up" flag after you\'ve fixed the underlying cause.'],
+    ['recoverAgent','Recover agent','agent','safe','canRecoverAgent','recover','Bring back an agent that stopped, crashed, or got stuck.'],
+    ['resumeSession','Resume session','agent','dialog','hasResumableSession','resume','Reopen the stopped agent\'s saved session with its memory intact.'],
+    ['resetSession','Reset session','agent','destructive','hasResumableSession',null,'Discard the saved session memory. The next start begins fresh.'],
+    ['restartAgent','Restart agent','agent','destructive','agentNotMerged',null,'Stop the agent and start a replacement that keeps the issue context.'],
+    ['syncMain','Sync main','workspace','safe','hasWorkspace','sync-main','Pull the latest main branch into this issue\'s branch.'],
+    ['rebuildAndStart','Rebuild & start','workspace','safe','canRebuildAndStart',null,'Rebuild the dev containers, then start the agent — the fix for "stack unhealthy".'],
+    ['createWorkspace','Create workspace','workspace','dialog','noWorkspace',null,'Create the isolated working copy (branch + folder + containers) for this issue.'],
+    ['copySettings','Copy settings','workspace','dialog','hasWorkspace',null,'Copy your editor/tooling settings into this issue\'s workspace.'],
+    ['tasks','Tasks','artifacts','safe','hasTasksOrPlan',null,'Open the plan\'s task checklist.'],
+    ['inference','Inference','artifacts','safe','hasInference',null,'Open the AI-inference artifact for this issue.'],
+    ['discussions','Discussions','artifacts','safe','hasDiscussions',null,'Open recorded design discussions.'],
+    ['transcripts','Transcripts','artifacts','safe','hasTranscripts',null,'Open saved agent session transcripts.'],
+    ['upload','Upload transcript','artifacts','dialog','always',null,'Attach an outside transcript to this issue.'],
+    ['syncDiscussions','Sync discussions','artifacts','dialog','always',null,'Refresh discussion data from the tracker.'],
+    ['statusReview','Status review','artifacts','safe','always',null,'Open the pipeline status overview for this issue.'],
+    ['open','Open','navigation','safe','hasWorkspace','open','Open this issue\'s workspace in your editor.'],
+    ['viewPr','View PR','navigation','safe','hasPrTarget',null,'Open the pull request in your browser.'],
+    ['reopen','Reopen','danger','safe','isDoneOrCanceled','reopen','Bring a closed or canceled issue back into the pipeline.'],
+    ['closeOut','Close out','danger','destructive','canCloseOut','close','The final ceremony: archive artifacts, tidy the workspace, close the tracker issue.'],
+    ['wipe','Wipe','danger','destructive','always','wipe','Erase this issue\'s agent state and workspace. Cannot be undone.'],
+    ['destroyWorkspace','Destroy workspace','danger','destructive','hasWorkspace','destroy','Delete the workspace folder and containers. The issue itself survives.'],
+    ['resetIssue','Reset issue','danger','destructive','always',null,'Back to square one: stop agents, delete workspace and branch, return the issue to Todo.'],
+    ['cancel','Cancel issue','danger','destructive','canCancelIssue',null,'Cancel this issue and clean up its abandoned run.'],
+    ['completeWorkReset','Complete work reset','danger','destructive','agentNotMerged',null,'Delete agent state but keep the workspace, plan, and tasks — a fresh brain, same desk.'],
+    ['restartFromPlan','Restart from plan','danger','destructive','planNotMerged',null,'Start a brand-new run from the existing plan.'],
   ];
   const GROUPS = [['phase','For this phase'],['planning','Planning'],['work','Work'],['review','Review & Test'],['agent','Agent'],['workspace','Workspace'],['artifacts','Artifacts'],['navigation','Navigation'],['session','This session'],['danger','Danger']];
-  const PRIMARY = { backlog:['plan','autoPlan','startSkipPlanning'], planning:['watchPlanning','donePlanning'], working:['tell','doneWork','stopAgent'], reviewing:['restartReview','recoverReview'], ready:['viewPr','syncMain'], merged:['closeOut','reopen'] };
-  let phase = 'working', dangerOpen = false;
+  const REASONS = { canPlan:'a plan already exists, or an agent is running', canStartAgent:'needs a finished plan + tasks and a stopped agent',
+    hasLiveAgent:'no running agent', canRestartReview:'no review to re-run', hasReviewFailure:'review is not stalled',
+    canPurgeReview:'no review sessions', isPaused:'agent is not paused', isTroubled:'agent is not troubled',
+    canRecoverAgent:'nothing to recover', hasResumableSession:'no saved session to resume', hasInference:'no inference artifact yet', hasDiscussions:'no discussions yet', hasTranscripts:'no transcripts yet', hasWorkspace:'no workspace yet',
+    hasPrTarget:'no PR yet', canCloseOut:'issue is not merged or verifying', isDoneOrCanceled:'issue is not done/canceled',
+    canCancelIssue:'issue is already terminal', noWorkspace:'workspace already exists' };
+
+  let phase = 'WORK_RUNNING', dangerOpen = false;
+  const gateOf = (a) => (s) => a[4]==='liveAndWorkRunning' ? G.liveAndWorkRunning(s, phase) : G[a[4]](s);
 
   function render() {
-    const enabled = (a) => a[4].includes(phase);
-    const items = A.map(a => ({ key:a[0], label:a[1], group:a[2], destr:a[3]===1, on:enabled(a), why:a[5] }));
-    const availableCount = items.filter(i=>i.on).length;
+    const s = ST[phase];
+    const items = A.map(a => ({ key:a[0], label:a[1], group:a[2], destr:a[3]==='destructive', kind:a[3], gate:a[4], verb:a[5], desc:a[6], on: !!gateOf(a)(s) }));
+    const avail = items.filter(i=>i.on).length;
     const menu = document.getElementById('pmenu');
-    let html = `<div class="mlabel" style="display:flex;align-items:center;gap:8px">Issue actions <span class="phasechip">${phase}</span></div>`;
-    html += `<div class="counts">${availableCount} available now · ${items.length - availableCount} gated (dimmed)</div>`;
+    menu.classList.toggle('explain', document.getElementById('explain').checked);
+    let html = `<div class="mlabel" style="display:flex;align-items:center;gap:8px">Issue actions <span class="phasechip">${phase.replace(/_/g,' ').toLowerCase()}</span></div>`;
+    html += `<div class="counts">${avail} available now · ${items.length - avail} gated (dimmed)</div>`;
+    const item = (i) => `<div class="mi ${i.destr?'red':''} ${i.on?'':'dis'}" role="menuitem" data-gate="${i.gate}" data-on="${i.on}">${i.label}${i.verb?`<span class="verb">pan ${i.verb}</span>`:''}<span class="desc">${i.desc}</span></div>`;
     for (const [gid, glabel] of GROUPS) {
       if (gid === 'phase') {
-        const prim = (PRIMARY[phase]||[]).map(k => items.find(i=>i.key===k)).filter(Boolean).filter(i=>i.on);
-        if (!prim.length) continue;
-        html += `<div class="mlabel">${glabel}</div>` + prim.map(i => `<div class="mi" role="menuitem">${i.label}</div>`).join('');
-        html += '<div class="msep"></div>';
+        const prim = (PHASE_PRIMARY[phase]||[]).map(k => items.find(i=>i.key===k)).filter(Boolean).filter(i=>i.on);
+        if (prim.length) { html += `<div class="mlabel">${glabel}</div>` + prim.map(item).join('') + '<div class="msep"></div>'; }
         continue;
       }
-      if (gid === 'session') {
-        html += `<div class="mlabel">${glabel}</div><div class="mi" role="menuitem">Open state dir</div><div class="mi" role="menuitem">View JSONL</div><div class="msep"></div>`;
-        continue;
-      }
+      if (gid === 'session') { html += `<div class="mlabel">${glabel}</div><div class="mi" role="menuitem">Open state dir<span class="desc">Open this agent's state folder on disk.</span></div><div class="mi" role="menuitem">View JSONL<span class="desc">Open the raw session transcript file.</span></div><div class="msep"></div>`; continue; }
       if (gid === 'danger') {
-        const dItems = items.filter(i=>i.group==='danger');
-        const dOn = dItems.filter(i=>i.on).length;
-        html += `<div class="dangerhead" id="dhead" role="button" tabindex="0">${dangerOpen?'▾':'▸'} Danger (${dOn} available)</div>`;
-        if (dangerOpen) html += dItems.map(i => `<div class="mi ${i.destr?'red':''} ${i.on?'':'dis'}" role="menuitem" data-why="${i.on?'':i.why}">${i.label}</div>`).join('');
+        const d = items.filter(i=>i.group==='danger');
+        html += `<div class="dangerhead" id="dhead" role="button" tabindex="0">${dangerOpen?'▾':'▸'} Danger (${d.filter(i=>i.on).length} available)</div>`;
+        if (dangerOpen) html += d.map(item).join('');
         continue;
       }
-      const gItems = items.filter(i=>i.group===gid);
-      if (!gItems.length) continue;
-      html += `<div class="mlabel">${glabel}</div>` + gItems.map(i =>
-        `<div class="mi ${i.destr?'red':''} ${i.on?'':'dis'}" role="menuitem" data-why="${i.on?'':i.why}">${i.label}</div>`).join('');
+      const gI = items.filter(i=>i.group===gid);
+      if (gI.length) html += `<div class="mlabel">${glabel}</div>` + gI.map(item).join('');
     }
     menu.innerHTML = html;
     const dh = document.getElementById('dhead');
-    if (dh) { dh.onclick = () => { dangerOpen = !dangerOpen; render(); };
-      dh.onkeydown = (e) => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); dangerOpen=!dangerOpen; render(); } }; }
-    menu.querySelectorAll('.mi.dis').forEach(el => el.addEventListener('mouseenter', () => {
-      document.getElementById('hoverwhy').textContent = `"${el.textContent}" is gated: ${el.dataset.why || 'not available in this phase'}.`;
+    if (dh) { const t = () => { dangerOpen = !dangerOpen; render(); }; dh.onclick = t; dh.onkeydown = (e) => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); t(); } }; }
+    menu.querySelectorAll('.mi[data-on="false"]').forEach(el => el.addEventListener('mouseenter', () => {
+      const g = el.dataset.gate;
+      document.getElementById('hoverwhy').textContent = `Gated by ${g}(): ${REASONS[g] || 'not available in this state'}.`;
     }));
+  }
+  function renderSpec() {
+    const head = '<tr><th>key</th><th>label</th><th>group</th><th>kind</th><th>enabledWhen</th><th>primary in phases</th><th>pan verb</th><th>newcomer description (BINDING copy)</th></tr>';
+    const phasesFor = (k) => Object.entries(PHASE_PRIMARY).filter(([,keys])=>keys.includes(k)).map(([p])=>p).join(', ') || '—';
+    document.getElementById('spectable').innerHTML = head + A.map(a =>
+      `<tr><td class="mono">${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td><td class="${a[3]==='destructive'?'red':''}">${a[3]}</td><td class="mono">${a[4]}</td><td class="mono" style="font-size:9.5px">${phasesFor(a[0])}</td><td class="mono">${a[5]?'pan '+a[5]:'—'}</td><td>${a[6]}</td></tr>`).join('')
+      + `<tr><td class="mono">reviewTest</td><td>Review &amp; test</td><td>preserved</td><td>dialog</td><td class="mono">hasWorkspace</td><td>—</td><td class="mono">pan review request</td><td><i>Legacy compat entry — disposition (retire or re-home) required in the no-loss audit; not rendered.</i></td></tr>`;
   }
   document.querySelectorAll('[data-ph]').forEach(b => b.onclick = () => {
     phase = b.dataset.ph; dangerOpen = false;
     document.querySelectorAll('[data-ph]').forEach(x => x.classList.toggle('on', x===b));
     render();
   });
-  render();
+  document.getElementById('explain').addEventListener('change', render);
+  render(); renderSpec();
 </script>
 </body>
 </html>

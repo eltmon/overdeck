@@ -127,7 +127,7 @@
 
   <h2>What the registry gains (and surfaces lose)</h2>
   <p class="note"><strong>Grouping and order move into the registry.</strong> <span class="mono">GROUP_ORDER</span>/<span class="mono">GROUP_LABELS</span> leave <span class="mono">IssueMissionControl.tsx:86-108</span> (delivered by PAN-2661) so every presentation renders the same sections in the same order. A surface declares only its mode: <span class="mono">grouped-panel</span>, <span class="mono">grouped-context</span>, or <span class="mono">primary-strip</span> (phase-primary buttons + a grouped overflow), plus optional pinned actions (the drawer pins Merge).</p>
-  <p class="note"><strong>Surface extras become registry entries with a surface tag.</strong> Open State Dir / View JSONL / the duplicate Deep Wipe stop being hardcoded JSX in <span class="mono">FeatureItem.tsx:734-755</span>; they register with <span class="mono">surfaces: ['rail-session']</span>, inherit confirm flows, and appear in the parity test like everything else.</p>
+  <p class="note"><strong>Surface extras become registry entries with a surface tag — a mechanism the registry ALREADY has.</strong> <span class="mono">issueActions.ts</span> already carries session-scoped entries tagged <span class="mono">ownerSurface: 'ZoneBActionStrip'</span> (View terminal / View State.md / View vBRIEF / Copy Session ID / Copy tmux command) — a fifth surface using exactly the pattern this issue generalizes. Open State Dir / View JSONL / the duplicate Deep Wipe stop being hardcoded JSX in <span class="mono">FeatureItem.tsx:734-755</span> and register the same way, inheriting confirm flows and the parity test.</p>
   <p class="note"><strong>Drift becomes a red test, not a bug report.</strong> A parity test renders each mode against the registry and asserts: identical item sets, identical gating, destructive-last, and no surface-local action definitions outside the registry module. The flat/grouped split that motivated this issue can't quietly return.</p>
 
   <h2>Parity matrix — today vs proposed</h2>
@@ -139,7 +139,8 @@
       <tr><td>Destructive separation</td><td class="bad">Danger group, inline</td><td class="bad">scattered red</td><td class="bad">in overflow, mixed</td><td class="bad">in overflow, mixed</td></tr>
       <tr><td>Surface extras</td><td>—</td><td class="bad">hardcoded ×3 (incl. duplicate Deep Wipe)</td><td>—</td><td class="bad">MergeButton bolted beside menu</td></tr>
       <tr><td><b>Proposed</b></td><td class="ok">grouped-panel from registry</td><td class="ok">grouped-context from registry (PAN-2661)</td><td class="ok">primary-strip from registry</td><td class="ok">primary-strip + pinned:merge from registry</td></tr>
-      <tr><td><b>Enforcement</b></td><td colspan="4" class="ok">one parity test over all four modes: same items, same gates, danger collapsed &amp; last, zero out-of-registry actions</td></tr>
+      <tr><td>Zone B action strip (5th surface)</td><td colspan="4" class="ok">already registry-driven via <span class="mono">ownerSurface</span> session-scoped entries — the existing proof this contract works; folded into the same parity test</td></tr>
+      <tr><td><b>Enforcement</b></td><td colspan="4" class="ok">one parity test over all FIVE surfaces: same items, same gates, danger collapsed &amp; last, zero out-of-registry actions</td></tr>
     </table>
   </div>
 
