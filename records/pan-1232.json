@@ -1125,7 +1125,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-15T04:12:50.346Z",
+  "updated": "2026-07-15T04:33:33.754Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "pending",
@@ -1257,5 +1257,6 @@
   },
   "swarm": {
     "finalizedAt": "2026-07-13T15:43:21.416Z"
-  }
+  },
+  "reviewMode": "full"
 }
