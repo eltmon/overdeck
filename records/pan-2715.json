@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:29:59.548Z",
+  "updated": "2026-07-15T15:30:18.642Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,8 +100,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "route-accepted-rows": {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 2134013,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:30:18.641Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -256,6 +264,10 @@
       "cli-accept-flags": {
         "reason": "Added seven generated accept flags, gate table/JSON output, force non-bypass tests; shrank CLI registry and lowered size ratchet; pushed through 27c6346ef1",
         "updatedAt": "2026-07-15T15:29:59.548Z"
+      },
+      "route-accepted-rows": {
+        "reason": "Continue next ready dashboard route item",
+        "updatedAt": "2026-07-15T15:30:18.641Z"
       }
     }
   },
@@ -303,6 +315,7 @@
     "cli-accept-flags.cli-accept-flags.ac1": "completed",
     "cli-accept-flags.cli-accept-flags.ac2": "completed",
     "cli-accept-flags.cli-accept-flags.ac3": "completed",
-    "cli-accept-flags.cli-accept-flags.ac4": "completed"
+    "cli-accept-flags.cli-accept-flags.ac4": "completed",
+    "route-accepted-rows": "running"
   }
 }
