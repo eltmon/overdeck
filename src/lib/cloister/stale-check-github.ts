@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process';
 import type { WorkflowRun } from './stale-check-classifier.js';
+import { FAILING_CHECK_CONCLUSIONS } from '../webhook-handlers.js';
 
 const RUN_FIELDS = 'databaseId,workflowName,createdAt,conclusion,status,attempt,headSha';
 
@@ -34,9 +35,12 @@ export async function listPrHeadFailingRuns(
 ): Promise<WorkflowRun[]> {
   try {
     const runs = JSON.parse(await execGh([
-      'run', 'list', '--repo', repo, '--branch', headRef, '--status', 'failure', '--json', RUN_FIELDS,
+      'run', 'list', '--repo', repo, '--branch', headRef, '--status', 'completed', '--json', RUN_FIELDS,
     ])) as WorkflowRun[];
-    return runs.filter((run) => run.headSha === headSha);
+    return runs.filter((run) =>
+      run.headSha === headSha
+      && run.status.toLowerCase() === 'completed'
+      && FAILING_CHECK_CONCLUSIONS.has(run.conclusion.toUpperCase()));
   } catch (error) {
     warn(`list failing runs for ${headRef}`, error);
     return [];
