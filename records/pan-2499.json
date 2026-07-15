@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:45:28.643Z",
+  "updated": "2026-07-15T14:45:41.304Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -130,7 +130,8 @@
     "clear-gates-server": "completed",
     "clear-gates-server.clear-gates-server.ac1": "completed",
     "clear-gates-server.clear-gates-server.ac2": "completed",
-    "clear-gates-server.clear-gates-server.ac3": "completed"
+    "clear-gates-server.clear-gates-server.ac3": "completed",
+    "agent-step-row": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -156,8 +157,16 @@
     }
   },
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "agent-step-row": {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1182287,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:45:41.304Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
