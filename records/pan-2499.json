@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:46:22.455Z",
+  "updated": "2026-07-15T14:46:42.957Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -140,7 +140,10 @@
     "ship-progress.ship-progress.ac1": "completed",
     "ship-progress.ship-progress.ac2": "completed",
     "ship-progress.ship-progress.ac3": "completed",
-    "verification-gates": "running"
+    "verification-gates": "completed",
+    "verification-gates.verification-gates.ac1": "completed",
+    "verification-gates.verification-gates.ac2": "completed",
+    "verification-gates.verification-gates.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -166,16 +169,8 @@
     }
   },
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "verification-gates": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1191820,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:46:22.455Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -231,6 +226,17 @@
         "outcome": "completed",
         "reason": "Verified existing pushed ShipProgress adoption in ShipTab and rail: 10 focused tests cover rebasing/verifying/merged progression, compact/full rendering and log polling with fake timers; full typecheck/lint pass.",
         "releasedAt": "2026-07-15T14:46:20.100Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1191820,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:46:22.455Z",
+        "itemId": "verification-gates",
+        "outcome": "completed",
+        "reason": "Verified existing pushed shared VerificationGates adoption in console and cockpit: 4 focused state tests pass, legacy drawer component is deleted, and the restored no-loss re-home gate passes.",
+        "releasedAt": "2026-07-15T14:46:42.956Z"
       }
     ],
     "statusReasons": {
@@ -253,6 +259,10 @@
       "ship-progress": {
         "reason": "Verified existing pushed ShipProgress adoption in ShipTab and rail: 10 focused tests cover rebasing/verifying/merged progression, compact/full rendering and log polling with fake timers; full typecheck/lint pass.",
         "updatedAt": "2026-07-15T14:46:20.100Z"
+      },
+      "verification-gates": {
+        "reason": "Verified existing pushed shared VerificationGates adoption in console and cockpit: 4 focused state tests pass, legacy drawer component is deleted, and the restored no-loss re-home gate passes.",
+        "updatedAt": "2026-07-15T14:46:42.956Z"
       }
     }
   }
