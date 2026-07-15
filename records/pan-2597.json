@@ -446,7 +446,7 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T14:02:26.707Z",
+  "updated": "2026-07-15T14:02:33.804Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "passed",
@@ -456,9 +456,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:02:26.647Z",
+    "updatedAt": "2026-07-15T14:02:33.759Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
-    "testNotes": "BLOCKED: workspace has an in-progress uncommitted git merge origin/main (MERGE_HEAD=ac998a91, main tip) with 4 unresolved conflict-marker files (review-mode.test.ts, codex-auth.test.ts, verification-runner.ts, verification-types.ts). npm run typecheck fails with 9x TS1185 merge-conflict-marker errors. Reviewed commit eb12cf2f82 itself is clean; this is a stuck main-sync, not a defect in the reviewed diff. Needs a work/sync agent to resolve the merge (git merge --abort or re-run pan sync-main PAN-2597, resolve conflicts, commit, push) before verification can proceed. No browser UAT required per vBRIEF NonGoals (backend-only transport change, no dashboard frontend changes).",
+    "testNotes": "retry check",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
@@ -640,10 +640,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 46,
-            "output": 12288,
-            "cacheRead": 3274297,
-            "cacheWrite": 172369
+            "input": 48,
+            "output": 12765,
+            "cacheRead": 3446666,
+            "cacheWrite": 176244
           }
         }
       },
@@ -673,15 +673,15 @@
           "cacheWrite": 411302
         },
         "anthropic/claude-sonnet-5": {
-          "input": 14263,
-          "output": 17608,
-          "cacheRead": 4943123,
-          "cacheWrite": 664144
+          "input": 14265,
+          "output": 18085,
+          "cacheRead": 5115492,
+          "cacheWrite": 668019
         }
       },
       "costAtCloseOut": {
-        "usd": 215.261451,
-        "pricingAsOf": "2026-07-15T14:02:26.694Z"
+        "usd": 215.310386,
+        "pricingAsOf": "2026-07-15T14:02:33.796Z"
       }
     },
     "merges": [
