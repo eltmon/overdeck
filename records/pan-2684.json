@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T09:59:09.324Z",
+  "updated": "2026-07-15T10:01:27.391Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "pending",
@@ -96,16 +96,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "docs-update": {
-        "writerId": "agent-pan-2684",
-        "agentId": "agent-pan-2684",
-        "pid": 1989875,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T09:59:09.324Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2684",
@@ -172,6 +164,17 @@
         "outcome": "completed",
         "reason": "Added rendered presence and write-path coverage for every legacy control plus compaction and YAML preview; old checkbox/tier-name surface is absent",
         "releasedAt": "2026-07-15T09:59:06.552Z"
+      },
+      {
+        "writerId": "agent-pan-2684",
+        "agentId": "agent-pan-2684",
+        "pid": 1989875,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T09:59:09.324Z",
+        "itemId": "docs-update",
+        "outcome": "completed",
+        "reason": "Documented board, crews, overrides-only disclosures, compaction choices, YAML preview, merge-on-load, and derived names",
+        "releasedAt": "2026-07-15T10:01:27.391Z"
       }
     ],
     "statusReasons": {
@@ -198,6 +201,10 @@
       "no-loss-audit": {
         "reason": "Added rendered presence and write-path coverage for every legacy control plus compaction and YAML preview; old checkbox/tier-name surface is absent",
         "updatedAt": "2026-07-15T09:59:06.552Z"
+      },
+      "docs-update": {
+        "reason": "Documented board, crews, overrides-only disclosures, compaction choices, YAML preview, merge-on-load, and derived names",
+        "updatedAt": "2026-07-15T10:01:27.391Z"
       }
     }
   },
@@ -233,6 +240,8 @@
     "no-loss-audit.no-loss-audit.ac1": "completed",
     "no-loss-audit.no-loss-audit.ac2": "completed",
     "no-loss-audit.no-loss-audit.ac3": "completed",
-    "docs-update": "running"
+    "docs-update": "completed",
+    "docs-update.docs-update.ac1": "completed",
+    "docs-update.docs-update.ac2": "completed"
   }
 }
