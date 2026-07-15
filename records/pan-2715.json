@@ -165,21 +165,21 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:24:49.940Z",
+  "updated": "2026-07-15T16:27:52.802Z",
   "pipeline": {
     "issueId": "PAN-2715",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:22:55.308Z",
+    "updatedAt": "2026-07-15T16:27:52.743Z",
     "reviewNotes": "[correctness] Journal-backed verification passes without the required verified commit — `src/lib/lifecycle/dod-gate.ts:241`",
-    "verificationNotes": "Verification FAILED at test (256518ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  12:16:00\n   Duration  724ms (transform 113ms, setup 100ms, import 288ms, tests 2ms, environment 251ms)\n\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\n",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
+    "lastVerifiedCommit": "30a6d2b34ca1dbea69c2224ea03708bcd3eda522",
     "reviewRequestedAt": "2026-07-15T16:22:54.451Z",
     "reviewSpawnedAt": "2026-07-15T16:22:55.307Z",
     "scopeDrift": {
@@ -244,15 +244,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6764664,
-            "output": 10331,
-            "cacheRead": 5908096,
+            "input": 6981994,
+            "output": 10602,
+            "cacheRead": 6121728,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 60944439,
-            "output": 107971,
-            "cacheRead": 59549184,
+            "input": 70026539,
+            "output": 122762,
+            "cacheRead": 68429568,
             "cacheWrite": 0
           }
         },
@@ -275,15 +275,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6764664,
-          "output": 10331,
-          "cacheRead": 5908096,
+          "input": 6981994,
+          "output": 10602,
+          "cacheRead": 6121728,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 60944439,
-          "output": 107971,
-          "cacheRead": 59549184,
+          "input": 70026539,
+          "output": 122762,
+          "cacheRead": 68429568,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -300,8 +300,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 53.509724,
-        "pricingAsOf": "2026-07-15T16:22:55.395Z"
+        "usd": 59.402226,
+        "pricingAsOf": "2026-07-15T16:27:52.789Z"
       }
     },
     "merges": [
