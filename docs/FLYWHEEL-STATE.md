@@ -3369,3 +3369,87 @@ AND its un-rebased branch diffed as reverting **142 lines of this file**. I reba
 3. Phase 2 (release readiness) once the cohort quiesces → report to operator; **operator cuts the
    release, never the flywheel.**
 4. HELD: order book (A13/B10–B13), PAN-2377, PAN-2702. No new intake.
+
+## RUN-63 tick 14 (2026-07-15 ~11:15 local / 15:15Z) — HANDOVER. Main GREEN. PAN-2716 fix in CI (PR #2719).
+
+**MAIN CI GREEN on all of today's merges** — `ac998a91`, `0f7aaa4e`, `2b8971f9` all `success`.
+Live server deployed and healthy on `2b8971f9b5` (pid 375845, systemd-parented, :3011, deacon=on).
+
+**PAN-2716 → PR #2719, CI running. THE NEXT RUN OWNS THIS MERGE.** Strike's fix is correct and I
+verified the gates myself (30 passed/1 skipped, typecheck, lint) and checked the diff stat is clean
+(no stale-branch reverts):
+- `src/lib/lifecycle/workflows.ts` `verifySquashMergedPrByBranch` — containment check: every
+  **non-merge** commit in `<mergedPrHead>..<tipSha>` must be an ancestor of `origin/main`. All are →
+  close-out proceeds. Any is not → still refuses, and the error now NAMES the offending commits
+  instead of the opaque "does not match the head commit".
+- PAN-2406 state-plane exemption preserved as a fallthrough (ordering is correct — containment runs
+  first, sets `commitsNotOnMain`, falls through, and only uses it for the better error at the end).
+
+**ON MERGE OF #2719, DO THIS IMMEDIATELY:** `pan close PAN-2683 --force` — it is merged
+(`0f7aaa4e86`) but stranded ONLY by PAN-2716. Until then its workspace/worktree/agent state/Docker
+stack leak and it still shows in `pan review pending --ready`. **Then DEPLOY** (build + restart) —
+PAN-2716 is CLI/lifecycle code; per the new DoD rule a merged fix is inert until the server runs it.
+
+### RUN-63 scoreboard
+**Merged (14):** PAN-2611, 2229, 2596, 2602, 2616, 2643, 2703, 2684, 2701, 2690, 2704, 2712, 2683
+(+2716 pending #2719).
+**Closed out (13):** all of the above except **PAN-2683** (blocked on PAN-2716).
+**Substrate filed this session (7):** PAN-2703(fixed), PAN-2706, PAN-2709, PAN-2710, PAN-2712(fixed),
+PAN-2716(in CI), + occurrence comments on PAN-2702 and PAN-2709.
+
+### THE BIG WIN — the merge-gate trap (PAN-2710 + PAN-2712), fixed and LIVE-VERIFIED
+Red main poisons every feature PR's `test` check → a `failing_checks` blocker latches into
+`review_status` → `readyForMerge=0` (PAN-905 absolute override) → **nothing re-runs the check**
+(PAN-2710) → **and the reconcile poller never re-examines the row** (PAN-2712: `failing_checks` was
+missing from `MERGEABILITY_BLOCKERS` AND from the candidate SQL; worse, the blocker sets
+`readyForMerge=0` which disqualified the row from the only other polling path — circular by
+construction). Result: issues silently and permanently out of the merge gate while the dashboard shows
+all gates passed and the gate reads as legitimately EMPTY. **At scale this freezes the whole Command
+Deck.** PAN-2712 is fixed+deployed; PAN-2710 (the red→green re-trigger) is STILL OPEN and is the
+remaining half — **worth striking next run.**
+
+### METHOD TRAPS — read before repeating my mistakes
+1. **`git merge-tree` is NOT a conflict probe.** It reported 0 conflicts for PAN-2597/2598/1234;
+   `pan sync-main PAN-2597` then found **4 real conflicts**. Judge divergence with `pan sync-main`
+   (it aborts cleanly, leaves no MERGE_HEAD, verified no damage).
+2. **`ls --time-style` prints LOCAL time.** Appending a literal `Z` makes it look like UTC and it is
+   4h off (host UTC-4). Use `date -u -r <file>` or compare in the same zone.
+3. **ALWAYS `git diff origin/main..HEAD --stat` a strike branch BEFORE landing.** strike-pan-2712's
+   rebase was denied by the permission reviewer; its un-rebased diff would have **reverted 142 lines
+   of this file**. Caught only by reading the stat.
+4. **Read the authoritative `review_status` row before making an impact claim.** The pane and the
+   `.overdeck/pipeline-verdict.json` fallback are NOT the source of truth. This caught my over-claim
+   on PAN-2706 and exposed the PAN-2712 blocker chain.
+5. **A gate failure in a fresh strike workspace is a setup artifact until proven otherwise** — run
+   `bun install` (~400ms) before believing `TS2688 Cannot find type definition file for 'node'` or
+   `madge not found`.
+6. **`pan close` needs `--force` to run non-interactively** (bare `pan close` blocks on y/N).
+
+### NEXT RUN — priority order
+1. **Land PR #2719 (PAN-2716)** → then `pan close PAN-2683 --force` → then **DEPLOY**.
+2. **Strike PAN-2710** — the remaining half of the merge-gate trap (nothing re-triggers poisoned
+   feature PR checks on red→green). Currently only manual `gh run rerun <id> --failed` breaks it.
+3. **Cohort** (all STOPPED, no live agents; capacity free ~1/20). Judge each with `pan sync-main`:
+   PAN-2597 (43 ahead/47 behind, **4 real conflicts**, review=FAILED → startup-triage says RESTART,
+   but it re-plans a big feature — a genuine cost call, decide with fresh context; PR #2601),
+   PAN-2598 (27/246, PR #2631), PAN-1234 (13/319, PR #2606 — 319 behind, likely restart),
+   PAN-1491 (28 ahead, no PR), PAN-2568 (4 ahead, no PR).
+   PAN-2619 = **0 commits** (never started, not stalled). PAN-1232 = **no workspace** (fresh start or park).
+4. **PAN-2709** — likely TWO faults; consider splitting: (a) no resumable session when the run is
+   stopped, (b) **liveness misreport** — strike-pan-2712 said the flywheel "wasn't running" while it
+   demonstrably WAS, yet strike-pan-2704's message succeeded (same harness/host/day).
+5. **PAN-2706** (ghost/leaked test sessions — latent trap, not a live blocker), **PAN-2713** (deploy
+   step has no mechanical owner — flywheel is the interim), **PAN-2715** (`pan close` DoD gate).
+6. **Close-out tail:** PAN-2699 still OPEN though `a9abceec` is on main — its trailer says
+   `Closes PAN-2699`; GitHub only auto-closes on `Closes #2699`. Repo-wide convention gap.
+7. **Phase 2 (release readiness)** once the cohort quiesces → verify main green, deploy, then REPORT
+   to the operator and SUGGEST the cut. **The operator cuts releases — never tag.**
+8. **HELD per operator standing order (2026-07-15):** order book A13=PAN-2445, B10=PAN-2232,
+   B11=PAN-2233, B12=PAN-2190, B13=PAN-2189; **PAN-2377 (Phase 3 CANCELLED this run)**; PAN-2702
+   (awaiting operator review — do NOT plan/start). **NO new intake.** Strikes PAN-2687/2688 are
+   already merged+closed — their lingering tmux sessions are harmless; disregard stale mailbox handoffs.
+
+**Also settled, do NOT re-chase:** the two `dist/dashboard/server.js` processes are NOT a dueling
+deacon. PID 3026350→375845 (systemd) owns :3011; the other is a workspace devcontainer peer under
+`containerd-shim` with `PORT=3013` and `OVERDECK_DISABLE_DEACON=1` — exactly what the single-deacon
+invariant requires.
