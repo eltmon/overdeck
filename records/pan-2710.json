@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:24:39.783Z",
+  "updated": "2026-07-15T16:25:43.316Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-troubleshooting": {
-        "writerId": "flywheel-orchestrator",
-        "agentId": "flywheel-orchestrator",
-        "pid": 3158569,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T16:24:39.782Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2710",
@@ -149,6 +141,17 @@
         "outcome": "completed",
         "reason": "Wired start/stop into dashboard lifecycle; build, typecheck, and isolated Node 22 runtime boot on port 39110 passed",
         "releasedAt": "2026-07-15T16:24:37.216Z"
+      },
+      {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 3158569,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T16:24:39.782Z",
+        "itemId": "docs-troubleshooting",
+        "outcome": "completed",
+        "reason": "Documented symptom, red-window and once-only guards, logs, manual rerun fallback, and blocker-clear cadence",
+        "releasedAt": "2026-07-15T16:25:43.316Z"
       }
     ],
     "statusReasons": {
@@ -167,6 +170,10 @@
       "wire-boot": {
         "reason": "Wired start/stop into dashboard lifecycle; build, typecheck, and isolated Node 22 runtime boot on port 39110 passed",
         "updatedAt": "2026-07-15T16:24:37.216Z"
+      },
+      "docs-troubleshooting": {
+        "reason": "Documented symptom, red-window and once-only guards, logs, manual rerun fallback, and blocker-clear cadence",
+        "updatedAt": "2026-07-15T16:25:43.316Z"
       }
     }
   },
@@ -190,6 +197,8 @@
     "wire-boot": "completed",
     "wire-boot.wire-boot.ac1": "completed",
     "wire-boot.wire-boot.ac2": "completed",
-    "docs-troubleshooting": "running"
+    "docs-troubleshooting": "completed",
+    "docs-troubleshooting.docs-troubleshooting.ac1": "completed",
+    "docs-troubleshooting.docs-troubleshooting.ac2": "completed"
   }
 }
