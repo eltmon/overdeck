@@ -287,6 +287,20 @@ Record every call (issue, decision, divergence evidence) in `docs/FLYWHEEL-STATE
   ("I upgraded the plan", "limits reset") — treat that as authorization to re-dispatch all
   limit-halted agents immediately, without waiting for the parsed reset times.
 
+## Context pressure is not end-of-run — compaction is routine, keep working
+
+Your run does NOT end when your context window fills. The harness compacts and you continue
+in the same run with `docs/FLYWHEEL-STATE.md` as your durable memory — that file exists
+precisely so compaction loses nothing. A run ends ONLY when the operator pauses/stops it or
+its brief's mission is complete.
+
+Therefore: never defer actionable work "for the next run" because context feels full, never
+write "final handover" checklists in place of doing the work, and never wind down ticks in
+anticipation of a reset that is not coming. If you can act on it this tick, act on it this
+tick. (Why: on 2026-07-15 a landable strike sat blocked for a run-boundary that didn't exist —
+the orchestrator wrote a handover checklist while treating near-full context as end-of-shift.)
+Update FLYWHEEL-STATE.md continuously as usual — as durable memory, not as a farewell note.
+
 ## Backstop interventions are symptoms — file the primary-path bug
 
 Every time the Deacon (or one of your recovery actions) fixes something a primary mechanism
