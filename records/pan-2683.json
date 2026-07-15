@@ -172,7 +172,7 @@
     "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T13:07:23.465Z",
+  "updated": "2026-07-15T13:08:19.696Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "passed",
@@ -181,37 +181,19 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-15T13:07:23.366Z",
-    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
-    "testNotes": "npm run typecheck passed; npm run lint passed; unrestricted npm test passed 984 root files/9,119 tests plus 3 frontend files/32 tests; npm run build:dashboard passed; workspace-built Node 22 dashboard booted on isolated port 3013 and /api/health confirmed repoRoot=/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683. Browser UAT required for Policies panel Standing crew control/chip/reset/helper-copy flows but no Playwright MCP tools are exposed to this test role, so those paths could not be exercised. Required canonical .pan/records/pan-2683.json and .pan/specs/ vBRIEF are also absent from the workspace; retired local continue/spec files were not used as canonical inputs.",
-    "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-15T13:08:19.652Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-15T13:08:19.652Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2693",
     "reviewedAtCommit": "5f460ca4e455e84d3d525b34ef616344b8f9f867",
     "lastVerifiedCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c",
-    "reviewSpawnedAt": "2026-07-15T12:29:53.515Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-cf2d1b32/security.md",
-        "atCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-cf2d1b32/correctness.md",
-        "atCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-cf2d1b32/performance.md",
-        "atCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-cf2d1b32/requirements.md",
-        "atCommit": "cf2d1b32a1aa639aa444ce18346e5651f6365c8c"
-      }
-    }
+    "reviewSpawnedAt": "2026-07-15T12:29:53.515Z"
   },
   "closeOut": {
     "usage": {
@@ -283,7 +265,7 @@
       },
       "costAtCloseOut": {
         "usd": 76.83948,
-        "pricingAsOf": "2026-07-15T13:07:23.414Z"
+        "pricingAsOf": "2026-07-15T13:08:19.691Z"
       }
     },
     "merges": [
