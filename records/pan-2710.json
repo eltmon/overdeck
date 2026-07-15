@@ -14,15 +14,7 @@
       "timestamp": "2026-07-15T16:34:29.242Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T16:34:29Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T16:50:00-04:00\n\n## Verdict: CHANGES REQUESTED — PR run discovery omits canonical failing conclusions, and the long-lived poller has unbounded concurrency and retained state\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-3015d4d1/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: 3015d4d1bfb4073102f1b16a5da68263fa4c7b83\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-3015d4d1/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-3015d4d1/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-3015d4d1/performance.md | 2 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-3015d4d1/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] PR run discovery omits canonical failing conclusions other than `failure` — `src/lib/cloister/stale-check-github.ts:37`\n`gh run list --status failure` filters runs before the classifier sees them, even though the feature's canonical failing set also includes `ERROR`, `TIMED_OUT`, `CANCELLED`, `ACTION_REQUIRED`, `STARTUP_FAILURE`, and `STALE`. This leaves managed PRs with those conclusions blocked after main recovers and makes FR-3 partial. Query a suitable completed/current-head run set and filter with the canonical conclusion set, then add adapter coverage for non-`FAILURE` conclusions.\n\n### [performance] Interval ticks can overlap and multiply GitHub CLI subprocesses — `src/dashboard/server/services/stale-check-retrigger-service.ts:113`\nThe 60-second `setInterval` launches `tickOnce` without awaiting or guarding the previous invocation. Because each candidate can perform multiple serial GitHub calls with 30-second timeouts, ticks can overlap and accumulate subprocesses, API traffic, memory pressure, and rate-limit pressure. Serialize scheduling or add an in-flight guard, with a fake-timer regression test proving that a pending tick prevents another evaluation.\n\n### [performance] Process-lifetime deduplication state grows without eviction — `src/dashboard/server/services/stale-check-retrigger-service.ts:28`\n`lastEvaluated`, `attemptedRunIds`, and `loggedSkips` retain completed issues and historical run IDs until dashboard shutdown. Their size grows with all activity since process start rather than the active candidate set. Prune issue state against current candidates and bound run-ID retention with a TTL or current-run reconciliation while preserving GitHub-derived idempotency.\n\n## Non-blocking Findings\n\n### [correctness] PR runs with non-`failure` failing conclusions are never considered\nThis duplicates the requirements blocker above and is retained under the requirements finding at blocker severity.\n\n### [correctness] Overlapping polls can exceed the five-rerun cap\nThis is another consequence of the performance overlap blocker above: concurrent ticks each own a five-rerun counter, so the service can exceed the intended aggregate limit.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-3015d4d1/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -49,21 +41,21 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:35:25.784Z",
+  "updated": "2026-07-15T16:35:27.339Z",
   "pipeline": {
     "issueId": "PAN-2710",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:35:25.734Z",
+    "updatedAt": "2026-07-15T16:35:27.189Z",
     "inspectNotes": "Item red-window-classifier ack: computeRedWindows/selectRerunCandidates are pure, correctly implement fail/success window pairing (trailing-fail=>null), half-open [start,end) window membership, and all four skip reasons (main-still-red, no-red-window-match, attempt-exceeded, missing-attempt); FAILING_CHECK_CONCLUSIONS imported from webhook-handlers.ts (not duplicated); no I/O in module; all ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
     "lastVerifiedCommit": "0edb5ed42beacc97d2bbb76e56bf641fb0417a94",
-    "reviewSpawnedAt": "2026-07-15T16:31:56.417Z"
+    "reviewSpawnedAt": "2026-07-15T16:35:27.188Z"
   },
   "closeOut": {
     "usage": {
@@ -127,7 +119,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.743263,
-        "pricingAsOf": "2026-07-15T16:35:25.771Z"
+        "pricingAsOf": "2026-07-15T16:35:27.292Z"
       }
     },
     "merges": [
