@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T14:30:09.902Z",
+  "updated": "2026-07-15T14:31:42.009Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -95,8 +95,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "dod-doc-drift-guard": {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 1001008,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:31:42.009Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -121,6 +129,7 @@
     "dod-rows-module": "completed",
     "dod-rows-module.dod-rows-module.ac1": "completed",
     "dod-rows-module.dod-rows-module.ac2": "completed",
-    "dod-rows-module.dod-rows-module.ac3": "completed"
+    "dod-rows-module.dod-rows-module.ac3": "completed",
+    "dod-doc-drift-guard": "running"
   }
 }
