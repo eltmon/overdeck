@@ -82,7 +82,7 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:53:54.642Z",
+  "updated": "2026-07-15T15:54:10.702Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "reviewing",
@@ -227,8 +227,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "injection-budget": "completed",
     "size-scaled-waits": "completed",
