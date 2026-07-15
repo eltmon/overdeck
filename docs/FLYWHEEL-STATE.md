@@ -4421,3 +4421,49 @@ buries the real error. That's why this took so long; called out in the issue.
 **Filed this session (8):** PAN-2733, PAN-2734, PAN-2735 (LANDED+PROVEN), PAN-2738, PAN-2739, PAN-2741,
 PAN-2742, PAN-2743. **Phase 2 prep done:** v0.45.19 + **62 commits** (19 fix / 1 feat / 25 chore) ⇒
 suggest **0.45.20** patch. **DO NOT TAG — report + suggest only.**
+
+## RUN-63 tick 34 (2026-07-15 ~15:15 local / 19:15Z) — ❌ MY PAN-2743 FIX WAS INERT. Caught by monitor. TRUE root cause found.
+
+**RUN-63: 29 merge commits / 28 issues merged; 27 closed out. PAN-2710 still the only one left.**
+
+### ❌ I REPEATED THE TICK-28 MISTAKE — and the monitor caught it, not me
+I predicted "retry counter stops climbing" ⇒ fix works. **The counter DID stop — because it LATCHED,
+not because it healed:** `stuck=1, stuck_reason=review_infrastructure_failure, stuck_at=19:02:31Z` —
+**55 seconds AFTER my deploy booted (19:01:36Z)**. Frozen at 20, pinned not resting.
+**A metric that stops moving because something ELSE broke is not proof.** I wrote that rule at tick 28
+and then walked straight into it. **Rule going forward: pick a FALSIFIABLE test BEFORE deploying**
+(the monitor's: *does sub-reviewer idle time RESET, and does the guard log STOP?* — both were NO).
+
+### 🎯 TRUE ROOT CAUSE — the guard probes a filename convoys NEVER write. One wrong word.
+My #2744 fixed `spawnReviewSubRoleForIssuePromise` (**sub-reviewer** layer). Dispatch never gets there
+— it's blocked one level UP at the **coordinator** guard, **56 no-ops since deploy**:
+```
+[review-agent] Idempotency guard: agent-pan-2710-review already running for PAN-2710 — skipping spawn
+```
+`review-agent.ts:413` `finishedIdle = (terminal || reportWritten) && newerRequest;`
+- `terminal` → reviewStatus is **`pending`** (deacon just reset it) ⇒ FALSE
+- `reportWritten` (`:410`) → `existsSync(.../review/<runId>/`**`review.md`**`)` ⇒ **ALWAYS FALSE**
+
+**Convoys write `synthesis.md`, NEVER `review.md`.** Proven:
+```
+ls .pan/review/agent-pan-2710-review-c3181b1f/  → context.json  synthesis.md
+find workspaces/feature-pan-2710/.pan/review -name review.md | wc -l  → 0
+find workspaces/*/.pan/review -name review.md | wc -l                 → 1   (EVERY workspace on the box)
+```
+Both paths are defined ~130 lines apart **in the same file**: `:104` `synthesis.md` (what convoys
+write) vs `:232` `review.md` (legacy single-reviewer). **The guard at `:410` probes the wrong one.**
+⇒ `finishedIdle = (false || false) && newerRequest` = **false forever** ⇒ guard blocks forever.
+**PAN-2584's own comment predicted it:** *"without it a newer request deadlocks behind the guard
+forever."* Its escape hatch is DEAD CODE for the default review shape.
+
+### 🔁 THIRD instance of "reports success for work that never happened"
+`:429` `return { success: true, message: 'Review already in progress' }` — **no prompt delivered.**
+Same shape as PAN-2706 (`if (msg.includes('already running')) testTaskDelivered = true`). A skipped
+spawn must NEVER be reported as success.
+
+### Struck again (correct layer). #2744 stays — its sub-reviewer stop-then-spawn is right and needed ONCE dispatch clears the guard.
+**PAN-2710 is now `stuck=1`** ⇒ `:496 if (status.stuck) return actions;` ⇒ **no review recovery can
+reach it** — the same terminal latch as PAN-2598. Clearing `stuck` may be required first; sharpens the
+open PAN-2735 question of whether `stuck` should gate *review* recovery at all.
+
+**Filed (9):** PAN-2733/2734/2735(landed+proven)/2738/2739/2741/2742/2743(reopened)/+#2744 merged.
