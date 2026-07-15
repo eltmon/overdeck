@@ -3226,3 +3226,70 @@ Capacity healthy: 1/20 active agents, RAM 23.8G/64G.
 clears; (4) THEN the stalled cohort (capacity is available — 1/20): PAN-1234 (PR #2606), PAN-2598
 (PR #2631), PAN-2597 (PR #2601, review=FAILED), PAN-1491, PAN-2568 via `pan review request|restart`
 after judging divergence; PAN-2619 has 0 commits and PAN-1232 has no workspace — triage separately.
+
+## RUN-63 tick 12 (2026-07-15 ~10:25 local / 14:25Z) — PAN-2704 drained; PAN-2712 merge-gate fix in CI; cohort triage started
+
+**PAN-2704 MERGED + CLOSED OUT** ✅ → `f24335bb68` (PR #2711). **RUN-63 total drained: 11.**
+(PAN-2611, 2229, 2596, 2602, 2616, 2643, 2703, 2684, 2701, 2690, 2704.)
+
+**PAN-2712 (merge-gate blocker) → PR #2714, CI running. I OWN THIS MERGE — land it next tick.**
+The strike's fix was correct AND complete at BOTH layers (either alone is inert):
+- `merge-blocker-reconcile-service.ts:41` — `failing_checks` added to `MERGEABILITY_BLOCKERS` → gets
+  the 10-min stale recheck cadence.
+- `review-status-sync.ts:463` — candidate SQL also selects `blocker_reasons LIKE '%failing_checks%'`
+  → the row is returned by the query at all. **Without this the Set change does nothing.**
+- Inverted the existing test `skips rows with only non-mergeability blockers` →
+  `re-verifies failing_checks blockers even when they make the row not ready`. NOT a weakened test —
+  the old one encoded the buggy behavior.
+- Gates verified by me: 5 passed (2 files), typecheck green, lint green.
+
+### ⚠️ NEAR-MISS — un-rebased strike branches can silently revert FLYWHEEL-STATE.md
+
+strike-pan-2712's `git rebase origin/main` was **denied twice by the permission reviewer**, so it
+committed but never rebased. Its diff vs current main showed **`docs/FLYWHEEL-STATE.md | 142
+-----------`** — merging as-is would have destroyed this run's durable memory. The rebase dropped it.
+**ALWAYS `git diff origin/main..HEAD --stat` a strike branch BEFORE landing** and look for unexpected
+deletions; a stale branch reverts anything that landed on main after it forked. Caught only because
+the stat was read.
+
+### Method correction — `git merge-tree` is NOT a reliable conflict probe
+
+I used `git merge-tree <base> HEAD origin/main | grep -c '^<<<<<<<'` to judge cohort divergence and
+got **0 conflicts for all three** — which was WRONG. `pan sync-main PAN-2597` then reported **4 real
+conflicts** (`review-mode.test.ts`, `codex-auth.test.ts`, `verification-runner.ts`,
+`verification-types.ts`). The old `merge-tree` form does not surface conflicts that way.
+**Judge divergence with `pan sync-main` itself (it aborts cleanly on conflict) — not merge-tree.**
+Verified the failed sync left NO damage: workspace clean, still on `feature/pan-2597`, no MERGE_HEAD.
+
+### Stalled-cohort triage (all confirmed STOPPED — no live agents — so sync-main is sanctioned)
+
+| Issue | PR | Commits ahead | Behind main | Verdict |
+| --- | --- | --- | --- | --- |
+| PAN-2597 | #2601 | 43 | 47 | **RESTART** — sync-main hit 4 real conflicts; review=FAILED. Foundation moved (verification-runner/types remodeled). Per startup triage → `pan plan --auto --auto-start` from current main + close #2601 as superseded. **Big feature (codex app-server adoption) — this discards/re-plans real work; deliberately NOT executed this tick, it is a cost decision the next tick should make with fresh context.** |
+| PAN-2598 | #2631 | 27 | 246 | sync-main NOT yet attempted — do that first, do NOT trust merge-tree |
+| PAN-1234 | #2606 | 13 | 319 | same — 319 behind is extreme; likely restart |
+| PAN-1491 | none | 28 | ? | same |
+| PAN-2568 | none | 4 | ? | same |
+| PAN-2619 | none | **0** | ? | no work done at all — triage as never-started, not stalled |
+| PAN-1232 | none | — | — | **NO workspace** — cannot resync; needs fresh start or park |
+
+**PAN-2709 occurrences 3+4 recorded on the issue.** Occurrence 3 is materially new: strike-pan-2712
+reported "the flywheel orchestrator wasn't running" **while I was demonstrably running** (I spawned
+it minutes earlier) → this is a **liveness misreport**, not just the stopped-run resume gap.
+Occurrence 4 (strike-pan-2704) is the counter-example: its `Message sent to flywheel-orchestrator`
+SUCCEEDED. Same harness/host/day, opposite outcomes → likely TWO faults (no-resumable-session vs
+liveness misreport), possibly worth splitting. Practical impact: **every finished strike today needed
+me to find it by reading its pane.**
+
+**Main CI GREEN on `47a8ade7`**; `f24335bb` (PAN-2704) running.
+
+**NEXT TICK — in priority order:**
+1. **Land PR #2714 (PAN-2712)** when green → close out. This unblocks the merge gate generally.
+2. **PAN-2683** — after #2714 deploys, its stale `failing_checks` blocker should finally clear
+   (its PR #2693 checks are already all-SUCCESS). Then merge + close out. NOTE: the fix must be
+   **deployed** to the live server (`npm run build` from primary main → `pan restart --dashboard
+   --health-timeout 180000` → verify new pid binds :3011, deacon=on) — a merged fix is inert until
+   the running dashboard is rebuilt onto it. If the blocker still will not clear post-deploy, that is
+   a PAN-2712 follow-on.
+3. Cohort per the table above — `pan sync-main` each to judge, then resync-or-restart.
+4. HELD per operator: order book (A13/B10–B13), PAN-2377, PAN-2702. No new intake.
