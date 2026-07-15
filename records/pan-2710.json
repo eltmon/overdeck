@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2710",
   "schemaVersion": 2,
-  "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T15:02:06.689Z",
-  "pipeline": {
-    "issueId": "PAN-2710",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:44:11.592Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-fable-5",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,74 @@
       "note": "Planning session started for PAN-2710: Feature PRs keep stale failed checks after red main clears — nothing re-triggers them, so they stay out of the merge gate until manually re-run",
       "timestamp": "2026-07-15T15:01:55.819Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-07-15T14:44:11.592Z",
+  "updated": "2026-07-15T15:22:05.086Z",
+  "pipeline": {
+    "issueId": "PAN-2710",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-15T15:22:04.994Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 53714,
+            "output": 219,
+            "cacheRead": 29952,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 679401,
+            "output": 2187,
+            "cacheRead": 550656,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 2780,
+            "output": 37677,
+            "cacheRead": 4276548,
+            "cacheWrite": 166964
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 53714,
+          "output": 219,
+          "cacheRead": 29952,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 679401,
+          "output": 2187,
+          "cacheRead": 550656,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 2780,
+          "output": 37677,
+          "cacheRead": 4276548,
+          "cacheWrite": 166964
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.259917,
+        "pricingAsOf": "2026-07-15T15:22:05.078Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
 }
