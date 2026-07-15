@@ -195,7 +195,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:51:09.199Z",
+  "updated": "2026-07-15T15:51:09.779Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "passed",
@@ -283,7 +283,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "conformance-test-strengthen": "completed",
     "conformance-test-strengthen.ac1": "completed",
