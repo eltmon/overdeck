@@ -197,6 +197,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-15T00:44:30.976Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T01:28:31.628Z"
     }
   ],
   "feedback": [],
@@ -326,7 +331,7 @@
     "recordedAt": "2026-07-14T22:38:30.578Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T01:28:28.542Z",
+  "updated": "2026-07-15T01:28:31.649Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "reviewing",
@@ -524,7 +529,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "docs-appserver": "completed",
     "docs-appserver.ac1": "completed",
