@@ -508,8 +508,13 @@ export async function handleReviewDiscoveryReady(
   // convoy launched — no-op. No evidence means launch, flag or no flag.
   try {
     const sessions = await Effect.runPromise(listSessionNames());
-    const reviewerPrefix = `agent-${normalized.toLowerCase()}-review-`;
-    if (sessions.some(name => name.startsWith(reviewerPrefix))) {
+    // PAN-2697: match ONLY the four convoy sub-role sessions. Prefix matching
+    // also caught the always-on review supervisor (agent-<id>-review-supervisor),
+    // which no-op'd every discovery-ready signal and stranded the convoy.
+    const reviewerSessionNames = new Set(
+      REVIEW_SUB_ROLES.map((subRole) => `agent-${normalized.toLowerCase()}-review-${subRole}`),
+    );
+    if (sessions.some(name => reviewerSessionNames.has(name))) {
       parent.reviewDiscoveryPending = false;
       await Effect.runPromise(saveAgentState(parent));
       return { success: true, message: `Convoy already launched for ${normalized} — no-op` };
