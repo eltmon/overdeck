@@ -691,7 +691,7 @@ export function capturePaneSync(sessionName: string, lines: number = 50): string
   }
 }
 
-async function capturePaneText(
+export async function capturePaneText(
   sessionName: string,
   lines: number = 50,
   options?: { escapeSequences?: boolean }
@@ -1123,6 +1123,11 @@ export async function sendEscapeKeyAsync(sessionName: string, times = 1): Promis
   }
 }
 
+export function deliveryVerifyLine(content: string): string {
+  const lines = content.split('\n');
+  return ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+}
+
 export const sendKeys = (
   sessionName: string,
   keys: string,
@@ -1142,8 +1147,7 @@ export const sendKeys = (
         await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
         await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
 
-        const lines = keys.split('\n');
-        const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+        const verifyLine = deliveryVerifyLine(keys);
         // 1.5s per attempt × 2 attempts = 3s worst case. The previous 8s × 2 = 16s
         // caused user-visible "Enter not sent" lag whenever the 10-line tail check
         // missed the verify line (e.g. tall Claude input box or wrapped paste).
