@@ -263,19 +263,20 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:31:27.708Z",
+  "updated": "2026-07-15T15:31:40.749Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-15T15:31:27.585Z",
+    "updatedAt": "2026-07-15T15:31:40.625Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "Verification FAILED at typecheck (4521ms):\n\n\n> @overdeck/core@0.45.19 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.45.19 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.19 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ Build start\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "lastVerifiedCommit": "7bebf8dcbfdf3c3e5498fc1adcb089d7af1be2e7",
@@ -458,7 +459,7 @@
       },
       "costAtCloseOut": {
         "usd": 99.612193,
-        "pricingAsOf": "2026-07-15T15:31:27.684Z"
+        "pricingAsOf": "2026-07-15T15:31:40.691Z"
       }
     },
     "merges": [
