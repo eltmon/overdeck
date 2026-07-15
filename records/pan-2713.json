@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:18:18.027Z",
+  "updated": "2026-07-15T14:21:46.659Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,8 +81,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "health-staleness-surface": {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 857715,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:21:46.659Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -128,6 +136,7 @@
     "staleness-module.staleness-module.ac2": "completed",
     "staleness-module.staleness-module.ac3": "completed",
     "staleness-module.staleness-module.ac4": "completed",
-    "staleness-module.staleness-module.ac5": "completed"
+    "staleness-module.staleness-module.ac5": "completed",
+    "health-staleness-surface": "running"
   }
 }
