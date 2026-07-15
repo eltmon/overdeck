@@ -568,7 +568,7 @@ program
 program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
-  .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
+  .option('--model <model>', 'Work model to use and persist for later respawns (defaults to Cloister config)').option('--swarm <mode>', 'Per-issue swarm policy: off | auto | always').option('--review-mode <mode>', 'Per-issue review mode: quick | full | none').option('--review-model <model>', 'Per-issue review model override')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
