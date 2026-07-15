@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:21:27.391Z",
+  "updated": "2026-07-15T15:25:13.608Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "record-dod-gate": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 1930228,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:21:27.391Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -199,6 +191,17 @@
         "outcome": "completed",
         "reason": "Assembled rows 1-7 into a blocking close-out gate with explicit per-row accepts; 56 tests and typecheck passed; pushed 97f9155806",
         "releasedAt": "2026-07-15T15:19:27.405Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1930228,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:21:27.391Z",
+        "itemId": "record-dod-gate",
+        "outcome": "completed",
+        "reason": "Persisted eight-row gate and accepted override attribution through record write door; tests/typecheck passed; pushed 06a647843a",
+        "releasedAt": "2026-07-15T15:25:13.608Z"
       }
     ],
     "statusReasons": {
@@ -236,8 +239,8 @@
         "updatedAt": "2026-07-15T15:19:27.405Z"
       },
       "record-dod-gate": {
-        "reason": "Required gate assembly inspection passed",
-        "updatedAt": "2026-07-15T15:21:27.391Z"
+        "reason": "Persisted eight-row gate and accepted override attribution through record write door; tests/typecheck passed; pushed 06a647843a",
+        "updatedAt": "2026-07-15T15:25:13.608Z"
       }
     }
   },
@@ -277,6 +280,9 @@
     "gate-assemble-wire.gate-assemble-wire.ac2": "completed",
     "gate-assemble-wire.gate-assemble-wire.ac3": "completed",
     "gate-assemble-wire.gate-assemble-wire.ac4": "completed",
-    "record-dod-gate": "running"
+    "record-dod-gate": "completed",
+    "record-dod-gate.record-dod-gate.ac1": "completed",
+    "record-dod-gate.record-dod-gate.ac2": "completed",
+    "record-dod-gate.record-dod-gate.ac3": "completed"
   }
 }
