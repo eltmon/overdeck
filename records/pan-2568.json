@@ -15,8 +15,39 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "src/lib/__tests__/deliver-agent-message.test.ts",
+      "src/lib/agents/delivery.ts",
+      "src/lib/channels/SMOKE_TEST.md",
+      "src/lib/channels/__tests__/injection-budget.test.ts",
+      "src/lib/channels/__tests__/pty-supervisor.test.ts",
+      "src/lib/channels/injection-budget.ts",
+      "src/lib/channels/pty-supervisor.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/tmux.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "src/lib/__tests__/deliver-agent-message.test.ts",
+      "src/lib/agents/delivery.ts",
+      "src/lib/channels/SMOKE_TEST.md",
+      "src/lib/channels/__tests__/injection-budget.test.ts",
+      "src/lib/channels/__tests__/pty-supervisor.test.ts",
+      "src/lib/channels/injection-budget.ts",
+      "src/lib/channels/pty-supervisor.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/tmux.ts"
+    ],
+    "recordedAt": "2026-07-15T15:47:00.777Z"
+  },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:47:00.778Z",
+  "updated": "2026-07-15T15:47:04.601Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -26,23 +57,56 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:36:45.440Z",
-    "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep)."
+    "updatedAt": "2026-07-15T15:47:04.399Z",
+    "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
+    "reviewRequestedAt": "2026-07-15T15:47:04.399Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "CLAUDE.md",
+        "src/lib/__tests__/deliver-agent-message.test.ts",
+        "src/lib/agents/delivery.ts",
+        "src/lib/channels/SMOKE_TEST.md",
+        "src/lib/channels/__tests__/injection-budget.test.ts",
+        "src/lib/channels/__tests__/pty-supervisor.test.ts",
+        "src/lib/channels/injection-budget.ts",
+        "src/lib/channels/pty-supervisor.ts",
+        "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+        "src/lib/overdeck/conversation-forks.ts",
+        "src/lib/tmux.ts"
+      ],
+      "actualChangedFiles": [
+        "CLAUDE.md",
+        "src/lib/__tests__/deliver-agent-message.test.ts",
+        "src/lib/agents/delivery.ts",
+        "src/lib/channels/SMOKE_TEST.md",
+        "src/lib/channels/__tests__/injection-budget.test.ts",
+        "src/lib/channels/__tests__/pty-supervisor.test.ts",
+        "src/lib/channels/injection-budget.ts",
+        "src/lib/channels/pty-supervisor.ts",
+        "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+        "src/lib/overdeck/conversation-forks.ts",
+        "src/lib/tmux.ts"
+      ],
+      "recordedAt": "2026-07-15T15:47:00.777Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1707469,
-            "output": 3620,
-            "cacheRead": 1503744,
+            "input": 2778393,
+            "output": 4727,
+            "cacheRead": 2539008,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 21267876,
-            "output": 30701,
-            "cacheRead": 20771072,
+            "input": 27976008,
+            "output": 38064,
+            "cacheRead": 27391744,
             "cacheWrite": 0
           }
         },
@@ -56,10 +120,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16056,
-            "output": 12678,
-            "cacheRead": 1711701,
-            "cacheWrite": 200247
+            "input": 16060,
+            "output": 15329,
+            "cacheRead": 1970252,
+            "cacheWrite": 204373
           }
         },
         "work": {
@@ -79,15 +143,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1707469,
-          "output": 3620,
-          "cacheRead": 1503744,
+          "input": 2778393,
+          "output": 4727,
+          "cacheRead": 2539008,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21267876,
-          "output": 30701,
-          "cacheRead": 20771072,
+          "input": 27976008,
+          "output": 38064,
+          "cacheRead": 27391744,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -97,10 +161,10 @@
           "cacheWrite": 148063
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16056,
-          "output": 12678,
-          "cacheRead": 1711701,
-          "cacheWrite": 200247
+          "input": 16060,
+          "output": 15329,
+          "cacheRead": 1970252,
+          "cacheWrite": 204373
         },
         "custom/MiniMax-M3": {
           "input": 248850,
@@ -116,11 +180,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 30.941414,
-        "pricingAsOf": "2026-07-15T15:36:45.662Z"
+        "usd": 34.998484,
+        "pricingAsOf": "2026-07-15T15:47:04.551Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2729"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -282,36 +348,5 @@
         "updatedAt": "2026-07-15T15:40:46.056Z"
       }
     }
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "CLAUDE.md",
-      "src/lib/__tests__/deliver-agent-message.test.ts",
-      "src/lib/agents/delivery.ts",
-      "src/lib/channels/SMOKE_TEST.md",
-      "src/lib/channels/__tests__/injection-budget.test.ts",
-      "src/lib/channels/__tests__/pty-supervisor.test.ts",
-      "src/lib/channels/injection-budget.ts",
-      "src/lib/channels/pty-supervisor.ts",
-      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
-      "src/lib/overdeck/conversation-forks.ts",
-      "src/lib/tmux.ts"
-    ],
-    "actualChangedFiles": [
-      "CLAUDE.md",
-      "src/lib/__tests__/deliver-agent-message.test.ts",
-      "src/lib/agents/delivery.ts",
-      "src/lib/channels/SMOKE_TEST.md",
-      "src/lib/channels/__tests__/injection-budget.test.ts",
-      "src/lib/channels/__tests__/pty-supervisor.test.ts",
-      "src/lib/channels/injection-budget.ts",
-      "src/lib/channels/pty-supervisor.ts",
-      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
-      "src/lib/overdeck/conversation-forks.ts",
-      "src/lib/tmux.ts"
-    ],
-    "recordedAt": "2026-07-15T15:47:00.777Z"
   }
 }
