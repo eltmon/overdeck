@@ -1,6 +1,7 @@
 import { open, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
 
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { getBuildInfo } from '../deploy/build-info.js';
@@ -55,6 +56,29 @@ function shortSha(sha: string | null): string {
   return sha?.slice(0, 8) || 'unknown';
 }
 
+export async function waitForChildSpawn(
+  child: Pick<ChildProcess, 'once' | 'removeListener' | 'unref'>,
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const onSpawn = () => {
+      cleanup();
+      child.unref();
+      resolve();
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+    const cleanup = () => {
+      child.removeListener('spawn', onSpawn);
+      child.removeListener('error', onError);
+    };
+
+    child.once('spawn', onSpawn);
+    child.once('error', onError);
+  });
+}
+
 async function spawnDetachedReload(request: ReloadRequest, now: number): Promise<void> {
   const logsDir = join(OVERDECK_HOME, 'logs');
   await mkdir(logsDir, { recursive: true });
@@ -75,7 +99,7 @@ async function spawnDetachedReload(request: ReloadRequest, now: number): Promise
         stdio: ['ignore', log.fd, log.fd],
       },
     );
-    child.unref();
+    await waitForChildSpawn(child);
   } finally {
     await log.close();
   }

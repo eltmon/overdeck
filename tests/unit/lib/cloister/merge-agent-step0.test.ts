@@ -49,12 +49,18 @@ describe('postMergeLifecycle Step 0 deploy gating', () => {
     })).resolves.toBe(true);
   });
 
-  it('preserves the existing restart behavior for an unknown legacy build', async () => {
-    const getBlockReason = vi.fn();
+  it('defers an unknown legacy build when the deploy window is unsafe', async () => {
+    const reason = 'Deployment deferred because flywheel run RUN-42 owns deployment.';
     await expect(shouldRestartForPostMerge('/repo', {
       computeStaleness: async () => staleness('unknown'),
-      getBlockReason,
+      getBlockReason: async () => reason,
+    })).resolves.toBe(false);
+  });
+
+  it('preserves the existing restart behavior for an unknown legacy build when the window is clear', async () => {
+    await expect(shouldRestartForPostMerge('/repo', {
+      computeStaleness: async () => staleness('unknown'),
+      getBlockReason: async () => null,
     })).resolves.toBe(true);
-    expect(getBlockReason).not.toHaveBeenCalled();
   });
 });

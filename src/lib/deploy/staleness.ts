@@ -26,11 +26,17 @@ export type GitExec = (
 ) => Promise<{ readonly stdout: string }>;
 
 const DEFAULT_FETCH_MIN_INTERVAL_MS = 120_000;
+const DEFAULT_GIT_TIMEOUT_MS = 30_000;
 const lastFetchAttemptByRepo = new Map<string, number>();
 
 const defaultExec: GitExec = (command, args, options) =>
   new Promise((resolve, reject) => {
-    execFile(command, [...args], { cwd: options.cwd, encoding: 'utf8' }, (error, stdout) => {
+    execFile(command, [...args], {
+      cwd: options.cwd,
+      encoding: 'utf8',
+      timeout: DEFAULT_GIT_TIMEOUT_MS,
+      killSignal: 'SIGTERM',
+    }, (error, stdout) => {
       if (error) {
         reject(error);
         return;
@@ -38,6 +44,27 @@ const defaultExec: GitExec = (command, args, options) =>
       resolve({ stdout });
     });
   });
+
+async function fetchOriginMain(
+  run: GitExec,
+  repoRoot: string,
+  timeoutMs: number,
+): Promise<void> {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      run('git', ['fetch', 'origin', 'main'], { cwd: repoRoot }),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error(`git fetch timed out after ${timeoutMs}ms`)),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
 
 function unknown(
   buildCommit: string | null,
@@ -66,6 +93,7 @@ export async function computeBuildStaleness(input: {
   readonly buildCommit: string | null;
   readonly exec?: GitExec;
   readonly fetchMinIntervalMs?: number;
+  readonly fetchTimeoutMs?: number;
 }): Promise<BuildStaleness> {
   const computedAt = Date.now();
   const { repoRoot, buildCommit } = input;
@@ -86,7 +114,7 @@ export async function computeBuildStaleness(input: {
   if (computedAt - lastFetchAttempt >= fetchMinIntervalMs) {
     lastFetchAttemptByRepo.set(repoRoot, computedAt);
     try {
-      await run('git', ['fetch', 'origin', 'main'], { cwd: repoRoot });
+      await fetchOriginMain(run, repoRoot, input.fetchTimeoutMs ?? DEFAULT_GIT_TIMEOUT_MS);
     } catch {
       // A stale local origin/main is still more useful than rejecting the health check.
     }

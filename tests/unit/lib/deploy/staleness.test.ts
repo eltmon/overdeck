@@ -98,4 +98,29 @@ describe('computeBuildStaleness', () => {
     await expect(computeBuildStaleness({ repoRoot: REPO_ROOT, buildCommit: BUILD_COMMIT, exec }))
       .resolves.toMatchObject({ status: 'stale', originMainSha: 'origin-sha', behindBuildInputs: 1 });
   });
+
+  it('bounds a stalled fetch and continues with the local origin/main ref', async () => {
+    const { exec: baseExec, calls } = createExec({ behindBuildInputs: 1 });
+    const exec: GitExec = async (command, args, options) => {
+      if (args[0] === 'fetch') {
+        calls.push([...args]);
+        return new Promise(() => undefined);
+      }
+      return baseExec(command, args, options);
+    };
+
+    const result = computeBuildStaleness({
+      repoRoot: REPO_ROOT,
+      buildCommit: BUILD_COMMIT,
+      exec,
+      fetchTimeoutMs: 1_000,
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+
+    await expect(result).resolves.toMatchObject({
+      status: 'stale',
+      originMainSha: 'origin-sha',
+      behindBuildInputs: 1,
+    });
+  });
 });

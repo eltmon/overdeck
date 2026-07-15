@@ -26,16 +26,14 @@ export async function shouldRestartForPostMerge(
     return false;
   }
 
-  if (staleness.status === 'stale') {
-    const getBlockReason = dependencies.getBlockReason ?? (async () =>
-      (await import('../deploy/deploy-window.js')).getDeployBlockReason());
-    const reason = await getBlockReason();
-    if (reason) {
-      (dependencies.log ?? console.log)(
-        `Deploy window unsafe (${reason}) — deferring deploy to the staleness patrol`,
-      );
-      return false;
-    }
+  const getBlockReason = dependencies.getBlockReason ?? (async () =>
+    (await import('../deploy/deploy-window.js')).getDeployBlockReason());
+  const reason = await getBlockReason();
+  if (reason) {
+    (dependencies.log ?? console.log)(
+      `Deploy window unsafe (${reason}) — deferring deploy to the staleness patrol`,
+    );
+    return false;
   }
 
   return true;

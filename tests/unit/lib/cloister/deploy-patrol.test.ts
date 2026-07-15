@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 
 import {
   _resetDeployPatrolForTests,
   runDeployPatrol,
+  waitForChildSpawn,
 } from '../../../../src/lib/cloister/deploy-patrol.js';
 import type { BuildStaleness } from '../../../../src/lib/deploy/staleness.js';
 
@@ -119,5 +121,30 @@ describe('runDeployPatrol', () => {
     await runDeployPatrol(unknownCtx);
     expect(unknownCtx.spawnReload).not.toHaveBeenCalled();
     expect(unknownCtx.emitEntry).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('waitForChildSpawn', () => {
+  it('unrefs only after the detached child reports a successful spawn', async () => {
+    const child = new EventEmitter() as EventEmitter & { unref: ReturnType<typeof vi.fn> };
+    child.unref = vi.fn();
+
+    const spawned = waitForChildSpawn(child);
+    child.emit('spawn');
+
+    await expect(spawned).resolves.toBeUndefined();
+    expect(child.unref).toHaveBeenCalledOnce();
+  });
+
+  it('rejects an asynchronous spawn error without leaving an unhandled error event', async () => {
+    const child = new EventEmitter() as EventEmitter & { unref: ReturnType<typeof vi.fn> };
+    child.unref = vi.fn();
+    const error = new Error('spawn failed');
+
+    const spawned = waitForChildSpawn(child);
+    child.emit('error', error);
+
+    await expect(spawned).rejects.toBe(error);
+    expect(child.unref).not.toHaveBeenCalled();
   });
 });
