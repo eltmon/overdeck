@@ -47,20 +47,21 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:47:07.553Z",
+  "updated": "2026-07-15T15:47:11.078Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:47:05.705Z",
+    "updatedAt": "2026-07-15T15:47:07.742Z",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
     "reviewRequestedAt": "2026-07-15T15:47:04.399Z",
+    "reviewSpawnedAt": "2026-07-15T15:47:07.699Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -181,7 +182,7 @@
       },
       "costAtCloseOut": {
         "usd": 34.998484,
-        "pricingAsOf": "2026-07-15T15:47:06.382Z"
+        "pricingAsOf": "2026-07-15T15:47:08.198Z"
       }
     },
     "merges": [
