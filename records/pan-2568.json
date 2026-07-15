@@ -16,33 +16,33 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:35:35.676Z",
+  "updated": "2026-07-15T15:36:45.851Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:35:27.865Z",
-    "inspectNotes": "Inspection error for bead injection-budget: tmux session inspect-pan-2568-injection-budget exited before producing a verdict. No verdict was produced."
+    "updatedAt": "2026-07-15T15:36:45.440Z",
+    "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1608506,
-            "output": 3564,
-            "cacheRead": 1408768,
+            "input": 1707469,
+            "output": 3620,
+            "cacheRead": 1503744,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 20795917,
-            "output": 28666,
-            "cacheRead": 20309504,
+            "input": 21267876,
+            "output": 30701,
+            "cacheRead": 20771072,
             "cacheWrite": 0
           }
         },
@@ -56,10 +56,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16050,
-            "output": 11868,
-            "cacheRead": 1338304,
-            "cacheWrite": 195892
+            "input": 16056,
+            "output": 12678,
+            "cacheRead": 1711701,
+            "cacheWrite": 200247
           }
         },
         "work": {
@@ -79,15 +79,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1608506,
-          "output": 3564,
-          "cacheRead": 1408768,
+          "input": 1707469,
+          "output": 3620,
+          "cacheRead": 1503744,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20795917,
-          "output": 28666,
-          "cacheRead": 20309504,
+          "input": 21267876,
+          "output": 30701,
+          "cacheRead": 20771072,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -97,10 +97,10 @@
           "cacheWrite": 148063
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16050,
-          "output": 11868,
-          "cacheRead": 1338304,
-          "cacheWrite": 195892
+          "input": 16056,
+          "output": 12678,
+          "cacheRead": 1711701,
+          "cacheWrite": 200247
         },
         "custom/MiniMax-M3": {
           "input": 248850,
@@ -116,8 +116,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 30.503946,
-        "pricingAsOf": "2026-07-15T15:35:28.002Z"
+        "usd": 30.941414,
+        "pricingAsOf": "2026-07-15T15:36:45.662Z"
       }
     },
     "merges": [],
