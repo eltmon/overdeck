@@ -2,7 +2,7 @@
   "issueId": "PAN-2683",
   "schemaVersion": 2,
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T06:29:06.400Z",
+  "updated": "2026-07-15T06:29:07.331Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2683: feat(dashboard): Policies panel — add per-issue tiered-execution override and tier-suspension messaging (PAN-2681 follow-up)",
       "timestamp": "2026-07-15T06:29:06.400Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
