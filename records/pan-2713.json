@@ -10,8 +10,73 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/merge-agent-step0.ts",
+      "tests/unit/dashboard/identity.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/hooks/useSystemHealth.ts",
+      "tests/unit/lib/deploy/build-info.test.ts"
+    ],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.test.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.tsx",
+      "src/dashboard/frontend/src/hooks/useSystemHealth.ts",
+      "src/dashboard/frontend/src/types.ts",
+      "src/dashboard/server/identity.ts",
+      "src/dashboard/server/services/__tests__/system-health-service.test.ts",
+      "src/dashboard/server/services/system-health-service.ts",
+      "src/dashboard/server/tsdown.config.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/deploy-patrol.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/deploy/build-info.ts",
+      "src/lib/deploy/deploy-window.ts",
+      "src/lib/deploy/staleness.ts",
+      "tests/unit/lib/cloister/deploy-patrol.test.ts",
+      "tests/unit/lib/cloister/merge-agent-step0.test.ts",
+      "tests/unit/lib/deploy/build-info.test.ts",
+      "tests/unit/lib/deploy/deploy-window.test.ts",
+      "tests/unit/lib/deploy/staleness.test.ts",
+      "tsdown.config.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/OVERDECK_DEV_SOP.md",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.test.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.tsx",
+      "src/dashboard/frontend/src/types.ts",
+      "src/dashboard/server/identity.ts",
+      "src/dashboard/server/services/__tests__/system-health-service.test.ts",
+      "src/dashboard/server/services/system-health-service.ts",
+      "src/dashboard/server/tsdown.config.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/deploy-patrol.ts",
+      "src/lib/cloister/merge-agent-step0.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/deploy/build-info.ts",
+      "src/lib/deploy/deploy-window.ts",
+      "src/lib/deploy/staleness.ts",
+      "tests/unit/dashboard/identity.test.ts",
+      "tests/unit/lib/cloister/deploy-patrol.test.ts",
+      "tests/unit/lib/cloister/merge-agent-step0.test.ts",
+      "tests/unit/lib/deploy/deploy-window.test.ts",
+      "tests/unit/lib/deploy/staleness.test.ts",
+      "tsdown.config.ts"
+    ],
+    "recordedAt": "2026-07-15T14:50:52.626Z"
+  },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:50:52.627Z",
+  "updated": "2026-07-15T14:50:55.831Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -21,23 +86,24 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:18:17.944Z",
-    "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers."
+    "updatedAt": "2026-07-15T14:50:55.715Z",
+    "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2721"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 643049,
-            "output": 1207,
-            "cacheRead": 553600,
+            "input": 4033045,
+            "output": 3790,
+            "cacheRead": 3820544,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 4295899,
-            "output": 11184,
-            "cacheRead": 4158976,
+            "input": 32654041,
+            "output": 49467,
+            "cacheRead": 32208384,
             "cacheWrite": 0
           }
         },
@@ -48,19 +114,27 @@
             "cacheRead": 8171192,
             "cacheWrite": 228109
           }
+        },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 155,
+            "cacheRead": 27914,
+            "cacheWrite": 91124
+          }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 643049,
-          "output": 1207,
-          "cacheRead": 553600,
+          "input": 4033045,
+          "output": 3790,
+          "cacheRead": 3820544,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4295899,
-          "output": 11184,
-          "cacheRead": 4158976,
+          "input": 32654041,
+          "output": 49467,
+          "cacheRead": 32208384,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -68,14 +142,22 @@
           "output": 71212,
           "cacheRead": 8171192,
           "cacheWrite": 228109
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 155,
+          "cacheRead": 27914,
+          "cacheWrite": 91124
         }
       },
       "costAtCloseOut": {
-        "usd": 17.692815,
-        "pricingAsOf": "2026-07-15T14:18:18.011Z"
+        "usd": 34.644626,
+        "pricingAsOf": "2026-07-15T14:50:55.798Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2721"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -247,70 +329,5 @@
     "deploy-docs": "completed",
     "deploy-docs.deploy-docs.ac1": "completed",
     "deploy-docs.deploy-docs.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt",
-      "src/lib/cloister/merge-agent-step0.ts",
-      "tests/unit/dashboard/identity.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/hooks/useSystemHealth.ts",
-      "tests/unit/lib/deploy/build-info.test.ts"
-    ],
-    "declaredScope": [
-      "docs/DEFINITION-OF-DONE.md",
-      "docs/OVERDECK_DEV_SOP.md",
-      "src/dashboard/frontend/src/App/AppChrome.tsx",
-      "src/dashboard/frontend/src/components/StaleBuildChip.test.tsx",
-      "src/dashboard/frontend/src/components/StaleBuildChip.tsx",
-      "src/dashboard/frontend/src/hooks/useSystemHealth.ts",
-      "src/dashboard/frontend/src/types.ts",
-      "src/dashboard/server/identity.ts",
-      "src/dashboard/server/services/__tests__/system-health-service.test.ts",
-      "src/dashboard/server/services/system-health-service.ts",
-      "src/dashboard/server/tsdown.config.ts",
-      "src/lib/cloister/config.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/deploy-patrol.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/deploy/build-info.ts",
-      "src/lib/deploy/deploy-window.ts",
-      "src/lib/deploy/staleness.ts",
-      "tests/unit/lib/cloister/deploy-patrol.test.ts",
-      "tests/unit/lib/cloister/merge-agent-step0.test.ts",
-      "tests/unit/lib/deploy/build-info.test.ts",
-      "tests/unit/lib/deploy/deploy-window.test.ts",
-      "tests/unit/lib/deploy/staleness.test.ts",
-      "tsdown.config.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/DEFINITION-OF-DONE.md",
-      "docs/OVERDECK_DEV_SOP.md",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/App/AppChrome.tsx",
-      "src/dashboard/frontend/src/components/StaleBuildChip.test.tsx",
-      "src/dashboard/frontend/src/components/StaleBuildChip.tsx",
-      "src/dashboard/frontend/src/types.ts",
-      "src/dashboard/server/identity.ts",
-      "src/dashboard/server/services/__tests__/system-health-service.test.ts",
-      "src/dashboard/server/services/system-health-service.ts",
-      "src/dashboard/server/tsdown.config.ts",
-      "src/lib/cloister/config.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/deploy-patrol.ts",
-      "src/lib/cloister/merge-agent-step0.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/deploy/build-info.ts",
-      "src/lib/deploy/deploy-window.ts",
-      "src/lib/deploy/staleness.ts",
-      "tests/unit/dashboard/identity.test.ts",
-      "tests/unit/lib/cloister/deploy-patrol.test.ts",
-      "tests/unit/lib/cloister/merge-agent-step0.test.ts",
-      "tests/unit/lib/deploy/deploy-window.test.ts",
-      "tests/unit/lib/deploy/staleness.test.ts",
-      "tsdown.config.ts"
-    ],
-    "recordedAt": "2026-07-15T14:50:52.626Z"
   }
 }
