@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:32:33.710Z",
+  "updated": "2026-07-15T09:34:47.056Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
@@ -57,18 +57,33 @@
   "reReviewScope": "changed",
   "reviewModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "staffing-tiered-block": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2683",
         "agentId": "agent-pan-2683",
         "pid": 1786978,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T09:32:33.710Z"
+        "claimedAt": "2026-07-15T09:32:33.710Z",
+        "itemId": "staffing-tiered-block",
+        "outcome": "completed",
+        "reason": "Added non-throwing tiered resolution block, surfaced spec metadata in staffing routes, and covered precedence/fallback cases",
+        "releasedAt": "2026-07-15T09:34:47.056Z"
+      }
+    ],
+    "statusReasons": {
+      "staffing-tiered-block": {
+        "reason": "Added non-throwing tiered resolution block, surfaced spec metadata in staffing routes, and covered precedence/fallback cases",
+        "updatedAt": "2026-07-15T09:34:47.056Z"
       }
     }
   },
   "statusOverrides": {
-    "staffing-tiered-block": "running"
+    "staffing-tiered-block": "completed",
+    "staffing-tiered-block.staffing-tiered-block.ac1": "completed",
+    "staffing-tiered-block.staffing-tiered-block.ac2": "completed",
+    "staffing-tiered-block.staffing-tiered-block.ac3": "completed",
+    "staffing-tiered-block.staffing-tiered-block.ac4": "completed"
   }
 }
