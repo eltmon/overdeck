@@ -87,23 +87,23 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T16:04:53.336Z",
+  "updated": "2026-07-15T16:05:01.036Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:04:51.851Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-15T16:05:00.977Z",
+    "reviewNotes": "[correctness] An idle empty prompt is incorrectly treated as successful submission — `src/lib/overdeck/conversation-forks.ts:350`",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
     "lastVerifiedCommit": "b71dee5eaf694510bb959e2367b2074fb4a8185c",
     "reviewRequestedAt": "2026-07-15T15:47:04.399Z",
-    "reviewSpawnedAt": "2026-07-15T15:53:22.238Z",
+    "reviewSpawnedAt": "2026-07-15T16:04:55.187Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -134,6 +134,28 @@
         "src/lib/tmux.ts"
       ],
       "recordedAt": "2026-07-15T15:47:00.777Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/security.md",
+        "atCommit": "b71dee5eaf694510bb959e2367b2074fb4a8185c"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/correctness.md",
+        "atCommit": "b71dee5eaf694510bb959e2367b2074fb4a8185c"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/performance.md",
+        "atCommit": "b71dee5eaf694510bb959e2367b2074fb4a8185c"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-6efc93aa/requirements.md",
+        "atCommit": "b71dee5eaf694510bb959e2367b2074fb4a8185c"
+      }
     }
   },
   "closeOut": {
@@ -224,7 +246,7 @@
       },
       "costAtCloseOut": {
         "usd": 46.205571,
-        "pricingAsOf": "2026-07-15T16:04:52.238Z"
+        "pricingAsOf": "2026-07-15T16:05:01.022Z"
       }
     },
     "merges": [
