@@ -99,15 +99,7 @@
       "timestamp": "2026-07-15T16:24:49.940Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T16:24:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2715\n\n# Review Synthesis — PAN-2715 — 2026-07-15T16:30:00-04:00\n\n## Verdict: CHANGES REQUESTED — correctness review failed and DoD audit persistence still blocks the dashboard event loop\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-6ce56b9f/context.json\n- Branch: feature/pan-2715\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715\n- HEAD reviewed: 6ce56b9f1ccb42717acca5508577b79d3a43fcc9\n- Cycle number: 2\n- Prior cycle SHA: 2b26ba74ad6977120743ea50b5f43b95b96a84df\n- PR base: d47f64cc538245b658d9ba74bfc6fc23c3685992\n- PR commits: 19\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed, then contradictory late ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-6ce56b9f/security.md | infrastructure failure |\n| correctness | failed | — | infrastructure failure |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-6ce56b9f/performance.md | 1 |\n| requirements | failed, then contradictory late ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-6ce56b9f/requirements.md | infrastructure failure |\n\n## Blocking Findings\n\n### [correctness] Reviewer session ended before writing a report\nThe correctness reviewer emitted `REVIEWER_FAILED correctness reviewer session ended before writing a report`, and no later ready signal or usable correctness report arrived. The review contract forbids approval when any reviewer fails because correctness coverage is incomplete.\n\n### [performance] DoD audit persistence performs synchronous record I/O on the dashboard request thread — `src/lib/lifecycle/workflows.ts:299`\n`recordDodGateStep` invokes `writeCloseOutDodGateSync` through `Effect.try`; this does not move its synchronous read, atomic write, fsync/rename, and read-back verification off Node's event loop. Every successful dashboard close-out can therefore pause HTTP, WebSocket, and polling work. Add an async write-door operation and invoke it through an async Effect, ideally combining terminal-state and DoD-audit persistence into one canonical transaction.\n\n### [security] Reviewer emitted a terminal failure before a contradictory late-ready report\nSecurity first emitted `REVIEWER_FAILED security reviewer session ended before writing a report`, then later emitted a ready signal with a readable report containing no blockers. The role contract says any reviewer failure blocks and the run promised exactly one terminal signal per sub-role, so this contradictory lifecycle cannot support approval even though the late report is substantively clean.\n\n### [requirements] Reviewer emitted a terminal failure before a contradictory late-ready report\nRequirements first emitted `REVIEWER_FAILED requirements reviewer session ended before writing a report`, then later emitted a ready signal with a readable report finding all seven in-scope constraints complete. The role contract says any reviewer failure blocks and the run promised exactly one terminal signal per sub-role, so this contradictory lifecycle cannot support approval even though the late report is substantively clean.\n\n## Non-blocking Findings\n\n### [security] Client-controlled override attribution permits audit-record spoofing — `src/dashboard/server/routes/issues.ts:591`\nAn authenticated dashboard caller can submit an arbitrary `acceptedBy` identity, weakening the durable override audit without bypassing close-out authorization. Derive attribution from trusted server-side identity; if no distinct user identity exists, record a fixed server-side actor and omit `acceptedBy` from the request schema.\n\n## Clean Sub-roles\n\nNone. The late requirements report is clean and the late security report has no blockers, but both sub-roles emitted prior terminal failures. Performance reported a blocker, and correctness coverage is missing.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-6ce56b9f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2715 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -165,7 +157,7 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:31:08.183Z",
+  "updated": "2026-07-15T16:31:10.479Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
