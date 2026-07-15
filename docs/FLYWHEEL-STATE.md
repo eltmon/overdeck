@@ -2969,3 +2969,58 @@ server-1 didn't crash-loop again (exit 130 may recur).
   - NO new intake (auto_pickup_backlog=false); don't touch stray planning-pan-2499/2633.
   - Flywheel-gap findings (ticks 3/3.5): frozen-alive work agents + convoy sub-reviewer respawn were
     un-re-drivable under --no-resume — moot if no-resume stays lifted (it was, ~15:30).
+
+## RUN-63 tick 8 (2026-07-15 ~08:47 local / 12:47Z) — FRESH RUN re-armed; RED MAIN (P0) found → filed PAN-2703 + struck
+
+**Run resumed after a 2-day gap** (prior session handed over at ~92% ctx on 07-13). `pan flywheel status`
+was stale (last tick 07-13, Main HEAD 469f5b2) — re-derived everything from live sources.
+
+**OPERATOR STANDING ORDER (2026-07-15) — supersedes RUN-63 Phase 3:**
+- DRAIN ONLY. Order book (A13=PAN-2445, B10=PAN-2232, B11=PAN-2233, B12=PAN-2190, B13=PAN-2189) stays
+  HELD. Order-book items already in-pipeline may finish.
+- **PAN-2377 is NOT dispatched** (Phase 3 cancelled for this run) — operator reassesses order-book work
+  only after everything currently open lands. Do NOT plan/start it.
+- PAN-2702 (deacon-owned strike merges) awaiting operator review — do NOT plan or start.
+- Stale mailbox handoffs for strikes PAN-2687/PAN-2688 = already merged+closed; disregard (their tmux
+  sessions linger harmlessly).
+
+**RED MAIN (P0).** main CI `test` RED on `a9abceec` + `aa65f505`; last green `06b62795`.
+lint/build/guard/smoke all GREEN — only `test`. 1 failed / 9039 passed.
+
+- **Failure:** `tests/unit/scripts/pre-push-hook.test.ts:97` > "audits feature branch ratchets from
+  origin/main merge-base, not the remote feature sha" → `AssertionError: expected false to be true`.
+- **Root cause (verified at code level, reproduced locally):** PAN-2699 (`a9abceec`) added
+  `bash scripts/guard-hook-bundle-freshness.sh "$base..$local_sha"` at `.husky/pre-push:60`, but never
+  updated the hook's own test fixture. `makeHookFixture()` (`tests/unit/scripts/pre-push-hook.test.ts:9-25`)
+  stubs `lint-file-size.sh`, `lint-ratchet-audit.sh`, `guard-state-plane-branches.sh` — NOT the new guard.
+  Fixture root lacks it → bash exits 127 → hook runs under `set -e` (`.husky/pre-push:8`) → hook exits
+  non-zero → `runHook()` returns ok:false → assertion fails.
+  **Test-fixture gap, NOT a defect in the shipped guard.** Fix = add the 3-line stub, matching the
+  existing idiom. Do NOT weaken the assertion or remove the guard call — the guard is PAN-2699's point.
+- **FILED [PAN-2703] (blocks-main) + `pan strike PAN-2703`** → strike-pan-2703, codex/gpt-5.6-sol,
+  branch strike/pan-2703 (NO --model/--harness override — provider default). I OWN ITS MERGE.
+- **INDEPENDENT CONFIRMATION:** strikes PAN-2701 and PAN-2690 both root-caused the SAME failure
+  unprompted and correctly refused to push without green gates. Diagnosis is triple-confirmed.
+
+**MERGE FREEZE while main is RED.** PAN-2684 is review+test passed (PR #2694, CLEAN/MERGEABLE, all
+checks green — they predate a9abceec). Held deliberately: do not stack merges onto a red main; land
+PAN-2703 first, then merge onto green.
+
+**Blocked-on-red (land as soon as main is green — in this order):**
+1. PAN-2703 (the fix itself) → main green.
+2. PAN-2701 (codex mail drain) — DONE + committed `ba71a8afd1`, focused tests 12 passed, typecheck+lint
+   green, NOT pushed pending green gates. Needs rebase→push→PR→merge.
+3. PAN-2690 (warm-idle agent state) — DONE + committed `a2b853a212`, focused tests+typecheck+lint green,
+   NOT pushed pending green gates. Needs rebase→push→PR→merge.
+4. PAN-2684 (PR #2694) — review+test passed, ready.
+5. PAN-2683 — review PASSED (verdict in workspace fallback per PAN-2583 journal-write failure); test live.
+
+**SUBSTRATE GAP (recorded, do NOT strike during drain):** `flywheel-orchestrator` cannot be auto-resumed
+— "no resumable session id found: no session.id file, no sessions.json entry". Strikes 2701/2690 tried to
+notify the flywheel, resume failed, and they fell back to durable issue comments (correct degradation, but
+the orchestrator mailbox is effectively write-only when the run is stopped). Related to PAN-2701's own fix.
+
+**Drained since last tick (verified closed):** PAN-2607, PAN-2564, PAN-1520.
+**Still-open cohort with NO live agent (stalled — shepherd after red-main clears):** PAN-1232, PAN-1491,
+PAN-2598, PAN-2568, PAN-2597, PAN-1234, PAN-2619.
+**Close-out tail:** PAN-2699 still OPEN though its fix (`a9abceec`, "Closes PAN-2699") is on main.
