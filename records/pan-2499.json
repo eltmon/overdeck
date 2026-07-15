@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:44:33.937Z",
+  "updated": "2026-07-15T14:45:28.643Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -127,7 +127,10 @@
     "issue-view-model.issue-view-model.ac3": "completed",
     "issue-view-model.issue-view-model.ac4": "completed",
     "issue-view-model.issue-view-model.ac5": "completed",
-    "clear-gates-server": "running"
+    "clear-gates-server": "completed",
+    "clear-gates-server.clear-gates-server.ac1": "completed",
+    "clear-gates-server.clear-gates-server.ac2": "completed",
+    "clear-gates-server.clear-gates-server.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -153,16 +156,8 @@
     }
   },
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "clear-gates-server": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1163551,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:44:33.937Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -185,6 +180,17 @@
         "outcome": "completed",
         "reason": "Verified existing pushed implementation: IssueViewModel exposes all ten sub-objects, composes only existing query hooks and agentsById, centralizes derivations, and covers active/merged/troubled fixtures; 20 focused frontend tests and typecheck pass.",
         "releasedAt": "2026-07-15T14:38:53.240Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1163551,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:44:33.937Z",
+        "itemId": "clear-gates-server",
+        "outcome": "completed",
+        "reason": "Verified existing pushed server implementation: clearGates clears paused/troubled gates through shared agent-state doors, preserves gated refusal without the flag, emits intervention events; 20 focused route tests, typecheck, and full lint/state-write gate pass.",
+        "releasedAt": "2026-07-15T14:45:28.642Z"
       }
     ],
     "statusReasons": {
@@ -195,6 +201,10 @@
       "issue-view-model": {
         "reason": "Verified existing pushed implementation: IssueViewModel exposes all ten sub-objects, composes only existing query hooks and agentsById, centralizes derivations, and covers active/merged/troubled fixtures; 20 focused frontend tests and typecheck pass.",
         "updatedAt": "2026-07-15T14:38:53.240Z"
+      },
+      "clear-gates-server": {
+        "reason": "Verified existing pushed server implementation: clearGates clears paused/troubled gates through shared agent-state doors, preserves gated refusal without the flag, emits intervention events; 20 focused route tests, typecheck, and full lint/state-write gate pass.",
+        "updatedAt": "2026-07-15T14:45:28.642Z"
       }
     }
   }
