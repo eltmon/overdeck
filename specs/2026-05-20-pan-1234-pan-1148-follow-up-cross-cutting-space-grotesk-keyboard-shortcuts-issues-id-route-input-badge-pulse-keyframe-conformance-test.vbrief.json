@@ -4,17 +4,17 @@
     "created": "2026-05-20T02:45:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1234: PAN-1148 follow-up — cross-cutting (Space Grotesk / keyboard shortcuts / /issues/:id route / INPUT badge / pulse keyframe / conformance test)",
-    "updated": "2026-07-15T14:52:45.044Z"
+    "updated": "2026-07-15T14:52:46.824Z"
   },
   "plan": {
     "id": "pan-1234",
     "title": "PAN-1148 follow-up — cross-cutting (Space Grotesk / keyboard shortcuts / /issues/:id route / INPUT badge / pulse keyframe / conformance test)",
-    "status": "approved",
+    "status": "running",
     "uid": "7b1212bd-e17e-449a-9067-08d73e52bcf4",
     "author": "agent:claude-opus-4-7",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-05-20T02:45:00.000Z",
-    "updated": "2026-07-15T14:52:45.044Z",
+    "updated": "2026-07-15T14:52:46.824Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1234",
