@@ -452,9 +452,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T16:58:06.918Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T16:59Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T16:59:24.442Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T16:59:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2597\n\n# Review Synthesis — PAN-2597 — 2026-07-15T16:58:06.871Z\n\n## Verdict: CHANGES REQUESTED — security reviewer failed and three ready reports are missing\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/context.json`\n- Branch: `feature/pan-2597`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597`\n- HEAD reviewed: `061ab6e83411b3c06f9bcbf9c99a8c269c5d1c00`\n- Cycle number: 14\n- Prior cycle SHA: `0cd815c68ec8b8826949db4d9789f4f5593fb3fc`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed: role run already running | — | infrastructure failure |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/correctness.md` (missing) | unreadable report |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/performance.md` (missing) | unreadable report |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/requirements.md` (missing) | unreadable report |\n\n## Blocking Findings\n\n### [security] Reviewer infrastructure failure\nThe security sub-role emitted `REVIEWER_FAILED` with `Role run agent-pan-2597-review-security already running`. Review policy forbids approval when any reviewer fails or times out.\n\n### [correctness] Ready report is missing\nThe correctness sub-role emitted `REVIEWER_READY`, but its referenced output file does not exist. A missing, empty, or unreadable ready report is blocking.\n\n### [performance] Ready report is missing\nThe performance sub-role emitted `REVIEWER_READY`, but its referenced output file does not exist. A missing, empty, or unreadable ready report is blocking.\n\n### [requirements] Ready report is missing\nThe requirements sub-role emitted `REVIEWER_READY`, but its referenced output file does not exist. A missing, empty, or unreadable ready report is blocking.\n\n## Non-blocking Findings\nNone available. The completed reviewer reports could not be read.\n\n## Clean Sub-roles\nNone. Security failed, and the other three sub-roles did not leave readable reports in the active review directory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2597 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/circular-deps-baseline.txt",
@@ -577,7 +590,7 @@
     "recordedAt": "2026-07-15T14:19:56.585Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T16:58:06.919Z",
+  "updated": "2026-07-15T16:59:24.443Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "reviewing",
