@@ -84,10 +84,10 @@
       "tests/unit/lib/lifecycle/workflows.test.ts",
       "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
     ],
-    "recordedAt": "2026-07-15T16:10:43.479Z"
+    "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:12:34.475Z",
+  "updated": "2026-07-15T16:12:40.859Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "reviewing",
