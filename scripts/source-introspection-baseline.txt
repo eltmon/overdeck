@@ -2,7 +2,6 @@
 1 src/dashboard/frontend/src/components/__tests__/IssueAgentCard-harness.test.tsx
 1 src/dashboard/server/routes/__tests__/effect-patterns.test.ts
 1 src/dashboard/server/routes/__tests__/projects-register.test.ts
-1 src/lib/agents/__tests__/tier-escalation.test.ts
 1 src/lib/cloister/__tests__/lint-stub-ui.test.ts
 1 src/lib/cloister/__tests__/no-resume-mode.test.ts
 1 src/lib/cloister/__tests__/reap-issue-residue.test.ts
