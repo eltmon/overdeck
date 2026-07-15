@@ -4241,3 +4241,47 @@ state kills the `pan done` nudge for ALL agents, forever.** Every other caller n
 ### Cohort
 PAN-2597 test=testing (moving!). PAN-2710 review=blocked (rework; agent healthy). PAN-2598 stuck=1.
 **RUN-63: 25 merged.** Filed this session: PAN-2733/2734/2735/2738/2739. PR #2620 closed (orphan).
+
+## RUN-63 tick 30 (2026-07-15 ~13:40 local / 17:40Z) — 🎯 PAN-2735 LANDED+DEPLOYED. 4 CLOSED OUT. Drain ≈ DONE.
+
+**RUN-63: 27 merge commits / 26 distinct issues merged; 26 closed out.** (PAN-2735 took two passes.)
+**Only TWO open PRs remain in the whole PAN drain: #2736 (PAN-2710), #2631 (PAN-2598).**
+
+### Landed this tick
+- **PAN-2735 v2** → `8796717201` (#2740) — the real fix. Operator said "review and land"; CI CLEAN.
+  **Deployed + verified in the running bundle** (`deacon-CIktvNMG.js`): all four probes FOUND —
+  `evaluateReviewConvoyLiveness`, `coordinator stopped`, `review watchdog expired`,
+  `all review agents stale`. pid **4030198** → later **4177526**, health 200, systemd-parented.
+- **PAN-2597** → `1f892613f6` (#2601) — codex app-server adoption. review=passed, test=passed, ready=1.
+  Reached `passed` via the NORMAL path (no recovery log line) — **again, do not credit my fix.**
+- **CLOSED OUT: PAN-2597, PAN-2568, PAN-2715, PAN-2735.** 2597's close-out pruned **9** stale agent rows.
+
+### ✅ The DoD gate WORKS — it caught me
+First `pan close PAN-2597` was **REFUSED**, correctly:
+```
+✗ dod:post-merge  — canonical state: in_review; running agents: agent-pan-2597
+✗ dod:main-verify — still running: build (22), lint, test, guard … on 1f892613f6
+✗ dod:deploy      — server started 17:22:07Z, dist built 17:21:50Z, merge 17:24:43Z  ← BUILD PREDATES MERGE
+```
+Exactly the operator's rule mechanically enforced: **merged is not done; closed-out is not done if the
+live server runs a build predating the merge.** Correct sequence, now proven: wait main CI green →
+rebuild → deploy → THEN close. Second attempt passed all 8 rows.
+- **PAN-2735 needed `--accept-*` overrides** (review/tests/verification/post-merge/deploy): it's a
+  **strike**, so it never went through review/test — those rows are structurally `pending` and can
+  never pass. Grounds recorded: I reviewed the diff, ran typecheck+lint+**1066 tests**, CI green,
+  deployed, verified in bundle. The `dod:deploy` row ALWAYS fails on "build commit not exposed" —
+  that's **PAN-2713**, already filed.
+
+### Remaining
+- **PAN-2710** — review=blocked (rework). Agent HEALTHY: committed 6 min ago, 0 unpushed, merged main
+  into its branch. PR #2736 MERGEABLE. Let it finish.
+- **PAN-2598** — `stuck=1 verification_stuck` ⇒ `:496 if (status.stuck) return actions;` blocks ALL
+  review recovery. **Deliberately out of scope for PAN-2735** (separate policy question). PR #2631
+  MERGEABLE. This is the last real blocker in the drain.
+- MIN-*/LEX-* rows are other projects with no live agents — stale rows, NOT this drain.
+- **Do NOT touch:** PAN-2499, PAN-1491/2214, PAN-2702 (operator-only), order book, PAN-2377.
+
+**Filed this session:** PAN-2733 (poller never ran, 49,907 fails), PAN-2734 (merge-queue zombie, 294
+boots), PAN-2735 (LANDED), PAN-2738 (strike rebase deadlock), PAN-2739 (first-completion nudge dead).
+**Phase 2 readiness is in reach** once 2710 + 2598 land → verify main green, deploy, REPORT + SUGGEST
+the cut. **OPERATOR CUTS; NEVER TAG.**

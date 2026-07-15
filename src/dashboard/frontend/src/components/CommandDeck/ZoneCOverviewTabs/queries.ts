@@ -76,6 +76,11 @@ export interface ActivitySection {
   tmuxSession?: string;
   role?: string;
   roundMetadata?: ReviewerRoundMetadata;
+  endedAt?: string | null;
+  planningComplete?: boolean;
+  awaitingInput?: boolean;
+  awaitingInputPrompt?: string;
+  awaitingInputReason?: string;
 }
 
 export interface ActivityResponse {

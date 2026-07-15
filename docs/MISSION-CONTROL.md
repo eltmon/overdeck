@@ -37,6 +37,36 @@ When you click a feature, the main panel shows all agent sessions unified into o
 
 **Section Isolation Mode**: Click a section header to view it full-screen. Press `Esc` or use the browser back button to return. The isolated view includes model display and a prominent keyboard hint.
 
+## Issue cockpit data sources
+
+The issue cockpit (the per-issue Mission Control view) builds its session tree from
+three layers, in order:
+
+1. **`/api/session-trees` (primary)** — harness-carrying nodes from the server-side
+   session tree resolver. This is the richest source: it knows each session's
+   harness, tmux session, and runtime state.
+2. **Activity sections fallback** — when the session-trees endpoint returns a
+   feature but no tree sessions, the cockpit falls back to the activity-derived
+   sessions (`/api/command-deck/activity/:issueId`). This keeps live planning and
+   work agents visible when only their activity section exists.
+3. **Resource-allocated deep-link fallback** — when the cockpit is opened on an
+   `?issue=` deep-link without a project name, it resolves the project from the
+   resource-allocated list and still attempts the session-trees + activity lookup.
+
+The phase banner's "writing code" headline is driven by a live work section
+(`type === 'work' && status === 'running'`) from the activity feed, not by the
+presence of a plan or review row.
+
+## Session end gating in the activity feed
+
+`HappenedFeed` renders a "finished the plan" line only when a planning section has
+both `endedAt` set and `planningComplete === true`. A planning session that ends
+without completing the plan renders a neutral "stopped planning" line instead, so
+operators are not told a plan is done while the agent is still thinking or blocked.
+Other session types render their done-line whenever `endedAt` is present. Live
+sections with `awaitingInput === true` render a "Waiting on you to answer a
+question" attention line.
+
 ### Badge Bar
 
 Quick-access badges appear below the feature header:

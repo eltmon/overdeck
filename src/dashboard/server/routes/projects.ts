@@ -45,7 +45,8 @@ import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
-import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
+import { isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
@@ -129,6 +130,16 @@ function escapeRegExp(value: string): string {
 
 function getSlotWorkSessionPattern(issueLower: string): RegExp {
   return new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`, 'i');
+}
+
+function issueIdsWithLiveTmuxSessions(sessionNames: ReadonlySet<string>): Set<string> {
+  const issueIds = new Set<string>();
+  for (const sessionName of sessionNames) {
+    const match = /^(?:planning|strike)-([a-z]+-\d+)$|^agent-([a-z]+-\d+)(?:-plan)?$/i.exec(sessionName);
+    const issueId = match?.[1] ?? match?.[2];
+    if (issueId) issueIds.add(issueId.toLowerCase());
+  }
+  return issueIds;
 }
 
 export function getSlotWorkSessionNumber(sessionId: string, issueLower: string): number | null {
@@ -215,13 +226,25 @@ async function collectSessionTreeNodes(
   const agentsDir = join(getOverdeckHome(), 'agents');
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;
+  const planRunAgentId = `agent-${issueLower}-plan`;
   const strikeAgentId = `strike-${issueLower}`;
   const knowledgeAgentId = `agent-${issueLower}-knowledge`;
   const slotWorkSessionPattern = getSlotWorkSessionPattern(issueLower);
   const sections: SessionNode[] = [];
   let hasPlanningSection = false;
 
-  const candidateSessionIds = new Set<string>([planningAgentId, agentId, strikeAgentId, knowledgeAgentId]);
+  // Resolve once per request: canonical spec exists and planning has finished.
+  const planningFinished = await Effect.runPromise(
+    isPlanningComplete(workspacePath).pipe(Effect.orElseSucceed(() => false)),
+  );
+
+  const candidateSessionIds = new Set<string>([
+    planningAgentId,
+    agentId,
+    planRunAgentId,
+    strikeAgentId,
+    knowledgeAgentId,
+  ]);
   const agentEntries = await readdir(agentsDir, { withFileTypes: true }).catch(() => []);
 
   for (const entry of agentEntries) {
@@ -244,7 +267,7 @@ async function collectSessionTreeNodes(
     if (!state) continue;
 
     try {
-      const isPlanning = checkId.startsWith('planning-');
+      const isPlanning = checkId.startsWith('planning-') || state.role === 'plan';
       const isStrike = checkId.startsWith('strike-');
       const sectionType: SessionNodeType = isPlanning
         ? 'planning'
@@ -264,13 +287,24 @@ async function collectSessionTreeNodes(
           : null;
       const sessionWorkspacePath = getSessionTreeWorkspacePath(issueLower, workspacePath, projectPath, checkId);
       const jsonlPath = await resolveJsonlPath(checkId, sessionWorkspacePath);
+
+      // Terminal-end signal: endedAt is populated only when the session has
+      // actually ended. duration is preserved as elapsed seconds for existing UI.
+      const tmuxAlive = context.tmuxSessionNames.has(checkId);
+      const sessionEnded = rtState?.state === 'suspended'
+        || presence === 'ended'
+        || (!!state.stoppedAt && !tmuxAlive);
+      const endedAt = sessionEnded
+        ? (state.stoppedAt || state.lastActivity || state.startedAt)
+        : undefined;
+
       sections.push({
         type: sectionType,
         sessionId: checkId,
         tmuxSession: sectionType === 'work' || sectionType === 'planning' || sectionType === 'strike' || sectionType === 'knowledge' ? checkId : undefined,
         model: state.model || 'unknown',
         startedAt: state.startedAt || new Date().toISOString(),
-        endedAt: undefined,
+        endedAt,
         duration: state.startedAt
           ? (() => {
               const ms = Date.now() - new Date(state.startedAt).getTime();
@@ -291,10 +325,43 @@ async function collectSessionTreeNodes(
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         deliveryMethod: state.deliveryMethod,
+        planningComplete: isPlanning ? planningFinished : undefined,
         ...await readSessionGateFields(checkId, state),
       });
     } catch {
       // skip malformed state
+    }
+  }
+
+  // Synthesize a planning node for a live tmux planning session even when the
+  // agent state dir is missing or unreadable. This catches the PAN-2597 case
+  // where only planning-<issue> (or agent-<issue>-plan) exists in tmux.
+  if (!hasPlanningSection) {
+    const planningTmuxId = context.tmuxSessionNames.has(planningAgentId)
+      ? planningAgentId
+      : context.tmuxSessionNames.has(planRunAgentId)
+        ? planRunAgentId
+        : null;
+    if (planningTmuxId) {
+      const jsonlPath = await resolveJsonlPath(planningTmuxId, workspacePath);
+      const jsonlStat = jsonlPath ? await stat(jsonlPath).catch(() => null) : null;
+      const stableStartedAt = jsonlStat
+        ? (jsonlStat.birthtimeMs > 0 ? jsonlStat.birthtime : jsonlStat.mtime).toISOString()
+        : new Date(0).toISOString();
+      const presence = await deriveSessionPresence(planningTmuxId, null, context.tmuxSessionNames);
+      sections.push({
+        type: 'planning',
+        sessionId: planningTmuxId,
+        model: 'unknown',
+        startedAt: stableStartedAt,
+        duration: null,
+        status: 'running',
+        presence,
+        hasJsonl: !!jsonlPath,
+        tmuxSession: planningTmuxId,
+        planningComplete: planningFinished,
+      });
+      hasPlanningSection = true;
     }
   }
 
@@ -532,6 +599,7 @@ export async function fetchProjectSessionTree(
   // Reuse shared request-scoped data when provided; otherwise fetch lazily.
   const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
     ?? new Set((await Effect.runPromise(listSessionNames()).catch(() => [] as string[])).filter(s => s.trim()));
+  const liveTmuxIssueIds = issueIdsWithLiveTmuxSessions(sharedTmuxSessionNames);
 
   const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
@@ -559,16 +627,24 @@ export async function fetchProjectSessionTree(
     const results = await Effect.runPromise(withConcurrencyLimit(
       featureCandidates.map((c) => Effect.promise(async () => {
         const agentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}`);
+        const planningAgentDir = join(getOverdeckHome(), 'agents', `planning-${c.issueLower}`);
+        const planRunAgentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}-plan`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
-        const [hasAgent, hasPlanning] = await Promise.all([
+        const overdeckDir = join(workspacesDir, c.name, WORKSPACE_RUNTIME_DIRNAME);
+        const hasIssueTmux = liveTmuxIssueIds.has(c.issueLower);
+        const [hasAgent, hasPlanning, hasPlanningAgent, hasPlanRunAgent, hasOverdeck] = await Promise.all([
           pathExists(agentDir),
           pathExists(panDir),
+          pathExists(planningAgentDir),
+          pathExists(planRunAgentDir),
+          pathExists(overdeckDir),
         ]);
-        if (!hasAgent && !hasPlanning) return null;
+        const hasAnySignal = hasAgent || hasPlanning || hasPlanningAgent || hasPlanRunAgent || hasOverdeck || hasIssueTmux;
+        if (!hasAnySignal) return null;
         try {
           const workspacePath = join(workspacesDir, c.name);
           const sessions = await collectSessionTreeNodes(c.issueId, workspacePath, projectPath, effectiveSharedContext);
-          if (sessions.length === 0) return null;
+          if (sessions.length === 0 && !hasAnySignal) return null;
           const title = await resolveFeatureTitle(c.issueId, c.issueLower, issueTitles, project);
           return { issueId: c.issueId, title, sessions };
         } catch (err) {

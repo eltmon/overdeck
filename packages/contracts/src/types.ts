@@ -601,6 +601,7 @@ export const SessionNode = Schema.Struct({
   harness: Schema.optional(Schema.String),
   startedAt: Schema.String,
   endedAt: Schema.optional(Schema.String),
+  planningComplete: Schema.optional(Schema.Boolean),
   duration: Schema.NullOr(Schema.Number),
   status: AgentStatus,
   hasJsonl: Schema.optional(Schema.Boolean),
