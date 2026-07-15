@@ -1125,7 +1125,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-15T04:33:39.334Z",
+  "updated": "2026-07-15T04:33:45.955Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "pending",
@@ -1259,5 +1259,6 @@
     "finalizedAt": "2026-07-13T15:43:21.416Z"
   },
   "reviewMode": "full",
-  "reReviewScope": "changed"
+  "reReviewScope": "changed",
+  "reviewModel": "gpt-5.6-sol"
 }
