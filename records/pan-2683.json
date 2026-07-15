@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:57:44.871Z",
+  "updated": "2026-07-15T09:57:51.723Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
@@ -202,5 +202,26 @@
     "docs-tiered-execution": "completed",
     "docs-tiered-execution.docs-tiered-execution.ac1": "completed",
     "docs-tiered-execution.docs-tiered-execution.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/agents/__tests__/tier-table.test.ts",
+      "src/lib/agents/tier-table.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/TIERED-EXECUTION.md",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/agents/__tests__/tier-table.test.ts",
+      "src/lib/agents/tier-table.ts"
+    ],
+    "recordedAt": "2026-07-15T09:57:51.722Z"
   }
 }
