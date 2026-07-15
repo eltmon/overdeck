@@ -459,15 +459,7 @@
       "timestamp": "2026-07-15T16:59:24.442Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T16:59:24Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2597\n\n# Review Synthesis — PAN-2597 — 2026-07-15T16:58:06.871Z\n\n## Verdict: CHANGES REQUESTED — security reviewer failed and three ready reports are missing\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/context.json`\n- Branch: `feature/pan-2597`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597`\n- HEAD reviewed: `061ab6e83411b3c06f9bcbf9c99a8c269c5d1c00`\n- Cycle number: 14\n- Prior cycle SHA: `0cd815c68ec8b8826949db4d9789f4f5593fb3fc`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed: role run already running | — | infrastructure failure |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/correctness.md` (missing) | unreadable report |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/performance.md` (missing) | unreadable report |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/requirements.md` (missing) | unreadable report |\n\n## Blocking Findings\n\n### [security] Reviewer infrastructure failure\nThe security sub-role emitted `REVIEWER_FAILED` with `Role run agent-pan-2597-review-security already running`. Review policy forbids approval when any reviewer fails or times out.\n\n### [correctness] Ready report is missing\nThe correctness sub-role emitted `REVIEWER_READY`, but its referenced output file does not exist. A missing, empty, or unreadable ready report is blocking.\n\n### [performance] Ready report is missing\nThe performance sub-role emitted `REVIEWER_READY`, but its referenced output file does not exist. A missing, empty, or unreadable ready report is blocking.\n\n### [requirements] Ready report is missing\nThe requirements sub-role emitted `REVIEWER_READY`, but its referenced output file does not exist. A missing, empty, or unreadable ready report is blocking.\n\n## Non-blocking Findings\nNone available. The completed reviewer reports could not be read.\n\n## Clean Sub-roles\nNone. Security failed, and the other three sub-roles did not leave readable reports in the active review directory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/.pan/review/agent-pan-2597-review-061ab6e8/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2597 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/circular-deps-baseline.txt",
@@ -590,22 +582,22 @@
     "recordedAt": "2026-07-15T14:19:56.585Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T16:59:51.238Z",
+  "updated": "2026-07-15T17:00:12.175Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:59:51.189Z",
+    "updatedAt": "2026-07-15T17:00:12.106Z",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "lastVerifiedCommit": "061ab6e83411b3c06f9bcbf9c99a8c269c5d1c00",
     "reviewRequestedAt": "2026-07-15T16:58:00.173Z",
-    "reviewSpawnedAt": "2026-07-15T16:58:05.605Z",
+    "reviewSpawnedAt": "2026-07-15T17:00:12.105Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/circular-deps-baseline.txt",
@@ -733,9 +725,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 24795356,
-            "output": 27655,
-            "cacheRead": 23093632,
+            "input": 24888492,
+            "output": 27733,
+            "cacheRead": 23101184,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -745,9 +737,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 83099366,
-            "output": 161469,
-            "cacheRead": 79759104,
+            "input": 84038141,
+            "output": 163201,
+            "cacheRead": 80484608,
             "cacheWrite": 0
           }
         },
@@ -786,9 +778,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 24795356,
-          "output": 27655,
-          "cacheRead": 23093632,
+          "input": 24888492,
+          "output": 27733,
+          "cacheRead": 23101184,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -798,9 +790,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 83099366,
-          "output": 161469,
-          "cacheRead": 79759104,
+          "input": 84038141,
+          "output": 163201,
+          "cacheRead": 80484608,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -817,8 +809,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 239.592992,
-        "pricingAsOf": "2026-07-15T16:59:51.232Z"
+        "usd": 241.074059,
+        "pricingAsOf": "2026-07-15T17:00:12.157Z"
       }
     },
     "merges": [
