@@ -1,0 +1,432 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-15T12:53:44.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2702: Strike agents should land on main without requiring the Flywheel — deacon-owned strike merge handoff",
+    "updated": "2026-07-15T12:58:43.965Z"
+  },
+  "plan": {
+    "id": "pan-2702",
+    "title": "Strike agents should land on main without requiring the Flywheel — deacon-owned strike merge handoff",
+    "status": "proposed",
+    "uid": "8ba3e958-9adc-4948-8c4d-c30f49cdd8cd",
+    "author": "agent:gpt-5.6-sol",
+    "sequence": 2,
+    "created": "2026-07-15T12:53:44.000Z",
+    "updated": "2026-07-15T12:58:43.965Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2702",
+        "label": "PAN-2702",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "strike",
+      "deacon",
+      "merge",
+      "recovery"
+    ],
+    "narratives": {
+      "Problem": "Strike agents finish with a pushed, verified strike branch but signal readiness only to the optional Flywheel session, so finished emergency fixes can remain unmerged for hours when Flywheel is absent.",
+      "Proposal": "Persist a strike-ready remote HEAD through the canonical pipeline writer, have Deacon claim it and invoke the existing server merge door with explicit strike context, and re-drive the warm strike agent on actionable conflicts or gate failures for up to three fresh-HEAD cycles before needs-you escalation.",
+      "NonGoals": "- Do not change the normal review → test → UAT → human/auto-merge lane or its eligibility rules.\n- Do not exempt `agent-*` or `strike-*` identities from the main-push guard.\n- Do not create a second merge implementation, direct local-main push path, or separate task/state store.\n- Do not make Flywheel required for strike landing or assign it sole ownership of the marker.\n- Do not change repository-wide forge merge method/history policy.\n- Do not restart the live dashboard server during implementation verification."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Use a dedicated `pan strike-ready <id>` signal instead of overloading `pan done --strike` or parsing readiness text.",
+        "rationale": "The existing `--strike` form means post-merge completion, while a dedicated command can validate branch identity and persist an unambiguous machine-readable event."
+      },
+      {
+        "summary": "Use three self-recovery cycles and require a new remote strike HEAD for each retry.",
+        "rationale": "Three matches the issue's suggested bounded range and prevents repeated patrols from consuming budget without new agent work."
+      },
+      {
+        "summary": "Reuse triggerMerge and its forge merge semantics rather than changing the global merge method.",
+        "rationale": "The requirement prioritizes the existing verified merge door and revertibility; changing normal history policy would exceed the strike-lane scope."
+      }
+    ],
+    "items": [
+      {
+        "id": "persist-strike-ready",
+        "title": "Persist an authenticated strike-ready signal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T12:53:44.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2702",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "merge-strike-through-door",
+            "patrol-strike-landings",
+            "redrive-failed-strikes"
+          ],
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/strike-ready.ts",
+            "src/cli/commands/__tests__/strike-ready.test.ts",
+            "src/lib/review-status.ts",
+            "src/lib/overdeck/review-status-sync.ts",
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "src/lib/database/schema.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "tests/dashboard/review-status.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/cli/commands/__tests__/strike-ready.test.ts tests/dashboard/review-status.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "strike-ready command and durable round-trip tests pass",
+            "TypeScript completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `pan strike-ready <issueId>` as the only strike completion signal. The command must resolve the configured project, require the current workspace/registered worktree to be `workspaces/feature-<issue>-strike` on `strike/<issue>`, fetch `origin/strike/<issue>`, require the local committed HEAD to equal the pushed remote HEAD, and write the marker through `setReviewStatusSync` (never direct DB/state access). Extend ReviewStatus, SQLite schema/migrations and sync mapping, durable status subset, PanIssuePipelineRecord, and record projection with: signaled remote HEAD, ready timestamp, landing state (`ready|landing|recovering|landed|needs_you`), recovery cycle count, and structured attempt history containing timestamp, strike HEAD, main HEAD, outcome, and detail. A new signal for a new HEAD resets landing state to ready but preserves prior attempt history; an identical HEAD signal is idempotent and must not consume recovery budget. Update `src/cli/commands/strike.ts` prompt and `roles/strike.md` to invoke this command after gates/push and remove Flywheel tell/comment fallback. Do not modify the main-push guard."
+        },
+        "items": [
+          {
+            "id": "persist-strike-ready.ac1",
+            "title": "Given a committed strike branch whose local and remote HEADs match, `pan strike-ready PAN-2702` persists that HEAD and produces landing state `ready` through the canonical writer.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-strike-ready.ac2",
+            "title": "Given a non-strike workspace, wrong branch, dirty/unpushed commit, or mismatched remote HEAD, the command rejects the signal and preserves the prior durable marker.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-strike-ready.ac3",
+            "title": "Given the same pushed HEAD is signaled twice, the writer preserves one readiness cycle and does not increment recovery count or duplicate attempt history.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "persist-strike-ready.ac4",
+            "title": "A cache rebuild from the issue record restores the strike readiness HEAD, landing state, recovery count, and attempt history without loss.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-strike-through-door",
+        "title": "Route strike branches through the canonical merge door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T12:53:44.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-2702",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "patrol-strike-landings",
+            "redrive-failed-strikes"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/merge-ops.ts",
+            "src/dashboard/server/services/auto-merge-executor.ts",
+            "tests/unit/dashboard/server/routes/strike-merge.test.ts",
+            "tests/unit/dashboard/server/routes/no-op-rebase.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/server/routes/strike-merge.test.ts tests/unit/dashboard/server/routes/no-op-rebase.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "strike merge-door and normal eligibility regression tests pass",
+            "TypeScript completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Refactor `triggerMerge(issueId)` to accept an optional discriminated strike request carrying the marker HEAD, strike workspace, `strike/<issue>` branch, and `strike-<issue>` recovery target. The normal/default call must retain every existing review/test/UAT/readyForMerge check. The strike call is eligible only when the durable landing state is `ready`, the recorded HEAD still equals `origin/strike/<issue>`, and the workspace/branch identity matches. Reuse the persistent per-project merge queue, `_serverManagedMerges`, PR creation, post-rebase quality gates, forge adapter merge, and `postMergeLifecycle(issueId, projectPath, branchName)`; do not add a local main push or bypass verification. Parameterize the current work-agent rebase handoff so the strike lane addresses the warm strike session and instructs it to re-signal after pushing. Preserve the existing forge merge method. Add a focused no-loss matrix proving all pre-existing normal triggerMerge gates and outcomes remain unchanged."
+        },
+        "items": [
+          {
+            "id": "merge-strike-through-door.ac1",
+            "title": "Given a valid durable strike marker, the merge door resolves `feature-<issue>-strike` and `strike/<issue>`, runs the configured post-rebase gates, merges through the forge adapter, and invokes postMergeLifecycle with the strike branch.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-strike-through-door.ac2",
+            "title": "Given the marker HEAD differs from `origin/strike/<issue>`, the strike merge request rejects before PR creation, verification, or merge and records the concrete stale-signal reason.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-strike-through-door.ac3",
+            "title": "Given a normal pipeline call, every prior review, test, UAT, queue, and already-merging eligibility outcome is preserved by the no-loss audit test.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-strike-through-door.ac4",
+            "title": "The main-push guard rejects direct `main` pushes from both agent and strike identities after the merge-door refactor.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "patrol-strike-landings",
+        "title": "Consume ready strikes from the Deacon patrol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T12:53:44.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2702",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-strike-landing.ts",
+            "src/lib/cloister/deacon.ts",
+            "tests/lib/cloister/deacon-strike-landing.test.ts",
+            "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/lib/cloister/deacon-strike-landing.test.ts tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "Deacon strike landing and patrol ordering tests pass",
+            "TypeScript completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a focused Deacon patrol helper that reads strike markers through the canonical review-status resolver, skips ignored/stuck/terminal/non-ready entries, atomically changes the matching HEAD from `ready` to `landing` through the writer before external work, and invokes the strike form of `triggerMerge`. Wire it into `runPatrol()` once per configured patrol interval. Treat a queued/in-progress/already-merged result as an idempotent observation, and mark successful completion `landed` without starting a second lifecycle. A Flywheel caller that observes the same marker must converge through the shared merge queue/landing state rather than double-merge. Use injected dependencies in unit tests and fake timers for cadence behavior."
+        },
+        "items": [
+          {
+            "id": "patrol-strike-landings.ac1",
+            "title": "Given Flywheel is absent and a strike marker is ready, the next Deacon patrol claims it and invokes the canonical strike merge door.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-strike-landings.ac2",
+            "title": "Given two observers race on the same signaled HEAD, exactly one claim starts merge work and the other observes landing, queued, or terminal state without issuing a second merge.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "patrol-strike-landings.ac3",
+            "title": "Given a successful merge result, the patrol persists landing state `landed`, clears readiness, and produces one action message naming the issue and merged strike HEAD.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "redrive-failed-strikes",
+        "title": "Re-drive actionable strike landing failures",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-15T12:53:44.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-2702",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-strike-landing.ts",
+            "src/lib/cloister/feedback-target.ts",
+            "src/lib/cloister/feedback-writer.ts",
+            "tests/lib/cloister/deacon-strike-landing.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/lib/cloister/deacon-strike-landing.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "bounded strike recovery and needs-you tests pass using fake timers",
+            "TypeScript completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Classify strike merge failures into agent-actionable (main moved, rebase conflict, stale marker, drifted anchors, branch/CI or configured gate failure) and non-actionable (merge guard refusal, missing project/integration permission, unavailable infrastructure). For an actionable failure below the three-cycle budget, append an attempt containing old strike HEAD, current main SHA, conflict files or failed check output, transition to `recovering`, and deliver a complete recovery request to `strike-<issue>` using async message delivery/resurrection without overriding an operator pause. The request must tell the strike to fetch/rebase current main, resolve, rerun configured gates, push only `strike/<issue>`, and run `pan strike-ready <issue>` again. Do not retry until a fresh remote HEAD signal arrives. For a non-actionable failure, failed delivery, or exhausted third cycle, persist `needs_you`, write feedback, and call the existing needs-you/stuck surface once with the full ordered attempt history."
+        },
+        "items": [
+          {
+            "id": "redrive-failed-strikes.ac1",
+            "title": "Given main moved and the strike branch conflicts, the patrol appends the conflict files and new main SHA, delivers them to `strike-<issue>`, and produces landing state `recovering` without emitting needs-you.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "redrive-failed-strikes.ac2",
+            "title": "Given the strike pushes and signals a fresh HEAD after recovery, the next patrol accepts the new cycle and can produce landing state `landed` without operator involvement.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "redrive-failed-strikes.ac3",
+            "title": "Given the same HEAD is re-signaled or no fresh signal arrives, later patrols preserve the recovery count and do not rerun merge work or resend recovery feedback.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "redrive-failed-strikes.ac4",
+            "title": "Given three actionable cycles fail, or a non-actionable failure occurs, the system emits needs-you exactly once and includes every attempted HEAD, main SHA, failed check/conflict, and delivery outcome.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "document-strike-landing",
+        "title": "Document Deacon-owned strike landing",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-15T12:53:44.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2702",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/QUICK-REFERENCE.md",
+            "docs/SPECIALIST_WORKFLOW.md",
+            "roles/strike.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint:prompts",
+            "npm run lint:skills",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "prompt and skill lint complete without errors",
+            "TypeScript completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Update `docs/QUICK-REFERENCE.md` and the strike/merge sections of `docs/SPECIALIST_WORKFLOW.md` to define the full operator-visible lane: the strike pushes only its strike branch, `pan strike-ready` durably hands ownership to Deacon, Deacon uses the existing verified merge queue without Flywheel, actionable failures return to the warm strike session for three fresh-HEAD cycles, and needs-you is the terminal escalation with attempt history. Ensure `pan --help`/command description and `roles/strike.md` use the same terminology and remove claims that the spawner/Flywheel must land the branch."
+        },
+        "items": [
+          {
+            "id": "document-strike-landing.ac1",
+            "title": "The quick reference produces a `pan strike-ready <id>` entry that states Deacon lands the pushed strike branch through the verified merge door without Flywheel.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "document-strike-landing.ac2",
+            "title": "The specialist workflow produces a recovery section that describes three fresh-HEAD cycles and states that needs-you includes ordered failure history after recovery is exhausted or impossible.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "persist-strike-ready",
+        "to": "merge-strike-through-door",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-strike-through-door",
+        "to": "patrol-strike-landings",
+        "type": "blocks"
+      },
+      {
+        "from": "patrol-strike-landings",
+        "to": "redrive-failed-strikes",
+        "type": "blocks"
+      },
+      {
+        "from": "redrive-failed-strikes",
+        "to": "document-strike-landing",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-15-PAN-2702-strike-agents-should-land-on-main-without-requiring-the-flywheel-deacon-owned-strike-merge-handoff.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
