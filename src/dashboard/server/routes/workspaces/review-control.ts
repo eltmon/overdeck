@@ -47,6 +47,14 @@ import {
 
 const execAsync = promisify(exec);
 
+function resolveConfiguredReviewModel(): string | null {
+  try {
+    return resolveModel('review');
+  } catch {
+    return null;
+  }
+}
+
 export type ResetReviewResult =
   | { httpStatus: 400; body: { success: false; error: string } }
   | {
@@ -623,7 +631,7 @@ const getReviewConfigRoute = HttpRouter.add(
       return {
         issueId,
         override: { reviewMode: record?.reviewMode ?? null, reReviewScope: record?.reReviewScope ?? null, reviewModel: record?.reviewModel ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record?.reviewModel ?? resolveModel('review') },
+        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record?.reviewModel ?? resolveConfiguredReviewModel() },
       };
     });
     return jsonResponse(result);
@@ -683,7 +691,7 @@ const postReviewConfigRoute = HttpRouter.add(
         success: true,
         issueId,
         override: { reviewMode: record.reviewMode ?? null, reReviewScope: record.reReviewScope ?? null, reviewModel: record.reviewModel ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record.reviewModel ?? resolveModel('review') },
+        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record.reviewModel ?? resolveConfiguredReviewModel() },
       };
     });
     return jsonResponse(result);

@@ -7,7 +7,7 @@ type SwarmMode = 'off' | 'auto' | 'always';
 
 interface ReviewConfigResponse {
   override: { reviewMode: ReviewModeValue | null; reReviewScope: ReReviewScopeValue | null; reviewModel: string | null };
-  resolved: { reviewMode: ReviewModeValue; reReviewScope: ReReviewScopeValue; reviewModel: string };
+  resolved: { reviewMode: ReviewModeValue; reReviewScope: ReReviewScopeValue; reviewModel: string | null };
 }
 
 interface StaffingResponse {
@@ -121,7 +121,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
           </select>
         )}
         <select aria-label="Review model for this issue" className={`${selectClass} ${review.override.reviewModel ? 'border-primary' : 'border-border'}`} disabled={saving} value={review.override.reviewModel ?? ''} onChange={(event) => save(`/api/review/${encoded}/config`, { reviewModel: event.target.value || null })}>
-          <option value="">{`reviewers: default (${review.resolved.reviewModel})`}</option>
+          <option value="">{`reviewers: default (${review.resolved.reviewModel ?? 'unconfigured'})`}</option>
           {models.map((model) => <option key={model.id} value={model.id}>{`reviewers: ${model.name}`}</option>)}
         </select>
         <select aria-label="Work model for this issue" className={`${selectClass} ${staffing.override.workModel ? 'border-primary' : 'border-border'}`} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
