@@ -90,22 +90,21 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:46:08.126Z",
+  "updated": "2026-07-15T11:48:11.938Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T11:46:08.079Z",
-    "reviewNotes": "Kind-only crew handling can emit invalid configuration or silently delete routed work.",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (13754ms):\n\nsrc/components/Settings/sections/TieredExecutionSection.tsx(109,5): error TS2322: Type 'TieredExecutionConfig' is not assignable to type '{ by_kind: Partial<Record<VBriefItemKind, string>>; enabled: boolean; tiers: Record<string, { model: ModelId; harness: Harness; difficulties: VBriefDifficulty[]; distribution?: Array<{ model: ModelId; harness: Harness; weight: number; }>; }>; ... 6 more ...; difficultyToTier?: Partial<Record<VBriefDifficulty, string...'.\n  Types of property 'by_kind' are incompatible.\n    Type 'Partial<Record<VBriefItemKind, string>> | undefined' is not assignable to type 'Partial<Record<VBriefItemKind, string>>'.\n      Type 'undefined' is not assignable to type 'Partial<Record<VBriefItemKind, string>>'.\n",
+    "updatedAt": "2026-07-15T11:48:11.898Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed frontend-typecheck",
     "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2694",
-    "lastVerifiedCommit": "5975f975e47524c4553d6159c295b7ea013adfac",
+    "lastVerifiedCommit": "3a142de8150351c3102897ad1168a7239d717b98",
     "reviewRequestedAt": "2026-07-15T10:08:49.814Z",
     "reviewSpawnedAt": "2026-07-15T11:31:51.827Z",
     "scopeDrift": {
@@ -135,15 +134,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2565438,
-            "output": 5287,
-            "cacheRead": 1968128,
+            "input": 2788368,
+            "output": 5531,
+            "cacheRead": 2187904,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 49488241,
-            "output": 82867,
-            "cacheRead": 48233984,
+            "input": 50517848,
+            "output": 83480,
+            "cacheRead": 49256960,
             "cacheWrite": 0
           }
         },
@@ -166,15 +165,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2565438,
-          "output": 5287,
-          "cacheRead": 1968128,
+          "input": 2788368,
+          "output": 5531,
+          "cacheRead": 2187904,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 49488241,
-          "output": 82867,
-          "cacheRead": 48233984,
+          "input": 50517848,
+          "output": 83480,
+          "cacheRead": 49256960,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -191,8 +190,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 38.722117,
-        "pricingAsOf": "2026-07-15T11:46:08.117Z"
+        "usd": 39.28515,
+        "pricingAsOf": "2026-07-15T11:48:11.934Z"
       }
     },
     "merges": [
