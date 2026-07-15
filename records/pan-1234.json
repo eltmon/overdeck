@@ -131,11 +131,16 @@
       "timestamp": "2026-07-15T15:13:16.709Z",
       "reason": "end",
       "note": "Fixed review and verification findings: canonical direct-route drawer close, exact pending-question contract, computed Space Grotesk browser assertions, required route regression location, and circular dependency lint failure."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T15:14:04.198Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:14:03.014Z",
+  "updated": "2026-07-15T15:14:04.216Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "reviewing",
@@ -219,7 +224,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "conformance-test-strengthen": "completed",
     "conformance-test-strengthen.ac1": "completed",
