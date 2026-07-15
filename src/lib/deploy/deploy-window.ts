@@ -7,6 +7,7 @@ import {
   readDevSupervisorMarker,
   type DevSupervisorMarker,
 } from '../dev-supervisor.js';
+import { getFlywheelActiveRunId } from '../overdeck/control-settings.js';
 import { getOverdeckHome } from '../paths.js';
 import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
 import { readRestartLockHolder, type RestartLockHolder } from '../restart-lock.js';
@@ -14,6 +15,7 @@ import { sessionExists } from '../tmux.js';
 
 interface DeployWindowDependencies {
   readonly loadReviewStatuses: () => Record<string, ReviewStatus>;
+  readonly getFlywheelActiveRunId: () => string | null;
   readonly isMergeAgentRunning: () => Promise<boolean>;
   readonly pendingPostMergeExists: () => Promise<boolean>;
   readonly readRestartLockHolder: () => Promise<RestartLockHolder | null>;
@@ -22,6 +24,7 @@ interface DeployWindowDependencies {
 
 const defaultDependencies: DeployWindowDependencies = {
   loadReviewStatuses,
+  getFlywheelActiveRunId,
   isMergeAgentRunning: () => Effect.runPromise(sessionExists('specialist-merge-agent')),
   pendingPostMergeExists: async () => {
     try {
@@ -46,6 +49,11 @@ export async function getDeployBlockReason(
 
   if (verifyingIssues.length > 0) {
     return `Deployment deferred because verification is in flight for ${verifyingIssues.join(', ')}.`;
+  }
+
+  const activeFlywheelRunId = deps.getFlywheelActiveRunId();
+  if (activeFlywheelRunId) {
+    return `Deployment deferred because flywheel run ${activeFlywheelRunId} owns deployment.`;
   }
 
   if (await deps.isMergeAgentRunning()) {

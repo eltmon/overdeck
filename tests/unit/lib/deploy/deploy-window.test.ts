@@ -5,6 +5,7 @@ import { getDeployBlockReason } from '../../../../src/lib/deploy/deploy-window.j
 function clearDependencies() {
   return {
     loadReviewStatuses: vi.fn(() => ({})),
+    getFlywheelActiveRunId: vi.fn(() => null as string | null),
     isMergeAgentRunning: vi.fn(async () => false),
     pendingPostMergeExists: vi.fn(async () => false),
     readRestartLockHolder: vi.fn(async () => null),
@@ -34,6 +35,16 @@ describe('getDeployBlockReason', () => {
     await expect(getDeployBlockReason(deps)).resolves.toBe(
       'Deployment deferred because a merge specialist session is active.',
     );
+  });
+
+  it('defers deployment to an active flywheel run', async () => {
+    const deps = clearDependencies();
+    deps.getFlywheelActiveRunId.mockReturnValue('RUN-42');
+
+    await expect(getDeployBlockReason(deps)).resolves.toBe(
+      'Deployment deferred because flywheel run RUN-42 owns deployment.',
+    );
+    expect(deps.isMergeAgentRunning).not.toHaveBeenCalled();
   });
 
   it('blocks while the post-merge lifecycle is pending', async () => {
