@@ -137,9 +137,10 @@ it('prunes issue throttles when candidates disappear', async () => {
 
   await __tickOnceForTests();
   expect(mocks.prHead).toHaveBeenCalledTimes(2);
+  expect(mocks.rerun).toHaveBeenCalledTimes(2);
 });
 
-it('expires run-id deduplication state after its retention window', async () => {
+it('does not retry a failed rerun command after the retention window', async () => {
   const log = vi.spyOn(console, 'log').mockImplementation(() => {});
   mocks.rerun.mockResolvedValue(false);
   await __tickOnceForTests();
@@ -147,7 +148,7 @@ it('expires run-id deduplication state after its retention window', async () => 
   vi.advanceTimersByTime(24 * 60 * 60_000 + 1);
   await __tickOnceForTests();
 
-  expect(mocks.rerun).toHaveBeenCalledTimes(2);
+  expect(mocks.rerun).toHaveBeenCalledTimes(1);
   expect(log).not.toHaveBeenCalledWith(expect.stringContaining('skipping run 10'));
 });
 

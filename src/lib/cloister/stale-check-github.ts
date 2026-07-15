@@ -35,7 +35,8 @@ export async function listPrHeadFailingRuns(
 ): Promise<WorkflowRun[]> {
   try {
     const runs = JSON.parse(await execGh([
-      'run', 'list', '--repo', repo, '--branch', headRef, '--status', 'completed', '--json', RUN_FIELDS,
+      'run', 'list', '--repo', repo, '--branch', headRef, '--commit', headSha,
+      '--status', 'completed', '--limit', '100', '--json', RUN_FIELDS,
     ])) as WorkflowRun[];
     return runs.filter((run) =>
       run.headSha === headSha

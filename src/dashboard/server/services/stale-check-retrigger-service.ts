@@ -10,11 +10,12 @@ import {
 
 interface PrRef { repo: string; number: number }
 interface CachedWindows { probedAt: number; windows: Map<string, RedWindow[]> }
+interface AttemptedRun { recordedAt: number; issueId: string; commandFailed: boolean }
 interface ServiceState {
   timer: ReturnType<typeof setInterval> | null;
   repoWindows: Map<string, CachedWindows>;
   lastEvaluated: Map<string, number>;
-  attemptedRunIds: Map<number, number>;
+  attemptedRunIds: Map<number, AttemptedRun>;
   loggedSkips: Map<number, number>;
   inFlight: boolean;
 }
@@ -41,8 +42,11 @@ function pruneState(state: ServiceState, issueIds: Set<string>, repos: Set<strin
   for (const repo of state.repoWindows.keys()) {
     if (!repos.has(repo)) state.repoWindows.delete(repo);
   }
-  for (const [runId, recordedAt] of state.attemptedRunIds) {
-    if (now - recordedAt >= RUN_STATE_RETENTION_MS) state.attemptedRunIds.delete(runId);
+  for (const [runId, attempt] of state.attemptedRunIds) {
+    if (!issueIds.has(attempt.issueId)
+      || (!attempt.commandFailed && now - attempt.recordedAt >= RUN_STATE_RETENTION_MS)) {
+      state.attemptedRunIds.delete(runId);
+    }
   }
   for (const [runId, recordedAt] of state.loggedSkips) {
     if (now - recordedAt >= RUN_STATE_RETENTION_MS) state.loggedSkips.delete(runId);
@@ -114,9 +118,18 @@ async function tickOnce(state: ServiceState): Promise<void> {
         }
         const window = windows.get(run.workflowName)?.find(({ start, end }) =>
           end !== null && start <= run.createdAt && run.createdAt < end);
-        state.attemptedRunIds.set(run.databaseId, now);
+        state.attemptedRunIds.set(run.databaseId, {
+          recordedAt: now,
+          issueId: candidate.issueId,
+          commandFailed: true,
+        });
         const succeeded = await rerunFailedRun(ref.repo, run.databaseId);
         if (succeeded && window?.end) {
+          state.attemptedRunIds.set(run.databaseId, {
+            recordedAt: now,
+            issueId: candidate.issueId,
+            commandFailed: false,
+          });
           retriggered++;
           console.log(`[stale-check-retrigger] re-ran run ${run.databaseId} (${run.workflowName}) for ${candidate.issueId} PR #${ref.number}: failed at ${run.createdAt} inside main red window ${window.start} → ${window.end}`);
         } else {
