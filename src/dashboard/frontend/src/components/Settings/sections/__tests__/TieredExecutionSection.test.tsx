@@ -344,6 +344,23 @@ describe('TieredExecutionSection', () => {
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.by_kind.docs).toBe('trivial-simple-medium-complex-expert');
   });
 
+  it('canonicalizes alias-only byKind through an unrelated replay edit', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: false,
+      tiers: { all: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+      byKind: { docs: 'all' },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.change(screen.getByLabelText('Replay threshold'), { target: { value: '0.75' } });
+    const saved = onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution;
+    expect(saved.by_kind).toEqual({ docs: 'all' });
+    expect(saved.byKind).toBeUndefined();
+    expect(saved.replay_threshold).toBe(0.75);
+  });
+
   it('edits feed, escalation, and replay threshold values', () => {
     const onSettingsChange = vi.fn();
     const { container } = render(

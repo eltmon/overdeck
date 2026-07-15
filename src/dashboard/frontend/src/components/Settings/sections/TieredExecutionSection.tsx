@@ -48,6 +48,20 @@ function defaultTieredExecution(enabled: boolean): TieredExecutionConfig {
   };
 }
 
+function normalizeTieredExecution(
+  config: TieredExecutionConfig | undefined,
+  enabled = config?.enabled ?? false,
+): TieredExecutionConfig {
+  const { byKind: _byKind, ...canonical } = config ?? {};
+  return {
+    ...defaultTieredExecution(enabled),
+    ...canonical,
+    enabled,
+    tiers: { ...(config?.tiers ?? {}) },
+    by_kind: config?.by_kind ?? config?.byKind ?? {},
+  };
+}
+
 function csvToList(value: string): string[] {
   return value.split(',').map((entry) => entry.trim()).filter(Boolean);
 }
@@ -98,11 +112,7 @@ export function TieredExecutionSection({
   onSettingsChange,
 }: TieredExecutionSectionProps) {
   const config = formData.tiered_execution;
-  const normalizedConfig = {
-    ...defaultTieredExecution(config?.enabled ?? false),
-    ...config,
-    by_kind: config?.by_kind ?? config?.byKind ?? {},
-  };
+  const normalizedConfig = normalizeTieredExecution(config);
   const { crews, assign, rest } = importCrews(normalizedConfig);
   let outgoingConfig: TieredExecutionConfig = normalizedConfig;
   try {
@@ -143,22 +153,14 @@ export function TieredExecutionSection({
   const updateTieredExecution = (nextConfig: TieredExecutionConfig) => {
     onSettingsChange({
       ...formData,
-      tiered_execution: nextConfig,
+      tiered_execution: normalizeTieredExecution(nextConfig),
     });
   };
 
-  const currentConfig = (): TieredExecutionConfig => ({
-    ...defaultTieredExecution(enabled),
-    ...config,
-    tiers: { ...(config?.tiers ?? {}) },
-  });
+  const currentConfig = (): TieredExecutionConfig => normalizeTieredExecution(config);
 
   const handleEnabledChange = () => {
-    updateTieredExecution({
-      ...defaultTieredExecution(!enabled),
-      ...config,
-      enabled: !enabled,
-    });
+    updateTieredExecution(normalizeTieredExecution(config, !enabled));
   };
 
   const writeCrews = (nextCrews: readonly Crew[], nextAssign: CrewAssignments, nextRest: CrewRest = rest) => {
