@@ -92,7 +92,7 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:12:48.417Z",
+  "updated": "2026-07-15T16:12:50.795Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -102,7 +102,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:12:48.290Z",
+    "updatedAt": "2026-07-15T16:12:50.698Z",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
     "reviewRequestedAt": "2026-07-15T16:10:47.225Z",
@@ -169,15 +169,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6438678,
-            "output": 9733,
-            "cacheRead": 5705472,
+            "input": 6493486,
+            "output": 9856,
+            "cacheRead": 5758080,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 51051074,
-            "output": 86732,
-            "cacheRead": 49873408,
+            "input": 53028240,
+            "output": 94625,
+            "cacheRead": 51784960,
             "cacheWrite": 0
           }
         },
@@ -200,15 +200,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6438678,
-          "output": 9733,
-          "cacheRead": 5705472,
+          "input": 6493486,
+          "output": 9856,
+          "cacheRead": 5758080,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 51051074,
-          "output": 86732,
-          "cacheRead": 49873408,
+          "input": 53028240,
+          "output": 94625,
+          "cacheRead": 51784960,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -225,8 +225,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 46.946721000000004,
-        "pricingAsOf": "2026-07-15T16:12:48.368Z"
+        "usd": 48.467357,
+        "pricingAsOf": "2026-07-15T16:12:50.776Z"
       }
     },
     "merges": [
