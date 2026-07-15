@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:32:25.413Z",
+  "updated": "2026-07-15T15:32:38.375Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,8 +100,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 22,
-    "claims": {},
+    "sequence": 23,
+    "claims": {
+      "skill-doc-update": {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 2189431,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:32:38.375Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -271,6 +279,10 @@
       "route-accepted-rows": {
         "reason": "Validated dashboard acceptedRows, returned 422 gate payloads, rendered frontend misses; server/frontend tests and typecheck passed; pushed 9b6bfc2c20",
         "updatedAt": "2026-07-15T15:32:25.413Z"
+      },
+      "skill-doc-update": {
+        "reason": "Complete final documentation and skill contract item",
+        "updatedAt": "2026-07-15T15:32:38.375Z"
       }
     }
   },
@@ -322,6 +334,7 @@
     "route-accepted-rows": "completed",
     "route-accepted-rows.route-accepted-rows.ac1": "completed",
     "route-accepted-rows.route-accepted-rows.ac2": "completed",
-    "route-accepted-rows.route-accepted-rows.ac3": "completed"
+    "route-accepted-rows.route-accepted-rows.ac3": "completed",
+    "skill-doc-update": "running"
   }
 }
