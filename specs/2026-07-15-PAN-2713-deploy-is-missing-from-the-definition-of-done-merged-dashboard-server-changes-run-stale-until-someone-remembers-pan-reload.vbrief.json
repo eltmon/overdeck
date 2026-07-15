@@ -4,17 +4,17 @@
     "created": "2026-07-15T13:51:11.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2713: Deploy is missing from the Definition of Done — merged dashboard/server changes run stale until someone remembers pan reload",
-    "updated": "2026-07-15T13:58:15.898Z"
+    "updated": "2026-07-15T14:09:46.460Z"
   },
   "plan": {
     "id": "pan-2713",
     "title": "Deploy is missing from the Definition of Done — merged dashboard/server changes run stale until someone remembers pan reload",
-    "status": "proposed",
+    "status": "approved",
     "uid": "0daeef14-8c59-4716-9ee2-64c6ad8beeb7",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-15T13:51:11.000Z",
-    "updated": "2026-07-15T13:58:15.898Z",
+    "updated": "2026-07-15T14:09:46.460Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2713",
@@ -693,5 +693,5 @@
       "canonicalFilename": "2026-07-15-PAN-2713-deploy-is-missing-from-the-definition-of-done-merged-dashboard-server-changes-run-stale-until-someone-remembers-pan-reload.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
