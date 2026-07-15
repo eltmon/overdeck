@@ -266,20 +266,20 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:17:32.257Z",
+  "updated": "2026-07-15T15:20:20.721Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-13T10:55:39.955Z",
-    "updatedAt": "2026-07-15T15:17:32.134Z",
+    "updatedAt": "2026-07-15T15:20:20.571Z",
     "reviewNotes": "[performance] Synchronous plan discovery and parsing added to the activity polling route — `src/dashboard/server/routes/command-deck.ts:277`",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt\n  - src/cli/commands/__tests__/start-plan-routing.test.ts deleted in origin/main and modified in HEAD.  Version HEAD of src/cli/commands/__tests__/start-plan-routing.test.ts left in tree.\n  - src/dashboard/frontend/src/App.test.tsx\n  - src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx\n  - tests/cli/commands/work/issue-beads-check.test.ts deleted in origin/main and modified in HEAD.  Version HEAD of tests/cli/commands/work/issue-beads-check.test.ts left in tree.",
+    "verificationNotes": "Verification FAILED at test (158277ms):\n\nrtifact.js:302:11\n    at \u001b[90mfile:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:1903:26\n    at \u001b[90mfile:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2326:20\n    at new Promise (<anonymous>)\n    at runWithCancel \u001b[90m(file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2323:10\u001b[90m)\u001b[39m\n    at \u001b[90mfile:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2305:20\n    at new Promise (<anonymous>)\n    at runWithTimeout \u001b[90m(file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2272:10\u001b[90m)\u001b[39m\n    at \u001b[90mfile:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/\u001b[39mnode_modules/\u001b[4m.bun\u001b[24m/@vitest+runner@4.1.6/node_modules/\u001b[4m@vitest/runner\u001b[24m/dist/chunk-artifact.js:2955:64\n\n\u001b[90mstderr\u001b[2m | tests/unit/dashboard/server/routes/conversations-fork-failure.test.ts\u001b[2m > \u001b[22m\u001b[2mhandleForkPipelineFailure\u001b[2m > \u001b[22m\u001b[2mmarks the fork failed and ended for a non-Error rejection value\n\u001b[22m\u001b[39m[fork-pipeline] Failed for fork-2: string failure\n\n\u001b[90mstderr\u001b[2m | src/lib/cloister/__tests__/review-verdict-feedback.test.ts\u001b[2m > \u001b[22m\u001b[2mdeliverReviewVerdictFeedback\u001b[2m > \u001b[22m\u001b[2mswallows a readonly DB failure when marking review feedback as needing human attention\n\u001b[22m\u001b[39m[review-verdict-feedback] Could not mark PAN-1917 as needing human attention; feedback file remains available: SQLITE_READONLY: attempt to write a readonly database\n\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "reviewSpawnedAt": "2026-07-15T14:49:16.893Z",
@@ -356,9 +356,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 572242,
-            "output": 1649,
-            "cacheRead": 429440,
+            "input": 867891,
+            "output": 1977,
+            "cacheRead": 711040,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -368,9 +368,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 23563055,
-            "output": 29814,
-            "cacheRead": 23046656,
+            "input": 27328693,
+            "output": 31855,
+            "cacheRead": 26775040,
             "cacheWrite": 0
           }
         },
@@ -417,9 +417,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 572242,
-          "output": 1649,
-          "cacheRead": 429440,
+          "input": 867891,
+          "output": 1977,
+          "cacheRead": 711040,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -429,9 +429,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23563055,
-          "output": 29814,
-          "cacheRead": 23046656,
+          "input": 27328693,
+          "output": 31855,
+          "cacheRead": 26775040,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -460,8 +460,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 86.190046,
-        "pricingAsOf": "2026-07-15T15:17:32.199Z"
+        "usd": 88.301738,
+        "pricingAsOf": "2026-07-15T15:20:20.655Z"
       }
     },
     "merges": [
