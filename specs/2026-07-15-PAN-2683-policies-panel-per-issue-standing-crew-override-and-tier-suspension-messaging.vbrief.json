@@ -4,17 +4,17 @@
     "created": "2026-07-15T06:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2683: feat(dashboard): Policies panel — add per-issue tiered-execution override and tier-suspension messaging (PAN-2681 follow-up)",
-    "updated": "2026-07-15T09:31:35.863Z"
+    "updated": "2026-07-15T14:13:01.411Z"
   },
   "plan": {
     "id": "pan-2683",
     "title": "Policies panel — per-issue Standing-crew override and tier-suspension messaging",
-    "status": "running",
+    "status": "completed",
     "uid": "87362650-8357-4de6-a29a-c31898930608",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-15T06:40:00.000Z",
-    "updated": "2026-07-15T09:31:35.863Z",
+    "updated": "2026-07-15T14:13:01.411Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2683",
@@ -409,5 +409,5 @@
       "canonicalFilename": "2026-07-15-PAN-2683-policies-panel-per-issue-standing-crew-override-and-tier-suspension-messaging.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
