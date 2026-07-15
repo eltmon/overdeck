@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:17:40.201Z",
+  "updated": "2026-07-15T14:18:18.027Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:17:40.148Z",
-    "inspectNotes": "Inspecting item staleness-module"
+    "updatedAt": "2026-07-15T14:18:17.944Z",
+    "inspectNotes": "Item staleness-module ack: computeBuildStaleness implements fresh/stale/unknown status via BUILD_INPUT_PATHS-filtered rev-list counts, fetch throttling keyed by repoRoot, and non-rejecting degradation on missing buildCommit / unknown commit / fetch failure — all 5 ACs covered by corresponding unit tests under fake timers."
   },
   "closeOut": {
     "usage": {
@@ -72,7 +72,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.692815,
-        "pricingAsOf": "2026-07-15T14:17:40.191Z"
+        "pricingAsOf": "2026-07-15T14:18:18.011Z"
       }
     },
     "merges": [],
