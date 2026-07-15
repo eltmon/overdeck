@@ -607,17 +607,17 @@
     "recordedAt": "2026-07-15T14:19:56.585Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T17:00:15.706Z",
+  "updated": "2026-07-15T17:01:44.342Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:00:12.106Z",
+    "updatedAt": "2026-07-15T17:01:44.276Z",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "lastVerifiedCommit": "061ab6e83411b3c06f9bcbf9c99a8c269c5d1c00",
@@ -750,9 +750,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 24888492,
-            "output": 27733,
-            "cacheRead": 23101184,
+            "input": 25079544,
+            "output": 27853,
+            "cacheRead": 23287808,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -762,9 +762,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 84038141,
-            "output": 163201,
-            "cacheRead": 80484608,
+            "input": 87638955,
+            "output": 168679,
+            "cacheRead": 83646464,
             "cacheWrite": 0
           }
         },
@@ -803,9 +803,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 24888492,
-          "output": 27733,
-          "cacheRead": 23101184,
+          "input": 25079544,
+          "output": 27853,
+          "cacheRead": 23287808,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -815,9 +815,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 84038141,
-          "output": 163201,
-          "cacheRead": 80484608,
+          "input": 87638955,
+          "output": 168679,
+          "cacheRead": 83646464,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -834,8 +834,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 241.074059,
-        "pricingAsOf": "2026-07-15T17:00:12.157Z"
+        "usd": 245.014117,
+        "pricingAsOf": "2026-07-15T17:01:44.328Z"
       }
     },
     "merges": [
