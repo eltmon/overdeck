@@ -199,7 +199,9 @@ function formatShortTimestamp(iso: string): string {
 
 // ─── URL helpers (Overdeck uses window.history directly) ────────────────────
 
-function readDiffParamsFromUrl(): { diff?: string; diffTurnId?: string; diffFilePath?: string } {
+type DiffUrlParams = { diff?: string; diffTurnId?: string; diffFilePath?: string }
+
+function readDiffParamsFromUrl(): DiffUrlParams {
   return parseDiffRouteSearch(
     Object.fromEntries(new URLSearchParams(window.location.search)),
   )
@@ -329,6 +331,17 @@ interface DiffPanelProps {
   turnDiffSummaries: TurnDiffSummary[]
   onClose?: () => void
   diffUrlPrefix?: string
+  /** Initial selection for an `isolateSelection` embed: `'full'` (default) =
+   *  the all-turns checkpoint thread; `'vs-main'` = current workspace branch vs
+   *  main. The drawer Files tab uses `'vs-main'`. Ignored when selection is
+   *  URL-driven (the default). */
+  defaultView?: 'full' | 'vs-main'
+  /** Drive turn/file selection from component-local state instead of the global
+   *  `?diff` URL params. Embedded surfaces (the drawer Files tab) opt in so they
+   *  neither inherit stale `?diff=1&diffTurnId=…` state left by other surfaces
+   *  (e.g. the conversation side panel) nor write back to the shared URL. The
+   *  local selection is initialized from `defaultView`. */
+  isolateSelection?: boolean
 }
 
 export function DiffPanel({
@@ -337,6 +350,8 @@ export function DiffPanel({
   turnDiffSummaries,
   onClose,
   diffUrlPrefix,
+  defaultView = 'full',
+  isolateSelection = false,
 }: DiffPanelProps) {
   const { resolvedTheme } = useTheme()
   const { prefs: diffPrefs, update: updateDiffPrefs } = useDiffPreferences()
@@ -348,16 +363,49 @@ export function DiffPanel({
   const [canScrollTurnStripRight, setCanScrollTurnStripRight] = useState(false)
   const [urlParams, setUrlParams] = useState(readDiffParamsFromUrl)
 
-  // Listen for URL changes (popstate)
+  // Listen for URL changes (popstate) — only when selection is URL-driven.
+  // `isolateSelection` embeds keep their selection in component-local state and
+  // ignore the global URL entirely.
   useEffect(() => {
+    if (isolateSelection) return
     const onPopState = () => setUrlParams(readDiffParamsFromUrl())
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
-  }, [])
+  }, [isolateSelection])
 
-  const diffOpen = urlParams.diff === '1'
-  const selectedTurnId = urlParams.diffTurnId ?? null
-  const selectedFilePath = selectedTurnId !== null ? (urlParams.diffFilePath ?? null) : null
+  // Component-local selection for embedded surfaces (drawer Files tab). Kept
+  // separate from the global `?diff` URL so the embed neither inherits stale
+  // `?diff` params from other surfaces nor writes back to the shared URL.
+  // Initialized from `defaultView` so the Files tab opens on branch-vs-main.
+  const [isolatedParams, setIsolatedParams] = useState<DiffUrlParams>(() =>
+    defaultView === 'vs-main' ? { diff: '1', diffTurnId: 'vs-main' } : { diff: '1' },
+  )
+
+  const effectiveParams = isolateSelection ? isolatedParams : urlParams
+
+  const writeParams = (params: DiffUrlParams) => {
+    if (isolateSelection) {
+      setIsolatedParams(params)
+    } else {
+      writeDiffParamsToUrl(params)
+      setUrlParams(readDiffParamsFromUrl())
+    }
+  }
+  const clearParams = () => {
+    if (isolateSelection) {
+      setIsolatedParams({})
+    } else {
+      clearDiffParamsFromUrl()
+      setUrlParams(readDiffParamsFromUrl())
+    }
+  }
+
+  // Inline embedding (drawer Files tab, conversation side panel) is always
+  // rendered — the parent already decided to show it by mounting it. The
+  // ?diff=1 param still gates the popout/sheet (sheet-mode) toggle path.
+  const diffOpen = mode === 'inline' || effectiveParams.diff === '1'
+  const selectedTurnId = effectiveParams.diffTurnId ?? null
+  const selectedFilePath = selectedTurnId !== null ? (effectiveParams.diffFilePath ?? null) : null
 
   // Sort summaries by turn count (newest first)
   const orderedTurnDiffSummaries = useMemo(
@@ -499,29 +547,24 @@ export function DiffPanel({
   // ─── Navigation ───────────────────────────────────────────────────────────
 
   const selectTurn = (turnId: string) => {
-    writeDiffParamsToUrl({ diff: '1', diffTurnId: turnId })
-    setUrlParams(readDiffParamsFromUrl())
+    writeParams({ diff: '1', diffTurnId: turnId })
   }
 
   const selectFile = (filePath: string) => {
     const turnId = selectedTurnId ?? undefined
-    writeDiffParamsToUrl({ diff: '1', ...(turnId && { diffTurnId: turnId }), diffFilePath: filePath })
-    setUrlParams(readDiffParamsFromUrl())
+    writeParams({ diff: '1', ...(turnId && { diffTurnId: turnId }), diffFilePath: filePath })
   }
 
   const selectWholeConversation = () => {
-    writeDiffParamsToUrl({ diff: '1' })
-    setUrlParams(readDiffParamsFromUrl())
+    writeParams({ diff: '1' })
   }
 
   const selectVsMain = () => {
-    writeDiffParamsToUrl({ diff: '1', diffTurnId: 'vs-main' })
-    setUrlParams(readDiffParamsFromUrl())
+    writeParams({ diff: '1', diffTurnId: 'vs-main' })
   }
 
   const handleClose = () => {
-    clearDiffParamsFromUrl()
-    setUrlParams(readDiffParamsFromUrl())
+    clearParams()
     onClose?.()
   }
 
@@ -699,7 +742,7 @@ export function DiffPanel({
 
   return (
     <DiffPanelShell mode={mode} header={headerRow}>
-      {orderedTurnDiffSummaries.length === 0 ? (
+      {orderedTurnDiffSummaries.length === 0 && !isVsMain ? (
         <div className="flex flex-1 items-center justify-center px-5 text-center text-xs text-muted-foreground/70">
           No completed turns yet.
         </div>
