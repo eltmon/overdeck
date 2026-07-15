@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T14:48:03.473Z",
+  "updated": "2026-07-15T14:48:58.939Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -100,7 +100,8 @@
     "full-length-purge": "running",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
     "size-scaled-waits.size-scaled-waits.ac2": "completed",
-    "size-scaled-waits.size-scaled-waits.ac3": "completed"
+    "size-scaled-waits.size-scaled-waits.ac3": "completed",
+    "tmux-verify-helpers": "running"
   },
   "swarm": {
     "slotAssignments": [],
@@ -109,6 +110,18 @@
         "slotIndex": 3,
         "agentId": "agent-pan-2568-slot-3",
         "completedAt": "2026-07-13T09:28:13.791Z"
+      }
+    }
+  },
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "tmux-verify-helpers": {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 1232721,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:48:58.939Z"
       }
     }
   }
