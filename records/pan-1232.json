@@ -1125,7 +1125,7 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-15T02:22:19.021Z",
+  "updated": "2026-07-15T04:12:50.346Z",
   "pipeline": {
     "issueId": "PAN-1232",
     "reviewStatus": "pending",
@@ -1205,8 +1205,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "tab-files": "completed",
     "tab-files.ac1": "completed",
