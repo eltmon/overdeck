@@ -446,21 +446,22 @@
     "recordedAt": "2026-07-15T01:58:04.401Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T13:52:07.196Z",
+  "updated": "2026-07-15T13:52:13.275Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T13:44:19.465Z",
+    "updatedAt": "2026-07-15T13:52:13.144Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/cli/commands/__tests__/review-mode.test.ts\n  - src/dashboard/server/routes/__tests__/codex-auth.test.ts\n  - src/lib/cloister/verification-runner.ts\n  - src/lib/cloister/verification-types.ts",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
+    "reviewedAtCommit": "eb12cf2f826738b95aea1d084cd59eda75e5f13c",
     "reviewRequestedAt": "2026-07-15T13:43:27.668Z",
     "reviewSpawnedAt": "2026-07-15T13:44:06.216Z",
     "scopeDrift": {
@@ -594,9 +595,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 22188638,
-            "output": 24469,
-            "cacheRead": 20631808,
+            "input": 22215580,
+            "output": 24550,
+            "cacheRead": 20639360,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -606,18 +607,18 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 43971657,
-            "output": 74897,
-            "cacheRead": 42241536,
+            "input": 49071087,
+            "output": 95160,
+            "cacheRead": 46846720,
             "cacheWrite": 0
           }
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 186,
-            "output": 51310,
-            "cacheRead": 49608786,
-            "cacheWrite": 86628
+            "input": 229,
+            "output": 63557,
+            "cacheRead": 63507882,
+            "cacheWrite": 108176
           }
         },
         "plan": {
@@ -639,9 +640,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 22188638,
-          "output": 24469,
-          "cacheRead": 20631808,
+          "input": 22215580,
+          "output": 24550,
+          "cacheRead": 20639360,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -651,16 +652,16 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 43971657,
-          "output": 74897,
-          "cacheRead": 42241536,
+          "input": 49071087,
+          "output": 95160,
+          "cacheRead": 46846720,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 18632,
-          "output": 105916,
-          "cacheRead": 54451711,
-          "cacheWrite": 384447
+          "input": 18675,
+          "output": 118163,
+          "cacheRead": 68350807,
+          "cacheWrite": 405995
         },
         "anthropic/claude-sonnet-5": {
           "input": 14217,
@@ -670,8 +671,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 191.191313,
-        "pricingAsOf": "2026-07-15T13:44:19.570Z"
+        "usd": 211.354255,
+        "pricingAsOf": "2026-07-15T13:52:13.201Z"
       }
     },
     "merges": [
@@ -679,8 +680,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "docs-appserver": "completed",
     "docs-appserver.ac1": "completed",
