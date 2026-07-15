@@ -36,6 +36,7 @@ function journal(overrides: Partial<PanIssuePipelineRecord> = {}): PanIssuePipel
     reviewStatus: 'passed',
     testStatus: 'passed',
     verificationStatus: 'passed',
+    lastVerifiedCommit: 'journal123',
     readyForMerge: true,
     updatedAt: '2026-07-15T00:00:00Z',
     ...overrides,
@@ -47,51 +48,56 @@ function deps(status: ReviewStatus | null, pipeline: PanIssuePipelineRecord | nu
 }
 
 describe('Definition-of-Done status rows', () => {
-  it('passes live review, test, and verified-commit verdicts', () => {
+  it('passes live review, test, and verified-commit verdicts', async () => {
     const source = deps(live());
-    expect(checkReviewRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'reviewStatus: passed' });
-    expect(checkTestsRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'testStatus: passed' });
-    expect(checkVerificationRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'verificationStatus: passed at abc123' });
+    expect(await checkReviewRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'reviewStatus: passed' });
+    expect(await checkTestsRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'testStatus: passed' });
+    expect(await checkVerificationRow(issueId, source)).toMatchObject({ status: 'pass', observed: 'verificationStatus: passed at abc123' });
   });
 
-  it('treats skipped verdicts as policy-approved passes', () => {
+  it('treats skipped verdicts as policy-approved passes', async () => {
     const source = deps(live({ reviewStatus: 'skipped', testStatus: 'skipped', verificationStatus: 'skipped' }));
-    for (const row of [checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)]) {
+    for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)])) {
       expect(row.status).toBe('pass');
       expect(row.observed).toContain('skipped per issue policy');
     }
   });
 
-  it('reports the actual non-passing verdict', () => {
+  it('reports the actual non-passing verdict', async () => {
     const source = deps(live({ reviewStatus: 'failed', testStatus: 'pending', verificationStatus: 'failed' }));
-    expect(checkReviewRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'reviewStatus: failed' });
-    expect(checkTestsRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'testStatus: pending' });
-    expect(checkVerificationRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'verificationStatus: failed at abc123' });
+    expect(await checkReviewRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'reviewStatus: failed' });
+    expect(await checkTestsRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'testStatus: pending' });
+    expect(await checkVerificationRow(issueId, source)).toMatchObject({ status: 'miss', observed: 'verificationStatus: failed at abc123' });
   });
 
-  it('requires a commit for a passed live verification verdict', () => {
-    expect(checkVerificationRow(issueId, deps(live({ lastVerifiedCommit: undefined })))).toMatchObject({
+  it('requires a commit for a passed live verification verdict', async () => {
+    expect(await checkVerificationRow(issueId, deps(live({ lastVerifiedCommit: undefined })))).toMatchObject({
       status: 'miss',
       observed: 'verificationStatus: passed',
     });
   });
 
-  it('falls back to durable pipeline journal verdicts after live status is cleared', () => {
+  it('falls back to durable pipeline journal verdicts after live status is cleared', async () => {
     const source = deps(null, journal());
-    for (const row of [checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)]) {
+    for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)])) {
       expect(row.status).toBe('pass');
       expect(row.observed).toContain('from pipeline journal');
     }
   });
 
-  it('returns misses instead of throwing when both sources are empty or a door fails', () => {
+  it('requires a verified commit from the durable pipeline journal', async () => {
+    const row = await checkVerificationRow(issueId, deps(null, journal({ lastVerifiedCommit: undefined })));
+    expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('from pipeline journal') });
+  });
+
+  it('returns misses instead of throwing when both sources are empty or a door fails', async () => {
     const empty = deps(null);
     const failing: DodStatusRowDeps = {
       getReviewStatus: () => { throw new Error('database unavailable'); },
       getJournalStatus: () => { throw new Error('journal unavailable'); },
     };
     for (const source of [empty, failing]) {
-      for (const row of [checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)]) {
+      for (const row of await Promise.all([checkReviewRow(issueId, source), checkTestsRow(issueId, source), checkVerificationRow(issueId, source)])) {
         expect(row).toMatchObject({ status: 'miss', observed: 'no review status or journal record found' });
       }
     }

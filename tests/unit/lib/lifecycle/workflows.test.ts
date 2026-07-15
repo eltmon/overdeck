@@ -643,6 +643,24 @@ describe('workflows', () => {
       );
     });
 
+    it('fails close-out and preserves review status when the DoD audit cannot persist', async () => {
+      mockWriteCloseOutDodGateSync.mockImplementationOnce(() => {
+        throw new Error('state push unavailable');
+      });
+      const ctx = { issueId: 'PAN-100', projectPath: testDir };
+
+      const result = await closeOut(ctx, { tracker: successfulTracker() });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.find(step => step.step === 'close-out:record-dod-gate')).toMatchObject({
+        success: false,
+        error: expect.stringContaining('state push unavailable'),
+      });
+      expect(result.steps.find(step => step.step === 'close-out:abort')?.error).toContain('audit could not be persisted');
+      expect(result.steps.some(step => step.step === 'clear-review-status')).toBe(false);
+      expect(mockClearReviewStatus).not.toHaveBeenCalled();
+    });
+
     it('preserves close-out success when the durable pipeline marker fails', async () => {
       mockMarkRecordPipelineClosedOutSync.mockImplementationOnce(() => {
         throw new Error('record unavailable');

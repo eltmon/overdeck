@@ -253,6 +253,10 @@ export function closeOut(
     allSteps.push(markTerminal);
     const recordDodGate = yield* recordDodGateStep(ctx, dodGate);
     allSteps.push(recordDodGate);
+    if (!recordDodGate.success) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — Definition-of-Done audit could not be persisted; review status preserved'));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+    }
     if (markTerminal.success) {
       const pruned = pruneStoppedAgentsForIssue(ctx.issueId);
       allSteps.push(pruned.preserved.length > 0
@@ -302,7 +306,7 @@ function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult): Effec
     catch: (err) => err,
   }).pipe(
     Effect.catch((err) =>
-      Effect.succeed(stepSkipped(step, [`Definition-of-Done gate record failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
+      Effect.succeed(stepFailed(step, `Definition-of-Done gate record failed: ${(err as Error).message ?? String(err)}`)),
     ),
   );
 }

@@ -5,16 +5,19 @@ import { stat } from 'node:fs/promises';
 import { userInfo } from 'node:os';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
-import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
-import { listRunningAgentsSync, type AgentState } from '../agents.js';
+import type { CanonicalState } from '../../core/state-mapping.js';
+import { Effect } from 'effect';
+import { listRunningAgents, type AgentState } from '../agents.js';
 import { getDashboardApiUrlSync } from '../config.js';
-import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
+import { getReviewStatus, type ReviewStatus } from '../review-status.js';
 import {
   getProjectConfigFromWorkspacePath,
-  readIssueRecordSync,
+  readIssueRecord,
   resolveProjectForIssue,
   type PanIssuePipelineRecord,
 } from '../pan-dir/record.js';
+import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
+import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
 import { acceptFlagFor, DOD_ROWS, type DodGateResult, type DodRowId, type DodRowResult } from './dod.js';
 import type { LifecycleContext, StepResult } from './types.js';
 
@@ -24,10 +27,11 @@ type StatusSource =
   | { source: 'live'; status: ReviewStatus }
   | { source: 'journal'; status: PanIssuePipelineRecord }
   | null;
+type Awaitable<T> = T | Promise<T>;
 
 export interface DodStatusRowDeps {
-  getReviewStatus: (issueId: string) => ReviewStatus | null;
-  getJournalStatus: (issueId: string) => PanIssuePipelineRecord | null;
+  getReviewStatus: (issueId: string) => Awaitable<ReviewStatus | null>;
+  getJournalStatus: (issueId: string) => Awaitable<PanIssuePipelineRecord | null>;
 }
 
 export interface MergedDodRowResult extends DodRowResult {
@@ -54,37 +58,25 @@ const defaultMergedRowDeps: MergedRowDeps = {
   }),
   readPullRequest: async (ctx, branchName) => {
     if (!ctx.github) return {};
-    const { stdout } = await execFileAsync('gh', [
-      'pr', 'view', branchName,
-      '--repo', `${ctx.github.owner}/${ctx.github.repo}`,
-      '--json', 'number,state,mergedAt,mergeCommit',
-    ], { encoding: 'utf-8', timeout: 10000 });
-    return JSON.parse(stdout);
+    void branchName;
+    const response = await fetchIssuePullRequest(ctx.issueId);
+    if (response.error) throw new Error(response.error);
+    return response.pr ?? {};
   },
 };
 
 interface PostMergeRowDeps {
   readCanonicalState: (ctx: LifecycleContext) => Promise<CanonicalState | null>;
-  readMergeStatus: (issueId: string) => string | undefined;
-  listAgents: () => Array<Pick<AgentState, 'id' | 'issueId' | 'role' | 'status'>>;
+  readMergeStatus: (issueId: string) => Awaitable<string | undefined>;
+  listAgents: () => Awaitable<Array<Pick<AgentState, 'id' | 'issueId' | 'role' | 'status'>>>;
 }
 
 const defaultPostMergeRowDeps: PostMergeRowDeps = {
   readCanonicalState: async ctx => {
-    if (!ctx.github) return null;
-    const { stdout } = await execFileAsync('gh', [
-      'issue', 'view', String(ctx.github.number),
-      '--repo', `${ctx.github.owner}/${ctx.github.repo}`,
-      '--json', 'state,labels',
-    ], { encoding: 'utf-8', timeout: 10000 });
-    const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
-    const labels = (parsed.labels ?? [])
-      .map(label => typeof label === 'string' ? label : label.name)
-      .filter((label): label is string => typeof label === 'string');
-    return mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+    return getAutoCloseOutCanonicalState(ctx.issueId) as Promise<CanonicalState | null>;
   },
-  readMergeStatus: issueId => getReviewStatusSync(issueId)?.mergeStatus,
-  listAgents: listRunningAgentsSync,
+  readMergeStatus: async issueId => (await Effect.runPromise(getReviewStatus(issueId)))?.mergeStatus,
+  listAgents: async () => Effect.runPromise(listRunningAgents()),
 };
 
 interface MainVerifyRowDeps {
@@ -98,11 +90,7 @@ interface MainVerifyRowDeps {
 const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
   readCheckRuns: async (ctx, mergeCommit) => {
     if (!ctx.github) return { total: 0, failed: [], pending: [] };
-    const { stdout } = await execFileAsync('gh', [
-      'api', `repos/${ctx.github.owner}/${ctx.github.repo}/commits/${mergeCommit}/check-runs`,
-      '--jq', '{total: .total_count, failed: [.check_runs[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped" and .conclusion != "neutral") | .name], pending: [.check_runs[] | select(.status != "completed") | .name]}',
-    ], { encoding: 'utf-8', timeout: 10000 });
-    return JSON.parse(stdout);
+    return fetchCommitCheckRuns(ctx.github.owner, ctx.github.repo, mergeCommit);
   },
 };
 
@@ -174,10 +162,10 @@ const defaultDeployRowDeps: DeployRowDeps = {
 };
 
 const defaultDeps: DodStatusRowDeps = {
-  getReviewStatus: getReviewStatusSync,
-  getJournalStatus: issueId => {
+  getReviewStatus: issueId => Effect.runPromise(getReviewStatus(issueId)),
+  getJournalStatus: async issueId => {
     const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
-    return readIssueRecordSync(project, issueId)?.pipeline ?? null;
+    return (await readIssueRecord(project, issueId))?.pipeline ?? null;
   },
 };
 
@@ -192,24 +180,24 @@ function result(id: DodRowId, status: DodRowResult['status'], observed: string):
   return { id, num: row.num, title: row.title, expected: row.expected, observed, status };
 }
 
-function loadStatus(issueId: string, deps: DodStatusRowDeps): StatusSource {
+async function loadStatus(issueId: string, deps: DodStatusRowDeps): Promise<StatusSource> {
   try {
-    const live = deps.getReviewStatus(issueId);
+    const live = await deps.getReviewStatus(issueId);
     if (live) return { source: 'live', status: live };
-    const journal = deps.getJournalStatus(issueId);
+    const journal = await deps.getJournalStatus(issueId);
     return journal ? { source: 'journal', status: journal } : null;
   } catch {
     return null;
   }
 }
 
-function checkVerdict(
+async function checkVerdict(
   issueId: string,
   id: 'review' | 'tests',
   field: 'reviewStatus' | 'testStatus',
   deps: DodStatusRowDeps,
-): DodRowResult {
-  const loaded = loadStatus(issueId, deps);
+): Promise<DodRowResult> {
+  const loaded = await loadStatus(issueId, deps);
   if (!loaded) return result(id, 'miss', 'no review status or journal record found');
 
   const value = loaded.status[field];
@@ -219,16 +207,16 @@ function checkVerdict(
   return result(id, value === 'passed' || value === 'skipped' ? 'pass' : 'miss', observed);
 }
 
-export function checkReviewRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): DodRowResult {
+export function checkReviewRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): Promise<DodRowResult> {
   return checkVerdict(issueId, 'review', 'reviewStatus', deps);
 }
 
-export function checkTestsRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): DodRowResult {
+export function checkTestsRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): Promise<DodRowResult> {
   return checkVerdict(issueId, 'tests', 'testStatus', deps);
 }
 
-export function checkVerificationRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): DodRowResult {
-  const loaded = loadStatus(issueId, deps);
+export async function checkVerificationRow(issueId: string, deps: DodStatusRowDeps = defaultDeps): Promise<DodRowResult> {
+  const loaded = await loadStatus(issueId, deps);
   if (!loaded) return result('verification', 'miss', 'no review status or journal record found');
 
   const value = loaded.status.verificationStatus;
@@ -238,7 +226,7 @@ export function checkVerificationRow(issueId: string, deps: DodStatusRowDeps = d
   const commitNote = commit ? ` at ${commit}` : '';
   const observed = `verificationStatus: ${value ?? 'missing'}${commitNote}${source}${policy}`;
   const acceptedStatus = value === 'passed' || value === 'skipped';
-  const hasRequiredCommit = loaded.source === 'journal' || Boolean(commit);
+  const hasRequiredCommit = Boolean(commit);
   return result('verification', acceptedStatus && hasRequiredCommit ? 'pass' : 'miss', observed);
 }
 
@@ -283,9 +271,9 @@ export async function checkPostMergeRow(
 ): Promise<DodRowResult> {
   try {
     const canonicalState = await deps.readCanonicalState(ctx);
-    const mergeStatus = deps.readMergeStatus(ctx.issueId);
+    const mergeStatus = await deps.readMergeStatus(ctx.issueId);
     const issueId = ctx.issueId.toUpperCase();
-    const runningAgents = deps.listAgents().filter(agent =>
+    const runningAgents = (await deps.listAgents()).filter(agent =>
       agent.issueId.toUpperCase() === issueId &&
       (agent.role === 'work' || agent.role === 'plan') &&
       (agent.status === 'starting' || agent.status === 'running'),
