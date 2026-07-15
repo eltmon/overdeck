@@ -63,6 +63,29 @@ describe('injectForkSummary standalone Enter recovery', () => {
     );
   });
 
+  it('nudges when the verification prefix wraps before Enter recovery', async () => {
+    vi.spyOn(forks, 'confirmForkPromptAccepted')
+      .mockResolvedValueOnce('unknown')
+      .mockResolvedValueOnce('accepted');
+    mocks.capturePaneText.mockResolvedValue('summary veri\nfy line');
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .resolves.toBe('submitted');
+
+    expect(mocks.sendKeysAsync).toHaveBeenCalledOnce();
+  });
+
+  it('keeps nudging when the verification prefix remains wrapped after Enter', async () => {
+    vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('unknown');
+    mocks.capturePaneText.mockResolvedValue('summary veri\nfy line');
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .resolves.toBe('stranded');
+
+    expect(mocks.sendKeysAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+  });
+
   it('treats a cleared composer as submitted while the runtime mirror lags', async () => {
     vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('unknown');
     mocks.capturePaneText

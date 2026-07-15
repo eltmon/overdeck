@@ -417,6 +417,7 @@ describe.skipIf(isBun)('pty-supervisor subprocess', () => {
     await waitForProcessOutput(() => stdout.includes(content), 'supervisor did not echo posted content');
     expect(stdout.match(new RegExp(content, 'g'))).toHaveLength(1);
     const logPath = join(tmpHome, 'logs', 'pty-supervisor-agent-echo.log');
+    await vi.waitFor(() => expect(existsSync(logPath)).toBe(true));
     expect(readFileSync(logPath, 'utf8')).toContain('"kind":"socket_write"');
   });
 

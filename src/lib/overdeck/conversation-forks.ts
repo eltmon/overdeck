@@ -348,10 +348,11 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
   const outcome = await self.confirmForkPromptAccepted(conv.tmuxSession, 8000);
   if (outcome === 'accepted') return 'submitted';
 
-  const verify = deliveryVerifyLine(summary).slice(0, 40);
+  const normalizePaneVerification = (value: string): string => value.replace(/\s+/g, '');
+  const verify = normalizePaneVerification(deliveryVerifyLine(summary).slice(0, 40));
   for (let nudge = 1; nudge <= 2; nudge++) {
     const pane = await capturePaneText(conv.tmuxSession, 40);
-    const composerStillFull = verify.length >= 3 && pane.includes(verify);
+    const composerStillFull = verify.length >= 3 && normalizePaneVerification(pane).includes(verify);
     if (!composerStillFull) {
       // `still-idle` is affirmative evidence that the first turn did not land;
       // without independent acceptance evidence, surface the ambiguity rather
@@ -365,7 +366,7 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
     if (await self.confirmForkPromptAccepted(conv.tmuxSession, 8000) === 'accepted') return 'submitted';
 
     const paneAfterNudge = await capturePaneText(conv.tmuxSession, 40);
-    if (!paneAfterNudge.includes(verify)) return 'submitted';
+    if (!normalizePaneVerification(paneAfterNudge).includes(verify)) return 'submitted';
   }
   return 'stranded';
 }

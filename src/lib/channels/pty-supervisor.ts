@@ -330,7 +330,10 @@ export async function injectPtyMessage(
     if (payload.echo !== false) {
       process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);
     }
-    await appendSocketWriteLog(agentId, payload);
+    // Delivery is complete once the standalone Enter is written. Logging is
+    // best-effort observability and must not hold the supervisor response open
+    // past the shared client deadline after the message has already submitted.
+    void appendSocketWriteLog(agentId, payload);
   } finally {
     subscription.dispose();
   }
