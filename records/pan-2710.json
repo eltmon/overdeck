@@ -209,17 +209,17 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:33:22.743Z",
+  "updated": "2026-07-15T17:37:54.907Z",
   "pipeline": {
     "issueId": "PAN-2710",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:31:49.889Z",
+    "updatedAt": "2026-07-15T17:37:54.831Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Commit 97ec41d2 is an empty merge commit (main->feature/pan-2710) touching only docs/FLYWHEEL-STATE.md. No red-window-classifier module, computeRedWindows, or selectRerunCandidates implementation exists anywhere in the repo history yet — none of the 4 acceptance criteria are addressed. Needs the actual pure-classifier implementation committed before this bead can pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
@@ -231,15 +231,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 4366844,
-            "output": 6719,
-            "cacheRead": 3875328,
+            "input": 4587973,
+            "output": 6845,
+            "cacheRead": 4083968,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 107074170,
-            "output": 103129,
-            "cacheRead": 105648384,
+            "input": 111469703,
+            "output": 113785,
+            "cacheRead": 109906944,
             "cacheWrite": 0
           }
         },
@@ -262,15 +262,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 4366844,
-          "output": 6719,
-          "cacheRead": 3875328,
+          "input": 4587973,
+          "output": 6845,
+          "cacheRead": 4083968,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 107074170,
-          "output": 103129,
-          "cacheRead": 105648384,
+          "input": 111469703,
+          "output": 113785,
+          "cacheRead": 109906944,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -287,8 +287,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 72.357781,
-        "pricingAsOf": "2026-07-15T17:31:49.942Z"
+        "usd": 75.491606,
+        "pricingAsOf": "2026-07-15T17:37:54.887Z"
       }
     },
     "merges": [
@@ -296,8 +296,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
     "claims": {},
