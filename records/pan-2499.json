@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:51:19.935Z",
+  "updated": "2026-07-15T15:12:49.184Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -153,7 +153,7 @@
     "active-agent-panel.active-agent-panel.ac2": "completed",
     "active-agent-panel.active-agent-panel.ac3": "completed",
     "active-agent-panel.active-agent-panel.ac4": "completed",
-    "issue-view-wrapper": "running"
+    "issue-view-wrapper": "pending"
   },
   "swarm": {
     "slotAssignments": [
@@ -179,16 +179,8 @@
     }
   },
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "issue-view-wrapper": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1287434,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:51:19.935Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -277,6 +269,17 @@
         "outcome": "completed",
         "reason": "Verified existing pushed ActiveAgentPanel across console, cockpit conversation/crew, and expanded rail nodes; 13 focused tests cover live lines, tell/resume endpoints, density, and collapsed-node zero-consumer behavior; full gates pass.",
         "releasedAt": "2026-07-15T14:51:04.496Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1287434,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:51:19.935Z",
+        "itemId": "issue-view-wrapper",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2499 dead)",
+        "releasedAt": "2026-07-15T15:12:49.168Z"
       }
     ],
     "statusReasons": {
@@ -311,6 +314,10 @@
       "active-agent-panel": {
         "reason": "Verified existing pushed ActiveAgentPanel across console, cockpit conversation/crew, and expanded rail nodes; 13 focused tests cover live lines, tell/resume endpoints, density, and collapsed-node zero-consumer behavior; full gates pass.",
         "updatedAt": "2026-07-15T14:51:04.496Z"
+      },
+      "issue-view-wrapper": {
+        "reason": "stale claim released (agent-pan-2499 dead)",
+        "updatedAt": "2026-07-15T15:12:49.168Z"
       }
     }
   }
