@@ -2,7 +2,7 @@
   "issueId": "PAN-2702",
   "schemaVersion": 2,
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-15T12:52:17.786Z",
+  "updated": "2026-07-15T12:52:18.597Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2702: Strike agents should land on main without requiring the Flywheel — deacon-owned strike merge handoff",
       "timestamp": "2026-07-15T12:52:17.786Z"
     }
-  ]
+  ],
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
 }
