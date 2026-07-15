@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:06:18.079Z",
+  "updated": "2026-07-15T15:09:30.013Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "gate-merged-row": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 1639345,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:06:18.078Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -144,6 +136,17 @@
         "outcome": "completed",
         "reason": "Implemented rows 1-3 with live resolver, journal fallback, focused tests, and typecheck; pushed commit 289423546b",
         "releasedAt": "2026-07-15T15:05:48.984Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1639345,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:06:18.078Z",
+        "itemId": "gate-merged-row",
+        "outcome": "completed",
+        "reason": "Reused exported merge verifier, added best-effort PR metadata, passed 39 lifecycle tests and typecheck; pushed 6a70aa59b3",
+        "releasedAt": "2026-07-15T15:09:30.012Z"
       }
     ],
     "statusReasons": {
@@ -161,8 +164,8 @@
         "updatedAt": "2026-07-15T15:05:48.984Z"
       },
       "gate-merged-row": {
-        "reason": "Continue next canonical ready item after stale idle-nudge",
-        "updatedAt": "2026-07-15T15:06:18.078Z"
+        "reason": "Reused exported merge verifier, added best-effort PR metadata, passed 39 lifecycle tests and typecheck; pushed 6a70aa59b3",
+        "updatedAt": "2026-07-15T15:09:30.012Z"
       }
     }
   },
@@ -179,6 +182,10 @@
     "gate-status-rows.gate-status-rows.ac2": "completed",
     "gate-status-rows.gate-status-rows.ac3": "completed",
     "gate-status-rows.gate-status-rows.ac4": "completed",
-    "gate-merged-row": "running"
+    "gate-merged-row": "completed",
+    "gate-merged-row.gate-merged-row.ac1": "completed",
+    "gate-merged-row.gate-merged-row.ac2": "completed",
+    "gate-merged-row.gate-merged-row.ac3": "completed",
+    "gate-merged-row.gate-merged-row.ac4": "completed"
   }
 }
