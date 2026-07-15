@@ -1135,18 +1135,19 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:45:31.659Z",
-  "updated": "2026-07-15T05:05:37.115Z",
+  "updated": "2026-07-15T06:12:02.095Z",
   "pipeline": {
     "issueId": "PAN-1232",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T05:05:37.070Z",
+    "updatedAt": "2026-07-15T06:12:02.047Z",
     "reviewNotes": "Agent re-review request (1/25): Re-requesting: verification passed at 04:53:48 but review dispatch was lost to a dashboard restart (supervisor fiber died)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2604",
+    "reviewedAtCommit": "37d87f14146fc97f44c74d7be3257e4190b2f687",
     "lastVerifiedCommit": "37d87f14146fc97f44c74d7be3257e4190b2f687",
     "reviewSpawnedAt": "2026-07-15T05:05:23.670Z"
   },
@@ -1167,9 +1168,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 7733345,
-            "output": 9251,
-            "cacheRead": 7549184,
+            "input": 11117041,
+            "output": 26708,
+            "cacheRead": 10579456,
             "cacheWrite": 0
           }
         },
@@ -1204,9 +1205,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7733345,
-          "output": 9251,
-          "cacheRead": 7549184,
+          "input": 11117041,
+          "output": 26708,
+          "cacheRead": 10579456,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -1217,8 +1218,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 52.165516000000004,
-        "pricingAsOf": "2026-07-15T05:05:37.109Z"
+        "usd": 55.971482,
+        "pricingAsOf": "2026-07-15T06:12:02.091Z"
       }
     },
     "merges": [
