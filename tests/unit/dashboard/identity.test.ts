@@ -1,6 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
-import { shouldRefuseHostDashboardPort } from '../../../src/dashboard/server/identity.js';
+import { getBuildInfo } from '../../../src/lib/deploy/build-info.js';
+import {
+  getDashboardIdentity,
+  shouldRefuseHostDashboardPort,
+} from '../../../src/dashboard/server/identity.js';
+
+describe('dashboard build identity', () => {
+  it('returns null build metadata when build-time globals are undefined', () => {
+    expect(getBuildInfo()).toEqual({ buildCommit: null, builtAt: null });
+  });
+
+  it('includes build metadata without removing existing identity fields', () => {
+    expect(getDashboardIdentity()).toMatchObject({
+      repoRoot: process.cwd(),
+      mode: expect.stringMatching(/^(primary|peer)$/),
+      buildCommit: null,
+      builtAt: null,
+    });
+  });
+});
 
 describe('dashboard identity port guard', () => {
   it('refuses a peer dashboard on the host dashboard API port', () => {

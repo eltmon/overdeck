@@ -14,7 +14,13 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
 import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
+import { getBuildInfo } from '../../../lib/deploy/build-info.js';
+import {
+  computeBuildStaleness,
+  type BuildStaleness,
+} from '../../../lib/deploy/staleness.js';
 import { initEventStore } from '../event-store.js';
+import { getDashboardIdentity } from '../identity.js';
 
 const execAsync = promisify(exec);
 const DEFAULT_HEALTH_POLL_SECONDS = 15;
@@ -138,6 +144,7 @@ export interface SystemHealthSnapshot {
   leakedSpecialists: HealthLeakedSpecialist[];
   topConsumers: HealthConsumer[];
   smeeRelay: SmeeRelayHealth;
+  deployStaleness: BuildStaleness | null;
 }
 
 let dockerStatsCollector: DockerStatsCollector | null = null;
@@ -155,6 +162,44 @@ let cachedResourceConfig = DEFAULT_RESOURCE_CONFIG;
 let cachedPollSeconds = DEFAULT_HEALTH_POLL_SECONDS;
 let resourceConfigLoadedAt = 0;
 let resourceConfigInflight: Promise<void> | null = null;
+let cachedDeployStaleness: BuildStaleness | null = null;
+let hasCachedDeployStaleness = false;
+let deployStalenessCacheExpiresAt = 0;
+let deployStalenessInflight: Promise<BuildStaleness | null> | null = null;
+let computeBuildStalenessFn = computeBuildStaleness;
+const DEPLOY_STALENESS_TTL_MS = 60_000;
+
+export async function getDeployStaleness(): Promise<BuildStaleness | null> {
+  if (hasCachedDeployStaleness && Date.now() < deployStalenessCacheExpiresAt) {
+    return cachedDeployStaleness;
+  }
+
+  if (!deployStalenessInflight) {
+    deployStalenessInflight = computeBuildStalenessFn({
+      repoRoot: getDashboardIdentity().repoRoot,
+      buildCommit: getBuildInfo().buildCommit,
+    }).catch(() => null).then((result) => {
+      cachedDeployStaleness = result;
+      hasCachedDeployStaleness = true;
+      deployStalenessCacheExpiresAt = Date.now() + DEPLOY_STALENESS_TTL_MS;
+      return result;
+    }).finally(() => {
+      deployStalenessInflight = null;
+    });
+  }
+
+  return deployStalenessInflight;
+}
+
+export function _resetDeployStalenessForTests(
+  compute: typeof computeBuildStaleness = computeBuildStaleness,
+): void {
+  cachedDeployStaleness = null;
+  hasCachedDeployStaleness = false;
+  deployStalenessCacheExpiresAt = 0;
+  deployStalenessInflight = null;
+  computeBuildStalenessFn = compute;
+}
 
 function getDockerStatsCollector(): DockerStatsCollector {
   if (!dockerStatsCollector) {
@@ -665,6 +710,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   const overdeckMemoryPercent = toPercent(overdeckMemoryBytes, memory.memTotal);
 
   const sortedAgents = [...agents].sort((a, b) => b.memoryBytes - a.memoryBytes);
+  const deployStaleness = await getDeployStaleness();
 
   // Hysteresis: require HYSTERESIS_POLLS consecutive polls at a new severity
   // before actually transitioning. Prevents flapping when metrics hover near thresholds.
@@ -719,6 +765,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     leakedSpecialists,
     topConsumers: buildTopConsumers(sortedAgents, containers, leakedSpecialists),
     smeeRelay,
+    deployStaleness,
   };
 
   if (previousSeverity && previousSeverity !== result.severity) {
