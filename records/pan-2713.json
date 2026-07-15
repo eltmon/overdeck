@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:50:44.316Z",
+  "updated": "2026-07-15T14:50:52.627Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -247,5 +247,70 @@
     "deploy-docs": "completed",
     "deploy-docs.deploy-docs.ac1": "completed",
     "deploy-docs.deploy-docs.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/merge-agent-step0.ts",
+      "tests/unit/dashboard/identity.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/hooks/useSystemHealth.ts",
+      "tests/unit/lib/deploy/build-info.test.ts"
+    ],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.test.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.tsx",
+      "src/dashboard/frontend/src/hooks/useSystemHealth.ts",
+      "src/dashboard/frontend/src/types.ts",
+      "src/dashboard/server/identity.ts",
+      "src/dashboard/server/services/__tests__/system-health-service.test.ts",
+      "src/dashboard/server/services/system-health-service.ts",
+      "src/dashboard/server/tsdown.config.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/deploy-patrol.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/deploy/build-info.ts",
+      "src/lib/deploy/deploy-window.ts",
+      "src/lib/deploy/staleness.ts",
+      "tests/unit/lib/cloister/deploy-patrol.test.ts",
+      "tests/unit/lib/cloister/merge-agent-step0.test.ts",
+      "tests/unit/lib/deploy/build-info.test.ts",
+      "tests/unit/lib/deploy/deploy-window.test.ts",
+      "tests/unit/lib/deploy/staleness.test.ts",
+      "tsdown.config.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/OVERDECK_DEV_SOP.md",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.test.tsx",
+      "src/dashboard/frontend/src/components/StaleBuildChip.tsx",
+      "src/dashboard/frontend/src/types.ts",
+      "src/dashboard/server/identity.ts",
+      "src/dashboard/server/services/__tests__/system-health-service.test.ts",
+      "src/dashboard/server/services/system-health-service.ts",
+      "src/dashboard/server/tsdown.config.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/deploy-patrol.ts",
+      "src/lib/cloister/merge-agent-step0.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/deploy/build-info.ts",
+      "src/lib/deploy/deploy-window.ts",
+      "src/lib/deploy/staleness.ts",
+      "tests/unit/dashboard/identity.test.ts",
+      "tests/unit/lib/cloister/deploy-patrol.test.ts",
+      "tests/unit/lib/cloister/merge-agent-step0.test.ts",
+      "tests/unit/lib/deploy/deploy-window.test.ts",
+      "tests/unit/lib/deploy/staleness.test.ts",
+      "tsdown.config.ts"
+    ],
+    "recordedAt": "2026-07-15T14:50:52.626Z"
   }
 }
