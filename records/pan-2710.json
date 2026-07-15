@@ -456,7 +456,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T18:17:53.298Z",
+  "updated": "2026-07-15T18:17:54.334Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
@@ -466,12 +466,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T18:17:53.137Z",
+    "updatedAt": "2026-07-15T18:17:54.273Z",
     "reviewNotes": "Agent re-review request (7/25): Fixed review issues",
     "inspectNotes": "Verified against ab30bec102 (src/lib/cloister/stale-check-classifier.ts + tests/unit/lib/cloister/stale-check-classifier.test.ts). AC1: computeRedWindows closes fail(t1)->success(t2) into one {start,end} window, trailing fail leaves end:null (tests confirm). AC2: selectRerunCandidates requires completed+attempt===1+failing-concluded+containing closed window of same workflowName before adding to rerun[]. AC3: main-still-red (open window), no-red-window-match (green interval / predating history / workflow mismatch), attempt-exceeded (attempt!==1), missing-attempt (checked before other reasons) all covered by dedicated tests with exact reason strings. AC4: module is pure (no fs/network I/O, operates only on passed-in arrays); imports FAILING_CHECK_CONCLUSIONS from ../webhook-handlers.js (webhook-handlers.ts:192) rather than duplicating the conclusion set; test 'recognizes every conclusion from the canonical failing set' cross-checks all 7 values. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
     "lastVerifiedCommit": "ae5cd253bf15f72c1d6bdc39b3f730d32285525d",
-    "reviewRequestedAt": "2026-07-15T18:16:56.955Z",
+    "reviewRequestedAt": "2026-07-15T18:17:53.875Z",
     "reviewSpawnedAt": "2026-07-15T18:16:58.814Z"
   },
   "closeOut": {
@@ -536,7 +536,7 @@
       },
       "costAtCloseOut": {
         "usd": 89.6426,
-        "pricingAsOf": "2026-07-15T18:17:53.276Z"
+        "pricingAsOf": "2026-07-15T18:17:54.306Z"
       }
     },
     "merges": [
