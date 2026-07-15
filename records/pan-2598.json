@@ -214,14 +214,11 @@
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/agent-targeting.test.ts",
-      "src/cli/commands/__tests__/start-plan-routing.test.ts",
-      "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/server/routes/__tests__/hooks-turn-complete.test.ts",
       "src/dashboard/server/services/__tests__/conversation-compaction.test.ts",
       "src/lib/channels/__tests__/overdeck-bridge.test.ts",
       "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
-      "tests/cli/commands/work/issue-beads-check.test.ts",
       "tests/lib/agents-compact-session.test.ts",
       "tests/unit/lib/cloister/feedback-target.test.ts"
     ],
@@ -252,8 +249,6 @@
       "packages/contracts/src/types.ts",
       "scripts/file-size-baseline.txt",
       "src/cli/commands/__tests__/agent-targeting.test.ts",
-      "src/cli/commands/__tests__/start-plan-routing.test.ts",
-      "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
       "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.test.tsx",
       "src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx",
@@ -267,7 +262,6 @@
       "src/lib/channels/__tests__/overdeck-bridge.test.ts",
       "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
       "sync-sources/hooks/ask-user-question-hook",
-      "tests/cli/commands/work/issue-beads-check.test.ts",
       "tests/lib/agent-enrichment-pending-inputs.test.ts",
       "tests/lib/agents-compact-session.test.ts",
       "tests/lib/auq-hook-detector-contract.test.ts",
@@ -275,10 +269,10 @@
       "tests/unit/dashboard/server/routes/projects.test.ts",
       "tests/unit/lib/cloister/feedback-target.test.ts"
     ],
-    "recordedAt": "2026-07-13T10:56:03.885Z"
+    "recordedAt": "2026-07-15T15:35:35.783Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:35:26.921Z",
+  "updated": "2026-07-15T15:35:35.784Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "reviewing",
