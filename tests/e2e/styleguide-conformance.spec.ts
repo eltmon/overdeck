@@ -383,7 +383,9 @@ beforeAll(async () => {
       name: 'styleguide-empty-index-css',
       enforce: 'pre',
       transform(_code: string, id: string) {
-        return id.endsWith('/src/index.css') ? { code: '', map: null } : null;
+        return id.endsWith('/src/index.css')
+          ? { code: '.font-display { font-family: "Space Grotesk", system-ui, sans-serif; }', map: null }
+          : null;
       },
     }],
     server: { host: '127.0.0.1', port: 0, watch: null },
@@ -542,5 +544,34 @@ describe('styleguide rendered surface conformance', () => {
     }), renderPoll).toEqual([{ path: '/api/agents/agent-pan-1148/untroubled', method: 'POST' }]);
 
     await context.close();
+  }, 45_000);
+
+  it('enforces visual contracts from the style guide (grid, badge tokens, drawer title font)', async () => {
+    const { context, page } = await openRoute('/pipeline');
+    const row = page.locator('[data-component="issue-row"][data-issue-id="PAN-1148"]');
+    await expect.poll(() => row.count(), renderPoll).toBe(1);
+    const grid = await row.evaluate((node) => window.getComputedStyle(node).gridTemplateColumns);
+    expect(grid).toBe('14px 78px 14px 1fr 220px 84px 26px');
+
+    const badges = page.locator('[data-component="verb-badge"]');
+    await expect.poll(() => badges.count(), renderPoll).toBeGreaterThan(0);
+    const badgeClass = await badges.first().getAttribute('class');
+    expect(badgeClass).toMatch(/\bbadge-bg-/);
+    expect(badgeClass).toMatch(/\bbadge-border-/);
+    await context.close();
+
+    const drawer = await openRoute('/pipeline?issue=PAN-1148&tab=overview');
+    const drawerTitle = drawer.page.locator('[data-testid="issue-drawer"] h2');
+    await expect.poll(() => drawerTitle.count(), renderPoll).toBe(1);
+    const drawerFont = await drawerTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
+    expect(drawerFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
+    await drawer.context.close();
+
+    const commandDeck = await openRoute('/command-deck');
+    const treeTitle = commandDeck.page.getByTestId('command-deck-tree-title').first();
+    await expect.poll(() => treeTitle.count(), renderPoll).toBe(1);
+    const treeTitleFont = await treeTitle.evaluate((node) => window.getComputedStyle(node).fontFamily);
+    expect(treeTitleFont.split(',')[0]?.replace(/["']/g, '').trim()).toBe('Space Grotesk');
+    await commandDeck.context.close();
   }, 45_000);
 });

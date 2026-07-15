@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 const mocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
@@ -115,6 +115,7 @@ describe('messageAgent', () => {
   });
 
   afterEach(() => {
+    rmSync('/tmp/agent-pan-2262', { recursive: true, force: true });
     rmSync('/tmp/agent-pan-2701', { recursive: true, force: true });
   });
 
@@ -150,8 +151,6 @@ describe('messageAgent', () => {
       workspace: '/repo',
       harness: 'codex',
     });
-    mocks.waitForAgentIdle.mockResolvedValue(false);
-
     await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
 
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
@@ -171,13 +170,37 @@ describe('messageAgent', () => {
       workspace: '/repo',
       harness: 'codex',
     });
+    mkdirSync('/tmp/agent-pan-2701', { recursive: true });
+    writeFileSync('/tmp/agent-pan-2701/turn-completed', new Date().toISOString());
 
     await messageAgent('agent-pan-2701', 'operator message', 'pan-tell');
 
     expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+    expect(existsSync('/tmp/agent-pan-2701/turn-completed')).toBe(false);
     const files = readdirSync('/tmp/agent-pan-2701/mail');
     expect(files).toHaveLength(1);
     expect(files[0]).toMatch(/\.md$/);
     expect(files[0]).not.toContain('.pending.md');
+  });
+
+  it('queues a second codex message until the current turn completes', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2701',
+      issueId: 'PAN-2701',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'codex',
+    });
+    mkdirSync('/tmp/agent-pan-2701', { recursive: true });
+    writeFileSync('/tmp/agent-pan-2701/turn-completed', new Date().toISOString());
+
+    await messageAgent('agent-pan-2701', 'first message', 'pan-tell');
+    await messageAgent('agent-pan-2701', 'second message', 'pan-tell');
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+    const pending = readdirSync('/tmp/agent-pan-2701/mail')
+      .filter((file) => file.endsWith('.pending.md'));
+    expect(pending).toHaveLength(1);
+    expect(readFileSync(`/tmp/agent-pan-2701/mail/${pending[0]}`, 'utf-8')).toContain('second message');
   });
 });

@@ -57,6 +57,7 @@ export interface DashboardStore extends DashboardState {
    */
   seedRecentActivity(entries: unknown[]): void
   openIssue(issueId: string, tab?: string): void
+  openIssueFromRoute(issueId: string, parentPath: string, routePath: string): void
   closeIssue(): void
   setDrawerTab(tab: string): void
   syncDrawerFromUrl(): void
@@ -126,6 +127,8 @@ function readDrawerFromUrl(): DrawerState {
   }
 }
 
+let directIssueRoute: { parentPath: string; routePath: string } | null = null
+
 export const useDashboardStore = create<DashboardStore>((set) => ({
   ...initialState,
 
@@ -158,14 +161,26 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     }),
 
   openIssue: (issueId, tab = 'overview') => {
+    directIssueRoute = null
     const drawer = { issueId, tab }
     replaceDrawerUrl(drawer)
     set({ drawer })
   },
 
+  openIssueFromRoute: (issueId, parentPath, routePath) => {
+    directIssueRoute = { parentPath, routePath }
+    set({ drawer: { issueId, tab: 'overview' } })
+  },
+
   closeIssue: () => {
     const drawer = { issueId: null, tab: 'overview' }
-    replaceDrawerUrl(drawer)
+    if (typeof window !== 'undefined' && directIssueRoute?.routePath === window.location.pathname) {
+      window.history.replaceState(null, '', directIssueRoute.parentPath)
+      directIssueRoute = null
+    } else {
+      directIssueRoute = null
+      replaceDrawerUrl(drawer)
+    }
     set({ drawer })
   },
 
@@ -177,7 +192,10 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     }),
 
   syncDrawerFromUrl: () =>
-    set({ drawer: readDrawerFromUrl() }),
+    set(() => {
+      directIssueRoute = null
+      return { drawer: readDrawerFromUrl() }
+    }),
 }))
 
 // ─── Selector memoization helpers ─────────────────────────────────────────────

@@ -376,7 +376,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
 
   // ── projects.ts ───────────────────────────────────────────────────────────
   { surface: 'GET /api/projects/:projectKey/session-tree',          kind: 'http', disposition: 'RELOCATE',    door: 'Conversations (session tree)' },
-  { surface: 'GET /api/projects/:projectKey/release-status',        kind: 'http', disposition: 'READ',        door: 'Project release-status resolver' },
+  { surface: 'GET /api/projects/:projectKey/release-status',        kind: 'http', disposition: 'READ',        door: 'ProjectPipelinesResolver.fetchProjectReleaseStatus (PAN-2555)' },
   { surface: 'GET /api/session-trees',                              kind: 'http', disposition: 'RELOCATE',    door: 'Conversations' },
   { surface: 'GET /api/projects/:projectKey/auto-merge-default',    kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (autoMergeDefault field)' },
   { surface: 'POST /api/projects/:projectKey/auto-merge-default',   kind: 'http', disposition: 'RELOCATE',    door: 'Config (ConfigWriter.setAutoMergeDefault, to be designed)' },
