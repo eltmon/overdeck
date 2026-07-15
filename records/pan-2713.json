@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:21:46.659Z",
+  "updated": "2026-07-15T14:23:47.413Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "health-staleness-surface": {
-        "writerId": "agent-pan-2713",
-        "agentId": "agent-pan-2713",
-        "pid": 857715,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:21:46.659Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -113,6 +105,17 @@
         "outcome": "completed",
         "reason": "Added async Git-based build staleness computation with filtered build-input counts, fetch throttling/fallback, unknown degradation, and fake-timer coverage.",
         "releasedAt": "2026-07-15T14:17:07.798Z"
+      },
+      {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 857715,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:21:46.659Z",
+        "itemId": "health-staleness-surface",
+        "outcome": "completed",
+        "reason": "Added cached deploy staleness to system-health snapshots and frontend types, with success, null-on-error, and 60-second cache tests.",
+        "releasedAt": "2026-07-15T14:23:47.413Z"
       }
     ],
     "statusReasons": {
@@ -123,6 +126,10 @@
       "staleness-module": {
         "reason": "Added async Git-based build staleness computation with filtered build-input counts, fetch throttling/fallback, unknown degradation, and fake-timer coverage.",
         "updatedAt": "2026-07-15T14:17:07.798Z"
+      },
+      "health-staleness-surface": {
+        "reason": "Added cached deploy staleness to system-health snapshots and frontend types, with success, null-on-error, and 60-second cache tests.",
+        "updatedAt": "2026-07-15T14:23:47.413Z"
       }
     }
   },
@@ -137,6 +144,9 @@
     "staleness-module.staleness-module.ac3": "completed",
     "staleness-module.staleness-module.ac4": "completed",
     "staleness-module.staleness-module.ac5": "completed",
-    "health-staleness-surface": "running"
+    "health-staleness-surface": "completed",
+    "health-staleness-surface.health-staleness-surface.ac1": "completed",
+    "health-staleness-surface.health-staleness-surface.ac2": "completed",
+    "health-staleness-surface.health-staleness-surface.ac3": "completed"
   }
 }
