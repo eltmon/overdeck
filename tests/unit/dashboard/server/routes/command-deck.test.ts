@@ -45,9 +45,9 @@ vi.mock('../../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssue: vi.fn(),
 }));
 
-const mockIsPlanningCompleteSync = vi.hoisted(() => vi.fn(() => false));
+const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
 vi.mock('../../../../../src/lib/vbrief/io.js', () => ({
-  isPlanningCompleteSync: mockIsPlanningCompleteSync,
+  isPlanningComplete: mockIsPlanningComplete,
   readWorkspacePlan: vi.fn(),
 }));
 
@@ -137,7 +137,7 @@ describe('fetchActivityDataWithContext', () => {
     vi.clearAllMocks();
     mockAgentStates.clear();
     mockRuntimeStates.clear();
-    mockIsPlanningCompleteSync.mockReturnValue(false);
+    mockIsPlanningComplete.mockReturnValue(Effect.succeed(false));
   });
 
   it('leaves endedAt undefined for a live work session', async () => {
@@ -208,7 +208,7 @@ describe('fetchActivityDataWithContext', () => {
     });
     mockRuntimeStates.set(planningId, { state: 'active' });
     mockRuntimeStates.set(workId, { state: 'active' });
-    mockIsPlanningCompleteSync.mockReturnValue(true);
+    mockIsPlanningComplete.mockReturnValue(Effect.succeed(true));
 
     const result = await fetchActivityDataWithContext(issueId, { tmuxSessionNames: new Set([planningId, workId]) });
     const sections = (result as { sections: Array<{ sessionId: string; planningComplete?: boolean; duration: number | null }> }).sections;

@@ -64,7 +64,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { isPlanningCompleteSync, readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { isPlanningComplete, readWorkspacePlan } from '../../../lib/vbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -275,13 +275,9 @@ export async function fetchActivityDataWithContext(
   const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
 
   // Resolve once per request: canonical spec exists and planning has finished.
-  const planningFinished = (() => {
-    try {
-      return isPlanningCompleteSync(workspacePath);
-    } catch {
-      return false;
-    }
-  })();
+  const planningFinished = await Effect.runPromise(
+    isPlanningComplete(workspacePath).pipe(Effect.orElseSucceed(() => false)),
+  );
 
   const agentId = `agent-${issueLower}`;
   const planningAgentId = `planning-${issueLower}`;

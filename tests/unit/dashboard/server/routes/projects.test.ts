@@ -78,9 +78,9 @@ vi.mock('node:fs/promises', async () => {
   };
 });
 
-const mockIsPlanningCompleteSync = vi.hoisted(() => vi.fn(() => false));
+const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
 vi.mock('../../../../../src/lib/vbrief/io.js', () => ({
-  isPlanningCompleteSync: mockIsPlanningCompleteSync,
+  isPlanningComplete: mockIsPlanningComplete,
 }));
 
 import { fetchProjectSessionTree, getSlotWorkSessionNumber } from '../../../../../src/dashboard/server/routes/projects.ts';
@@ -131,6 +131,7 @@ describe('fetchProjectSessionTree', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAgentStates.clear();
+    mockIsPlanningComplete.mockReturnValue(Effect.succeed(false));
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed(null));
     (getReviewStatusSync as any).mockReturnValue(null);
@@ -543,7 +544,7 @@ describe('fetchProjectSessionTree', () => {
       '/tmp/overdeck/workspaces/feature-pan-539/.pan/continue.json',
     ]));
     mockWorkspaceReaddir([FEATURE_PAN_539_DIRENT]);
-    mockIsPlanningCompleteSync.mockReturnValue(true);
+    mockIsPlanningComplete.mockReturnValue(Effect.succeed(true));
 
     const result = await fetchProjectSessionTree('overdeck');
 
@@ -669,6 +670,7 @@ describe('fetchProjectSessionTree', () => {
     expect(sessions[0]?.type).toBe('planning');
     expect(sessions[0]?.presence).not.toBe('ended');
     expect(sessions[0]?.tmuxSession).toBe('planning-pan-999');
+    expect(sessions[0]?.startedAt).toBe('1970-01-01T00:00:00.000Z');
   });
 
   it('emits exactly one planning node when a registered planning agent exists', async () => {

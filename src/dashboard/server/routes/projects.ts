@@ -37,7 +37,7 @@ import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
-import { isPlanningCompleteSync } from '../../../lib/vbrief/io.js';
+import { isPlanningComplete } from '../../../lib/vbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
 
@@ -120,6 +120,16 @@ function escapeRegExp(value: string): string {
 
 function getSlotWorkSessionPattern(issueLower: string): RegExp {
   return new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`, 'i');
+}
+
+function issueIdsWithLiveTmuxSessions(sessionNames: ReadonlySet<string>): Set<string> {
+  const issueIds = new Set<string>();
+  for (const sessionName of sessionNames) {
+    const match = /^(?:planning|strike)-([a-z]+-\d+)$|^agent-([a-z]+-\d+)(?:-plan)?$/i.exec(sessionName);
+    const issueId = match?.[1] ?? match?.[2];
+    if (issueId) issueIds.add(issueId.toLowerCase());
+  }
+  return issueIds;
 }
 
 export function getSlotWorkSessionNumber(sessionId: string, issueLower: string): number | null {
@@ -214,12 +224,9 @@ async function collectSessionTreeNodes(
   let hasPlanningSection = false;
 
   // Resolve once per request: canonical spec exists and planning has finished.
-  let planningFinished = false;
-  try {
-    planningFinished = isPlanningCompleteSync(workspacePath);
-  } catch {
-    // ignore read/parse failures — treat as unfinished
-  }
+  const planningFinished = await Effect.runPromise(
+    isPlanningComplete(workspacePath).pipe(Effect.orElseSucceed(() => false)),
+  );
 
   const candidateSessionIds = new Set<string>([
     planningAgentId,
@@ -327,12 +334,16 @@ async function collectSessionTreeNodes(
         : null;
     if (planningTmuxId) {
       const jsonlPath = await resolveJsonlPath(planningTmuxId, workspacePath);
+      const jsonlStat = jsonlPath ? await stat(jsonlPath).catch(() => null) : null;
+      const stableStartedAt = jsonlStat
+        ? (jsonlStat.birthtimeMs > 0 ? jsonlStat.birthtime : jsonlStat.mtime).toISOString()
+        : new Date(0).toISOString();
       const presence = await deriveSessionPresence(planningTmuxId, null, context.tmuxSessionNames);
       sections.push({
         type: 'planning',
         sessionId: planningTmuxId,
         model: 'unknown',
-        startedAt: new Date().toISOString(),
+        startedAt: stableStartedAt,
         duration: null,
         status: 'running',
         presence,
@@ -560,6 +571,7 @@ export async function fetchProjectSessionTree(
   // Reuse shared request-scoped data when provided; otherwise fetch lazily.
   const sharedTmuxSessionNames = sharedContext?.tmuxSessionNames
     ?? new Set((await Effect.runPromise(listSessionNames()).catch(() => [] as string[])).filter(s => s.trim()));
+  const liveTmuxIssueIds = issueIdsWithLiveTmuxSessions(sharedTmuxSessionNames);
 
   const effectiveSharedContext: SessionTreeContext = {
     tmuxSessionNames: sharedTmuxSessionNames,
@@ -591,8 +603,7 @@ export async function fetchProjectSessionTree(
         const planRunAgentDir = join(getOverdeckHome(), 'agents', `agent-${c.issueLower}-plan`);
         const panDir = join(workspacesDir, c.name, PAN_DIRNAME);
         const overdeckDir = join(workspacesDir, c.name, WORKSPACE_RUNTIME_DIRNAME);
-        const issueTmuxPattern = new RegExp(`^(planning-${escapeRegExp(c.issueLower)}|agent-${escapeRegExp(c.issueLower)}(-plan)?|strike-${escapeRegExp(c.issueLower)})$`, 'i');
-        const hasIssueTmux = [...sharedTmuxSessionNames].some((s) => issueTmuxPattern.test(s));
+        const hasIssueTmux = liveTmuxIssueIds.has(c.issueLower);
         const [hasAgent, hasPlanning, hasPlanningAgent, hasPlanRunAgent, hasOverdeck] = await Promise.all([
           pathExists(agentDir),
           pathExists(panDir),
