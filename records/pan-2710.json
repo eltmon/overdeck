@@ -37,9 +37,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T16:35:32.864Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T16:37Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T16:37:22.173Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T16:37:22Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T16:55:00-04:00\n\n## Verdict: CHANGES REQUESTED — prior blockers remain unchanged after an unrelated main merge\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-0edb5ed4/context.json\n- Branch: feature/2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: 0edb5ed42beacc97d2bbb76e56bf641fb0417a94\n- Cycle number: 2\n- Prior cycle SHA: 3015d4d1bfb4073102f1b16a5da68263fa4c7b83\n- Cycle diff: only `docs/FLYWHEEL-STATE.md` changed through a merge from `origin/main`; the three blocked implementation paths are unchanged\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-0edb5ed4/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-0edb5ed4/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-0edb5ed4/performance.md | 2 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-0edb5ed4/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] PR run discovery omits canonical failing conclusions other than `failure` — `src/lib/cloister/stale-check-github.ts:37`\n`gh run list --status failure` filters runs before the classifier sees them, although the canonical failing set also includes `ERROR`, `TIMED_OUT`, `CANCELLED`, `ACTION_REQUIRED`, `STARTUP_FAILURE`, and `STALE`. FR-3 remains partial and managed PRs with those conclusions can remain blocked after main recovers. The implementation and tests are unchanged since cycle 1.\n\n### [performance] Interval ticks can overlap and multiply GitHub CLI subprocesses — `src/dashboard/server/services/stale-check-retrigger-service.ts:113`\nThe 60-second interval still launches `tickOnce` without awaiting or guarding the previous invocation. Slow GitHub operations can accumulate concurrent reconciliation passes and exceed the intended aggregate five-rerun limit. The implementation and fake-timer tests are unchanged since cycle 1.\n\n### [performance] Process-lifetime deduplication state grows without eviction — `src/dashboard/server/services/stale-check-retrigger-service.ts:28`\n`lastEvaluated`, `attemptedRunIds`, and `loggedSkips` still retain completed issues and historical run IDs until dashboard shutdown. Their size remains tied to all process-lifetime activity rather than the active candidate set. The implementation is unchanged since cycle 1.\n\n## Non-blocking Findings\n\n### [correctness] PR runs with non-`failure` failing conclusions are never considered\nThis duplicates the requirements blocker and is retained there at blocker severity.\n\n### [correctness] Overlapping polls can exceed the five-rerun cap\nThis is a consequence of the performance overlap blocker and is retained there at blocker severity.\n\n## Scope Note\nThe cycle diff contains only an unrelated `docs/FLYWHEEL-STATE.md` merge from main. Because this is cycle 2, the convergence gate does not demote the unchanged cycle-1 blockers; all three remain inside the PR diff and unresolved.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-0edb5ed4/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -66,7 +79,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:36:13.395Z",
+  "updated": "2026-07-15T16:37:22.173Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
