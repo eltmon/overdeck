@@ -2,479 +2,685 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Tiered Execution settings — redesign (PAN-2684)</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --bg:#0b0e14;--card:#11151f;--card2:#0e1219;--panel:#141a24;--border:#1e2430;--border-hi:#2c3547;
-    --fg:#e6e9ef;--muted:#8b93a5;--faint:#5b6373;
-    --teal:#2dd4bf;--blue:#3b82f6;--violet:#8b5cf6;--amber:#f59e0b;--red:#ef4444;--green:#34d399;--cyan:#22d3ee;
-  }
-  *{box-sizing:border-box}
-  body{background:var(--bg);color:var(--fg);font:13.5px/1.5 "DM Sans",system-ui,sans-serif;font-weight:500;margin:0;padding:24px 28px;max-width:1280px}
-  h1{font:600 20px "Space Grotesk";margin:0 0 3px}
-  h2{font:600 14px "Space Grotesk";margin:24px 0 8px}
-  .sub{color:var(--muted);font-size:12px;margin-bottom:18px}
-  .sub a{color:var(--blue);text-decoration:none}
-  .mono{font-family:"DM Mono",monospace}
-  .layout{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
-
-  .card{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:14px 16px;margin-bottom:12px}
-  .row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-  .grow{flex:1;min-width:0}
-  select,input[type=text],input[type=number]{
-    appearance:none;background:var(--panel);border:1px solid var(--border-hi);border-radius:6px;color:var(--fg);
-    font:500 11.5px "DM Sans";padding:4px 8px}
-  select{padding-right:20px;background-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="5" viewBox="0 0 8 5"><path d="M0 0l4 5 4-5z" fill="%238b93a5"/></svg>');background-repeat:no-repeat;background-position:right 7px center;cursor:pointer}
-  select:focus,input:focus{outline:none;border-color:var(--blue)}
-  .switch{width:34px;height:18px;border-radius:99px;background:#1a2130;position:relative;cursor:pointer;flex:none;border:none;padding:0}
-  .switch.on{background:var(--blue)}
-  .switch::after{content:"";position:absolute;width:13px;height:13px;border-radius:99px;background:#fff;top:2.5px;left:3px;transition:transform .15s}
-  .switch.on::after{transform:translateX(15px)}
-  .hint{font-size:11px;color:var(--muted)}
-  .hint .mono{font-size:10px}
-  .statuschip{font:500 10px "DM Mono";letter-spacing:.04em;border-radius:4px;padding:2px 7px}
-  .st-ok{background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.32);color:#a7f3d0}
-  .st-off{background:rgba(139,147,165,.1);border:1px solid rgba(139,147,165,.25);color:var(--muted)}
-  .st-bad{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.4);color:#fca5a5}
-
-  /* ladder */
-  .ladder{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-  .lcol{border:1px solid var(--border);border-radius:9px;background:var(--card2);padding:9px 10px;border-top-width:3px}
-  .lcol .d{font:600 10px "DM Mono";letter-spacing:.07em;text-transform:uppercase;color:var(--fg)}
-  .lcol .esc{font-size:9px;color:var(--faint);margin-top:1px}
-  .lcol select{width:100%;margin-top:7px}
-  .lcol .staff{font-family:"DM Mono";font-size:9.5px;color:var(--muted);margin-top:6px;line-height:1.45;min-height:26px}
-  .lcol .costq{font-family:"DM Mono";font-size:9.5px;color:var(--cyan);margin-top:2px}
-  .escrow{display:flex;align-items:center;gap:4px;margin:8px 2px 0;font-size:9.5px;color:var(--faint)}
-  .escrow .arr{color:var(--faint)}
-  .kindpins{margin-top:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-  .chip{display:inline-flex;align-items:center;gap:5px;font:500 10px "DM Mono";border:1px solid var(--border-hi);border-radius:4px;padding:2px 7px;color:var(--muted);background:var(--panel)}
-  .chip.ov{border-color:rgba(59,130,246,.5);color:#93c5fd}
-  .chip button{background:none;border:none;color:var(--faint);cursor:pointer;font-size:10px;padding:0}
-  .addbtn{font:500 11px "DM Sans";border:1px solid var(--border-hi);border-radius:6px;background:var(--panel);color:var(--fg);padding:3px 10px;cursor:pointer}
-  .warnchip{display:inline-flex;align-items:center;gap:4px;font:500 9.5px "DM Mono";border-radius:4px;padding:1px 6px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.32);color:#fcd34d}
-
-  /* tier roster */
-  .trow{border:1px solid var(--border);border-radius:9px;background:var(--card2);margin-bottom:8px;overflow:hidden}
-  .thead{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer}
-  .tdot{width:8px;height:8px;border-radius:2px;flex:none}
-  .tname{font-family:"DM Mono";font-size:12px}
-  .tstaff{font-family:"DM Mono";font-size:10.5px;color:var(--muted)}
-  .towns{font-size:10px;color:var(--faint);margin-left:auto}
-  .tcost{font-family:"DM Mono";font-size:10.5px;color:var(--cyan);width:88px;text-align:right}
-  .caret{color:var(--faint);font-size:10px;width:12px}
-  .tbody{display:none;border-top:1px solid var(--border);padding:11px 12px;background:rgba(255,255,255,.012)}
-  .trow.open .tbody{display:block}
-  .distbar{display:flex;height:8px;border-radius:4px;overflow:hidden;border:1px solid var(--border);margin:4px 0 8px}
-  .distbar div{height:100%}
-  .distline{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.1fr) 64px 60px;gap:8px;align-items:center;margin-bottom:6px}
-  .distline .rm{font-size:10px;color:var(--faint);background:none;border:1px solid var(--border);border-radius:5px;padding:3px 0;cursor:pointer}
-  .fieldlbl{font-size:10px;color:var(--faint);margin-bottom:3px}
-  .total{font-family:"DM Mono";font-size:10px}
-  .total.bad{color:#fca5a5}
-  .total.ok{color:var(--muted)}
-  .footbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
-  .footbtns .danger{color:#fca5a5;border-color:rgba(239,68,68,.35)}
-
-  /* sentence cards */
-  .sent{font-size:12.5px}
-  .sent b{font-weight:600}
-  .disc{border:1px solid var(--border);border-radius:9px;background:var(--card2);margin-bottom:8px}
-  .dischead{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer}
-  .dischead .t{font:600 12px "DM Sans"}
-  .dischead .sum{font-size:11px;color:var(--muted);margin-left:auto;text-align:right}
-  .discbody{display:none;border-top:1px solid var(--border);padding:11px 12px}
-  .disc.open .discbody{display:block}
-  .fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .fgrid5{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
-  label.f{display:block}
-  label.f input,label.f select{width:100%;margin-top:3px}
-  .newtag{font:500 8px "DM Mono";letter-spacing:.06em;text-transform:uppercase;color:var(--blue);border:1px solid rgba(59,130,246,.4);border-radius:4px;padding:1px 4px;vertical-align:1px}
-
-  /* yaml */
-  .yaml{position:sticky;top:16px;border:1px solid var(--border);border-radius:12px;background:#0a0d12;padding:12px 14px}
-  .yaml h3{font:600 10px "DM Mono";letter-spacing:.07em;text-transform:uppercase;color:var(--faint);margin:0 0 8px}
-  .yaml pre{margin:0;font:400 10px/1.55 "DM Mono";color:#9fe7d4;white-space:pre;overflow-x:auto}
-
-  table.audit{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:6px}
-  table.audit th,table.audit td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--border)}
-  table.audit th{font:600 9.5px "Space Grotesk";text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-  .deltas{font-size:11.5px;color:var(--muted);border-left:2px solid var(--border);padding-left:12px}
-  .deltas li{margin-bottom:4px}
-</style>
 </head>
 <body>
+<style>
+  :root {
+    --pan-scheme: light;
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --card-2: #f7f7f8;
+    --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --success: #10b981;
+    --success-foreground: #047857;
+    --signal-cost: #06b6d4;
+    --signal-cost-foreground: #0e7490;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+    --crew-a: #0d9488; --crew-b: #4f46e5; --crew-c: #9333ea; --crew-d: #b45309; --crew-e: #047857;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --pan-scheme: dark;
+      --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+      --primary: oklch(0.588 0.217 264); --primary-foreground: #ffffff;
+      --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+      --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+      --destructive: #f87171; --destructive-foreground: #fca5a5;
+      --warning: #f59e0b; --warning-foreground: #fbbf24;
+      --success: #10b981; --success-foreground: #34d399;
+      --signal-cost: #06b6d4; --signal-cost-foreground: #22d3ee;
+      --shadow-card: none;
+      --crew-a: #2dd4bf; --crew-b: #818cf8; --crew-c: #c084fc; --crew-d: #fbbf24; --crew-e: #34d399;
+    }
+  }
+  :root[data-theme="dark"] {
+    --pan-scheme: dark;
+    --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f; --popover: #0c1018;
+    --primary: oklch(0.588 0.217 264); --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --signal-cost: #06b6d4; --signal-cost-foreground: #22d3ee;
+    --shadow-card: none;
+    --crew-a: #2dd4bf; --crew-b: #818cf8; --crew-c: #c084fc; --crew-d: #fbbf24; --crew-e: #34d399;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light;
+    --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8; --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264); --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c;
+    --warning: #f59e0b; --warning-foreground: #b45309;
+    --success: #10b981; --success-foreground: #047857;
+    --signal-cost: #06b6d4; --signal-cost-foreground: #0e7490;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+    --crew-a: #0d9488; --crew-b: #4f46e5; --crew-c: #9333ea; --crew-d: #b45309; --crew-e: #047857;
+  }
 
-<h1>Tiered Execution — settings redesign</h1>
-<div class="sub">PAN-2684 · same treatment as the issue policy strip: quiet defaults, overrides-only visibility, invalid states unrepresentable · seeded with the operator's live config · interactive — everything below works and updates the YAML preview.</div>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-weight: 500; font-size: 14px; line-height: 1.55; color-scheme: var(--pan-scheme);
+  }
+  .mono { font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace; }
+  .page { max-width: 920px; margin: 0 auto; padding: 40px 24px 96px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+  h1 { font-size: 21px; font-weight: 500; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 36px; max-width: 66ch; }
+  .doc-sub .mono { font-size: 12px; }
+  h2 { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted-foreground); margin: 44px 0 12px; }
+  p.note { color: var(--muted-foreground); font-size: 13px; max-width: 68ch; margin: 10px 0; }
+  p.note strong { color: var(--foreground); font-weight: 500; }
+  button.theme-toggle { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  button.theme-toggle:hover { color: var(--foreground); }
 
-<div class="layout">
-<div>
+  .frame { background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-card); padding: 18px 20px; }
 
-  <!-- enable -->
-  <div class="card">
-    <div class="row">
-      <div class="grow">
-        <div style="font:600 13px 'DM Sans'">Tiered execution</div>
-        <div class="hint">Routes each task to the cheapest tier that can do it. Per issue, the Standing Crew override on the issue record beats the plan's metadata, which beats this switch.</div>
+  /* ---- CURRENT (faithful, condensed) ---- */
+  .cur { font-size: 12px; }
+  .cur .secline { display:flex; justify-content:space-between; align-items:center; margin: 0 0 8px; }
+  .cur .secline b { font-weight: 500; font-size: 13px; }
+  .cur .box { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  .cur .dgrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .cur .dgrid div { background: var(--card-2); border-radius: 6px; padding: 6px 8px; }
+  .cur .dgrid .t { font-size: 11px; }
+  .cur .dgrid .v { font-size: 10.5px; color: var(--muted-foreground); }
+  .cur select, .cur input { border-radius: 5px; border: 1px solid var(--input); background: var(--popover); color: var(--foreground); padding: 2px 6px; font: inherit; font-size: 11px; }
+  .cur .distrow { display:grid; grid-template-columns: 1.4fr 1fr 60px 60px; gap:6px; margin-bottom:5px; }
+  .cur .kgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .cur .kgrid label { display:block; font-size:11px; }
+  .cur .kgrid select { width:100%; margin-top:2px; }
+  .cur .chk { display:inline-flex; align-items:center; gap:4px; border:1px solid var(--border); border-radius:5px; padding:2px 6px; font-size:10.5px; margin-right:4px; }
+  .callouts { margin: 14px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 70ch; display: grid; gap: 7px; }
+  .callouts li { padding-left: 22px; position: relative; }
+  .callouts li::before {
+    content: attr(data-n); position: absolute; left: 0; top: 2px; width: 15px; height: 15px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--destructive) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+    color: var(--destructive-foreground);
+  }
+  .callouts strong { color: var(--foreground); font-weight: 500; }
+
+  /* ---- PROPOSED ---- */
+  .scenarios { display: flex; gap: 6px; margin: 0 0 12px; flex-wrap: wrap; }
+  .scenarios span { font-size: 11px; color: var(--muted-foreground); align-self: center; margin-right: 2px; }
+  .scenarios button { border: 1px solid var(--border); background: none; border-radius: 5px; color: var(--muted-foreground); font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
+  .scenarios button:hover { color: var(--foreground); background: var(--muted); }
+  .scenarios button.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  .enrow { display:flex; align-items:center; gap:12px; margin-bottom: 16px; }
+  .enrow .grow { flex:1; }
+  .enrow b { font-weight:500; font-size:14px; }
+  .enrow .hint { font-size:12px; color: var(--muted-foreground); max-width: 58ch; }
+  .switch { width: 34px; height: 18px; border-radius: 99px; background: var(--input); position: relative; cursor: pointer; flex: none; border: none; padding: 0; }
+  .switch.on { background: var(--primary); }
+  .switch::after { content: ""; position: absolute; width: 13px; height: 13px; border-radius: 99px; background: #fff; top: 2.5px; left: 3px; transition: transform .15s; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+  .switch.on::after { transform: translateX(15px); }
+  @media (prefers-reduced-motion: reduce) { .switch::after { transition: none; } }
+
+  .board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+  .bcol { padding: 10px 11px 12px; border-left: 1px solid var(--border); border-top: 3px solid transparent; background: var(--card); }
+  .bcol:first-child { border-left: none; }
+  .bcol .d { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; }
+  .bcol .dsub { font-size: 10px; color: var(--muted-foreground); margin-bottom: 8px; }
+  .bcol select { width: 100%; border-radius: 5px; border: 1px solid var(--input); background: var(--popover); color: var(--foreground); padding: 3px 6px; font: inherit; font-size: 11px; }
+  .bcol .who { font-size: 10.5px; color: var(--muted-foreground); margin-top: 7px; line-height: 1.45; min-height: 30px; }
+  .bcol .cost { font-size: 10.5px; color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; margin-top: 3px; }
+  .escpath { font-size: 11px; color: var(--muted-foreground); margin: 8px 2px 0; }
+
+  .crew { border: 1px solid var(--border); border-radius: 9px; background: var(--card); margin-bottom: 8px; overflow: hidden; }
+  .crew-head { display: flex; align-items: center; gap: 10px; padding: 10px 13px; cursor: pointer; }
+  .crew-head:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .cdot { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+  .cname { font-size: 13px; }
+  .cwho { font-size: 11px; color: var(--muted-foreground); }
+  .cowns { font-size: 11px; color: var(--muted-foreground); margin-left: auto; }
+  .ccost { font-size: 11px; color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; width: 78px; text-align: right; }
+  .caret { color: var(--muted-foreground); font-size: 10px; width: 12px; }
+  .crew-body { display: none; border-top: 1px solid var(--border); padding: 12px 13px; background: var(--card-2); }
+  .crew.open .crew-body { display: block; }
+  .mixbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); margin: 4px 0 10px; }
+  .mixbar div { height: 100%; opacity: .8; }
+  .mixline { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(0,1.1fr) 62px 64px; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .crew-body select, .crew-body input { width: 100%; border-radius: 5px; border: 1px solid var(--input); background: var(--popover); color: var(--foreground); padding: 3px 7px; font: inherit; font-size: 11.5px; }
+  .rm { font-size: 10.5px; color: var(--muted-foreground); background: none; border: 1px solid var(--border); border-radius: 5px; padding: 3px 0; cursor: pointer; }
+  .flbl { font-size: 10.5px; color: var(--muted-foreground); margin-bottom: 3px; display: block; }
+  .total { font-size: 10.5px; font-variant-numeric: tabular-nums; }
+  .total.bad { color: var(--destructive-foreground); }
+  .total.ok { color: var(--muted-foreground); }
+  .smallbtn { font: inherit; font-size: 11px; border: 1px solid var(--border); border-radius: 5px; background: none; color: var(--foreground); padding: 3px 10px; cursor: pointer; }
+  .smallbtn:hover { background: var(--muted); }
+  .smallbtn.danger { color: var(--destructive-foreground); border-color: color-mix(in srgb, var(--destructive) 35%, transparent); }
+  .footbtns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+  .warnchip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; border-radius: 3px; padding: 1px 6px;
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+    color: var(--warning-foreground); }
+  .hintline { font-size: 11.5px; color: var(--muted-foreground); margin: 6px 2px 0; }
+
+  .disc { border: 1px solid var(--border); border-radius: 9px; background: var(--card); margin-bottom: 8px; }
+  .disc-head { display: flex; align-items: center; gap: 10px; padding: 10px 13px; cursor: pointer; }
+  .disc-head .t { font-size: 13px; }
+  .disc-head .sum { font-size: 11.5px; color: var(--muted-foreground); margin-left: auto; text-align: right; }
+  .disc-body { display: none; border-top: 1px solid var(--border); padding: 12px 13px; }
+  .disc.open .disc-body { display: block; }
+  .fgrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .fgrid5 { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px; }
+  label.f { display: block; }
+  label.f input, label.f select { width: 100%; margin-top: 3px; border-radius: 5px; border: 1px solid var(--input); background: var(--popover); color: var(--foreground); padding: 3px 7px; font: inherit; font-size: 11.5px; }
+  .newtag { font-size: 9px; letter-spacing: .05em; text-transform: uppercase; color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); border-radius: 3px; padding: 1px 4px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 3px; font-size: 11px;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); }
+  .chip button { background: none; border: none; color: var(--muted-foreground); cursor: pointer; font-size: 10px; padding: 0; }
+  .yaml { background: var(--card-2); border-radius: 7px; padding: 10px 12px; overflow-x: auto; }
+  .yaml pre { margin: 0; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10.5px; line-height: 1.55; color: var(--foreground); }
+
+  table.naming { border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+  table.naming th, table.naming td { text-align: left; padding: 5px 22px 5px 0; border-bottom: 1px solid var(--border); font-weight: 500; }
+  table.naming th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+  table.naming td.old { color: var(--muted-foreground); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--destructive) 55%, transparent); }
+  table.audit { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+  table.audit th, table.audit td { text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--border); }
+  table.audit th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Tiered Execution — settings redesign</h1>
+    <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
+  </header>
+  <p class="doc-sub">The Settings → Tiered Execution panel (<span class="mono">TieredExecutionSection.tsx</span>, PAN-2684) asks you to invent tier names, spread one decision across two disconnected surfaces, and renders every default at full volume. This proposal replaces the tier abstraction with the question you're actually answering — <em>who works on what?</em> Everything in the proposed section is clickable.</p>
+
+  <h2>Current — what ships today</h2>
+  <div class="frame cur">
+    <div class="secline"><b>Tiered execution</b><span style="display:inline-flex;gap:8px;align-items:center"><span style="font-size:11px">Enabled · 3 tiers configured</span><button class="switch on" disabled aria-label="enabled"></button></span></div>
+    <div class="box">
+      <div class="secline"><b style="font-size:12px">Difficulty routing</b><span style="font-size:10.5px;color:var(--primary)">YAML reference</span></div>
+      <div class="dgrid">
+        <div><div class="t">trivial</div><div class="v mono">tier-1</div></div>
+        <div><div class="t">simple</div><div class="v mono">tier-1</div></div>
+        <div><div class="t">medium</div><div class="v mono">tier-2</div></div>
+        <div><div class="t">complex</div><div class="v mono">tier-3</div></div>
+        <div><div class="t">expert</div><div class="v mono">tier-3</div></div>
       </div>
-      <span class="statuschip st-ok" id="stchip">ENABLED · VALID</span>
-      <button class="switch on" id="ensw" aria-label="Enable tiered execution"></button>
     </div>
-  </div>
-
-  <!-- ladder -->
-  <h2>Routing ladder <span class="hint" style="font-weight:500">— each difficulty picks its tier; coverage gaps are impossible by construction</span></h2>
-  <div class="card">
-    <div class="ladder" id="ladder"></div>
-    <div class="escrow"><span>escalation path</span><span class="arr">trivial → simple → medium → complex → expert</span><span id="escnote"></span></div>
-    <div class="kindpins" id="kindpins"></div>
-  </div>
-
-  <!-- tiers -->
-  <h2>Tiers <span class="hint" style="font-weight:500">— ordered cheap → premium · blended $/1M from the model catalog</span></h2>
-  <div id="roster"></div>
-  <div class="row" style="justify-content:flex-end"><button class="addbtn" id="addtier">Add tier</button></div>
-  <div class="hint" style="margin-top:4px">New tiers default to Haiku 4.5 — never a frontier model (2026-07-05 incident rule preserved).</div>
-
-  <!-- supervisor -->
-  <h2>Supervisor</h2>
-  <div class="disc" id="supdisc">
-    <div class="dischead" data-toggle="supdisc">
-      <span class="caret">▸</span><span class="t">Standing reviewer</span>
-      <span class="sum" id="supsum"></span>
+    <div class="box">
+      <div class="secline"><b style="font-size:12px">Tier table</b><span style="font-size:10.5px">Add tier</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-bottom:8px">
+        <label>Tier name<br><input value="tier-2" style="width:100%"></label>
+        <div>Difficulties<br>
+          <span class="chk">☐ trivial</span><span class="chk">☐ simple</span><span class="chk">☑ medium</span><span class="chk">☐ complex</span><span class="chk">☐ expert</span>
+        </div>
+      </div>
+      <div style="font-size:11px;margin-bottom:4px">Distribution <span style="float:right;color:var(--muted-foreground)">Total: 100% (must total 100)</span></div>
+      <div class="distrow"><select><option>GPT-5.5</option></select><select><option>codex</option></select><input value="25"><button class="rm">Remove</button></div>
+      <div class="distrow"><select><option>GLM-5.2</option></select><select><option>ohmypi</option></select><input value="25"><button class="rm">Remove</button></div>
+      <div class="distrow"><select><option>Kimi K2.7 Code</option></select><select><option>claude-code</option></select><input value="25"><button class="rm">Remove</button></div>
+      <div class="distrow"><select><option>M3</option></select><select><option>claude-code</option></select><input value="25"><button class="rm">Remove</button></div>
+      <div style="font-size:10.5px;color:var(--muted-foreground)">…two more tier cards like this one (tier-1, tier-3)…</div>
     </div>
-    <div class="discbody">
-      <div class="hint" style="margin-bottom:8px">Wakes on commit events and reviews the diff against the task's acceptance criteria. Findings block the foreman. Required whenever tiers are configured — to run unsupervised, disable tiered execution.</div>
-      <div class="fgrid">
-        <label class="f"><span class="fieldlbl">Model</span><select id="supmodel"></select></label>
-        <label class="f"><span class="fieldlbl">Harness</span><select id="supharness"></select></label>
-        <label class="f"><span class="fieldlbl">Reviews</span><select id="supsub">
-          <option value="all">every task commit (all)</option>
-          <option value="flagged">only commits flagged for inspection (flagged)</option>
-          <option value="sampled">a cost-measurement sample (sampled)</option>
-        </select></label>
-        <div class="f"><span class="fieldlbl">Owns inspection — <span class="hint">pan inspect routes here instead of spawning an ephemeral inspector</span></span>
-          <div style="margin-top:5px"><button class="switch on" id="supown"></button></div></div>
+    <div class="box" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <label style="font-size:11px">Supervisor model<br><select style="width:100%"><option>Claude Sonnet 5</option></select></label>
+      <label style="font-size:11px">Harness<br><select style="width:100%"><option>claude-code</option></select></label>
+    </div>
+    <div class="box">
+      <div style="font-size:12px;margin-bottom:6px"><b>Kind overrides</b></div>
+      <div class="kgrid">
+        <label>docs<select><option>Default routing</option></select></label>
+        <label>api<select><option>Default routing</option></select></label>
+        <label>backend<select><option>Default routing</option></select></label>
+        <label>frontend<select><option>Default routing</option></select></label>
+        <label>infra<select><option>Default routing</option></select></label>
+        <label>test<select><option>Default routing</option></select></label>
       </div>
     </div>
   </div>
-
-  <!-- kinds -->
-  <h2>Kind overrides</h2>
-  <div class="card">
-    <div class="row">
-      <span class="hint grow" id="kindsline">All kinds follow difficulty routing.</span>
-      <select id="kindpick"><option value="">kind…</option></select>
-      <select id="kindtier"></select>
-      <button class="addbtn" id="kindadd">Add override</button>
-    </div>
-    <div class="kindpins" id="kindchips" style="margin-top:8px"></div>
-  </div>
-
-  <!-- advanced -->
-  <h2>Advanced</h2>
-  <div class="disc" id="feeddisc">
-    <div class="dischead" data-toggle="feeddisc"><span class="caret">▸</span><span class="t">Commit feed</span><span class="sum" id="feedsum"></span></div>
-    <div class="discbody">
-      <div class="hint" style="margin-bottom:8px">Every standing tier hears every commit (keeps sessions warm, keeps replay deterministic). These knobs only remove noise or grant listeners a limited voice — they never filter by relevance.</div>
-      <div class="fgrid">
-        <label class="f"><span class="fieldlbl">Listener call-outs</span><select id="feedcall">
-          <option value="off">off — feed is strictly ingestion-only</option>
-          <option value="notify">notify — one flag per listener, never blocks dispatch</option>
-          <option value="corroborate">corroborate — notify + one supervisor review of that commit</option>
-        </select></label>
-        <label class="f"><span class="fieldlbl">Cap diffs at (bytes) — larger diffs become a stat + truncation note</span><input type="number" id="feedmax" placeholder="uncapped"></label>
-        <label class="f"><span class="fieldlbl">Exclude paths (git pathspecs, comma-sep)</span><input type="text" id="feedexcl" placeholder="none"></label>
-        <label class="f"><span class="fieldlbl">Skip commits whose subject starts with (comma-sep)</span><input type="text" id="feedsubj" placeholder="none"></label>
-      </div>
-    </div>
-  </div>
-
-  <div class="disc" id="escdisc">
-    <div class="dischead" data-toggle="escdisc"><span class="caret">▸</span><span class="t">Escalation</span><span class="sum" id="escsum"></span></div>
-    <div class="discbody">
-      <div class="hint" style="margin-bottom:8px">On a supervisor BLOCKED verdict, a verification failure, or a blown time budget, the task's difficulty is promoted one step up the ladder — after the configured retries at its current tier, and never past the promotion cap. At the cap (or at expert), it blocks and surfaces to you.</div>
-      <div class="row" style="margin-bottom:8px"><span class="hint grow">Enabled</span><button class="switch on" id="escsw"></button></div>
-      <div class="fgrid">
-        <label class="f"><span class="fieldlbl">Retries at current tier before promoting</span><input type="number" id="escretries" min="0" value="1"></label>
-        <label class="f"><span class="fieldlbl">Max promotions per task</span><input type="number" id="escpromo" min="0" value="2"></label>
-      </div>
-      <div class="fieldlbl" style="margin-top:8px">Floundering budget (minutes) — promote when a task exceeds its difficulty's budget; blank = trigger inactive</div>
-      <div class="fgrid5" id="flounder"></div>
-    </div>
-  </div>
-
-  <div class="disc" id="repdisc">
-    <div class="dischead" data-toggle="repdisc"><span class="caret">▸</span><span class="t">Replay &amp; compaction</span><span class="sum" id="repsum"></span></div>
-    <div class="discbody">
-      <div class="hint" style="margin-bottom:8px">A tier session that dies or fills its context is restarted and re-fed the issue history from durable commits — replay IS the compaction strategy.</div>
-      <div class="fgrid">
-        <label class="f"><span class="fieldlbl">Replay at context fraction (0–1]</span><input type="number" id="repthresh" min="0.01" max="1" step="0.01" value="0.5"></label>
-        <label class="f"><span class="fieldlbl">On replay <span class="newtag">new — in config, missing from current UI</span></span><select id="repcompact">
-          <option value="off">respawn the same slot as before (off)</option>
-          <option value="on">recompute remaining schedule; retire tiers no longer needed (on)</option>
-        </select></label>
-      </div>
-    </div>
-  </div>
-
-  <!-- audit -->
-  <h2>No-loss audit — every current control's new home</h2>
-  <div class="card">
-    <table class="audit">
-      <thead><tr><th>Current control</th><th>New home</th></tr></thead>
-      <tbody>
-        <tr><td>Enable toggle · resolved state · tier count</td><td>Enable card (state chip folds Enabled/Invalid/Disabled + validity)</td></tr>
-        <tr><td>Validation banner</td><td>State chip turns red + inline errors at the offending control (total≠100, missing supervisor)</td></tr>
-        <tr><td>Difficulty routing readout (read-only)</td><td>Routing ladder — now the editor, not a readout</td></tr>
-        <tr><td>Per-tier difficulty checkboxes</td><td>Deleted as a shape: ladder selects are a total function, so unmapped/double-mapped is unrepresentable</td></tr>
-        <tr><td>Tier name / model / harness / rename / remove / add</td><td>Tier roster rows (expand to edit); add keeps the never-frontier default</td></tr>
-        <tr><td>Distribution editor (entries, weights, total-100, single↔distribution)</td><td>Roster expanded view — weighted bar + same fields, same representative rule</td></tr>
-        <tr><td>Supervisor model/harness/subscribe/owns_inspection</td><td>Supervisor disclosure (sentence summary collapsed)</td></tr>
-        <tr><td>9-select kind grid</td><td>Overrides-only chips + Add override (defaults stop rendering)</td></tr>
-        <tr><td>Feed callouts / max bytes / excludes / subjects</td><td>Commit feed disclosure (plain-language options)</td></tr>
-        <tr><td>Escalation enabled / retries / promotions / flounder budgets</td><td>Escalation disclosure (mechanism explained inline)</td></tr>
-        <tr><td>Replay threshold</td><td>Replay &amp; compaction disclosure</td></tr>
-        <tr><td><span class="mono">compaction_reroute</span> — in config, NO control today</td><td>Replay &amp; compaction disclosure (gap fixed)</td></tr>
-      </tbody>
-    </table>
-  </div>
-
-  <h2>Conformance deltas</h2>
-  <ul class="deltas">
-    <li>Hand-rolled dark tokens + Google-font stand-ins, same as the PAN-2499/PAN-2674 mockups; production uses <span class="mono">index.css</span> tokens.</li>
-    <li>Tier colors (teal/blue/violet) are structural identity for ladder↔roster correspondence, not status; status colors keep their meanings (amber = human decision, cyan = money, red = invalid).</li>
-    <li>Harness "auto (provider default)" + the amber mismatch warning is a <b>proposed behavior change</b> (PAN-1865), decided at PRD time — today's UI stores explicit harnesses only.</li>
+  <ul class="callouts">
+    <li data-n="1"><strong>“tier-1, tier-2, tier-3” are names you had to invent, and they mean nothing.</strong> The decision you're actually making is “who handles trivial work, who handles expert work” — but the UI makes you define abstract containers first and wire them up second.</li>
+    <li data-n="2"><strong>One decision, two disconnected surfaces.</strong> Difficulty→tier lives in a read-only readout at the top AND as checkboxes inside each tier card. Uncheck “medium” in tier-2 and the error appears far away — and unmapped/double-mapped states are perfectly reachable.</li>
+    <li data-n="3"><strong>Defaults shout.</strong> Nine kind selects render “Default routing”, and Feed/Escalation/Replay each occupy a full card even when every value is stock.</li>
+    <li data-n="4"><strong><span class="mono">compaction_reroute</span> has no control at all.</strong> It's in the config schema, in your live config.yaml, and the docs claim the panel includes it — the only way to change it is hand-editing YAML.</li>
+    <li data-n="5"><strong>No cost signal, no hazard signal.</strong> Tiers exist to save money but nothing shows $/1M; and your live config runs Kimi on <span class="mono">claude-code</span> — the PAN-1865 CLIProxy deadlock trap — with no warning.</li>
   </ul>
 
-</div>
+  <h2>Proposed — who works on what</h2>
+  <p class="note"><strong>No more tier names.</strong> You assign each difficulty a <em>crew</em> — a model, or a weighted mix — and crews are labeled by what they are (“Kimi K2.7 Code”, “4-model mix”), never by a name you invent. Coverage gaps are impossible: every difficulty always points at a crew. Tier names still exist in the YAML, auto-derived from the difficulties they cover. Your live config imports as just <strong>two crews</strong>, because tier-2 and tier-3 were identical mixes.</p>
+  <div class="scenarios">
+    <span>Preview a state:</span>
+    <button type="button" id="scLive" class="on">Your config today</button>
+    <button type="button" id="scSimple">Simplest setup (one crew)</button>
+  </div>
 
-<!-- yaml -->
-<div class="yaml">
-  <h3>writes to config.yaml</h3>
-  <pre id="yaml"></pre>
-</div>
+  <div class="frame">
+    <div class="enrow">
+      <div class="grow">
+        <b>Tiered execution</b>
+        <div class="hint">Routes each task to the cheapest crew that can handle it. A per-issue Standing Crew override beats the plan, which beats this switch.</div>
+      </div>
+      <span id="stchip" style="font-size:11px;color:var(--success-foreground)">On · valid</span>
+      <button class="switch on" id="ensw" aria-label="Enable tiered execution"></button>
+    </div>
+
+    <div class="board" id="board"></div>
+    <div class="escpath" id="escpath"></div>
+
+    <div style="margin-top:18px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+        <span style="font-size:13px"><b>The crews</b></span>
+        <span style="font-size:11px;color:var(--muted-foreground)">click a crew to edit · new crews start on Haiku 4.5, never a frontier model</span>
+      </div>
+      <div id="crews"></div>
+    </div>
+
+    <div style="margin-top:18px">
+      <div style="font-size:13px;margin-bottom:6px"><b>Supervisor</b></div>
+      <div class="disc" id="supdisc">
+        <div class="disc-head" data-disc="supdisc" tabindex="0"><span class="caret">▸</span><span class="t">Standing reviewer</span><span class="sum" id="supsum"></span></div>
+        <div class="disc-body">
+          <p class="note" style="margin-top:0">Wakes on every commit a crew makes and reviews the diff against the task's acceptance criteria. Findings block the line. Required whenever crews are configured — to run unsupervised, turn tiered execution off.</p>
+          <div class="fgrid">
+            <label class="f"><span class="flbl">Model</span><select id="supmodel"></select></label>
+            <label class="f"><span class="flbl">Harness</span><select id="supharness"></select></label>
+            <label class="f"><span class="flbl">Reviews</span><select id="supsub">
+              <option value="all">every commit (all)</option>
+              <option value="flagged">only commits flagged for inspection (flagged)</option>
+              <option value="sampled">a sample, for cost measurement (sampled)</option>
+            </select></label>
+            <div class="f"><span class="flbl">Owns inspection — <span style="font-size:10px">pan inspect routes here instead of a throwaway inspector</span></span>
+              <button class="switch on" id="supown" style="margin-top:5px"></button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:14px">
+      <div style="font-size:13px;margin-bottom:6px"><b>Kind overrides</b></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span class="hintline" id="kindsline" style="margin:0;flex:1"></span>
+        <select id="kindpick" style="border-radius:5px;border:1px solid var(--input);background:var(--popover);color:var(--foreground);padding:3px 7px;font:inherit;font-size:11.5px"></select>
+        <select id="kindcrew" style="border-radius:5px;border:1px solid var(--input);background:var(--popover);color:var(--foreground);padding:3px 7px;font:inherit;font-size:11.5px"></select>
+        <button class="smallbtn" id="kindadd">Add override</button>
+      </div>
+      <div class="chips" id="kindchips"></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div style="font-size:13px;margin-bottom:6px"><b>Advanced</b></div>
+      <div class="disc" id="feeddisc">
+        <div class="disc-head" data-disc="feeddisc" tabindex="0"><span class="caret">▸</span><span class="t">Commit feed</span><span class="sum" id="feedsum"></span></div>
+        <div class="disc-body">
+          <p class="note" style="margin-top:0">Every crew hears every commit — that's what keeps their sessions warm. These knobs only remove noise or give listeners a limited voice; they never filter by relevance.</p>
+          <div class="fgrid">
+            <label class="f"><span class="flbl">Listener call-outs</span><select id="feedcall">
+              <option value="off">off — the feed is read-only</option>
+              <option value="notify">notify — one flag per listener, never blocks work</option>
+              <option value="corroborate">corroborate — a flag also triggers one supervisor review</option>
+            </select></label>
+            <label class="f"><span class="flbl">Cap diffs at (bytes) — bigger diffs become a summary</span><input type="number" id="feedmax" placeholder="uncapped"></label>
+            <label class="f"><span class="flbl">Exclude paths (comma-sep git pathspecs)</span><input type="text" id="feedexcl" placeholder="none"></label>
+            <label class="f"><span class="flbl">Skip commits whose subject starts with</span><input type="text" id="feedsubj" placeholder="none"></label>
+          </div>
+        </div>
+      </div>
+      <div class="disc" id="escdisc">
+        <div class="disc-head" data-disc="escdisc" tabindex="0"><span class="caret">▸</span><span class="t">Escalation</span><span class="sum" id="escsum"></span></div>
+        <div class="disc-body">
+          <p class="note" style="margin-top:0">When a task keeps failing — a supervisor block, a failed verification, or a blown time budget — it's bumped one difficulty step up, onto the next crew. After the promotion cap (or at expert) it stops and asks you instead.</p>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span class="flbl" style="margin:0">Enabled</span><button class="switch on" id="escsw"></button></div>
+          <div class="fgrid">
+            <label class="f"><span class="flbl">Retries with the same crew before bumping</span><input type="number" id="escretries" min="0" value="1"></label>
+            <label class="f"><span class="flbl">Max bumps per task</span><input type="number" id="escpromo" min="0" value="2"></label>
+          </div>
+          <span class="flbl" style="margin-top:10px">Time budget per difficulty (minutes) — blank leaves the timer off</span>
+          <div class="fgrid5" id="flounder"></div>
+        </div>
+      </div>
+      <div class="disc" id="repdisc">
+        <div class="disc-head" data-disc="repdisc" tabindex="0"><span class="caret">▸</span><span class="t">Session replay</span><span class="sum" id="repsum"></span></div>
+        <div class="disc-body">
+          <p class="note" style="margin-top:0">A crew session that dies or fills its context gets restarted and re-fed the issue's commit history. That replay IS the compaction strategy.</p>
+          <div class="fgrid">
+            <label class="f"><span class="flbl">Replay when context is this full (0–1]</span><input type="number" id="repthresh" min="0.01" max="1" step="0.01" value="0.5"></label>
+            <label class="f"><span class="flbl">On replay <span class="newtag">new — in config, missing from today's UI</span></span><select id="repcompact">
+              <option value="off">bring back the same session as before</option>
+              <option value="on">re-plan remaining work; retire crews no longer needed</option>
+            </select></label>
+          </div>
+        </div>
+      </div>
+      <div class="disc" id="yamldisc">
+        <div class="disc-head" data-disc="yamldisc" tabindex="0"><span class="caret">▸</span><span class="t">What this writes to config.yaml</span><span class="sum" id="yamlsum"></span></div>
+        <div class="disc-body">
+          <p class="note" style="margin-top:0">Tier names don't disappear from the file — they're derived from the difficulties each crew covers, so the YAML stays readable and hand-editable.</p>
+          <div class="yaml"><pre id="yaml"></pre></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>What changed, and why</h2>
+  <p class="note"><strong>The question replaces the abstraction.</strong> “Tiers” forced you to create containers, name them, then wire difficulties to them with checkboxes — with a validator to catch the wiring mistakes. Here each difficulty simply picks its crew, so “every difficulty maps to exactly one tier” isn't a rule the form checks; it's the only thing the form can express. The validator's whole difficulty-coverage class of errors is gone by construction.</p>
+  <p class="note"><strong>Crews are labeled by what they are.</strong> “Kimi K2.7 Code” and “4-model mix · GPT-5.5 / GLM-5.2 / Kimi / M3” need no legend. Costs ride along ($/1M, blended for mixes) because cheap-work-cheap is the entire point of this feature. Harness defaults to the model's provider routing; an explicit harness that contradicts it gets an amber warning — your live config's Kimi-on-claude-code (the PAN-1865 deadlock trap) would have been flagged the day it was set.</p>
+  <p class="note"><strong>Defaults are quiet.</strong> Kind overrides show only actual overrides. Feed, escalation, and replay collapse to one-line summaries of their current resolution and expand only when you need them — same overrides-only principle as the issue Policies control. The YAML disclosure keeps the file honest and shows where the auto-derived tier names go.</p>
+  <table class="naming">
+    <tr><th>Today</th><th>Proposed</th></tr>
+    <tr><td class="old">Tier name: <span class="mono">tier-2</span> + difficulty checkboxes</td><td>Each difficulty picks its crew on the board; names auto-derived in YAML</td></tr>
+    <tr><td class="old">Difficulty routing readout (read-only, top of page)</td><td>The board is the editor — readout and editor are one surface</td></tr>
+    <tr><td class="old">Model + Harness selects on every tier and entry</td><td>Crew editor; harness is “auto (provider)” unless deliberately overridden</td></tr>
+    <tr><td class="old">9 kind selects, mostly “Default routing”</td><td>“All kinds follow difficulty routing” + override chips</td></tr>
+    <tr><td class="old">Feed / Escalation / Replay always-open cards</td><td>Collapsed disclosures with plain-language summaries</td></tr>
+    <tr><td class="old">(no control)</td><td><span class="mono">compaction_reroute</span> restored under Session replay</td></tr>
+  </table>
+
+  <h2>No-loss audit</h2>
+  <table class="audit">
+    <tr><th>Current control</th><th>New home</th></tr>
+    <tr><td>Enable toggle · resolved state · tier count</td><td>Header row (chip folds Enabled/Invalid/Disabled)</td></tr>
+    <tr><td>Validation banner</td><td>Chip turns red + inline error at the offending control (mix ≠ 100%)</td></tr>
+    <tr><td>Difficulty routing readout + per-tier checkboxes</td><td>The board (single surface; invalid coverage unrepresentable)</td></tr>
+    <tr><td>Tier name / rename</td><td>Removed as an operator concern; auto-derived in YAML (rename lives on in hand-edited YAML, still honored on read)</td></tr>
+    <tr><td>Tier model/harness, distribution entries + weights + total-100, single↔mix toggle, add/remove tier</td><td>Crew editor (same fields, same representative rule, mixes get a weight bar)</td></tr>
+    <tr><td>Supervisor model/harness/subscribe/owns_inspection</td><td>Supervisor disclosure (sentence summary collapsed)</td></tr>
+    <tr><td>Kind overrides ×9</td><td>Overrides-only chips + Add override</td></tr>
+    <tr><td>Feed callouts / cap / excludes / subjects</td><td>Commit feed disclosure</td></tr>
+    <tr><td>Escalation enabled / retries / promotions / budgets ×5</td><td>Escalation disclosure</td></tr>
+    <tr><td>Replay threshold</td><td>Session replay disclosure</td></tr>
+    <tr><td><span class="mono">compaction_reroute</span> (in config, no control today)</td><td>Session replay disclosure — gap fixed</td></tr>
+    <tr><td>Never-frontier default for new tiers/supervisor</td><td>Preserved — new crews start on Haiku 4.5</td></tr>
+  </table>
+  <p class="note" style="margin-top:16px">Implementation note: this is a presentation-layer rebuild of <span class="mono">TieredExecutionSection.tsx</span> over the existing <span class="mono">tiered_execution</span> schema. Crews serialize as tiers with derived names; reading a hand-authored YAML with custom tier names keeps them. The harness “auto (provider default)” option is the one behavior change and gets its own decision in the PRD.</p>
 </div>
 
 <script>
-const $=(id)=>document.getElementById(id);
-const DIFFS=['trivial','simple','medium','complex','expert'];
-const KINDS=['docs','api','backend','frontend','infra','test','refactor','design','spike'];
-const CATALOG={
-  'claude-fable-5':{n:'Claude Fable 5',c:90,p:'anthropic'},
-  'claude-opus-4-8':{n:'Claude Opus 4.8',c:45,p:'anthropic'},
-  'claude-sonnet-5':{n:'Claude Sonnet 5',c:6,p:'anthropic'},
-  'claude-haiku-4-5':{n:'Claude Haiku 4.5',c:1,p:'anthropic'},
-  'gpt-5.5':{n:'GPT-5.5',c:17.5,p:'openai'},
-  'gpt-5.6-terra':{n:'GPT-5.6 Terra',c:8.75,p:'openai'},
-  'glm-5.2':{n:'GLM-5.2',c:1.4,p:'zai'},
-  'kimi-k2.7-code':{n:'Kimi K2.7 Code',c:2.5,p:'kimi'},
-  'minimax-m3':{n:'MiniMax M3',c:1.2,p:'minimax'},
-};
-const PROVIDER_HARNESS={anthropic:'claude-code',openai:'codex',kimi:'ohmypi',zai:'ohmypi',minimax:'ohmypi'};
-const HARNESSES=['claude-code','ohmypi','codex'];
-const COLORS=['var(--teal)','var(--blue)','var(--violet)','var(--amber)','var(--green)'];
+  document.getElementById('themeToggle').addEventListener('click', () => {
+    const root = document.documentElement;
+    const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    root.dataset.theme = dark ? 'light' : 'dark';
+  });
 
-const S={
-  enabled:true,
-  diffMap:{trivial:'tier-1',simple:'tier-1',medium:'tier-2',complex:'tier-3',expert:'tier-3'},
-  tiers:[
-    {name:'tier-1',mode:'single',model:'kimi-k2.7-code',harness:'claude-code',dist:[]},
-    {name:'tier-2',mode:'dist',model:'gpt-5.5',harness:'codex',dist:[
-      {model:'gpt-5.5',harness:'codex',weight:25},{model:'glm-5.2',harness:'ohmypi',weight:25},
-      {model:'kimi-k2.7-code',harness:'auto',weight:25},{model:'minimax-m3',harness:'auto',weight:25}]},
-    {name:'tier-3',mode:'dist',model:'gpt-5.5',harness:'codex',dist:[
-      {model:'gpt-5.5',harness:'codex',weight:25},{model:'glm-5.2',harness:'ohmypi',weight:25},
-      {model:'kimi-k2.7-code',harness:'auto',weight:25},{model:'minimax-m3',harness:'auto',weight:25}]},
-  ],
-  sup:{model:'claude-sonnet-5',harness:'claude-code',subscribe:'all',owns:true},
-  kinds:{},
-  feed:{callouts:'off',max:null,exclude:[],subjects:[]},
-  esc:{enabled:true,retries:1,promos:2,flounder:{}},
-  replay:0.5, compact:'off',
-  open:{},
-};
+  const $ = (id) => document.getElementById(id);
+  const DIFFS = ['trivial','simple','medium','complex','expert'];
+  const KINDS = ['docs','api','backend','frontend','infra','test','refactor','design','spike'];
+  const CATALOG = {
+    'claude-opus-4-8':{n:'Claude Opus 4.8',c:45,p:'anthropic'},
+    'claude-sonnet-5':{n:'Claude Sonnet 5',c:6,p:'anthropic'},
+    'claude-haiku-4-5':{n:'Claude Haiku 4.5',c:1,p:'anthropic'},
+    'gpt-5.5':{n:'GPT-5.5',c:17.5,p:'openai'},
+    'gpt-5.6-terra':{n:'GPT-5.6 Terra',c:8.75,p:'openai'},
+    'glm-5.2':{n:'GLM-5.2',c:1.4,p:'zai'},
+    'kimi-k2.7-code':{n:'Kimi K2.7 Code',c:2.5,p:'kimi'},
+    'minimax-m3':{n:'MiniMax M3',c:1.2,p:'minimax'},
+  };
+  const PROVIDER_HARNESS = {anthropic:'claude-code',openai:'codex',kimi:'ohmypi',zai:'ohmypi',minimax:'ohmypi'};
+  const HARNESSES = ['claude-code','ohmypi','codex'];
+  const CREW_COLORS = ['var(--crew-a)','var(--crew-b)','var(--crew-c)','var(--crew-d)','var(--crew-e)'];
 
-const tierColor=(name)=>COLORS[S.tiers.findIndex(t=>t.name===name)%COLORS.length]||'var(--faint)';
-const tierByName=(n)=>S.tiers.find(t=>t.name===n);
-const autoHarness=(model)=>PROVIDER_HARNESS[CATALOG[model]?.p]||'claude-code';
-const effHarness=(e)=>e.harness==='auto'?autoHarness(e.model):e.harness;
-const mismatch=(e)=>e.harness!=='auto'&&e.harness!==autoHarness(e.model);
-const blended=(t)=>t.mode==='dist'
-  ? t.dist.reduce((s,e)=>s+(CATALOG[e.model]?.c??0)*e.weight,0)/100
-  : (CATALOG[t.model]?.c??0);
-const staffLabel=(t)=>t.mode==='dist'
-  ? t.dist.map(e=>`${CATALOG[e.model]?.n??e.model} ${e.weight}%`).join(' · ')
-  : `${CATALOG[t.model]?.n??t.model} · ${effHarness(t)}${t.harness==='auto'?' (auto)':''}`;
+  const LIVE = {
+    crews: [
+      {mode:'single', model:'kimi-k2.7-code', harness:'claude-code', dist:[]},
+      {mode:'mix', model:'gpt-5.5', harness:'codex', dist:[
+        {model:'gpt-5.5',harness:'codex',weight:25},{model:'glm-5.2',harness:'ohmypi',weight:25},
+        {model:'kimi-k2.7-code',harness:'auto',weight:25},{model:'minimax-m3',harness:'auto',weight:25}]},
+    ],
+    assign: {trivial:0, simple:0, medium:1, complex:1, expert:1},
+  };
+  const SIMPLE = {
+    crews: [{mode:'single', model:'claude-sonnet-5', harness:'auto', dist:[]}],
+    assign: {trivial:0, simple:0, medium:0, complex:0, expert:0},
+  };
 
-function modelOptions(sel){return Object.entries(CATALOG).map(([id,m])=>`<option value="${id}" ${id===sel?'selected':''}>${m.n} — $${m.c}/1M</option>`).join('')}
-function harnessOptions(sel,model){
-  const auto=`<option value="auto" ${sel==='auto'?'selected':''}>auto (${autoHarness(model)})</option>`;
-  return auto+HARNESSES.map(h=>`<option value="${h}" ${sel===h?'selected':''}>${h}</option>`).join('');
-}
+  let S = {
+    enabled: true,
+    crews: JSON.parse(JSON.stringify(LIVE.crews)),
+    assign: {...LIVE.assign},
+    sup: {model:'claude-sonnet-5', harness:'claude-code', subscribe:'all', owns:true},
+    kinds: {},
+    feed: {callouts:'off', max:null, exclude:[], subjects:[]},
+    esc: {enabled:true, retries:1, promos:2, flounder:{}},
+    replay: 0.5, compact: 'off',
+    open: {},
+  };
 
-function render(){
-  // enable chip
-  const totalBad=S.tiers.some(t=>t.mode==='dist'&&t.dist.reduce((s,e)=>s+e.weight,0)!==100);
-  $('stchip').textContent=!S.enabled?'DISABLED':totalBad?'INVALID · WEIGHTS ≠ 100':'ENABLED · VALID';
-  $('stchip').className='statuschip '+(!S.enabled?'st-off':totalBad?'st-bad':'st-ok');
-  $('ensw').classList.toggle('on',S.enabled);
-
-  // ladder
-  $('ladder').innerHTML=DIFFS.map(d=>{
-    const tn=S.diffMap[d],t=tierByName(tn);
-    return `<div class="lcol" style="border-top-color:${tierColor(tn)}">
-      <div class="d">${d}</div>
-      <select data-diff="${d}">${S.tiers.map(x=>`<option ${x.name===tn?'selected':''}>${x.name}</option>`).join('')}</select>
-      <div class="staff">${t?staffLabel(t):'—'}</div>
-      <div class="costq">≈ $${t?blended(t).toFixed(1):'0'}/1M</div>
-    </div>`}).join('');
-  $('ladder').querySelectorAll('select').forEach(s=>s.onchange=()=>{S.diffMap[s.dataset.diff]=s.value;render()});
-  $('escnote').textContent=S.esc.enabled?` · promotions on (max ${S.esc.promos})`:' · promotions off';
-
-  // kind pins under ladder
-  const kEntries=Object.entries(S.kinds);
-  $('kindpins').innerHTML=kEntries.length?kEntries.map(([k,t])=>`<span class="chip ov">${k} → ${t}</span>`).join(''):'';
-
-  // roster
-  $('roster').innerHTML=S.tiers.map((t,i)=>{
-    const owns=DIFFS.filter(d=>S.diffMap[d]===t.name);
-    const tot=t.dist.reduce((s,e)=>s+e.weight,0);
-    const warn=(t.mode==='single'&&mismatch(t))||t.dist.some(mismatch);
-    return `<div class="trow ${S.open[t.name]?'open':''}" data-t="${t.name}">
-      <div class="thead" data-open="${t.name}">
-        <span class="caret">${S.open[t.name]?'▾':'▸'}</span>
-        <span class="tdot" style="background:${tierColor(t.name)}"></span>
-        <span class="tname">${t.name}</span>
-        <span class="tstaff">${staffLabel(t)}</span>
-        ${warn?'<span class="warnchip">⚠ harness overrides provider default — PAN-1865</span>':''}
-        <span class="towns">${owns.length?owns.join(' · '):'owns nothing — pick it in the ladder'}</span>
-        <span class="tcost">≈ $${blended(t).toFixed(1)}/1M</span>
-      </div>
-      <div class="tbody">
-        ${t.mode==='single'?`
-          <div class="fgrid">
-            <label class="f"><span class="fieldlbl">Model</span><select data-tm="${i}">${modelOptions(t.model)}</select></label>
-            <label class="f"><span class="fieldlbl">Harness</span><select data-th="${i}">${harnessOptions(t.harness,t.model)}</select></label>
-          </div>`:`
-          <div class="row" style="justify-content:space-between"><span class="fieldlbl">Distribution — deterministic per task, weights must total 100</span>
-            <span class="total ${tot===100?'ok':'bad'}">total ${tot}%</span></div>
-          <div class="distbar">${t.dist.map(e=>`<div style="width:${e.weight}%;background:${COLORS[t.dist.indexOf(e)%COLORS.length]};opacity:.75"></div>`).join('')}</div>
-          ${t.dist.map((e,j)=>`<div class="distline">
-            <select data-dm="${i}:${j}">${modelOptions(e.model)}</select>
-            <select data-dh="${i}:${j}">${harnessOptions(e.harness,e.model)}</select>
-            <input type="number" min="1" max="100" value="${e.weight}" data-dw="${i}:${j}">
-            <button class="rm" data-dr="${i}:${j}">remove</button>
-          </div>`).join('')}
-          <button class="addbtn" data-da="${i}">Add model</button>`}
-        <div class="footbtns">
-          <button class="addbtn" data-mode="${i}">${t.mode==='dist'?'Use single model':'Use distribution'}</button>
-          <button class="addbtn danger" data-del="${i}">Remove tier</button>
-        </div>
-      </div>
-    </div>`}).join('');
-  wireRoster();
-
-  // supervisor
-  $('supsum').textContent=`reviews ${S.sup.subscribe==='all'?'every commit':S.sup.subscribe==='flagged'?'flagged commits':'a sample'} · ${CATALOG[S.sup.model]?.n??S.sup.model}${S.sup.owns?' · owns inspection':''}`;
-  $('supmodel').innerHTML=modelOptions(S.sup.model);
-  $('supharness').innerHTML=HARNESSES.map(h=>`<option ${h===S.sup.harness?'selected':''}>${h}</option>`).join('');
-  $('supsub').value=S.sup.subscribe;
-  $('supown').classList.toggle('on',S.sup.owns);
-
-  // kinds card
-  $('kindsline').textContent=kEntries.length?`${kEntries.length} kind${kEntries.length>1?'s':''} overridden; the rest follow difficulty routing.`:'All kinds follow difficulty routing.';
-  $('kindchips').innerHTML=kEntries.map(([k,t])=>`<span class="chip ov">${k} → ${t} <button data-krm="${k}">✕</button></span>`).join('');
-  $('kindchips').querySelectorAll('[data-krm]').forEach(b=>b.onclick=()=>{delete S.kinds[b.dataset.krm];render()});
-  $('kindpick').innerHTML='<option value="">kind…</option>'+KINDS.filter(k=>!S.kinds[k]).map(k=>`<option>${k}</option>`).join('');
-  $('kindtier').innerHTML=S.tiers.map(t=>`<option>${t.name}</option>`).join('');
-
-  // advanced summaries
-  $('feedsum').textContent=`call-outs ${S.feed.callouts}${S.feed.max?` · diffs capped ${S.feed.max}B`:''}${S.feed.exclude.length||S.feed.subjects.length?` · ${S.feed.exclude.length+S.feed.subjects.length} exclusion${S.feed.exclude.length+S.feed.subjects.length>1?'s':''}`:' · no exclusions'}`;
-  $('escsum').textContent=S.esc.enabled?`on · ${S.esc.retries} retry at tier · max ${S.esc.promos} promotions`:'off — verdicts and failures never promote';
-  $('escsw').classList.toggle('on',S.esc.enabled);
-  $('repsum').textContent=`replay at ${Math.round(S.replay*100)}% context · reroute ${S.compact}`;
-
-  // yaml
-  const y=[];
-  y.push('tiered_execution:');
-  y.push(`  enabled: ${S.enabled}`);
-  y.push('  tiers:');
-  for(const t of S.tiers){
-    y.push(`    ${t.name}:`);
-    if(t.mode==='dist'){
-      y.push('      distribution:');
-      for(const e of t.dist) y.push(`        - { model: ${e.model}, harness: ${effHarness(e)}, weight: ${e.weight} }`);
-    } else {
-      y.push(`      model: ${t.model}`);
-      y.push(`      harness: ${effHarness(t)}`);
-    }
-    y.push(`      difficulties: [${DIFFS.filter(d=>S.diffMap[d]===t.name).join(', ')}]`);
+  const autoHarness = (m) => PROVIDER_HARNESS[CATALOG[m]?.p] || 'claude-code';
+  const effHarness = (e) => e.harness === 'auto' ? autoHarness(e.model) : e.harness;
+  const mismatch = (e) => e.harness !== 'auto' && e.harness !== autoHarness(e.model);
+  const blended = (c) => c.mode === 'mix'
+    ? c.dist.reduce((s,e) => s + (CATALOG[e.model]?.c ?? 0) * e.weight, 0) / 100
+    : (CATALOG[c.model]?.c ?? 0);
+  function crewLabel(c) {
+    if (c.mode === 'single') return CATALOG[c.model]?.n ?? c.model;
+    return c.dist.length + '-model mix';
   }
-  y.push('  supervisor:');
-  y.push(`    model: ${S.sup.model}`);
-  y.push(`    harness: ${S.sup.harness}`);
-  y.push(`    subscribe: ${S.sup.subscribe}`);
-  y.push(`    owns_inspection: ${S.sup.owns}`);
-  if(Object.keys(S.kinds).length){y.push('  by_kind:');for(const[k,t]of Object.entries(S.kinds))y.push(`    ${k}: ${t}`)}
-  y.push('  feed:');
-  y.push(`    callouts: ${S.feed.callouts}`);
-  y.push(`    exclude: [${S.feed.exclude.join(', ')}]`);
-  y.push(`    exclude_subjects: [${S.feed.subjects.join(', ')}]`);
-  y.push(`    max_diff_bytes: ${S.feed.max??'null'}`);
-  y.push('  escalation:');
-  y.push(`    enabled: ${S.esc.enabled}`);
-  y.push(`    retries_at_tier: ${S.esc.retries}`);
-  y.push(`    max_promotions: ${S.esc.promos}`);
-  y.push(`    flounder_budget_minutes: {${Object.entries(S.esc.flounder).map(([d,v])=>` ${d}: ${v}`).join(',')} }`);
-  y.push(`  compaction_reroute: ${S.compact}`);
-  y.push(`  replay_threshold: ${S.replay}`);
-  $('yaml').textContent=y.join('\n');
-}
+  function crewWho(c) {
+    if (c.mode === 'single') return (CATALOG[c.model]?.n ?? c.model) + ' · ' + effHarness(c) + (c.harness==='auto' ? ' (auto)' : '');
+    return c.dist.map(e => (CATALOG[e.model]?.n ?? e.model) + ' ' + e.weight + '%').join(' · ');
+  }
+  const crewOwns = (i) => DIFFS.filter(d => S.assign[d] === i);
+  function tierSlug(diffs) { return diffs.length === 1 ? diffs[0] : diffs[0] + '-' + diffs[diffs.length-1]; }
 
-function wireRoster(){
-  document.querySelectorAll('[data-open]').forEach(h=>h.onclick=(ev)=>{if(ev.target.tagName==='BUTTON'||ev.target.tagName==='SELECT'||ev.target.tagName==='INPUT')return;const n=h.dataset.open;S.open[n]=!S.open[n];render()});
-  document.querySelectorAll('[data-tm]').forEach(s=>s.onchange=()=>{S.tiers[+s.dataset.tm].model=s.value;render()});
-  document.querySelectorAll('[data-th]').forEach(s=>s.onchange=()=>{S.tiers[+s.dataset.th].harness=s.value;render()});
-  document.querySelectorAll('[data-dm]').forEach(s=>s.onchange=()=>{const[i,j]=s.dataset.dm.split(':');S.tiers[+i].dist[+j].model=s.value;render()});
-  document.querySelectorAll('[data-dh]').forEach(s=>s.onchange=()=>{const[i,j]=s.dataset.dh.split(':');S.tiers[+i].dist[+j].harness=s.value;render()});
-  document.querySelectorAll('[data-dw]').forEach(s=>s.onchange=()=>{const[i,j]=s.dataset.dw.split(':');S.tiers[+i].dist[+j].weight=+s.value;render()});
-  document.querySelectorAll('[data-dr]').forEach(b=>b.onclick=()=>{const[i,j]=b.dataset.dr.split(':');S.tiers[+i].dist.splice(+j,1);render()});
-  document.querySelectorAll('[data-da]').forEach(b=>b.onclick=()=>{const t=S.tiers[+b.dataset.da];t.dist.push({model:t.model,harness:'auto',weight:0});render()});
-  document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{const t=S.tiers[+b.dataset.mode];
-    if(t.mode==='dist'){const top=t.dist.reduce((a,e)=>e.weight>a.weight?e:a,t.dist[0]||{model:t.model,harness:t.harness,weight:0});t.mode='single';t.model=top.model;t.harness=top.harness}
-    else{t.mode='dist';t.dist=[{model:t.model,harness:t.harness,weight:100}]}render()});
-  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const t=S.tiers[+b.dataset.del];
-    const owns=DIFFS.filter(d=>S.diffMap[d]===t.name);
-    if(owns.length){alert(`${t.name} still owns ${owns.join(', ')} — reassign them in the ladder first.`);return}
-    S.tiers.splice(+b.dataset.del,1);render()});
-}
+  function modelOptions(sel) { return Object.entries(CATALOG).map(([id,m]) => `<option value="${id}" ${id===sel?'selected':''}>${m.n} — $${m.c}/1M</option>`).join(''); }
+  function harnessOptions(sel, model) {
+    return `<option value="auto" ${sel==='auto'?'selected':''}>auto (${autoHarness(model)})</option>` +
+      HARNESSES.map(h => `<option value="${h}" ${sel===h?'selected':''}>${h}</option>`).join('');
+  }
 
-// static wiring
-$('ensw').onclick=()=>{S.enabled=!S.enabled;render()};
-document.querySelectorAll('[data-toggle]').forEach(h=>h.onclick=(ev)=>{if(['BUTTON','SELECT','INPUT'].includes(ev.target.tagName))return;const d=$(h.dataset.toggle);d.classList.toggle('open');h.querySelector('.caret').textContent=d.classList.contains('open')?'▾':'▸'});
-$('addtier').onclick=()=>{let i=S.tiers.length+1;while(S.tiers.some(t=>t.name===`tier-${i}`))i++;S.tiers.push({name:`tier-${i}`,mode:'single',model:'claude-haiku-4-5',harness:'auto',dist:[]});S.open[`tier-${i}`]=true;render()};
-$('supmodel').onchange=(e)=>{S.sup.model=e.target.value;render()};
-$('supharness').onchange=(e)=>{S.sup.harness=e.target.value;render()};
-$('supsub').onchange=(e)=>{S.sup.subscribe=e.target.value;render()};
-$('supown').onclick=()=>{S.sup.owns=!S.sup.owns;render()};
-$('kindadd').onclick=()=>{const k=$('kindpick').value,t=$('kindtier').value;if(!k||!t)return;S.kinds[k]=t;render()};
-$('feedcall').onchange=(e)=>{S.feed.callouts=e.target.value;render()};
-$('feedmax').onchange=(e)=>{S.feed.max=e.target.value?+e.target.value:null;render()};
-$('feedexcl').onchange=(e)=>{S.feed.exclude=e.target.value.split(',').map(s=>s.trim()).filter(Boolean);render()};
-$('feedsubj').onchange=(e)=>{S.feed.subjects=e.target.value.split(',').map(s=>s.trim()).filter(Boolean);render()};
-$('escsw').onclick=()=>{S.esc.enabled=!S.esc.enabled;render()};
-$('escretries').onchange=(e)=>{S.esc.retries=+e.target.value;render()};
-$('escpromo').onchange=(e)=>{S.esc.promos=+e.target.value;render()};
-$('flounder').innerHTML=DIFFS.map(d=>`<label class="f"><span class="fieldlbl">${d}</span><input type="number" min="1" data-fl="${d}" placeholder="—"></label>`).join('');
-document.querySelectorAll('[data-fl]').forEach(i=>i.onchange=()=>{if(i.value)S.esc.flounder[i.dataset.fl]=+i.value;else delete S.esc.flounder[i.dataset.fl];render()});
-$('repthresh').onchange=(e)=>{S.replay=+e.target.value;render()};
-$('repcompact').onchange=(e)=>{S.compact=e.target.value;render()};
+  function render() {
+    const mixBad = S.crews.some(c => c.mode==='mix' && c.dist.reduce((s,e)=>s+e.weight,0) !== 100);
+    $('stchip').textContent = !S.enabled ? 'Off' : mixBad ? 'Invalid — a mix doesn’t total 100%' : 'On · valid';
+    $('stchip').style.color = !S.enabled ? 'var(--muted-foreground)' : mixBad ? 'var(--destructive-foreground)' : 'var(--success-foreground)';
+    $('ensw').classList.toggle('on', S.enabled);
 
-render();
+    // board
+    $('board').innerHTML = DIFFS.map(d => {
+      const ci = S.assign[d], c = S.crews[ci];
+      return `<div class="bcol" style="border-top-color:${CREW_COLORS[ci % CREW_COLORS.length]}">
+        <div class="d">${d}</div>
+        <div class="dsub">${d==='trivial'?'typo-level fixes':d==='simple'?'small scoped edits':d==='medium'?'typical tasks':d==='complex'?'multi-file work':'judgment calls'}</div>
+        <select data-assign="${d}" aria-label="crew for ${d}">
+          ${S.crews.map((cc,i)=>`<option value="${i}" ${i===ci?'selected':''}>${crewLabel(cc)}</option>`).join('')}
+          <option value="new">+ new crew…</option>
+        </select>
+        <div class="who">${c ? crewWho(c) : '—'}</div>
+        <div class="cost">≈ $${c ? blended(c).toFixed(1) : '0'}/1M</div>
+      </div>`;
+    }).join('');
+    $('board').querySelectorAll('select').forEach(s => s.onchange = () => {
+      if (s.value === 'new') {
+        S.crews.push({mode:'single', model:'claude-haiku-4-5', harness:'auto', dist:[]});
+        S.assign[s.dataset.assign] = S.crews.length - 1;
+        S.open[S.crews.length - 1] = true;
+      } else S.assign[s.dataset.assign] = +s.value;
+      render();
+    });
+    $('escpath').innerHTML = S.esc.enabled
+      ? 'When a task keeps failing it climbs: trivial → simple → medium → complex → expert (max ' + S.esc.promos + ' bumps — see Escalation below).'
+      : 'Escalation is off — a failing task stays with its crew and surfaces to you.';
+
+    // crews
+    $('crews').innerHTML = S.crews.map((c, i) => {
+      const owns = crewOwns(i);
+      const tot = c.dist.reduce((s,e)=>s+e.weight,0);
+      const warn = (c.mode==='single' && mismatch(c)) || c.dist.some(mismatch);
+      return `<div class="crew ${S.open[i]?'open':''}">
+        <div class="crew-head" data-crew="${i}" tabindex="0">
+          <span class="caret">${S.open[i]?'▾':'▸'}</span>
+          <span class="cdot" style="background:${CREW_COLORS[i % CREW_COLORS.length]}"></span>
+          <span class="cname">${crewLabel(c)}</span>
+          <span class="cwho">${c.mode==='mix' ? crewWho(c) : ''}</span>
+          ${warn ? '<span class="warnchip">⚠ harness overrides provider default — PAN-1865</span>' : ''}
+          <span class="cowns">${owns.length ? 'handles ' + owns.join(' · ') : 'handles nothing — assign it on the board or remove it'}</span>
+          <span class="ccost">≈ $${blended(c).toFixed(1)}/1M</span>
+        </div>
+        <div class="crew-body">
+          ${c.mode === 'single' ? `
+            <div class="fgrid">
+              <label class="f"><span class="flbl">Model</span><select data-cm="${i}">${modelOptions(c.model)}</select></label>
+              <label class="f"><span class="flbl">Harness</span><select data-ch="${i}">${harnessOptions(c.harness, c.model)}</select></label>
+            </div>` : `
+            <div style="display:flex;justify-content:space-between"><span class="flbl">Weighted mix — each task rolls deterministically; weights must total 100</span>
+              <span class="total ${tot===100?'ok':'bad'}">total ${tot}%</span></div>
+            <div class="mixbar">${c.dist.map((e,j)=>`<div style="width:${e.weight}%;background:${CREW_COLORS[j % CREW_COLORS.length]}"></div>`).join('')}</div>
+            ${c.dist.map((e,j)=>`<div class="mixline">
+              <select data-mm="${i}:${j}">${modelOptions(e.model)}</select>
+              <select data-mh="${i}:${j}">${harnessOptions(e.harness, e.model)}</select>
+              <input type="number" min="1" max="100" value="${e.weight}" data-mw="${i}:${j}" aria-label="weight">
+              <button class="rm" data-mr="${i}:${j}">remove</button>
+            </div>`).join('')}
+            <button class="smallbtn" data-ma="${i}">Add model</button>`}
+          <div class="footbtns">
+            <button class="smallbtn" data-mode="${i}">${c.mode==='mix' ? 'Use one model' : 'Use a weighted mix'}</button>
+            <button class="smallbtn danger" data-del="${i}">Remove crew</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    wireCrews();
+
+    // supervisor
+    $('supsum').textContent = 'reviews ' + (S.sup.subscribe==='all' ? 'every commit' : S.sup.subscribe==='flagged' ? 'flagged commits' : 'a sample') + ' · ' + (CATALOG[S.sup.model]?.n ?? S.sup.model) + (S.sup.owns ? ' · owns inspection' : '');
+    $('supmodel').innerHTML = modelOptions(S.sup.model);
+    $('supharness').innerHTML = HARNESSES.map(h => `<option ${h===S.sup.harness?'selected':''}>${h}</option>`).join('');
+    $('supsub').value = S.sup.subscribe;
+    $('supown').classList.toggle('on', S.sup.owns);
+
+    // kinds
+    const kE = Object.entries(S.kinds);
+    $('kindsline').textContent = kE.length ? kE.length + ' kind' + (kE.length>1?'s':'') + ' overridden; the rest follow difficulty routing.' : 'All kinds follow difficulty routing.';
+    $('kindchips').innerHTML = kE.map(([k,ci]) => `<span class="chip">${k} → ${crewLabel(S.crews[ci]) ?? '?'} <button data-krm="${k}" aria-label="remove">✕</button></span>`).join('');
+    $('kindchips').querySelectorAll('[data-krm]').forEach(b => b.onclick = () => { delete S.kinds[b.dataset.krm]; render(); });
+    $('kindpick').innerHTML = '<option value="">kind…</option>' + KINDS.filter(k => !(k in S.kinds)).map(k => `<option>${k}</option>`).join('');
+    $('kindcrew').innerHTML = S.crews.map((c,i) => `<option value="${i}">${crewLabel(c)}</option>`).join('');
+
+    // advanced summaries
+    const excl = S.feed.exclude.length + S.feed.subjects.length;
+    $('feedsum').textContent = 'call-outs ' + S.feed.callouts + (S.feed.max ? ' · diffs capped ' + S.feed.max + 'B' : '') + (excl ? ' · ' + excl + ' exclusion' + (excl>1?'s':'') : ' · no exclusions');
+    $('escsum').textContent = S.esc.enabled ? 'on · ' + S.esc.retries + ' retry, then bump · max ' + S.esc.promos + ' bumps' : 'off — failures never change crews';
+    $('escsw').classList.toggle('on', S.esc.enabled);
+    $('repsum').textContent = 'replay at ' + Math.round(S.replay*100) + '% context · re-plan on replay: ' + S.compact;
+
+    // yaml
+    const bands = S.crews.map((c,i) => ({c, i, diffs: crewOwns(i)})).filter(b => b.diffs.length);
+    const y = ['tiered_execution:', '  enabled: ' + S.enabled, '  tiers:'];
+    for (const b of bands) {
+      y.push('    ' + tierSlug(b.diffs) + ':');
+      if (b.c.mode === 'mix') {
+        y.push('      distribution:');
+        for (const e of b.c.dist) y.push(`        - { model: ${e.model}, harness: ${effHarness(e)}, weight: ${e.weight} }`);
+      } else {
+        y.push('      model: ' + b.c.model);
+        y.push('      harness: ' + effHarness(b.c));
+      }
+      y.push('      difficulties: [' + b.diffs.join(', ') + ']');
+    }
+    y.push('  supervisor:');
+    y.push('    model: ' + S.sup.model);
+    y.push('    harness: ' + S.sup.harness);
+    y.push('    subscribe: ' + S.sup.subscribe);
+    y.push('    owns_inspection: ' + S.sup.owns);
+    if (Object.keys(S.kinds).length) { y.push('  by_kind:'); for (const [k,ci] of Object.entries(S.kinds)) y.push('    ' + k + ': ' + tierSlug(crewOwns(+ci).length ? crewOwns(+ci) : ['unassigned'])); }
+    y.push('  feed:');
+    y.push('    callouts: ' + S.feed.callouts);
+    y.push('    exclude: [' + S.feed.exclude.join(', ') + ']');
+    y.push('    exclude_subjects: [' + S.feed.subjects.join(', ') + ']');
+    y.push('    max_diff_bytes: ' + (S.feed.max ?? 'null'));
+    y.push('  escalation:');
+    y.push('    enabled: ' + S.esc.enabled);
+    y.push('    retries_at_tier: ' + S.esc.retries);
+    y.push('    max_promotions: ' + S.esc.promos);
+    y.push('    flounder_budget_minutes: {' + Object.entries(S.esc.flounder).map(([d,v]) => ' ' + d + ': ' + v).join(',') + ' }');
+    y.push('  compaction_reroute: ' + S.compact);
+    y.push('  replay_threshold: ' + S.replay);
+    $('yaml').textContent = y.join('\n');
+    $('yamlsum').textContent = 'auto-named tiers: ' + bands.map(b => tierSlug(b.diffs)).join(', ');
+  }
+
+  function wireCrews() {
+    document.querySelectorAll('[data-crew]').forEach(h => {
+      const open = () => { const i = +h.dataset.crew; S.open[i] = !S.open[i]; render(); };
+      h.onclick = (ev) => { if (['BUTTON','SELECT','INPUT'].includes(ev.target.tagName)) return; open(); };
+      h.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } };
+    });
+    document.querySelectorAll('[data-cm]').forEach(s => s.onchange = () => { S.crews[+s.dataset.cm].model = s.value; render(); });
+    document.querySelectorAll('[data-ch]').forEach(s => s.onchange = () => { S.crews[+s.dataset.ch].harness = s.value; render(); });
+    document.querySelectorAll('[data-mm]').forEach(s => s.onchange = () => { const [i,j] = s.dataset.mm.split(':'); S.crews[+i].dist[+j].model = s.value; render(); });
+    document.querySelectorAll('[data-mh]').forEach(s => s.onchange = () => { const [i,j] = s.dataset.mh.split(':'); S.crews[+i].dist[+j].harness = s.value; render(); });
+    document.querySelectorAll('[data-mw]').forEach(s => s.onchange = () => { const [i,j] = s.dataset.mw.split(':'); S.crews[+i].dist[+j].weight = +s.value; render(); });
+    document.querySelectorAll('[data-mr]').forEach(b => b.onclick = () => { const [i,j] = b.dataset.mr.split(':'); S.crews[+i].dist.splice(+j,1); render(); });
+    document.querySelectorAll('[data-ma]').forEach(b => b.onclick = () => { const c = S.crews[+b.dataset.ma]; c.dist.push({model:'claude-haiku-4-5', harness:'auto', weight:0}); render(); });
+    document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+      const c = S.crews[+b.dataset.mode];
+      if (c.mode === 'mix') {
+        const top = c.dist.reduce((a,e) => e.weight > a.weight ? e : a, c.dist[0] || {model:c.model, harness:c.harness, weight:0});
+        c.mode = 'single'; c.model = top.model; c.harness = top.harness;
+      } else { c.mode = 'mix'; c.dist = [{model:c.model, harness:c.harness, weight:100}]; }
+      render();
+    });
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+      const i = +b.dataset.del;
+      if (crewOwns(i).length) { alert('This crew still handles ' + crewOwns(i).join(', ') + ' — reassign those on the board first.'); return; }
+      S.crews.splice(i, 1);
+      for (const d of DIFFS) if (S.assign[d] > i) S.assign[d]--;
+      if (Object.keys(S.kinds).length) for (const k of Object.keys(S.kinds)) { if (S.kinds[k] === i) delete S.kinds[k]; else if (S.kinds[k] > i) S.kinds[k]--; }
+      render();
+    });
+  }
+
+  // static wiring
+  $('ensw').onclick = () => { S.enabled = !S.enabled; render(); };
+  document.querySelectorAll('[data-disc]').forEach(h => {
+    const toggle = () => { const d = $(h.dataset.disc); d.classList.toggle('open'); h.querySelector('.caret').textContent = d.classList.contains('open') ? '▾' : '▸'; };
+    h.onclick = (ev) => { if (['BUTTON','SELECT','INPUT'].includes(ev.target.tagName)) return; toggle(); };
+    h.onkeydown = (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } };
+  });
+  $('supmodel').onchange = (e) => { S.sup.model = e.target.value; render(); };
+  $('supharness').onchange = (e) => { S.sup.harness = e.target.value; render(); };
+  $('supsub').onchange = (e) => { S.sup.subscribe = e.target.value; render(); };
+  $('supown').onclick = () => { S.sup.owns = !S.sup.owns; render(); };
+  $('kindadd').onclick = () => { const k = $('kindpick').value, c = $('kindcrew').value; if (!k || c === '') return; S.kinds[k] = +c; render(); };
+  $('feedcall').onchange = (e) => { S.feed.callouts = e.target.value; render(); };
+  $('feedmax').onchange = (e) => { S.feed.max = e.target.value ? +e.target.value : null; render(); };
+  $('feedexcl').onchange = (e) => { S.feed.exclude = e.target.value.split(',').map(s=>s.trim()).filter(Boolean); render(); };
+  $('feedsubj').onchange = (e) => { S.feed.subjects = e.target.value.split(',').map(s=>s.trim()).filter(Boolean); render(); };
+  $('escsw').onclick = () => { S.esc.enabled = !S.esc.enabled; render(); };
+  $('escretries').onchange = (e) => { S.esc.retries = +e.target.value; render(); };
+  $('escpromo').onchange = (e) => { S.esc.promos = +e.target.value; render(); };
+  $('flounder').innerHTML = DIFFS.map(d => `<label class="f"><span class="flbl">${d}</span><input type="number" min="1" data-fl="${d}" placeholder="—"></label>`).join('');
+  document.querySelectorAll('[data-fl]').forEach(i => i.onchange = () => { if (i.value) S.esc.flounder[i.dataset.fl] = +i.value; else delete S.esc.flounder[i.dataset.fl]; render(); });
+  $('repthresh').onchange = (e) => { S.replay = +e.target.value; render(); };
+  $('repcompact').onchange = (e) => { S.compact = e.target.value; render(); };
+
+  // scenarios
+  const scLive = $('scLive'), scSimple = $('scSimple');
+  scLive.onclick = () => {
+    S.crews = JSON.parse(JSON.stringify(LIVE.crews)); S.assign = {...LIVE.assign}; S.kinds = {}; S.open = {};
+    scLive.classList.add('on'); scSimple.classList.remove('on'); render();
+  };
+  scSimple.onclick = () => {
+    S.crews = JSON.parse(JSON.stringify(SIMPLE.crews)); S.assign = {...SIMPLE.assign}; S.kinds = {}; S.open = {0:true};
+    scSimple.classList.add('on'); scLive.classList.remove('on'); render();
+  };
+
+  render();
 </script>
 </body>
 </html>
