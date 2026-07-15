@@ -81,7 +81,10 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/lib/__tests__/agent-state-role.test.ts",
+      "src/lib/agents/runtime-command.ts"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "docs/TIERED-EXECUTION.md",
@@ -96,13 +99,15 @@
       "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
       "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
       "src/dashboard/server/routes/projects.ts",
+      "src/lib/__tests__/agent-state-role.test.ts",
       "src/lib/agents/__tests__/tier-table.test.ts",
+      "src/lib/agents/runtime-command.ts",
       "src/lib/agents/tier-table.ts"
     ],
-    "recordedAt": "2026-07-15T09:57:51.722Z"
+    "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T11:21:33.371Z",
+  "updated": "2026-07-15T11:21:40.256Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "passed",
