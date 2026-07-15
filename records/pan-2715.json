@@ -135,17 +135,17 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:17:30.593Z",
+  "updated": "2026-07-15T16:22:20.343Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:17:30.460Z",
+    "updatedAt": "2026-07-15T16:22:20.282Z",
     "reviewNotes": "[correctness] Journal-backed verification passes without the required verified commit — `src/lib/lifecycle/dod-gate.ts:241`",
     "verificationNotes": "Verification FAILED at test (256518ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  12:16:00\n   Duration  724ms (transform 113ms, setup 100ms, import 288ms, tests 2ms, environment 251ms)\n\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\n",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
@@ -214,15 +214,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6493486,
-            "output": 9856,
-            "cacheRead": 5758080,
+            "input": 6764664,
+            "output": 10331,
+            "cacheRead": 5908096,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 56184184,
-            "output": 103488,
-            "cacheRead": 54837760,
+            "input": 60944439,
+            "output": 107971,
+            "cacheRead": 59549184,
             "cacheWrite": 0
           }
         },
@@ -245,15 +245,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6493486,
-          "output": 9856,
-          "cacheRead": 5758080,
+          "input": 6764664,
+          "output": 10331,
+          "cacheRead": 5908096,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 56184184,
-          "output": 103488,
-          "cacheRead": 54837760,
+          "input": 60944439,
+          "output": 107971,
+          "cacheRead": 59549184,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -270,8 +270,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 50.775367,
-        "pricingAsOf": "2026-07-15T16:17:30.533Z"
+        "usd": 53.509724,
+        "pricingAsOf": "2026-07-15T16:22:20.332Z"
       }
     },
     "merges": [
