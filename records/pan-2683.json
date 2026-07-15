@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:45:15.199Z",
+  "updated": "2026-07-15T09:46:00.638Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
@@ -99,16 +99,8 @@
   "reReviewScope": "changed",
   "reviewModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "crews-label-copy": {
-        "writerId": "agent-pan-2683",
-        "agentId": "agent-pan-2683",
-        "pid": 1854474,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T09:45:15.199Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2683",
@@ -142,6 +134,17 @@
         "outcome": "completed",
         "reason": "Added conditional crew-routing suspension helper and chip suffix with enabled/disabled/no-override coverage",
         "releasedAt": "2026-07-15T09:45:02.245Z"
+      },
+      {
+        "writerId": "agent-pan-2683",
+        "agentId": "agent-pan-2683",
+        "pid": 1854474,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T09:45:15.199Z",
+        "itemId": "crews-label-copy",
+        "outcome": "completed",
+        "reason": "Verified PAN-2684 crew UI has not landed, retained tiered copy with required follow-up comment, and locked it in a component test",
+        "releasedAt": "2026-07-15T09:46:00.638Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "work-model-suspension-copy": {
         "reason": "Added conditional crew-routing suspension helper and chip suffix with enabled/disabled/no-override coverage",
         "updatedAt": "2026-07-15T09:45:02.245Z"
+      },
+      "crews-label-copy": {
+        "reason": "Verified PAN-2684 crew UI has not landed, retained tiered copy with required follow-up comment, and locked it in a component test",
+        "updatedAt": "2026-07-15T09:46:00.638Z"
       }
     }
   },
@@ -174,6 +181,8 @@
     "work-model-suspension-copy.work-model-suspension-copy.ac1": "completed",
     "work-model-suspension-copy.work-model-suspension-copy.ac2": "completed",
     "work-model-suspension-copy.work-model-suspension-copy.ac3": "completed",
-    "crews-label-copy": "running"
+    "crews-label-copy": "completed",
+    "crews-label-copy.crews-label-copy.ac1": "completed",
+    "crews-label-copy.crews-label-copy.ac2": "completed"
   }
 }
