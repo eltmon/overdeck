@@ -65,19 +65,21 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:49:38.928Z",
+  "updated": "2026-07-15T15:53:20.105Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:47:07.742Z",
+    "updatedAt": "2026-07-15T15:53:19.845Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
+    "lastVerifiedCommit": "6efc93aa4e5dcf41bdf88ed89dcb0944870c8389",
     "reviewRequestedAt": "2026-07-15T15:47:04.399Z",
     "reviewSpawnedAt": "2026-07-15T15:47:07.699Z",
     "scopeDrift": {
@@ -117,15 +119,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2778393,
-            "output": 4727,
-            "cacheRead": 2539008,
+            "input": 3429692,
+            "output": 5294,
+            "cacheRead": 3150080,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 27976008,
-            "output": 38064,
-            "cacheRead": 27391744,
+            "input": 34595583,
+            "output": 53412,
+            "cacheRead": 33682688,
             "cacheWrite": 0
           }
         },
@@ -162,15 +164,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2778393,
-          "output": 4727,
-          "cacheRead": 2539008,
+          "input": 3429692,
+          "output": 5294,
+          "cacheRead": 3150080,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 27976008,
-          "output": 38064,
-          "cacheRead": 27391744,
+          "input": 34595583,
+          "output": 53412,
+          "cacheRead": 33682688,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -199,8 +201,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 34.998484,
-        "pricingAsOf": "2026-07-15T15:47:08.198Z"
+        "usd": 40.247551,
+        "pricingAsOf": "2026-07-15T15:53:20.023Z"
       }
     },
     "merges": [
