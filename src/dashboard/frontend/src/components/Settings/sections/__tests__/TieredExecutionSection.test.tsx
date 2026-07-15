@@ -282,7 +282,7 @@ describe('TieredExecutionSection', () => {
 
   it('edits feed, escalation, and replay threshold values', () => {
     const onSettingsChange = vi.fn();
-    render(
+    const { container } = render(
       <TieredExecutionSection
         formData={baseSettings({
           tiered_execution: {
@@ -316,6 +316,13 @@ describe('TieredExecutionSection', () => {
 
     fireEvent.change(screen.getByLabelText('Replay threshold'), { target: { value: '0.75' } });
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.replay_threshold).toBe(0.75);
+
+    fireEvent.change(screen.getByLabelText('Compaction reroute'), { target: { value: 'on' } });
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.compaction_reroute).toBe('on');
+    expect(screen.getByText(/Commit feed/)).toBeTruthy();
+    expect(screen.getByText(/off — failures never change crews/)).toBeTruthy();
+    fireEvent.click(screen.getByText(/What this writes to config.yaml/));
+    expect(container.querySelector('pre')?.textContent).toContain('tiered_execution:\n  enabled: false');
   });
 
   it('renders supervisor-required and replay-threshold validation errors inline', () => {

@@ -10,6 +10,7 @@ import {
   DIFFICULTIES,
   importCrews,
   providerDefaultHarness,
+  renderYamlPreview,
   serializeCrews,
   type Crew,
   type CrewAssignments,
@@ -99,6 +100,7 @@ export function TieredExecutionSection({
   const config = formData.tiered_execution;
   const normalizedConfig = { ...defaultTieredExecution(config?.enabled ?? false), ...config };
   const { crews, assign, rest } = importCrews(normalizedConfig);
+  const outgoingConfig = serializeCrews(crews, assign, rest);
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [kindDraft, setKindDraft] = useState<typeof ITEM_KINDS[number]>('docs');
@@ -237,6 +239,11 @@ export function TieredExecutionSection({
         replay_threshold: value === '' ? 0 : Number(value),
       },
     }, { debounce: true });
+  };
+
+  const handleCompactionRerouteChange = (value: 'off' | 'on') => {
+    const next = currentConfig();
+    updateTieredExecution({ ...next, compaction_reroute: value });
   };
 
   return (
@@ -433,10 +440,11 @@ export function TieredExecutionSection({
           {byKindError && <p className="mt-3 text-xs text-destructive">{byKindError}</p>}
         </div>
 
-        <div className="grid gap-3 @xl:grid-cols-2">
-          <div className="px-4 py-3 rounded-lg border border-border/70">
-            <span className="text-sm font-medium text-foreground">Feed</span>
-            <div className="mt-3 space-y-3">
+        <div className="space-y-2">
+          <span className="text-sm font-medium text-foreground">Advanced</span>
+          <details className="rounded-lg border border-border/70">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">Commit feed <span className="ml-2 text-xs font-normal text-muted-foreground">— {config?.feed?.callouts === 'notify' ? 'listeners may flag once' : config?.feed?.callouts === 'corroborate' ? 'flags trigger supervisor review' : 'read-only for every crew'}</span></summary>
+            <div className="space-y-3 border-t border-border/70 px-4 py-3">
               <label className="block space-y-1.5">
                 <span className="text-xs font-medium text-foreground">Call-outs</span>
                 <select
@@ -477,11 +485,11 @@ export function TieredExecutionSection({
               </label>
             </div>
             {feedError && <p className="mt-3 text-xs text-destructive">{feedError}</p>}
-          </div>
+          </details>
 
-          <div className="px-4 py-3 rounded-lg border border-border/70">
-            <span className="text-sm font-medium text-foreground">Escalation</span>
-            <div className="mt-3 space-y-3">
+          <details className="rounded-lg border border-border/70">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">Escalation <span className="ml-2 text-xs font-normal text-muted-foreground">— {config?.escalation?.enabled ? `on · up to ${config.escalation.max_promotions ?? 0} promotions` : 'off — failures never change crews'}</span></summary>
+            <div className="space-y-3 border-t border-border/70 px-4 py-3">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-medium text-foreground">Enabled</span>
                 <button
@@ -537,12 +545,13 @@ export function TieredExecutionSection({
               </div>
             </div>
             {escalationError && <p className="mt-3 text-xs text-destructive">{escalationError}</p>}
-          </div>
+          </details>
         </div>
 
-        <div className="px-4 py-3 rounded-lg border border-border/70">
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-foreground">Replay threshold</span>
+        <details className="rounded-lg border border-border/70">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">Session replay <span className="ml-2 text-xs font-normal text-muted-foreground">— threshold {config?.replay_threshold ?? 0.5} · {config?.compaction_reroute === 'on' ? 're-plan after compaction' : 'bring back the same session'}</span></summary>
+          <div className="grid gap-3 border-t border-border/70 px-4 py-3 @xl:grid-cols-2">
+          <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">Replay threshold</span>
             <input
               type="number"
               min="0.01"
@@ -553,8 +562,15 @@ export function TieredExecutionSection({
               className="w-32 rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
             />
           </label>
+          <label className="block space-y-1.5"><span className="text-xs font-medium text-foreground">After compaction</span><select aria-label="Compaction reroute" value={config?.compaction_reroute ?? 'off'} onChange={(event) => handleCompactionRerouteChange(event.target.value as 'off' | 'on')} className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"><option value="off">bring back the same session as before</option><option value="on">re-plan remaining work; retire crews no longer needed</option></select></label>
           {replayThresholdError && <p className="mt-3 text-xs text-destructive">{replayThresholdError}</p>}
-        </div>
+          </div>
+        </details>
+
+        <details className="rounded-lg border border-border/70">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">What this writes to config.yaml <span className="ml-2 text-xs font-normal text-muted-foreground">— {Object.keys(normalizedConfig.tiers).join(', ') || 'no tiers'}</span></summary>
+          <pre className="overflow-x-auto border-t border-border/70 bg-muted/20 px-4 py-3 text-xs text-foreground">{renderYamlPreview(outgoingConfig)}</pre>
+        </details>
       </div>
     </section>
   );
