@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:39:40.033Z",
+  "updated": "2026-07-15T14:39:55.444Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:39:39.989Z",
-    "inspectNotes": "Inspection error for bead issue-view-model: tmux session inspect-pan-2499-issue-view-model exited before producing a verdict. No verdict was produced."
+    "updatedAt": "2026-07-15T14:39:55.352Z",
+    "inspectNotes": "Item issue-view-model BLOCKED: commit 7f45661b touches only src/dashboard/frontend/src/components/issue-view/inventory.ts (adds ISSUE_VIEW_INVENTORY manifest + IssueViewInventoryEntry type, +60/-3 lines). It makes no changes to useIssueView.ts, types.ts, derivations.ts, or index.ts. None of AC1-5 (populated IssueViewModel with ten sub-objects, agents[].active/ship.status derivation, hook reuse of queries.ts with no new useQuery keys, single exported isAgentRunning/readyForMerge/mergeStep/stuckReason, operator.needsYou troubled state) are addressed by this diff. git log --follow on useIssueView.ts shows those files were already introduced by an earlier commit (f28e460311), not this one. This commit reads as a no-loss-inventory manifest for a different bead (FR-0 surface lock), not issue-view-model WI-1. Required fix: verify commit routing — resubmit the actual useIssueView/IssueViewModel diff against this bead, or re-file this commit under its correct bead."
   },
   "closeOut": {
     "usage": {
@@ -108,7 +108,7 @@
       },
       "costAtCloseOut": {
         "usd": 58.859223,
-        "pricingAsOf": "2026-07-15T14:39:40.025Z"
+        "pricingAsOf": "2026-07-15T14:39:55.428Z"
       }
     },
     "merges": [],
