@@ -67,9 +67,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T15:16:19.365Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T15:18Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T15:18:48.600Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T15:18:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2713\n\n# Review Synthesis — PAN-2713 — 2026-07-15T15:30:00-04:00\n\n## Verdict: CHANGES REQUESTED — unknown build state bypasses the deploy safety window\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-9e838feb/context.json\n- Branch: feature/pan-2713\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2713\n- HEAD reviewed: 9e838feb867eb3dc7aac5997325bb8c322a65eb1\n- Cycle number: 2\n- Prior cycle SHA: d5f48b48342d0479980fc4b5b6af0df3ea2378e7\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-9e838feb/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-9e838feb/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-9e838feb/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-9e838feb/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Unknown build state bypasses the deploy safety window — `src/lib/cloister/merge-agent-step0.ts:29`\n`shouldRestartForPostMerge()` calls `getBlockReason()` only when staleness is `stale`; an `unknown` result falls through to `true`. A missing build stamp or Git comparison failure can therefore start the post-merge deploy while verification is running, the flywheel owns deployment, a merge or pending lifecycle is active, a restart lock exists, or the development supervisor is running. Treat every non-fresh result as requiring the deployment-window check, while retaining the legacy restart behavior for `unknown` only when that window is clear.\n\n## Non-blocking Findings\n\n### Correctness\n- `~` Detached reload spawn can crash the dashboard on an asynchronous spawn failure — `src/lib/cloister/deploy-patrol.ts:72`. The child has no `error` listener, so an executable, working-directory, or resource failure can become an uncaught exception after `spawn()` returns.\n\n### Performance\n- `~` Bound the Git fetch used by staleness polling — `src/lib/deploy/staleness.ts:89`. An unbounded network-facing fetch can permanently retain the health refresh promise and pause the serial Deacon patrol when transport stalls.\n\n### Requirements\n- The manifest's null-return stub heuristic is mitigated: `StaleBuildChip` returns `null` only for the intended non-stale state and renders real system-health data when stale.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2713/.pan/review/agent-pan-2713-review-9e838feb/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2713 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -136,7 +149,7 @@
     "recordedAt": "2026-07-15T14:50:52.626Z"
   },
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T15:16:53.134Z",
+  "updated": "2026-07-15T15:18:48.600Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "reviewing",
