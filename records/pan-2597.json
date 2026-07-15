@@ -607,7 +607,7 @@
     "recordedAt": "2026-07-15T14:19:56.585Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T17:28:26.076Z",
+  "updated": "2026-07-15T17:28:40.512Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "passed",
@@ -615,9 +615,9 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:28:26.022Z",
+    "updatedAt": "2026-07-15T17:28:40.449Z",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
     "reviewedAtCommit": "d77d63d0882b2bf5f5cb70512c16b48a0d5a5d6f",
@@ -836,7 +836,7 @@
       },
       "costAtCloseOut": {
         "usd": 250.961093,
-        "pricingAsOf": "2026-07-15T17:28:26.070Z"
+        "pricingAsOf": "2026-07-15T17:28:40.481Z"
       }
     },
     "merges": [
@@ -844,8 +844,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-fable-5",
   "statusOverrides": {
     "docs-appserver": "completed",
     "docs-appserver.ac1": "completed",
