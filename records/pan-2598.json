@@ -282,6 +282,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-15T17:29:35.543Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T17:30:33.140Z"
     }
   ],
   "feedback": [],
@@ -347,23 +352,23 @@
     "recordedAt": "2026-07-15T16:04:48.597Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T17:30:31.732Z",
+  "updated": "2026-07-15T17:30:33.153Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:30:30.842Z",
+    "updatedAt": "2026-07-15T17:30:31.752Z",
     "reviewNotes": "Agent re-review request (1/25): Resolved target branch sync conflicts",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "lastVerifiedCommit": "825f90104e57781c3da4b605f869abc7dc8233c3",
     "reviewRequestedAt": "2026-07-15T17:30:30.406Z",
-    "reviewSpawnedAt": "2026-07-15T17:29:33.722Z",
+    "reviewSpawnedAt": "2026-07-15T17:30:31.750Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -536,7 +541,7 @@
       },
       "costAtCloseOut": {
         "usd": 111.882986,
-        "pricingAsOf": "2026-07-15T17:30:30.884Z"
+        "pricingAsOf": "2026-07-15T17:30:31.851Z"
       }
     },
     "merges": [
@@ -545,7 +550,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
