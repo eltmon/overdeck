@@ -3293,3 +3293,79 @@ me to find it by reading its pane.**
    a PAN-2712 follow-on.
 3. Cohort per the table above — `pan sync-main` each to judge, then resync-or-restart.
 4. HELD per operator: order book (A13/B10–B13), PAN-2377, PAN-2702. No new intake.
+
+## RUN-63 tick 13 (2026-07-15 ~10:50 local / 14:50Z) — MERGE-GATE TRAP FIXED + LIVE-VERIFIED; DEPLOYED; PAN-2683 merged
+
+**PAN-2712 MERGED → `2b8971f9b5` (PR #2714) + CLOSED OUT.** Then **DEPLOYED** and **verified the fix
+works in production**:
+
+- Built from primary main at `2b8971f9b5`, `pan restart --dashboard --health-timeout 180000`.
+- New pid **375845**, **systemd-parented** (ppid 2052 = `systemd --user`, NOT containerd-shim), binds
+  **:3011**, `/api/health` 200, **deacon=on**.
+- **LIVE PROOF:** PAN-2683's stale `failing_checks` blocker — frozen since 13:08:19Z through every
+  earlier poll — **cleared within one poll of the restart**: `ready_for_merge` 0 → **1**,
+  `blockers` → `None`. It then appeared in `pan review pending --ready` and PR #2693 went
+  MERGEABLE/**CLEAN**. The PAN-2710+PAN-2712 trap is broken.
+- **PAN-2683 MERGED → `0f7aaa4e86`** (PR #2693, squash).
+
+**RUN-63 total merged: 14** (PAN-2611, 2229, 2596, 2602, 2616, 2643, 2703, 2684, 2701, 2690, 2704,
+2712, 2683 + PAN-2683's chain). **Closed out: 13** — PAN-2683 is merged but NOT closed out (below).
+
+### ⚠️ DEPLOY WAS THE REAL GAP TODAY — and a timezone trap nearly hid it
+
+New DoD rule landed mid-run (`~/.claude/CLAUDE.md`): *merged is not done; closed-out is not done if
+the server is stale.* It names today's incident — and it was **mine**: I merged PAN-2703/2684/2701/
+2690/2704 and closed them out while the live dashboard still ran a build predating them. **Every fix
+was inert.** The deploy step's gap is already filed as **PAN-2713** (interim owner = flywheel manual
+`npm run build` + `pan restart`); the `pan close` DoD gate is **PAN-2715**. Nothing new to file — the
+job was to DO it, which I now have.
+
+**TIMEZONE TRAP:** `ls --time-style=+%Y-%m-%dT%H:%M:%SZ` prints **LOCAL** time; appending a literal
+`Z` makes it look like UTC and it is 4h off (host is UTC-4). I first read dist as "09:22Z" (really
+13:22Z). **Compare build freshness against `date` in the SAME zone**, or use `date -u -r <file>`.
+
+### [PAN-2716] FILED — close-out verify-merged uses head-commit EQUALITY (PAN-2683 is stranded)
+
+`pan close PAN-2683 --force` **refuses**: "feature/pan-2683 does not match the head commit of merged
+PR #2693". Inspected as instructed — **the work is fully merged and nothing is unpushed**:
+
+```
+merged PR head (= origin/feature/pan-2683):  f1c457d830
+local branch / workspace HEAD:               cf2d1b32a1   ← AHEAD, not behind
+commits in remote not in local:              (none)
+commits in local not in remote:              cf2d1b32a1 (merge main), aa65f50508 (merge main),
+                                             73178549f7 (fix(cloister)… — already ON main)
+```
+
+Both extras are ancestors of `origin/main`; the delta is **pure main**, zero PAN-2683 work. The
+workspace merely merged a newer main locally after its PR head was pushed — normal, encouraged
+behavior. Head equality cannot distinguish "unmerged work" (the real hazard) from "newer main merged
+in locally" (benign); both fail identically. Fix = containment check: allow close-out when every
+local commit not in the PR head is already an ancestor of `origin/main`. Must NOT lean on
+`merge-base --is-ancestor <prHead> origin/main` — that is false by construction for a squash-merge
+(PAN-2703's close-out already handles squash correctly; reuse that reasoning).
+
+**I did NOT force past it.** The only ways through are `git reset --hard` of the feature branch or
+branch deletion — both forbidden one-way doors. **PAN-2683 stays merged-but-open until PAN-2716
+lands**; its workspace/worktree/agent state/Docker stack leak until then. Do NOT "fix" it by hand.
+
+### PAN-2709 sharpened — likely TWO faults (occurrences 3+4 on the issue)
+
+strike-pan-2712 reported "the flywheel orchestrator wasn't running" **while I was demonstrably
+running** (I spawned it minutes earlier) → a **liveness misreport**, distinct from the
+stopped-run/no-resumable-session gap. strike-pan-2704's message **succeeded** the same day, same
+harness, same host → delivery is *inconsistent*, not uniformly broken. May warrant splitting.
+**Every finished strike today needed me to find it by reading its pane.**
+
+**Also:** strike-pan-2712's rebase was denied twice by the permission reviewer → it could not push,
+AND its un-rebased branch diffed as reverting **142 lines of this file**. I rebased by hand.
+**ALWAYS `git diff origin/main..HEAD --stat` a strike branch before landing.**
+
+**NEXT TICK:**
+1. **PAN-2716** — needed to close out PAN-2683 (and any future workspace that merged main late).
+   Strike-worthy: it strands completed work and leaks workspaces.
+2. Cohort per tick-12 table — `pan sync-main` each to judge (NOT merge-tree; it under-reports).
+   PAN-2597 restart-vs-salvage is a real cost call (43 commits) — decide with fresh context.
+3. Phase 2 (release readiness) once the cohort quiesces → report to operator; **operator cuts the
+   release, never the flywheel.**
+4. HELD: order book (A13/B10–B13), PAN-2377, PAN-2702. No new intake.
