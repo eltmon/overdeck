@@ -624,6 +624,37 @@ async function verifySquashMergedPrByBranch(
       return stepOk(step, [`${prLabel} is squash-merged and ${branchRef} matches the merged PR head`]);
     }
 
+    // A workspace may merge a newer main after its PR head was pushed. Ignore
+    // those merge commits and allow close-out when every post-PR commit is
+    // already on origin/main; only branch-unique work is unsafe to discard.
+    let commitsNotOnMain: string[] | null = null;
+    try {
+      const { stdout: commitsRaw } = await execAsync(
+        `git log --no-merges --format=%H ${mergedPr.headRefOid}..${tipSha}`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      const commits = commitsRaw.split('\n').map((sha) => sha.trim()).filter(Boolean);
+      const unmerged: string[] = [];
+      for (const commit of commits) {
+        try {
+          await execAsync(
+            `git merge-base --is-ancestor ${commit} origin/main`,
+            { cwd: ctx.projectPath, encoding: 'utf-8' },
+          );
+        } catch {
+          unmerged.push(commit);
+        }
+      }
+      if (unmerged.length === 0) {
+        const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+        return stepOk(step, [
+          `${prLabel} is squash-merged; all ${commits.length} post-PR non-merge commit(s) on ${branchRef} are already on origin/main`,
+        ]);
+      }
+
+      commitsNotOnMain = unmerged;
+    } catch { /* containment check failure falls through to the state-plane policy */ }
+
     // PAN-2406 / state-plane policy rule 3: commits after the merged head that
     // touch ONLY legacy state-plane paths under .pan/ are pipeline exhaust —
     // e.g. 'chore: record merge status' — and must not block close-out.
@@ -657,6 +688,9 @@ async function verifySquashMergedPrByBranch(
     } catch { /* diff failure falls through to the strict rejection below */ }
 
     const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
+    if (commitsNotOnMain) {
+      return stepFailed(step, `${branchRef} has ${commitsNotOnMain.length} commit(s) after merged ${prLabel} that are not on origin/main: ${commitsNotOnMain.join(', ')}`);
+    }
     return stepFailed(step, `${branchRef} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
   } catch {
     return null;
