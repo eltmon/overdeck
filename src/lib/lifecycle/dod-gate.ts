@@ -2,6 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
+import { userInfo } from 'node:os';
 import { resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
@@ -14,7 +15,7 @@ import {
   resolveProjectForIssue,
   type PanIssuePipelineRecord,
 } from '../pan-dir/record.js';
-import { DOD_ROWS, type DodRowId, type DodRowResult } from './dod.js';
+import { acceptFlagFor, DOD_ROWS, type DodGateResult, type DodRowId, type DodRowResult } from './dod.js';
 import type { LifecycleContext, StepResult } from './types.js';
 
 const execFileAsync = promisify(execFile);
@@ -112,6 +113,28 @@ interface DeployRowDeps {
   serverStartedAt: (port: number) => Promise<Date>;
   distMtime: (repoRoot: string) => Promise<Date>;
 }
+
+export interface EvaluateDodGateDeps {
+  review: (issueId: string) => DodRowResult | Promise<DodRowResult>;
+  tests: (issueId: string) => DodRowResult | Promise<DodRowResult>;
+  verification: (issueId: string) => DodRowResult | Promise<DodRowResult>;
+  merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
+  postMerge: (ctx: LifecycleContext) => DodRowResult | Promise<DodRowResult>;
+  mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
+  deploy: (ctx: LifecycleContext, merge: { mergedAt?: string; mergeCommit?: string }) => DodRowResult | Promise<DodRowResult>;
+  now: () => string;
+}
+
+const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
+  review: checkReviewRow,
+  tests: checkTestsRow,
+  verification: checkVerificationRow,
+  merged: checkMergedRow,
+  postMerge: checkPostMergeRow,
+  mainVerify: checkMainVerifyRow,
+  deploy: checkDeployRow,
+  now: () => new Date().toISOString(),
+};
 
 const defaultDeployRowDeps: DeployRowDeps = {
   dashboardUrl: getDashboardApiUrlSync,
@@ -365,4 +388,41 @@ export async function checkDeployRow(
     const message = error instanceof Error ? error.message : String(error);
     return result('deploy', 'miss', `deploy evidence unavailable: ${message}`);
   }
+}
+
+export async function evaluateDodGate(
+  ctx: LifecycleContext,
+  opts: { acceptedRows?: DodRowId[]; acceptedBy?: string } = {},
+  deps: EvaluateDodGateDeps = defaultEvaluateDodGateDeps,
+): Promise<DodGateResult> {
+  const acceptedRows = new Set(opts.acceptedRows ?? []);
+  const overridable = new Set(DOD_ROWS.filter(row => row.overridable).map(row => row.id));
+  for (const id of acceptedRows) {
+    if (!overridable.has(id)) throw new TypeError(`DoD row "${id}" cannot be accepted; valid rows: ${[...overridable].join(', ')}`);
+  }
+
+  const merged = await deps.merged(ctx);
+  const rows = await Promise.all([
+    deps.review(ctx.issueId),
+    deps.tests(ctx.issueId),
+    deps.verification(ctx.issueId),
+    Promise.resolve(merged),
+    deps.postMerge(ctx),
+    deps.mainVerify(ctx, merged.mergeCommit),
+    deps.deploy(ctx, { mergedAt: merged.mergedAt, mergeCommit: merged.mergeCommit }),
+  ]);
+  const by = opts.acceptedBy ?? process.env.OVERDECK_AGENT_ID ?? userInfo().username;
+  for (const row of rows) {
+    if (row.status === 'miss' && acceptedRows.has(row.id)) {
+      row.acceptedBy = { flag: acceptFlagFor(rowDefinition(row.id)), by, at: deps.now() };
+    }
+  }
+  const misses = rows.filter(row => row.status === 'miss').map(row => row.id);
+  const accepted = rows.filter(row => row.acceptedBy).map(row => row.id);
+  return {
+    rows,
+    misses,
+    accepted,
+    passed: rows.every(row => row.status !== 'miss' || Boolean(row.acceptedBy)),
+  };
 }

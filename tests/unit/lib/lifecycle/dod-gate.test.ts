@@ -9,8 +9,10 @@ import {
   checkReviewRow,
   checkTestsRow,
   checkVerificationRow,
+  evaluateDodGate,
   type DodStatusRowDeps,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
+import { DOD_ROWS, type DodRowId, type DodRowResult } from '../../../../src/lib/lifecycle/dod.js';
 import { stepFailed, stepOk, stepSkipped } from '../../../../src/lib/lifecycle/types.js';
 
 const issueId = 'PAN-2715';
@@ -314,5 +316,52 @@ describe('Definition-of-Done deploy row', () => {
     });
     expect(otherProject).toMatchObject({ status: 'skip', observed: expect.stringContaining('not this project') });
     expect(unreachable).toMatchObject({ status: 'miss', observed: expect.stringContaining('dashboard not reachable') });
+  });
+});
+
+describe('assembled Definition-of-Done gate', () => {
+  const ctx = { issueId, projectPath: '/repo/overdeck' };
+  const makeRow = (id: DodRowId, status: DodRowResult['status'] = 'pass'): DodRowResult => {
+    const def = DOD_ROWS.find(row => row.id === id)!;
+    return { ...def, status, observed: `${id} observed` };
+  };
+  const deps = (deployStatus: DodRowResult['status'] = 'pass') => ({
+    review: async () => makeRow('review'),
+    tests: async () => makeRow('tests'),
+    verification: async () => makeRow('verification'),
+    merged: async () => ({ ...makeRow('merged'), mergedAt: '2026-07-15T12:00:00Z', mergeCommit: 'abc123' }),
+    postMerge: async () => makeRow('post-merge'),
+    mainVerify: async (_ctx: unknown, commit?: string) => {
+      expect(commit).toBe('abc123');
+      return makeRow('main-verify');
+    },
+    deploy: async (_ctx: unknown, merge: { mergedAt?: string; mergeCommit?: string }) => {
+      expect(merge).toEqual({ mergedAt: '2026-07-15T12:00:00Z', mergeCommit: 'abc123' });
+      return makeRow('deploy', deployStatus);
+    },
+    now: () => '2026-07-15T13:00:00Z',
+  });
+
+  it('runs rows one through seven in canonical order and passes a green gate', async () => {
+    const gate = await evaluateDodGate(ctx, {}, deps());
+    expect(gate.passed).toBe(true);
+    expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 7).map(row => row.id));
+  });
+
+  it('blocks an unaccepted miss and records an accepted miss with who and when', async () => {
+    const blocked = await evaluateDodGate(ctx, {}, deps('miss'));
+    const accepted = await evaluateDodGate(ctx, { acceptedRows: ['deploy'], acceptedBy: 'operator' }, deps('miss'));
+    expect(blocked).toMatchObject({ passed: false, misses: ['deploy'], accepted: [] });
+    expect(accepted).toMatchObject({ passed: true, misses: ['deploy'], accepted: ['deploy'] });
+    expect(accepted.rows.at(-1)?.acceptedBy).toEqual({
+      flag: '--accept-deploy',
+      by: 'operator',
+      at: '2026-07-15T13:00:00Z',
+    });
+  });
+
+  it('rejects unknown and non-overridable acceptance rows', async () => {
+    await expect(evaluateDodGate(ctx, { acceptedRows: ['teardown'] }, deps())).rejects.toThrow(TypeError);
+    await expect(evaluateDodGate(ctx, { acceptedRows: ['unknown' as DodRowId] }, deps())).rejects.toThrow(TypeError);
   });
 });

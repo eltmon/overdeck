@@ -21,6 +21,7 @@ import type {
   ApproveOptions,
   DeepWipeOptions,
   ArchiveOptions,
+  CloseOutOptions,
 } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { archivePlanning, findWorkspacePath } from './archive-planning.js';
@@ -31,6 +32,8 @@ import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { getProjectConfigFromWorkspacePath, markRecordPipelineClosedOutSync } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
+import { evaluateDodGate } from './dod-gate.js';
+import { acceptFlagFor, DOD_ROWS, type DodGateResult } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -47,6 +50,7 @@ function buildResult(
   issueId: string,
   steps: StepResult[],
   startTime: number,
+  dodGate?: DodGateResult,
 ): WorkflowResult {
   return {
     workflow,
@@ -54,6 +58,7 @@ function buildResult(
     success: steps.every(s => s.success),
     steps,
     duration: Date.now() - startTime,
+    ...(dodGate ? { dodGate } : {}),
   };
 }
 
@@ -151,17 +156,41 @@ export function close(
  */
 export function closeOut(
   ctx: LifecycleContext,
-  opts: CloseIssueOptions & ArchiveOptions = {},
+  opts: CloseIssueOptions & ArchiveOptions & CloseOutOptions = {},
 ): Effect.Effect<WorkflowResult> {
   return Effect.gen(function* () {
     const start = Date.now();
     const allSteps: StepResult[] = [];
 
-    // 1. Verify branch merged (hard fail — must pass before we archive or clean up)
-    const mergeVerify = yield* verifyBranchMerged(ctx);
-    allSteps.push(mergeVerify);
-    if (!mergeVerify.success && !mergeVerify.skipped) {
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+    // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
+    const dodGate = yield* Effect.promise(() => evaluateDodGate(ctx, {
+      acceptedRows: opts.dodAcceptedRows,
+      acceptedBy: opts.dodAcceptedBy,
+    }));
+    for (const row of dodGate.rows) {
+      const details = [`expected: ${row.expected}`, `observed: ${row.observed}`];
+      if (row.acceptedBy) {
+        allSteps.push(stepSkipped(`dod:${row.id}`, [
+          ...details,
+          `MISS accepted via ${row.acceptedBy.flag} by ${row.acceptedBy.by} at ${row.acceptedBy.at}`,
+        ]));
+      } else if (row.status === 'skip') {
+        allSteps.push(stepSkipped(`dod:${row.id}`, details));
+      } else if (row.status === 'pass') {
+        allSteps.push(stepOk(`dod:${row.id}`, details));
+      } else {
+        allSteps.push(stepFailed(`dod:${row.id}`, row.observed, details));
+      }
+    }
+    if (!dodGate.passed) {
+      const flags = dodGate.rows
+        .filter(row => row.status === 'miss' && !row.acceptedBy)
+        .map(row => `${row.id} (${acceptFlagFor(DOD_ROWS.find(def => def.id === row.id)!)})`);
+      allSteps.push(stepFailed(
+        'close-out:dod-gate',
+        `Definition-of-Done gate blocked close-out: ${flags.join(', ')}. Re-run with the named --accept-<row> flag to record an explicit override.`,
+      ));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 2. Move PRD + archive workspace artifacts
@@ -172,7 +201,7 @@ export function closeOut(
     const archiveFailed = archiveSteps.some(s => !s.success && !s.skipped);
     if (archiveFailed) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — archiving failed, workspace preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 3. Mark the vBRIEF completed on main before teardown removes local state.
@@ -180,7 +209,7 @@ export function closeOut(
     allSteps.push(vbriefStep);
     if (!vbriefStep.success && !vbriefStep.skipped) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — vBRIEF completion failed, workspace preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 5+6. Teardown workspace + agent state
@@ -192,7 +221,7 @@ export function closeOut(
     allSteps.push(...teardownSteps);
     if (hasBlockingFailure(teardownSteps)) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — teardown failed, tracker issue and review status preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 6+7. Close issue + apply label
@@ -204,7 +233,7 @@ export function closeOut(
     allSteps.push(...closeSteps);
     if (hasBlockingFailure(closeSteps)) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — issue close failed, review status preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 8. Mark durable pipeline terminal before clearing the DB cache.
@@ -224,7 +253,7 @@ export function closeOut(
     yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
     yield* Effect.promise(() => recordFeatureRegistryLifecycle({ issueId: ctx.issueId, status: 'archived' }));
 
-    return buildResult('close-out', ctx.issueId, allSteps, start);
+    return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
   });
 }
 

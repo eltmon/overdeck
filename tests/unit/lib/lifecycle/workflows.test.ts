@@ -17,12 +17,18 @@ const {
   mockResetPostMergeState,
   mockMarkRecordPipelineClosedOutSync,
   mockSweepOrphanedTasks,
+  mockEvaluateDodGate,
 } = vi.hoisted(() => ({
   mockExecAsync: vi.fn().mockResolvedValue({ stdout: '', stderr: '' }),
   mockClearReviewStatus: vi.fn(),
   mockResetPostMergeState: vi.fn(),
   mockMarkRecordPipelineClosedOutSync: vi.fn(),
   mockSweepOrphanedTasks: vi.fn().mockResolvedValue({ ok: true, closedIds: [], skipped: 0 }),
+  mockEvaluateDodGate: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/lifecycle/dod-gate.js', () => ({
+  evaluateDodGate: mockEvaluateDodGate,
 }));
 
 vi.mock('child_process', () => ({
@@ -164,6 +170,22 @@ describe('workflows', () => {
     mkdirSync(OVERDECK_HOME, { recursive: true });
 
     vi.clearAllMocks();
+    mockEvaluateDodGate.mockResolvedValue({
+      passed: true,
+      misses: [],
+      accepted: [],
+      rows: [
+        ['review', 1], ['tests', 2], ['verification', 3], ['merged', 4],
+        ['post-merge', 5], ['main-verify', 6], ['deploy', 7],
+      ].map(([id, num]) => ({
+        id,
+        num,
+        title: `${id} title`,
+        expected: `${id} expected`,
+        observed: `${id} observed`,
+        status: 'pass',
+      })),
+    });
     process.env.HOME = testDir;
     delete process.env.LINEAR_API_KEY;
     mockExecAsync.mockImplementation(async (command: string) => {
@@ -252,6 +274,52 @@ describe('workflows', () => {
   });
 
   describe('closeOut', () => {
+    it('blocks before cleanup when the Definition-of-Done gate misses', async () => {
+      mockEvaluateDodGate.mockResolvedValueOnce({
+        passed: false,
+        misses: ['deploy'],
+        accepted: [],
+        rows: [{
+          id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge',
+          observed: 'live build is stale', status: 'miss',
+        }],
+      });
+      const tracker = successfulTracker();
+      const result = await closeOut({ issueId: 'PAN-100', projectPath: testDir }, { tracker });
+
+      expect(result.success).toBe(false);
+      expect(result.steps.at(-1)).toMatchObject({
+        step: 'close-out:dod-gate',
+        error: expect.stringContaining('--accept-deploy'),
+      });
+      expect(result.steps.some(step => step.step.startsWith('archive-planning:'))).toBe(false);
+      expect(tracker.transitionIssue).not.toHaveBeenCalled();
+    });
+
+    it('proceeds when a missed row carries an explicit acceptance', async () => {
+      mockEvaluateDodGate.mockResolvedValueOnce({
+        passed: true,
+        misses: ['deploy'],
+        accepted: ['deploy'],
+        rows: [{
+          id: 'deploy', num: 7, title: 'Deployed', expected: 'live build includes merge',
+          observed: 'live build is stale', status: 'miss',
+          acceptedBy: { flag: '--accept-deploy', by: 'operator', at: '2026-07-15T13:00:00Z' },
+        }],
+      });
+      const result = await closeOut(
+        { issueId: 'PAN-100', projectPath: testDir },
+        { tracker: successfulTracker(), dodAcceptedRows: ['deploy'], dodAcceptedBy: 'operator' },
+      );
+
+      expect(result.steps.find(step => step.step === 'dod:deploy')).toMatchObject({
+        success: true,
+        skipped: true,
+        details: expect.arrayContaining([expect.stringContaining('MISS accepted via --accept-deploy by operator')]),
+      });
+      expect(result.steps.some(step => step.step.startsWith('archive-planning:'))).toBe(true);
+    });
+
     it('should verify branch merged before proceeding', async () => {
       // Mock git branch check — branch doesn't exist (squash-merged)
       mockExecAsync.mockResolvedValue({ stdout: '', stderr: '' });
@@ -708,11 +776,20 @@ describe('workflows', () => {
       }
     });
 
-    it('closeOut should run verify-merged first', async () => {
+    it('closeOut should run the Definition-of-Done gate first', async () => {
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx);
 
-      expect(result.steps[0].step).toBe('close-out:verify-merged');
+      expect(result.steps[0].step).toBe('dod:review');
+      expect(result.steps.slice(0, 7).map(step => step.step)).toEqual([
+        'dod:review',
+        'dod:tests',
+        'dod:verification',
+        'dod:merged',
+        'dod:post-merge',
+        'dod:main-verify',
+        'dod:deploy',
+      ]);
     });
   });
 });
