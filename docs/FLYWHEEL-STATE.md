@@ -4285,3 +4285,43 @@ rebuild → deploy → THEN close. Second attempt passed all 8 rows.
 boots), PAN-2735 (LANDED), PAN-2738 (strike rebase deadlock), PAN-2739 (first-completion nudge dead).
 **Phase 2 readiness is in reach** once 2710 + 2598 land → verify main green, deploy, REPORT + SUGGEST
 the cut. **OPERATOR CUTS; NEVER TAG.**
+
+## RUN-63 tick 31 (2026-07-15 ~14:00 local / 18:00Z) — PAN-2598 LANDED. Drain down to ONE issue. PAN-2735 PROVEN in prod.
+
+**RUN-63: 28 merge commits / 27 distinct issues merged; 27 closed out.**
+**The drain is ONE issue from done: only PAN-2710 remains.**
+
+### ✅ PAN-2735 IS LIVE-PROVEN — I finally get to credit it (operator-verified)
+Monitor conv confirmed what I could not: **PAN-2598's review convoy went from 156m idle → 14m idle —
+it recovered exactly as the fix designed.** Then it completed: review=passed, test=passed, ready=1.
+Tick 28 said "the fix does NOT work" and tick 29 said "unproven"; **both were wrong — the fix works.**
+I was measuring in a 15-min window against a 45-min watchdog. **Patience is part of verification.**
+The convoy-liveness oracle (`review-convoy-liveness.ts`) unwedged a convoy dead for 2.5 hours.
+
+- **PAN-2598** → `6c5083f025` (#2631) — merged, main CI green, deployed (pid **164727**, health 200,
+  systemd-parented, dist 17:58:18Z), **CLOSED OUT** (10 stale agent rows pruned). It closed cleanly
+  **despite `stuck=1`** — the stuck flag blocks *recovery*, not close-out.
+
+### 🔍 PAN-2741 FILED — the best find of the session. Verification feedback is NOISE.
+`validation.ts:587`: `((error.stdout||'') + (error.stderr||'')).slice(-2000)` — stderr is concatenated
+**AFTER** stdout, so the last-2KB slice keeps **stderr's tail** and **DISCARDS vitest's entire failure
+report** (which lives in stdout). Tests spawn temp git repos → git writes `init.defaultBranch` advice
+to stderr → that advice is the ONLY thing the agent ever sees.
+**PAN-2598's complete stored feedback was 2041 chars of `hint: git branch -m <name>` and NOT ONE
+failing test.** Arithmetic confirms the mechanism exactly: 2000 (slice) + 41 (`Verification FAILED at
+test (242238ms):\n\n`) = **2041** = measured length. It even **starts mid-word** (`enamed via this
+command:`) — the signature of a `.slice(-N)` cut.
+**This IS the `verification stuck after 3/3 attempts` generator:** agent gets 2KB of git hints → can't
+fix an invisible failure → 3 cycles burn → `stuck=1` → `:496 if (status.stuck) return actions;` ⇒ **no
+review recovery can EVER reach it again.** Hits PAN-2598 (confirmed) and PAN-1491 (same reason).
+The gate meant to keep bad code off main is randomly blindfolding agents based on which stream wrote last.
+
+### Remaining: PAN-2710 ONLY — healthy, converging
+review=**blocked**, cycle **7**, PR #2736 MERGEABLE / 0 failures. Work agent **ALIVE** (active 29s ago,
+committed 11m ago `eabb1d6607`, 0 unpushed). Real finding: cycle 7 removed `FailedRuns.lastSeenAt`
+eviction ⇒ failed-rerun state leaks for the process lifetime. It's oscillating (cycle 6 fixed
+idempotency, cycle 7 broke eviction) but the review is catching real defects and narrowing. **Let it work.**
+
+**Filed this session:** PAN-2733, PAN-2734, PAN-2735 (LANDED+PROVEN), PAN-2738, PAN-2739, PAN-2741.
+**PHASE 2 is one issue away** → when 2710 lands: verify main green, deploy, **REPORT readiness + SUGGEST
+the cut. OPERATOR CUTS; NEVER TAG.**
