@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:25:58.256Z",
+  "updated": "2026-07-15T14:27:42.419Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "deploy-window-guard": {
-        "writerId": "agent-pan-2713",
-        "agentId": "agent-pan-2713",
-        "pid": 923240,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:25:58.256Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -135,6 +127,17 @@
         "outcome": "completed",
         "reason": "Added the header stale-build text signal with build/origin tooltip and component coverage for stale, fresh, unknown, and unavailable states.",
         "releasedAt": "2026-07-15T14:25:45.096Z"
+      },
+      {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 923240,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:25:58.256Z",
+        "itemId": "deploy-window-guard",
+        "outcome": "completed",
+        "reason": "Added the ordered shared deploy safety-window guard over canonical verification, merge, lifecycle, restart-lock, and dev-session readers with complete coverage.",
+        "releasedAt": "2026-07-15T14:27:42.419Z"
       }
     ],
     "statusReasons": {
@@ -153,6 +156,10 @@
       "stale-build-chip": {
         "reason": "Added the header stale-build text signal with build/origin tooltip and component coverage for stale, fresh, unknown, and unavailable states.",
         "updatedAt": "2026-07-15T14:25:45.096Z"
+      },
+      "deploy-window-guard": {
+        "reason": "Added the ordered shared deploy safety-window guard over canonical verification, merge, lifecycle, restart-lock, and dev-session readers with complete coverage.",
+        "updatedAt": "2026-07-15T14:27:42.419Z"
       }
     }
   },
@@ -175,6 +182,10 @@
     "stale-build-chip.stale-build-chip.ac1": "completed",
     "stale-build-chip.stale-build-chip.ac2": "completed",
     "stale-build-chip.stale-build-chip.ac3": "completed",
-    "deploy-window-guard": "running"
+    "deploy-window-guard": "completed",
+    "deploy-window-guard.deploy-window-guard.ac1": "completed",
+    "deploy-window-guard.deploy-window-guard.ac2": "completed",
+    "deploy-window-guard.deploy-window-guard.ac3": "completed",
+    "deploy-window-guard.deploy-window-guard.ac4": "completed"
   }
 }
