@@ -37,17 +37,17 @@
     "recordedAt": "2026-07-15T09:57:51.722Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T09:57:54.478Z",
+  "updated": "2026-07-15T09:57:55.820Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T09:57:54.428Z",
+    "updatedAt": "2026-07-15T09:57:55.767Z",
     "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2693"
   },
@@ -113,7 +113,7 @@
       },
       "costAtCloseOut": {
         "usd": 22.493209,
-        "pricingAsOf": "2026-07-15T09:57:54.472Z"
+        "pricingAsOf": "2026-07-15T09:57:55.813Z"
       }
     },
     "merges": [
