@@ -11,20 +11,36 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:17:32.930Z",
+  "updated": "2026-07-15T14:17:40.201Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:09:43.226Z"
+    "updatedAt": "2026-07-15T14:17:40.148Z",
+    "inspectNotes": "Inspecting item staleness-module"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 643049,
+            "output": 1207,
+            "cacheRead": 553600,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 4295899,
+            "output": 11184,
+            "cacheRead": 4158976,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 1003,
@@ -35,6 +51,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 643049,
+          "output": 1207,
+          "cacheRead": 553600,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 4295899,
+          "output": 11184,
+          "cacheRead": 4158976,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 1003,
           "output": 71212,
@@ -43,15 +71,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 14.593192,
-        "pricingAsOf": "2026-07-15T14:09:43.274Z"
+        "usd": 17.692815,
+        "pricingAsOf": "2026-07-15T14:17:40.191Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 4,
     "claims": {},
