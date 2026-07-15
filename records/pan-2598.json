@@ -352,17 +352,17 @@
     "recordedAt": "2026-07-15T16:04:48.597Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T17:35:13.200Z",
+  "updated": "2026-07-15T17:47:49.716Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-15T17:35:13.036Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-15T17:47:49.646Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2598-review already running. Use 'pan tell' to message it.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -439,9 +439,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2717165,
-            "output": 5473,
-            "cacheRead": 2385664,
+            "input": 2794734,
+            "output": 5763,
+            "cacheRead": 2440320,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -451,9 +451,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 72094008,
-            "output": 69206,
-            "cacheRead": 70883328,
+            "input": 72317031,
+            "output": 71150,
+            "cacheRead": 71086592,
             "cacheWrite": 0
           }
         },
@@ -500,9 +500,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2717165,
-          "output": 5473,
-          "cacheRead": 2385664,
+          "input": 2794734,
+          "output": 5763,
+          "cacheRead": 2440320,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -512,9 +512,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 72094008,
-          "output": 69206,
-          "cacheRead": 70883328,
+          "input": 72317031,
+          "output": 71150,
+          "cacheRead": 71086592,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -543,8 +543,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 114.76154700000001,
-        "pricingAsOf": "2026-07-15T17:35:13.138Z"
+        "usd": 115.020294,
+        "pricingAsOf": "2026-07-15T17:47:49.703Z"
       }
     },
     "merges": [
