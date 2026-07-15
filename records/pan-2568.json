@@ -24,15 +24,7 @@
       "timestamp": "2026-07-15T15:49:38.928Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T15:49:37Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2568\n\n# Review Synthesis — PAN-2568 — 2026-07-15T15:50:00-04:00\n\n## Verdict: CHANGES REQUESTED — cleared composer can trigger duplicate full-summary delivery\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-68a5bd4e/context.json\n- Branch: feature/pan-2568\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568\n- HEAD reviewed: 68a5bd4e664e45e7a1a733b9abb992a7d5aa0a1a\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-68a5bd4e/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-68a5bd4e/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-68a5bd4e/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-68a5bd4e/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Cleared composer triggers duplicate full-summary delivery — `src/lib/overdeck/conversation-forks.ts:356`\nWhen runtime-state confirmation returns `unknown` or `still-idle`, the new code captures the pane and breaks out of the Enter-nudge loop if the verification marker is absent. It then advances to the outer retry and calls `deliverAgentMessage()` with the complete summary again. A successful initial Enter can clear the composer before the runtime mirror reports `active`, so absence of the marker is affirmative evidence of submission under this function's documented contract, not evidence that the startup paste was dropped. Line wrapping can also make the raw substring check miss a summary that remains visible. This changed code is inside the PR diff and can duplicate a full fork prompt into a live successor session. Treat a cleared composer as `submitted`, or require affirmative empty/ready-prompt evidence before re-delivery, normalize verification against pane wrapping, and add a regression test for `unknown` plus an empty prompt that asserts exactly one delivery.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2568/.pan/review/agent-pan-2568-review-68a5bd4e/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2568 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -65,23 +57,23 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:53:20.105Z",
+  "updated": "2026-07-15T15:53:22.613Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:53:19.845Z",
+    "updatedAt": "2026-07-15T15:53:22.239Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
     "lastVerifiedCommit": "6efc93aa4e5dcf41bdf88ed89dcb0944870c8389",
     "reviewRequestedAt": "2026-07-15T15:47:04.399Z",
-    "reviewSpawnedAt": "2026-07-15T15:47:07.699Z",
+    "reviewSpawnedAt": "2026-07-15T15:53:22.238Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -202,7 +194,7 @@
       },
       "costAtCloseOut": {
         "usd": 40.247551,
-        "pricingAsOf": "2026-07-15T15:53:20.023Z"
+        "pricingAsOf": "2026-07-15T15:53:22.476Z"
       }
     },
     "merges": [
