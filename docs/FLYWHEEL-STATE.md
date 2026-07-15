@@ -3900,3 +3900,40 @@ before the guard refuses". I always deploy from the primary main worktree (`/hom
 never a workspace cwd. The flywheel is the sanctioned single deployer.
 
 **Main CI:** `5f5f6ab0` GREEN; `847414f5` in progress. Ready set empty; no blockers anywhere.
+
+## RUN-63 tick 23 (2026-07-15 ~12:25 local / 16:25Z) — PAN-2725 + PAN-1234 LANDED. Cohort drain is WORKING.
+
+**PAN-2725 MERGED → `1baca0503e` (PR #2728), DEPLOYED, CLOSED OUT.** Build from main at `1baca0503e`
+→ `pan restart --dashboard --health-timeout 180000` → pid **2443704**, systemd-parented, health 200.
+Idle-codex delivery now works, which should end the PAN-2709 "strikes can't reach the flywheel" class.
+
+**PAN-1234 MERGED → `4d9ddfc27f` (PR #2606) + CLOSED OUT.** ⭐ **First cohort issue fully drained.**
+It had sat `review=pending` with NO live agent since **07-13**; this run: `pan sync-main` (1 conflict) →
+`pan start --fresh` → agent resolved the conflict + review feedback → `review=passed test=passed
+ready=1` → merged onto green main. **Proof the re-drive path works on genuinely stalled cohort issues.**
+
+**RUN-63: 20 merged, 20 closed out.**
+
+### Cohort scoreboard — the drain is converging
+| Issue | Was (tick 12) | Now | 
+| --- | --- | --- |
+| PAN-1234 | stalled since 07-13, no agent | ✅ **MERGED + CLOSED** |
+| PAN-2598 | stalled, 5 conflicts | `review=reviewing` (recovered from `blocked`) |
+| PAN-2713 | — | `review=reviewing` (recovered from `blocked`) |
+| PAN-2597 | "restart-vs-salvage cost call" | `review=reviewing` — **the tick-12 restart call was never needed; it self-drove** |
+| PAN-2568 | stalled | `review=pending`, work + review-supervisor live |
+| PAN-2710 | parked | operator-released → work agent + review-supervisor live |
+| PAN-2715 | — | `review=pending`, work + review-supervisor live |
+| PAN-2499 | — | **operator-stop gate (`stoppedByUser=True`) — NOT re-driven** |
+| PAN-1491 | stalled | **PAUSED needs-you** (verification stuck 3/3) — operator gate |
+
+**Note on PAN-2597:** tick 12 framed it as a hard restart-vs-salvage decision (43 commits, 4 conflicts,
+review=FAILED). It never needed one — it had a live agent the whole time and is now in review. **A
+second confirmation that a stale inventory manufactures fake decisions.** Re-derive before deciding.
+
+**Main CI:** `847414f5` GREEN; `ecba0bd6` + `1baca050` in progress. Ready set empty (PAN-1234 drained).
+30 live sessions; no blockers on any row.
+
+**NEXT:** drive PAN-2597/2598/2713 review→test→merge; PAN-2710 (operator-released) to merged;
+PAN-2568/2715 to verdict. **Do NOT touch PAN-2499 (operator-stop) or PAN-1491 (needs-you).**
+Phase 2 release readiness once these quiesce → report + suggest; **operator cuts, never tag.**
