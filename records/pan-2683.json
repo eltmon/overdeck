@@ -102,18 +102,19 @@
     "recordedAt": "2026-07-15T09:57:51.722Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T10:52:11.263Z",
+  "updated": "2026-07-15T11:16:17.294Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T10:52:11.225Z",
+    "updatedAt": "2026-07-15T11:16:17.178Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues (tier-table malformed-value validation); workspace cleared of generated hook-bundle noise",
+    "testNotes": "npm run typecheck passed; npm run lint passed; unrestricted npm test passed 984 root files/9,119 tests plus 3 frontend files/32 tests; npm run build:dashboard passed; workspace-built Node 22 dashboard booted on isolated port 3013 and /api/health confirmed repoRoot=/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683. Browser UAT required for Policies panel Standing crew control/chip/reset/helper-copy flows but no Playwright MCP tools are exposed to this test role, so those paths could not be exercised. Required canonical .pan/records/pan-2683.json and .pan/specs/ vBRIEF are also absent from the workspace; retired local continue/spec files were not used as canonical inputs.",
     "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2693",
     "reviewedAtCommit": "5f460ca4e455e84d3d525b34ef616344b8f9f867",
@@ -125,15 +126,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1426587,
-            "output": 3758,
-            "cacheRead": 1257984,
+            "input": 1839166,
+            "output": 4706,
+            "cacheRead": 1615744,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 46337707,
-            "output": 45745,
-            "cacheRead": 45232128,
+            "input": 53218969,
+            "output": 55912,
+            "cacheRead": 51934464,
             "cacheWrite": 0
           }
         },
@@ -164,15 +165,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1426587,
-          "output": 3758,
-          "cacheRead": 1257984,
+          "input": 1839166,
+          "output": 4706,
+          "cacheRead": 1615744,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 46337707,
-          "output": 45745,
-          "cacheRead": 45232128,
+          "input": 53218969,
+          "output": 55912,
+          "cacheRead": 51934464,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -189,8 +190,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 57.577459,
-        "pricingAsOf": "2026-07-15T10:52:11.256Z"
+        "usd": 62.128267,
+        "pricingAsOf": "2026-07-15T11:16:17.247Z"
       }
     },
     "merges": [
