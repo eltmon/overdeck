@@ -97,9 +97,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T17:08:16.999Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T17:09Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T17:09:57.688Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T17:09:57Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T17:12:00-04:00\n\n## Verdict: CHANGES REQUESTED — the new failed-attempt pruning model permits retries after candidate flapping and remains unbounded for continuously active candidates\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-4a038d8d/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: 4a038d8dcff6295fa355342d8c74f8c0d92c6e9a\n- Cycle number: 4\n- Prior cycle SHA: b8852d83252a82f579417f7079d2f603619a848a\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-4a038d8d/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-4a038d8d/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-4a038d8d/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-4a038d8d/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] A transient candidate disappearance re-enables a failed rerun command — `src/dashboard/server/services/stale-check-retrigger-service.ts:45`\nThe new pruning condition deletes every attempted-run marker whose issue is absent from one candidate snapshot, including `commandFailed: true` entries. If a `failing_checks` blocker temporarily disappears and later returns while the underlying GitHub run remains attempt 1, the service invokes `gh run rerun` again. That violates the one-command-attempt then manual-fallback requirement. Preserve failed-command suppression across candidate flapping and add a fake-timer regression test that removes and restores the candidate after a failed command while asserting exactly one rerun call.\n\n### [performance] Failed rerun attempts can accumulate for the lifetime of an active issue — `src/dashboard/server/services/stale-check-retrigger-service.ts:45`\nThe same new pruning model exempts `commandFailed: true` entries from the 24-hour TTL while their issue remains active. A long-lived blocked issue can produce new commits and run IDs during a prolonged GitHub or CLI failure, causing the map and its per-tick scan cost to grow with every failed command. Bound failed-attempt retention by the current bounded GitHub run set or a bounded per-issue collection without making an evicted run automatically eligible for another command attempt.\n\n## Non-blocking Findings\nNone.\n\n## Scope Note\nThe cycle-4 convergence gate was applied against `b8852d83252a82f579417f7079d2f603619a848a`. Both blockers survive because the `AttemptedRun` record and its candidate-aware/command-failure pruning conditions were introduced in this cycle. These findings could not have been raised in cycle 1: the original implementation used unstructured process-lifetime sets, while the candidate-linked failed-attempt semantics under review did not exist until this revision. The prior 24-hour retry blocker is fixed for continuously active candidates, but the replacement creates the two narrower failures above.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-4a038d8d/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -126,7 +139,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:09:49.600Z",
+  "updated": "2026-07-15T17:09:57.689Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
