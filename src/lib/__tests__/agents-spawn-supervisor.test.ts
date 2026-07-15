@@ -69,6 +69,9 @@ function mockSpawnDependencies(): void {
   vi.doMock('../runtimes/codex.js', () => ({
     initCodexHome: vi.fn(),
   }));
+  vi.doMock('../codex-auth.js', () => ({
+    assertCodexNativeAuthForSpawn: vi.fn(),
+  }));
   vi.doMock('../runtimes/pi-fifo.js', () => ({
     PiNotReady: class PiNotReady extends Error {
       readonly code = 'PI_NOT_READY';
@@ -197,6 +200,7 @@ afterEach(() => {
   vi.doUnmock('../agents/hook-readiness.js');
   vi.doUnmock('../agent-runtime-mirror.js');
   vi.doUnmock('../runtimes/codex.js');
+  vi.doUnmock('../codex-auth.js');
   vi.doUnmock('../runtimes/pi-fifo.js');
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
