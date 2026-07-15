@@ -90,18 +90,19 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:43:34.193Z",
+  "updated": "2026-07-15T11:44:13.110Z",
   "pipeline": {
     "issueId": "PAN-2684",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T11:43:34.140Z",
+    "updatedAt": "2026-07-15T11:44:13.011Z",
     "reviewNotes": "Kind-only crew handling can emit invalid configuration or silently delete routed work.",
+    "verificationNotes": "Verification FAILED at frontend-typecheck (13754ms):\n\nsrc/components/Settings/sections/TieredExecutionSection.tsx(109,5): error TS2322: Type 'TieredExecutionConfig' is not assignable to type '{ by_kind: Partial<Record<VBriefItemKind, string>>; enabled: boolean; tiers: Record<string, { model: ModelId; harness: Harness; difficulties: VBriefDifficulty[]; distribution?: Array<{ model: ModelId; harness: Harness; weight: number; }>; }>; ... 6 more ...; difficultyToTier?: Partial<Record<VBriefDifficulty, string...'.\n  Types of property 'by_kind' are incompatible.\n    Type 'Partial<Record<VBriefItemKind, string>> | undefined' is not assignable to type 'Partial<Record<VBriefItemKind, string>>'.\n      Type 'undefined' is not assignable to type 'Partial<Record<VBriefItemKind, string>>'.\n",
     "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2694",
     "lastVerifiedCommit": "5975f975e47524c4553d6159c295b7ea013adfac",
@@ -191,7 +192,7 @@
       },
       "costAtCloseOut": {
         "usd": 37.940128,
-        "pricingAsOf": "2026-07-15T11:43:34.183Z"
+        "pricingAsOf": "2026-07-15T11:44:13.067Z"
       }
     },
     "merges": [
