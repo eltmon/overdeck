@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:09:46.603Z",
+  "updated": "2026-07-15T15:11:32.864Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "gate-postmerge-row": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 1707608,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:09:46.603Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -155,6 +147,17 @@
         "outcome": "completed",
         "reason": "Reused exported merge verifier, added best-effort PR metadata, passed 39 lifecycle tests and typecheck; pushed 6a70aa59b3",
         "releasedAt": "2026-07-15T15:09:30.012Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1707608,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:09:46.603Z",
+        "itemId": "gate-postmerge-row",
+        "outcome": "completed",
+        "reason": "Checked canonical post-merge state and running issue agents; 14 tests and typecheck passed; pushed 47952854c0",
+        "releasedAt": "2026-07-15T15:11:32.863Z"
       }
     ],
     "statusReasons": {
@@ -176,8 +179,8 @@
         "updatedAt": "2026-07-15T15:09:30.012Z"
       },
       "gate-postmerge-row": {
-        "reason": "Continue canonical next item after merged-row completion",
-        "updatedAt": "2026-07-15T15:09:46.603Z"
+        "reason": "Checked canonical post-merge state and running issue agents; 14 tests and typecheck passed; pushed 47952854c0",
+        "updatedAt": "2026-07-15T15:11:32.863Z"
       }
     }
   },
@@ -199,6 +202,9 @@
     "gate-merged-row.gate-merged-row.ac2": "completed",
     "gate-merged-row.gate-merged-row.ac3": "completed",
     "gate-merged-row.gate-merged-row.ac4": "completed",
-    "gate-postmerge-row": "running"
+    "gate-postmerge-row": "completed",
+    "gate-postmerge-row.gate-postmerge-row.ac1": "completed",
+    "gate-postmerge-row.gate-postmerge-row.ac2": "completed",
+    "gate-postmerge-row.gate-postmerge-row.ac3": "completed"
   }
 }
