@@ -37,7 +37,7 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T10:11:04.841Z",
+  "updated": "2026-07-15T11:08:06.144Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "reviewing",
@@ -47,12 +47,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T10:11:04.796Z",
+    "updatedAt": "2026-07-15T11:08:06.033Z",
     "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2694",
     "lastVerifiedCommit": "41e765d47cc9fc0581089f40ef9a9468da5483c5",
     "reviewRequestedAt": "2026-07-15T10:08:49.814Z",
-    "reviewSpawnedAt": "2026-07-15T10:08:50.576Z",
+    "reviewSpawnedAt": "2026-07-15T11:08:06.032Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -137,7 +137,7 @@
       },
       "costAtCloseOut": {
         "usd": 26.033272,
-        "pricingAsOf": "2026-07-15T10:11:04.827Z"
+        "pricingAsOf": "2026-07-15T11:08:06.106Z"
       }
     },
     "merges": [
