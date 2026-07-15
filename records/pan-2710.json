@@ -226,17 +226,17 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:42:13.235Z",
+  "updated": "2026-07-15T17:43:28.654Z",
   "pipeline": {
     "issueId": "PAN-2710",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:42:13.087Z",
+    "updatedAt": "2026-07-15T17:43:28.598Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "Verified against ab30bec102 (src/lib/cloister/stale-check-classifier.ts + tests/unit/lib/cloister/stale-check-classifier.test.ts). AC1: computeRedWindows closes fail(t1)->success(t2) into one {start,end} window, trailing fail leaves end:null (tests confirm). AC2: selectRerunCandidates requires completed+attempt===1+failing-concluded+containing closed window of same workflowName before adding to rerun[]. AC3: main-still-red (open window), no-red-window-match (green interval / predating history / workflow mismatch), attempt-exceeded (attempt!==1), missing-attempt (checked before other reasons) all covered by dedicated tests with exact reason strings. AC4: module is pure (no fs/network I/O, operates only on passed-in arrays); imports FAILING_CHECK_CONCLUSIONS from ../webhook-handlers.js (webhook-handlers.ts:192) rather than duplicating the conclusion set; test 'recognizes every conclusion from the canonical failing set' cross-checks all 7 values. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
@@ -248,15 +248,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 5079807,
-            "output": 7132,
-            "cacheRead": 4563712,
+            "input": 5338129,
+            "output": 7255,
+            "cacheRead": 4816896,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 113117314,
-            "output": 115974,
-            "cacheRead": 111533056,
+            "input": 114668128,
+            "output": 119234,
+            "cacheRead": 113050880,
             "cacheWrite": 0
           }
         },
@@ -270,24 +270,24 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 26,
-            "output": 8103,
-            "cacheRead": 1196313,
-            "cacheWrite": 417113
+            "input": 28,
+            "output": 9940,
+            "cacheRead": 1324595,
+            "cacheWrite": 422023
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 5079807,
-          "output": 7132,
-          "cacheRead": 4563712,
+          "input": 5338129,
+          "output": 7255,
+          "cacheRead": 4816896,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 113117314,
-          "output": 115974,
-          "cacheRead": 111533056,
+          "input": 114668128,
+          "output": 119234,
+          "cacheRead": 113050880,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -297,15 +297,15 @@
           "cacheWrite": 166964
         },
         "anthropic/claude-sonnet-5": {
-          "input": 26,
-          "output": 8103,
-          "cacheRead": 1196313,
-          "cacheWrite": 417113
+          "input": 28,
+          "output": 9940,
+          "cacheRead": 1324595,
+          "cacheWrite": 422023
         }
       },
       "costAtCloseOut": {
-        "usd": 76.805418,
-        "pricingAsOf": "2026-07-15T17:42:13.151Z"
+        "usd": 77.883385,
+        "pricingAsOf": "2026-07-15T17:43:28.639Z"
       }
     },
     "merges": [
