@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:38:40.418Z",
+  "updated": "2026-07-15T15:38:44.076Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -128,7 +128,7 @@
   "statusOverrides": {
     "injection-budget": "completed",
     "size-scaled-waits": "completed",
-    "full-length-purge": "running",
+    "full-length-purge": "completed",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
     "size-scaled-waits.size-scaled-waits.ac2": "completed",
     "size-scaled-waits.size-scaled-waits.ac3": "completed",
@@ -151,7 +151,10 @@
     "injection-budget.injection-budget.ac4": "completed",
     "delivery-race-test": "completed",
     "delivery-race-test.delivery-race-test.ac1": "completed",
-    "delivery-race-test.delivery-race-test.ac2": "completed"
+    "delivery-race-test.delivery-race-test.ac2": "completed",
+    "full-length-purge.full-length-purge.ac1": "completed",
+    "full-length-purge.full-length-purge.ac2": "completed",
+    "full-length-purge.full-length-purge.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -164,16 +167,8 @@
     }
   },
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "full-length-purge": {
-        "writerId": "agent-pan-2568",
-        "agentId": "agent-pan-2568",
-        "pid": 2310969,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:38:40.418Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
@@ -229,6 +224,17 @@
         "outcome": "completed",
         "reason": "Added fake-timer regression coverage proving 30 KB payloads receive the derived timeout and remain on the supervisor tier when completion occurs just under budget.",
         "releasedAt": "2026-07-15T15:37:51.700Z"
+      },
+      {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 2310969,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:38:40.418Z",
+        "itemId": "full-length-purge",
+        "outcome": "completed",
+        "reason": "Expanded purge to the shared 262,144-char cap, rejected oversized payloads, scaled purge settle time, and added fake-timer coverage.",
+        "releasedAt": "2026-07-15T15:38:44.076Z"
       }
     ],
     "statusReasons": {
@@ -253,9 +259,8 @@
         "updatedAt": "2026-07-15T15:37:51.700Z"
       },
       "full-length-purge": {
-        "reason": "Reset recovered item for canonical reclaim and completion.",
-        "updatedAt": "2026-07-15T15:38:37.000Z",
-        "forced": true
+        "reason": "Expanded purge to the shared 262,144-char cap, rejected oversized payloads, scaled purge settle time, and added fake-timer coverage.",
+        "updatedAt": "2026-07-15T15:38:44.076Z"
       }
     }
   }
