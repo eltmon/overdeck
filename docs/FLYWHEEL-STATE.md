@@ -3794,3 +3794,46 @@ liveness). No blockers on any row. **Main CI GREEN** on `19f6989b` + `ebceddd2`;
 **NEXT:** land PR #2723 → close out → deploy. Then `pan start PAN-2710` when planning finalizes.
 Then drive the blocked-review trio to verdict. PAN-1491 stays PAUSED (needs-you: verification stuck
 3/3 — operator gate, do not force).
+
+## RUN-63 tick 21 (2026-07-15 ~11:45 local / 15:45Z) — PAN-2722 LANDED+DEPLOYED; PAN-2569 fired on PAN-2710 (caught+fixed); PAN-2724 in CI
+
+**PAN-2722 MERGED → `8d3ecd404d` (PR #2723), DEPLOYED, CLOSED OUT.** Build from main at `8d3ecd404d`
+(freshness checked with `date -u -r`), `pan restart --dashboard --health-timeout 180000` → pid
+**1857792**, systemd-parented, health 200. **RUN-63: 17 merged, 17 closed out.**
+
+### ⚠️ PAN-2569 FIRED — exactly as flagged in tick 20. Caught ONLY by a manual sweep.
+
+`pan plan PAN-2710 --auto` **finalized successfully** — spec written to `overdeck-state`
+(`2026-07-15-PAN-2710-feature-prs-keep-stale-failed-checks…vbrief.json`), `planning-pan-2710` pane
+gone — and **NO work agent spawned.** `review_status` = `('pending','pending',0)`; the only pan-2710
+session was the dead `strike-pan-2710`. No error, no needs-you, no trace. **It would have sat at
+`planned` forever**, on the critical path, on an operator-RELEASED issue.
+
+`pan start PAN-2710` → started immediately, clean, **5 checklist items** — proving nothing was wrong
+with the issue, plan, or capacity. The auto-start step simply never fired.
+**Occurrence recorded on PAN-2569** with full evidence, and cross-linked to PAN-2691 (auto-planned
+issues park silently when the post-finalize spawn is gated — same silence, possibly same root).
+**STANDING LESSON: after ANY `pan plan --auto` finalizes, VERIFY a work agent exists. Do not assume.**
+
+**PAN-2724 → PR #2726, CI running. I OWN THIS MERGE.** Replaces the beads-era `"Item <id> …"` notes
+regex with a structured `--item` flag for inspect verdicts. Verified myself: 21 tests passed (3 files),
+typecheck, lint; diff stat clean.
+**Checked the risky part** — `--item` is now REQUIRED for inspect, which would break every caller that
+omits it. Confirmed the ONLY callers are the standing-supervisor prompts
+(`tier-supervisor.ts:391/397`) and **the strike updated both to emit `--item` in the same change**, and
+registered the flag on the CLI (`specialists/index.ts`). No caller left on the old shape. It also
+validates the item against the vBRIEF and fails loudly on an unknown id rather than mis-attributing.
+
+**strike-pan-2725 IN FLIGHT** — committed `73eafbdefd` (fix(cloister): deliver messages to idle codex
+agents), still writing tests. Operator: *"until it lands, `pan tell` to IDLE codex agents dead-letters;
+if an agent doesn't react, cycle its session (kill + stack rebuild + start) so queued mail replays at
+spawn."* **Low impact on me — the flywheel never uses `pan tell` (forbidden by doctrine)** — but it
+explains why finished strikes could not reach me all day (PAN-2709 occurrences 1–4).
+
+**Live now:** PAN-2597 (reviewing), PAN-2499, PAN-2568, PAN-2598 (review=blocked, working feedback),
+PAN-1234 (review=blocked, working), PAN-2713 (review=blocked, working), PAN-2715, **PAN-2710 (work
+agent, 5 items)**, planning-pan-2702 (not mine), strike-pan-2724 (PR #2726), strike-pan-2725.
+**Main CI:** `244aa59f` GREEN; `8d3ecd40` in progress. PAN-1491 stays PAUSED (needs-you, operator gate).
+
+**NEXT:** land PR #2726 → close → deploy. Land PAN-2725 on green. Drive the blocked-review trio.
+Shepherd PAN-2710 (operator-released) to merged.
