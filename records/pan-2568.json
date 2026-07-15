@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:38:34.153Z",
+  "updated": "2026-07-15T15:38:37.000Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -128,7 +128,7 @@
   "statusOverrides": {
     "injection-budget": "completed",
     "size-scaled-waits": "completed",
-    "full-length-purge": "blocked",
+    "full-length-purge": "pending",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
     "size-scaled-waits.size-scaled-waits.ac2": "completed",
     "size-scaled-waits.size-scaled-waits.ac3": "completed",
@@ -164,7 +164,7 @@
     }
   },
   "tasks": {
-    "sequence": 13,
+    "sequence": 14,
     "claims": {},
     "claimHistory": [
       {
@@ -245,8 +245,8 @@
         "updatedAt": "2026-07-15T15:37:51.700Z"
       },
       "full-length-purge": {
-        "reason": "Recover malformed running state with missing claim owner after agent restart; implementation is already committed and pushed.",
-        "updatedAt": "2026-07-15T15:38:34.153Z",
+        "reason": "Reset recovered item for canonical reclaim and completion.",
+        "updatedAt": "2026-07-15T15:38:37.000Z",
         "forced": true
       }
     }
