@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T14:55:34.257Z",
+  "updated": "2026-07-15T14:57:44.284Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -110,7 +110,10 @@
     "fork-enter-nudge.fork-enter-nudge.ac2": "completed",
     "fork-enter-nudge.fork-enter-nudge.ac3": "completed",
     "fork-enter-nudge.fork-enter-nudge.ac4": "completed",
-    "fork-stranded-status": "running"
+    "fork-stranded-status": "completed",
+    "fork-stranded-status.fork-stranded-status.ac1": "completed",
+    "fork-stranded-status.fork-stranded-status.ac2": "completed",
+    "fork-stranded-status.fork-stranded-status.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -123,16 +126,8 @@
     }
   },
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "fork-stranded-status": {
-        "writerId": "agent-pan-2568",
-        "agentId": "agent-pan-2568",
-        "pid": 1379862,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:55:34.257Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
@@ -155,6 +150,17 @@
         "outcome": "completed",
         "reason": "Added pane-verified standalone Enter recovery with two-nudge cap, composer-clear detection, stranded result, and fake-timer regression tests",
         "releasedAt": "2026-07-15T14:55:19.016Z"
+      },
+      {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 1379862,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:55:34.257Z",
+        "itemId": "fork-stranded-status",
+        "outcome": "completed",
+        "reason": "Run-fork pipeline now records actionable failed status for stranded submissions while preserving the live session; submitted forks still clear status",
+        "releasedAt": "2026-07-15T14:57:44.283Z"
       }
     ],
     "statusReasons": {
@@ -165,6 +171,10 @@
       "fork-enter-nudge": {
         "reason": "Added pane-verified standalone Enter recovery with two-nudge cap, composer-clear detection, stranded result, and fake-timer regression tests",
         "updatedAt": "2026-07-15T14:55:19.016Z"
+      },
+      "fork-stranded-status": {
+        "reason": "Run-fork pipeline now records actionable failed status for stranded submissions while preserving the live session; submitted forks still clear status",
+        "updatedAt": "2026-07-15T14:57:44.283Z"
       }
     }
   }
