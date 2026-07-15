@@ -3,7 +3,7 @@
 An Overdeck issue is **done** when every row in this table is green — not when the PR merges,
 and not when the tracker issue closes. Each row names its **mechanical owner**: the code that
 performs it and the surface where its result is visible. A row with no live owner is a pipeline
-gap — file an issue for it (that is how PAN-2713 exists). "Is anything missed?" is answered by
+gap — file an issue for it. "Is anything missed?" is answered by
 the `pan close` DoD gate (PAN-2715), never by reasoning from memory.
 
 | # | Step | Mechanical owner | Visible at |
@@ -14,7 +14,7 @@ the `pan close` DoD gate (PAN-2715), never by reasoning from memory.
 | 4 | Merged to main (squash PR, revertible history) | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`) | PR `MERGED`, `mergeStatus: merged` |
 | 5 | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard) | issue labels, agent states |
 | 6 | Verified on main (post-merge verification of the merged commit) | deacon verify-on-main flow | `verifying_on_main` → verified |
-| 7 | **Deployed: the live dashboard runs a build that includes the merge** | **GAP — PAN-2713** (interim: flywheel doctrine / manual `npm run build` + `pan restart`) | server build commit vs origin/main |
+| 7 | **Deployed: the live dashboard runs a build that includes the merge** | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit` + stale-build chip |
 | 8 | Close-out: worktree removed, branches per `close_out` config, vBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
 
 ## Rules of the table
@@ -24,7 +24,7 @@ the `pan close` DoD gate (PAN-2715), never by reasoning from memory.
   closed-out while the live server ran a build from three merges earlier — every fix inert.
 - **Every row must name a live owner.** Doctrine ("the flywheel usually does X") is not an
   owner; only code with a trigger is. When you find an ownerless step, drive it manually for
-  velocity AND file the gap issue — same discipline as the flywheel's backstop-as-symptom rule
+  velocity and file the gap issue — the flywheel follows the same backstop-as-symptom rule
   (`roles/flywheel.md`).
 - **Enforcement is the gate, not this doc.** `pan close` verifies the rows mechanically
   (PAN-2715) and reports any miss instead of completing silently. Changing the DoD means

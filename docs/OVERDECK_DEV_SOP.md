@@ -53,6 +53,33 @@ The supervisor also polls the Qwen TTS daemon every 10 seconds when TTS is enabl
 
 The latest restart outcome is written to `${OVERDECK_HOME}/restart-status.json`. `pan status` renders that state, including failures and watchdog give-up alarms.
 
+## Automatic deployment after merges
+
+Production builds embed their Git commit and build time. Deacon compares that commit with
+`origin/main` every fifth patrol cycle, counting only commits that touch build inputs such as
+`src/`, `packages/`, `package.json`, `bun.lock`, and `tsdown.config.ts`. `/api/health` exposes the
+running `buildCommit`; the app header shows `build stale ×N` when newer build-input commits exist.
+
+The post-merge lifecycle and Deacon share the same deploy safety window. They defer while
+verification, merging, another restart, a pending post-merge lifecycle, or `pan dev` is active.
+Deacon also waits for the merge debounce interval, so a merge train produces one rebuild and
+restart instead of one per merge.
+
+Configure the behavior in Cloister config:
+
+```yaml
+deploy:
+  auto_deploy: true       # default: rebuild and restart when the safety window clears
+  debounce_minutes: 5     # default: wait for origin/main to settle
+```
+
+Set `deploy.auto_deploy: false` for signal-only mode. Staleness remains visible in system health
+and the header, but Deacon does not start a deployment. Detached deployment output is appended to
+`~/.overdeck/logs/auto-deploy.log`.
+
+`pan reload` remains the manual deployment door. It builds first, preserves the running dashboard
+when the build fails, restarts the Node 22 bundle after a successful build, and waits for health.
+
 ## Dashboard recovery guardian
 
 The local recovery model has two tiers. The `overdeck-supervisor.service` systemd user unit keeps the supervisor sidecar alive, and the supervisor keeps the dashboard alive by polling health and running `pan restart --dashboard` when the dashboard is down. Systemd owns only the supervisor, not the dashboard process, so dashboard recovery still flows through the existing watchdog logic and avoids a second owner fighting the restart path.

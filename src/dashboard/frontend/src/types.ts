@@ -547,6 +547,16 @@ export interface SystemHealthSnapshot {
     status: 'not_configured' | 'running' | 'stopped' | 'unknown';
     message: string;
   };
+  deployStaleness: {
+    status: 'fresh' | 'stale' | 'unknown';
+    buildCommit: string | null;
+    originMainSha: string | null;
+    behindTotal: number | null;
+    behindBuildInputs: number | null;
+    originMainLastCommitAt: number | null;
+    computedAt: number;
+    reason?: string;
+  } | null;
 }
 
 export interface StartAgentGuardrailWarning {
