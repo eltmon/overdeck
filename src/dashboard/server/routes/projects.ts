@@ -729,13 +729,17 @@ function getIssueStaffingPayload(project: NonNullable<ReturnType<typeof getProje
   const config = loadConfigSync().config;
   const tiered = resolveTieredExecutionEnabledForIssue(config.tieredExecution, issueId);
   const implicit = resolveImplicitStaffing(config, `work:${issueId.toLowerCase()}`);
+  // PAN-2686: recordedModel reflects the most recent work-agent run, so prefer
+  // the live agent state over the permanent record (which can lag a
+  // restart-fresh respawn). The mid-spawn placeholder is not authoritative.
+  const liveModel = getAgentStateSync(`agent-${issueId.toLowerCase()}`)?.model;
   return {
     override: { workModel: record?.workModel ?? null },
     resolved: {
       model: record?.workModel ?? implicit.model,
       tiered,
       source: record?.workModel ? 'issue' : 'default',
-      recordedModel: record?.model ?? null,
+      recordedModel: (liveModel && liveModel !== 'pending-work-spawn' ? liveModel : undefined) ?? record?.model ?? null,
     },
   };
 }

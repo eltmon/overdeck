@@ -774,7 +774,7 @@ describe('PAN-1919: buildIssueRecord backfill migration', () => {
     rmSync(project.path, { recursive: true, force: true });
   });
 
-  it('prefers existing record harness/model over agents table', async () => {
+  it('prefers live agents-table harness/model over existing record (PAN-2686)', async () => {
     const project = makeProject();
     writeIssueRecordSync(project, 'PAN-1919', {
       issueId: 'PAN-1919',
@@ -789,8 +789,46 @@ describe('PAN-1919: buildIssueRecord backfill migration', () => {
     ]);
 
     const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('claude-code');
+    expect(record.model).toBe('claude-opus-4-8');
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('keeps existing record harness/model when no agent row remains', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      harness: 'pi',
+      model: 'kimi-k2.5',
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+    mockListOverdeckAgentStatesSync.mockReturnValue([]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
     expect(record.harness).toBe('pi');
     expect(record.model).toBe('kimi-k2.5');
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('ignores a mid-spawn placeholder row and falls back to the existing record', async () => {
+    const project = makeProject();
+    writeIssueRecordSync(project, 'PAN-1919', {
+      issueId: 'PAN-1919',
+      schemaVersion: 2,
+      harness: 'codex',
+      model: 'gpt-5.5',
+      pipeline: { issueId: 'PAN-1919', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'host' },
+    });
+    mockListOverdeckAgentStatesSync.mockReturnValue([
+      { id: 'agent-pan-1919', issueId: 'PAN-1919', role: 'work', harness: 'claude-code', model: 'pending-work-spawn', status: 'starting', startedAt: '2026-06-22T00:00:00.000Z' },
+    ]);
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.harness).toBe('codex');
+    expect(record.model).toBe('gpt-5.5');
     rmSync(project.path, { recursive: true, force: true });
   });
 });

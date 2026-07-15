@@ -190,6 +190,9 @@ function projectAgentHarnessModel(issueId: string): { harness?: RuntimeName; mod
         .filter((a) => a.role === 'work')
         .sort((a, b) => (b.startedAt ?? '').localeCompare(a.startedAt ?? ''))[0]
       ?? agents[agents.length - 1];
+    // Mid-spawn placeholder row (spawn routes write model 'pending-work-spawn'
+    // with a defaulted harness) — not authoritative yet.
+    if (workAgent?.model === 'pending-work-spawn') return {};
     return {
       harness: workAgent?.harness,
       model: workAgent?.model ?? undefined,
@@ -223,10 +226,14 @@ export async function buildIssueRecord(
     ? { ...(existing?.statusOverrides ?? {}), ...workspaceStatusOverrides }
     : existing?.statusOverrides;
 
-  // PAN-1919: harness/model from existing record, then agents table as fallback.
-  const agentHM = existing?.harness || existing?.model
-    ? { harness: existing.harness, model: existing.model }
-    : projectAgentHarnessModel(issueId);
+  // PAN-2686: live agents-table harness/model wins so a restart-fresh with a
+  // new model refreshes the record; the existing record survives as fallback
+  // when no agent row remains (PAN-1919's rebuild idempotency).
+  const liveHM = projectAgentHarnessModel(issueId);
+  const agentHM = {
+    harness: liveHM.harness ?? existing?.harness,
+    model: liveHM.model ?? existing?.model,
+  };
 
   return {
     issueId: issueId.toUpperCase(),
