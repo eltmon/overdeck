@@ -46,12 +46,12 @@ interface MergedRowDeps {
 }
 
 const defaultMergedRowDeps: MergedRowDeps = {
-  verifyMerged: async ctx => {
-    // Dynamic import prevents a static workflows -> dod-gate -> workflows cycle
-    // when closeOut begins evaluating the gate.
-    const { verifyBranchMergedImpl } = await import('./workflows.js');
-    return verifyBranchMergedImpl(ctx);
-  },
+  verifyMerged: async () => ({
+    step: 'close-out:verify-merged',
+    success: false,
+    skipped: false,
+    error: 'merge verifier was not supplied',
+  }),
   readPullRequest: async (ctx, branchName) => {
     if (!ctx.github) return {};
     const { stdout } = await execFileAsync('gh', [
@@ -392,7 +392,11 @@ export async function checkDeployRow(
 
 export async function evaluateDodGate(
   ctx: LifecycleContext,
-  opts: { acceptedRows?: DodRowId[]; acceptedBy?: string } = {},
+  opts: {
+    acceptedRows?: DodRowId[];
+    acceptedBy?: string;
+    verifyMerged?: MergedRowDeps['verifyMerged'];
+  } = {},
   deps: EvaluateDodGateDeps = defaultEvaluateDodGateDeps,
 ): Promise<DodGateResult> {
   const acceptedRows = new Set(opts.acceptedRows ?? []);
@@ -401,7 +405,9 @@ export async function evaluateDodGate(
     if (!overridable.has(id)) throw new TypeError(`DoD row "${id}" cannot be accepted; valid rows: ${[...overridable].join(', ')}`);
   }
 
-  const merged = await deps.merged(ctx);
+  const merged = opts.verifyMerged
+    ? await checkMergedRow(ctx, { ...defaultMergedRowDeps, verifyMerged: opts.verifyMerged })
+    : await deps.merged(ctx);
   const rows = await Promise.all([
     deps.review(ctx.issueId),
     deps.tests(ctx.issueId),

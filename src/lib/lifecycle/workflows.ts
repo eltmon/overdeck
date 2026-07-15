@@ -170,6 +170,7 @@ export function closeOut(
     const dodGate = yield* Effect.promise(() => evaluateDodGate(ctx, {
       acceptedRows: opts.dodAcceptedRows,
       acceptedBy: opts.dodAcceptedBy,
+      verifyMerged: verifyBranchMergedImpl,
     }));
     for (const row of dodGate.rows) {
       const details = [`expected: ${row.expected}`, `observed: ${row.observed}`];
