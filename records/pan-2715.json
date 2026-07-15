@@ -11,20 +11,36 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T14:12:59.189Z",
+  "updated": "2026-07-15T14:29:53.285Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:09:18.002Z"
+    "updatedAt": "2026-07-15T14:29:53.243Z",
+    "inspectNotes": "Inspecting item dod-rows-module"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 381951,
+            "output": 956,
+            "cacheRead": 343552,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 1955847,
+            "output": 6648,
+            "cacheRead": 1856768,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 156,
@@ -35,6 +51,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 381951,
+          "output": 956,
+          "cacheRead": 343552,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1955847,
+          "output": 6648,
+          "cacheRead": 1856768,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 156,
           "output": 51276,
@@ -43,15 +71,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 12.954963,
-        "pricingAsOf": "2026-07-15T14:09:18.044Z"
+        "usd": 14.578182,
+        "pricingAsOf": "2026-07-15T14:29:53.273Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 2,
     "claims": {},
