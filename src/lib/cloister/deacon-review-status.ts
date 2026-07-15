@@ -47,6 +47,8 @@ const execAsync = promisify(exec);
  * resets the counter (see review-agent.ts and checkPostReviewCommits below).
  */
 const REVIEW_INFRA_BREAKER_THRESHOLD = 3;
+const REVIEW_AGENT_IDLE_THRESHOLD_MS = 15 * 60 * 1000;
+const REVIEWING_WATCHDOG_THRESHOLD_MS = 45 * 60 * 1000;
 
 /**
  * Orphan-test self-heal state. A test role cannot spawn while the workspace
@@ -191,6 +193,8 @@ async function recoverUnhealthyTestStack(
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ReviewStatusLike {
+  updatedAt?: string;
+  reviewSpawnedAt?: string;
   reviewStatus?: string;
   verificationStatus?: string;
   testStatus?: string;
@@ -255,16 +259,31 @@ export function completedReviewSnapshotAfterCoordinatorExit(
   };
 }
 
-async function isReviewAgentActiveForIssue(issueId: string): Promise<boolean> {
+async function isReviewAgentActiveForIssue(issueId: string, status: ReviewStatusLike): Promise<boolean> {
   // PAN-1048 R5: role-primitive review/test runs (agent-<id>-review, agent-<id>-test).
   try {
     const agents = await Effect.runPromise(listRunningAgents());
-    for (const agent of agents) {
-      if (agent.status === 'stopped' || agent.status === 'error') continue;
+    const issueUpper = issueId.toUpperCase();
+    const reviewAgents = agents.filter((agent) => {
       const id = (agent.issueId ?? '').trim().toUpperCase();
-      if (!id || id !== issueId.toUpperCase()) continue;
       const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : agent.id.endsWith('-test') ? 'test' : null);
-      if (role === 'review') return true;
+      return id === issueUpper && role === 'review';
+    });
+
+    const coordinatorId = `agent-${issueId.toLowerCase()}-review`;
+    if (reviewAgents.some((agent) => agent.id === coordinatorId && (agent.status === 'stopped' || agent.status === 'error'))) {
+      return false;
+    }
+
+    const reviewStartedAt = Date.parse(status.reviewSpawnedAt ?? status.updatedAt ?? '');
+    if (Number.isFinite(reviewStartedAt) && Date.now() - reviewStartedAt >= REVIEWING_WATCHDOG_THRESHOLD_MS) {
+      return false;
+    }
+
+    for (const agent of reviewAgents) {
+      if (agent.status === 'stopped' || agent.status === 'error') continue;
+      const lastActivity = Date.parse(agent.lastActivity ?? '');
+      if (!Number.isFinite(lastActivity) || Date.now() - lastActivity < REVIEW_AGENT_IDLE_THRESHOLD_MS) return true;
     }
   } catch {
     // fall through
@@ -483,7 +502,7 @@ async function reconcileReviewStatusOrphan(
   const latestTerminalReview = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
   const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
 
-  const reviewAgentActive = await isReviewAgentActiveForIssue(issueId);
+  const reviewAgentActive = await isReviewAgentActiveForIssue(issueId, status);
 
   // A supervised verification worker can finish after the dashboard process
   // that requested it has died. The worker records the pass, but the dead HTTP
