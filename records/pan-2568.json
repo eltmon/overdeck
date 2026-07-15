@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:35:28.028Z",
+  "updated": "2026-07-15T15:35:35.676Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -148,7 +148,8 @@
     "injection-budget.injection-budget.ac1": "completed",
     "injection-budget.injection-budget.ac2": "completed",
     "injection-budget.injection-budget.ac3": "completed",
-    "injection-budget.injection-budget.ac4": "completed"
+    "injection-budget.injection-budget.ac4": "completed",
+    "delivery-race-test": "running"
   },
   "swarm": {
     "slotAssignments": [],
@@ -161,8 +162,16 @@
     }
   },
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "delivery-race-test": {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 2263830,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:35:35.676Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
