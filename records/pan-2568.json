@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:32:51.191Z",
+  "updated": "2026-07-15T15:32:54.025Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -100,7 +100,7 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "statusOverrides": {
-    "injection-budget": "running",
+    "injection-budget": "completed",
     "size-scaled-waits": "completed",
     "full-length-purge": "running",
     "size-scaled-waits.size-scaled-waits.ac1": "completed",
@@ -118,7 +118,11 @@
     "fork-stranded-status": "completed",
     "fork-stranded-status.fork-stranded-status.ac1": "completed",
     "fork-stranded-status.fork-stranded-status.ac2": "completed",
-    "fork-stranded-status.fork-stranded-status.ac3": "completed"
+    "fork-stranded-status.fork-stranded-status.ac3": "completed",
+    "injection-budget.injection-budget.ac1": "completed",
+    "injection-budget.injection-budget.ac2": "completed",
+    "injection-budget.injection-budget.ac3": "completed",
+    "injection-budget.injection-budget.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -131,16 +135,8 @@
     }
   },
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "injection-budget": {
-        "writerId": "agent-pan-2568",
-        "agentId": "agent-pan-2568",
-        "pid": 2195583,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:32:51.190Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
@@ -174,6 +170,17 @@
         "outcome": "completed",
         "reason": "Run-fork pipeline now records actionable failed status for stranded submissions while preserving the live session; submitted forks still clear status",
         "releasedAt": "2026-07-15T14:57:44.283Z"
+      },
+      {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 2195583,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:32:51.190Z",
+        "itemId": "injection-budget",
+        "outcome": "completed",
+        "reason": "Added the shared payload-aware budget, wired the delivery client timeout above it, and covered floors, caps, monotonicity, and deadline ordering.",
+        "releasedAt": "2026-07-15T15:32:54.024Z"
       }
     ],
     "statusReasons": {
@@ -190,9 +197,8 @@
         "updatedAt": "2026-07-15T14:57:44.283Z"
       },
       "injection-budget": {
-        "reason": "Reset recovered item for canonical reclaim and completion.",
-        "updatedAt": "2026-07-15T15:32:48.198Z",
-        "forced": true
+        "reason": "Added the shared payload-aware budget, wired the delivery client timeout above it, and covered floors, caps, monotonicity, and deadline ordering.",
+        "updatedAt": "2026-07-15T15:32:54.024Z"
       }
     }
   }
