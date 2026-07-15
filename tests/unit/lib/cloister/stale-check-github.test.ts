@@ -53,7 +53,8 @@ describe('listPrHeadFailingRuns', () => {
 
     await expect(listPrHeadFailingRuns('eltmon/overdeck', 'feature/pan-2710', 'current')).resolves.toEqual([current]);
     expect(execFileMock.mock.calls[0][1]).toEqual([
-      'run', 'list', '--repo', 'eltmon/overdeck', '--branch', 'feature/pan-2710', '--status', 'completed',
+      'run', 'list', '--repo', 'eltmon/overdeck', '--branch', 'feature/pan-2710', '--commit', 'current',
+      '--status', 'completed', '--limit', '100',
       '--json', 'databaseId,workflowName,createdAt,conclusion,status,attempt,headSha',
     ]);
   });
