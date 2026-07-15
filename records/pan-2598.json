@@ -287,24 +287,24 @@
     "recordedAt": "2026-07-15T15:35:35.783Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:52:09.135Z",
+  "updated": "2026-07-15T15:52:10.051Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:52:09.043Z",
+    "updatedAt": "2026-07-15T15:52:09.806Z",
     "reviewNotes": "Agent re-review request (1/25): Resolved target branch sync conflicts",
     "verificationNotes": "Verification FAILED at test (171975ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2598\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/src/dashboard/frontend\u001b[39m\n\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "lastVerifiedCommit": "067f06d0037fa764a9168d19b569f289621e7ecf",
     "reviewRequestedAt": "2026-07-15T15:52:08.586Z",
-    "reviewSpawnedAt": "2026-07-15T15:40:44.249Z",
+    "reviewSpawnedAt": "2026-07-15T15:52:09.804Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -477,7 +477,7 @@
       },
       "costAtCloseOut": {
         "usd": 105.794384,
-        "pricingAsOf": "2026-07-15T15:52:09.085Z"
+        "pricingAsOf": "2026-07-15T15:52:09.985Z"
       }
     },
     "merges": [
