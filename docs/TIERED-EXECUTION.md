@@ -67,7 +67,7 @@ The dashboard Settings -> Tiered Execution panel is the operator-facing edit sur
 
 The panel also shows a resolved-state preview so operators can see the effective tiered-execution state that will be used by routing after global config, project config, and issue context are applied.
 
-On the issue view, any per-issue `plan.metadata.tiered_execution` override is visible in the issue header/resolution area as an editable **Standing Crew** toggle (PAN-2383). Flipping the toggle writes the override to the per-issue permanent record through the record write door. Because the vBRIEF spec remains immutable under PAN-1124, the override is stored outside the spec and resolved at runtime.
+The issue view's **Policies** panel exposes the per-issue override in its Work group as a **Standing crew** segmented control: `Default · <effective> (<source>)`, `On`, or `Off`. Explicit overrides appear in the collapsed strip as an overrides-only `crew · on|off` chip and write to the per-issue permanent record through `PATCH /api/workspaces/:issueId/tiered-execution`; the vBRIEF spec remains immutable under PAN-1124, so the override is stored outside the spec and resolved at runtime. When a per-issue work-model override is active, it suspends crew routing for the entire issue, and the panel and collapsed chip state that consequence.
 
 ## Resolution Chain
 
