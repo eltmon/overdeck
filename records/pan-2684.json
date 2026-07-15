@@ -89,15 +89,7 @@
       "timestamp": "2026-07-15T11:50:46.273Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-15T11:50:46Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2684\n\n# Review Synthesis — PAN-2684 — 2026-07-15\n\n## Verdict: CHANGES REQUESTED — cycle-3 alias normalization still disables `byKind` routing on non-crew edits\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2684/.pan/review/agent-pan-2684-review-3a142de8/context.json`\n- Branch: `feature/pan-2684`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2684`\n- HEAD reviewed: `3a142de8150351c3102897ad1168a7239d717b98`\n- Cycle number: 3\n- Prior cycle SHA: `5975f975e47524c4553d6159c295b7ea013adfac`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 1 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 0 after convergence gate |\n\n## Blocking Findings\n\n### [correctness] Cycle-3 normalization still disables alias-only `byKind` routing on non-crew edits — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:101`\n\nCycle 3 changed the render/write normalization to canonicalize `byKind` for crew edits, but `currentConfig`, enablement, feed, escalation, replay, and compaction save paths still independently combine `defaultTieredExecution()` with the alias-only input. Those paths emit both the stale alias and an injected empty canonical `by_kind`, so canonical-first readers disable the route after an unrelated edit. This is the same FR-1 losslessness blocker raised in cycle 2, and the attempted normalization fix at lines 101-105 is inside the cycle diff, so it survives the cycle-3 convergence gate. Use one shared canonical normalization helper for every saved-config constructor, remove the stale alias on output, and test an alias-only configuration through a non-crew edit such as replay threshold.\n\n## Non-blocking Findings\n\n### [requirements] [demoted: previously reviewed] Empty-board select cannot create the first crew — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:342`\n\nThe reviewer reports that a controlled select whose current and only option are both `value=\"new\"` cannot produce a normal user change event. This code did not change since the prior synthesis, and the cycle-2 requirements review explicitly classified the five-column total assignment surface as implemented. Under the mandatory cycle-3 convergence gate, it cannot be promoted to a blocker in this cycle; it remains advisory for follow-up.\n\n## Clean Sub-roles\n\n- Security\n- Performance\n- Requirements after convergence gating\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2684/.pan/review/agent-pan-2684-review-3a142de8/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2684 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -120,23 +112,23 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:58:45.588Z",
+  "updated": "2026-07-15T11:58:46.231Z",
   "pipeline": {
     "issueId": "PAN-2684",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T11:58:45.546Z",
+    "updatedAt": "2026-07-15T11:58:46.101Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "Item crews-module ack: importCrews/serializeCrews round-trip, blendedCost (verified 6.525 against real modelCatalog costs), providerDefaultHarness fallback chain, and renderYamlPreview all match AC1-5; no package.json changes, module is pure with full unit coverage.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2694",
     "lastVerifiedCommit": "dea465c2bdffa471af516fe15413ef36ac183245",
     "reviewRequestedAt": "2026-07-15T10:08:49.814Z",
-    "reviewSpawnedAt": "2026-07-15T11:48:12.292Z",
+    "reviewSpawnedAt": "2026-07-15T11:58:46.100Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -221,7 +213,7 @@
       },
       "costAtCloseOut": {
         "usd": 44.216281,
-        "pricingAsOf": "2026-07-15T11:58:45.584Z"
+        "pricingAsOf": "2026-07-15T11:58:46.196Z"
       }
     },
     "merges": [
