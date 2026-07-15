@@ -184,17 +184,17 @@
     "recordedAt": "2026-07-15T16:38:20.246Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:38:21.250Z",
+  "updated": "2026-07-15T16:44:51.397Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:38:21.155Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-15T16:44:51.219Z",
     "reviewNotes": "[correctness] Journal-backed verification passes without the required verified commit — `src/lib/lifecycle/dod-gate.ts:241`",
     "verificationNotes": "Verification FAILED at lint (23777ms):\n\n                                                                                                                                                                    ──────────┬──────────  \n \u001b[38;5;240m  │\u001b[0m                                                                                                                                                                                                         ╰──────────── No such file or directory (os error 2)\n\u001b[38;5;246m───╯\u001b[0m\n\n    at aggregateBindingErrorsIntoJsError (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/error-DL-e8-oE.mjs:48:18)\n    at unwrapBindingResult (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/error-DL-e8-oE.mjs:18:128)\n    at #build (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/shared/rolldown-build-DSxL8qiP.mjs:3317:34)\n    at async build (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/rolldown@1.0.0-rc.17/node_modules/rolldown/dist/index.mjs:42:22)\n    at async Promise.all (index 0)\n    at async buildSingle (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:760:19)\n    at async Promise.all (index 0)\n    at async buildWithConfigs (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/build-CgGnBlCD.mjs:716:18)\n    at async CAC.<anonymous> (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:25:2)\n    at async runCLI (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/node_modules/.bun/tsdown@0.21.10/node_modules/tsdown/dist/run.mjs:49:3)\n\n",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
@@ -265,15 +265,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 7935693,
-            "output": 11453,
-            "cacheRead": 7041536,
+            "input": 8257660,
+            "output": 11625,
+            "cacheRead": 7359616,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 79652132,
-            "output": 138924,
-            "cacheRead": 77803776,
+            "input": 79917624,
+            "output": 139695,
+            "cacheRead": 78064640,
             "cacheWrite": 0
           }
         },
@@ -295,24 +295,24 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 50,
-            "output": 6335,
-            "cacheRead": 3218401,
-            "cacheWrite": 154364
+            "input": 84,
+            "output": 13878,
+            "cacheRead": 6119685,
+            "cacheWrite": 185187
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 7935693,
-          "output": 11453,
-          "cacheRead": 7041536,
+          "input": 8257660,
+          "output": 11625,
+          "cacheRead": 7359616,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 79652132,
-          "output": 138924,
-          "cacheRead": 77803776,
+          "input": 79917624,
+          "output": 139695,
+          "cacheRead": 78064640,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -322,15 +322,15 @@
           "cacheWrite": 197959
         },
         "anthropic/claude-sonnet-5": {
-          "input": 68,
-          "output": 12363,
-          "cacheRead": 4294339,
-          "cacheWrite": 270068
+          "input": 102,
+          "output": 19906,
+          "cacheRead": 7195623,
+          "cacheWrite": 300891
         }
       },
       "costAtCloseOut": {
-        "usd": 66.924158,
-        "pricingAsOf": "2026-07-15T16:38:21.240Z"
+        "usd": 67.833674,
+        "pricingAsOf": "2026-07-15T16:44:51.325Z"
       }
     },
     "merges": [
