@@ -156,7 +156,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:18:35.716Z",
+  "updated": "2026-07-15T17:18:41.703Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
@@ -166,7 +166,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:18:30.038Z",
+    "updatedAt": "2026-07-15T17:18:41.619Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Inspection error for bead red-window-classifier: tmux session inspect-pan-2710-red-window-classifier exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
@@ -235,7 +235,7 @@
       },
       "costAtCloseOut": {
         "usd": 57.971211000000004,
-        "pricingAsOf": "2026-07-15T17:18:30.098Z"
+        "pricingAsOf": "2026-07-15T17:18:41.678Z"
       }
     },
     "merges": [
