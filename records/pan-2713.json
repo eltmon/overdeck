@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:27:42.419Z",
+  "updated": "2026-07-15T14:27:54.572Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,8 +81,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "deploy-patrol": {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 958515,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:27:54.572Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -186,6 +194,7 @@
     "deploy-window-guard.deploy-window-guard.ac1": "completed",
     "deploy-window-guard.deploy-window-guard.ac2": "completed",
     "deploy-window-guard.deploy-window-guard.ac3": "completed",
-    "deploy-window-guard.deploy-window-guard.ac4": "completed"
+    "deploy-window-guard.deploy-window-guard.ac4": "completed",
+    "deploy-patrol": "running"
   }
 }
