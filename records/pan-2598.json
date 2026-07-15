@@ -192,9 +192,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.5",
       "timestamp": "2026-07-15T15:30:39.178Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T15:31Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-07-15T15:31:41.356Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:31:41.490Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-07-15T15:31:41Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-2598 (attempt 3/3):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (4521ms):\n\n\n> @overdeck/core@0.45.19 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.45.19 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.19 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2598/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ Build start\n\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-2598 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -263,7 +281,7 @@
     "recordedAt": "2026-07-13T10:56:03.885Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:31:40.749Z",
+  "updated": "2026-07-15T15:31:41.490Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "pending",
