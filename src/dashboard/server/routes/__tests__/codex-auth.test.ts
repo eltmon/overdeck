@@ -44,6 +44,7 @@ const reusedCodeBurnBlock = (ts: string) =>
   `    "code": "refresh_token_reused"\n  }`;
 
 let tmpRoot = '';
+let originalHome: string | undefined;
 
 beforeEach(async () => {
   vi.useFakeTimers();
@@ -51,6 +52,8 @@ beforeEach(async () => {
   tmpRoot = await mkdtemp(join(tmpdir(), 'pan-codex-auth-route-'));
   mockCliproxy.authDir = join(tmpRoot, 'auth');
   mockCliproxy.logPath = join(tmpRoot, 'cliproxy.log');
+  originalHome = process.env.HOME;
+  process.env.HOME = tmpRoot;
 });
 
 afterEach(async () => {
@@ -59,6 +62,8 @@ afterEach(async () => {
   tmpRoot = '';
   mockCliproxy.authDir = '';
   mockCliproxy.logPath = '';
+  if (originalHome === undefined) delete process.env.HOME;
+  else process.env.HOME = originalHome;
 });
 
 const writeCodexFixture = async (logLines: string[] = []) => {
@@ -101,6 +106,7 @@ describe('GET /api/settings/codex-auth', () => {
       status: 'burned',
       email: EMAIL,
       expiresAt: '2026-06-02T04:40:00.000Z',
+      source: 'cliproxy',
     });
   });
 
@@ -114,6 +120,7 @@ describe('GET /api/settings/codex-auth', () => {
       status: 'valid',
       email: EMAIL,
       expiresAt: '2026-06-02T04:40:00.000Z',
+      source: 'cliproxy',
     });
   });
 });
