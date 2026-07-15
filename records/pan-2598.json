@@ -257,6 +257,11 @@
       "timestamp": "2026-07-15T16:04:49.999Z",
       "reason": "end",
       "note": "Current synced head passes npm run typecheck with exit code 0; reset stale verification worker failure."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-15T16:04:58.908Z"
     }
   ],
   "feedback": [],
@@ -322,24 +327,23 @@
     "recordedAt": "2026-07-15T16:04:48.597Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T16:04:53.494Z",
+  "updated": "2026-07-15T16:04:59.711Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:04:52.529Z",
+    "updatedAt": "2026-07-15T16:04:53.386Z",
     "reviewNotes": "Agent re-review request (1/25): Resolved target branch sync conflicts",
-    "verificationNotes": "Verification FAILED at test (242238ms):\n\nenamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\nhint: Using 'master' as the name for the initial branch. This default branch name\nhint: is subject to change. To configure the initial branch name to use in all\nhint: of your new repositories, which will suppress this warning, call:\nhint: \nhint: \tgit config --global init.defaultBranch <name>\nhint: \nhint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\nhint: 'development'. The just-created branch can be renamed via this command:\nhint: \nhint: \tgit branch -m <name>\n",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
     "lastVerifiedCommit": "067f06d0037fa764a9168d19b569f289621e7ecf",
     "reviewRequestedAt": "2026-07-15T16:04:50.029Z",
-    "reviewSpawnedAt": "2026-07-15T16:02:42.098Z",
+    "reviewSpawnedAt": "2026-07-15T16:04:53.385Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -512,7 +516,7 @@
       },
       "costAtCloseOut": {
         "usd": 111.438421,
-        "pricingAsOf": "2026-07-15T16:04:52.848Z"
+        "pricingAsOf": "2026-07-15T16:04:53.720Z"
       }
     },
     "merges": [
@@ -521,7 +525,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
