@@ -1,7 +1,13 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
+
+vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
+  queueAutoCommit: vi.fn(),
+  flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
+}));
 
 import { releaseStaleTaskClaims } from '../../../../src/lib/cloister/stale-task-claims.js';
 import { readIssueRecordSync, writeIssueRecordSync, type PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';

@@ -4,6 +4,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Effect } from 'effect';
 import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
 
@@ -12,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   getReviewStatusSync: vi.fn(),
   setReviewStatusSync: vi.fn(),
   isDeaconGloballyPausedSync: vi.fn(() => false),
+}));
+
+vi.mock('../../../../src/lib/pan-dir/auto-commit.js', () => ({
+  queueAutoCommit: vi.fn(),
+  flushAutoCommits: vi.fn(() => Effect.succeed({ committed: false, reason: 'no pending' })),
 }));
 
 vi.mock('../../../../src/lib/projects.js', () => ({
