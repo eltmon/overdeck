@@ -477,17 +477,18 @@
     "recordedAt": "2026-07-15T14:11:01.254Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T14:13:10.099Z",
+  "updated": "2026-07-15T14:13:10.373Z",
   "pipeline": {
     "issueId": "PAN-2597",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:13:08.831Z",
+    "updatedAt": "2026-07-15T14:13:10.326Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-2597-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Verification FAILED at build (8589ms):\n\n\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/packages/pi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.10 kB\u001b[22m \u001b[2m│ gzip: 7.19 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m  \u001b[2m 6.06 kB\u001b[22m \u001b[2m│ gzip: 1.59 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 2 files, total: 33.16 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m503ms\u001b[39m\n\n> @overdeck/core@0.45.19 build:ohmypi-extension\n> npm --prefix ./packages/ohmypi-extension run build\n\n\n> @overdeck/ohmypi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/packages/ohmypi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.24 kB\u001b[22m \u001b[2m│ gzip: 7.21 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m  \u001b[2m 6.36 kB\u001b[22m \u001b[2m│ gzip: 1.65 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 2 files, total: 33.60 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m455ms\u001b[39m\n\n> @overdeck/core@0.45.19 build:cli\n> node scripts/build-cli.mjs\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2597/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/cli/index.ts, src/index.ts, src/supervisor/server.ts, src/lib/channels/pty-supervisor.ts, src/lib/codex/app-server-host.ts, src/lib/cloister/verification-worker.ts, src/lib/memory/fts-worker.ts\u001b[39m\n\u001b[34mℹ\u001b[39m target: \u001b[34mnode18\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 470 files\nTerminated\n",
     "inspectNotes": "Bead appserver-manager-core ack: CodexAppServerManager implements initialize->initialized handshake, 20s fake-timer-driven request timeout, invalid-JSON line warning with continued processing, sub-0.144.0 version rejection naming both installed and floor versions, and ANSI-stripped ERROR stderr forwarding that filters the benign rollout-path/thread-lookup noise — all five acceptance criteria are exercised by the accompanying fake-app-server-backed tests and match the implementation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2601",
@@ -709,7 +710,7 @@
       },
       "costAtCloseOut": {
         "usd": 222.237424,
-        "pricingAsOf": "2026-07-15T14:13:08.884Z"
+        "pricingAsOf": "2026-07-15T14:13:10.368Z"
       }
     },
     "merges": [
