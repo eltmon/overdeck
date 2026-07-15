@@ -4325,3 +4325,53 @@ idempotency, cycle 7 broke eviction) but the review is catching real defects and
 **Filed this session:** PAN-2733, PAN-2734, PAN-2735 (LANDED+PROVEN), PAN-2738, PAN-2739, PAN-2741.
 **PHASE 2 is one issue away** → when 2710 lands: verify main green, deploy, **REPORT readiness + SUGGEST
 the cut. OPERATOR CUTS; NEVER TAG.**
+
+## RUN-63 tick 32 (2026-07-15 ~14:30 local / 18:30Z) — PAN-2742 filed. PAN-2710 is the LAST issue.
+
+**RUN-63: 28 merge commits / 27 issues merged; 27 closed out. ONLY PAN-2710 REMAINS.**
+
+### 🔍 PAN-2742 FILED — review synthesis emits FALSE blocking verdicts
+Run `ae5cd253` mtimes prove it — **this is not a narrow race**:
+```
+18:18:01.318  context.json      ← convoy spawned
+18:18:08.503  requirements.md   ← reviewer wrote a CLEAN report, 8645 bytes, 0 blocking findings
+18:18:43.166  synthesis.md      ← 35 SECONDS LATER
+```
+…and synthesis still declared `| requirements | failed | — | infrastructure failure |` and emitted
+**`CHANGES REQUESTED — all four convoy reviewers failed`**. It ran 35s AFTER the report existed and
+never saw it. It also fired only **42s after spawn**, while the other 3 were mid-turn
+(`status=running, lastActivity=5m`; panes showed `[turn] started`/`[turn] completed`).
+**Why it matters:** an INFRA failure is reported to the work agent as a CODE verdict it cannot act on;
+it burns a review cycle (2710 is at **cycle 9**); it throws away a reviewer's completed work. PAN-2461
+already establishes the right rule for verification gates — *"an infra-unavailable gate is NOT a code
+failure — it must not consume an attempt"* — the same rule belongs in review synthesis.
+
+### ✅ RULED OUT: this is NOT a regression from my PAN-2735 fix — verified, not assumed
+I suspected my own change first (right instinct — the timing lined up). Checked and cleared:
+- **No type collision.** `deacon-review-status.ts:71` keeps its own `ReviewConvoyLiveness
+  {anyLive, anyGated, agentIds}`; my module's `{active, reason}` type is never imported — only the
+  FUNCTION `evaluateReviewConvoyLiveness` is. No shadowing. (Had they collided, `liveness.anyLive`
+  would be `undefined` ⇒ the guard at `:752` never fires ⇒ synthesis always proceeds. It didn't.)
+- **`recoverStalledReviewConvoys` SKIPS 2710:** `reviewConvoyLiveness()` still reads
+  `status === 'running'` ⇒ `anyLive=true` ⇒ `:752 if (anyLive || anyGated) continue;`. The deacon did
+  NOT synthesize — the review COORDINATOR did.
+- My `review-agent.ts` change was a 1-line timestamp-parse correction; it cannot trigger synthesis.
+- The oracle is used ONLY in the recovery/watchdog paths, never in the synthesis trigger.
+
+### ✅ PAN-2735 observability payoff is LIVE
+`[deacon] Evaluated reviewing status for PAN-2710: coordinator stopped` — **the exact log line whose
+absence made this bug take hours.** A skipped/evaluated `reviewing` is now visible WITH ITS REASON.
+
+### PAN-2710 — healthy, iterating, do not interfere
+review=blocked, cycle 9, PR #2736 MERGEABLE/0 failures. Agent **ALIVE**: committed 2m ago
+(`fix: distinguish empty run probes`), 0 unpushed, re-ran `pan review request` itself. Its pane reads
+"idle 158m" while committing — **the PAN-2731 trap for the 4th time this run.** Genuine oscillation
+across cycles 5-8 (eviction ↔ idempotency tension), but findings are real and narrowing.
+
+### Release readiness (Phase 2 prep — gathering, NOT acting)
+- Last tag **v0.45.19**; **62 commits** on main since. Breakdown: **19 fix, 1 feat, 25 chore, 3 docs,
+  2 test** ⇒ a **patch** release: suggest **0.45.20**. Heavily weighted to pipeline reliability
+  (2735/2727/2725/2724/2722/2716/2712/2701/2699/2692/2690).
+- **DO NOT TAG.** Report + suggest only. `pan release stable --version X.Y.Z` is the operator's call.
+
+**Filed this session:** PAN-2733, PAN-2734, PAN-2735 (LANDED+PROVEN), PAN-2738, PAN-2739, PAN-2741, PAN-2742.
