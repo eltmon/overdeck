@@ -155,17 +155,17 @@
     "recordedAt": "2026-07-15T11:21:40.256Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T11:28:07.363Z",
+  "updated": "2026-07-15T12:17:29.806Z",
   "pipeline": {
     "issueId": "PAN-2683",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T11:26:12.343Z",
+    "updatedAt": "2026-07-15T12:17:29.756Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues (tier-table malformed-value validation); workspace cleared of generated hook-bundle noise",
     "testNotes": "npm run typecheck passed; npm run lint passed; unrestricted npm test passed 984 root files/9,119 tests plus 3 frontend files/32 tests; npm run build:dashboard passed; workspace-built Node 22 dashboard booted on isolated port 3013 and /api/health confirmed repoRoot=/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683. Browser UAT required for Policies panel Standing crew control/chip/reset/helper-copy flows but no Playwright MCP tools are exposed to this test role, so those paths could not be exercised. Required canonical .pan/records/pan-2683.json and .pan/specs/ vBRIEF are also absent from the workspace; retired local continue/spec files were not used as canonical inputs.",
     "inspectNotes": "Item staffing-tiered-block ack: resolveTieredExecutionBlock correctly prioritizes issue-override > plan-metadata > global, GET route now threads spec.document.plan.metadata through findSpecByIssue (fixing the prior dead-parameter bug), malformed values fall back to global without throwing, and all 4 ACs verified against live code (record.tieredExecutionOverride typing, findSpecByIssue===findSpecByIssueThroughOverdeck, resolveTieredExecutionEnabledForIssue/spawn-prep.ts/PATCH route untouched).",
@@ -179,24 +179,24 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2116643,
-            "output": 5324,
-            "cacheRead": 1857024,
+            "input": 2230471,
+            "output": 5737,
+            "cacheRead": 1926656,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 56061416,
-            "output": 60791,
-            "cacheRead": 54475008,
+            "input": 59436777,
+            "output": 71559,
+            "cacheRead": 57628928,
             "cacheWrite": 0
           }
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 101,
-            "output": 39975,
-            "cacheRead": 20961996,
-            "cacheWrite": 71796
+            "input": 107,
+            "output": 42274,
+            "cacheRead": 22444265,
+            "cacheWrite": 74863
           }
         },
         "plan": {
@@ -218,22 +218,22 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2116643,
-          "output": 5324,
-          "cacheRead": 1857024,
+          "input": 2230471,
+          "output": 5737,
+          "cacheRead": 1926656,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 56061416,
-          "output": 60791,
-          "cacheRead": 54475008,
+          "input": 59436777,
+          "output": 71559,
+          "cacheRead": 57628928,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 1212,
-          "output": 67379,
-          "cacheRead": 23944468,
-          "cacheWrite": 224786
+          "input": 1218,
+          "output": 69678,
+          "cacheRead": 25426737,
+          "cacheWrite": 227853
         },
         "anthropic/claude-sonnet-5": {
           "input": 10,
@@ -243,8 +243,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 67.549435,
-        "pricingAsOf": "2026-07-15T11:26:12.421Z"
+        "usd": 72.192257,
+        "pricingAsOf": "2026-07-15T12:17:29.796Z"
       }
     },
     "merges": [
