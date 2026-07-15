@@ -352,7 +352,7 @@
     "recordedAt": "2026-07-15T16:04:48.597Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T17:48:02.811Z",
+  "updated": "2026-07-15T17:48:21.883Z",
   "pipeline": {
     "issueId": "PAN-2598",
     "reviewStatus": "passed",
@@ -552,8 +552,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-fable-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "activity-terminal-end-signal": "completed",
     "activity-terminal-end-signal.activity-terminal-end-signal.ac1": "completed",
