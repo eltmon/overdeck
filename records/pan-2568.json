@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:36:45.851Z",
+  "updated": "2026-07-15T15:37:51.700Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -149,7 +149,9 @@
     "injection-budget.injection-budget.ac2": "completed",
     "injection-budget.injection-budget.ac3": "completed",
     "injection-budget.injection-budget.ac4": "completed",
-    "delivery-race-test": "running"
+    "delivery-race-test": "completed",
+    "delivery-race-test.delivery-race-test.ac1": "completed",
+    "delivery-race-test.delivery-race-test.ac2": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -162,16 +164,8 @@
     }
   },
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "delivery-race-test": {
-        "writerId": "agent-pan-2568",
-        "agentId": "agent-pan-2568",
-        "pid": 2263830,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:35:35.676Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
@@ -216,6 +210,17 @@
         "outcome": "completed",
         "reason": "Added the shared payload-aware budget, wired the delivery client timeout above it, and covered floors, caps, monotonicity, and deadline ordering.",
         "releasedAt": "2026-07-15T15:32:54.024Z"
+      },
+      {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 2263830,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:35:35.676Z",
+        "itemId": "delivery-race-test",
+        "outcome": "completed",
+        "reason": "Added fake-timer regression coverage proving 30 KB payloads receive the derived timeout and remain on the supervisor tier when completion occurs just under budget.",
+        "releasedAt": "2026-07-15T15:37:51.700Z"
       }
     ],
     "statusReasons": {
@@ -234,6 +239,10 @@
       "injection-budget": {
         "reason": "Added the shared payload-aware budget, wired the delivery client timeout above it, and covered floors, caps, monotonicity, and deadline ordering.",
         "updatedAt": "2026-07-15T15:32:54.024Z"
+      },
+      "delivery-race-test": {
+        "reason": "Added fake-timer regression coverage proving 30 KB payloads receive the derived timeout and remain on the supervisor tier when completion occurs just under budget.",
+        "updatedAt": "2026-07-15T15:37:51.700Z"
       }
     }
   }
