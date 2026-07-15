@@ -94,8 +94,8 @@ export interface ReviewStatus {
   stuckAt?: string;
   /** PAN-653: JSON details about the stuck event (e.g. {localSha, remoteSha}) */
   stuckDetails?: string;
-  /** PAN-699: timestamp when review agents were dispatched (deacon timeout detection) */
-  reviewSpawnedAt?: string;
+  /** PAN-699: timestamp when review agents were dispatched (ISO in records, epoch millis in SQLite) */
+  reviewSpawnedAt?: string | number;
   /**
    * PAN-1988 auto-heal: durable JOURNAL intent set by `pan done` BEFORE it reaches the dashboard.
    * "The work agent finished and wants review." When this is newer than {@link reviewSpawnedAt}

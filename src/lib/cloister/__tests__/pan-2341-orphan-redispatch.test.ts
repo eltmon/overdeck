@@ -219,7 +219,7 @@ describe('PAN-2341 orphan journal reconcile before re-dispatch', () => {
     vi.setSystemTime(new Date('2026-07-07T01:00:00.000Z'));
     const raw = status({
       issueId: 'PAN-3002',
-      reviewSpawnedAt: '2026-07-07T00:00:00.000Z',
+      reviewSpawnedAt: Date.parse('2026-07-07T00:00:00.000Z'),
       updatedAt: '2026-07-07T00:55:00.000Z',
     });
     mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
@@ -227,6 +227,21 @@ describe('PAN-2341 orphan journal reconcile before re-dispatch', () => {
     mocks.listRunningAgents.mockReturnValue(Effect.succeed([
       { id: 'agent-pan-3002-review', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:59:00.000Z' },
     ]));
+
+    const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
+    await checkOrphanedReviewStatuses();
+
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3002', expect.objectContaining({ reviewStatus: 'pending' }));
+  });
+
+  it('recovers reviewing when a verification failure separately marked the issue stuck', async () => {
+    const raw = status({
+      issueId: 'PAN-3002',
+      stuck: true,
+      stuckReason: 'verification_stuck',
+    });
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
+    mocks.getReviewStatusSync.mockReturnValue(raw);
 
     const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
     await checkOrphanedReviewStatuses();

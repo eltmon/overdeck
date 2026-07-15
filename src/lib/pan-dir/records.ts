@@ -118,7 +118,9 @@ function projectPipeline(
     reviewedAtCommit: status.reviewedAtCommit,
     lastVerifiedCommit: status.lastVerifiedCommit,
     reviewRequestedAt: status.reviewRequestedAt,
-    reviewSpawnedAt: status.reviewSpawnedAt,
+    reviewSpawnedAt: typeof status.reviewSpawnedAt === 'number'
+      ? new Date(status.reviewSpawnedAt).toISOString()
+      : status.reviewSpawnedAt,
     scopeDrift: status.scopeDrift,
     autoMerge: status.autoMerge,
     deaconIgnored: status.deaconIgnored,
