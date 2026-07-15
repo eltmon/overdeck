@@ -50,12 +50,12 @@ import {
   getProviderExportsForModel,
 } from './provider-env.js';
 
-function queueAgentMail(agentId: string, message: string): void {
+function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery = false): void {
   const mailDir = join(getAgentDir(agentId), 'mail');
   mkdirSync(mailDir, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   writeFileSync(
-    join(mailDir, `${timestamp}.md`),
+    join(mailDir, `${timestamp}${pendingTurnEndDelivery ? '.pending' : ''}.md`),
     `# Message\n\n${message}\n`
   );
 }
@@ -368,13 +368,21 @@ export async function messageAgent(
   // mirror 'idle' via Stop/SessionStart hook), not a tmux pane-scrape.
   const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
+    if (expectedHarness === 'codex') {
+      queueAgentMail(normalizedId, message, true);
+      logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
+      console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
+      await appendTellInterventionForUserSource(normalizedId, caller);
+      return;
+    }
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 
   const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
   await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
 
-  // Also save to mail queue
+  // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook
+  // does not replay ordinary `.md` backups because they have already landed.
   queueAgentMail(normalizedId, message);
   await appendTellInterventionForUserSource(normalizedId, caller);
 }
