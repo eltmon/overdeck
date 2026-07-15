@@ -192,6 +192,7 @@ async function recoverUnhealthyTestStack(
 
 interface ReviewStatusLike {
   reviewStatus?: string;
+  verificationStatus?: string;
   testStatus?: string;
   mergeStatus?: string;
   readyForMerge?: boolean;
@@ -203,9 +204,14 @@ interface ReviewStatusLike {
   recoveryStartedAt?: string;
   history?: Array<{ type: string; status: string; notes?: string }>;
   reviewNotes?: string;
+  lastVerifiedCommit?: string;
   reviewedAtCommit?: string;
   stuckAt?: string;
   stuckDetails?: string;
+}
+
+interface OrphanRecoveryOptions {
+  readWorkspaceHead?: (workspace: string) => Promise<string>;
 }
 
 function latestHistoryEntry(
@@ -459,7 +465,11 @@ export async function handleWorkCompleted(issueId: string): Promise<string[]> {
  * PAN-1908: per-issue orphan reconciler for a single review-status row. Used by
  * the legacy checkOrphanedReviewStatuses safety net and by reactive handlers.
  */
-async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewStatusLike): Promise<string[]> {
+async function reconcileReviewStatusOrphan(
+  issueId: string,
+  rawStatus: ReviewStatusLike,
+  options: OrphanRecoveryOptions = {},
+): Promise<string[]> {
   const actions: string[] = [];
 
   const status = getReviewStatusSync(issueId) ?? rawStatus;
@@ -474,6 +484,42 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
   const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
 
   const reviewAgentActive = await isReviewAgentActiveForIssue(issueId);
+
+  // A supervised verification worker can finish after the dashboard process
+  // that requested it has died. The worker records the pass, but the dead HTTP
+  // fiber never clears the prior review failure or dispatches review. Recover
+  // only when the verified commit is still current; a moved HEAD needs a fresh
+  // verification instead of carrying the old pass forward.
+  if (
+    status.verificationStatus === 'passed' &&
+    status.lastVerifiedCommit &&
+    !['pending', 'reviewing', 'passed'].includes(status.reviewStatus ?? '') &&
+    !reviewAgentActive
+  ) {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const issueLower = issueId.toLowerCase();
+    const agentState = getAgentStateSync(`agent-${issueLower}`);
+    const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
+
+    if (workspace) {
+      try {
+        const currentHead = options.readWorkspaceHead
+          ? await options.readWorkspaceHead(workspace)
+          : (await execAsync('git rev-parse HEAD', { cwd: workspace })).stdout.trim();
+        if (currentHead === status.lastVerifiedCommit) {
+          setReviewStatusSync(issueId, {
+            reviewStatus: 'pending',
+            reviewNotes: undefined,
+          });
+          status.reviewStatus = 'pending';
+          status.reviewNotes = undefined;
+          actions.push(`Recovered review continuation for ${issueId} after verification completed during restart`);
+        }
+      } catch {
+        // A missing/unreadable workspace cannot prove the pass is current.
+      }
+    }
+  }
 
   // Orphaned reviewing status
   if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
@@ -655,7 +701,7 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
   return actions;
 }
 
-export async function checkOrphanedReviewStatuses(): Promise<string[]> {
+export async function checkOrphanedReviewStatuses(options: OrphanRecoveryOptions = {}): Promise<string[]> {
   const actions: string[] = [];
 
   try {
@@ -664,7 +710,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     // as a thin SQLite-only safety net for dropped events.
     const statuses = loadReviewStatuses();
     for (const [issueId, status] of Object.entries(statuses)) {
-      const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike);
+      const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike, options);
       actions.push(...result);
     }
   } catch (error: unknown) {

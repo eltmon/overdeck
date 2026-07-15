@@ -29,12 +29,14 @@ import { getOverdeckHome } from '../../../src/lib/paths.js';
 
 const mockLoadReviewStatuses = vi.fn<[], Record<string, unknown>>();
 const mockSetReviewStatus = vi.fn();
+const mockGetReviewStatus = vi.fn();
 
 vi.mock('../../../src/lib/review-status.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/lib/review-status.js')>();
   return {
     ...actual,
     loadReviewStatuses: (...args: unknown[]) => mockLoadReviewStatuses(...args as []),
+    getReviewStatusSync: (...args: unknown[]) => mockGetReviewStatus(...args),
     setReviewStatus: (...args: unknown[]) => mockSetReviewStatus(...args),
   setReviewStatusSync: (...args: unknown[]) => mockSetReviewStatus(...args),
   };
@@ -180,6 +182,7 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     mockResolveProjectFromIssue.mockReturnValue(null);
     // Default: empty review status store (DB-backed via loadReviewStatuses mock)
     mockLoadReviewStatuses.mockReturnValue({});
+    mockGetReviewStatus.mockReturnValue(null);
     mockIsIssueClosed.mockResolvedValue(false);
     // Default: parallel review dispatch succeeds (review orphan re-dispatch path)
     mockSpawnReviewRoleForIssue.mockResolvedValue({ success: true, message: 'dispatched' });
@@ -488,6 +491,48 @@ describe('checkOrphanedReviewStatuses — PAN-369 orphan recovery', () => {
     // Since the mock doesn't call setReviewStatus, we verify dispatch was called — that is
     // the deacon's responsibility. The status transition is covered by review-agent tests.
     expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('resumes review when verification passed during a dashboard restart', async () => {
+    const workspace = '/workspaces/feature-pan-369-test';
+    const verifiedHead = 'verified-head';
+    const agentId = `agent-${ISSUE_ID.toLowerCase()}`;
+    const agentDir = join(getOverdeckHome(), 'agents', agentId);
+    completedProcessedPath = join(agentDir, 'completed.processed');
+
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(completedProcessedPath, '', 'utf-8');
+    mockLoadReviewStatuses.mockReturnValue({
+      [ISSUE_ID]: {
+        reviewStatus: 'failed',
+        reviewNotes: 'Verification failed at test',
+        verificationStatus: 'passed',
+        lastVerifiedCommit: verifiedHead,
+        testStatus: 'pending',
+        prUrl: 'https://github.com/test/repo/pull/1',
+        readyForMerge: false,
+        history: [],
+      },
+    });
+    mockGetAgentState.mockReturnValue({ workspace });
+    mockResolveProjectFromIssue.mockReturnValue({ projectKey: 'overdeck', projectPath: '/workspaces' });
+    mockSpawnReviewRoleForIssue.mockResolvedValue({ success: true, message: 'dispatched' });
+
+    const actions = await checkOrphanedReviewStatuses({
+      readWorkspaceHead: vi.fn().mockResolvedValue(verifiedHead),
+    });
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith(ISSUE_ID, {
+      reviewStatus: 'pending',
+      reviewNotes: undefined,
+    });
+    expect(mockSpawnReviewRoleForIssue).toHaveBeenCalledWith({
+      issueId: ISSUE_ID,
+      workspace,
+      branch: `feature/${ISSUE_ID.toLowerCase()}`,
+    });
+    expect(actions).toContain(`Recovered review continuation for ${ISSUE_ID} after verification completed during restart`);
+    expect(actions).toContain(`Re-dispatched pending review for ${ISSUE_ID} (deacon-orphan-recovery)`);
   });
 
   it('(d-fail) does not mark reviewing when spawnReviewRoleForIssue rejects', async () => {
