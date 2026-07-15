@@ -17,9 +17,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T11:08:07.091Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T11:10Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-15T11:10:23.865Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T11:10:23.988Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T11:10:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2684\n\n# Review Synthesis — PAN-2684 — 2026-07-15\n\n## Verdict: CHANGES REQUESTED — reassigning a crew's final difficulty silently deletes its kind overrides\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2684/.pan/review/agent-pan-2684-review-41e765d4/context.json`\n- Branch: `feature/pan-2684`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2684`\n- HEAD reviewed: `41e765d47cc9fc0581089f40ef9a9468da5483c5`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 1 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Reassigning a crew's final difficulty silently deletes its kind overrides — `src/dashboard/frontend/src/components/Settings/sections/tiered-crews.ts:101`\n\n`serializeCrews` omits crews with no difficulty assignments, so it never records those crews in `crewToTier`; the later `by_kind` rewrite consequently drops every override referencing the omitted crew. This occurs through the new difficulty-assignment flow when an operator moves a crew's final difficulty elsewhere: the independently configured kind route disappears from the saved configuration without warning. The cited serializer is a newly added PR file, so the finding is inside the PR diff and blocks cycle 1. The UI must prevent or explicitly resolve that loss, with a regression test covering a crew that owns one difficulty and one kind override before its final difficulty is reassigned.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security\n- Performance\n- Requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2684/.pan/review/agent-pan-2684-review-41e765d4/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2684 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -42,7 +60,7 @@
     "recordedAt": "2026-07-15T10:08:46.962Z"
   },
   "created": "2026-07-15T06:29:06.653Z",
-  "updated": "2026-07-15T11:10:23.135Z",
+  "updated": "2026-07-15T11:10:23.988Z",
   "pipeline": {
     "issueId": "PAN-2684",
     "reviewStatus": "blocked",
