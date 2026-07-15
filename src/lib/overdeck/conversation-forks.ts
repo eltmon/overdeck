@@ -355,7 +355,11 @@ export async function injectForkSummary(conv: Conversation, summary: string, cal
     for (let nudge = 1; nudge <= 2; nudge++) {
       const pane = await capturePaneText(conv.tmuxSession, 40);
       composerStillFull = verify.length >= 3 && pane.includes(verify);
-      if (!composerStillFull) break;
+      // A cleared composer is affirmative submission evidence even when the
+      // runtime mirror still lags. Re-delivering here can duplicate the full
+      // summary into a live successor; wrapped pane text can also make the
+      // raw verification substring absent while the first delivery succeeded.
+      if (!composerStillFull) return 'submitted';
 
       console.warn(`[${caller}] ${conv.name} still has the delivered summary in its composer — sending standalone Enter (${nudge}/2)`);
       await sendKeysAsync(conv.tmuxSession, 'C-m', `${caller}:enter-nudge`);

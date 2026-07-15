@@ -75,6 +75,17 @@ describe('injectForkSummary standalone Enter recovery', () => {
     expect(mocks.sendKeysAsync).toHaveBeenCalledOnce();
   });
 
+  it('does not re-deliver when unknown confirmation finds an empty prompt', async () => {
+    vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('unknown');
+    mocks.capturePaneText.mockResolvedValue('empty prompt');
+
+    await expect(forks.injectForkSummary(conversation, 'summary verify line', 'summary-fork'))
+      .resolves.toBe('submitted');
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledOnce();
+    expect(mocks.sendKeysAsync).not.toHaveBeenCalled();
+  });
+
   it('returns stranded after two nudges without re-delivering onto a full composer', async () => {
     vi.spyOn(forks, 'confirmForkPromptAccepted').mockResolvedValue('unknown');
     mocks.capturePaneText.mockResolvedValue('summary verify line');
