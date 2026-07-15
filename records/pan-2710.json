@@ -566,17 +566,17 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T18:33:06.113Z",
+  "updated": "2026-07-15T18:33:56.522Z",
   "pipeline": {
     "issueId": "PAN-2710",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T18:33:02.814Z",
+    "updatedAt": "2026-07-15T18:33:56.466Z",
     "reviewNotes": "Agent re-review request (9/25): Fixed review issues",
     "inspectNotes": "Verified against ab30bec102 (src/lib/cloister/stale-check-classifier.ts + tests/unit/lib/cloister/stale-check-classifier.test.ts). AC1: computeRedWindows closes fail(t1)->success(t2) into one {start,end} window, trailing fail leaves end:null (tests confirm). AC2: selectRerunCandidates requires completed+attempt===1+failing-concluded+containing closed window of same workflowName before adding to rerun[]. AC3: main-still-red (open window), no-red-window-match (green interval / predating history / workflow mismatch), attempt-exceeded (attempt!==1), missing-attempt (checked before other reasons) all covered by dedicated tests with exact reason strings. AC4: module is pure (no fs/network I/O, operates only on passed-in arrays); imports FAILING_CHECK_CONCLUSIONS from ../webhook-handlers.js (webhook-handlers.ts:192) rather than duplicating the conclusion set; test 'recognizes every conclusion from the canonical failing set' cross-checks all 7 values. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
@@ -595,9 +595,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 136609828,
-            "output": 186320,
-            "cacheRead": 133828864,
+            "input": 136930357,
+            "output": 187852,
+            "cacheRead": 134070528,
             "cacheWrite": 0
           }
         },
@@ -626,9 +626,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 136609828,
-          "output": 186320,
-          "cacheRead": 133828864,
+          "input": 136930357,
+          "output": 187852,
+          "cacheRead": 134070528,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -645,8 +645,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 96.103537,
-        "pricingAsOf": "2026-07-15T18:33:02.866Z"
+        "usd": 96.664654,
+        "pricingAsOf": "2026-07-15T18:33:56.505Z"
       }
     },
     "merges": [
