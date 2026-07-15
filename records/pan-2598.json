@@ -282,21 +282,21 @@
     "recordedAt": "2026-07-15T15:35:35.783Z"
   },
   "created": "2026-07-12T17:18:11.256Z",
-  "updated": "2026-07-15T15:37:28.083Z",
+  "updated": "2026-07-15T15:40:43.595Z",
   "pipeline": {
     "issueId": "PAN-2598",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:35:39.094Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-15T15:40:43.552Z",
+    "reviewNotes": "Agent re-review request (1/25): Resolved target branch sync conflicts",
     "inspectNotes": "Bead phase-banner-work-signal ack: workRunning now derives from activity.data.sections.some(type===work && status===running) (IssueMissionControl.tsx:828), verified via deriveNarrative precedence in StatusNarrative.tsx and existing+new tests covering all 3 ACs (planning-only session, live work session, beads-driven regression path); change is additive per NFR-1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2631",
-    "lastVerifiedCommit": "7bebf8dcbfdf3c3e5498fc1adcb089d7af1be2e7",
+    "lastVerifiedCommit": "067f06d0037fa764a9168d19b569f289621e7ecf",
     "reviewRequestedAt": "2026-07-15T15:35:36.664Z",
     "reviewSpawnedAt": "2026-07-15T15:35:38.281Z",
     "scopeDrift": {
@@ -366,9 +366,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1712118,
-            "output": 3348,
-            "cacheRead": 1497728,
+            "input": 1826311,
+            "output": 3625,
+            "cacheRead": 1606912,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -378,9 +378,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 50806581,
-            "output": 41557,
-            "cacheRead": 50076160,
+            "input": 52669168,
+            "output": 44143,
+            "cacheRead": 51915520,
             "cacheWrite": 0
           }
         },
@@ -427,9 +427,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1712118,
-          "output": 3348,
-          "cacheRead": 1497728,
+          "input": 1826311,
+          "output": 3625,
+          "cacheRead": 1606912,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -439,9 +439,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 50806581,
-          "output": 41557,
-          "cacheRead": 50076160,
+          "input": 52669168,
+          "output": 44143,
+          "cacheRead": 51915520,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -470,8 +470,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 101.127198,
-        "pricingAsOf": "2026-07-15T15:35:39.166Z"
+        "usd": 102.240593,
+        "pricingAsOf": "2026-07-15T15:40:43.589Z"
       }
     },
     "merges": [
