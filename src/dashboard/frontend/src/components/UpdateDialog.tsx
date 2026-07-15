@@ -23,6 +23,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const phaseRef = useRef<UpdateSnapshot['phase']>('checking');
   const bridge = window.overdeckBridge;
 
   const check = useCallback(async () => {
@@ -68,7 +69,7 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
     previousFocusRef.current = document.activeElement as HTMLElement | null;
     window.setTimeout(() => dialogRef.current?.querySelector<HTMLElement>('button, a[href]')?.focus(), 0);
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !['downloading', 'installing'].includes(snapshot?.phase ?? '')) onClose();
+      if (event.key === 'Escape' && !['downloading', 'installing'].includes(phaseRef.current)) onClose();
       if (event.key === 'Tab' && dialogRef.current) {
         const focusable = [...dialogRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), a[href]')];
         const first = focusable[0]; const last = focusable.at(-1);
@@ -78,11 +79,12 @@ export function UpdateDialog({ isOpen, runningAgentCount, onClose }: UpdateDialo
     };
     window.addEventListener('keydown', onKeyDown);
     return () => { window.removeEventListener('keydown', onKeyDown); previousFocusRef.current?.focus(); };
-  }, [isOpen, onClose, snapshot?.phase]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   const phase = snapshot?.phase ?? 'checking';
+  phaseRef.current = phase;
   const incompatibleAgents = snapshot?.compatibility.targetAgentProtocol != null
     && snapshot.compatibility.targetAgentProtocol !== snapshot.compatibility.currentAgentProtocol
     && runningAgentCount > 0;

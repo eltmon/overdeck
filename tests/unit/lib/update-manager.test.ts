@@ -15,14 +15,16 @@ describe('update manager', () => {
     const fetchImpl = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       if (url.includes('registry.npmjs.org')) return new Response(JSON.stringify({ latest: '1.2.4', canary: '1.3.0-canary.1' }));
+      if (url.includes('manifest.test')) return new Response('overdeckDashboardProtocol: 1\noverdeckAgentProtocol: 1\n');
       return new Response(JSON.stringify([{
         tag_name: 'v1.2.4', name: 'Overdeck 1.2.4', body: '## Fixed\n\n- Updater', html_url: 'https://example.test/release', published_at: '2026-07-13T00:00:00Z',
+        assets: [{ name: 'latest-linux.yml', browser_download_url: 'https://manifest.test/latest-linux.yml' }],
       }]));
     }) as typeof fetch;
     const manager = new UpdateManager({ currentVersion: '1.2.3', installMode: 'npm', fetchImpl });
     const snapshot = await manager.check();
     expect(snapshot).toMatchObject({
-      phase: 'available', targetVersion: '1.2.4', releaseNotes: '## Fixed\n\n- Updater',
+      phase: 'available', targetVersion: '1.2.4', releaseNotes: '## Fixed\n\n- Updater', compatibility: { status: 'compatible' },
     });
   });
 

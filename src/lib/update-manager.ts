@@ -24,8 +24,7 @@ interface ReleaseData {
   published_at?: string;
   draft?: boolean;
   prerelease?: boolean;
-  overdeckDashboardProtocol?: number;
-  overdeckAgentProtocol?: number;
+  assets?: Array<{ name?: string; browser_download_url?: string }>;
 }
 
 type ExecFileFn = (file: string, args: readonly string[]) => Promise<unknown>;
@@ -92,9 +91,19 @@ export class UpdateManager {
       const targetVersion = tags[this.snapshot.channel === 'canary' ? 'canary' : 'latest'];
       if (!targetVersion || !SEMVER.test(targetVersion)) throw new Error(`No valid ${this.snapshot.channel} release is published`);
       const releases = await releasesResponse.json() as ReleaseData[];
-      const release = releases.find((item) => !item.draft && item.tag_name === `v${targetVersion}`);
-      const dashboard = release?.overdeckDashboardProtocol ?? null;
-      const agent = release?.overdeckAgentProtocol ?? null;
+      const release = releases.find((item) => !item.draft && item.tag_name === `v${targetVersion}`
+        && (this.snapshot.channel === 'canary' ? item.prerelease === true : item.prerelease !== true));
+      const manifestPrefix = this.snapshot.channel === 'canary' ? 'beta' : 'latest';
+      const manifestAsset = release?.assets?.find((asset) => asset.name === `${manifestPrefix}-linux.yml`)
+        ?? release?.assets?.find((asset) => asset.name === `${manifestPrefix}.yml`);
+      let dashboard: number | null = null; let agent: number | null = null;
+      if (manifestAsset?.browser_download_url) {
+        const manifestResponse = await this.fetchImpl(manifestAsset.browser_download_url, request);
+        if (!manifestResponse.ok) throw new Error(`Update manifest returned ${manifestResponse.status}`);
+        const manifest = await manifestResponse.text();
+        dashboard = Number(manifest.match(/^overdeckDashboardProtocol:\s*(\d+)/m)?.[1]) || null;
+        agent = Number(manifest.match(/^overdeckAgentProtocol:\s*(\d+)/m)?.[1]) || null;
+      }
       const status = dashboard === OVERDECK_DASHBOARD_PROTOCOL_VERSION && agent === OVERDECK_AGENT_PROTOCOL_VERSION ? 'compatible' : 'unknown';
       this.successfulCheckAt = this.now();
       this.publish({
