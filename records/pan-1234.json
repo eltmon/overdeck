@@ -133,16 +133,16 @@
     }
   ],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T15:06:40.031Z",
+  "updated": "2026-07-15T15:07:53.845Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:06:39.970Z",
+    "updatedAt": "2026-07-15T15:07:53.254Z",
     "reviewNotes": "[correctness] Closing a direct-linked drawer leaves the issue route active — `src/dashboard/frontend/src/App.tsx:395`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
     "reviewSpawnedAt": "2026-07-15T14:52:41.885Z"
@@ -152,9 +152,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 431485,
-            "output": 1986,
-            "cacheRead": 366208,
+            "input": 795993,
+            "output": 2452,
+            "cacheRead": 724352,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -164,9 +164,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 7735363,
-            "output": 20187,
-            "cacheRead": 7310848,
+            "input": 9147938,
+            "output": 22048,
+            "cacheRead": 8692480,
             "cacheWrite": 0
           }
         },
@@ -181,9 +181,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 431485,
-          "output": 1986,
-          "cacheRead": 366208,
+          "input": 795993,
+          "output": 2452,
+          "cacheRead": 724352,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -193,9 +193,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7735363,
-          "output": 20187,
-          "cacheRead": 7310848,
+          "input": 9147938,
+          "output": 22048,
+          "cacheRead": 8692480,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -206,8 +206,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 51.673274,
-        "pricingAsOf": "2026-07-15T15:06:40.024Z"
+        "usd": 52.574635,
+        "pricingAsOf": "2026-07-15T15:07:53.396Z"
       }
     },
     "merges": [
