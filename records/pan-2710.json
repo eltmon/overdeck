@@ -492,9 +492,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T18:25:04.100Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T18:27Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T18:27:59.563Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T18:27:59Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T14:27:33-04:00\n\n## Verdict: CHANGES REQUESTED — security and performance reviewers failed before producing usable reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-1697a98a/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: 1697a98a2b93d41692e74ae31f834b78f6d8f7e2\n- Cycle number: 10\n- Prior cycle SHA: ae5cd253bf15f72c1d6bdc39b3f730d32285525d\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | ready after an earlier contradictory failed signal | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-1697a98a/correctness.md | 0 |\n| performance | failed | — | infrastructure failure |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-1697a98a/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-security already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n### [performance] Reviewer failed before producing a usable report\nThe terminal signal reported: `Role run agent-pan-2710-review-performance already running. Use 'pan tell' to message it.` Review policy forbids approval without a readable report from every sub-role.\n\n## Non-blocking Findings\n\n### [correctness] Failed main-history probes are treated as authoritative empty history — `src/lib/cloister/stale-check-github.ts:21`\n`listRecentMainRuns` returns an empty list after a GitHub CLI or JSON failure, so the service can cache empty red-window history and defer the affected candidate for ten minutes. The reviewer classified this as an advisory availability edge because the candidate is eventually reconsidered. The cited line is in the PR diff but outside this cycle's diff, so cycle-10 convergence also prevents promotion to a blocker.\n\n## Clean Sub-roles\n- correctness — no blocking correctness findings; all 49 focused tests passed in the reviewer run.\n- requirements — all 18 in-scope requirements and non-goals were reported implemented, with no findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-1697a98a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -521,7 +534,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T18:25:04.100Z",
+  "updated": "2026-07-15T18:27:59.563Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
