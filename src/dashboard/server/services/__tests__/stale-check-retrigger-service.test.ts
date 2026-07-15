@@ -165,12 +165,12 @@ it('does not retry a failed rerun when its candidate disappears and returns', as
   expect(mocks.rerun).toHaveBeenCalledTimes(1);
 });
 
-it('bounds failed-attempt suppression to one high watermark per issue', async () => {
+it('tracks failed attempts by exact run ID regardless of response order', async () => {
   mocks.rerun.mockResolvedValue(false);
   mocks.prRuns.mockResolvedValue([
-    run({ databaseId: 10 }),
-    run({ databaseId: 11 }),
     run({ databaseId: 12 }),
+    run({ databaseId: 11 }),
+    run({ databaseId: 10 }),
   ]);
   await __tickOnceForTests();
 
@@ -178,6 +178,20 @@ it('bounds failed-attempt suppression to one high watermark per issue', async ()
   await __tickOnceForTests();
 
   expect(mocks.rerun).toHaveBeenCalledTimes(3);
+});
+
+it('prunes exact failed IDs to the current bounded run set', async () => {
+  mocks.rerun.mockResolvedValue(false);
+  mocks.prRuns.mockResolvedValue(Array.from(
+    { length: 100 },
+    (_, index) => run({ databaseId: index + 1 }),
+  ));
+  for (let tick = 0; tick < 20; tick++) await __tickOnceForTests();
+
+  vi.advanceTimersByTime(10 * 60_000);
+  mocks.prRuns.mockResolvedValue([run({ databaseId: 101 })]);
+  await __tickOnceForTests();
+  expect(mocks.rerun).toHaveBeenCalledTimes(101);
 });
 
 it('expires skip-log deduplication after its retention window', async () => {
