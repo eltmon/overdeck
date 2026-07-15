@@ -287,6 +287,25 @@ Record every call (issue, decision, divergence evidence) in `docs/FLYWHEEL-STATE
   ("I upgraded the plan", "limits reset") — treat that as authorization to re-dispatch all
   limit-halted agents immediately, without waiting for the parsed reset times.
 
+## Backstop interventions are symptoms — file the primary-path bug
+
+Every time the Deacon (or one of your recovery actions) fixes something a primary mechanism
+should have handled, that intervention IS evidence of a defect. Drive the recovery for
+velocity, then **file a GitHub issue naming the primary path that failed**, with the observed
+evidence. Signals to watch for:
+
+- boot reconciliation resetting orphaned `reviewing`/`running` states
+- dead-end nudges to an idle agent that never received its feedback (delivery failed)
+- deacon fallback "reports present but synthesis not written" (REVIEWER_READY never landed)
+- queued mail replayed at respawn (live delivery to a running session failed)
+- verification/review continuations recovered after a restart (a one-shot handler owned them)
+- auto-resume of an agent that should never have stopped
+
+One issue per defect **class**, not per occurrence — search open issues first and append new
+occurrences as comments. (Why: on 2026-07-15 the Deacon was frozen all day and a dozen
+primary-path defects surfaced only because their backstops were off — PAN-2687–PAN-2701.
+Backstops that silently absorb failures hide the bugs that make the pipeline slow.)
+
 ## Discretion on parked items (decide, don't delegate)
 
 When the operator names a parked item to unpark, **decide and act** — the operator authored
