@@ -15,7 +15,7 @@ pan swarm <id>
 ```
 
 Use `pan staffing <id> --swarm off|auto|always|default` to set or clear the durable per-issue
-swarm override. The shared issue-header policy strip exposes the same setting, and
+swarm override. The issue-header Policies control exposes the same setting, and
 `GET/POST /api/issues/:issueId/swarm-policy` provides API parity; the issue layer beats project
 and global swarm modes.
 
