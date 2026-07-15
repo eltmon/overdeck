@@ -192,6 +192,7 @@ async function recoverUnhealthyTestStack(
 
 interface ReviewStatusLike {
   reviewStatus?: string;
+  verificationStatus?: string;
   testStatus?: string;
   mergeStatus?: string;
   readyForMerge?: boolean;
@@ -203,6 +204,7 @@ interface ReviewStatusLike {
   recoveryStartedAt?: string;
   history?: Array<{ type: string; status: string; notes?: string }>;
   reviewNotes?: string;
+  lastVerifiedCommit?: string;
   reviewedAtCommit?: string;
   stuckAt?: string;
   stuckDetails?: string;
@@ -474,6 +476,40 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
   const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
 
   const reviewAgentActive = await isReviewAgentActiveForIssue(issueId);
+
+  // A supervised verification worker can finish after the dashboard process
+  // that requested it has died. The worker records the pass, but the dead HTTP
+  // fiber never clears the prior review failure or dispatches review. Recover
+  // only when the verified commit is still current; a moved HEAD needs a fresh
+  // verification instead of carrying the old pass forward.
+  if (
+    status.verificationStatus === 'passed' &&
+    status.lastVerifiedCommit &&
+    !['pending', 'reviewing', 'passed'].includes(status.reviewStatus ?? '') &&
+    !reviewAgentActive
+  ) {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const issueLower = issueId.toLowerCase();
+    const agentState = getAgentStateSync(`agent-${issueLower}`);
+    const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
+
+    if (workspace) {
+      try {
+        const { stdout } = await execAsync('git rev-parse HEAD', { cwd: workspace });
+        if (stdout.trim() === status.lastVerifiedCommit) {
+          setReviewStatusSync(issueId, {
+            reviewStatus: 'pending',
+            reviewNotes: undefined,
+          });
+          status.reviewStatus = 'pending';
+          status.reviewNotes = undefined;
+          actions.push(`Recovered review continuation for ${issueId} after verification completed during restart`);
+        }
+      } catch {
+        // A missing/unreadable workspace cannot prove the pass is current.
+      }
+    }
+  }
 
   // Orphaned reviewing status
   if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
