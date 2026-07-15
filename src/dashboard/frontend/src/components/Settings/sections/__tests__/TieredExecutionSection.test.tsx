@@ -181,6 +181,37 @@ describe('TieredExecutionSection', () => {
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
+  it('blocks reassigning the final difficulty from a kind-routed crew', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+        standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['simple', 'medium', 'complex', 'expert'] },
+      },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      by_kind: { docs: 'cheap' }, replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.change(screen.getByLabelText('crew for trivial'), { target: { value: 'standard' } });
+    expect(screen.getByText("Move or remove docs kind overrides before reassigning this crew's final difficulty.")).toBeTruthy();
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it('blocks removing a crew referenced solely by a kind override', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: false,
+      tiers: { legacy: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: [] } },
+      by_kind: { docs: 'legacy' }, replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getAllByText('Claude Haiku 4.5').find((element) => element.closest('summary'))!.closest('summary')!);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew' }));
+    expect(screen.getByText('Move or remove these kind overrides before removing this crew.')).toBeTruthy();
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
   it('edits supervisor fields through onSettingsChange', () => {
     const onSettingsChange = vi.fn();
     render(
@@ -215,6 +246,23 @@ describe('TieredExecutionSection', () => {
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.subscribe).toBe('all');
 
     fireEvent.click(screen.getByRole('switch', { name: 'Supervisor owns inspection' }));
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.owns_inspection).toBe(true);
+  });
+
+  it('preserves effective inspection ownership when the field is omitted', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: false,
+      tiers: {},
+      by_kind: {},
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    expect(screen.getByRole('button', { name: /Standing reviewer/ }).textContent).toContain('owns inspection');
+    fireEvent.click(screen.getByRole('button', { name: /Standing reviewer/ }));
+    expect(screen.getByRole('switch', { name: 'Supervisor owns inspection' })).toHaveAttribute('aria-checked', 'true');
+    fireEvent.change(screen.getByLabelText('Subscribe'), { target: { value: 'all' } });
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.supervisor.owns_inspection).toBe(true);
   });
 
@@ -278,6 +326,22 @@ describe('TieredExecutionSection', () => {
     );
 
     expect(screen.getByText('backend → Claude Haiku 4.5')).toBeTruthy();
+  });
+
+  it('normalizes alias-only byKind before an unrelated crew edit', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: false,
+      tiers: { all: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+      byKind: { docs: 'all' },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    expect(screen.getByText('docs → Claude Haiku 4.5')).toBeTruthy();
+    fireEvent.click(screen.getAllByText('Claude Haiku 4.5').find((element) => element.closest('summary'))!.closest('summary')!);
+    fireEvent.change(screen.getByLabelText('Model'), { target: { value: 'claude-sonnet-5' } });
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.by_kind.docs).toBe('trivial-simple-medium-complex-expert');
   });
 
   it('edits feed, escalation, and replay threshold values', () => {

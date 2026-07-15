@@ -26,9 +26,10 @@ function HarnessSelect({ model, value, settings, onChange, label = 'Harness' }: 
   </select></label>;
 }
 
-export function CrewRow({ crew, owned, settings, open, onToggle, onChange, onRemove }: {
+export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onChange, onRemove }: {
   crew: Crew;
   owned: string[];
+  ownedKinds: string[];
   settings: SettingsConfig;
   open: boolean;
   onToggle: () => void;
@@ -51,7 +52,7 @@ export function CrewRow({ crew, owned, settings, open, onToggle, onChange, onRem
     <summary onClick={(event) => { event.preventDefault(); onToggle(); }} className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 focus-visible:ring-2 focus-visible:ring-primary">
       <span aria-hidden>{open ? '▾' : '▸'}</span><span className="font-medium text-foreground">{crewLabel(crew)}</span>
       {warning && <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">⚠ harness overrides provider default — PAN-1865</span>}
-      <span className="ml-auto text-[11px] text-muted-foreground">{owned.length ? `handles ${owned.join(' · ')}` : 'handles nothing — assign it on the board or remove it'}</span>
+      <span className="ml-auto text-[11px] text-muted-foreground">{owned.length || ownedKinds.length ? `handles ${[...owned, ...ownedKinds.map((kind) => `${kind} override`)].join(' · ')}` : 'handles nothing — assign it on the board or remove it'}</span>
       <span className="text-[11px] font-medium text-cyan-600 dark:text-cyan-400">{cost == null ? '—' : `≈ $${cost.toFixed(1)}/1M`}</span>
     </summary>
     <div className="space-y-3 border-t border-border/70 px-4 py-3">
@@ -71,7 +72,11 @@ export function CrewRow({ crew, owned, settings, open, onToggle, onChange, onRem
       </>}
       <div className="flex justify-between gap-2">
         <button type="button" onClick={() => entries ? onChange({ ...crew, distribution: undefined }) : onChange({ ...crew, distribution: [{ model: crew.model, harness: crew.harness, weight: 100 }] })} className="rounded-md border border-border px-2.5 py-1.5 text-xs">{entries ? 'Use one model' : 'Use a weighted mix'}</button>
-        <button type="button" onClick={() => { if (owned.length) setRemoveError('Assign these difficulties to another crew before removing it.'); else onRemove(); }} className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground">Remove crew</button>
+        <button type="button" onClick={() => {
+          if (owned.length) setRemoveError('Assign these difficulties to another crew before removing it.');
+          else if (ownedKinds.length) setRemoveError('Move or remove these kind overrides before removing this crew.');
+          else onRemove();
+        }} className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground">Remove crew</button>
       </div>
       {removeError && <p className="text-xs text-destructive">{removeError}</p>}
     </div>

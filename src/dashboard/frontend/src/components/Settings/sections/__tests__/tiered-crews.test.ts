@@ -100,7 +100,7 @@ describe('tiered crews mapping', () => {
     expect(config.tiers.expert.harness).toBe('claude-code');
   });
 
-  it('retains a kind-routed crew after its final difficulty is reassigned', () => {
+  it('rejects unassigning the final difficulty from a kind-routed crew', () => {
     const imported = importCrews({
       enabled: true,
       tiers: {
@@ -111,17 +111,10 @@ describe('tiered crews mapping', () => {
       replay_threshold: 0.5,
     });
 
-    const serialized = serializeCrews(
+    expect(() => serializeCrews(
       imported.crews,
       { ...imported.assign, trivial: 'standard' },
       imported.rest,
-    );
-
-    expect(serialized.tiers['kind-docs']).toMatchObject({
-      model: 'claude-haiku-4-5',
-      harness: 'claude-code',
-      difficulties: [],
-    });
-    expect(serialized.by_kind).toEqual({ docs: 'kind-docs' });
+    )).toThrow("Move or remove docs kind overrides before unassigning this crew's final difficulty.");
   });
 });

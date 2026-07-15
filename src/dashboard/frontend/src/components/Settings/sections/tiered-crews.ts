@@ -109,10 +109,11 @@ export function serializeCrews(
   for (const crew of crews) {
     const difficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id);
     const kinds = kindsByCrew.get(crew.id) ?? [];
-    if (difficulties.length === 0 && kinds.length === 0) continue;
-    const tierName = difficulties.length > 0
-      ? deriveTierName(difficulties)
-      : `kind-${[...kinds].sort().join('-')}`;
+    if (difficulties.length === 0) {
+      if (kinds.length > 0) throw new Error(`Move or remove ${kinds.sort().join(', ')} kind overrides before unassigning this crew's final difficulty.`);
+      continue;
+    }
+    const tierName = deriveTierName(difficulties);
     crewToTier.set(crew.id, tierName);
 
     const distribution = crew.distribution ? sortedDistribution(crew.distribution) : undefined;

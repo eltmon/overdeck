@@ -69,6 +69,8 @@ The supervisor collapses to a sentence describing its subscription, model, and i
 
 On load, tiers with identical staffing merge into one crew and own the union of their difficulties; this changes only the editing shape, not runtime routing. On save, tier names are derived from the owned difficulties in ladder order, such as `trivial-simple` or `medium-complex-expert`, and every `by_kind` reference is rewritten in the same operation. Hand-authored tier names remain valid and are honored when read from YAML, but the next UI save replaces them with derived names. The operator-approved interaction and copy reference is [`docs/design/mockups/tiered-execution-redesign-pan-2684.html`](design/mockups/tiered-execution-redesign-pan-2684.html).
 
+Every crew must retain at least one difficulty because runtime tiers reject an empty `difficulties` list. If a crew has kind overrides, the Settings UI blocks moving its final difficulty or removing the crew until those overrides are explicitly moved or removed; this prevents an unrelated routing edit from silently deleting kind-routed work.
+
 On the issue view, any per-issue `plan.metadata.tiered_execution` override is visible in the issue header/resolution area as an editable **Standing Crew** toggle (PAN-2383). Flipping the toggle writes the override to the per-issue permanent record through the record write door. Because the vBRIEF spec remains immutable under PAN-1124, the override is stored outside the spec and resolved at runtime.
 
 ## Resolution Chain

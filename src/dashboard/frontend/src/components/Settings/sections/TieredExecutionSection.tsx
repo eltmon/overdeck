@@ -98,13 +98,23 @@ export function TieredExecutionSection({
   onSettingsChange,
 }: TieredExecutionSectionProps) {
   const config = formData.tiered_execution;
-  const normalizedConfig = { ...defaultTieredExecution(config?.enabled ?? false), ...config };
+  const normalizedConfig = {
+    ...defaultTieredExecution(config?.enabled ?? false),
+    ...config,
+    by_kind: config?.by_kind ?? config?.byKind ?? {},
+  };
   const { crews, assign, rest } = importCrews(normalizedConfig);
-  const outgoingConfig = serializeCrews(crews, assign, rest);
+  let outgoingConfig = normalizedConfig;
+  try {
+    outgoingConfig = serializeCrews(crews, assign, rest);
+  } catch {
+    // Keep invalid hand-authored config inspectable; guarded UI actions cannot save this state.
+  }
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [kindDraft, setKindDraft] = useState<typeof ITEM_KINDS[number]>('docs');
   const [crewDraft, setCrewDraft] = useState('');
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const byKind = rest.by_kind;
   const supervisor = rest.supervisor;
   const supervisorModelName = Object.values(MODELS_BY_PROVIDER).flatMap((provider) => provider.models)
@@ -156,6 +166,14 @@ export function TieredExecutionSection({
   };
 
   const handleAssignment = (difficulty: typeof DIFFICULTIES[number], crewId: string) => {
+    const currentCrewId = assign[difficulty];
+    const currentCrewDifficulties = DIFFICULTIES.filter((entry) => assign[entry] === currentCrewId);
+    const currentCrewKinds = Object.entries(byKind).filter(([, id]) => id === currentCrewId).map(([kind]) => kind);
+    if (crewId !== currentCrewId && currentCrewDifficulties.length === 1 && currentCrewKinds.length > 0) {
+      setAssignmentError(`Move or remove ${currentCrewKinds.join(', ')} kind overrides before reassigning this crew's final difficulty.`);
+      return;
+    }
+    setAssignmentError(null);
     if (crewId !== 'new') {
       writeCrews(crews, { ...assign, [difficulty]: crewId });
       return;
@@ -176,7 +194,7 @@ export function TieredExecutionSection({
         model: rest.supervisor?.model ?? DEFAULT_SUPERVISOR_MODEL,
         harness: rest.supervisor?.harness ?? 'claude-code',
         subscribe: rest.supervisor?.subscribe ?? 'flagged',
-        owns_inspection: rest.supervisor?.owns_inspection ?? false,
+        owns_inspection: rest.supervisor?.owns_inspection ?? true,
         ...patch,
       },
     });
@@ -284,6 +302,7 @@ export function TieredExecutionSection({
               </p>
             </div>
           </div>
+          {assignmentError && <p className="mt-3 text-xs text-destructive">{assignmentError}</p>}
         </div>
 
         {(reason || serverTieredError) && (
@@ -349,6 +368,7 @@ export function TieredExecutionSection({
               key={crew.id}
               crew={crew}
               owned={DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id)}
+              ownedKinds={Object.entries(byKind).filter(([, crewId]) => crewId === crew.id).map(([kind]) => kind)}
               settings={formData}
               open={openCrewId === crew.id}
               onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
@@ -365,7 +385,7 @@ export function TieredExecutionSection({
         <div className="rounded-lg border border-border/70">
           <button type="button" aria-expanded={supervisorOpen} onClick={() => setSupervisorOpen(!supervisorOpen)} className="flex w-full items-center gap-2 px-4 py-3 text-left focus-visible:ring-2 focus-visible:ring-primary">
             <span>{supervisorOpen ? '▾' : '▸'}</span><span className="text-sm font-medium text-foreground">Standing reviewer</span>
-            <span className="text-xs text-muted-foreground">— {supervisor?.subscribe === 'all' ? 'reviews every commit' : supervisor?.subscribe === 'sampled' ? 'reviews a sample' : 'wakes on flagged commits'} · {supervisorModelName} · {supervisor?.owns_inspection ? 'owns inspection' : 'inspection stays separate'}</span>
+            <span className="text-xs text-muted-foreground">— {supervisor?.subscribe === 'all' ? 'reviews every commit' : supervisor?.subscribe === 'sampled' ? 'reviews a sample' : 'wakes on flagged commits'} · {supervisorModelName} · {supervisor?.owns_inspection ?? true ? 'owns inspection' : 'inspection stays separate'}</span>
           </button>
           {supervisorOpen && <div className="grid gap-3 border-t border-border/70 px-4 py-3 @xl:grid-cols-2">
             <p className="col-span-full text-xs text-muted-foreground">Wakes on every commit a crew makes and reviews the diff against the task's acceptance criteria. Required whenever crews are configured.</p>
@@ -412,15 +432,15 @@ export function TieredExecutionSection({
               <button
                 type="button"
                 role="switch"
-                aria-checked={supervisor?.owns_inspection ?? false}
+                aria-checked={supervisor?.owns_inspection ?? true}
                 aria-label="Supervisor owns inspection"
-                onClick={() => handleSupervisorPatch({ owns_inspection: !(supervisor?.owns_inspection ?? false) })}
+                onClick={() => handleSupervisorPatch({ owns_inspection: !(supervisor?.owns_inspection ?? true) })}
                 className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 ${
-                  supervisor?.owns_inspection ? 'bg-primary' : 'bg-muted'
+                  supervisor?.owns_inspection ?? true ? 'bg-primary' : 'bg-muted'
                 }`}
               >
                 <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${
-                  supervisor?.owns_inspection ? 'translate-x-[18px]' : 'translate-x-[3px]'
+                  supervisor?.owns_inspection ?? true ? 'translate-x-[18px]' : 'translate-x-[3px]'
                 }`} />
               </button>
             </div>
