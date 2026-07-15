@@ -17,11 +17,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T15:35:02.647Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T15:51:18.731Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:35:02.648Z",
+  "updated": "2026-07-15T15:51:18.732Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
