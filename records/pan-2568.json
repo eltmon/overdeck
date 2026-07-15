@@ -112,6 +112,11 @@
       "reason": "feedback",
       "note": "[2026-07-15T16:23Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-07-15T16:23:29.682Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T16:33:29.589Z"
     }
   ],
   "feedback": [],
@@ -147,23 +152,23 @@
     "recordedAt": "2026-07-15T15:47:00.777Z"
   },
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T16:33:28.022Z",
+  "updated": "2026-07-15T16:33:29.589Z",
   "pipeline": {
     "issueId": "PAN-2568",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:33:26.440Z",
+    "updatedAt": "2026-07-15T16:33:28.050Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "Item injection-budget ack: leaf module exports the 4 required functions with 0 src/lib imports, delivery.ts wires supervisorInjectionBudgetMs+SUPERVISOR_CLIENT_MARGIN_MS (no 8_000 literal), injection-budget.test.ts 7/7 pass proving exact floors/cap/monotonicity, pty-supervisor.ts has no local echo/settle/purge constants and imports them from injection-budget.js; tsdown build clean (frontend build fails only on a pre-existing unrelated missing tailwind container-queries dep).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2729",
     "lastVerifiedCommit": "8f7e211e4c68285b3e3761825ce5bfef37c131aa",
     "reviewRequestedAt": "2026-07-15T15:47:04.399Z",
-    "reviewSpawnedAt": "2026-07-15T16:21:22.599Z",
+    "reviewSpawnedAt": "2026-07-15T16:33:28.050Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -284,7 +289,7 @@
       },
       "costAtCloseOut": {
         "usd": 60.781714,
-        "pricingAsOf": "2026-07-15T16:33:27.199Z"
+        "pricingAsOf": "2026-07-15T16:33:28.192Z"
       }
     },
     "merges": [
