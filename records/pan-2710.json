@@ -126,7 +126,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:08:17.000Z",
+  "updated": "2026-07-15T17:08:24.845Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
@@ -136,7 +136,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T17:08:10.731Z",
+    "updatedAt": "2026-07-15T17:08:24.701Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Item red-window-classifier ack: computeRedWindows/selectRerunCandidates are pure, correctly implement fail/success window pairing (trailing-fail=>null), half-open [start,end) window membership, and all four skip reasons (main-still-red, no-red-window-match, attempt-exceeded, missing-attempt); FAILING_CHECK_CONCLUSIONS imported from webhook-handlers.ts (not duplicated); no I/O in module; all ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2736",
@@ -205,7 +205,7 @@
       },
       "costAtCloseOut": {
         "usd": 46.778812,
-        "pricingAsOf": "2026-07-15T17:08:10.796Z"
+        "pricingAsOf": "2026-07-15T17:08:24.824Z"
       }
     },
     "merges": [
