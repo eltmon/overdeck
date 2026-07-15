@@ -29,22 +29,14 @@ import { getVBriefACStatusSync } from '../vbrief/acceptance-criteria.js';
 import { VBriefMergeConflictError } from '../vbrief/io.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
+import type { VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
+
+export type { VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
 const execAsync = promisify(exec);
 
 export const VERIFICATION_MAX_CYCLES = 3;
 const NO_PROGRESS_REPEAT_THRESHOLD = 2;
-
-export type VerificationRunnerOutcome =
-  | { outcome: 'passed' }
-  | { outcome: 'skipped'; reason: string }
-  | { outcome: 'failed'; failedCheck: string; cycleCount: number; maxCycles: number }
-  | { outcome: 'error'; message: string };
-
-export interface WorkspaceInfo {
-  isRemote: boolean;
-  vmName?: string;
-}
 
 export interface VerificationRunnerOptions {
   syncTargetBranch?: boolean;
