@@ -10,7 +10,7 @@ import {
 
 interface PrRef { repo: string; number: number }
 interface CachedWindows { probedAt: number; windows: Map<string, RedWindow[]> }
-interface FailedRuns { runIds: Set<number>; lastSeenAt: number }
+interface FailedRuns { runIds: Set<number> }
 interface ServiceState {
   timer: ReturnType<typeof setInterval> | null;
   repoWindows: Map<string, CachedWindows>;
@@ -49,10 +49,6 @@ function pruneState(state: ServiceState, issueIds: Set<string>, repos: Set<strin
   }
   for (const [runId, recordedAt] of state.loggedSkips) {
     if (now - recordedAt >= RUN_STATE_RETENTION_MS) state.loggedSkips.delete(runId);
-  }
-  for (const [issueId, failedRuns] of state.failedRunsByIssue) {
-    if (issueIds.has(issueId)) failedRuns.lastSeenAt = now;
-    else if (now - failedRuns.lastSeenAt >= RUN_STATE_RETENTION_MS) state.failedRunsByIssue.delete(issueId);
   }
 }
 
@@ -138,9 +134,8 @@ async function tickOnce(state: ServiceState): Promise<void> {
           console.log(`[stale-check-retrigger] re-ran run ${run.databaseId} (${run.workflowName}) for ${candidate.issueId} PR #${ref.number}: failed at ${run.createdAt} inside main red window ${window.start} → ${window.end}`);
         } else {
           const issueFailedRuns = state.failedRunsByIssue.get(candidate.issueId)
-            ?? { runIds: new Set<number>(), lastSeenAt: now };
+            ?? { runIds: new Set<number>() };
           issueFailedRuns.runIds.add(run.databaseId);
-          issueFailedRuns.lastSeenAt = now;
           state.failedRunsByIssue.set(candidate.issueId, issueFailedRuns);
           skipped++;
         }
