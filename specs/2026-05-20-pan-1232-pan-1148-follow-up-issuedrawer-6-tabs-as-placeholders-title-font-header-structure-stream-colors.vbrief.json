@@ -4,17 +4,17 @@
     "created": "2026-05-20T02:45:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1232: PAN-1148 follow-up — IssueDrawer 6 tabs as placeholders + title font + header structure + stream colors",
-    "updated": "2026-07-15T04:34:29.699Z"
+    "updated": "2026-07-15T13:07:54.006Z"
   },
   "plan": {
     "id": "pan-1232",
     "title": "PAN-1148 follow-up — IssueDrawer 6 tabs as placeholders + title font + header structure + stream colors",
-    "status": "running",
+    "status": "completed",
     "uid": "d4f2e1a7-5b9c-4e3d-a8f6-2c1b9d4e5a7f",
     "author": "agent:claude-opus-4-7",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-05-20T02:45:00.000Z",
-    "updated": "2026-07-15T04:34:29.699Z",
+    "updated": "2026-07-15T13:07:54.006Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1232",
@@ -535,5 +535,5 @@
       "canonicalFilename": "2026-05-20-PAN-1232-pan-1148-follow-up-issuedrawer-6-tabs-as-placeholders-title-font-header-structure-stream-colors.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
