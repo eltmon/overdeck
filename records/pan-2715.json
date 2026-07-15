@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T15:16:04.090Z",
+  "updated": "2026-07-15T15:19:27.405Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "gate-assemble-wire": {
-        "writerId": "agent-pan-2715",
-        "agentId": "agent-pan-2715",
-        "pid": 1819877,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:16:04.090Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2715",
@@ -188,6 +180,17 @@
         "outcome": "completed",
         "reason": "Implemented build-commit and timestamp deploy evidence; 22 tests and typecheck passed; pushed d5e07d0ebf",
         "releasedAt": "2026-07-15T15:15:40.259Z"
+      },
+      {
+        "writerId": "agent-pan-2715",
+        "agentId": "agent-pan-2715",
+        "pid": 1819877,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:16:04.090Z",
+        "itemId": "gate-assemble-wire",
+        "outcome": "completed",
+        "reason": "Assembled rows 1-7 into a blocking close-out gate with explicit per-row accepts; 56 tests and typecheck passed; pushed 97f9155806",
+        "releasedAt": "2026-07-15T15:19:27.405Z"
       }
     ],
     "statusReasons": {
@@ -221,8 +224,8 @@
         "updatedAt": "2026-07-15T15:15:40.259Z"
       },
       "gate-assemble-wire": {
-        "reason": "All row checkers complete; assemble close-out gate",
-        "updatedAt": "2026-07-15T15:16:04.090Z"
+        "reason": "Assembled rows 1-7 into a blocking close-out gate with explicit per-row accepts; 56 tests and typecheck passed; pushed 97f9155806",
+        "updatedAt": "2026-07-15T15:19:27.405Z"
       }
     }
   },
@@ -257,6 +260,10 @@
     "gate-deploy-row.gate-deploy-row.ac2": "completed",
     "gate-deploy-row.gate-deploy-row.ac3": "completed",
     "gate-deploy-row.gate-deploy-row.ac4": "completed",
-    "gate-assemble-wire": "running"
+    "gate-assemble-wire": "completed",
+    "gate-assemble-wire.gate-assemble-wire.ac1": "completed",
+    "gate-assemble-wire.gate-assemble-wire.ac2": "completed",
+    "gate-assemble-wire.gate-assemble-wire.ac3": "completed",
+    "gate-assemble-wire.gate-assemble-wire.ac4": "completed"
   }
 }
