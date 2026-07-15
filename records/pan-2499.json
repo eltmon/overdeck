@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:46:01.853Z",
+  "updated": "2026-07-15T14:46:20.100Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -136,7 +136,10 @@
     "agent-step-row.agent-step-row.ac2": "completed",
     "agent-step-row.agent-step-row.ac3": "completed",
     "agent-step-row.agent-step-row.ac4": "completed",
-    "ship-progress": "running"
+    "ship-progress": "completed",
+    "ship-progress.ship-progress.ac1": "completed",
+    "ship-progress.ship-progress.ac2": "completed",
+    "ship-progress.ship-progress.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -162,16 +165,8 @@
     }
   },
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "ship-progress": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 1185164,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:46:01.853Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -216,6 +211,17 @@
         "outcome": "completed",
         "reason": "Verified existing pushed shared AgentStepRow adoption in cockpit and rail: 10 focused tests cover density, active-only spinner, reviewer verdict, and all context actions; full typecheck/lint already pass and legacy file-size baselines are removed.",
         "releasedAt": "2026-07-15T14:45:58.856Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1185164,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:46:01.853Z",
+        "itemId": "ship-progress",
+        "outcome": "completed",
+        "reason": "Verified existing pushed ShipProgress adoption in ShipTab and rail: 10 focused tests cover rebasing/verifying/merged progression, compact/full rendering and log polling with fake timers; full typecheck/lint pass.",
+        "releasedAt": "2026-07-15T14:46:20.100Z"
       }
     ],
     "statusReasons": {
@@ -234,6 +240,10 @@
       "agent-step-row": {
         "reason": "Verified existing pushed shared AgentStepRow adoption in cockpit and rail: 10 focused tests cover density, active-only spinner, reviewer verdict, and all context actions; full typecheck/lint already pass and legacy file-size baselines are removed.",
         "updatedAt": "2026-07-15T14:45:58.856Z"
+      },
+      "ship-progress": {
+        "reason": "Verified existing pushed ShipProgress adoption in ShipTab and rail: 10 focused tests cover rebasing/verifying/merged progression, compact/full rendering and log polling with fake timers; full typecheck/lint pass.",
+        "updatedAt": "2026-07-15T14:46:20.100Z"
       }
     }
   }
