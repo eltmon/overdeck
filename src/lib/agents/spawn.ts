@@ -16,6 +16,7 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { resetPipelineVerdictsForWorkStartSync } from '../review-status.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
@@ -162,6 +163,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     role,
     model: selectedModel,
   });
+  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
+  // missing/expired/burned — it would wedge silently in a 401 loop.
+  assertCodexNativeAuthForSpawn(resolvedHarness);
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
 
   if (
@@ -494,6 +498,9 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role,
     model: selectedModel,
   });
+  // PAN-2285: never launch a fresh Codex agent when native Codex auth is
+  // missing/expired/burned — it would wedge silently in a 401 loop.
+  assertCodexNativeAuthForSpawn(resolvedHarness);
   await ensureLifecycleHooksBeforeLaunch(agentId, resolvedHarness);
   // Create state
   const state: AgentState = {
