@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T14:55:19.016Z",
+  "updated": "2026-07-15T14:55:34.257Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -109,7 +109,8 @@
     "fork-enter-nudge.fork-enter-nudge.ac1": "completed",
     "fork-enter-nudge.fork-enter-nudge.ac2": "completed",
     "fork-enter-nudge.fork-enter-nudge.ac3": "completed",
-    "fork-enter-nudge.fork-enter-nudge.ac4": "completed"
+    "fork-enter-nudge.fork-enter-nudge.ac4": "completed",
+    "fork-stranded-status": "running"
   },
   "swarm": {
     "slotAssignments": [],
@@ -122,8 +123,16 @@
     }
   },
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "fork-stranded-status": {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 1379862,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:55:34.257Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
