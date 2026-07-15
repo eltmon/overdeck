@@ -110,23 +110,18 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-13T05:17:43.971Z",
+  "updated": "2026-07-15T14:52:41.338Z",
   "pipeline": {
     "issueId": "PAN-1234",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:39:37.230Z",
-    "updatedAt": "2026-07-13T05:17:43.857Z",
-    "reviewNotes": "Review reset by deacon: no active review session after 384min",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (22665ms):\n\nsrc/components/KanbanBoard.tsx(1,53): error TS6133: 'useRef' is declared but its value is never read.\n",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
-    "lastVerifiedCommit": "2ea5a6da1a3429ae071245846092cbb1eaa1b795",
-    "reviewRequestedAt": "2026-07-12T22:39:37.230Z",
-    "reviewSpawnedAt": "2026-07-12T22:53:59.093Z"
+    "updatedAt": "2026-07-15T14:52:41.276Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2606"
   },
   "closeOut": {
     "usage": {
@@ -164,7 +159,7 @@
       },
       "costAtCloseOut": {
         "usd": 44.068123,
-        "pricingAsOf": "2026-07-13T05:17:43.936Z"
+        "pricingAsOf": "2026-07-15T14:52:41.331Z"
       }
     },
     "merges": [
@@ -173,7 +168,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "conformance-test-strengthen": "completed",
     "conformance-test-strengthen.ac1": "completed",
