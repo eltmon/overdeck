@@ -25,9 +25,37 @@ pan close <issue-id> --json
 pan close <issue-id> --force
 ```
 
+`pan close` first prints the Definition-of-Done gate table: row number, gate ID,
+expected evidence, observed evidence, and `PASS`, `MISS`, `SKIP`, or
+`MISS-ACCEPTED`. An unaccepted `MISS` blocks every archive, teardown, and tracker
+mutation. `--force` skips the confirmation prompt; it never bypasses this gate.
+
+Each overridable row has one explicit acceptance flag:
+
+```text
+--accept-review       Row 1: review passed
+--accept-tests        Row 2: tests passed
+--accept-verification Row 3: branch verification passed at lastVerifiedCommit
+--accept-merged       Row 4: PR merged on the forge
+--accept-post-merge   Row 5: post-merge lifecycle completed
+--accept-main-verify  Row 6: merge commit verified on main
+--accept-deploy       Row 7: live dashboard build includes the merge
+```
+
+An acceptance records the flag, operator/agent identity, and timestamp in the
+issue close-out record. Use it only when the missing evidence is understood:
+
+```bash
+pan close PAN-1234 --force
+# Row 7 deploy: MISS — live server build predates the merge
+pan close PAN-1234 --force --accept-deploy
+# Row 7 deploy: MISS-ACCEPTED — override is now durable and auditable
+```
+
 ## What It Does
 
-Runs the close-out ceremony after a successful merge and post-merge verification. Merge
+Runs the close-out ceremony after mechanically checking review, tests, branch verification,
+forge merge, post-merge lifecycle, main verification, deployment, and teardown. Merge
 moves the issue to canonical state `verifying_on_main`; close-out is the deliberate final
 step that completes the vBRIEF, archives planning artifacts, applies final cleanup, closes
 the tracker issue, and clears review status.
@@ -38,7 +66,7 @@ cleanup policy instead of force-deleting everything.
 ## When to Use
 
 - After the PR has merged and the issue is in `verifying_on_main`
-- After post-merge UAT on `main` has passed
+- After post-merge verification on `main` has passed and the live build includes the merge
 - Completing the lifecycle for a finished issue
 
 ## Close-Out Configuration

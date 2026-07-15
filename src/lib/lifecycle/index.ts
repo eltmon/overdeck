@@ -22,6 +22,7 @@ export type {
   ArchiveOptions,
   ApproveOptions,
   DeepWipeOptions,
+  CloseOutOptions,
 } from './types.js';
 
 export { stepOk, stepSkipped, stepFailed } from './types.js';

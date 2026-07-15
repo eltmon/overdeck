@@ -13,7 +13,9 @@
  * passed through unchanged. The supervisor proxies stdin/stdout/resize between
  * tmux and Claude, and listens on `${OVERDECK_HOME}/sockets/pty-<agentId>.sock`
  * for authenticated HTTP-on-unix POSTs. Socket-injected messages echo to stdout
- * by default so the tmux transcript shows what Cloister sent. Permission relay
+ * by default so the tmux transcript shows what Cloister sent. Accepted payloads
+ * never exceed the shared purge cap, preserving the invariant that an
+ * unconfirmed write is fully erased before retry. Permission relay
  * is intentionally out of scope; existing Channels MCP remains the bidirectional
  * permission path for agents that opt into it.
  */
@@ -27,18 +29,20 @@ import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
 import { getOverdeckHome } from '../paths.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
+import {
+  INPUT_ECHO_CONFIRM_INTERVAL_MS,
+  INPUT_ECHO_CONFIRM_ATTEMPTS,
+  INPUT_ECHO_CONFIRM_PREFIX_CHARS,
+  echoConfirmTimeoutMs,
+  inputSettleMs,
+  INPUT_PURGE_MAX_CHARS,
+  purgeSettleMs,
+} from './injection-budget.js';
 
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 const SHUTDOWN_GRACE_MS = 2_000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
-const INPUT_ECHO_CONFIRM_TIMEOUT_MS = 2_500;
-const INPUT_ECHO_CONFIRM_INTERVAL_MS = 50;
-const INPUT_ECHO_CONFIRM_ATTEMPTS = 2;
-const INPUT_ECHO_CONFIRM_PREFIX_CHARS = 40;
-const INPUT_SETTLE_MS = 300;
-const INPUT_PURGE_MAX_CHARS = 8_192;
-const INPUT_PURGE_SETTLE_MS = 150;
 
 export interface PtySupervisorPayload {
   content: string;
@@ -109,6 +113,7 @@ function parsePayload(value: unknown): PtySupervisorPayload | null {
   if (value === null || typeof value !== 'object') return null;
   const payload = value as Partial<PtySupervisorPayload>;
   if (typeof payload.content !== 'string' || payload.content.length === 0) return null;
+  if (payload.content.length > INPUT_PURGE_MAX_CHARS) return null;
   if (payload.echo !== undefined && typeof payload.echo !== 'boolean') return null;
   if (payload.caller !== undefined && typeof payload.caller !== 'string') return null;
   if (payload.meta !== undefined) {
@@ -124,19 +129,50 @@ function payloadCaller(payload: PtySupervisorPayload): string | undefined {
   return payload.caller ?? payload.meta?.caller;
 }
 
-async function appendSocketWriteLog(agentId: string, payload: PtySupervisorPayload): Promise<void> {
+export interface SocketWriteLogRecord {
+  agentId: string;
+  contentLength: number;
+  caller?: string;
+}
+
+export function createSocketWriteLogQueue(
+  write: (record: SocketWriteLogRecord) => Promise<void>,
+  maxPending = 64,
+): { enqueue: (agentId: string, payload: PtySupervisorPayload) => boolean } {
+  let pending = 0;
+  let tail: Promise<void> = Promise.resolve();
+
+  return {
+    enqueue(agentId, payload) {
+      if (pending >= maxPending) return false;
+      const caller = payloadCaller(payload);
+      const record: SocketWriteLogRecord = {
+        agentId,
+        contentLength: payload.content.length,
+        ...(caller ? { caller } : {}),
+      };
+      pending += 1;
+      tail = tail
+        .then(() => write(record))
+        .catch(() => undefined)
+        .finally(() => { pending -= 1; });
+      return true;
+    },
+  };
+}
+
+async function appendSocketWriteLog(record: SocketWriteLogRecord): Promise<void> {
   try {
-    const logPath = getPtySupervisorLogPath(agentId);
+    const logPath = getPtySupervisorLogPath(record.agentId);
     await mkdir(join(getOverdeckHome(), 'logs'), { recursive: true, mode: 0o700 });
-    const caller = payloadCaller(payload);
     await appendFile(
       logPath,
       `${JSON.stringify({
         ts: new Date().toISOString(),
-        agentId,
+        agentId: record.agentId,
         kind: 'socket_write',
-        contentLength: payload.content.length,
-        ...(caller ? { caller } : {}),
+        contentLength: record.contentLength,
+        ...(record.caller ? { caller: record.caller } : {}),
       })}\n`,
       'utf8',
     );
@@ -144,6 +180,8 @@ async function appendSocketWriteLog(agentId: string, payload: PtySupervisorPaylo
     // non-critical
   }
 }
+
+const socketWriteLogQueue = createSocketWriteLogQueue(appendSocketWriteLog);
 
 /**
  * Record what the PTY actually showed when echo confirmation failed — without
@@ -243,9 +281,9 @@ export function isEchoConfirmed(rawOutput: string, prefix: string): boolean {
   return normalized.includes(prefix) || PASTE_PLACEHOLDER_NORMALIZED_RE.test(normalized);
 }
 
-async function waitForPtyEcho(readOutput: () => string, prefix: string): Promise<boolean> {
+async function waitForPtyEcho(readOutput: () => string, prefix: string, timeoutMs: number): Promise<boolean> {
   const confirmed = (): boolean => isEchoConfirmed(readOutput(), prefix);
-  const deadline = Date.now() + INPUT_ECHO_CONFIRM_TIMEOUT_MS;
+  const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (confirmed()) return true;
     await sleep(INPUT_ECHO_CONFIRM_INTERVAL_MS);
@@ -260,12 +298,14 @@ async function waitForPtyEcho(readOutput: () => string, prefix: string): Promise
  * composer are no-ops, and a collapsed `[Pasted text]` placeholder is deleted
  * atomically by the first DEL. Without this, an unconfirmed-but-landed write
  * stacks with the retry write and the caller's tmux fallback, submitting the
- * same message two or three times (PAN-1769).
+ * same message two or three times (PAN-1769). This invariant holds for payloads
+ * up to INPUT_PURGE_MAX_CHARS; larger payloads are rejected by parsePayload so
+ * "accepted" always implies "purgeable".
  */
 async function purgePtyInput(child: pty.IPty, charCount: number): Promise<void> {
   const count = Math.min(charCount, INPUT_PURGE_MAX_CHARS) + 8;
   child.write('\x7f'.repeat(count));
-  await sleep(INPUT_PURGE_SETTLE_MS);
+  await sleep(purgeSettleMs(count));
 }
 
 export async function injectPtyMessage(
@@ -297,10 +337,11 @@ export async function injectPtyMessage(
         await purgePtyInput(child, trimmed.length);
       }
       child.write(trimmed);
-      confirmed = await waitForPtyEcho(() => observedOutput, prefix);
+      const attemptTimeoutMs = echoConfirmTimeoutMs(trimmed.length);
+      confirmed = await waitForPtyEcho(() => observedOutput, prefix, attemptTimeoutMs);
       if (!confirmed && attempt < INPUT_ECHO_CONFIRM_ATTEMPTS) {
         console.warn(
-          `[pty-supervisor] Input echo not confirmed for ${agentId} after ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms ` +
+          `[pty-supervisor] Input echo not confirmed for ${agentId} after ${attemptTimeoutMs}ms ` +
           `(attempt ${attempt}/${INPUT_ECHO_CONFIRM_ATTEMPTS}); purging and rewriting content before Enter.`,
         );
       }
@@ -313,16 +354,19 @@ export async function injectPtyMessage(
       await purgePtyInput(child, trimmed.length);
       await appendEchoFailureLog(agentId, payload, normalizePtyText(observedOutput).slice(-200));
       throw new Error(
-        `input echo confirmation failed after ${INPUT_ECHO_CONFIRM_ATTEMPTS} attempts × ${INPUT_ECHO_CONFIRM_TIMEOUT_MS}ms`,
+        `input echo confirmation failed after ${INPUT_ECHO_CONFIRM_ATTEMPTS} attempts × ${echoConfirmTimeoutMs(trimmed.length)}ms`,
       );
     }
 
-    await sleep(INPUT_SETTLE_MS);
+    await sleep(inputSettleMs(trimmed.length));
     child.write('\r');
     if (payload.echo !== false) {
       process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);
     }
-    await appendSocketWriteLog(agentId, payload);
+    // Delivery is complete once the standalone Enter is written. Logging is
+    // best-effort observability and must not hold the supervisor response open
+    // past the shared client deadline after the message has already submitted.
+    socketWriteLogQueue.enqueue(agentId, payload);
   } finally {
     subscription.dispose();
   }

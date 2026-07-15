@@ -72,7 +72,7 @@ import { doneCommand } from './commands/done.js';
 import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
-import { closeOutCommand } from './commands/close.js';
+import { registerCloseCommand } from './commands/close.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
@@ -558,12 +558,7 @@ program
   .option('--project <path>', 'Explicit project path (overrides registry)')
   .action(destroyWorkspaceCommand);
 
-program
-  .command('close <id>')
-  .description('Verify, clean up, and close issue on tracker')
-  .option('--force', 'Skip confirmation prompt')
-  .option('--json', 'Output as JSON')
-  .action((id, options) => closeOutCommand(id, options));
+registerCloseCommand(program);
 
 program
   .command('start <id>')

@@ -48,6 +48,10 @@ import { BRIDGE_TOKEN_HEADER, writeBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../pty-token.js';
 import { deliverAgentMessage, deliverAgentPermissionDecision, deliverInitialPromptWithRetry, deliverResumeMessageWithTranscriptConfirmation, getAgentDir, type AgentState } from '../agents.js';
 import { sendKeys } from '../tmux.js';
+import {
+  SUPERVISOR_CLIENT_MARGIN_MS,
+  supervisorInjectionBudgetMs,
+} from '../channels/injection-budget.js';
 
 function writeAgentState(agentId: string, partial: Partial<AgentState>): void {
   const dir = join(stateDir, agentId);
@@ -542,6 +546,56 @@ describe('channel bridge delivery', () => {
     }
   });
 
+  it('scales the supervisor socket timeout with a 30 KB payload', async () => {
+    const agentId = 'conv-supervisor-large-timeout';
+    await writePtyToken(agentId);
+    const message = 'x'.repeat(30 * 1_024);
+    const expectedTimeout = supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS;
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout');
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 200,
+      body: 'ok',
+    });
+
+    try {
+      await expect(deliverAgentMessage(agentId, message, 'large-timeout-test')).resolves.toEqual({
+        ok: true,
+        path: 'supervisor',
+      });
+      expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), expectedTimeout);
+    } finally {
+      timeoutSpy.mockRestore();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
+  it('keeps a 30 KB delivery on the supervisor tier when it responds just under budget', async () => {
+    vi.useFakeTimers();
+    const agentId = 'conv-supervisor-large-delayed';
+    await writePtyToken(agentId);
+    const message = 'x'.repeat(30 * 1_024);
+    const supervisorBudget = supervisorInjectionBudgetMs(message.length);
+    const capture: { lastBody?: string } = {};
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 200,
+      body: 'ok',
+      delayMs: supervisorBudget - 1,
+      capture,
+    });
+
+    try {
+      const delivered = deliverAgentMessage(agentId, message, 'large-delayed-test');
+      await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
+      await vi.advanceTimersByTimeAsync(supervisorBudget - 1);
+
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'supervisor' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+      await new Promise<void>((r) => server.close(() => r()));
+    }
+  });
+
   it('supervisor missing: falls through to channels when channels are enabled', async () => {
     const agentId = 'agent-supervisor-missing';
     writeAgentState(agentId, { channelsEnabled: true });
@@ -647,11 +701,13 @@ describe('channel bridge delivery', () => {
     writeAgentState(agentId, { channelsEnabled: true });
     await writePtyToken(agentId);
     writeBridgeTokenSync(agentId);
+    const message = 'timeout fallback';
+    const clientTimeout = supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS;
     const capture: { lastBody?: string } = {};
     const supervisor = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
       status: 200,
       body: 'late',
-      delayMs: 9_000,
+      delayMs: clientTimeout + 1_000,
       capture,
     });
     const channel = await startFakeBridge(join(socketDir, `agent-${agentId}.sock`), {
@@ -660,9 +716,9 @@ describe('channel bridge delivery', () => {
     });
     vi.useFakeTimers();
     try {
-      const delivered = deliverAgentMessage(agentId, 'timeout fallback', 'caller-timeout');
+      const delivered = deliverAgentMessage(agentId, message, 'caller-timeout');
       await vi.waitFor(() => expect(capture.lastBody).toBeDefined());
-      await vi.advanceTimersByTimeAsync(8_100);
+      await vi.advanceTimersByTimeAsync(clientTimeout + 100);
       await expect(delivered).resolves.toEqual({ ok: true, path: 'channels' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'channel' });

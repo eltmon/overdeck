@@ -8,6 +8,12 @@ this path because it requires an interactive Claude session; the in-process
 unit tests in `__tests__/overdeck-bridge.test.ts` and
 `../__tests__/deliver-agent-message.test.ts` are the automated layer.
 
+The preferred PTY path derives both supervisor waits and the client deadline
+from `injection-budget.ts`: echo and settle windows scale with payload size, and
+the client always waits longer than the supervisor's worst-case injection path.
+Accepted messages are capped at 262,144 characters so a failed echo can always
+purge the complete composer contents before a retry.
+
 ## Prerequisites
 
 - `claude` on PATH and authenticated against an Anthropic provider
@@ -71,6 +77,16 @@ unit tests in `__tests__/overdeck-bridge.test.ts` and
      the PTY supervisor socket for this disposable smoke-test agent, then send a
      second `pan tell` and expect `path: 'channel'` plus the bridge companion
      line.
+
+6. **Fork a large summary into Codex.**
+   - Create a summary fork whose generated summary exceeds 8 KB and targets a
+     Codex conversation.
+   - Confirm the first turn submits without a second delivery: the conversation
+     transcript gains the summary prompt, the terminal composer no longer shows
+     its tail, and the conversation does not retain `forkStatus = 'failed'`.
+   - If the composer keeps the summary after delivery, confirm the fork pipeline
+     sends a standalone Enter. Two unsuccessful nudges must surface an actionable
+     `forkError` while leaving the live terminal available for recovery.
 
 ## Expected log signatures
 

@@ -110,6 +110,7 @@ import {
   resetIssueTransition,
 } from '../../../lib/overdeck/issue-transitions.js';
 import { bulkCloseOut, closeOutIssue } from '../../../lib/overdeck/issue-close-out.js';
+import { DOD_ROWS, type DodRowId } from '../../../lib/lifecycle/dod.js';
 import {
   analyzeIssue,
   getIssueTasks,
@@ -572,7 +573,24 @@ const postIssueCloseOutRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
 
-    return yield* closeOutIssue(id);
+    const text = yield* request.text;
+    let body: { acceptedRows?: unknown } = {};
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+    const validRows = DOD_ROWS.filter(row => row.overridable).map(row => row.id);
+    if (body.acceptedRows !== undefined && (
+      !Array.isArray(body.acceptedRows) ||
+      body.acceptedRows.some(row => typeof row !== 'string' || !validRows.includes(row as DodRowId))
+    )) {
+      return jsonResponse({ error: `Invalid acceptedRows; valid ids: ${validRows.join(', ')}`, validRows }, { status: 400 });
+    }
+    return yield* closeOutIssue(id, {
+      acceptedRows: (body.acceptedRows ?? []) as DodRowId[],
+      acceptedBy: 'dashboard-operator',
+    });
   })),
 );
 
