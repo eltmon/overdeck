@@ -9,6 +9,7 @@ import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, sessionExists, sessionExistsSync } from '../tmux.js';
+import { flagCodexAgentAuthBurned, paneShowsCodexAuthBurn } from '../codex-auth.js';
 
 const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
 const REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS = 60 * 1000;
@@ -382,6 +383,13 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     if (!outputWrittenForThisRun && runtimeState?.state === 'idle') {
       const tail = await Effect.runPromise(capturePane(agentId, 100)).catch(() => '');
       contextOverflowDetected = isContextOverflowTail(tail);
+      // PAN-2285: a convoy reviewer wedged on a revoked Codex refresh token shows
+      // the burn markers in its pane. The idle-no-output path below already fails
+      // this reviewer; flag the native auth as burned so the CodexAuthBanner
+      // fires and the operator is pointed at re-authentication.
+      if (paneShowsCodexAuthBurn(tail)) {
+        flagCodexAgentAuthBurned(agentId);
+      }
     }
 
     let signal: 'ready' | 'failed' | 'timeout' | null = null;

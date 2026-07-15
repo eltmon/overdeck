@@ -86,6 +86,43 @@ This catches **burned tokens** — when the refresh token was consumed by anothe
 
 If this string is found, the status is reported as `burned`.
 
+### 3. Native Store + Live Pane Burn (PAN-2285)
+
+The status endpoint also probes the codex CLI's own **native** credential at
+`~/.codex/auth.json` — decoding the `access_token` JWT `exp` — and reports
+`expired`/`missing` for that store. The native and CLIProxy statuses are merged
+into the single worst state the banner reacts to (`burned` > `expired` > `valid`
+> `missing` > `unknown`), because a global `codex login` heals both.
+
+A **revoked refresh token** is invisible statically: the codex CLI keeps an
+unexpired access-token JWT while its refresh token is dead, and the failure
+(`token_invalidated` / "your refresh token was revoked") never lands in the
+rollout JSONL — only in the live TUI pane. The deacon pane patrol greps each
+codex agent's pane for those markers; on a match it marks the agent **troubled**
+(never auto-killed or auto-respawned) and flags the native store so the endpoint
+reports `burned` with the affected agent ids. A global `codex login` clears the
+flags (the native file's newer write prunes them).
+
+---
+
+## Per-Agent Codex Homes & the Shared Token Family (PAN-2285)
+
+Codex-harness agents run with a per-agent `CODEX_HOME` at
+`~/.overdeck/agents/<id>/codex-home/`. Its `auth.json` is a **symlink** to the
+global `~/.codex/auth.json` (created/migrated idempotently by `initCodexHome()`
+in `src/lib/runtimes/codex.ts` on every spawn and resume). Earlier builds
+*copied* the file once, which forked the OAuth refresh-token family — OpenAI
+rotates refresh tokens on every refresh, so once the global side rotated, every
+stale per-agent copy was revoked and its agent wedged forever in a 401 loop.
+
+The symlink keeps all agents on one refresh chain: the codex CLI persists a
+refresh **in place** (open+truncate+write, no temp-file rename — see
+`codex-rs/login/src/auth/storage.rs`), so a refresh writes through the symlink
+into the global file and the link survives. A single global `codex login` then
+heals every agent at once. Fresh codex spawns are **refused** while the native
+store is missing/expired or any agent is currently burned, with an error that
+points at the banner / `codex login`.
+
 ---
 
 ## Re-Authentication Flow
