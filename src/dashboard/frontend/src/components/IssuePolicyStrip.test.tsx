@@ -9,7 +9,11 @@ function response(body: unknown): Response {
 
 const defaults = {
   review: { override: { reviewMode: null, reReviewScope: null, reviewModel: null }, resolved: { reviewMode: 'full', reReviewScope: 'changed', reviewModel: null } },
-  staffing: { override: { workModel: null }, resolved: { model: 'gpt-5.5', tiered: true, source: 'default', recordedModel: 'gpt-5.5' } },
+  staffing: {
+    override: { workModel: null },
+    tieredExecution: { effective: true, source: 'global', override: null },
+    resolved: { model: 'gpt-5.5', tiered: true, source: 'default', recordedModel: 'gpt-5.5' },
+  },
   swarm: { configured: null, resolved: { mode: 'off', source: { mode: 'default' } } },
 };
 
@@ -95,15 +99,62 @@ describe('IssuePolicyStrip', () => {
     expect(screen.queryByLabelText('Re-review scope for this issue')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['issue-override', 'on (issue)'],
+    ['plan-metadata', 'on (plan)'],
+    ['global', 'on (global)'],
+  ] as const)('renders the Standing crew default from the %s source', async (source, label) => {
+    fixtures.staffing.tieredExecution.source = source;
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    expect(within(screen.getByLabelText('Standing crew routing for this issue')).getByRole('button', { name: `Default · ${label}` })).toBeInTheDocument();
+  });
+
+  it('writes and displays a Standing crew override only when explicitly configured', async () => {
+    fixtures.staffing.tieredExecution.override = 'on';
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+
+    const strip = await screen.findByTestId('issue-policy-strip');
+    expect(within(strip).getByRole('button', { name: /crew · on/i })).toBeInTheDocument();
+    fireEvent.click(within(strip).getByRole('button', { name: 'Issue policies' }));
+    fireEvent.click(within(screen.getByLabelText('Standing crew routing for this issue')).getByRole('button', { name: 'Off' }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workspaces/PAN-2681/tiered-execution', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({ override: 'off' }),
+    })));
+  });
+
+  it('clears the Standing crew override from the row and Reset all', async () => {
+    fixtures.staffing.tieredExecution.override = 'off';
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset standing crew to default' }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workspaces/PAN-2681/tiered-execution', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({ override: null }),
+    })));
+
+    vi.mocked(global.fetch).mockClear();
+    fireEvent.click(screen.getByRole('button', { name: 'Reset all to defaults' }));
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledWith('/api/workspaces/PAN-2681/tiered-execution', expect.objectContaining({
+      method: 'PATCH',
+      body: JSON.stringify({ override: null }),
+    })));
+  });
+
   it('preserves every affordance from the five-select policy strip', async () => {
     fixtures.review.override = { reviewMode: 'full', reReviewScope: 'all', reviewModel: 'gpt-5.5' };
     fixtures.staffing.override.workModel = 'claude-sonnet-5';
     fixtures.staffing.resolved.recordedModel = 'gpt-5.5';
     fixtures.swarm.configured = { mode: 'always' };
+    fixtures.staffing.tieredExecution.override = 'on';
 
     render(<IssuePolicyStrip issueId="PAN-2681" />);
     const strip = await screen.findByTestId('issue-policy-strip');
-    expect(within(strip).getByText('5')).toBeInTheDocument();
+    expect(within(strip).getByText('6')).toBeInTheDocument();
     expect(within(strip).getByRole('button', { name: /review · full/i })).toBeInTheDocument();
     expect(within(strip).getByRole('button', { name: 'restart pending' })).toBeInTheDocument();
 
@@ -114,6 +165,7 @@ describe('IssuePolicyStrip', () => {
       'Review model for this issue',
       'Work model for this issue',
       'Swarm mode for this issue',
+      'Standing crew routing for this issue',
     ];
     for (const ariaLabel of legacyControls) expect(screen.getByLabelText(ariaLabel)).toBeInTheDocument();
 
@@ -123,6 +175,7 @@ describe('IssuePolicyStrip', () => {
       'Reset review model to default',
       'Reset work model to default',
       'Reset swarm mode to default',
+      'Reset standing crew to default',
     ]) expect(screen.getByRole('button', { name: accessibleName })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Reset all to defaults' }));
@@ -135,6 +188,10 @@ describe('IssuePolicyStrip', () => {
         ['/api/issues/PAN-2681/staffing', expect.objectContaining({ body: JSON.stringify({ workModel: null }) })],
         ['/api/issues/PAN-2681/swarm-policy', expect.objectContaining({ body: JSON.stringify({ value: null }) })],
       ]));
+      expect(vi.mocked(global.fetch).mock.calls).toContainEqual([
+        '/api/workspaces/PAN-2681/tiered-execution',
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ override: null }) }),
+      ]);
     });
     expect(screen.getByText('The work-model override applies to the next spawn; running agents are never restarted automatically.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Restart agent with new staffing' })).toBeInTheDocument();
