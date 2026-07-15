@@ -16,33 +16,33 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:33:19.373Z",
+  "updated": "2026-07-15T15:35:28.028Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:33:19.129Z",
-    "inspectNotes": "Inspecting item injection-budget"
+    "updatedAt": "2026-07-15T15:35:27.865Z",
+    "inspectNotes": "Inspection error for bead injection-budget: tmux session inspect-pan-2568-injection-budget exited before producing a verdict. No verdict was produced."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1353774,
-            "output": 3194,
-            "cacheRead": 1165312,
+            "input": 1608506,
+            "output": 3564,
+            "cacheRead": 1408768,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 19629724,
-            "output": 27252,
-            "cacheRead": 19170560,
+            "input": 20795917,
+            "output": 28666,
+            "cacheRead": 20309504,
             "cacheWrite": 0
           }
         },
@@ -56,10 +56,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16038,
-            "output": 7705,
-            "cacheRead": 726123,
-            "cacheWrite": 100556
+            "input": 16050,
+            "output": 11868,
+            "cacheRead": 1338304,
+            "cacheWrite": 195892
           }
         },
         "work": {
@@ -79,15 +79,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1353774,
-          "output": 3194,
-          "cacheRead": 1165312,
+          "input": 1608506,
+          "output": 3564,
+          "cacheRead": 1408768,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 19629724,
-          "output": 27252,
-          "cacheRead": 19170560,
+          "input": 20795917,
+          "output": 28666,
+          "cacheRead": 20309504,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -97,10 +97,10 @@
           "cacheWrite": 148063
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16038,
-          "output": 7705,
-          "cacheRead": 726123,
-          "cacheWrite": 100556
+          "input": 16050,
+          "output": 11868,
+          "cacheRead": 1338304,
+          "cacheWrite": 195892
         },
         "custom/MiniMax-M3": {
           "input": 248850,
@@ -116,8 +116,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 29.353378,
-        "pricingAsOf": "2026-07-15T15:33:19.342Z"
+        "usd": 30.503946,
+        "pricingAsOf": "2026-07-15T15:35:28.002Z"
       }
     },
     "merges": [],
