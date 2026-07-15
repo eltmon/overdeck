@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:37:58.323Z",
-  "updated": "2026-07-15T14:36:28.963Z",
+  "updated": "2026-07-15T14:37:50.481Z",
   "pipeline": {
     "issueId": "PAN-2713",
     "reviewStatus": "pending",
@@ -81,16 +81,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "deploy-docs": {
-        "writerId": "agent-pan-2713",
-        "agentId": "agent-pan-2713",
-        "pid": 1039158,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:36:28.963Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2713",
@@ -168,6 +160,17 @@
         "outcome": "completed",
         "reason": "Gated post-merge Step 0 through staleness and deploy-window decisions while preserving stale-clear/unknown restart behavior and in-process fallback; lowered the merge-agent file-size baseline after shrinking the file.",
         "releasedAt": "2026-07-15T14:36:14.874Z"
+      },
+      {
+        "writerId": "agent-pan-2713",
+        "agentId": "agent-pan-2713",
+        "pid": 1039158,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:36:28.963Z",
+        "itemId": "deploy-docs",
+        "outcome": "completed",
+        "reason": "Updated the Definition of Done with mechanical deploy owners and visible signals, and documented auto-deploy configuration, safety behavior, logging, signal-only mode, and the manual reload door.",
+        "releasedAt": "2026-07-15T14:37:50.481Z"
       }
     ],
     "statusReasons": {
@@ -198,6 +201,10 @@
       "step0-deploy-gating": {
         "reason": "Gated post-merge Step 0 through staleness and deploy-window decisions while preserving stale-clear/unknown restart behavior and in-process fallback; lowered the merge-agent file-size baseline after shrinking the file.",
         "updatedAt": "2026-07-15T14:36:14.874Z"
+      },
+      "deploy-docs": {
+        "reason": "Updated the Definition of Done with mechanical deploy owners and visible signals, and documented auto-deploy configuration, safety behavior, logging, signal-only mode, and the manual reload door.",
+        "updatedAt": "2026-07-15T14:37:50.481Z"
       }
     }
   },
@@ -237,6 +244,8 @@
     "step0-deploy-gating.step0-deploy-gating.ac3": "completed",
     "step0-deploy-gating.step0-deploy-gating.ac4": "completed",
     "step0-deploy-gating.step0-deploy-gating.ac5": "completed",
-    "deploy-docs": "running"
+    "deploy-docs": "completed",
+    "deploy-docs.deploy-docs.ac1": "completed",
+    "deploy-docs.deploy-docs.ac2": "completed"
   }
 }
