@@ -167,9 +167,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T17:31:44.706Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T17:33Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T17:33:22.742Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T17:33:22Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2710\n\n# Review Synthesis — PAN-2710 — 2026-07-15T17:36:00-04:00\n\n## Verdict: CHANGES REQUESTED — an issue absent for 24 hours loses failed-command idempotency and can retry the same GitHub run\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ecca922c/context.json\n- Branch: feature/pan-2710\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710\n- HEAD reviewed: ecca922cfc951338f50eb35c75f0bba967df8037\n- Cycle number: 6\n- Prior cycle SHA: 97ec41d2d63059ea8789c4b15386d7bbe9d87e05\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ecca922c/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ecca922c/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ecca922c/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ecca922c/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] A candidate absent for 24 hours loses failed-command idempotency — `src/dashboard/server/services/stale-check-retrigger-service.ts:53`\nThe new `failedRunsByIssue` pruning deletes an issue's exact failed-run IDs after the issue remains outside the current candidate set for `RUN_STATE_RETENTION_MS`. Candidate absence does not prove that the GitHub run changed: the same attempt-1 run can return after a pipeline transition or temporarily cleared blocker. Once the bucket expires, the service invokes `gh run rerun` again for that unchanged run, violating the explicit one-attempt then manual-fallback rule. Preserve exact failed IDs until the current GitHub head/run set proves they are irrelevant, keep the empty-result guard for adapter failures, and add a fake-timer regression test covering an absence longer than 24 hours followed by restoration of the same run.\n\n## Non-blocking Findings\nNone.\n\n## Scope Note\nThe cycle-6 convergence gate was applied against `97ec41d2d63059ea8789c4b15386d7bbe9d87e05`. The blocker survives because `FailedRuns.lastSeenAt` and inactive-bucket expiry were introduced in this cycle. It could not have been raised in cycle 1 because the original implementation had neither candidate-absence expiry nor the current exact-ID lifecycle. The prior high-watermark ordering and permanent historical-retention blockers are resolved by this revision.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2710/.pan/review/agent-pan-2710-review-ecca922c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2710 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -196,7 +209,7 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T17:32:22.439Z",
+  "updated": "2026-07-15T17:33:22.743Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "reviewing",
