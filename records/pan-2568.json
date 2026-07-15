@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T14:52:55.331Z",
+  "updated": "2026-07-15T14:55:19.016Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -105,7 +105,11 @@
     "tmux-verify-helpers.tmux-verify-helpers.ac1": "completed",
     "tmux-verify-helpers.tmux-verify-helpers.ac2": "completed",
     "tmux-verify-helpers.tmux-verify-helpers.ac3": "completed",
-    "fork-enter-nudge": "running"
+    "fork-enter-nudge": "completed",
+    "fork-enter-nudge.fork-enter-nudge.ac1": "completed",
+    "fork-enter-nudge.fork-enter-nudge.ac2": "completed",
+    "fork-enter-nudge.fork-enter-nudge.ac3": "completed",
+    "fork-enter-nudge.fork-enter-nudge.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -118,16 +122,8 @@
     }
   },
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "fork-enter-nudge": {
-        "writerId": "agent-pan-2568",
-        "agentId": "agent-pan-2568",
-        "pid": 1330150,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T14:52:55.331Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
@@ -139,12 +135,27 @@
         "outcome": "completed",
         "reason": "Exported capturePaneText and extracted deliveryVerifyLine without changing sendKeys verification behavior; typecheck and lint pass",
         "releasedAt": "2026-07-15T14:52:40.107Z"
+      },
+      {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 1330150,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:52:55.331Z",
+        "itemId": "fork-enter-nudge",
+        "outcome": "completed",
+        "reason": "Added pane-verified standalone Enter recovery with two-nudge cap, composer-clear detection, stranded result, and fake-timer regression tests",
+        "releasedAt": "2026-07-15T14:55:19.016Z"
       }
     ],
     "statusReasons": {
       "tmux-verify-helpers": {
         "reason": "Exported capturePaneText and extracted deliveryVerifyLine without changing sendKeys verification behavior; typecheck and lint pass",
         "updatedAt": "2026-07-15T14:52:40.107Z"
+      },
+      "fork-enter-nudge": {
+        "reason": "Added pane-verified standalone Enter recovery with two-nudge cap, composer-clear detection, stranded result, and fake-timer regression tests",
+        "updatedAt": "2026-07-15T14:55:19.016Z"
       }
     }
   }
