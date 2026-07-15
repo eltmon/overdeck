@@ -474,10 +474,10 @@
       "tests/unit/lib/pan-dir/cutover-behavioral.test.ts",
       "tsdown.config.ts"
     ],
-    "recordedAt": "2026-07-15T14:11:01.254Z"
+    "recordedAt": "2026-07-15T14:14:06.885Z"
   },
   "created": "2026-07-12T16:30:19.031Z",
-  "updated": "2026-07-15T14:14:00.774Z",
+  "updated": "2026-07-15T14:14:06.887Z",
   "pipeline": {
     "issueId": "PAN-2597",
     "reviewStatus": "failed",
