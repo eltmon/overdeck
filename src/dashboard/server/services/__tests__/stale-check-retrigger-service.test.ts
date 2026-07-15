@@ -11,7 +11,13 @@ vi.mock('../../../../lib/overdeck/review-status-sync.js', () => ({
 vi.mock('../../../../lib/cloister/stale-check-github.js', () => ({
   listRecentMainRuns: mocks.mainRuns,
   getPrHead: mocks.prHead,
-  listPrHeadFailingRuns: mocks.prRuns,
+  probePrHeadFailingRuns: async (...args: unknown[]) => {
+    try {
+      return { ok: true, runs: await mocks.prRuns(...args) };
+    } catch {
+      return { ok: false };
+    }
+  },
   rerunFailedRun: mocks.rerun,
 }));
 

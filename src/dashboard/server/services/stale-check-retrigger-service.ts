@@ -3,8 +3,8 @@ import { getMergeBlockerReconcileCandidates } from '../../../lib/overdeck/review
 import { computeRedWindows, selectRerunCandidates, type RedWindow } from '../../../lib/cloister/stale-check-classifier.js';
 import {
   getPrHead,
-  listPrHeadFailingRuns,
   listRecentMainRuns,
+  probePrHeadFailingRuns,
   rerunFailedRun,
 } from '../../../lib/cloister/stale-check-github.js';
 
@@ -68,7 +68,9 @@ async function pruneDepartedFailedRuns(state: ServiceState, issueIds: Set<string
       state.failedRunsByIssue.delete(issueId);
       continue;
     }
-    const runs = await listPrHeadFailingRuns(failedRuns.ref.repo, head.headRefName, head.headRefOid);
+    const result = await probePrHeadFailingRuns(failedRuns.ref.repo, head.headRefName, head.headRefOid);
+    if (!result.ok) continue;
+    const runs = result.runs;
     if (runs.length === 0) {
       state.failedRunsByIssue.delete(issueId);
       continue;
@@ -129,7 +131,9 @@ async function tickOnce(state: ServiceState): Promise<void> {
         state.lastEvaluated.set(candidate.issueId, now);
         continue;
       }
-      const runs = await listPrHeadFailingRuns(ref.repo, head.headRefName, head.headRefOid);
+      const result = await probePrHeadFailingRuns(ref.repo, head.headRefName, head.headRefOid);
+      if (!result.ok) continue;
+      const runs = result.runs;
       const currentRunIds = new Set(runs.map((run) => run.databaseId));
       const failedRuns = state.failedRunsByIssue.get(candidate.issueId);
       if (failedRuns && currentRunIds.size === 0) {
