@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-15T16:00:43.105Z",
+  "updated": "2026-07-15T16:03:22.780Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "gh-run-adapter": {
-        "writerId": "flywheel-orchestrator",
-        "agentId": "flywheel-orchestrator",
-        "pid": 2731738,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T16:00:43.105Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2710",
@@ -116,12 +108,27 @@
         "outcome": "completed",
         "reason": "Added pure per-workflow red-window classification and exhaustive synchronous candidate-selection tests",
         "releasedAt": "2026-07-15T15:26:27.559Z"
+      },
+      {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 2731738,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T16:00:43.105Z",
+        "itemId": "gh-run-adapter",
+        "outcome": "completed",
+        "reason": "Added async gh run/PR adapter with current-head filtering, safe fallbacks, warnings, and mocked unit coverage",
+        "releasedAt": "2026-07-15T16:03:22.780Z"
       }
     ],
     "statusReasons": {
       "red-window-classifier": {
         "reason": "Added pure per-workflow red-window classification and exhaustive synchronous candidate-selection tests",
         "updatedAt": "2026-07-15T15:26:27.559Z"
+      },
+      "gh-run-adapter": {
+        "reason": "Added async gh run/PR adapter with current-head filtering, safe fallbacks, warnings, and mocked unit coverage",
+        "updatedAt": "2026-07-15T16:03:22.780Z"
       }
     }
   },
@@ -131,6 +138,10 @@
     "red-window-classifier.red-window-classifier.ac2": "completed",
     "red-window-classifier.red-window-classifier.ac3": "completed",
     "red-window-classifier.red-window-classifier.ac4": "completed",
-    "gh-run-adapter": "running"
+    "gh-run-adapter": "completed",
+    "gh-run-adapter.gh-run-adapter.ac1": "completed",
+    "gh-run-adapter.gh-run-adapter.ac2": "completed",
+    "gh-run-adapter.gh-run-adapter.ac3": "completed",
+    "gh-run-adapter.gh-run-adapter.ac4": "completed"
   }
 }
