@@ -92,7 +92,7 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:12:41.800Z",
+  "updated": "2026-07-15T16:12:42.646Z",
   "pipeline": {
     "issueId": "PAN-2715",
     "reviewStatus": "pending",
@@ -102,7 +102,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:12:41.740Z",
+    "updatedAt": "2026-07-15T16:12:42.599Z",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
     "reviewRequestedAt": "2026-07-15T16:10:47.225Z",
@@ -226,7 +226,7 @@
       },
       "costAtCloseOut": {
         "usd": 46.946721000000004,
-        "pricingAsOf": "2026-07-15T16:12:41.794Z"
+        "pricingAsOf": "2026-07-15T16:12:42.639Z"
       }
     },
     "merges": [
