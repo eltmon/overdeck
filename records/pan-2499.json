@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T15:22:32.680Z",
+  "updated": "2026-07-15T15:23:46.281Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -21,8 +21,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:22:32.613Z",
-    "inspectNotes": "Operator reconciliation (PAN-2724): supervisor verified all five ACs for bead issue-view-model at commit b50e3ba5; original checkpoint was misattributed by the notes parser. This re-lands the verdict for bead issue-view-model."
+    "updatedAt": "2026-07-15T15:23:40.724Z",
+    "inspectNotes": "Operator reconciliation (PAN-2724): supervisor verified all five ACs for bead issue-view-model at commit b50e3ba5; re-landing the misattributed verdict for bead issue-view-model."
   },
   "closeOut": {
     "usage": {
@@ -43,10 +43,10 @@
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 27,
-            "output": 15487,
-            "cacheRead": 1730021,
-            "cacheWrite": 27569
+            "input": 37,
+            "output": 19997,
+            "cacheRead": 5334959,
+            "cacheWrite": 32270
           }
         },
         "plan": {
@@ -88,10 +88,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 25998,
-          "output": 70924,
-          "cacheRead": 7943873,
-          "cacheWrite": 432038
+          "input": 26008,
+          "output": 75434,
+          "cacheRead": 11548811,
+          "cacheWrite": 436739
         },
         "anthropic/claude-sonnet-5": {
           "input": 16839,
@@ -107,8 +107,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 66.414158,
-        "pricingAsOf": "2026-07-15T15:22:32.667Z"
+        "usd": 70.303459,
+        "pricingAsOf": "2026-07-15T15:23:42.517Z"
       }
     },
     "merges": [],
