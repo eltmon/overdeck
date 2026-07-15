@@ -19,9 +19,10 @@ import { Effect } from 'effect';
 
 import chalk from 'chalk';
 import { spawn } from 'child_process';
-import { dirname, join } from 'path';
+import { dirname, join, parse, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync } from 'fs';
+import { isWorkspaceRepoRoot } from '../../dashboard/server/identity.js';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
@@ -65,6 +66,29 @@ function resolveScope(options: RestartOptions): 'dashboard' | 'cliproxy' | 'trae
     process.exit(2);
   }
   return (flags[0] as any) || 'dashboard';
+}
+
+export function resolveGitRepoRoot(cwd: string): string | null {
+  let candidate = resolve(cwd);
+  const filesystemRoot = parse(candidate).root;
+  while (true) {
+    if (existsSync(join(candidate, '.git'))) return candidate;
+    if (candidate === filesystemRoot) return null;
+    candidate = dirname(candidate);
+  }
+}
+
+function refuseWorkspaceDashboardRestart(cwd: string): boolean {
+  const repoRoot = resolveGitRepoRoot(cwd);
+  if (!repoRoot || !isWorkspaceRepoRoot(repoRoot)) return false;
+
+  const primaryRepoRoot = dirname(dirname(repoRoot));
+  console.error(chalk.red(
+    `Refusing to restart the host dashboard from workspace checkout ${repoRoot}. ` +
+      `Run this command from the primary checkout at ${primaryRepoRoot}.`,
+  ));
+  process.exitCode = 2;
+  return true;
 }
 
 function resolveNode22(): string {
@@ -185,6 +209,9 @@ export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = pr
 export async function restartCommand(options: RestartOptions): Promise<void> {
   const startedAt = Date.now();
   const scope = resolveScope(options);
+  if ((scope === 'dashboard' || scope === 'full') && refuseWorkspaceDashboardRestart(process.cwd())) {
+    return;
+  }
   const config = readPlatformConfigSync();
   const healthTimeoutMs = options.healthTimeout
     ? parseInt(options.healthTimeout, 10)
