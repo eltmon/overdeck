@@ -42,9 +42,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-15T10:18:48.564Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-15T10:23Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-15T10:23:42.396Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-15T10:23:42.438Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-15T10:23:42Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2683\n\n# Review Synthesis — PAN-2683 — 2026-07-15T10:34:00-04:00\n\n## Verdict: CHANGES REQUESTED — malformed plan tiered-execution metadata is silently displayed as the global policy\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-b097b3f7/context.json`\n- Branch: `feature/pan-2683`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683`\n- HEAD reviewed: `b097b3f785a7046a57f43b13bf948e29787ed516`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-b097b3f7/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-b097b3f7/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-b097b3f7/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-b097b3f7/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness, requirements] Malformed plan tiered-execution values silently resolve as global — `src/lib/agents/tier-table.ts:152`\n\n`resolveTieredExecutionBlock` returns the global setting for every plan metadata value other than `on` or `off`, while the established `resolveTieredExecutionEnabled` contract throws `TieredExecutionConfigError` for a present malformed value. The new test at `src/lib/agents/__tests__/tier-table.test.ts:72` explicitly locks in that inconsistent fallback. Because the new helper feeds the staffing GET response, the Policies UI can report a global effective policy for an issue that spawn-time resolution rejects, violating D-R and NFR-1. Both the helper and its malformed-value test are additions in this PR, so the finding survives the mandatory PR-scope gate.\n\nThe fix should preserve issue-override precedence while sharing the established plan-value validation semantics; malformed plan metadata must throw when no valid issue override supersedes it.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security found no vulnerabilities or advisories.\n- Performance found no material latency, memory, concurrency, or render-scaling regressions.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2683/.pan/review/agent-pan-2683-review-b097b3f7/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2683 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -67,7 +85,7 @@
     "recordedAt": "2026-07-15T09:57:51.722Z"
   },
   "created": "2026-07-15T06:29:06.400Z",
-  "updated": "2026-07-15T10:21:29.195Z",
+  "updated": "2026-07-15T10:23:42.438Z",
   "pipeline": {
     "issueId": "PAN-2683",
     "reviewStatus": "reviewing",
