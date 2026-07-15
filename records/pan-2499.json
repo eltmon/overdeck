@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:46:20.100Z",
+  "updated": "2026-07-15T14:46:22.455Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -139,7 +139,8 @@
     "ship-progress": "completed",
     "ship-progress.ship-progress.ac1": "completed",
     "ship-progress.ship-progress.ac2": "completed",
-    "ship-progress.ship-progress.ac3": "completed"
+    "ship-progress.ship-progress.ac3": "completed",
+    "verification-gates": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -165,8 +166,16 @@
     }
   },
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "verification-gates": {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 1191820,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T14:46:22.455Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
