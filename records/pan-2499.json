@@ -11,33 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T14:39:55.444Z",
+  "updated": "2026-07-15T14:41:37.293Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T14:39:55.352Z",
-    "inspectNotes": "Item issue-view-model BLOCKED: commit 7f45661b touches only src/dashboard/frontend/src/components/issue-view/inventory.ts (adds ISSUE_VIEW_INVENTORY manifest + IssueViewInventoryEntry type, +60/-3 lines). It makes no changes to useIssueView.ts, types.ts, derivations.ts, or index.ts. None of AC1-5 (populated IssueViewModel with ten sub-objects, agents[].active/ship.status derivation, hook reuse of queries.ts with no new useQuery keys, single exported isAgentRunning/readyForMerge/mergeStep/stuckReason, operator.needsYou troubled state) are addressed by this diff. git log --follow on useIssueView.ts shows those files were already introduced by an earlier commit (f28e460311), not this one. This commit reads as a no-loss-inventory manifest for a different bead (FR-0 surface lock), not issue-view-model WI-1. Required fix: verify commit routing — resubmit the actual useIssueView/IssueViewModel diff against this bead, or re-file this commit under its correct bead."
+    "updatedAt": "2026-07-15T14:41:37.227Z",
+    "inspectNotes": "Inspecting item issue-view-model"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 664955,
-            "output": 2795,
-            "cacheRead": 548608,
+            "input": 958492,
+            "output": 3385,
+            "cacheRead": 793728,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 4787108,
-            "output": 15357,
-            "cacheRead": 4577280,
+            "input": 6024035,
+            "output": 17091,
+            "cacheRead": 5800192,
             "cacheWrite": 0
           }
         },
@@ -59,10 +59,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16811,
-            "output": 4544,
-            "cacheRead": 1108994,
-            "cacheWrite": 199304
+            "input": 16813,
+            "output": 4763,
+            "cacheRead": 1235888,
+            "cacheWrite": 199806
           }
         },
         "work": {
@@ -76,15 +76,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 664955,
-          "output": 2795,
-          "cacheRead": 548608,
+          "input": 958492,
+          "output": 3385,
+          "cacheRead": 793728,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4787108,
-          "output": 15357,
-          "cacheRead": 4577280,
+          "input": 6024035,
+          "output": 17091,
+          "cacheRead": 5800192,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -94,10 +94,10 @@
           "cacheWrite": 432038
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16811,
-          "output": 4544,
-          "cacheRead": 1108994,
-          "cacheWrite": 199304
+          "input": 16813,
+          "output": 4763,
+          "cacheRead": 1235888,
+          "cacheWrite": 199806
         },
         "custom/kimi-k2.7-code": {
           "input": 3398495,
@@ -107,8 +107,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 58.859223,
-        "pricingAsOf": "2026-07-15T14:39:55.428Z"
+        "usd": 59.621602,
+        "pricingAsOf": "2026-07-15T14:41:37.279Z"
       }
     },
     "merges": [],
