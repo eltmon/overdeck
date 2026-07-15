@@ -2,6 +2,8 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
+import { listRunningAgentsSync, type AgentState } from '../agents.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import {
   getProjectConfigFromWorkspacePath,
@@ -55,6 +57,30 @@ const defaultMergedRowDeps: MergedRowDeps = {
     ], { encoding: 'utf-8', timeout: 10000 });
     return JSON.parse(stdout);
   },
+};
+
+interface PostMergeRowDeps {
+  readCanonicalState: (ctx: LifecycleContext) => Promise<CanonicalState | null>;
+  readMergeStatus: (issueId: string) => string | undefined;
+  listAgents: () => Array<Pick<AgentState, 'id' | 'issueId' | 'role' | 'status'>>;
+}
+
+const defaultPostMergeRowDeps: PostMergeRowDeps = {
+  readCanonicalState: async ctx => {
+    if (!ctx.github) return null;
+    const { stdout } = await execFileAsync('gh', [
+      'issue', 'view', String(ctx.github.number),
+      '--repo', `${ctx.github.owner}/${ctx.github.repo}`,
+      '--json', 'state,labels',
+    ], { encoding: 'utf-8', timeout: 10000 });
+    const parsed = JSON.parse(stdout) as { state?: string; labels?: Array<string | { name?: string }> };
+    const labels = (parsed.labels ?? [])
+      .map(label => typeof label === 'string' ? label : label.name)
+      .filter((label): label is string => typeof label === 'string');
+    return mapGitHubStateToCanonical(parsed.state ?? 'open', labels);
+  },
+  readMergeStatus: issueId => getReviewStatusSync(issueId)?.mergeStatus,
+  listAgents: listRunningAgentsSync,
 };
 
 const defaultDeps: DodStatusRowDeps = {
@@ -159,4 +185,35 @@ export async function checkMergedRow(
   }
 
   return merged;
+}
+
+export async function checkPostMergeRow(
+  ctx: LifecycleContext,
+  deps: PostMergeRowDeps = defaultPostMergeRowDeps,
+): Promise<DodRowResult> {
+  try {
+    const canonicalState = await deps.readCanonicalState(ctx);
+    const mergeStatus = deps.readMergeStatus(ctx.issueId);
+    const issueId = ctx.issueId.toUpperCase();
+    const runningAgents = deps.listAgents().filter(agent =>
+      agent.issueId.toUpperCase() === issueId &&
+      (agent.role === 'work' || agent.role === 'plan') &&
+      (agent.status === 'starting' || agent.status === 'running'),
+    );
+    const stateObserved = canonicalState
+      ? `canonical state: ${canonicalState}`
+      : `canonical state unavailable; mergeStatus: ${mergeStatus ?? 'missing'}`;
+    const agentsObserved = runningAgents.length > 0
+      ? `running agents: ${runningAgents.map(agent => agent.id).join(', ')}`
+      : 'no running work/planning agents';
+    const lifecycleObserved = canonicalState === 'verifying_on_main' || mergeStatus === 'merged';
+    return result(
+      'post-merge',
+      lifecycleObserved && runningAgents.length === 0 ? 'pass' : 'miss',
+      `${stateObserved}; ${agentsObserved}`,
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return result('post-merge', 'miss', `post-merge evidence unavailable: ${message}`);
+  }
 }

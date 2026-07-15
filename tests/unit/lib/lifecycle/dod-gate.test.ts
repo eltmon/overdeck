@@ -3,6 +3,7 @@ import type { ReviewStatus } from '../../../../src/lib/review-status.js';
 import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
 import {
   checkMergedRow,
+  checkPostMergeRow,
   checkReviewRow,
   checkTestsRow,
   checkVerificationRow,
@@ -151,5 +152,55 @@ describe('Definition-of-Done merged row', () => {
       status: 'pass',
       observed: expect.stringContaining('forge metadata unavailable: gh timed out'),
     });
+  });
+});
+
+describe('Definition-of-Done post-merge row', () => {
+  const ctx = {
+    issueId,
+    projectPath: '/tmp/overdeck',
+    github: { owner: 'eltmon', repo: 'overdeck', number: 2715 },
+  };
+  const clearAgents = () => [];
+
+  it('passes when the issue is verifying on main and issue agents are stopped', async () => {
+    const row = await checkPostMergeRow(ctx, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergeStatus: () => 'merged',
+      listAgents: clearAgents,
+    });
+    expect(row).toMatchObject({ status: 'pass', observed: expect.stringContaining('no running work/planning agents') });
+  });
+
+  it('misses and names running work or planning agents', async () => {
+    const row = await checkPostMergeRow(ctx, {
+      readCanonicalState: async () => 'verifying_on_main',
+      readMergeStatus: () => 'merged',
+      listAgents: () => [
+        { id: 'agent-pan-2715', issueId, role: 'work', status: 'running' },
+        { id: 'planning-pan-2715', issueId, role: 'plan', status: 'starting' },
+      ],
+    });
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('agent-pan-2715');
+    expect(row.observed).toContain('planning-pan-2715');
+  });
+
+  it('misses when neither canonical state nor merge status proves lifecycle completion', async () => {
+    const row = await checkPostMergeRow(ctx, {
+      readCanonicalState: async () => 'in_review',
+      readMergeStatus: () => 'verifying',
+      listAgents: clearAgents,
+    });
+    expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('canonical state: in_review') });
+  });
+
+  it('turns canonical-state probe failures into an observed miss', async () => {
+    const row = await checkPostMergeRow(ctx, {
+      readCanonicalState: async () => { throw new Error('gh timed out'); },
+      readMergeStatus: () => 'merged',
+      listAgents: clearAgents,
+    });
+    expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('gh timed out') });
   });
 });
