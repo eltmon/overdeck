@@ -135,18 +135,19 @@
     "recordedAt": "2026-07-15T16:12:40.858Z"
   },
   "created": "2026-07-15T13:37:41.042Z",
-  "updated": "2026-07-15T16:14:46.650Z",
+  "updated": "2026-07-15T16:17:30.593Z",
   "pipeline": {
     "issueId": "PAN-2715",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T16:13:28.403Z",
+    "updatedAt": "2026-07-15T16:17:30.460Z",
     "reviewNotes": "[correctness] Journal-backed verification passes without the required verified commit — `src/lib/lifecycle/dod-gate.ts:241`",
+    "verificationNotes": "Verification FAILED at test (256518ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2715\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  12:16:00\n   Duration  724ms (transform 113ms, setup 100ms, import 288ms, tests 2ms, environment 251ms)\n\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nfatal: not a git repository (or any of the parent directories): .git\nerror: option '--test-waived <reason>' argument missing\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\nSwitched to a new branch 'overdeck-state'\n",
     "inspectNotes": "Item gate-assemble-wire ack: evaluateDodGate assembled and wired into closeOut() as the first step, blocking with named row ids + --accept-<id> flags before archive/teardown/close/status-clear; dodAcceptedRows records flag/by/at and unblocks; TypeError thrown for non-overridable/unknown accept ids; approve()/close()/deepWipe() untouched (no dod:* steps). dod-gate.test.ts + workflows.test.ts pass (56/56, 1 skipped, 0 failed).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2732",
     "reviewRequestedAt": "2026-07-15T16:13:25.318Z",
@@ -206,28 +207,6 @@
         "tests/unit/lib/pan-dir/closeout-preserve.test.ts"
       ],
       "recordedAt": "2026-07-15T16:10:43.479Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-2b26ba74/security.md",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-2b26ba74/correctness.md",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      },
-      "performance": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-2b26ba74/performance.md",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2715/.pan/review/agent-pan-2715-review-2b26ba74/requirements.md",
-        "atCommit": "2b26ba74ad6977120743ea50b5f43b95b96a84df"
-      }
     }
   },
   "closeOut": {
@@ -241,9 +220,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 53028240,
-            "output": 94625,
-            "cacheRead": 51784960,
+            "input": 56184184,
+            "output": 103488,
+            "cacheRead": 54837760,
             "cacheWrite": 0
           }
         },
@@ -272,9 +251,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53028240,
-          "output": 94625,
-          "cacheRead": 51784960,
+          "input": 56184184,
+          "output": 103488,
+          "cacheRead": 54837760,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -291,8 +270,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 48.467357,
-        "pricingAsOf": "2026-07-15T16:13:28.444Z"
+        "usd": 50.775367,
+        "pricingAsOf": "2026-07-15T16:17:30.533Z"
       }
     },
     "merges": [
@@ -300,8 +279,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 24,
     "claims": {},
