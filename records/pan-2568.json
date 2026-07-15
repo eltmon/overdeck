@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-11T17:44:00.676Z",
-  "updated": "2026-07-15T15:39:10.348Z",
+  "updated": "2026-07-15T15:40:46.056Z",
   "pipeline": {
     "issueId": "PAN-2568",
     "reviewStatus": "pending",
@@ -155,7 +155,10 @@
     "full-length-purge.full-length-purge.ac1": "completed",
     "full-length-purge.full-length-purge.ac2": "completed",
     "full-length-purge.full-length-purge.ac3": "completed",
-    "docs-update": "running"
+    "docs-update": "completed",
+    "docs-update.docs-update.ac1": "completed",
+    "docs-update.docs-update.ac2": "completed",
+    "docs-update.docs-update.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -168,16 +171,8 @@
     }
   },
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "docs-update": {
-        "writerId": "agent-pan-2568",
-        "agentId": "agent-pan-2568",
-        "pid": 2319158,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T15:39:10.348Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2568",
@@ -244,6 +239,17 @@
         "outcome": "completed",
         "reason": "Expanded purge to the shared 262,144-char cap, rejected oversized payloads, scaled purge settle time, and added fake-timer coverage.",
         "releasedAt": "2026-07-15T15:38:44.076Z"
+      },
+      {
+        "writerId": "agent-pan-2568",
+        "agentId": "agent-pan-2568",
+        "pid": 2319158,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T15:39:10.348Z",
+        "itemId": "docs-update",
+        "outcome": "completed",
+        "reason": "Documented the shared injection budget, full-length purge contract, large Codex fork smoke case, standalone-Enter recovery, and actionable stranded-fork status.",
+        "releasedAt": "2026-07-15T15:40:46.056Z"
       }
     ],
     "statusReasons": {
@@ -270,6 +276,10 @@
       "full-length-purge": {
         "reason": "Expanded purge to the shared 262,144-char cap, rejected oversized payloads, scaled purge settle time, and added fake-timer coverage.",
         "updatedAt": "2026-07-15T15:38:44.076Z"
+      },
+      "docs-update": {
+        "reason": "Documented the shared injection budget, full-length purge contract, large Codex fork smoke case, standalone-Enter recovery, and actionable stranded-fork status.",
+        "updatedAt": "2026-07-15T15:40:46.056Z"
       }
     }
   }
