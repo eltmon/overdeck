@@ -1,8 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Route } from 'lucide-react';
 import { type Harness, type SettingsConfig, type TieredExecutionConfig } from '../types';
 import type { SaveStatus } from '../hooks/useAutosavePipeline';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
+import {
+  blendedCost,
+  crewLabel,
+  deriveTierName,
+  DIFFICULTIES,
+  importCrews,
+  serializeCrews,
+  type Crew,
+  type CrewAssignments,
+  type CrewRest,
+} from './tiered-crews';
 
 interface TieredExecutionSectionProps {
   formData: SettingsConfig;
@@ -11,21 +22,12 @@ interface TieredExecutionSectionProps {
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
 }
 
-const DIFFICULTIES = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 const ITEM_KINDS = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
 const HARNESSES: Harness[] = ['claude-code', 'ohmypi', 'codex'];
 const SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
 const CALLOUTS = ['off', 'notify', 'corroborate'] as const;
-const MODEL_OPTIONS = Object.entries(MODELS_BY_PROVIDER).flatMap(([providerId, provider]) =>
-  provider.models.map((model) => ({
-    providerId,
-    providerName: provider.name,
-    id: model.id,
-    name: model.name,
-  })),
-);
-// Defaults must NEVER be a frontier model (fable/opus). MODEL_OPTIONS[0] is
-// the most premium catalog entry, and defaulting new tiers/the supervisor to
+// Defaults must NEVER be a frontier model (fable/opus). The first catalog
+// entries are premium models, and defaulting new crews/the supervisor to
 // it silently burned the operator's Anthropic plan (2026-07-05 incident).
 // Frontier models stay fully selectable — they are just never the unchosen
 // default. Enforced by __tests__/TieredExecutionSection.test.tsx.
@@ -61,7 +63,6 @@ function validationReason(config: TieredExecutionConfig | undefined): string | n
   }
   if (!shouldValidateTierTable) return null;
 
-  const owners = new Map<string, string[]>();
   for (const [tierName, tier] of tiers) {
     if (tier.distribution) {
       if (tier.distribution.length === 0) return `tiered_execution.tiers.${tierName}.distribution must be a non-empty array`;
@@ -70,18 +71,6 @@ function validationReason(config: TieredExecutionConfig | undefined): string | n
     }
     if (!tier.model) return `tiered_execution.tiers.${tierName}.model is required`;
     if (!tier.harness) return `tiered_execution.tiers.${tierName}.harness is required`;
-    if (!Array.isArray(tier.difficulties) || tier.difficulties.length === 0) {
-      return `tiered_execution.tiers.${tierName}.difficulties must contain at least one difficulty`;
-    }
-    for (const difficulty of tier.difficulties) {
-      owners.set(difficulty, [...(owners.get(difficulty) ?? []), tierName]);
-    }
-  }
-
-  for (const difficulty of DIFFICULTIES) {
-    const mapped = owners.get(difficulty) ?? [];
-    if (mapped.length === 0) return `tiered_execution difficulty '${difficulty}' is not mapped to any tier`;
-    if (mapped.length > 1) return `tiered_execution difficulty '${difficulty}' is mapped to multiple tiers: ${mapped.join(', ')}`;
   }
 
   for (const [kind, tierName] of Object.entries(config.by_kind ?? {})) {
@@ -92,80 +81,13 @@ function validationReason(config: TieredExecutionConfig | undefined): string | n
   return null;
 }
 
-function inputDifficultyMap(config: TieredExecutionConfig | undefined): Partial<Record<typeof DIFFICULTIES[number], string>> {
-  const result: Partial<Record<typeof DIFFICULTIES[number], string>> = {};
-  for (const [tierName, tier] of Object.entries(config?.tiers ?? {})) {
-    for (const difficulty of tier.difficulties ?? []) {
-      if (DIFFICULTIES.includes(difficulty)) result[difficulty] = result[difficulty] ? 'multiple' : tierName;
-    }
-  }
-  return result;
-}
-
-function nextTierName(config: TieredExecutionConfig | undefined): string {
-  const existing = new Set(Object.keys(config?.tiers ?? {}));
-  let index = existing.size + 1;
-  while (existing.has(`tier-${index}`)) index += 1;
-  return `tier-${index}`;
-}
-
-function TierNameInput({
-  name,
-  tierNames,
-  onRename,
-}: {
-  name: string;
-  tierNames: string[];
-  onRename: (oldName: string, newName: string) => void;
-}) {
-  const [draft, setDraft] = useState(name);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setDraft(name);
-    setError(null);
-  }, [name]);
-
-  const commit = () => {
-    const nextName = draft.trim();
-    if (!nextName || nextName === name) {
-      setDraft(name);
-      setError(null);
-      return;
-    }
-    if (tierNames.includes(nextName)) {
-      setError('Tier name already exists');
-      return;
-    }
-    setError(null);
-    onRename(name, nextName);
-  };
-
-  return (
-    <label className="space-y-1.5">
-      <span className="text-xs font-medium text-foreground">Tier name</span>
-      <input
-        type="text"
-        value={draft}
-        onBlur={commit}
-        onChange={(event) => {
-          setDraft(event.target.value);
-          setError(null);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') event.currentTarget.blur();
-          if (event.key === 'Escape') {
-            setDraft(name);
-            setError(null);
-            event.currentTarget.blur();
-          }
-        }}
-        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs font-mono text-foreground focus:ring-1 focus:ring-primary"
-      />
-      {error && <p className="text-xs text-destructive">{error}</p>}
-    </label>
-  );
-}
+const DIFFICULTY_SUBTITLES = {
+  trivial: 'typo-level fixes',
+  simple: 'small scoped edits',
+  medium: 'typical tasks',
+  complex: 'multi-file work',
+  expert: 'judgment calls',
+} as const;
 
 export function TieredExecutionSection({
   formData,
@@ -174,14 +96,15 @@ export function TieredExecutionSection({
   onSettingsChange,
 }: TieredExecutionSectionProps) {
   const config = formData.tiered_execution;
-  const tiers = Object.entries(config?.tiers ?? {});
-  const difficultyMap = inputDifficultyMap(config);
+  const normalizedConfig = { ...defaultTieredExecution(config?.enabled ?? false), ...config };
+  const { crews, assign, rest } = importCrews(normalizedConfig);
+  const [openCrewId, setOpenCrewId] = useState<string | null>(null);
   const byKind = config?.by_kind ?? config?.byKind ?? {};
   const reason = validationReason(config);
   const enabled = config?.enabled ?? false;
-  const resolvedState = enabled && !reason ? 'Enabled' : reason ? 'Invalid' : 'Disabled';
   const serverTieredError = saveErrorMessage?.includes('tiered_execution') ? saveErrorMessage : null;
-  const difficultyError = serverTieredError?.includes('tiered_execution difficulty') ? serverTieredError : null;
+  const invalidReason = serverTieredError ?? reason;
+  const resolvedState = !enabled ? 'Off' : invalidReason ? `Invalid — ${invalidReason}` : 'On · valid';
   const supervisorError = serverTieredError?.includes('tiered_execution.supervisor') || reason?.includes('tiered_execution.supervisor')
     ? serverTieredError ?? reason
     : null;
@@ -216,117 +139,22 @@ export function TieredExecutionSection({
     });
   };
 
-  const handleAddTier = () => {
-    const next = currentConfig();
-    const name = nextTierName(next);
-    updateTieredExecution({
-      ...next,
-      tiers: {
-        ...next.tiers,
-        [name]: {
-          model: DEFAULT_MODEL,
-          harness: 'claude-code',
-          difficulties: [],
-        },
-      },
-    });
+  const writeCrews = (nextCrews: readonly Crew[], nextAssign: CrewAssignments, nextRest: CrewRest = rest) => {
+    updateTieredExecution(serializeCrews(nextCrews, nextAssign, nextRest));
   };
 
-  const handleRenameTier = (oldName: string, newName: string) => {
-    if (!newName || newName === oldName) return;
-    const next = currentConfig();
-    if (next.tiers[newName]) return;
-    const { [oldName]: tier, ...rest } = next.tiers;
-    if (!tier) return;
-    updateTieredExecution({
-      ...next,
-      tiers: {
-        ...rest,
-        [newName]: tier,
-      },
-    });
-  };
-
-  const handleTierPatch = (
-    name: string,
-    patch: Partial<TieredExecutionConfig['tiers'][string]>,
-  ) => {
-    const next = currentConfig();
-    const tier = next.tiers[name];
-    if (!tier) return;
-    updateTieredExecution({
-      ...next,
-      tiers: {
-        ...next.tiers,
-        [name]: {
-          ...tier,
-          ...patch,
-        },
-      },
-    });
-  };
-
-  const handleDifficultyToggle = (name: string, difficulty: typeof DIFFICULTIES[number]) => {
-    const tier = config?.tiers?.[name];
-    if (!tier) return;
-    const difficulties = tier.difficulties.includes(difficulty)
-      ? tier.difficulties.filter((entry) => entry !== difficulty)
-      : [...tier.difficulties, difficulty];
-    handleTierPatch(name, { difficulties });
-  };
-
-  type DistributionEntry = { model: string; harness: Harness; weight: number };
-
-  const representativeOf = (entries: DistributionEntry[]): { model: string; harness: Harness } => {
-    const top = entries.reduce((best, entry) => (entry.weight > best.weight ? entry : best));
-    return { model: top.model, harness: top.harness };
-  };
-
-  const handleToggleDistribution = (name: string) => {
-    const tier = config?.tiers?.[name];
-    if (!tier) return;
-    if (tier.distribution) {
-      const { model, harness } = representativeOf(tier.distribution as DistributionEntry[]);
-      handleTierPatch(name, { model, harness, distribution: undefined } as never);
-    } else {
-      handleTierPatch(name, {
-        distribution: [{ model: tier.model, harness: tier.harness, weight: 100 }],
-      } as never);
+  const handleAssignment = (difficulty: typeof DIFFICULTIES[number], crewId: string) => {
+    if (crewId !== 'new') {
+      writeCrews(crews, { ...assign, [difficulty]: crewId });
+      return;
     }
-  };
-
-  const handleDistributionPatch = (name: string, index: number, patch: Partial<DistributionEntry>) => {
-    const tier = config?.tiers?.[name];
-    const entries = (tier?.distribution ?? []) as DistributionEntry[];
-    const next = entries.map((entry, i) => (i === index ? { ...entry, ...patch } : entry));
-    // Keep model/harness = the max-weight representative so save/load
-    // round-trips stay idempotent with the server validator.
-    handleTierPatch(name, { distribution: next, ...representativeOf(next) } as never);
-  };
-
-  const handleDistributionAdd = (name: string) => {
-    const tier = config?.tiers?.[name];
-    if (!tier) return;
-    const entries = (tier.distribution ?? []) as DistributionEntry[];
-    const next = [...entries, { model: tier.model, harness: tier.harness, weight: 0 } as DistributionEntry];
-    handleTierPatch(name, { distribution: next, ...representativeOf(next) } as never);
-  };
-
-  const handleDistributionRemove = (name: string, index: number) => {
-    const tier = config?.tiers?.[name];
-    const entries = (tier?.distribution ?? []) as DistributionEntry[];
-    if (entries.length <= 1) return handleToggleDistribution(name);
-    const next = entries.filter((_, i) => i !== index);
-    handleTierPatch(name, { distribution: next, ...representativeOf(next) } as never);
-  };
-
-  const handleRemoveTier = (name: string) => {
-    const next = currentConfig();
-    const { [name]: _removed, ...tiersWithoutRemoved } = next.tiers;
-    updateTieredExecution({
-      ...next,
-      tiers: tiersWithoutRemoved,
-    });
+    const id = `crew-${crypto.randomUUID()}`;
+    const crew: Crew = { id, model: DEFAULT_MODEL, harness: 'claude-code' };
+    const nextAssign = crews.length === 0
+      ? Object.fromEntries(DIFFICULTIES.map((entry) => [entry, id])) as CrewAssignments
+      : { ...assign, [difficulty]: id };
+    setOpenCrewId(deriveTierName(DIFFICULTIES.filter((entry) => nextAssign[entry] === id)));
+    writeCrews([...crews, crew], nextAssign);
   };
 
   const handleSupervisorPatch = (patch: Partial<NonNullable<TieredExecutionConfig['supervisor']>>) => {
@@ -415,9 +243,9 @@ export function TieredExecutionSection({
       <div className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 rounded-lg bg-muted/20">
           <div>
-            <span className="text-sm font-medium text-foreground">Tiered execution</span>
+            <span className="text-sm font-medium text-foreground">Route work by difficulty</span>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Global default for task routing; issue metadata can override with <code className="font-mono">tiered_execution: on|off</code>.
+              Each difficulty picks one crew. A per-issue override wins over the plan, and the plan wins over this global default.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -436,11 +264,11 @@ export function TieredExecutionSection({
               }`} />
             </button>
             <div className="text-right">
-              <span className={`text-xs font-semibold ${reason ? 'text-destructive' : enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+              <span className={`text-xs font-semibold ${invalidReason ? 'text-destructive' : enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
                 {resolvedState}
               </span>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {tiers.length} tier{tiers.length === 1 ? '' : 's'} configured
+                {crews.length} crew{crews.length === 1 ? '' : 's'} configured
               </p>
             </div>
           </div>
@@ -457,9 +285,9 @@ export function TieredExecutionSection({
           </div>
         )}
 
-        <div className="px-4 py-3 rounded-lg border border-border/70">
+        <div className="px-4 py-3 rounded-lg border border-border/70" aria-label="Difficulty routing board">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <span className="text-sm font-medium text-foreground">Difficulty routing</span>
+            <span className="text-sm font-medium text-foreground">Who handles each difficulty?</span>
             <a
               href="https://github.com/eltmon/overdeck/blob/main/docs/TIERED-EXECUTION.md"
               target="_blank"
@@ -470,175 +298,50 @@ export function TieredExecutionSection({
             </a>
           </div>
           <div className="grid gap-2 grid-cols-2 @xl:grid-cols-5">
-            {DIFFICULTIES.map((difficulty) => (
-              <div key={difficulty} className="rounded-md bg-muted/20 px-3 py-2">
-                <div className="text-xs font-medium text-foreground">{difficulty}</div>
-                <div className="text-xs text-muted-foreground mt-1 font-mono">
-                  {difficultyMap[difficulty] ?? 'unmapped'}
+            {DIFFICULTIES.map((difficulty, index) => {
+              const crew = crews.find((entry) => entry.id === assign[difficulty]);
+              const cost = crew ? blendedCost(crew) : null;
+              return (
+              <div key={difficulty} className="rounded-md border border-border/70 border-t-2 bg-muted/20 px-3 py-2" style={{ borderTopColor: `var(--crew-${String.fromCharCode(97 + index)})` }}>
+                <div className="text-xs font-semibold capitalize text-foreground">{difficulty}</div>
+                <div className="mb-2 text-[11px] text-muted-foreground">{DIFFICULTY_SUBTITLES[difficulty]}</div>
+                <select
+                  required
+                  aria-label={`crew for ${difficulty}`}
+                  value={crew?.id ?? 'new'}
+                  onChange={(event) => handleAssignment(difficulty, event.target.value)}
+                  className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
+                >
+                  {crews.map((entry) => <option key={entry.id} value={entry.id}>{crewLabel(entry)}</option>)}
+                  <option value="new">+ new crew…</option>
+                </select>
+                <div className="mt-2 truncate text-[11px] text-muted-foreground">
+                  {crew ? crewLabel(crew) : 'Choose a crew'}
+                </div>
+                <div className="mt-1 text-[11px] font-medium text-cyan-600 dark:text-cyan-400">
+                  {cost == null ? '—' : `≈ $${cost.toFixed(1)}/1M`}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
-          {difficultyError && (
-            <p className="mt-3 text-xs text-destructive">{difficultyError}</p>
-          )}
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-foreground">Tier table</span>
-            <button
-              type="button"
-              onClick={handleAddTier}
-              className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
-            >
-              Add tier
-            </button>
+            <span className="text-sm font-medium text-foreground">The crews</span>
+            <span className="text-[11px] text-muted-foreground">click a crew to edit · new crews start on Haiku 4.5, never a frontier model</span>
           </div>
-          {tiers.length > 0 ? tiers.map(([name, tier]) => (
-            <div key={name} className="px-4 py-3 rounded-lg border border-border/70">
-              <div className="grid gap-3 @xl:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
-                <TierNameInput name={name} tierNames={tierNames} onRename={handleRenameTier} />
-                {!tier.distribution && (<>
-                <label className="space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Model</span>
-                  <select
-                    value={tier.model}
-                    onChange={(event) => handleTierPatch(name, { model: event.target.value })}
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                  >
-                    {!MODEL_OPTIONS.some((model) => model.id === tier.model) && (
-                      <option value={tier.model}>{tier.model}</option>
-                    )}
-                    {Object.entries(MODELS_BY_PROVIDER).map(([providerId, provider]) => (
-                      <optgroup key={providerId} label={provider.name}>
-                        {provider.models.map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.name}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </label>
-                <label className="space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Harness</span>
-                  <select
-                    value={tier.harness}
-                    onChange={(event) => handleTierPatch(name, { harness: event.target.value as Harness })}
-                    className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                  >
-                    {HARNESSES.map((harness) => (
-                      <option key={harness} value={harness}>{harness}</option>
-                    ))}
-                  </select>
-                </label>
-                </>)}
-                <div className="space-y-1.5">
-                  <span className="text-xs font-medium text-foreground">Difficulties</span>
-                  <div className="flex flex-wrap gap-2">
-                    {DIFFICULTIES.map((difficulty) => (
-                      <label
-                        key={difficulty}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={tier.difficulties.includes(difficulty)}
-                          onChange={() => handleDifficultyToggle(name, difficulty)}
-                          className="h-3.5 w-3.5 accent-primary"
-                        />
-                        {difficulty}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              {tier.distribution && (
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-foreground">Distribution</span>
-                    <span className={`text-xs ${tier.distribution.reduce((sum, entry) => sum + (entry.weight || 0), 0) === 100 ? 'text-muted-foreground' : 'text-destructive'}`}>
-                      Total: {tier.distribution.reduce((sum, entry) => sum + (entry.weight || 0), 0)}% (must total 100)
-                    </span>
-                  </div>
-                  {tier.distribution.map((entry, index) => (
-                    <div key={index} className="grid gap-2 @2xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_90px_70px] items-center">
-                      <select
-                        value={entry.model}
-                        onChange={(event) => handleDistributionPatch(name, index, { model: event.target.value })}
-                        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                      >
-                        {!MODEL_OPTIONS.some((model) => model.id === entry.model) && (
-                          <option value={entry.model}>{entry.model}</option>
-                        )}
-                        {Object.entries(MODELS_BY_PROVIDER).map(([providerId, provider]) => (
-                          <optgroup key={providerId} label={provider.name}>
-                            {provider.models.map((model) => (
-                              <option key={model.id} value={model.id}>{model.name}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                      <select
-                        value={entry.harness}
-                        onChange={(event) => handleDistributionPatch(name, index, { harness: event.target.value as Harness })}
-                        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                      >
-                        {HARNESSES.map((harness) => (
-                          <option key={harness} value={harness}>{harness}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={entry.weight}
-                        onChange={(event) => handleDistributionPatch(name, index, { weight: Number(event.target.value) })}
-                        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary"
-                        aria-label={`weight for entry ${index + 1}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleDistributionRemove(name, index)}
-                        className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-muted-foreground hover:bg-muted/30"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => handleDistributionAdd(name)}
-                    className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
-                  >
-                    Add model
-                  </button>
-                </div>
-              )}
-              {serverTieredError?.includes(`tiers.${name}`) && (
-                <p className="mt-3 text-xs text-destructive">{serverTieredError}</p>
-              )}
-              <div className="mt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleToggleDistribution(name)}
-                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/30"
-                >
-                  {tier.distribution ? 'Use single model' : 'Use distribution'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleRemoveTier(name)}
-                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted/30"
-                >
-                  Remove tier
-                </button>
-              </div>
-            </div>
+          {crews.length > 0 ? crews.map((crew) => (
+            <details key={crew.id} open={openCrewId === crew.id} className="rounded-lg border border-border/70 px-4 py-3">
+              <summary className="cursor-pointer text-xs font-medium text-foreground" onClick={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}>
+                {crewLabel(crew)} · handles {DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id).join(' · ')}
+              </summary>
+              <p className="mt-2 text-xs text-muted-foreground">Crew editing controls appear here.</p>
+            </details>
           )) : (
             <div className="px-4 py-3 rounded-lg border border-border/70 text-xs text-muted-foreground">
-              No tiers are configured; tiered execution remains off unless a valid tier table is added.
+              Choose “+ new crew…” on the board to create the first crew.
             </div>
           )}
         </div>

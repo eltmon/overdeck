@@ -72,118 +72,52 @@ describe('TieredExecutionSection', () => {
 
     expect(screen.getByText('Not saved — fix errors')).toBeTruthy();
     expect(screen.getAllByText("tiered_execution difficulty 'trivial' is not mapped to any tier").length).toBeGreaterThan(0);
-    expect(screen.getByText('Invalid')).toBeTruthy();
+    expect(screen.getByText(/^Invalid — tiered_execution difficulty/)).toBeTruthy();
     expect(screen.getByRole('switch', { name: 'Enable tiered execution' }).getAttribute('aria-checked')).toBe('true');
   });
 
-  it('adds, edits, and removes tiers through tiered_execution.tiers inputs', () => {
+  it('renders five required difficulty columns with the binding subtitles and reassigns one crew', () => {
     const onSettingsChange = vi.fn();
     const formData = baseSettings({
       tiered_execution: {
-        enabled: false,
-        tiers: {},
+        enabled: true,
+        tiers: {
+          cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+          capable: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+        },
         by_kind: {},
+        supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
         replay_threshold: 0.5,
       },
     });
-    const { rerender } = render(
+    render(
       <TieredExecutionSection
         formData={formData}
         onSettingsChange={onSettingsChange}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add tier' }));
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['tier-1']).toMatchObject({
-      harness: 'claude-code',
-      difficulties: [],
-    });
+    expect(screen.getAllByLabelText(/^crew for /)).toHaveLength(5);
+    for (const subtitle of ['typo-level fixes', 'small scoped edits', 'typical tasks', 'multi-file work', 'judgment calls']) {
+      expect(screen.getByText(subtitle)).toBeTruthy();
+    }
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    expect(screen.getAllByLabelText(/^crew for /).every((select) => select.hasAttribute('required'))).toBe(true);
 
-    const withTier = onSettingsChange.mock.calls.at(-1)![0] as SettingsConfig;
-    rerender(
-      <TieredExecutionSection
-        formData={withTier}
-        onSettingsChange={onSettingsChange}
-      />,
-    );
-
-    fireEvent.change(screen.getByLabelText('Tier name'), { target: { value: 'cheap' } });
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['tier-1']).toBeDefined();
-    fireEvent.blur(screen.getByLabelText('Tier name'));
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers.cheap).toBeDefined();
-
-    const renamed = onSettingsChange.mock.calls.at(-1)![0] as SettingsConfig;
-    rerender(
-      <TieredExecutionSection
-        formData={renamed}
-        onSettingsChange={onSettingsChange}
-      />,
-    );
-
-    fireEvent.change(screen.getAllByLabelText('Model')[0], { target: { value: 'claude-opus-4-8' } });
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers.cheap.model).toBe('claude-opus-4-8');
-
-    fireEvent.change(screen.getAllByLabelText('Harness')[0], { target: { value: 'codex' } });
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers.cheap.harness).toBe('codex');
-
-    fireEvent.click(screen.getAllByLabelText('trivial')[0]);
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers.cheap.difficulties).toContain('trivial');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Remove tier' }));
-    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers).toEqual({});
+    fireEvent.change(screen.getByLabelText('crew for medium'), { target: { value: 'cheap' } });
+    expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['trivial-simple-medium'].difficulties)
+      .toEqual(['trivial', 'simple', 'medium']);
   });
 
-  it('surfaces difficulty mapping errors near the tier table controls', () => {
+  it('creates a Haiku crew from the board, assigns every difficulty, and opens it', () => {
     const onSettingsChange = vi.fn();
-
-    render(
-      <TieredExecutionSection
-        formData={baseSettings({
-          tiered_execution: {
-            enabled: true,
-            tiers: {
-              cheap: {
-                model: 'claude-haiku-4-5',
-                harness: 'claude-code',
-                difficulties: ['trivial'],
-              },
-            },
-            by_kind: {},
-            replay_threshold: 0.5,
-          },
-        })}
-        saveStatus="error"
-        saveErrorMessage="tiered_execution difficulty 'simple' is not mapped to any tier"
-        onSettingsChange={onSettingsChange}
-      />,
-    );
-
-    expect(screen.getAllByText("tiered_execution difficulty 'simple' is not mapped to any tier").length).toBeGreaterThan(1);
-    expect(screen.getAllByText('unmapped').length).toBeGreaterThan(0);
-  });
-
-  it('rejects renaming a tier onto an existing tier name', () => {
-    const onSettingsChange = vi.fn();
-
-    render(
+    const { rerender } = render(
       <TieredExecutionSection
         formData={baseSettings({
           tiered_execution: {
             enabled: false,
-            tiers: {
-              cheap: {
-                model: 'claude-haiku-4-5',
-                harness: 'claude-code',
-                difficulties: ['trivial'],
-              },
-              expensive: {
-                model: 'claude-opus-4-8',
-                harness: 'claude-code',
-                difficulties: ['simple', 'medium', 'complex', 'expert'],
-              },
-            },
+            tiers: {},
             by_kind: {},
-            supervisor: { model: 'claude-opus-4-8', harness: 'claude-code', subscribe: 'flagged' },
             replay_threshold: 0.5,
           },
         })}
@@ -191,11 +125,20 @@ describe('TieredExecutionSection', () => {
       />,
     );
 
-    fireEvent.change(screen.getAllByLabelText('Tier name')[0], { target: { value: 'expensive' } });
-    fireEvent.blur(screen.getAllByLabelText('Tier name')[0]);
-
-    expect(onSettingsChange).not.toHaveBeenCalled();
-    expect(screen.getByText('Tier name already exists')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('crew for trivial'), { target: { value: 'new' } });
+    const next = onSettingsChange.mock.calls.at(-1)?.[0] as SettingsConfig;
+    expect(next.tiered_execution?.tiers['trivial-simple-medium-complex-expert']).toMatchObject({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+    });
+    rerender(
+      <TieredExecutionSection
+        formData={next}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+    expect(screen.getByText('Crew editing controls appear here.').closest('details')).toHaveAttribute('open');
   });
 
   it('edits supervisor fields through onSettingsChange', () => {
