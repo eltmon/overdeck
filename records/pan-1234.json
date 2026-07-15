@@ -115,28 +115,63 @@
   ],
   "feedback": [],
   "created": "2026-07-12T20:43:21.494Z",
-  "updated": "2026-07-15T14:52:51.328Z",
+  "updated": "2026-07-15T14:57:01.153Z",
   "pipeline": {
     "issueId": "PAN-1234",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-12T22:39:37.230Z",
-    "updatedAt": "2026-07-15T14:52:41.885Z",
+    "updatedAt": "2026-07-15T14:57:01.105Z",
+    "reviewNotes": "[correctness] Closing a direct-linked drawer leaves the issue route active — `src/dashboard/frontend/src/App.tsx:395`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2606",
-    "reviewSpawnedAt": "2026-07-15T14:52:41.885Z"
+    "reviewSpawnedAt": "2026-07-15T14:52:41.885Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1234/.pan/review/agent-pan-1234-review-2ea5a6da/security.md",
+        "atCommit": "0aef74a8a818031076f09af0151eaed495992b81"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1234/.pan/review/agent-pan-1234-review-2ea5a6da/correctness.md",
+        "atCommit": "0aef74a8a818031076f09af0151eaed495992b81"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1234/.pan/review/agent-pan-1234-review-2ea5a6da/performance.md",
+        "atCommit": "0aef74a8a818031076f09af0151eaed495992b81"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1234/.pan/review/agent-pan-1234-review-2ea5a6da/requirements.md",
+        "atCommit": "0aef74a8a818031076f09af0151eaed495992b81"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
+          "openai/codex-auto-review": {
+            "input": 131370,
+            "output": 891,
+            "cacheRead": 108416,
+            "cacheWrite": 0
+          },
           "openai/gpt-5.5": {
-            "input": 16138987,
-            "output": 63288,
-            "cacheRead": 14491392,
+            "input": 17044382,
+            "output": 66315,
+            "cacheRead": 15276672,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 3801588,
+            "output": 17332,
+            "cacheRead": 3448832,
             "cacheWrite": 0
           }
         },
@@ -150,10 +185,22 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 131370,
+          "output": 891,
+          "cacheRead": 108416,
+          "cacheWrite": 0
+        },
         "openai/gpt-5.5": {
-          "input": 16138987,
-          "output": 63288,
-          "cacheRead": 14491392,
+          "input": 17044382,
+          "output": 66315,
+          "cacheRead": 15276672,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 3801588,
+          "output": 17332,
+          "cacheRead": 3448832,
           "cacheWrite": 0
         },
         "custom/kimi-k2.7-code": {
@@ -164,8 +211,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 44.068123,
-        "pricingAsOf": "2026-07-15T14:52:42.068Z"
+        "usd": 49.160304000000004,
+        "pricingAsOf": "2026-07-15T14:57:01.143Z"
       }
     },
     "merges": [
