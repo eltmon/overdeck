@@ -2,7 +2,7 @@
   "issueId": "PAN-2702",
   "schemaVersion": 2,
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-15T12:52:24.185Z",
+  "updated": "2026-07-15T12:52:26.651Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -33,5 +33,6 @@
     "policy": {
       "mode": "off"
     }
-  }
+  },
+  "reviewMode": "full"
 }
