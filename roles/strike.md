@@ -1,6 +1,6 @@
 ---
 name: strike
-description: Overdeck strike role — drop in, implement, push a ready strike branch, and signal the spawner to land it. Bypasses the plan → review → test pipeline.
+description: Overdeck strike role — drop in, implement, push a ready strike branch, and hand it to Deacon for verified landing. Bypasses the plan → review → test pipeline.
 # No `model:` pin — Cloister resolves the model from config.yaml (roles.strike.model).
 permissionMode: default
 effort: high
@@ -68,7 +68,9 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
    ```bash
    pan strike-ready <id>
    ```
-   If the tell fails, post the same readiness message as a durable issue comment. Do not wait for a reply after the signal.
+   This durable signal replaces any Flywheel tell or issue-comment fallback. Do not wait for a reply after the command succeeds.
+
+If Deacon returns a recovery request, fetch and rebase the current `origin/main`, resolve the named conflicts or failed gate, rerun the configured gates, push only `strike/<id>`, and run `pan strike-ready <id>` again. Each recovery requires a fresh pushed HEAD. After three failed cycles, or when recovery needs operator permissions or infrastructure, Deacon changes the landing state to `needs_you` and includes the ordered attempt history.
 
 The strike agent must never switch to `main`, merge into `main`, or push `origin main`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`. The Deacon consumes the durable readiness marker and owns the server-side merge handoff.
 
