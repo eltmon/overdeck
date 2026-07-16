@@ -9,6 +9,7 @@ import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDeta
 import { MergeQueueCard } from '../components/flywheel/MergeQueueCard';
 import { RailCard } from '../components/flywheel/RailCard';
 import { MergePolicySection } from '../components/MergePolicySection';
+import { consumePendingReveal, subscribeRevealOpenQuestions } from '../lib/flywheelReveal';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
 
 interface FlywheelPageProps {
@@ -392,6 +393,17 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       window.clearInterval(interval);
       unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    const revealOpenQuestions = () => {
+      setActiveTab('status');
+      requestAnimationFrame(() => {
+        document.getElementById('flywheel-open-questions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    };
+    if (consumePendingReveal()) revealOpenQuestions();
+    return subscribeRevealOpenQuestions(revealOpenQuestions);
   }, []);
 
   const freshness = effectiveStatus ? getLastTickFreshness(effectiveStatus.lastTickAt, nowMs) : null;
