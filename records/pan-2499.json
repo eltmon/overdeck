@@ -208,17 +208,17 @@
     "recordedAt": "2026-07-16T01:13:10.379Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T01:19:26.041Z",
+  "updated": "2026-07-16T01:29:19.156Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T01:17:14.746Z",
+    "updatedAt": "2026-07-16T01:29:19.088Z",
     "inspectNotes": "Both prior blockers are fixed. (1) IssueView.tsx now types IssueViewProps as Omit<HTMLAttributes<HTMLDivElement>,'children'> and spreads ...rootProps onto the root div (data-component defaults to 'issue-view' but is overridable) — FeatureItem's data-component/data-issue-id now actually reach the DOM, and a new render+dispatchEvent test in IssueView.test.tsx verifies both the attribute and an onClick handler forward correctly. (2) The FR-0 gate is now real: densitySections.ts is hand-authored per density instead of self-deriving from ISSUE_VIEW_INVENTORY, IssueView.tsx no longer emits hidden decoy spans, and dozens of real production elements (ReviewGroup, Badges, MergeButton, ResourceStrip, SessionNode, AgentsLane, CrewStage, HappenedFeed, StatusNarrative, IssueMissionControl tabs, IssueDrawer panels, etc.) now carry genuine data-section markers verified in source. New tests in IssueMissionControl.test.tsx and IssueDrawer.test.tsx render the real shells and assert data-section presence in the DOM, not just the static map against itself. AC5: verified directly — FeatureItem.tsx is 1366 lines matching its baseline exactly (no growth), and IssueDrawer.tsx (319 lines) / IssueMissionControl.tsx (986 lines) are both under the 1000-line ceiling in scripts/lint-file-size.sh and correctly absent from file-size-baseline.txt (no stale entries), so lint passes. Minor non-blocking nit for the review convoy: FeatureItem.tsx's 'Filter bar' data-section wraps the same DOM as 'Feature (issue) row' (no distinct filter-bar UI exists in that file) and SessionNode.tsx stacks three section markers (SessionNode / SessionNode context menu / ModelResolutionCard) on one identical wrapper — these satisfy AC2's literal text but are imprecise placements worth tightening, not a functional or gate-integrity violation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "cc6b645b18a3a591bc449c4010622ee8bd9e1fdb",
@@ -369,15 +369,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 9324038,
-            "output": 10333,
-            "cacheRead": 7990912,
+            "input": 10378557,
+            "output": 10675,
+            "cacheRead": 9022976,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 90730706,
-            "output": 134793,
-            "cacheRead": 88677120,
+            "input": 103502415,
+            "output": 162619,
+            "cacheRead": 101249536,
             "cacheWrite": 0
           }
         },
@@ -416,15 +416,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 9324038,
-          "output": 10333,
-          "cacheRead": 7990912,
+          "input": 10378557,
+          "output": 10675,
+          "cacheRead": 9022976,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 90730706,
-          "output": 134793,
-          "cacheRead": 88677120,
+          "input": 103502415,
+          "output": 162619,
+          "cacheRead": 101249536,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -447,8 +447,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 120.712456,
-        "pricingAsOf": "2026-07-16T01:17:14.899Z"
+        "usd": 128.82990900000001,
+        "pricingAsOf": "2026-07-16T01:29:19.146Z"
       }
     },
     "merges": [
