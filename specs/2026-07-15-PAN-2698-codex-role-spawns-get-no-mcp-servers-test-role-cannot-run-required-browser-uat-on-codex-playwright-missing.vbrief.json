@@ -4,17 +4,17 @@
     "created": "2026-07-15T13:13:34Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2698: Codex role spawns get no MCP servers — test role cannot run required browser UAT on codex (Playwright missing)",
-    "updated": "2026-07-15T13:16:28.834Z"
+    "updated": "2026-07-16T07:23:50.105Z"
   },
   "plan": {
     "id": "pan-2698",
     "title": "Codex role spawns get no MCP servers — test role cannot run required browser UAT on codex (Playwright missing)",
-    "status": "proposed",
+    "status": "approved",
     "uid": "dc95558b-699b-4060-abb5-20583085027a",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-15T13:13:34Z",
-    "updated": "2026-07-15T13:16:28.834Z",
+    "updated": "2026-07-16T07:23:50.105Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2698",
@@ -416,5 +416,5 @@
       "canonicalFilename": "2026-07-15-PAN-2698-codex-role-spawns-get-no-mcp-servers-test-role-cannot-run-required-browser-uat-on-codex-playwright-missing.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
