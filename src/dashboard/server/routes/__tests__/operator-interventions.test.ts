@@ -400,8 +400,8 @@ describe('operator.intervention dashboard routes', () => {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
     });
 
-    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
-    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
     expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
   });
 

@@ -8,8 +8,8 @@ import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import {
-  saveAgentStateSync, determineModel, getProviderAuthMode, getAgentState,
-  clearAgentPaused, clearAgentTroubled, clearAgentPausedSync, clearAgentTroubledSync,
+  saveAgentStateSync, saveAgentState, determineModel, getProviderAuthMode, getAgentState,
+  clearAgentPaused, clearAgentTroubled,
 } from '../../../../lib/agents.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
@@ -676,14 +676,14 @@ export const postAgentsRoute = HttpRouter.add(
     let gatesCommitted = false;
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
       if (startGateBlock && !gatesCommitted) {
-        if (startGateBlock.paused) clearAgentPausedSync(agentSessionName);
-        if (startGateBlock.troubled) clearAgentTroubledSync(agentSessionName);
+        if (startGateBlock.paused) await Effect.runPromise(clearAgentPaused(agentSessionName));
+        if (startGateBlock.troubled) await Effect.runPromise(clearAgentTroubled(agentSessionName));
       }
       let activityId: string;
       try {
         activityId = await spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd });
       } catch (error) {
-        if (startGateBlock && initialAgentState) saveAgentStateSync(initialAgentState);
+        if (startGateBlock && initialAgentState) await Effect.runPromise(saveAgentState(initialAgentState));
         throw error;
       }
       if (startGateBlock && !gatesCommitted) {
