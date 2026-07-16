@@ -21,42 +21,42 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:02:04.201Z",
+  "updated": "2026-07-16T00:02:11.439Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-15T15:23:40.724Z",
-    "inspectNotes": "Operator reconciliation (PAN-2724): supervisor verified all five ACs for bead issue-view-model at commit b50e3ba5; re-landing the misattributed verdict for bead issue-view-model."
+    "updatedAt": "2026-07-16T00:02:11.397Z",
+    "inspectNotes": "Inspecting item issue-view-wrapper"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2454196,
-            "output": 4557,
-            "cacheRead": 2210048,
+            "input": 2483626,
+            "output": 4658,
+            "cacheRead": 2217600,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 15365439,
-            "output": 28181,
-            "cacheRead": 14851072,
+            "input": 21191156,
+            "output": 39572,
+            "cacheRead": 20329472,
             "cacheWrite": 0
           }
         },
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 37,
-            "output": 19997,
-            "cacheRead": 5334959,
-            "cacheWrite": 32270
+            "input": 40,
+            "output": 20426,
+            "cacheRead": 6784124,
+            "cacheWrite": 33896
           }
         },
         "plan": {
@@ -86,22 +86,22 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2454196,
-          "output": 4557,
-          "cacheRead": 2210048,
+          "input": 2483626,
+          "output": 4658,
+          "cacheRead": 2217600,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 15365439,
-          "output": 28181,
-          "cacheRead": 14851072,
+          "input": 21191156,
+          "output": 39572,
+          "cacheRead": 20329472,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
-          "input": 26008,
-          "output": 75434,
-          "cacheRead": 11548811,
-          "cacheWrite": 436739
+          "input": 26011,
+          "output": 75863,
+          "cacheRead": 12997976,
+          "cacheWrite": 438365
         },
         "anthropic/claude-sonnet-5": {
           "input": 16839,
@@ -117,15 +117,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 70.303459,
-        "pricingAsOf": "2026-07-15T15:23:42.517Z"
+        "usd": 76.611945,
+        "pricingAsOf": "2026-07-16T00:02:11.430Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "no-loss-manifest": "completed",
     "no-loss-manifest.no-loss-manifest.ac1": "completed",
