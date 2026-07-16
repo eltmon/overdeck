@@ -35,6 +35,7 @@ vi.mock('../../../../src/lib/vbrief/io.js', () => ({
 describe('specialists done command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://localhost:3011');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
       return {
@@ -61,6 +62,7 @@ describe('specialists done command', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
