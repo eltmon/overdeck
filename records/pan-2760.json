@@ -544,15 +544,7 @@
       "timestamp": "2026-07-16T21:08:11.216Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T21:08:11Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2760\n\n# Review Synthesis — PAN-2760 — 2026-07-16T21:20:00Z\n\n## Verdict: CHANGES REQUESTED — first-crew creation persists tiers without the required supervisor\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-e3c779b2/context.json\n- Branch: feature/pan-2760\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2760\n- HEAD reviewed: e3c779b26b100897fcd2ec305abb031afa605cd5\n- Cycle number: 2\n- Prior cycle SHA: 78b732233cb0e03b42239f35698a1843ccd25937\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-e3c779b2/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-e3c779b2/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-e3c779b2/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Creating the first crew persists an invalid configuration — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:229`\nThe new empty-roster action calls `createCrew(null)`, which writes the first tier through `writeCrews` while `rest.supervisor` can still be absent. The same component requires a supervisor whenever tiers exist, so the advertised first-crew flow immediately emits invalid settings and autosave can reject them. Initialize the default supervisor as part of first-tier creation and cover the resulting valid configuration in a regression test.\n\n### [security] Reviewer failed before writing a report\nThe security reviewer session ended without producing its required report. Review policy forbids approval when any reviewer fails or times out, so security remains unverified for this cycle.\n\n## Non-blocking Findings\n\n### [performance] Build every crew's heir list on every render — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:510`\nThe roster maps every crew and filters the full crew list for each row even though only the open removal prompt consumes `otherCrews`. This adds O(n²) allocation to the settings render path; compute the heir list only for the active prompt to keep the work O(n).\n\n## Clean Sub-roles\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-e3c779b2/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2760 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -575,7 +567,7 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T21:24:57.333Z",
+  "updated": "2026-07-16T21:24:58.262Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "pending",
