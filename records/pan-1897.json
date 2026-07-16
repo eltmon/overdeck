@@ -44,15 +44,7 @@
       "timestamp": "2026-07-16T21:11:59.032Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T21:11:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1897\n\n# Review Synthesis — PAN-1897 — 2026-07-16T21:11:05Z\n\n## Verdict: CHANGES REQUESTED — spawn timeout can leave agent creation running after `pan start` reports failure\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-5c805146/context.json\n- Branch: feature/pan-1897\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897\n- HEAD reviewed: 5c805146dafd9378c79a81eba4889b415f9e7eb4\n- Cycle number: 2\n- Prior cycle SHA: d69644fbbb85a687327a570a0739c88d09917acd\n- PR diff: fd517078d47e5ec57ddb8f5cabe0de3f12e68e3c..5c805146dafd9378c79a81eba4889b415f9e7eb4\n- PR commits: 10\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-5c805146/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-5c805146/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-5c805146/performance.md | 0 |\n| requirements | failed | — | infrastructure failure |\n\n## Blocking Findings\n\n### [correctness] Spawn timeout leaves agent creation running after `pan start` fails — `src/cli/commands/start.ts:1221`\nThe spawn phase passes `() => spawnAgent(...)` to `runStartPrepStep`, discarding the `AbortSignal` supplied by `prep.step`. When the 600-second fail-fast budget expires, `step()` aborts its controller but detaches the still-running operation instead of awaiting quiescence. `pan start` can therefore report failure while `spawnAgent` continues creating persistent agent state or a tmux session, and a retry can collide with that late-created state. The spawn path must honor cancellation and reach a confirmed safe state before the timeout error is returned; if cancellation is unsupported, the timeout path must await explicit quiescence rather than detach the operation.\n\n### [requirements] Requirements reviewer failed before producing a report\nThe requirements reviewer session ended without writing a usable report. Review policy forbids approval when any reviewer fails or times out because requirement and acceptance-criteria coverage remains unverified.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-5c805146/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1897 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -82,22 +74,22 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T21:16:09.332Z",
+  "updated": "2026-07-16T21:16:10.358Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:16:09.289Z",
+    "updatedAt": "2026-07-16T21:16:10.172Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "5c805146dafd9378c79a81eba4889b415f9e7eb4",
     "reviewRequestedAt": "2026-07-16T21:16:08.795Z",
-    "reviewSpawnedAt": "2026-07-16T20:59:57.532Z",
+    "reviewSpawnedAt": "2026-07-16T21:16:10.172Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -212,7 +204,7 @@
       },
       "costAtCloseOut": {
         "usd": 112.813465,
-        "pricingAsOf": "2026-07-16T21:16:09.292Z"
+        "pricingAsOf": "2026-07-16T21:16:10.284Z"
       }
     },
     "merges": [
