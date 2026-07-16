@@ -120,43 +120,21 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T19:00:15.312Z",
+  "updated": "2026-07-16T19:05:32.649Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:00:14.271Z",
+    "updatedAt": "2026-07-16T19:05:32.569Z",
     "reviewNotes": "[correctness] A new crew collapses into an existing Haiku crew on rerender — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:183`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
-    "lastVerifiedCommit": "78b732233cb0e03b42239f35698a1843ccd25937",
+    "lastVerifiedCommit": "e3c779b26b100897fcd2ec305abb031afa605cd5",
     "reviewRequestedAt": "2026-07-16T18:36:33.187Z",
     "reviewSpawnedAt": "2026-07-16T18:59:18.730Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/security.md",
-        "atCommit": "e3c779b26b100897fcd2ec305abb031afa605cd5"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/correctness.md",
-        "atCommit": "e3c779b26b100897fcd2ec305abb031afa605cd5"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/performance.md",
-        "atCommit": "e3c779b26b100897fcd2ec305abb031afa605cd5"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/requirements.md",
-        "atCommit": "e3c779b26b100897fcd2ec305abb031afa605cd5"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -204,9 +182,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2026345,
-            "output": 278317,
-            "cacheRead": 35711488,
+            "input": 2039905,
+            "output": 280395,
+            "cacheRead": 36606464,
             "cacheWrite": 0
           }
         }
@@ -219,15 +197,15 @@
           "cacheWrite": 520882
         },
         "openai/gpt-5.6-sol": {
-          "input": 3502930,
-          "output": 391562,
-          "cacheRead": 50065408,
+          "input": 3516490,
+          "output": 393640,
+          "cacheRead": 50960384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 68.447211,
-        "pricingAsOf": "2026-07-16T19:00:14.339Z"
+        "usd": 69.024839,
+        "pricingAsOf": "2026-07-16T19:05:32.639Z"
       }
     },
     "merges": [
