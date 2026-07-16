@@ -56,19 +56,22 @@
     "recordedAt": "2026-07-16T17:53:59.399Z"
   },
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-16T17:54:04.217Z",
+  "updated": "2026-07-16T18:00:15.332Z",
   "pipeline": {
     "issueId": "PAN-2633",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T17:54:04.132Z",
+    "updatedAt": "2026-07-16T18:00:15.192Z",
+    "reviewNotes": "All four reviewers passed; one non-blocking performance advisory on repeated convergence events.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Bead reducer-liveness-gate ack: commit df35ff8b merges 438a42c8f7, which adds shouldForceReemitPendingInput to the enrichment poller (agent-enrichment-service.ts) — the convergence-guarantee bead, separate from this ones scope. No changes to event-reducers.ts or its tests; reducer behavior verified against AC1-4 remains unaffected and still holds.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2793",
+    "reviewedAtCommit": "fea5026986e058f9ca463b6e8f3a9dee8f0b0831",
     "reviewRequestedAt": "2026-07-16T17:54:02.348Z",
     "reviewSpawnedAt": "2026-07-16T17:54:03.268Z",
     "scopeDrift": {
@@ -100,6 +103,24 @@
         "tests/dashboard/event-reducers.test.ts"
       ],
       "recordedAt": "2026-07-16T17:53:59.399Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "fea5026986e058f9ca463b6e8f3a9dee8f0b0831"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "fea5026986e058f9ca463b6e8f3a9dee8f0b0831"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "fea5026986e058f9ca463b6e8f3a9dee8f0b0831"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "fea5026986e058f9ca463b6e8f3a9dee8f0b0831"
+      }
     },
     "strikeRecoveryCount": 0
   },
@@ -134,6 +155,46 @@
             "cacheWrite": 418542
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 358239,
+            "output": 12472,
+            "cacheRead": 3124736,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 979957,
+            "output": 12633,
+            "cacheRead": 2201088,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 785894,
+            "output": 18147,
+            "cacheRead": 1961472,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 902155,
+            "output": 22545,
+            "cacheRead": 2336768,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 681326,
+            "output": 8630,
+            "cacheRead": 1328128,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 18953,
@@ -150,9 +211,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 483042,
-            "output": 15448,
-            "cacheRead": 5387776,
+            "input": 496772,
+            "output": 20148,
+            "cacheRead": 6841856,
             "cacheWrite": 0
           }
         }
@@ -171,9 +232,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 515523,
-          "output": 15520,
-          "cacheRead": 5397760,
+          "input": 4236824,
+          "output": 94647,
+          "cacheRead": 17804032,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -196,8 +257,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 32.071602,
-        "pricingAsOf": "2026-07-16T17:54:04.195Z"
+        "usd": 59.255053000000004,
+        "pricingAsOf": "2026-07-16T18:00:15.317Z"
       }
     },
     "merges": [
