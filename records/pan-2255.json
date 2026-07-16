@@ -102,7 +102,7 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T07:10:19.611Z",
+  "updated": "2026-07-16T07:11:17.283Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
@@ -112,12 +112,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:10:19.438Z",
+    "updatedAt": "2026-07-16T07:11:17.180Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at build (88408ms):\n\n\n> @overdeck/core@0.45.20 build\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs\n\n\n> @overdeck/core@0.45.20 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.45.20 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m178.08 kB\u001b[22m \u001b[2m│ gzip: 30.01 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 178.08 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2241ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m151.97 kB\u001b[22m \u001b[2m│ gzip: 28.11 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m287.56 kB\u001b[22m \u001b[2m│ gzip: 49.39 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 39.53 kB\u001b[22m \u001b[2m│ gzip:  4.58 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m692.50 kB\u001b[22m \u001b[2m│ gzip: 65.57 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.17 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m2478ms\u001b[39m\n\n> @overdeck/core@0.45.20 build:pi-extension\n> npm --prefix ./packages/pi-extension run build\n\n\n> @overdeck/pi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/packages/pi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.10 kB\u001b[22m \u001b[2m│ gzip: 7.19 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m  \u001b[2m 6.06 kB\u001b[22m \u001b[2m│ gzip: 1.59 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 2 files, total: 33.16 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m440ms\u001b[39m\n\n> @overdeck/core@0.45.20 build:ohmypi-extension\n> npm --prefix ./packages/ohmypi-extension run build\n\n\n> @overdeck/ohmypi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/packages/ohmypi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.24 kB\u001b[22m \u001b[2m│ gzip: 7.21 kB\u001b[22m\n\u001b[34\n...(truncated)",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
-    "reviewRequestedAt": "2026-07-16T07:00:08.608Z",
+    "reviewRequestedAt": "2026-07-16T07:11:16.793Z",
     "reviewSpawnedAt": "2026-07-16T07:00:09.637Z"
   },
   "closeOut": {
@@ -125,15 +125,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3843289,
-            "output": 4482,
-            "cacheRead": 3633024,
+            "input": 4255286,
+            "output": 4802,
+            "cacheRead": 4040192,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 36589071,
-            "output": 54422,
-            "cacheRead": 35923712,
+            "input": 37119582,
+            "output": 55235,
+            "cacheRead": 36446464,
             "cacheWrite": 0
           }
         },
@@ -156,15 +156,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3843289,
-          "output": 4482,
-          "cacheRead": 3633024,
+          "input": 4255286,
+          "output": 4802,
+          "cacheRead": 4040192,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 36589071,
-          "output": 54422,
-          "cacheRead": 35923712,
+          "input": 37119582,
+          "output": 55235,
+          "cacheRead": 36446464,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -181,8 +181,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 23.585471000000002,
-        "pricingAsOf": "2026-07-16T07:10:19.552Z"
+        "usd": 23.910032,
+        "pricingAsOf": "2026-07-16T07:11:17.249Z"
       }
     },
     "merges": [
