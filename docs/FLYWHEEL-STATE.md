@@ -4795,3 +4795,50 @@ reliability). **OPERATOR CUTS. I NEVER TAG.**
 
 **Drain: 30 merged / 27 closed out.** Filed (16): +PAN-2761.
 Outstanding operator decisions, NOT re-asked: (1) PAN-2710 bypass verdict; (2) v0.45.20.
+
+---
+
+## Tick 41 — 2026-07-16 ~02:30Z — 3rd red main (REAL) fixed by operator; PAN-2752 on PR #2764
+
+### 🔴→🟢 THIRD red main tonight — `release.ts` `dirname` — REAL, and operator-fixed
+`strike-pan-2753` reported main red. **I verified instead of trusting** (last report was a phantom):
+isolated worktree at `eb8f1da761` + contracts built ⇒ **exactly 1 error on all of main**:
+```
+src/cli/commands/release.ts(256,15): error TS2552: Cannot find name 'dirname'. Did you mean '__dirname'?
+```
+`:5 import { join } from 'path'` but `:256 const dir = dirname(filePath)`. Introduced by **`eb8f1da761`
+(author: Edward Becker, direct push, no PR, no CI)**. Filed **PAN-2762** + struck.
+**Operator fixed it first** — `3369f78c81` added `import { dirname, join } from 'path'`.
+Verified at `f2339640bb`: **tsc 0 errors**. Closed PAN-2762 as fixed. `strike-pan-2762` now runs a
+closed issue (can't `pan kill` — doctrine); deacon should reap it.
+
+**Two strike reports tonight: one PHANTOM (2752/env), one REAL (2753/dirname). Verify EACH — never
+generalize from the last one.**
+
+### 🚨 THREE red mains tonight, ALL from direct pushes to main with no PR and no CI
+`8e458171b5` (PAN-2748) → `eb8f1da761` (PAN-2762) → (+ the env-phantom cost). Each one **idles every
+strike agent behind it**, because strikes correctly refuse to push against red gates. The cost is not a
+broken build — it's a stalled pipeline. Raised in PAN-2762; **worth a durable home, it dies with that issue.**
+
+### ⚠️ I NEARLY CREDITED A HOLLOW GREEN — caught it
+I printed `typecheck … (no output above = clean)` for PAN-2752. **That is inference from SILENCE — the
+exact false-signal trap I've spent the night calling out in others.** The focused test hadn't run AT ALL
+(`ERR_MODULE_NOT_FOUND: vite`). Re-ran on **real exit codes**: test **7/7**, typecheck **exit 0, 0 errors**.
+Genuinely green — but only because I checked. **Never accept absent output as a pass.**
+
+### 🚨 PAN-2763 — workspace `node_modules` SYMLINKED to primary (CLAUDE.md explicitly forbids)
+`workspaces/feature-pan-2752-strike/node_modules -> /home/eltmon/Projects/overdeck/node_modules`.
+Broke vitest resolution; `bun install` reports `Failed to install 1 package`. CLAUDE.md: *"NEVER symlink
+node_modules … symlinks break local workspace package resolution"* — a workspace can then typecheck
+against the **primary's** build. **A silently wrong green is worse than a failure.** Asked for a
+mechanical guard at workspace setup. Filed **PAN-2763**.
+
+### ✅ PAN-2752 → PR #2764 (monitor armed)
+Reviewed the diff myself: widens BOTH unions (`+'ai-explicit'`, `+'ai-refined'` to the Schema literals)
++ a decode test. **Correctly chose option 1 over writing `'ai'`** — `'ai'` would make `canRefineTitle`
+return true and let refinement clobber an explicitly-requested title. No behavior change.
+Held it until the dirname red cleared rather than stacking onto a red main.
+
+**Drain: 30 merged / 27 closed out.** Filed (17): +PAN-2762 (closed), +PAN-2763.
+Outstanding operator decisions, NOT re-asked: (1) PAN-2710 bypass verdict; (2) **v0.45.20 — now
+unblocked; `release.ts` typechecks again.**
