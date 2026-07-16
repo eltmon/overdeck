@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T05:45:43.630Z",
+  "updated": "2026-07-16T06:28:29.905Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -57,5 +57,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "reveal-signal-module": {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 2352358,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:28:29.905Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "reveal-signal-module": "running"
+  }
 }
