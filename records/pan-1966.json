@@ -253,21 +253,44 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T13:41:04.089Z",
+  "updated": "2026-07-16T13:41:05.855Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T13:41:02.472Z",
+    "updatedAt": "2026-07-16T13:41:05.810Z",
+    "reviewNotes": "[correctness] Explicitly ready GitHub issues are filtered out before lane assignment — `src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx:312`",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "lastVerifiedCommit": "734d83a23600637843861e355ed37feec021f755",
-    "reviewSpawnedAt": "2026-07-16T13:41:02.470Z"
+    "reviewSpawnedAt": "2026-07-16T13:41:02.470Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/security.md",
+        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/correctness.md",
+        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
+      },
+      "performance": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/performance.md",
+        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/requirements.md",
+        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -331,7 +354,7 @@
       },
       "costAtCloseOut": {
         "usd": 69.495843,
-        "pricingAsOf": "2026-07-16T13:41:02.575Z"
+        "pricingAsOf": "2026-07-16T13:41:05.845Z"
       }
     },
     "merges": [
