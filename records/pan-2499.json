@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:28:42.511Z",
+  "updated": "2026-07-16T00:28:54.193Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -178,7 +178,8 @@
     "start-agent-cta.start-agent-cta.ac2": "completed",
     "start-agent-cta.start-agent-cta.ac3": "completed",
     "start-agent-cta.start-agent-cta.ac4": "completed",
-    "start-agent-cta.start-agent-cta.ac5": "completed"
+    "start-agent-cta.start-agent-cta.ac5": "completed",
+    "cta-kanban-fleet": "running"
   },
   "swarm": {
     "slotAssignments": [
@@ -204,8 +205,16 @@
     }
   },
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "cta-kanban-fleet": {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 576611,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T00:28:54.192Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
