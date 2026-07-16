@@ -164,20 +164,20 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:34:06.655Z",
+  "updated": "2026-07-16T21:36:22.030Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "blocked",
     "testStatus": "failed",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:34:03.389Z",
+    "updatedAt": "2026-07-16T21:36:21.983Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "testNotes": "See .pan/test/result.json for full evidence. Code fix verified correct (typecheck, lint, targeted XTerminal.test.tsx PASS). FAILED because broad --changed vitest gate fails on unrelated pre-existing App.test.tsx defect (commit 2f4648e673, untouched by this diff), and required browser UAT could not run: workspace container /ws/terminal rejects upgrades with 403 via frontend Traefik/Vite proxy path, and PTY spawn segfaults (node:22-alpine/musl vs glibc-only @lydell/node-pty-linux-x64). Both pre-existing env defects, out of test-role scope. No host dashboard fallback used. Flywheel notified via pan tell.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
-    "lastVerifiedCommit": "2f50757534e026b0c6eb8adb20c55d739328e0b7",
+    "lastVerifiedCommit": "e3568752da539e8a69a62d6d2079775d86ca3c40",
     "reviewRequestedAt": "2026-07-16T21:16:57.434Z",
     "reviewSpawnedAt": "2026-07-16T21:26:26.145Z",
     "scopeDrift": {
@@ -208,9 +208,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 13621929,
-            "output": 33178,
-            "cacheRead": 12972032,
+            "input": 14740878,
+            "output": 33591,
+            "cacheRead": 14084352,
             "cacheWrite": 0
           }
         },
@@ -264,10 +264,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1681,
-            "output": 59732,
-            "cacheRead": 20564478,
-            "cacheWrite": 236200
+            "input": 1685,
+            "output": 60852,
+            "cacheRead": 21098934,
+            "cacheWrite": 237462
           }
         },
         "work": {
@@ -287,9 +287,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 19432478,
-          "output": 249139,
-          "cacheRead": 52521984,
+          "input": 20551427,
+          "output": 249552,
+          "cacheRead": 53634304,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -299,15 +299,15 @@
           "cacheWrite": 327850
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1681,
-          "output": 59732,
-          "cacheRead": 20564478,
-          "cacheWrite": 236200
+          "input": 1685,
+          "output": 60852,
+          "cacheRead": 21098934,
+          "cacheWrite": 237462
         }
       },
       "costAtCloseOut": {
-        "usd": 89.829727,
-        "pricingAsOf": "2026-07-16T21:34:05.366Z"
+        "usd": 90.552676,
+        "pricingAsOf": "2026-07-16T21:36:22.004Z"
       }
     },
     "merges": [
