@@ -4842,3 +4842,48 @@ Held it until the dirname red cleared rather than stacking onto a red main.
 **Drain: 30 merged / 27 closed out.** Filed (17): +PAN-2762 (closed), +PAN-2763.
 Outstanding operator decisions, NOT re-asked: (1) PAN-2710 bypass verdict; (2) **v0.45.20 — now
 unblocked; `release.ts` typechecks again.**
+
+---
+
+## Tick 42 — 2026-07-16 ~02:50Z — BOTH operator requests LANDED (32 merged); DEPLOY BLOCKED by foreign WIP
+
+### ✅ PAN-2752 `45ac781581` + PAN-2753 `8beae25fa1` — both operator requests merged
+Main CI **success** on `45ac781581`, `31679078e0`, `f2339640bb`. Gates verified by me on real exit codes
+before each merge.
+
+### 🛟 RESCUED PAN-2753's stranded work — it looked red TWICE and was good both times
+The strike was killed by PAN-2758 (capacity) with its fix **committed but never pushed**, idle 66m.
+Its gates *appeared* red — **both false, in OPPOSITE directions:**
+1. **typecheck exit 2** → the **inherited `dirname` bug** from its merge-base `eb8f1da761`. Not its fault;
+   already fixed on main by `3369f78c81`.
+2. **test exit 1** → **MY error.** I ran vitest from the repo root, whose config **excludes
+   `src/dashboard/frontend/**`** ⇒ *"No test files found, exiting with code 1"*. In the correct frontend
+   project: **51/51 pass, exit 0.**
+**Two bad signals stacked on one genuinely correct fix.** Taking either at face value discards good work.
+**No rebase needed** — a PR merges against current main, so CI validates the merge result and the
+inherited error simply isn't present. Pushed the agent's OWN commits (author `panopticon-agent[bot]`,
+not me) → PR #2766 → merged. **Flagged in the PR that the visual result is UNVERIFIED** (the agent died
+before screenshotting); did not imply a check I hadn't done.
+
+### 🚧 DEPLOY BLOCKED — the shared primary worktree is being actively edited
+`git status` = **12 foreign modified files** incl. `FeatureItem.tsx`, `SessionNode.tsx`,
+`command-deck.module.css`, `packages/contracts/src/types.ts`, + 2 untracked.
+- `git pull --ff-only` **REFUSED** ⇒ HEAD stuck at `31679078e0`, never reached the tree fix.
+- `npm run build` **FAILED (exit 2)**: `FeatureItem.tsx(12,1) TS6133: 'StatusDotStatus' declared but
+  never read` — **from THEIR WIP, not main.** Proof: `origin/main`'s copy has both `sessionLabel` and
+  the `StatusDotStatus` import; the working copy had neither.
+- **The tree CHURNED mid-read** — the build named a symbol that wasn't in the file seconds later.
+  An active editor, not a stable state.
+**Deploy needs a clean primary tree** (`dist/` must live in the primary; `pan restart` runs
+`dist/dashboard/server.js` from there). **NOT forcing it.** Building this tree would ship someone's
+unreviewed WIP — the exact hazard flagged in tick 37. Live server: pid 2798239 (booted 21:57, NOT mine —
+something restarted after my deploy; healthy, not chased).
+
+### ⚠️ MY OWN FALSE-GREEN, twice now — `EXIT=$?` after a PIPE measures the LAST command
+`timeout 900 npm run build 2>&1 | tail -3; echo "BUILD-EXIT=$?"` printed **BUILD-EXIT=0 while the build
+FAILED with exit 2.** `$?` measured `tail`. Same class as the hollow `(no output = clean)` typecheck in
+tick 41. **Redirect to a file and check the exit code directly — never pipe then read `$?`.**
+
+**Drain: 32 merged / 27 closed out.** Filed (17): PAN-2762 closed (operator-fixed).
+Outstanding, NOT re-asked: (1) PAN-2710 bypass verdict; (2) **v0.45.20 — unblocked**.
+**OWED: deploy** — blocked on the primary tree being clean; retry next tick.
