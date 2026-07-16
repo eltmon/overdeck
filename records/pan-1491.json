@@ -323,7 +323,7 @@
     "recordedAt": "2026-07-11T10:51:47.612Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-13T06:20:37.652Z",
+  "updated": "2026-07-16T07:24:43.099Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
@@ -568,8 +568,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
     "b8-orchestrator-doc.ac1": "completed",
