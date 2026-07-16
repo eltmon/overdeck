@@ -2,7 +2,7 @@
   "issueId": "PAN-2760",
   "schemaVersion": 2,
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T01:54:55.366Z",
+  "updated": "2026-07-16T01:54:56.494Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2760: fix(dashboard): make crew create and delete discoverable in Tiered Execution settings",
       "timestamp": "2026-07-16T01:54:55.365Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
