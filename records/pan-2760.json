@@ -617,21 +617,21 @@
     "recordedAt": "2026-07-16T21:42:09.171Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T21:42:11.312Z",
+  "updated": "2026-07-16T21:42:12.589Z",
   "pipeline": {
     "issueId": "PAN-2760",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:42:10.260Z",
+    "updatedAt": "2026-07-16T21:42:12.462Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "lastVerifiedCommit": "e8648f7e6acd33fedbec51285248e3f6e3053840",
     "reviewRequestedAt": "2026-07-16T21:42:10.145Z",
-    "reviewSpawnedAt": "2026-07-16T21:35:46.751Z",
+    "reviewSpawnedAt": "2026-07-16T21:42:11.489Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -722,10 +722,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1283,
-            "output": 26805,
-            "cacheRead": 6730215,
-            "cacheWrite": 263737
+            "input": 1285,
+            "output": 27206,
+            "cacheRead": 6876748,
+            "cacheWrite": 265507
           }
         },
         "work": {
@@ -757,15 +757,15 @@
           "cacheWrite": 520882
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1283,
-          "output": 26805,
-          "cacheRead": 6730215,
-          "cacheWrite": 263737
+          "input": 1285,
+          "output": 27206,
+          "cacheRead": 6876748,
+          "cacheWrite": 265507
         }
       },
       "costAtCloseOut": {
-        "usd": 89.929414,
-        "pricingAsOf": "2026-07-16T21:42:10.333Z"
+        "usd": 89.96716,
+        "pricingAsOf": "2026-07-16T21:42:12.493Z"
       }
     },
     "merges": [
