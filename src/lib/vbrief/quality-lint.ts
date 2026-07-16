@@ -80,6 +80,20 @@ function hasFilenameLikeSegment(value: string): boolean {
   return segment.includes('.');
 }
 
+function isDocumentationPath(value: string): boolean {
+  const scope = value.trim().toLowerCase();
+  if (!scope) return false;
+  if (/\.mdx?$/.test(scope)) return true;
+  return scope.split('/').filter(Boolean).some(segment => segment === 'docs');
+}
+
+function documentsSomething(item: VBriefItem): boolean {
+  if (item.metadata?.kind === 'docs') return true;
+  const filesScope = item.metadata?.files_scope;
+  if (!Array.isArray(filesScope)) return false;
+  return filesScope.some(scope => typeof scope === 'string' && isDocumentationPath(scope));
+}
+
 function isBroadFilesScope(value: string): boolean {
   const scope = value.trim();
   if (!scope) return true;
@@ -240,6 +254,19 @@ function lintTraceCoverage(doc: VBriefDocument, prdText?: string): QualityIssue[
     .map(id => warning(null, 'trace-uncovered', `Requirement ${id} is declared in the PRD but no plan item metadata.traces references it`));
 }
 
+function lintDocsCoverage(doc: VBriefDocument): QualityIssue[] {
+  if (stringValue(doc.plan.metadata?.docsJustification)) return [];
+
+  const active = doc.plan.items.filter(item => item.status !== 'cancelled');
+  if (active.some(documentsSomething)) return [];
+
+  return [issue(
+    null,
+    'docs-item-missing',
+    'Plan has no documentation work item: no active item sets metadata.kind "docs" or names a documentation file (.md/.mdx, or a docs/ path) in metadata.files_scope. Add the item naming the exact doc files it touches, or set plan.metadata.docsJustification to state why the change alters no documented surface.',
+  )];
+}
+
 function orderedPairKey(left: string, right: string): string {
   return [left, right].sort().join('\0');
 }
@@ -315,6 +342,7 @@ export function lintPlanQuality(doc: VBriefDocument, options: QualityLintOptions
   return [
     ...doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item)),
     ...lintDocumentReferences(doc),
+    ...lintDocsCoverage(doc),
     ...lintTraceCoverage(doc, options.prdText),
     ...lintOverlapAudit(doc, options),
   ];

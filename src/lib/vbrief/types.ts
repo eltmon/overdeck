@@ -142,6 +142,8 @@ export interface VBriefPlan {
   metadata?: {
     /** Issue-keyed filename used in `./vbrief/<lifecycle>/`. Set by plan-finalize. */
     canonicalFilename?: string;
+    /** Why the plan carries no documentation item. Set only when the change alters no documented surface; waives the docs-item-missing quality gate. */
+    docsJustification?: string;
     [key: string]: unknown;
   };
   items: VBriefItem[];

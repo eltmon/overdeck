@@ -49,6 +49,7 @@ function swarmablePlan(): VBriefDocument {
       id: ISSUE_ID.toLowerCase(),
       title: 'Foreman swarm dogfood',
       status: 'proposed',
+      metadata: { docsJustification: 'Dispatch fixture; documentation coverage is exercised in the quality-lint suite' },
       items: [
         item('tier-table-config', ['src/config/tier-table.ts'], 'npm run test:tier-table', 'tier table test reports success'),
         item('scheduler-relevance-map', ['src/scheduler/relevance-map.ts'], 'npm run test:relevance-map', 'relevance map test reports success'),

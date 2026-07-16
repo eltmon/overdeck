@@ -37,7 +37,7 @@ function item(overrides: Partial<VBriefItem> = {}): VBriefItem {
   };
 }
 
-function doc(items: VBriefItem[]): VBriefDocument {
+function doc(items: VBriefItem[], planMetadata: Record<string, unknown> = { docsJustification: 'Fixture plan; docs coverage is exercised in its own suite' }): VBriefDocument {
   return {
     vBRIEFInfo: {
       version: '0.5',
@@ -47,6 +47,7 @@ function doc(items: VBriefItem[]): VBriefDocument {
       id: 'PAN-1788',
       title: 'Plan',
       status: 'proposed',
+      metadata: planMetadata,
       items,
       edges: [],
     },
@@ -327,6 +328,60 @@ describe('lintPlanQuality DAG and references', () => {
   });
 });
 
+describe('lintPlanQuality documentation coverage', () => {
+  const noWaiver: Record<string, unknown> = {};
+
+  function rulesForPlan(items: VBriefItem[], planMetadata = noWaiver): string[] {
+    return lintPlanQuality(doc(items, planMetadata)).map(issue => issue.rule);
+  }
+
+  it('flags a plan whose items touch no documentation', () => {
+    expect(lintPlanQuality(doc([item()], noWaiver))).toEqual(expect.arrayContaining([
+      expect.objectContaining({ itemId: null, rule: 'docs-item-missing', severity: 'error' }),
+    ]));
+  });
+
+  it('accepts a dedicated docs item via metadata.kind', () => {
+    expect(rulesForPlan([
+      item(),
+      item({ id: 'item-2', metadata: { kind: 'docs', files_scope: ['configuration/harnesses.mdx'] } }),
+    ])).not.toContain('docs-item-missing');
+  });
+
+  it.each([
+    ['a Mintlify page', 'configuration/harnesses.mdx'],
+    ['a developer doc', 'docs/VBRIEF.md'],
+    ['a rule file', '.claude/rules/prd-authoring.md'],
+    ['a docs glob', 'docs/*'],
+  ])('accepts a vertical slice that also updates %s', (_label, docPath) => {
+    expect(rulesForPlan([
+      item({ metadata: { kind: 'backend', files_scope: ['src/lib/harness.ts', docPath] } }),
+    ])).not.toContain('docs-item-missing');
+  });
+
+  it('does not count a source file that merely lives beside docs', () => {
+    expect(rulesForPlan([
+      item({ metadata: { files_scope: ['src/lib/markdown/render.ts'] } }),
+    ])).toContain('docs-item-missing');
+  });
+
+  it('ignores a cancelled docs item', () => {
+    expect(rulesForPlan([
+      item(),
+      item({ id: 'item-2', status: 'cancelled', metadata: { kind: 'docs', files_scope: ['docs/VBRIEF.md'] } }),
+    ])).toContain('docs-item-missing');
+  });
+
+  it('waives the rule when plan.metadata.docsJustification explains why', () => {
+    expect(rulesForPlan([item()], { docsJustification: 'Internal refactor; no documented surface changes' }))
+      .not.toContain('docs-item-missing');
+  });
+
+  it('does not accept an empty docsJustification as a waiver', () => {
+    expect(rulesForPlan([item()], { docsJustification: '   ' })).toContain('docs-item-missing');
+  });
+});
+
 describe('lintPlanQuality requirement traces', () => {
   it('warns on FR declared in PRD but traced by no item', () => {
     const issues = lintPlanQuality(doc([item()]), {
@@ -367,6 +422,7 @@ describe('lintPlanQuality observable-term tuning (PAN-1796)', () => {
     vBRIEFInfo: { version: '0.6', created: 'x' },
     plan: {
       id: 'pan-1', title: 't', status: 'approved',
+      metadata: { docsJustification: 'Fixture plan; docs coverage is exercised in its own suite' },
       items: [{
         id: 'a', title: 'item a', status: 'pending',
         metadata: {
