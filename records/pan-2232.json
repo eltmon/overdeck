@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-16T18:07:51.456Z",
+  "updated": "2026-07-16T18:08:20.709Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -54,18 +54,25 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "wi-1-spawn": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2232",
         "agentId": "agent-pan-2232",
         "pid": 2335797,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:42:33.799Z"
+        "claimedAt": "2026-07-16T17:42:33.799Z",
+        "itemId": "wi-1-spawn",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:08:20.709Z"
       }
-    }
+    ]
   },
   "statusOverrides": {
-    "wi-1-spawn": "running"
+    "wi-1-spawn": "completed",
+    "wi-1-spawn.wi-1-spawn.ac1": "completed",
+    "wi-1-spawn.wi-1-spawn.ac2": "completed",
+    "wi-1-spawn.wi-1-spawn.ac3": "completed"
   }
 }
