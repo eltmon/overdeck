@@ -41,6 +41,7 @@ const mockProvisionClaudeHooks = vi.fn().mockResolvedValue({
   registered: [],
   pruned: [],
 });
+const mockExecSync = vi.fn();
 
 vi.mock('../../../src/lib/sync.js', () => ({
   planSync: mockPlanSync,
@@ -138,7 +139,7 @@ vi.mock('ora', () => ({
 
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
-  return { ...actual, execSync: vi.fn() };
+  return { ...actual, execSync: mockExecSync };
 });
 
 // ── Tests ──────────────────────────────────────────────────────────────────
@@ -162,6 +163,7 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
       registered: [],
       pruned: [],
     });
+    mockExecSync.mockReturnValue(Buffer.from(''));
   });
 
   it('mirrors project skills from the current working directory', async () => {
@@ -224,6 +226,22 @@ describe('syncCommand — layered sync (PAN-1201)', () => {
       ([msg]) => typeof msg === 'string' && msg.includes('Skills mirror'),
     );
     expect(mirrorLog).toBeUndefined();
+    consoleSpy.mockRestore();
+  });
+
+  it('points missing-jq users to the sudo-free installer without installing during sync', async () => {
+    mockExecSync.mockImplementation((command: string) => {
+      if (command === 'which jq') throw new Error('jq missing');
+      return Buffer.from('');
+    });
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const { syncCommand } = await import('../../../src/cli/commands/sync.js');
+    await syncCommand({});
+
+    expect(consoleSpy.mock.calls.some(
+      ([message]) => typeof message === 'string' && message.includes('curl -fsSL https://overdeck.ai/install | sh'),
+    )).toBe(true);
     consoleSpy.mockRestore();
   });
 

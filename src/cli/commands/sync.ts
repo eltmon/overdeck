@@ -436,7 +436,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
   // Check jq availability (required by statusline and specialists)
   if (!checkCommand('jq')) {
     console.log(chalk.yellow('\n  ⚠ jq not found — statusline and other features need it'));
-    console.log(chalk.dim('    Install: apt install jq / brew install jq\n'));
+    console.log(chalk.dim('    Install without sudo: curl -fsSL https://overdeck.ai/install | sh\n'));
   }
 
   // Sync statusline to all runtimes
