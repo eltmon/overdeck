@@ -4,17 +4,17 @@
     "created": "2026-07-16T17:49:25Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2045: perf(test): frontend vitest (jsdom) is the test-gate bottleneck — ~5min vs ~72s root; move to happy-dom / tune pool",
-    "updated": "2026-07-16T21:06:54.172Z"
+    "updated": "2026-07-16T21:06:55.953Z"
   },
   "plan": {
     "id": "pan-2045",
     "title": "perf(test): frontend vitest (jsdom) is the test-gate bottleneck — ~5min vs ~72s root; move to happy-dom / tune pool",
-    "status": "approved",
+    "status": "running",
     "uid": "0987e139-72b5-4d61-880c-15abaef580d7",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-16T17:49:25Z",
-    "updated": "2026-07-16T21:06:54.172Z",
+    "updated": "2026-07-16T21:06:55.953Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2045",
