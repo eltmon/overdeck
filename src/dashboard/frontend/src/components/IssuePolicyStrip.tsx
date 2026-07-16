@@ -2,6 +2,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { HelpTooltip, TooltipBody, TooltipProvider } from './shared/Tooltip';
+
+/** Wide enough for a 108px label column plus a four-option segmented control and its reset link. */
+const PANEL_WIDTH = 440;
+
 type ReviewModeValue = 'quick' | 'full' | 'none';
 type ReReviewScopeValue = 'all' | 'changed' | 'blockers';
 type SwarmMode = 'off' | 'auto' | 'always';
@@ -32,6 +37,63 @@ type AvailableModelsResponse = Record<string, AvailableModel[]>;
 const selectClass =
   'w-full rounded border border-border bg-popover px-2 py-0.5 text-[11.5px] font-medium text-foreground focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50';
 
+/**
+ * Help copy for each dial, written against the resolvers rather than the docs — the two disagree.
+ * Swarm `always` is deliberately not described as forcing a swarm: `resolveAutomaticSwarmPolicy`
+ * only tests `mode !== 'off'`, so it is indistinguishable from `auto` until PAN-2646 lands.
+ */
+const POLICY_HELP = {
+  reviewMode: {
+    hint: 'How much AI review runs before merge.',
+    title: 'Review mode',
+    body: 'How much AI review runs once the work agent finishes. Typecheck, lint, and tests always run first — this dial never skips them.',
+    options: [
+      ['Quick', 'One reviewer makes a single self-review pass.'],
+      ['Full', 'Four reviewers — security, correctness, performance, requirements — run in parallel, then a fifth synthesizes their reports.'],
+      ['None', 'Skips AI review only. The issue still advances to test and merge.'],
+    ] as Array<[string, string]>,
+  },
+  reReviewScope: {
+    hint: 'Which reviewers run again after you push fixes.',
+    title: 'Re-review scope',
+    body: 'On the second and later review cycles, which of the four reviewers run again. Reviewers that are skipped carry their earlier verdict forward.',
+    options: [
+      ['Changed', 'Reviewers that blocked, plus any whose domain the new commits touch. Correctness and requirements re-run on any change; security and performance only on paths that match theirs.'],
+      ['All', 'All four reviewers re-run every cycle.'],
+      ['Blockers', 'Only reviewers that blocked last cycle.'],
+    ] as Array<[string, string]>,
+  },
+  reviewModel: {
+    hint: 'Which model reviews this issue.',
+    title: 'Review model',
+    body: 'Overrides the model used to review this issue. Leave on Default to use the model configured for the review role.',
+  },
+  workModel: {
+    hint: 'Pins the implementation model for this issue.',
+    title: 'Work model',
+    body: 'Pins the model every work agent on this issue uses. It takes effect on the next spawn and applies to every dispatch after that — a running agent keeps the model it started with.',
+  },
+  swarm: {
+    hint: 'Run plan items in parallel across several agents.',
+    title: 'Swarm',
+    body: 'Whether several work agents take independent plan items on this issue at the same time.',
+    options: [
+      ['Off', 'One work agent at a time.'],
+      ['Auto', 'Swarms when the vBRIEF is partitionable and at least two items are independently startable.'],
+      ['Always', 'Behaves the same as Auto today — it does not yet force a swarm on a plan that cannot partition.'],
+    ] as Array<[string, string]>,
+  },
+  standingCrew: {
+    hint: 'Route each item to a model tier by difficulty.',
+    title: 'Standing crew',
+    body: 'Routes each plan item to a model tier by its declared difficulty or kind, instead of running everything on one model. Items the tier table cannot place fall back to the work role’s model. Default shows both the value and where it came from — this issue, the plan’s vBRIEF metadata, or your global config.',
+    options: [
+      ['On', 'Use the tier table to pick a model per item.'],
+      ['Off', 'Every item runs on the work role’s model.'],
+    ] as Array<[string, string]>,
+  },
+};
+
 interface SegmentedProps {
   ariaLabel: string;
   value: string | null;
@@ -53,6 +115,41 @@ function Segmented({ ariaLabel, value, resolvedLabel, options, disabled, onChang
           {label}
         </button>
       ))}
+    </div>
+  );
+}
+
+interface PolicyRowProps {
+  label: string;
+  help: { hint: string; title: string; body: string; options?: Array<[string, string]> };
+  /** Drives the override dot and the label emphasis. */
+  overridden: boolean;
+  reset?: React.ReactNode;
+  /** Conditional copy below the hint, e.g. the crew-suspension note. */
+  note?: React.ReactNode;
+  children: React.ReactNode;
+}
+
+function PolicyRow({ label, help, overridden, reset, note, children }: PolicyRowProps) {
+  return (
+    <div className="my-2 grid grid-cols-[108px_1fr] items-start gap-2.5">
+      <span className={`flex items-center gap-1.5 pt-1 text-[12px] font-medium ${overridden ? 'text-foreground' : 'text-muted-foreground'}`}>
+        <span className={`h-[5px] w-[5px] shrink-0 rounded-full bg-primary ${overridden ? 'opacity-100' : 'opacity-0'}`} />
+        {label}
+        <HelpTooltip
+          label={label}
+          side="left"
+          content={<TooltipBody title={help.title} body={help.body} options={help.options} />}
+        />
+      </span>
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          {children}
+          {reset}
+        </div>
+        <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{help.hint}</div>
+        {note}
+      </div>
     </div>
   );
 }
@@ -120,7 +217,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
   const positionPanel = useCallback(() => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const panelWidth = Math.min(400, Math.max(0, window.innerWidth - 16));
+    const panelWidth = Math.min(PANEL_WIDTH, Math.max(0, window.innerWidth - 16));
     setPanelPos({
       top: rect.bottom + 6,
       left: Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8)),
@@ -145,7 +242,8 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
 
   useEffect(() => {
     if (!open) return;
-    panelRef.current?.querySelector<HTMLElement>('button, select')?.focus();
+    // Help triggers are skipped so focus still lands on the first real control, not an info affordance.
+    panelRef.current?.querySelector<HTMLElement>('button:not([data-help-trigger]), select')?.focus();
     const onMouseDown = (event: MouseEvent) => {
       const target = event.target as Node;
       if (!buttonRef.current?.contains(target) && !panelRef.current?.contains(target)) setOpen(false);
@@ -221,9 +319,7 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
     if (staffing.tieredExecution.override !== null) await save(`/api/workspaces/${encoded}/tiered-execution`, { override: null }, 'PATCH');
   };
 
-  const rowLabelClass = 'flex items-center gap-1.5 text-[12px] font-medium';
   const resetClass = 'text-[10.5px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50';
-  const controlCellClass = 'flex min-w-0 items-center gap-2';
 
   return (
     <span className="flex flex-wrap items-center gap-1.5" data-testid="issue-policy-strip" title="Per-issue review and staffing overrides">
@@ -256,93 +352,86 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
       )}
 
       {open && panelPos && createPortal(
+        <TooltipProvider delayDuration={200} skipDelayDuration={300}>
         <div
           ref={panelRef}
           role="dialog"
           aria-label="Issue policy overrides"
           tabIndex={-1}
-          className="fixed z-[100] w-[400px] max-w-[calc(100vw-16px)] rounded-lg border border-border bg-popover px-4 pb-3 pt-3.5 shadow-lg"
+          className="fixed z-[100] w-[440px] max-w-[calc(100vw-16px)] rounded-lg border border-border bg-popover px-4 pb-3 pt-3.5 shadow-lg"
           style={{ top: panelPos.top, left: panelPos.left }}
         >
           <h3 className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Review</h3>
-          <div className="my-2 grid grid-cols-[92px_1fr] items-center gap-2.5">
-            <span className={`${rowLabelClass} ${review.override.reviewMode ? 'text-foreground' : 'text-muted-foreground'}`}>
-              <span className={`h-[5px] w-[5px] rounded-full bg-primary ${review.override.reviewMode ? 'opacity-100' : 'opacity-0'}`} /> Mode
-            </span>
-            <div className={controlCellClass}>
-              <Segmented ariaLabel="Review mode for this issue" value={review.override.reviewMode} resolvedLabel={review.resolved.reviewMode} options={[["quick", "Quick"], ["full", "Full"], ["none", "None"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reviewMode: next })} />
-              {review.override.reviewMode && <button type="button" aria-label="Reset review mode to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewMode: null })}>reset</button>}
-            </div>
-          </div>
+          <PolicyRow
+            label="Mode"
+            help={POLICY_HELP.reviewMode}
+            overridden={Boolean(review.override.reviewMode)}
+            reset={review.override.reviewMode ? <button type="button" aria-label="Reset review mode to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewMode: null })}>reset</button> : undefined}
+          >
+            <Segmented ariaLabel="Review mode for this issue" value={review.override.reviewMode} resolvedLabel={review.resolved.reviewMode} options={[["quick", "Quick"], ["full", "Full"], ["none", "None"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reviewMode: next })} />
+          </PolicyRow>
 
           {effectiveReviewMode === 'full' && (
-            <div className="my-2 grid grid-cols-[92px_1fr] items-center gap-2.5">
-              <span className={`${rowLabelClass} ${review.override.reReviewScope ? 'text-foreground' : 'text-muted-foreground'}`}>
-                <span className={`h-[5px] w-[5px] rounded-full bg-primary ${review.override.reReviewScope ? 'opacity-100' : 'opacity-0'}`} /> Re-review
-              </span>
-              <div className={controlCellClass}>
-                <Segmented ariaLabel="Re-review scope for this issue" value={review.override.reReviewScope} resolvedLabel={review.resolved.reReviewScope} options={[["changed", "Changed"], ["all", "All"], ["blockers", "Blockers"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reReviewScope: next })} />
-                {review.override.reReviewScope && <button type="button" aria-label="Reset re-review scope to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reReviewScope: null })}>reset</button>}
-              </div>
-            </div>
+            <PolicyRow
+              label="Re-review"
+              help={POLICY_HELP.reReviewScope}
+              overridden={Boolean(review.override.reReviewScope)}
+              reset={review.override.reReviewScope ? <button type="button" aria-label="Reset re-review scope to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reReviewScope: null })}>reset</button> : undefined}
+            >
+              <Segmented ariaLabel="Re-review scope for this issue" value={review.override.reReviewScope} resolvedLabel={review.resolved.reReviewScope} options={[["changed", "Changed"], ["all", "All"], ["blockers", "Blockers"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reReviewScope: next })} />
+            </PolicyRow>
           )}
 
-          <div className="my-2 grid grid-cols-[92px_1fr] items-center gap-2.5">
-            <span className={`${rowLabelClass} ${review.override.reviewModel ? 'text-foreground' : 'text-muted-foreground'}`}>
-              <span className={`h-[5px] w-[5px] rounded-full bg-primary ${review.override.reviewModel ? 'opacity-100' : 'opacity-0'}`} /> Model
-            </span>
-            <div className={controlCellClass}>
-              <select aria-label="Review model for this issue" className={selectClass} disabled={saving} value={review.override.reviewModel ?? ''} onChange={(event) => save(`/api/review/${encoded}/config`, { reviewModel: event.target.value || null })}>
-                <option value="">Default · {review.resolved.reviewModel ? modelName(review.resolved.reviewModel) : 'per-role default'}</option>
-                {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-              </select>
-              {review.override.reviewModel && <button type="button" aria-label="Reset review model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewModel: null })}>reset</button>}
-            </div>
-          </div>
+          <PolicyRow
+            label="Model"
+            help={POLICY_HELP.reviewModel}
+            overridden={Boolean(review.override.reviewModel)}
+            reset={review.override.reviewModel ? <button type="button" aria-label="Reset review model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reviewModel: null })}>reset</button> : undefined}
+          >
+            <select aria-label="Review model for this issue" className={selectClass} disabled={saving} value={review.override.reviewModel ?? ''} onChange={(event) => save(`/api/review/${encoded}/config`, { reviewModel: event.target.value || null })}>
+              <option value="">Default · {review.resolved.reviewModel ? modelName(review.resolved.reviewModel) : 'per-role default'}</option>
+              {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+            </select>
+          </PolicyRow>
 
           <h3 className="mb-2 mt-4 border-t border-border pt-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Work</h3>
-          <div className="my-2 grid grid-cols-[92px_1fr] items-center gap-2.5">
-            <span className={`${rowLabelClass} ${staffing.override.workModel ? 'text-foreground' : 'text-muted-foreground'}`}>
-              <span className={`h-[5px] w-[5px] rounded-full bg-primary ${staffing.override.workModel ? 'opacity-100' : 'opacity-0'}`} /> Model
-            </span>
-            <div className="min-w-0">
-              <div className={controlCellClass}>
-                <select aria-label="Work model for this issue" className={selectClass} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
-                  <option value="">Default · {workDefault}</option>
-                  {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
-                </select>
-                {staffing.override.workModel && <button type="button" aria-label="Reset work model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button>}
-              </div>
-              {crewSuspended && <div className="mt-1 text-[11px] text-muted-foreground">Overrides crew routing — every item on this issue runs this model.</div>}
-            </div>
-          </div>
+          <PolicyRow
+            label="Model"
+            help={POLICY_HELP.workModel}
+            overridden={Boolean(staffing.override.workModel)}
+            reset={staffing.override.workModel ? <button type="button" aria-label="Reset work model to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/staffing`, { workModel: null })}>reset</button> : undefined}
+            note={crewSuspended ? <div className="mt-1 text-[11px] leading-snug text-muted-foreground">Overrides crew routing — every item on this issue runs this model.</div> : undefined}
+          >
+            <select aria-label="Work model for this issue" className={selectClass} disabled={saving} value={staffing.override.workModel ?? ''} onChange={(event) => save(`/api/issues/${encoded}/staffing`, { workModel: event.target.value || null })}>
+              <option value="">Default · {workDefault}</option>
+              {models.map((model) => <option key={model.id} value={model.id}>{model.name}</option>)}
+            </select>
+          </PolicyRow>
 
-          <div className="my-2 grid grid-cols-[92px_1fr] items-center gap-2.5">
-            <span className={`${rowLabelClass} ${swarm.configured?.mode ? 'text-foreground' : 'text-muted-foreground'}`}>
-              <span className={`h-[5px] w-[5px] rounded-full bg-primary ${swarm.configured?.mode ? 'opacity-100' : 'opacity-0'}`} /> Swarm
-            </span>
-            <div className={controlCellClass}>
-              <Segmented ariaLabel="Swarm mode for this issue" value={swarm.configured?.mode ?? null} resolvedLabel={swarm.resolved.mode} options={[["off", "Off"], ["auto", "Auto"], ["always", "Always"]]} disabled={saving} onChange={(next) => save(`/api/issues/${encoded}/swarm-policy`, { value: next ? { mode: next } : null })} />
-              {swarm.configured?.mode && <button type="button" aria-label="Reset swarm mode to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/swarm-policy`, { value: null })}>reset</button>}
-            </div>
-          </div>
+          <PolicyRow
+            label="Swarm"
+            help={POLICY_HELP.swarm}
+            overridden={Boolean(swarm.configured?.mode)}
+            reset={swarm.configured?.mode ? <button type="button" aria-label="Reset swarm mode to default" className={resetClass} disabled={saving} onClick={() => save(`/api/issues/${encoded}/swarm-policy`, { value: null })}>reset</button> : undefined}
+          >
+            <Segmented ariaLabel="Swarm mode for this issue" value={swarm.configured?.mode ?? null} resolvedLabel={swarm.resolved.mode} options={[["off", "Off"], ["auto", "Auto"], ["always", "Always"]]} disabled={saving} onChange={(next) => save(`/api/issues/${encoded}/swarm-policy`, { value: next ? { mode: next } : null })} />
+          </PolicyRow>
 
-          <div className="my-2 grid grid-cols-[92px_1fr] items-center gap-2.5">
-            <span className={`${rowLabelClass} ${staffing.tieredExecution.override ? 'text-foreground' : 'text-muted-foreground'}`}>
-              <span className={`h-[5px] w-[5px] rounded-full bg-primary ${staffing.tieredExecution.override ? 'opacity-100' : 'opacity-0'}`} /> Standing crew
-            </span>
-            <div className={controlCellClass}>
-              <Segmented
-                ariaLabel="Standing crew routing for this issue"
-                value={staffing.tieredExecution.override}
-                resolvedLabel={`${staffing.tieredExecution.effective ? 'on' : 'off'} (${staffing.tieredExecution.source === 'issue-override' ? 'issue' : staffing.tieredExecution.source === 'plan-metadata' ? 'plan' : 'global'})`}
-                options={[["on", "On"], ["off", "Off"]]}
-                disabled={saving}
-                onChange={(next) => save(`/api/workspaces/${encoded}/tiered-execution`, { override: next }, 'PATCH')}
-              />
-              {staffing.tieredExecution.override && <button type="button" aria-label="Reset standing crew to default" className={resetClass} disabled={saving} onClick={() => save(`/api/workspaces/${encoded}/tiered-execution`, { override: null }, 'PATCH')}>reset</button>}
-            </div>
-          </div>
+          <PolicyRow
+            label="Standing crew"
+            help={POLICY_HELP.standingCrew}
+            overridden={Boolean(staffing.tieredExecution.override)}
+            reset={staffing.tieredExecution.override ? <button type="button" aria-label="Reset standing crew to default" className={resetClass} disabled={saving} onClick={() => save(`/api/workspaces/${encoded}/tiered-execution`, { override: null }, 'PATCH')}>reset</button> : undefined}
+          >
+            <Segmented
+              ariaLabel="Standing crew routing for this issue"
+              value={staffing.tieredExecution.override}
+              resolvedLabel={`${staffing.tieredExecution.effective ? 'on' : 'off'} (${staffing.tieredExecution.source === 'issue-override' ? 'issue' : staffing.tieredExecution.source === 'plan-metadata' ? 'plan' : 'global'})`}
+              options={[["on", "On"], ["off", "Off"]]}
+              disabled={saving}
+              onChange={(next) => save(`/api/workspaces/${encoded}/tiered-execution`, { override: next }, 'PATCH')}
+            />
+          </PolicyRow>
 
           {needsRestart && (
             <div className="mt-3 rounded-md border border-warning/32 bg-warning/8 px-2.5 py-2 text-[11.5px] font-medium text-warning-foreground">
@@ -358,7 +447,8 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             <span className="text-[10.5px] font-medium text-muted-foreground">Overrides apply to this issue only.</span>
             {overrideCount > 0 && <button type="button" className="text-[11px] font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50" disabled={saving} onClick={resetAll}>Reset all to defaults</button>}
           </div>
-        </div>,
+        </div>
+        </TooltipProvider>,
         document.body,
       )}
     </span>
