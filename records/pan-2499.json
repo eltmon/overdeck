@@ -52,9 +52,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T01:17:18.034Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T01:19Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T01:19:26.040Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T01:19:26Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2499\n\n# Review Synthesis — PAN-2499 — 2026-07-15\n\n## Verdict: CHANGES REQUESTED — failed starts can permanently clear operator safety gates\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-cc6b645b/context.json`\n- Branch: `feature/2499`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499`\n- HEAD reviewed: `cc6b645b18a3a591bc449c4010622ee8bd9e1fdb`\n- Cycle number: 2\n- Prior cycle SHA: `f02a5fae640cf8b73b7aa2278527ab8ba710847a`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 2 |\n| performance | ready | `performance.md` | 3 |\n| requirements | ready | `requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Resumable agents are started fresh instead of resumed — `src/dashboard/frontend/src/components/issue-view/StartAgentCta.tsx:33`\nThe CTA selects `start` before `resume` when both actions are enabled. Those predicates overlap for a stopped, planned agent with a resumable lifecycle session, so the normal resume branch is unreachable and the UI posts to the fresh-start endpoint instead of restoring the saved session. Give resumable sessions priority, except where the explicit clear-and-start flow deliberately requires a fresh run, and cover the overlapping-predicate case with a focused test.\n\n### [correctness] Failed starts permanently clear paused or troubled gates — `src/dashboard/server/routes/agents/spawn.ts:245`\nThe route persists gate clearing and emits intervention events before later workspace, plan, guardrail, authentication, and spawn checks can reject the request. A failed combined clear-and-start operation therefore removes an operator safety gate without starting an agent. Complete non-mutating validation before clearing the gates, then make the committed spawn boundary atomic or restore the original state on any remaining failure; add a route test proving a post-gate validation failure preserves the gate and emits no clear event.\n\n### [performance] Start-agent gate clearing performs synchronous state I/O in the HTTP handler — `src/dashboard/server/routes/agents/spawn.ts:258`\nThe new route branch calls `clearAgentPausedSync` and `clearAgentTroubledSync`, whose filesystem-backed reads and writes block the dashboard's Node event loop and can stall unrelated HTTP and terminal WebSocket traffic. Route the handler through the canonical async gate-clearing implementation, preserve event and lifecycle-log ordering after awaited writes, and recheck the gate asynchronously.\n\n### [performance] Collapsed issue rows start five per-issue polling queries — `src/dashboard/frontend/src/components/issue-view/IssueView.tsx:29`\nEvery project-tree issue mounts `StartAgentCta`, which invokes the full `useIssueView(issueId)` query bundle before deciding whether it renders anything. This creates five recurring per-issue subscriptions for collapsed rows, turning navigation-tree background load into O(visible issues) HTTP traffic. Derive the rail CTA from existing shared feature and agent state, or defer and enable the expensive detail queries only when the issue is selected or expanded.\n\n### [performance] Compact beads chips poll full task lists per issue — `src/dashboard/frontend/src/components/issue-view/BeadsPanel.tsx:127`\nEach task-bearing project-tree issue mounts a compact `BeadsPanel` that polls its distinct task-list endpoint every ten seconds, although the chip only needs completed and total counts. This creates an N+1 recurring request pattern across visible issues. Supply task summaries through the shared tree read model or a batched source, and keep detailed task polling disabled until an expanded panel needs the list.\n\n### [requirements] The no-loss gate does not prove inventory sections render — `src/dashboard/frontend/src/components/issue-view/IssueView.tsx:19`\nScope: `in_pr_scope`. FR-0 and WI-6 require a render-level gate that prevents any inventoried section from disappearing from Console, Cockpit, or Rail. `DENSITY_SECTIONS` does not control `IssueView`, while the tests only validate declared string membership and manifest home paths, so a real shell can omit a required section without failing. Render each density through its actual adapter and assert its required independent inventory sections exist in the DOM, or make the density map drive composition while retaining an independent hardcoded inventory check.\n\n## Non-blocking Findings\n\n### Requirements\n- The seven stub-UI heuristics are mitigated by working state transitions and controls rather than placeholder state.\n- The inspected wiring respects the explicit non-goals: it adds no endpoint, preserves all three adapters and Command Deck navigation, and confines server behavior to `clearGates` on the existing start route.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories in the changed server and frontend surfaces.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-cc6b645b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2499 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -195,7 +208,7 @@
     "recordedAt": "2026-07-16T01:13:10.379Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T01:17:18.034Z",
+  "updated": "2026-07-16T01:19:26.041Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "reviewing",
