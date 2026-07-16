@@ -5036,3 +5036,20 @@ the proven root cause + exact fix (route kickoff via app-server for codex agents
 delivery verified (userMessages=6). **When 2771 lands, every parked issue moves.**
 
 **Landed this session: 35 merges** (+2774, 2776/PostHog, 2778/PAN-2777). Strikes active: 2710, 2741, 2771.
+
+---
+
+## Tick 47 — 2026-07-16 ~06:50Z — PAN-2771 landed+deployed but NOT SUFFICIENT; residual filed PAN-2781
+
+### ✅ Landed: PAN-2741 (`a97479ef80` gate-output), PAN-2771 (`28bd9a0bf0` kickoff routing), PostHog (`3e1b10ebae`), PAN-2777 (`0c818f484e`)
+### ✅ Closed out: PAN-2499 (ALL 8 DoD rows PASS) + 2748/2752/2753/2770 (recorded --accept overrides; strike-branch DoD gap)
+### ⚠️ Deploy incident: `build; restart` (my `;` not `&&`) shipped a half-stale dist on BUILD EXIT=1 — root cause: posthog-js dep never bun-installed in primary after the PostHog merge. Fixed: install → BUILD EXIT=0 → redeploy. `pan restart` itself doesn't gate on build success (PAN-2713 gap).
+### ❌ LIVE PROOF FAILED — kickoff STILL dies post-fix
+Fix present in running chunks (`agents-d31-gCtd.js`), state.harness=codex → auto routing engaged — yet
+`deliver('auto')` ESCAPED with the strict supervisor tier's throw (socket-missing), never cascading to tmux.
+Stale app-server socket (existsSync passes, host dead) suspected of poisoning the app-server tier.
+**Filed PAN-2781** with full evidence + tier-logging ask; struck. Chunk lesson: grep dist/cli/index.js
+alone is a FALSE NEGATIVE — code lives in hash chunks that import each other.
+### PAN-2499 close-out teardown KILLED the host dashboard (orphan-killer swept wide; systemd respawned).
+Also killed 2 workspace CONTAINER peers myself on a wrong orphan-storm read — harmless, noted.
+**7 issues still dammed on kickoff (now PAN-2781). PAN-2710 strike still working. PAN-1491 unpause queued post-fix.**
