@@ -647,7 +647,7 @@
     "recordedAt": "2026-07-16T21:42:09.171Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T22:58:05.731Z",
+  "updated": "2026-07-16T23:59:30.763Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "passed",
@@ -656,7 +656,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T22:58:05.723Z",
+    "updatedAt": "2026-07-16T23:59:30.749Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2760-review",
     "testNotes": "Skipped: issue is already merged",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
@@ -797,7 +797,7 @@
       },
       "costAtCloseOut": {
         "usd": 113.66871,
-        "pricingAsOf": "2026-07-16T22:58:05.726Z"
+        "pricingAsOf": "2026-07-16T23:59:30.760Z"
       }
     },
     "merges": [
