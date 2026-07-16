@@ -107,7 +107,7 @@ vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
 vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div>Agents lane</div> }))
-vi.mock('../../issue-view/BeadsPanel', () => ({ BeadsPanel: () => <div>Beads panel</div> }))
+vi.mock('./TasksRail', () => ({ TasksRail: () => <div>Tasks rail</div> }))
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 
@@ -141,7 +141,7 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
 describe('IssueMissionControl', () => {
   it('renders cockpit inventory markers on the real overview shell', () => {
     const { container } = renderMissionControl();
-    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'BeadsRail / BeadsTab', 'Awareness rail', 'ReviewPolicyControl']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'Awareness rail', 'UatEnvironmentPanel', 'NowPanel', 'PickupGateCard', 'ReviewPolicyControl']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
   });

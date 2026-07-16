@@ -28,7 +28,6 @@ import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
-import { BeadsPanel } from '../../issue-view/BeadsPanel';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import { SessionNode } from './SessionNode';
@@ -1234,8 +1233,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       </ContextMenuTrigger>
       </div></div>
       <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
-      {feature.resourceDetails?.hasTasks && (
-        <BeadsPanel issueId={feature.issueId} compact onOpenFull={() => onSelect?.()} />
+      {feature.resourceDetails?.hasTasks && feature.taskTotals && (
+        <button type="button" data-section="Tasks summary" className={styles.featureBadge} onClick={(event) => { event.stopPropagation(); onSelect?.(); }} title="Open issue tasks">
+          tasks {feature.taskTotals.closed}/{feature.taskTotals.total}</button>
       )}
 
       {expanded && (
@@ -1294,7 +1294,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     />
                   );
                 })}
-                {hasConversations && issueConversations.map(conv => (
+                {hasConversations && <div data-section="Conversation rows">{issueConversations.map(conv => (
                   <a
                     key={`conv-${conv.id}`}
                     href={`/conv/${conv.id}`}
@@ -1307,7 +1307,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{conv.status}</span>
                     <span style={{ fontSize: 10, color: 'var(--muted-foreground)', fontVariantNumeric: 'tabular-nums' }}>#{conv.id}</span>
                   </a>
-                ))}
+                ))}</div>}
               </>
             );
           })()}

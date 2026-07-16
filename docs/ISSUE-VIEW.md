@@ -15,7 +15,7 @@ The kit currently owns these reusable pieces:
 - `ActiveAgentPanel` renders the selected live session stream and its resume and message actions.
 - `ShipProgress` renders compact and full merge/verification progress.
 - `VerificationGates` renders the current verification cycle and gate results.
-- `BeadsPanel` renders task progress in compact or full form.
+- `TasksPanel`, `TasksRail`, and `TasksTab` retain the canonical PAN-2696 task-status semantics. Collapsed rail rows use the shared `taskTotals` rollup and never poll task detail per issue.
 - `StartAgentCta` selects one start, clear-and-start, or resume mode. Its issue-view form includes model and harness overrides; the kanban chip and Fleet inline forms deliberately do not.
 
 `useIssueView`, `IssueViewModel`, the shared derivations, and the public components are exported through `components/issue-view/index.ts`.

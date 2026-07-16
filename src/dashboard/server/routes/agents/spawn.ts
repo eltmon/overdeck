@@ -243,7 +243,8 @@ export const postAgentsRoute = HttpRouter.add(
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
     const clearGates = originCheck.ok && (body as any).clearGates === true;
-    const startGateBlock = evaluateAgentStartGate(agentSessionName, yield* getAgentState(agentSessionName));
+    const initialAgentState = yield* getAgentState(agentSessionName);
+    const startGateBlock = evaluateAgentStartGate(agentSessionName, initialAgentState);
     if (startGateBlock) {
       if (!clearGates) {
         yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_gate', {
@@ -254,21 +255,6 @@ export const postAgentsRoute = HttpRouter.add(
         }));
         return jsonResponse(startGateBlock, { status: 409 });
       }
-      if (startGateBlock.paused) {
-        clearAgentPausedSync(agentSessionName);
-        yield* eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'unpause', source: 'dashboard' }));
-      }
-      if (startGateBlock.troubled) {
-        clearAgentTroubledSync(agentSessionName);
-        yield* eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'untroubled', source: 'dashboard' }));
-      }
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_gates_cleared', {
-        issueId,
-        paused: startGateBlock.paused,
-        troubled: startGateBlock.troubled,
-      }));
-      const recheckBlock = evaluateAgentStartGate(agentSessionName, yield* getAgentState(agentSessionName));
-      if (recheckBlock) return jsonResponse(recheckBlock, { status: 409 });
     }
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
@@ -687,14 +673,35 @@ export const postAgentsRoute = HttpRouter.add(
     }
 
     // Spawn pan start command
-    const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => spawnPanCommandDetached({
-      agentSessionName,
-      issueId,
-      role,
-      workspacePath,
-      args,
-      cwd,
-    });
+    let gatesCommitted = false;
+    const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
+      if (startGateBlock && !gatesCommitted) {
+        if (startGateBlock.paused) clearAgentPausedSync(agentSessionName);
+        if (startGateBlock.troubled) clearAgentTroubledSync(agentSessionName);
+      }
+      let activityId: string;
+      try {
+        activityId = await spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd });
+      } catch (error) {
+        if (startGateBlock && initialAgentState) saveAgentStateSync(initialAgentState);
+        throw error;
+      }
+      if (startGateBlock && !gatesCommitted) {
+        gatesCommitted = true;
+        if (startGateBlock.paused) {
+          await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'unpause', source: 'dashboard' })));
+        }
+        if (startGateBlock.troubled) {
+          await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'untroubled', source: 'dashboard' })));
+        }
+        await appendAgentLifecycleLog(agentSessionName, 'agent.start_gates_cleared', {
+          issueId,
+          paused: startGateBlock.paused,
+          troubled: startGateBlock.troubled,
+        });
+      }
+      return activityId;
+    };
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
     const updateIssueStatus = async () => {

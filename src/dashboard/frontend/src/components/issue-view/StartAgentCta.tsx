@@ -5,7 +5,6 @@ import { useIssueActions } from '../IssueActionMenu/useIssueActions';
 import { ModelHarnessPicker, useAvailableModels, type Harness } from '../shared/ModelPicker';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
-import { useIssueView } from './useIssueView';
 import type { IssueViewDensity } from './inventory';
 
 async function errorMessage(response: Response, fallback: string) {
@@ -18,7 +17,6 @@ type StartAgentCtaSurface = 'issue-view' | 'chip' | 'inline';
 export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { issueId: string; density: IssueViewDensity; surface?: StartAgentCtaSurface }) {
   const queryClient = useQueryClient();
   const actions = useIssueActions(issueId);
-  const modelView = useIssueView(issueId);
   const { groups, defaultModel, harnessPolicy } = useAvailableModels();
   const [confirming, setConfirming] = useState(false);
   const [overrideOpen, setOverrideOpen] = useState(false);
@@ -28,12 +26,12 @@ export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { is
   useEffect(() => { if (defaultModel) setModel(defaultModel); }, [defaultModel]);
   const start = actions.all.find((view) => view.action.key === 'startAgent');
   const resume = actions.all.find((view) => view.action.key === 'resumeSession');
-  const gate = modelView.operator.needsYou?.kind === 'troubled' || actions.agent?.troubled ? 'troubled' : modelView.operator.needsYou?.kind === 'paused' || actions.agent?.paused ? 'paused' : null;
+  const gate = actions.agent?.troubled ? 'troubled' : actions.agent?.paused ? 'paused' : null;
   const clearAndStart = Boolean(gate && start?.enabled);
-  const mode = clearAndStart || start?.enabled ? 'start' : resume?.enabled ? 'resume' : null;
+  const mode = clearAndStart ? 'start' : resume?.enabled ? 'resume' : start?.enabled ? 'start' : null;
   const mutation = useMutation({
     mutationFn: async (mode: 'start' | 'resume') => {
-      const agentId = actions.agent?.id ?? modelView.operator.needsYou?.sessionId;
+      const agentId = actions.agent?.id;
       const url = mode === 'resume' ? `/api/agents/${agentId}/resume` : '/api/agents';
       const payload: Record<string, unknown> = mode === 'resume' ? {} : { issueId, projectId: actions.issue?.project?.id };
       if (mode === 'start' && clearAndStart) payload.clearGates = true;

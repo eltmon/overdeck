@@ -391,7 +391,7 @@ describe('operator.intervention dashboard routes', () => {
   // functions pan untroubled / pan unpause use and emit the matching intervention
   // event — and must refuse (not silently no-op) when clearGates is absent.
 
-  it('clears the troubled gate and emits untroubled when clearGates is set on spawn (AC1)', async () => {
+  it('preserves the troubled gate when post-gate spawn validation fails', async () => {
     agentMocks.getAgentState.mockReturnValue(
       Effect.succeed({ ...agentState, troubled: true, consecutiveFailures: 2 }),
     );
@@ -400,15 +400,12 @@ describe('operator.intervention dashboard routes', () => {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
     });
 
-    expect(agentMocks.clearAgentTroubledSync).toHaveBeenCalledWith('agent-pan-1');
+    expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
     expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
-    expect(appendedEvents).toContainEqual(expect.objectContaining({
-      type: 'operator.intervention',
-      payload: { issueId: 'PAN-1', kind: 'untroubled', source: 'dashboard' },
-    }));
+    expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
   });
 
-  it('clears the paused gate and emits unpause when clearGates is set on spawn (AC2)', async () => {
+  it('preserves the paused gate when post-gate spawn validation fails', async () => {
     agentMocks.getAgentState.mockReturnValue(
       Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
     );
@@ -417,12 +414,9 @@ describe('operator.intervention dashboard routes', () => {
       body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
     });
 
-    expect(agentMocks.clearAgentPausedSync).toHaveBeenCalledWith('agent-pan-1');
+    expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
     expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
-    expect(appendedEvents).toContainEqual(expect.objectContaining({
-      type: 'operator.intervention',
-      payload: { issueId: 'PAN-1', kind: 'unpause', source: 'dashboard' },
-    }));
+    expect(appendedEvents).not.toContainEqual(expect.objectContaining({ type: 'operator.intervention' }));
   });
 
   it('refuses a gated spawn without clearGates and clears nothing (AC3)', async () => {

@@ -10,7 +10,7 @@ import DrawerActionBar from './DrawerActionBar';
 import { DrawerAgentSession, pickDefaultDrawerAgent } from './DrawerAgentSession';
 import DrawerActivityRail from './DrawerActivityRail';
 import DrawerArtifactsPanel from './DrawerArtifactsPanel';
-import { BeadsPanel } from '../issue-view/BeadsPanel';
+import { TasksPanel } from '../TasksPanel';
 import DrawerReviewSpecialists from './DrawerReviewSpecialists';
 import DrawerTabs from './DrawerTabs';
 import { VerificationGates } from '../issue-view/VerificationGates';
@@ -22,6 +22,7 @@ import { DrawerActivityPanel, DrawerPlanPanel } from './DrawerSecondaryPanels';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { IssueView } from '../issue-view/IssueView';
+import { UatEnvironmentPanel } from '../CommandDeck/UatEnvironmentPanel';
 
 // PAN-2059: the backlog pickup controls (Plan → Release, AI objection, Ready /
 // Park / Blocks-main, planning, pickup gate) on the issue overlay — the same
@@ -89,7 +90,7 @@ export function IssueDrawer() {
   const drawer = useDashboardStore((state) => state.drawer);
   const closeIssue = useDashboardStore((state) => state.closeIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
-  const { issue, agents, tasks } = useDrawerData();
+  const { issue, agents } = useDrawerData();
 
   // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
   // survives a Conversation ⇄ Terminal tab switch; falls back to the default
@@ -221,14 +222,15 @@ export function IssueDrawer() {
                 <div data-section="PhaseTimeline"><PhaseTimeline /></div>
                 <div data-section="DrawerPickupSection / PickupGateControls"><DrawerPickupSection issueId={drawer.issueId} /></div>
                 <div data-section="DrawerWorkspaceSection"><DrawerWorkspaceSection issueId={drawer.issueId} /></div>
+                <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={drawer.issueId} /></div>
                 <div data-section="DrawerActiveAgent"><ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" /></div>
                 <div data-section="DrawerVerificationGates"><VerificationGates issueId={drawer.issueId} /></div>
-                <div data-section="DrawerBeadsList"><BeadsPanel issueId={drawer.issueId} items={tasks} /></div>
+                <div data-section="DrawerTasksList"><TasksPanel issueId={drawer.issueId} /></div>
                 <div data-section="DrawerReviewSpecialists"><DrawerReviewSpecialists /></div>
               </div>
             ) : drawer.tab === 'tasks' ? (
-              <div data-testid="drawer-tab-panel-tasks" data-section="DrawerBeadsList">
-                <BeadsPanel issueId={drawer.issueId} items={tasks} />
+              <div data-testid="drawer-tab-panel-tasks" data-section="DrawerTasksList">
+                <TasksPanel issueId={drawer.issueId} />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
               <div data-section="DrawerPlanPanel / VBriefViewer"><DrawerPlanPanel issueId={drawer.issueId} /></div>

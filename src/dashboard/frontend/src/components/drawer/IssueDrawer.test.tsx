@@ -887,38 +887,9 @@ describe('IssueDrawer', () => {
   it('renders console inventory markers on the real overview shell', () => {
     useDashboardStore.getState().openIssue('PAN-1');
     const { container } = renderDrawer();
-    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'DrawerReviewSpecialists', 'DrawerBeadsList', 'DrawerActivityRail / DrawerActivityPanel', 'ReviewPolicyControl']) {
+    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'IssuePolicyStrip / PoliciesControl', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'DrawerReviewSpecialists', 'DrawerTasksList', 'DrawerActivityRail / DrawerActivityPanel', 'StartAgentCta']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
-  });
-
-  it('renders drawer beads list from drawer data with done and current states', () => {
-    useDashboardStore.getState().openIssue('PAN-1');
-
-    renderDrawer([
-      {
-        id: 'workspace-done',
-        title: 'PAN-1: Completed bead',
-        status: 'closed',
-        createdAt: '2026-05-18T00:00:00.000Z',
-        closedAt: '2026-05-18T00:05:00.000Z',
-      },
-      {
-        id: 'workspace-current',
-        title: 'PAN-1: Current bead',
-        status: 'in_progress',
-        createdAt: '2026-05-18T00:00:00.000Z',
-        updatedAt: '2026-05-18T00:03:00.000Z',
-      },
-    ]);
-
-    expect(screen.getByTestId('drawer-beads-list')).toBeInTheDocument();
-    expect(screen.getByText('Completed bead')).toHaveClass('line-through', 'decoration-[rgba(255,255,255,0.18)]');
-    expect(screen.getByText('workspace-done')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
-    expect(screen.getByText('5m')).toHaveClass('font-mono', 'text-[10px]', 'tabular-nums');
-    expect(screen.getByTestId('drawer-bead-status-done')).toHaveClass('bg-success', 'text-white', 'text-[9px]');
-    expect(screen.getByTestId('drawer-bead-status-current')).toHaveClass('relative');
-    expect(screen.getByTestId('drawer-bead-status-current').firstElementChild).toHaveClass('drawer-bead-current-ping', 'border-[1.5px]', 'border-info');
   });
 
   it('renders four review specialist rows from drawer data with status dots', () => {

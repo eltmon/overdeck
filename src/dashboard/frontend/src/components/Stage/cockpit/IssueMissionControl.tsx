@@ -31,7 +31,8 @@ import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
-import { BeadsPanel } from '../../issue-view/BeadsPanel'
+import { TasksRail } from './TasksRail'
+import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
@@ -481,7 +482,7 @@ function IssueTreeLane({
   return (
     <aside className="min-w-0 rounded-[20px] border border-border bg-card/50 p-2" aria-label="Issue tree">
       {staleReviewers.length > 0 ? (
-        <div className="mb-2 rounded-[var(--radius-sm)] border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px]" role="alert">
+        <div data-section="Stale-review warning" className="mb-2 rounded-[var(--radius-sm)] border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px]" role="alert">
           <div className="font-semibold text-amber-600 dark:text-amber-400">⚠ Stale review state</div>
           <div className="mt-0.5 text-muted-foreground">
             {staleReviewers.length} leftover review agent{staleReviewers.length === 1 ? '' : 's'} from a previous
@@ -780,11 +781,12 @@ function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }:
   return (
     <div className="space-y-3.5">
       {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
+      <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
       <HappenedFeed issueId={issueId} />
       <PlanMapCard issueId={issueId} />
       <IssueBlockerSpotlight issueId={issueId} />
-      <NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
-      <PickupGateCard issueId={issueId} />
+      <div data-section="NowPanel"><NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} /></div>
+      <div data-section="PickupGateCard"><PickupGateCard issueId={issueId} /></div>
     </div>
   )
 }
@@ -935,7 +937,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           </nav>
           <div className="p-4">
             {(treeContext || selectedTreeSession) && (
-              <IssueTreeContextPanel
+              <div data-section="SessionPanel"><IssueTreeContextPanel
                 context={treeContext ?? 'issue'}
                 issueId={issueId}
                 selectedSession={selectedTreeSession}
@@ -947,7 +949,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 onBackToIssue={selectIssueFromTree}
                 onTab={selectTab}
                 onOpenAgent={openAgentByType}
-              />
+              /></div>
             )}
             {activeTab === 'overview' && <div data-section="Awareness rail"><OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} /></div>}
             {activeTab === 'code' && (
@@ -976,10 +978,10 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'conversation' && <div data-section="Conversation / Files / Terminal tabs"><MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} /></div>}
             {activeTab === 'files' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} /></div>}
             {activeTab === 'terminal' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} /></div>}
-            {activeTab === 'beads' && <div data-section="BeadsRail / BeadsTab"><TasksTab issueId={issueId} /></div>}
+            {activeTab === 'beads' && <div data-section="TasksRail / TasksTab"><TasksTab issueId={issueId} /></div>}
           </div>
         </main>
-        <div data-section="BeadsRail / BeadsTab"><BeadsPanel issueId={issueId} onOpenFull={() => selectTab('beads')} /></div>
+        <div data-section="TasksRail / TasksTab"><TasksRail issueId={issueId} onOpenFull={() => selectTab('beads')} /></div>
       </div>
     </IssueView>
   )

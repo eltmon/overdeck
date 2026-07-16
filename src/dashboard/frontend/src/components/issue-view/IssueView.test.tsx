@@ -61,7 +61,10 @@ describe('IssueView', () => {
 
     for (const density of ['cockpit', 'console'] as const) {
       const view = render(<IssueView issueId="PAN-2499" density={density}><span /></IssueView>);
-      expect(screen.getByText('policy PAN-2499')).toBeInTheDocument();
+      expect(screen.getByText('policy PAN-2499').parentElement).toHaveAttribute(
+        'data-section',
+        density === 'console' ? 'IssuePolicyStrip / PoliciesControl' : 'ReviewPolicyControl',
+      );
       view.unmount();
     }
   });

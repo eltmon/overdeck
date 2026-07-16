@@ -4,11 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { StartAgentCta } from './StartAgentCta';
 
 const useIssueActions = vi.fn();
-const useIssueView = vi.fn();
 const refreshDashboardState = vi.fn();
 
 vi.mock('../IssueActionMenu/useIssueActions', () => ({ useIssueActions: (...args: unknown[]) => useIssueActions(...args) }));
-vi.mock('./useIssueView', () => ({ useIssueView: (...args: unknown[]) => useIssueView(...args) }));
 vi.mock('../shared/ModelPicker', () => ({
   useAvailableModels: () => ({ groups: [], defaultModel: 'claude-sonnet-5', harnessPolicy: undefined }),
   ModelHarnessPicker: () => <div>model picker</div>,
@@ -23,9 +21,6 @@ function setState({ start = false, resume = false, troubled = false, paused = fa
     all: [action('startAgent', start), action('resumeSession', resume)],
     agent: agentId ? { id: agentId, troubled, paused } : undefined,
     issue: { project: { id: 'overdeck' } },
-  });
-  useIssueView.mockReturnValue({
-    operator: { needsYou: troubled ? { kind: 'troubled', sessionId: agentId } : paused ? { kind: 'paused', sessionId: agentId } : undefined },
   });
 }
 
@@ -83,6 +78,14 @@ describe('StartAgentCta', () => {
 
   it('resumes a resumable stopped session through the agent endpoint', async () => {
     setState({ resume: true });
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
+    renderCta();
+    fireEvent.click(screen.getByRole('button', { name: 'Resume session' }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-2499/resume', expect.objectContaining({ method: 'POST' })));
+  });
+
+  it('prefers resume when fresh start and resume are both enabled', async () => {
+    setState({ start: true, resume: true });
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}'));
     renderCta();
     fireEvent.click(screen.getByRole('button', { name: 'Resume session' }));

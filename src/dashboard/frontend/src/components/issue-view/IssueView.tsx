@@ -22,11 +22,11 @@ export function IssueView({ issueId, density, children, ...rootProps }: IssueVie
   return (
     <div {...rootProps} data-component={typeof dataComponent === 'string' ? dataComponent : 'issue-view'} data-density={density}>
       {(density === 'cockpit' || density === 'console') && (
-        <div data-section="ReviewPolicyControl">
+        <div data-section={density === 'console' ? 'IssuePolicyStrip / PoliciesControl' : 'ReviewPolicyControl'}>
           <ReviewPolicyControl issueId={issueId} />
         </div>
       )}
-      <StartAgentCta issueId={issueId} density={density} />
+      <div data-section="StartAgentCta"><StartAgentCta issueId={issueId} density={density} /></div>
       {children}
     </div>
   );
