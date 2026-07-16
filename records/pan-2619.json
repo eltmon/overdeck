@@ -164,7 +164,7 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:33:56.276Z",
+  "updated": "2026-07-16T21:34:06.655Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "blocked",
@@ -173,9 +173,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:33:55.130Z",
+    "updatedAt": "2026-07-16T21:34:03.389Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
-    "testNotes": "Code fix verified correct (typecheck, lint, targeted XTerminal.test.tsx all PASS; diff matches the planned CSS fix). FAILED because: (1) broad --changed vitest gate fails on src/App.test.tsx due to an unrelated pre-existing main defect (missing selectPendingInputSubjects mock, from commit 2f4648e673, byte-identical on main, untouched by this diff); (2) required browser UAT (ACs call for Playwright getBoundingClientRect + tmux pane-size checks) could not run: the workspace's own isolated container stack rejects /ws/terminal WebSocket upgrades with 403 via the frontend Traefik/Vite-proxied path (Origin header lost in that proxy hop) and, when a connection does get through, the server segfaults on PTY spawn (devcontainer is node:22-alpine/musl; pinned @lydell/node-pty-linux-x64 binary is glibc-only). Both are pre-existing environment defects outside test-role scope to fix; no fallback to host dashboard was used per role boundary. Notified flywheel-orchestrator via pan tell.",
+    "testNotes": "See .pan/test/result.json for full evidence. Code fix verified correct (typecheck, lint, targeted XTerminal.test.tsx PASS). FAILED because broad --changed vitest gate fails on unrelated pre-existing App.test.tsx defect (commit 2f4648e673, untouched by this diff), and required browser UAT could not run: workspace container /ws/terminal rejects upgrades with 403 via frontend Traefik/Vite proxy path, and PTY spawn segfaults (node:22-alpine/musl vs glibc-only @lydell/node-pty-linux-x64). Both pre-existing env defects, out of test-role scope. No host dashboard fallback used. Flywheel notified via pan tell.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "lastVerifiedCommit": "2f50757534e026b0c6eb8adb20c55d739328e0b7",
     "reviewRequestedAt": "2026-07-16T21:16:57.434Z",
@@ -264,10 +264,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1679,
-            "output": 59169,
-            "cacheRead": 20298831,
-            "cacheWrite": 234928
+            "input": 1681,
+            "output": 59732,
+            "cacheRead": 20564478,
+            "cacheWrite": 236200
           }
         },
         "work": {
@@ -299,15 +299,15 @@
           "cacheWrite": 327850
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1679,
-          "output": 59169,
-          "cacheRead": 20298831,
-          "cacheWrite": 234928
+          "input": 1681,
+          "output": 59732,
+          "cacheRead": 20564478,
+          "cacheWrite": 236200
         }
       },
       "costAtCloseOut": {
-        "usd": 89.767784,
-        "pricingAsOf": "2026-07-16T21:33:55.296Z"
+        "usd": 89.829727,
+        "pricingAsOf": "2026-07-16T21:34:05.366Z"
       }
     },
     "merges": [
