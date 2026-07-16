@@ -331,9 +331,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T12:32:07.046Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T12:34Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T12:34:18.839Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T12:34:18Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1491\n\n# Review Synthesis — PAN-1491 — 2026-07-16T08:33:43-04:00\n\n## Verdict: CHANGES REQUESTED — requirements reviewer failed before writing a report\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/context.json\n- Branch: feature/pan-1491\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491\n- HEAD reviewed: 782a127e82f29cfa7ca44ba9eef0fcbe1321a18f\n- Cycle number: 10\n- Prior cycle SHA: dd2b032eee2553bc57642c398799be1f098a9a17\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/performance.md | 0 |\n| requirements | failed | — | 1 |\n\n## Blocking Findings\n\n### [requirements] Reviewer failed before writing a report\nThe requirements reviewer terminal signal was `REVIEWER_FAILED requirements reviewer session ended before writing a report`. Per the review role, any failed reviewer blocks approval even when the other reports are clean.\n\n## Non-blocking Findings\n\n### [performance] Weights HTTP route performs synchronous database scans on the Node.js event loop — `src/lib/overdeck/substrate-bug-weights-service.ts:52`\n[demoted: previously reviewed] The performance reviewer flagged that `GET /api/flywheel/substrate-bug-weights` calls `listSubstrateBugWeights()`, which uses synchronous SQLite-backed telemetry and substrate-bug reads before response pagination. The cited service lines existed before this cycle; the cycle diff from `dd2b032eee2553bc57642c398799be1f098a9a17` to `782a127e82f29cfa7ca44ba9eef0fcbe1321a18f` only changes the comparator at `src/lib/overdeck/substrate-bug-weights-service.ts:80` to preserve operator precedence. Per the cycle >= 3 convergence gate, this finding is not promotable to a blocker in this cycle.\n\n## Clean Sub-roles\n- security\n- correctness\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1491 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -405,7 +418,7 @@
     "recordedAt": "2026-07-16T12:07:29.315Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T12:32:07.065Z",
+  "updated": "2026-07-16T12:34:18.840Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "reviewing",
