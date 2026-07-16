@@ -353,17 +353,17 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T14:08:13.980Z",
+  "updated": "2026-07-16T14:24:03.078Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T14:08:09.610Z",
+    "updatedAt": "2026-07-16T14:24:03.017Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
@@ -382,9 +382,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 101419621,
-            "output": 180183,
-            "cacheRead": 99039744,
+            "input": 101458462,
+            "output": 180219,
+            "cacheRead": 99077376,
             "cacheWrite": 0
           }
         },
@@ -413,9 +413,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 101419621,
-          "output": 180183,
-          "cacheRead": 99039744,
+          "input": 101458462,
+          "output": 180219,
+          "cacheRead": 99077376,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -432,8 +432,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 75.073554,
-        "pricingAsOf": "2026-07-16T14:08:09.825Z"
+        "usd": 75.099495,
+        "pricingAsOf": "2026-07-16T14:24:03.052Z"
       }
     },
     "merges": [
