@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pendingCommand } from '../../../src/cli/commands/pending.js';
 import { getAllReviewStatusesFromDb } from '../../../src/lib/overdeck/review-status-sync.js';
+import { gatherProjectLensSignals } from '../../../src/lib/pipeline-membership-gather.js';
 import type { ReviewStatus } from '../../../src/lib/review-status.js';
 
 vi.mock('../../../src/lib/overdeck/review-status-sync.js', () => ({
@@ -12,7 +13,33 @@ vi.mock('../../../src/lib/agents.js', () => ({
   listRunningAgentsSync: vi.fn(() => []),
 }));
 
+vi.mock('../../../src/lib/projects.js', () => ({
+  listProjectsSync: vi.fn(() => [{
+    key: 'overdeck',
+    config: { name: 'overdeck', path: '/project', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN' },
+  }]),
+}));
+
+vi.mock('../../../src/lib/pipeline-membership-gather.js', () => ({
+  gatherProjectLensSignals: vi.fn(),
+}));
+
 const getStatuses = vi.mocked(getAllReviewStatusesFromDb);
+const gatherSignals = vi.mocked(gatherProjectLensSignals);
+
+function signal(issueId: string, overrides: Partial<Awaited<ReturnType<typeof gatherProjectLensSignals>>[number]> = {}) {
+  return {
+    issueId,
+    issueOpen: true,
+    hasOpenPr: true,
+    hasMergedPr: false,
+    hasConventionBranch: true,
+    branchUnmerged: true,
+    phaseLabel: 'in-review',
+    hasVbriefSpec: true,
+    ...overrides,
+  };
+}
 
 function status(issueId: string, overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   return {
@@ -35,6 +62,7 @@ describe('pendingCommand', () => {
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     getStatuses.mockReturnValue({});
+    gatherSignals.mockResolvedValue([signal('PAN-1'), signal('PAN-2'), signal('PAN-3')]);
   });
 
   afterEach(() => {
@@ -87,5 +115,35 @@ describe('pendingCommand', () => {
     expect(output(logSpy)).toContain('PAN-1  merge_conflict');
     expect(output(logSpy)).toContain('PAN-2  test=dispatch_failed');
     expect(output(logSpy)).not.toContain('PAN-3');
+  });
+
+  it('prints resolver membership and drift when review status is empty', async () => {
+    gatherSignals.mockResolvedValue([
+      signal('PAN-10', { hasOpenPr: false, hasMergedPr: true, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null }),
+    ]);
+
+    await pendingCommand();
+
+    expect(output(logSpy)).toContain('Pipeline Membership');
+    expect(output(logSpy)).toContain('PAN-10  post_merge_limbo');
+    expect(output(logSpy)).toContain('open issue with a merged PR');
+    expect(output(logSpy)).toContain('No pending reviews.');
+  });
+
+  it('keeps ready and blocked filters within the resolver membership set', async () => {
+    gatherSignals.mockResolvedValue([signal('PAN-1')]);
+    getStatuses.mockReturnValue({
+      'PAN-1': status('PAN-1', { readyForMerge: true, testStatus: 'failed' }),
+      'PAN-2': status('PAN-2', { readyForMerge: true, testStatus: 'failed' }),
+    });
+
+    await pendingCommand({ ready: true });
+    expect(output(logSpy)).toContain('PAN-1');
+    expect(output(logSpy)).not.toContain('PAN-2');
+
+    logSpy.mockClear();
+    await pendingCommand({ blocked: true });
+    expect(output(logSpy)).toContain('PAN-1');
+    expect(output(logSpy)).not.toContain('PAN-2');
   });
 });
