@@ -479,7 +479,7 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T13:09:29.435Z",
+  "updated": "2026-07-16T14:10:28.169Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "passed",
@@ -489,7 +489,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T13:09:29.288Z",
+    "updatedAt": "2026-07-16T14:10:28.080Z",
     "reviewNotes": "Agent re-review request (2/25): Serialized all pending-feedback journal mutations and isolated mailbox accounting after successful transport; targeted tests, typecheck, and lint gates pass.",
     "testNotes": "Gates at HEAD 6ff696806c (feature/pan-2255): npm run typecheck passed; npm run lint passed (all sub-checks incl. circular/file-size/ratchet/quarantine audits). Ran full diff-changed + related test suite via vitest directly (not `npm test --` which mis-targets the composite script): 15 files / 86 tests passed - src/dashboard/server/__tests__/pending-feedback.test.ts, src/lib/__tests__/agent-mailbox-drain.test.ts, src/lib/__tests__/close-out.test.ts, src/lib/cloister/__tests__/agent-mailbox-escalation.test.ts, src/lib/cloister/__tests__/agent-mailbox.test.ts, src/lib/cloister/__tests__/feedback-writer.test.ts, src/lib/cloister/__tests__/review-verdict-feedback.test.ts, tests/unit/lib/cloister/ci-failure-feedback.test.ts, tests/unit/lib/cloister/deacon-mailbox-cleanup.test.ts, tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts, tests/unit/lib/cloister/feedback-target.test.ts, tests/lib/cloister/review-verdict-feedback.test.ts, src/lib/cloister/__tests__/config.test.ts, tests/lib/cloister/auto-resume-gating.test.ts, src/lib/__tests__/pan-871-agent-id-normalization.test.ts. Frontend no-loss gate also passed: 3 files / 32 tests (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx). Two file paths named in the vBRIEF's verify_commands (tests/cloister/verification-runner.test.ts, src/lib/cloister/__tests__/pan-871-auto-resume.test.ts) do not exist anywhere in repo history under those names at current HEAD - stale spec references from the 2026-07-03 plan predating later refactors; substituted with the actual current test files covering the same code (verification-runner.ts changes are exercised via ci-failure-feedback/review-verdict-feedback/agent-mailbox tests per the review's own coverage notes). No browser UAT run: the vBRIEF NonGoals explicitly state 'No browser UAT requirement; verification is backend unit/integration coverage', confirmed Implemented in the review's requirements.md matrix - no frontend/UI surface was touched. NOTE FOR OPERATOR: the GitHub issue body opens with an explicit 2026-07-11 operator directive marking this feature 'LAST RESORT ONLY... Status: deliberately NOT scheduled for implementation... Implement only on explicit operator instruction.' The branch has nonetheless been fully implemented and review-approved (synthesis verdict APPROVED at this commit, ~$116 spent). This is a policy/authorization question outside the test role's scope to adjudicate - flagging for operator confirmation before merge, not treating it as a gate failure since all technical acceptance criteria and quality gates pass.",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
@@ -569,7 +569,7 @@
       },
       "costAtCloseOut": {
         "usd": 120.65239,
-        "pricingAsOf": "2026-07-16T13:09:29.391Z"
+        "pricingAsOf": "2026-07-16T14:10:28.140Z"
       }
     },
     "merges": [
