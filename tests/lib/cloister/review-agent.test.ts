@@ -1029,7 +1029,7 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
-  it('review-pipeline.ts request-review route yields the verification Effect directly', async () => {
+  it('review-pipeline.ts request-review route acknowledges before slow verification and dispatch', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1042,9 +1042,22 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
 
-    expect(requestReviewBlock).toContain('yield* runVerificationForIssue(');
-    expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
-    expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
+    const backgroundStartIdx = requestReviewBlock.lastIndexOf('(async () => {');
+    const verificationIdx = requestReviewBlock.lastIndexOf('runVerificationForIssue(');
+    const acknowledgementIdx = requestReviewBlock.lastIndexOf('Review request accepted');
+
+    expect(backgroundStartIdx).toBeGreaterThanOrEqual(0);
+    expect(verificationIdx).toBeGreaterThan(backgroundStartIdx);
+    expect(acknowledgementIdx).toBeGreaterThan(verificationIdx);
+    expect(requestReviewBlock).toContain('await Effect.runPromise(runVerificationForIssue(');
+    expect(requestReviewBlock).toContain('}, { status: 202 });');
+    expect(requestReviewBlock).not.toContain('yield* runVerificationForIssue(');
+    expect(requestReviewBlock).toContain("reqVerifyOutcome.outcome === 'failed'");
+    expect(requestReviewBlock).toContain("reqVerifyOutcome.outcome === 'error'");
+    expect(requestReviewBlock).toContain('if (result.gated)');
+    expect(requestReviewBlock).toContain('Dispatch failed:');
+    expect(requestReviewBlock).toContain('Dispatch error:');
+    expect(requestReviewBlock).toContain('autoRequeueCount: currentCount');
   });
 
   it('specialists review restart route returns 409 for gated dispatches', async () => {
