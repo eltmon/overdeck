@@ -85,43 +85,21 @@
   ],
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T09:00:18.956Z",
+  "updated": "2026-07-16T10:01:17.174Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-16T09:00:18.830Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T10:01:17.086Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2786",
     "lastVerifiedCommit": "efdf6bf28798d0779a04402341824a44c2962842",
     "reviewRequestedAt": "2026-07-16T08:35:05.583Z",
-    "reviewSpawnedAt": "2026-07-16T08:58:31.395Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-efdf6bf2/security.md",
-        "atCommit": "efdf6bf28798d0779a04402341824a44c2962842"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-efdf6bf2/correctness.md",
-        "atCommit": "efdf6bf28798d0779a04402341824a44c2962842"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-efdf6bf2/performance.md",
-        "atCommit": "efdf6bf28798d0779a04402341824a44c2962842"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-efdf6bf2/requirements.md",
-        "atCommit": "efdf6bf28798d0779a04402341824a44c2962842"
-      }
-    }
+    "reviewSpawnedAt": "2026-07-16T08:58:31.395Z"
   },
   "closeOut": {
     "usage": {
@@ -134,9 +112,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 39534833,
-            "output": 56915,
-            "cacheRead": 37994240,
+            "input": 39734500,
+            "output": 57710,
+            "cacheRead": 38191104,
             "cacheWrite": 0
           }
         },
@@ -165,9 +143,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 39534833,
-          "output": 56915,
-          "cacheRead": 37994240,
+          "input": 39734500,
+          "output": 57710,
+          "cacheRead": 38191104,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -184,8 +162,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 40.148172,
-        "pricingAsOf": "2026-07-16T09:00:18.885Z"
+        "usd": 40.284469,
+        "pricingAsOf": "2026-07-16T10:01:17.149Z"
       }
     },
     "merges": [
