@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T12:36:51.909Z",
+  "updated": "2026-07-16T12:39:36.756Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -128,16 +128,8 @@
   },
   "reviewMode": "full",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "redrive-failed-strikes": {
-        "writerId": "agent-pan-2702",
-        "agentId": "agent-pan-2702",
-        "pid": 2157086,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:36:51.909Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2702",
@@ -203,6 +195,16 @@
         "itemId": "patrol-strike-landings",
         "outcome": "completed",
         "releasedAt": "2026-07-16T12:31:58.825Z"
+      },
+      {
+        "writerId": "agent-pan-2702",
+        "agentId": "agent-pan-2702",
+        "pid": 2157086,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:36:51.909Z",
+        "itemId": "redrive-failed-strikes",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T12:39:36.756Z"
       }
     ],
     "statusReasons": {
@@ -231,6 +233,10 @@
     "patrol-strike-landings.patrol-strike-landings.ac1": "completed",
     "patrol-strike-landings.patrol-strike-landings.ac2": "completed",
     "patrol-strike-landings.patrol-strike-landings.ac3": "completed",
-    "redrive-failed-strikes": "running"
+    "redrive-failed-strikes": "completed",
+    "redrive-failed-strikes.redrive-failed-strikes.ac1": "completed",
+    "redrive-failed-strikes.redrive-failed-strikes.ac2": "completed",
+    "redrive-failed-strikes.redrive-failed-strikes.ac3": "completed",
+    "redrive-failed-strikes.redrive-failed-strikes.ac4": "completed"
   }
 }
