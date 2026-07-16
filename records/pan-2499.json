@@ -242,9 +242,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T02:27:52.083Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T02:30Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T02:30:12.416Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T02:30:12Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2499\n\n# Review Synthesis — PAN-2499 — 2026-07-15\n\n## Verdict: CHANGES REQUESTED — the no-loss gate excludes the beads section family\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-c947d2aa/context.json`\n- Branch: `feature/pan-2499`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499`\n- HEAD reviewed: `c947d2aadf5011bc21c6293692c6edacb45fad8d`\n- Cycle number: 8\n- Prior cycle SHA: `82daafcb4a1389c9fe46822c4eae4748126fad09`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-c947d2aa/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-c947d2aa/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-c947d2aa/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-c947d2aa/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] The no-loss gate excludes the beads section family — `src/dashboard/frontend/src/components/issue-view/inventory.ts:118`\n\nFR-0 requires the focused no-loss gate to account mechanically for every promised shared replacement section. This cycle removed `BEADS_PANEL_SECTIONS` and omitted beads from `SECTION_INVENTORY`, so the gate can pass while WI-4b / FR-5 remains wholly absent. Restore full and compact beads section entries to the independent gated inventory and require render evidence for both forms.\n\n## Non-blocking Findings\n\n### Security\n\n- `[demoted: previously reviewed]` The start route treats a trusted `Origin` as authorization for `clearGates` at `src/dashboard/server/routes/agents/spawn.ts:268`. The cited authorization predicate did not change since the prior verdict, so the cycle-8 convergence gate prevents promotion.\n\n### Correctness\n\n- `[demoted: previously reviewed]` The remote-workspace return path can bypass the new local clear-before-spawn helper at `src/dashboard/server/routes/agents/spawn.ts:590`. The cited remote branch did not change since the prior verdict, so it is not promotable in this cycle.\n\n### Requirements\n\n- `[demoted: previously reviewed]` The shared `BeadsPanel` remains absent from the drawer, cockpit, and rail consumers. Those cited consumer lines did not change this cycle; the newly changed and blocking regression is captured separately as the no-loss inventory removal.\n- `[demoted: previously reviewed]` `IssueView` still does not consume `DENSITY_SECTIONS`; the cited composition code did not change this cycle.\n- `[demoted: previously reviewed]` The requirements report says `clearGates` only bypasses the initial guard, but the current local route calls `spawnAfterClearingStartGates` through `spawnPanCommand`. Its cited guard line is unchanged and is not promotable in cycle 8.\n- The six automated stub-UI warnings are mitigated by real interaction and mutation writers.\n\n## Clean Sub-roles\n\n- Performance found no blocking or advisory regressions.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-c947d2aa/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2499 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -381,7 +394,7 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:27:55.227Z",
+  "updated": "2026-07-16T02:30:12.416Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "reviewing",
