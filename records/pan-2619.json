@@ -127,9 +127,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T21:26:30.659Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T21:30Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T21:30:23.110Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T21:30:22Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2619\n\n# Review Synthesis — PAN-2619 — 2026-07-16T17:31:00-04:00\n\n## Verdict: CHANGES REQUESTED — correctness reviewer failed before producing a report\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/context.json\n- Branch: feature/pan-2619\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619\n- HEAD reviewed: 2f50757534e026b0c6eb8adb20c55d739328e0b7\n- Cycle number: 4\n- Prior cycle SHA: 527600642793acab98d2c574fd40b91ead884c2b\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/security.md | 0 |\n| correctness | failed: reviewer session ended before writing a report | — | — |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Reviewer failed before producing a report\nThe correctness reviewer session ended before writing a report. Reviewer failures block approval because correctness coverage is unavailable. This infrastructure failure is not a code finding and therefore is not demotable by the cycle-four convergence gate.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2619 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -146,7 +159,7 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:26:37.092Z",
+  "updated": "2026-07-16T21:30:23.110Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "reviewing",
