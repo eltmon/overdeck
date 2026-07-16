@@ -64,6 +64,7 @@ describe('ProjectHome', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Unknown project: overdeck')
     expect(input).toHaveValue('Keep this query')
+    expect(screen.queryByRole('listbox')).toBeNull()
     expect(openOrFocusAgentPane).not.toHaveBeenCalled()
   })
 
