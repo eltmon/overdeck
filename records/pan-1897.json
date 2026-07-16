@@ -12,17 +12,14 @@
       "reason": "feedback",
       "note": "[2026-07-16T19:40Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-16T19:40:42.676Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T19:40:42Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1897\n\n# Review Synthesis — PAN-1897 — 2026-07-16T19:50:00Z\n\n## Verdict: CHANGES REQUESTED — degraded sync-main timeout can spawn an agent against a workspace still being mutated\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-d69644fb/context.json\n- Branch: feature/pan-1897\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897\n- HEAD reviewed: d69644fbbb85a687327a570a0739c88d09917acd\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR diff: ec483d94c24fc8a76d27e7ee7e170926d741dd8f..d69644fbbb85a687327a570a0739c88d09917acd\n- PR commits: 8\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-d69644fb/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-d69644fb/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-d69644fb/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-d69644fb/requirements.md | 2 |\n\n## Blocking Findings\n\n### [correctness] A degraded timeout lets agent spawn race an ongoing Git sync — `src/cli/commands/start-prep-progress.ts:68`\n`step()` rejects its `Promise.race` when the 240-second sync-main budget expires, but it neither cancels nor awaits the underlying `syncMainIntoWorkspace()` operation. `runStartPrepStep()` converts that timeout into a degraded success, after which `pan start` proceeds toward `spawnAgent()` while the original Git operation may still auto-commit, fetch, merge, abort, or mutate HEAD and the worktree. The agent can therefore start against an unstable workspace and without late conflict context. The timeout path must cancel the subprocess tree, perform required Git cleanup, and await quiescence before degrading; if quiescence cannot be guaranteed, sync-main must fail fast rather than continue to spawn.\n\n### [requirements] Remote starts receive the new state-reconcile timeout — `src/cli/commands/start.ts:847`\nThe explicit non-goal says the remote/fly.io workspace path must remain unchanged, but `state-reconcile` is now wrapped in a new 60-second fail-fast budget before the command branches into remote dispatch. A slow remote start can now fail where the pre-PR flow continued. Keep the new state-reconcile timeout on the scoped local workspace-preparation path, or otherwise preserve the remote path's prior behavior.\n\n### [requirements] Planning-session streaming is routed through the new prep output path — `src/cli/commands/start.ts:890`\nThe explicit non-goal says the planning-session streaming path must remain unchanged, but the planning branch now uses `prep.update()` before the request and for `streamPlanningSession` callbacks. On non-TTY streams this adds `[prep]` output to planning updates. Restore direct spinner updates in the planning branch and reserve prep progress output for the four scoped local work-agent preparation phases.\n\n## Non-blocking Findings\n\n### [correctness] A timed-out operation-head check is treated as proof that the ref is absent — `src/lib/cloister/merge-agent.ts:103`\nThe new 30-second timeout on `git rev-parse -q --verify <OPERATION_HEAD>` is swallowed by the existing blanket catch, so timeout and execution failures are treated like an expected missing ref. Continue only for the specific missing-ref result and return a named failure for timeout or other probe errors so the auto-commit safety gate fails closed.\n\n### [performance] Timed-out prep work continues after the budget expires — `src/cli/commands/start-prep-progress.ts:68`\nThis is the resource-lifetime aspect of the blocking correctness finding above. Degraded prep steps can leave child processes, network requests, and callbacks alive while later preparation proceeds, and repeated starts can accumulate overlapping work. Cooperative cancellation and awaited cleanup resolve both findings.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-d69644fb/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1897 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T20:59:58.659Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -52,22 +49,22 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T20:59:57.063Z",
+  "updated": "2026-07-16T20:59:58.659Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:59:57.020Z",
+    "updatedAt": "2026-07-16T20:59:57.533Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "5c805146dafd9378c79a81eba4889b415f9e7eb4",
     "reviewRequestedAt": "2026-07-16T19:36:58.340Z",
-    "reviewSpawnedAt": "2026-07-16T19:37:06.432Z",
+    "reviewSpawnedAt": "2026-07-16T20:59:57.532Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -174,7 +171,7 @@
       },
       "costAtCloseOut": {
         "usd": 97.511321,
-        "pricingAsOf": "2026-07-16T20:59:57.056Z"
+        "pricingAsOf": "2026-07-16T20:59:57.539Z"
       }
     },
     "merges": [
