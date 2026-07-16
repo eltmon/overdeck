@@ -452,61 +452,38 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T11:38:54.693Z",
+  "updated": "2026-07-16T11:39:51.218Z",
   "pipeline": {
     "issueId": "PAN-2255",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T11:38:53.987Z",
-    "reviewNotes": "[correctness] Concurrent journal updates can silently discard pending feedback — `src/dashboard/server/pending-feedback.ts:89`",
+    "updatedAt": "2026-07-16T11:39:51.160Z",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
     "reviewedAtCommit": "aadf7c313884122b0dd747ca3035df93f57008c0",
     "lastVerifiedCommit": "0b1e4894bdc36aec719839d7bb08c6454f2216cc",
     "reviewRequestedAt": "2026-07-16T11:34:00.587Z",
-    "reviewSpawnedAt": "2026-07-16T11:37:04.657Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-0b1e4894/security.md",
-        "atCommit": "0b1e4894bdc36aec719839d7bb08c6454f2216cc"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-0b1e4894/correctness.md",
-        "atCommit": "0b1e4894bdc36aec719839d7bb08c6454f2216cc"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-0b1e4894/performance.md",
-        "atCommit": "0b1e4894bdc36aec719839d7bb08c6454f2216cc"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-0b1e4894/requirements.md",
-        "atCommit": "0b1e4894bdc36aec719839d7bb08c6454f2216cc"
-      }
-    }
+    "reviewSpawnedAt": "2026-07-16T11:37:04.657Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 8932378,
-            "output": 11266,
-            "cacheRead": 8394496,
+            "input": 8964484,
+            "output": 11297,
+            "cacheRead": 8425600,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 147157572,
-            "output": 267279,
-            "cacheRead": 142042880,
+            "input": 148034337,
+            "output": 268017,
+            "cacheRead": 142915328,
             "cacheWrite": 0
           }
         },
@@ -537,15 +514,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 8932378,
-          "output": 11266,
-          "cacheRead": 8394496,
+          "input": 8964484,
+          "output": 11297,
+          "cacheRead": 8425600,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 147157572,
-          "output": 267279,
-          "cacheRead": 142042880,
+          "input": 148034337,
+          "output": 268017,
+          "cacheRead": 142915328,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -562,8 +539,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 106.67741600000001,
-        "pricingAsOf": "2026-07-16T11:38:54.019Z"
+        "usd": 107.157365,
+        "pricingAsOf": "2026-07-16T11:39:51.195Z"
       }
     },
     "merges": [
