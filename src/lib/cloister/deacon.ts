@@ -2753,7 +2753,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
-
+  for (const a of await (await import('./agent-mailbox-escalation.js')).patrolPendingMailboxEscalations({ policyWindowMs: config.patrolIntervalMs })) { actions.push(a); addLog('action', a, state.patrolCycle); }
   for (const a of await (await import('./stale-task-claims.js')).patrolStaleTaskClaims()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   const stuckRemediationActions = await checkStuckAgentRemediation();
   actions.push(...stuckRemediationActions);
