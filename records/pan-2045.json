@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:20:44.831Z",
+  "updated": "2026-07-16T18:22:51.573Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -74,16 +74,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "switch-happy-dom": {
-        "writerId": "agent-pan-2045",
-        "agentId": "agent-pan-2045",
-        "pid": 3845334,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:20:44.831Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2045",
@@ -106,6 +98,17 @@
         "outcome": "completed",
         "reason": "Measured the full jsdom frontend suite at 26.94s wall-clock: 214 files and 2,008 tests passed. Recorded the dated before row in docs/TESTING.md.",
         "releasedAt": "2026-07-16T18:20:26.181Z"
+      },
+      {
+        "writerId": "agent-pan-2045",
+        "agentId": "agent-pan-2045",
+        "pid": 3845334,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:20:44.831Z",
+        "itemId": "switch-happy-dom",
+        "outcome": "completed",
+        "reason": "Pinned happy-dom 20.10.6, switched Vitest environment to happy-dom, preserved setup ordering, and made prompt/scrollIntoView/ResizeObserver/matchMedia fallbacks conditional. Three issueActions gate files pass: 3 files, 32 tests.",
+        "releasedAt": "2026-07-16T18:22:51.572Z"
       }
     ],
     "statusReasons": {
@@ -116,6 +119,10 @@
       "baseline-jsdom-timing": {
         "reason": "Measured the full jsdom frontend suite at 26.94s wall-clock: 214 files and 2,008 tests passed. Recorded the dated before row in docs/TESTING.md.",
         "updatedAt": "2026-07-16T18:20:26.181Z"
+      },
+      "switch-happy-dom": {
+        "reason": "Pinned happy-dom 20.10.6, switched Vitest environment to happy-dom, preserved setup ordering, and made prompt/scrollIntoView/ResizeObserver/matchMedia fallbacks conditional. Three issueActions gate files pass: 3 files, 32 tests.",
+        "updatedAt": "2026-07-16T18:22:51.572Z"
       }
     }
   },
@@ -127,6 +134,9 @@
     "baseline-jsdom-timing": "completed",
     "baseline-jsdom-timing.baseline-jsdom-timing.ac1": "completed",
     "baseline-jsdom-timing.baseline-jsdom-timing.ac2": "completed",
-    "switch-happy-dom": "running"
+    "switch-happy-dom": "completed",
+    "switch-happy-dom.switch-happy-dom.ac1": "completed",
+    "switch-happy-dom.switch-happy-dom.ac2": "completed",
+    "switch-happy-dom.switch-happy-dom.ac3": "completed"
   }
 }
