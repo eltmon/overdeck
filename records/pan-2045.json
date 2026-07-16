@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:54:16.343Z",
+  "updated": "2026-07-16T18:55:22.266Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -90,16 +90,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-perf-record": {
-        "writerId": "agent-pan-2045",
-        "agentId": "agent-pan-2045",
-        "pid": 1599850,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:54:16.343Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2045",
@@ -173,6 +165,16 @@
         "itemId": "pool-threads-tuning",
         "outcome": "completed",
         "releasedAt": "2026-07-16T18:53:47.845Z"
+      },
+      {
+        "writerId": "agent-pan-2045",
+        "agentId": "agent-pan-2045",
+        "pid": 1599850,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:54:16.343Z",
+        "itemId": "docs-perf-record",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:55:22.266Z"
       }
     ],
     "statusReasons": {
@@ -217,6 +219,9 @@
     "pool-threads-tuning.pool-threads-tuning.ac1": "completed",
     "pool-threads-tuning.pool-threads-tuning.ac2": "completed",
     "pool-threads-tuning.pool-threads-tuning.ac3": "completed",
-    "docs-perf-record": "running"
+    "docs-perf-record": "completed",
+    "docs-perf-record.docs-perf-record.ac1": "completed",
+    "docs-perf-record.docs-perf-record.ac2": "completed",
+    "docs-perf-record.docs-perf-record.ac3": "completed"
   }
 }
