@@ -260,7 +260,7 @@
     "recordedAt": "2026-07-16T01:13:10.379Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:04:01.157Z",
+  "updated": "2026-07-16T02:04:25.150Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "passed",
@@ -270,7 +270,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:04:01.070Z",
+    "updatedAt": "2026-07-16T02:04:25.010Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -294,9 +294,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 120145862,
-            "output": 198341,
-            "cacheRead": 117408768,
+            "input": 120370078,
+            "output": 198388,
+            "cacheRead": 117418752,
             "cacheWrite": 0
           }
         },
@@ -349,9 +349,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 120145862,
-          "output": 198341,
-          "cacheRead": 117408768,
+          "input": 120370078,
+          "output": 198388,
+          "cacheRead": 117418752,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -374,8 +374,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 144.104649,
-        "pricingAsOf": "2026-07-16T02:04:01.146Z"
+        "usd": 145.182211,
+        "pricingAsOf": "2026-07-16T02:04:25.090Z"
       }
     },
     "merges": [
