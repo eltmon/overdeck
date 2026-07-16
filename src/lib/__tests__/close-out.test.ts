@@ -6,6 +6,7 @@ import { Effect } from 'effect';
 
 const mocks = vi.hoisted(() => ({
   exec: vi.fn(),
+  execFile: vi.fn(),
   clearReviewStatus: vi.fn(),
   loadReviewStatuses: vi.fn(() => ({})),
   markRecordPipelineClosedOutSync: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('child_process', async (importOriginal) => {
   return {
     ...actual,
     exec: mocks.exec,
+    execFile: mocks.execFile,
   };
 });
 
@@ -75,6 +77,10 @@ describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
       if (command.includes('git branch --list')) cb?.(null, { stdout: '', stderr: '' });
       else if (command.includes('git ls-remote')) cb?.(null, { stdout: '', stderr: '' });
       else cb?.(null, { stdout: '', stderr: '' });
+      return { on: vi.fn() };
+    });
+    mocks.execFile.mockImplementation((_file: string, _args: string[], _opts: unknown, callback?: (error: Error | null, stdout: string, stderr: string) => void) => {
+      callback?.(null, '', '');
       return { on: vi.fn() };
     });
   });
@@ -152,6 +158,10 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
       cb?.(null, { stdout: '', stderr: '' });
       return { on: vi.fn() };
     });
+    mocks.execFile.mockImplementation((_file: string, _args: string[], _opts: unknown, callback?: (error: Error | null, stdout: string, stderr: string) => void) => {
+      callback?.(null, '', '');
+      return { on: vi.fn() };
+    });
   });
 
   afterEach(() => {
@@ -212,18 +222,24 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     mkdirSync(workspacePath, { recursive: true });
     mocks.findWorkspacePath.mockReturnValue(workspacePath);
     mocks.listMailboxItems.mockResolvedValue([
-      { issueId, role: 'work', source: 'review-agent', summary: 'Fix review', actionRequired: true, state: 'pending', createdAt: '2026-07-16T12:00:00Z', filePath: `${workspacePath}/.pan/feedback/001-review.md`, legacy: false, markdownBody: '' },
+      { issueId, role: 'work', source: 'review-agent', summary: 'Fix $(touch /tmp/pwned) and `whoami`', actionRequired: true, state: 'pending', createdAt: '2026-07-16T12:00:00Z', filePath: `${workspacePath}/.pan/feedback/001-review.md`, legacy: false, markdownBody: '' },
       { issueId, role: 'work', source: 'test-agent', summary: 'Fix tests', actionRequired: true, state: 'pending', createdAt: '2026-07-16T12:01:00Z', filePath: `${workspacePath}/.pan/feedback/002-test.md`, legacy: false, markdownBody: '' },
     ]);
 
     await Effect.runPromise(executeCloseOut({ issueId, projectPath, isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 2510 }));
-    const commands = mocks.exec.mock.calls.map(call => String(call[0]));
-    const commentIndex = commands.findIndex(command => command.startsWith('gh issue comment 2510'));
-    const removalIndex = commands.findIndex(command => command.startsWith('git worktree remove'));
-    expect(commentIndex).toBeGreaterThanOrEqual(0);
-    expect(commentIndex).toBeLessThan(removalIndex);
-    expect(commands[commentIndex]).toContain('During close-out the system identified 2 undelivered message(s)');
-    expect(commands[commentIndex]).toContain('treat them as likely stale');
+    expect(mocks.execFile).toHaveBeenCalledTimes(1);
+    const [file, args] = mocks.execFile.mock.calls[0] as [string, string[]];
+    expect(file).toBe('gh');
+    expect(args.slice(0, 6)).toEqual(['issue', 'comment', '2510', '--repo', 'eltmon/overdeck', '--body']);
+    const body = args[6];
+    expect(body).toContain('During close-out the system identified 2 undelivered message(s)');
+    expect(body).toContain('Fix $(touch /tmp/pwned) and `whoami`');
+    expect(body).toContain('treat them as likely stale');
+    const removalCall = mocks.exec.mock.calls.findIndex(call => String(call[0]).startsWith('git worktree remove'));
+    expect(removalCall).toBeGreaterThanOrEqual(0);
+    expect(mocks.execFile.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.exec.mock.invocationCallOrder[removalCall],
+    );
   });
 
   it('records a warning but does not abort when network removal cannot be verified', async () => {

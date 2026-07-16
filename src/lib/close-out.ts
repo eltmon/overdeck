@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { exec } from 'child_process';
+import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect, Data } from 'effect';
 import {
@@ -29,6 +29,7 @@ import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './is
 import { listMailboxItems, type MailboxItem } from './cloister/agent-mailbox.js';
 
 const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 export function buildPendingMailboxCloseOutComment(items: MailboxItem[]): string {
   const details = items.map(item =>
@@ -348,7 +349,15 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
         .filter(item => item.state === 'pending');
       if (pendingMail.length > 0) {
         const comment = buildPendingMailboxCloseOutComment(pendingMail);
-        await execAsync(`gh issue comment ${ctx.number} --repo ${ctx.owner}/${ctx.repo} --body ${JSON.stringify(comment)}`, { cwd: ctx.projectPath });
+        await execFileAsync('gh', [
+          'issue',
+          'comment',
+          String(ctx.number),
+          '--repo',
+          `${ctx.owner}/${ctx.repo}`,
+          '--body',
+          comment,
+        ], { cwd: ctx.projectPath });
         steps.push({ name: 'Comment pending mailbox', status: 'passed', message: `Commented ${pendingMail.length} undelivered message(s)` });
       }
     }
