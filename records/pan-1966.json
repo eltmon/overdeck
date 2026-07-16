@@ -159,15 +159,7 @@
       "timestamp": "2026-07-16T13:34:02.967Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T13:34:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1966\n\n# Review Synthesis — PAN-1966 — 2026-07-16T09:38:00-04:00\n\n## Verdict: CHANGES REQUESTED — convoy reports reviewed inconsistent post-HEAD workspace states\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/context.json`\n- Branch: `feature/pan-1966`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966`\n- HEAD reviewed: `734d83a23600637843861e355ed37feec021f755`\n- Cycle number: 4\n- Prior cycle SHA: `d1119d505551c0cc7d459e4e8fc741d325a35a19`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/correctness.md` | 0 after convergence gate |\n| performance | ready but snapshot-mismatched | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/performance.md` | 1 coverage gap |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/requirements.md` | 0 after convergence gate |\n\n## Blocking Findings\n\n### [performance/coverage] Convoy reports do not consistently cover manifest HEAD — `src/lib/pipeline-membership-gather.ts:40`\nThe manifest fixes the review target at `734d83a23600637843861e355ed37feec021f755`, whose committed `listMergedPullRequestHeadsBatched` implementation chunks aliases at `PIPELINE_PR_HEAD_BATCH_SIZE = 50`; its committed scale test sends 120 heads through three GraphQL calls and caps every query at 50 aliases. The performance report instead describes and cites a later uncommitted implementation that sends all aliases in one call, and the requirements report likewise treats the post-HEAD one-call helper and post-HEAD `explicitlyReady` lens as reviewed code. The reports therefore cover different workspace moments rather than the manifest SHA. Approval would certify code that the convoy did not consistently inspect, so a fresh review against a stable committed head is required.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: previously reviewed] Explicitly ready GitHub issues are filtered out before lane assignment — `src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx:312`\nThe cited frontend and resolver path did not change after the cycle-3 synthesis, so this finding is not promotable in cycle 4. It remains a serious advisory for follow-up, but convergence rules prohibit using unchanged code to block this cycle.\n\n### [correctness] Batched merged-PR lookup is not qualified by head owner — `src/lib/pipeline-membership-gather.ts:48`\nThe cycle-4 GraphQL query matches only `headRefName`, so a merged PR from a fork with the same branch name can be attributed to the project branch. This current-cycle collision case remains advisory at the reviewer's assigned severity.\n\n### [performance] [demoted: not present at reviewed HEAD] Membership refresh builds unbounded GraphQL queries from repository history — `src/lib/pipeline-membership-gather.ts:40`\nThe reported implementation is not the manifest HEAD. At `734d83a2`, merged-head queries are fixed-size chunks of 50 and the cited 120-head test expects three calls. The finding describes later uncommitted workspace content and cannot be treated as a code blocker on this SHA; it instead proves the snapshot-integrity coverage gap above.\n\n### [requirements] [demoted: previously reviewed] Resource discovery drops the promised orphan-resource diagnostic row — `wire-resource-discovery.ac2`\nThe cited resource-discovery code did not change after the previous synthesis and is not promotable in cycle 4.\n\n### [requirements] [demoted: previously reviewed] No-loss audit does not inspect consumer source — `no-loss-audit-test.ac1/ac2`\nThe cited audit test did not change after the previous synthesis and is not promotable in cycle 4.\n\n### [requirements] [demoted: previously reviewed] Lint self-test does not exercise seeded rejection paths — `lint-guard-fr5.ac2/ac3`\nThe cited lint script did not change after the previous synthesis and is not promotable in cycle 4.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1966 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
@@ -256,36 +248,36 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T13:38:21.216Z",
+  "updated": "2026-07-16T13:41:02.642Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T13:38:21.159Z",
+    "updatedAt": "2026-07-16T13:41:02.472Z",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "lastVerifiedCommit": "734d83a23600637843861e355ed37feec021f755",
-    "reviewSpawnedAt": "2026-07-16T13:31:03.160Z"
+    "reviewSpawnedAt": "2026-07-16T13:41:02.470Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6800189,
-            "output": 13936,
-            "cacheRead": 6081280,
+            "input": 7076323,
+            "output": 14462,
+            "cacheRead": 6316416,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 87647427,
-            "output": 168442,
-            "cacheRead": 85475328,
+            "input": 92555206,
+            "output": 170593,
+            "cacheRead": 90365952,
             "cacheWrite": 0
           }
         },
@@ -308,15 +300,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6800189,
-          "output": 13936,
-          "cacheRead": 6081280,
+          "input": 7076323,
+          "output": 14462,
+          "cacheRead": 6316416,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 87647427,
-          "output": 168442,
-          "cacheRead": 85475328,
+          "input": 92555206,
+          "output": 170593,
+          "cacheRead": 90365952,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -333,8 +325,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 66.900226,
-        "pricingAsOf": "2026-07-16T13:38:21.208Z"
+        "usd": 69.495843,
+        "pricingAsOf": "2026-07-16T13:41:02.575Z"
       }
     },
     "merges": [
