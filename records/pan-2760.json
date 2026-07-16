@@ -617,21 +617,42 @@
     "recordedAt": "2026-07-16T21:42:09.171Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T21:42:09.172Z",
+  "updated": "2026-07-16T21:42:11.312Z",
   "pipeline": {
     "issueId": "PAN-2760",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:41:30.343Z",
+    "updatedAt": "2026-07-16T21:42:10.260Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "lastVerifiedCommit": "e8648f7e6acd33fedbec51285248e3f6e3053840",
-    "reviewRequestedAt": "2026-07-16T21:24:56.928Z",
+    "reviewRequestedAt": "2026-07-16T21:42:10.145Z",
     "reviewSpawnedAt": "2026-07-16T21:35:46.751Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/TIERED-EXECUTION.md",
+        "docs/design/mockups/crew-create-delete-pan-2760.html",
+        "docs/design/mockups/tiered-execution-redesign-pan-2684.html",
+        "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+      ],
+      "actualChangedFiles": [
+        "docs/TIERED-EXECUTION.md",
+        "docs/design/mockups/crew-create-delete-pan-2760.html",
+        "docs/design/mockups/tiered-execution-redesign-pan-2684.html",
+        "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+        "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+      ],
+      "recordedAt": "2026-07-16T21:42:09.171Z"
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -639,15 +660,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 494667,
-            "output": 1570,
-            "cacheRead": 378240,
+            "input": 758953,
+            "output": 1956,
+            "cacheRead": 612096,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 16961541,
-            "output": 32619,
-            "cacheRead": 16211200,
+            "input": 17617938,
+            "output": 33353,
+            "cacheRead": 16862208,
             "cacheWrite": 0
           }
         },
@@ -701,10 +722,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1279,
-            "output": 26431,
-            "cacheRead": 6440696,
-            "cacheWrite": 261697
+            "input": 1283,
+            "output": 26805,
+            "cacheRead": 6730215,
+            "cacheWrite": 263737
           }
         },
         "work": {
@@ -718,15 +739,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 494667,
-          "output": 1570,
-          "cacheRead": 378240,
+          "input": 758953,
+          "output": 1956,
+          "cacheRead": 612096,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21163836,
-          "output": 441434,
-          "cacheRead": 70239488,
+          "input": 21820233,
+          "output": 442168,
+          "cacheRead": 70890496,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -736,15 +757,15 @@
           "cacheWrite": 520882
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1279,
-          "output": 26431,
-          "cacheRead": 6440696,
-          "cacheWrite": 261697
+          "input": 1283,
+          "output": 26805,
+          "cacheRead": 6730215,
+          "cacheWrite": 263737
         }
       },
       "costAtCloseOut": {
-        "usd": 89.488193,
-        "pricingAsOf": "2026-07-16T21:41:30.361Z"
+        "usd": 89.929414,
+        "pricingAsOf": "2026-07-16T21:42:10.333Z"
       }
     },
     "merges": [
