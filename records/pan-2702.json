@@ -36,7 +36,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T12:03:46.631Z",
+  "updated": "2026-07-16T12:04:18.283Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   },
   "reviewMode": "full",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "merge-strike-through-door": {
+        "writerId": "agent-pan-2702",
+        "agentId": "agent-pan-2702",
+        "pid": 1632384,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:04:18.283Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2702",
@@ -146,6 +154,7 @@
     "persist-strike-ready.persist-strike-ready.ac1": "completed",
     "persist-strike-ready.persist-strike-ready.ac2": "completed",
     "persist-strike-ready.persist-strike-ready.ac3": "completed",
-    "persist-strike-ready.persist-strike-ready.ac4": "completed"
+    "persist-strike-ready.persist-strike-ready.ac4": "completed",
+    "merge-strike-through-door": "running"
   }
 }
