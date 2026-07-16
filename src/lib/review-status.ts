@@ -16,7 +16,7 @@ import { registerReviewStatusMapReader } from './cloister/review-status-source.j
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
-import type { ScopeDriftRecord } from './vbrief/continue-state.js';
+import type { ScopeDriftRecord } from './vbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -40,7 +40,7 @@ export interface BlockerReason {
   detectedAt: string;
 }
 
-export interface ReviewStatus {
+export interface ReviewStatus extends StrikeLandingStatus {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';

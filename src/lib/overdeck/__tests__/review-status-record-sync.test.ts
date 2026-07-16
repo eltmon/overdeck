@@ -96,4 +96,20 @@ describe('readJournalStatusSync terminal markers (PAN-2054)', () => {
     expect(journal?.durable.closedOut).toBe(true);
     expect(journal?.durable.closedOutAt).toBe('2026-06-27T00:00:00.000Z');
   });
+
+  it('projects durable strike landing state from the pipeline block', () => {
+    const attempts = [{ timestamp: 't', strikeHead: 'head', mainHead: 'main', outcome: 'failed', detail: 'conflict' }];
+    mocks.readIssueRecordSync.mockReturnValue({
+      pipeline: {
+        issueId: 'PAN-2702', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false,
+        strikeReadyHead: 'head', strikeLandingState: 'recovering', strikeRecoveryCount: 1,
+        strikeLandingAttempts: attempts, updatedAt: '2026-07-16T00:00:00.000Z',
+      },
+    });
+
+    expect(readJournalStatusSync('PAN-2702')?.durable).toMatchObject({
+      strikeReadyHead: 'head', strikeLandingState: 'recovering', strikeRecoveryCount: 1,
+      strikeLandingAttempts: attempts,
+    });
+  });
 });

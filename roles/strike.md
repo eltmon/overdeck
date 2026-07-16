@@ -36,7 +36,7 @@ You are a strike agent. Each strike is a **single decisive precision action**: d
 
 ## Bypass shape
 
-Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no vBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and signal the spawner to review and land it. The spawner, normally the Flywheel or operator, owns the merge and close-out.
+Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no vBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and persist readiness for the Deacon to land it through the server merge door.
 
 This is appropriate only for issues that are:
 
@@ -66,11 +66,11 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
    ```
 7. **Signal readiness, then stop:**
    ```bash
-   pan tell flywheel-orchestrator "strike <id>: fix ready on strike/<id>, gates green — review and land"
+   pan strike-ready <id>
    ```
    If the tell fails, post the same readiness message as a durable issue comment. Do not wait for a reply after the signal.
 
-The strike agent must never switch to `main`, merge into `main`, or push `origin main`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`. Whoever spawned the strike, normally the Flywheel or operator, owns reviewing the `strike/<id>` branch, merging it, and running `pan done <id> --strike` after the merge.
+The strike agent must never switch to `main`, merge into `main`, or push `origin main`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`. The Deacon consumes the durable readiness marker and owns the server-side merge handoff.
 
 Do NOT call plain `pan done`. Do NOT call `pan done <id> --strike`. The strike role does NOT use the review pipeline and no longer performs the post-merge lifecycle handoff.
 
