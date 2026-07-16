@@ -179,7 +179,7 @@ describe('XTerminal', () => {
   it('allows the terminal frame to shrink inside constrained flex layouts (PAN-2619)', () => {
     const { container } = render(<XTerminal sessionName="test-session" />);
     const frame = container.firstElementChild;
-    const terminalSurface = container.querySelector('.absolute.inset-2');
+    const terminalSurface = container.querySelector('.xterm-host');
 
     expect(frame).toHaveClass('min-w-0', 'min-h-0', 'overflow-hidden');
     expect(terminalSurface).not.toHaveStyle({ padding: '8px' });
@@ -339,7 +339,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement | null;
     expect(terminalSurface).toBeTruthy();
 
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
@@ -356,7 +356,7 @@ describe('XTerminal', () => {
 
     const term = (Terminal as unknown as { instances: Array<{ selection: string }> }).instances[0];
     term.selection = 'selected output';
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement;
     const rightMouseDown = new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
     const stopPropagation = vi.spyOn(rightMouseDown, 'stopPropagation');
 
@@ -384,7 +384,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement | null;
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
     fireEvent.click(await screen.findByText('Paste'));
 
