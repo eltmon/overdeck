@@ -78,6 +78,8 @@ interface XTerminalProps {
   embedded?: boolean;
 }
 
+type ConnectionStatus = 'connected' | 'reconnecting' | 'restarting' | 'failed';
+
 interface TerminalSnapshotMessage {
   type: 'snapshot';
   cols: number;
@@ -139,10 +141,12 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectPolicy = useRef<ReconnectPolicyState | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectRef = useRef<(() => void) | null>(null);
   const remoteSize = useRef<{ cols: number; rows: number } | null>(null);
   const requestedSize = useRef<{ cols: number; rows: number } | null>(null);
   const readyForLiveData = useRef(false);
   const [shouldReconnect, setShouldReconnect] = useState(true);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   // Auto-copy state from localStorage or prop
   const [autoCopyOnSelect, setAutoCopyOnSelect] = useState(() => {
@@ -599,6 +603,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // that blocked the main thread and caused multi-second typing lag.
     const queueLiveData = (data: string) => {
       reconnectPolicy.current = null;
+      setConnectionStatus('connected');
       if (!term) return;
       if (DEBUG_TERMINAL) {
         console.log(`XTerminal-debug: WRITE len=${data.length}`);
@@ -660,6 +665,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
             sendResizeIfNeeded();
           });
           reconnectPolicy.current = null;
+          setConnectionStatus('connected');
           ws.send(JSON.stringify({ type: 'ready' }));
           profMark(sessionName, tProf, 'ready sent');
           return;
@@ -708,15 +714,13 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
       if (delay !== null) {
         policy.attempt += 1;
-
-        term!.writeln(`\r\n\x1b[33m● Connection lost — reconnecting to \x1b[1m${sessionName}\x1b[0m\x1b[33m in ${delay / 1000}s (attempt ${policy.attempt})...\x1b[0m`);
+        setConnectionStatus('reconnecting');
 
         reconnectTimer.current = setTimeout(() => {
           connect();
         }, delay);
       } else {
-        term!.writeln(`\r\n\x1b[31m● Could not reconnect to \x1b[1m${sessionName}\x1b[0m\x1b[31m after 5 minutes.\x1b[0m`);
-        onDisconnectRef.current?.();
+        setConnectionStatus('failed');
       }
     };
 
@@ -764,6 +768,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       fitAddon.current = null;
     };
   }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyEvent, handleContextMenu, handleTerminalWheel, getMeasuredSize, sendResizeIfNeeded]);
+  connectRef.current = connect;
 
   useEffect(() => {
     const tMount = performance.now();
@@ -817,6 +822,12 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
   const handleClick = () => {
     terminalInstance.current?.focus();
+  };
+
+  const handleReconnect = () => {
+    reconnectPolicy.current = null;
+    setConnectionStatus('reconnecting');
+    connectRef.current?.();
   };
 
   return (
@@ -900,6 +911,33 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
           outline: 'none',
         }}
       />
+
+      {connectionStatus !== 'connected' && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+          <div
+            role="status"
+            aria-live="polite"
+            className="pointer-events-auto flex items-center gap-3 rounded-lg border border-border bg-card/90 px-4 py-2 text-sm text-muted-foreground shadow-lg backdrop-blur-sm"
+          >
+            <span>
+              {connectionStatus === 'failed'
+                ? 'Connection unavailable.'
+                : connectionStatus === 'restarting'
+                  ? 'Server restarting — reconnecting…'
+                  : 'Connection lost — reconnecting…'}
+            </span>
+            {connectionStatus === 'failed' && (
+              <button
+                type="button"
+                onClick={handleReconnect}
+                className="rounded-md border border-border bg-muted px-3 py-1 text-sm text-foreground transition-colors hover:bg-accent"
+              >
+                Reconnect
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Context menu */}
       {contextMenu.visible && (

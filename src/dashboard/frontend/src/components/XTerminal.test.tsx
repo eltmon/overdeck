@@ -627,21 +627,26 @@ describe('XTerminal - patient reconnect', () => {
     vi.useRealTimers();
   });
 
-  it('keeps reconnecting past five attempts and 31 seconds', async () => {
+  it('keeps reconnecting past five attempts without writing retry messages to scrollback', async () => {
     render(<XTerminal sessionName="test-session" />);
     await act(async () => vi.advanceTimersByTimeAsync(0));
 
+    const term = (Terminal as unknown as {
+      instances: Array<{ writeln: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
     const delays = [1_000, 2_000, 4_000, 5_000, 5_000, 5_000, 5_000, 5_000];
     for (const delay of delays) {
       const socket = MockWebSocket.instances.at(-1)!;
       act(() => socket.onclose?.({ code: 1006, reason: 'restart' }));
+      expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
       await act(async () => vi.advanceTimersByTimeAsync(delay));
     }
 
     expect(MockWebSocket.instances).toHaveLength(9);
+    expect(term.writeln).not.toHaveBeenCalled();
   });
 
-  it('stops reconnecting when the five-minute window expires without healthy data', async () => {
+  it('shows a manual Reconnect button when the five-minute window expires', async () => {
     const onDisconnect = vi.fn();
     render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
     await act(async () => vi.advanceTimersByTimeAsync(0));
@@ -652,10 +657,38 @@ describe('XTerminal - patient reconnect', () => {
 
     await act(async () => vi.advanceTimersByTimeAsync(PATIENT_WINDOW_MS - 1_000));
     act(() => MockWebSocket.instances[1].onclose?.({ code: 1006, reason: 'still down' }));
-    await act(async () => vi.runOnlyPendingTimersAsync());
 
     expect(MockWebSocket.instances).toHaveLength(2);
-    expect(onDisconnect).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent('Connection unavailable.');
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    expect(onDisconnect).not.toHaveBeenCalled();
+  });
+
+  it('reconnects immediately when requested and clears the overlay on snapshot data', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENT_WINDOW_MS));
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 1006, reason: 'still down' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+
+    expect(MockWebSocket.instances).toHaveLength(3);
+    expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
+
+    const snapshot = '\u001b[31mreconnected snapshot\u001b[0m';
+    act(() => {
+      MockWebSocket.instances[2].onmessage?.({
+        data: `\u0000${JSON.stringify({ type: 'snapshot', data: snapshot, cols: 80, rows: 24 })}`,
+      });
+    });
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ write: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    expect(term.write).toHaveBeenCalledWith(snapshot, expect.any(Function));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('starts a fresh reconnect window after a snapshot proves the connection healthy', async () => {
@@ -689,6 +722,7 @@ describe('XTerminal - patient reconnect', () => {
     }).instances[0];
     expect(term.writeln).toHaveBeenCalledWith(expect.stringContaining('has ended'));
     expect(onDisconnect).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(MockWebSocket.instances).toHaveLength(1);
   });
 });
