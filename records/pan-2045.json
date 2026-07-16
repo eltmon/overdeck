@@ -242,20 +242,22 @@
     "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T20:28:06.265Z",
+  "updated": "2026-07-16T20:28:12.736Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "blocked",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:28:05.556Z",
-    "reviewNotes": "[correctness] The happy-dom suite still passes while real network work fails outside Vitest — `src/dashboard/frontend/vitest.config.ts:90`",
+    "updatedAt": "2026-07-16T20:28:12.696Z",
+    "reviewNotes": "both prior blockers are repaired; the only new raw finding is demoted by the mandatory cycle-3 convergence gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
+    "reviewedAtCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2",
     "reviewRequestedAt": "2026-07-16T20:26:25.115Z",
     "reviewSpawnedAt": "2026-07-16T20:27:56.877Z",
     "scopeDrift": {
@@ -388,22 +390,18 @@
     "reviewerVerdicts": {
       "security": {
         "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-434eea49/security.md",
         "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
       },
       "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-434eea49/correctness.md",
+        "status": "passed",
         "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
       },
       "performance": {
         "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-434eea49/performance.md",
         "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
       },
       "requirements": {
         "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-434eea49/requirements.md",
         "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
       }
     },
@@ -513,7 +511,7 @@
       },
       "costAtCloseOut": {
         "usd": 131.438938,
-        "pricingAsOf": "2026-07-16T20:28:05.563Z"
+        "pricingAsOf": "2026-07-16T20:28:12.722Z"
       }
     },
     "merges": [
