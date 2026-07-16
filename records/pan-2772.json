@@ -62,17 +62,17 @@
     "recordedAt": "2026-07-16T19:18:10.850Z"
   },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T20:03:36.023Z",
+  "updated": "2026-07-16T20:06:36.060Z",
   "pipeline": {
     "issueId": "PAN-2772",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:03:32.037Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2772-review",
+    "updatedAt": "2026-07-16T20:06:35.979Z",
+    "reviewNotes": "Reconnected terminal sockets escape component unmount cleanup, leaving live WebSocket and PTY clients behind.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2801",
     "lastVerifiedCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b",
     "reviewRequestedAt": "2026-07-16T20:02:41.137Z",
@@ -123,6 +123,24 @@
       ],
       "recordedAt": "2026-07-16T19:18:10.850Z"
     },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -138,9 +156,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1811088,
-            "output": 22021,
-            "cacheRead": 2722816,
+            "input": 2143922,
+            "output": 27333,
+            "cacheRead": 5728256,
             "cacheWrite": 0
           }
         },
@@ -193,15 +211,15 @@
           "cacheWrite": 167646
         },
         "openai/gpt-5.6-sol": {
-          "input": 10258797,
-          "output": 316808,
-          "cacheRead": 74626048,
+          "input": 10591631,
+          "output": 322120,
+          "cacheRead": 77631488,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 106.199928,
-        "pricingAsOf": "2026-07-16T20:03:32.560Z"
+        "usd": 109.526178,
+        "pricingAsOf": "2026-07-16T20:06:36.037Z"
       }
     },
     "merges": [
