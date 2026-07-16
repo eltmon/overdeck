@@ -9,8 +9,6 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync }));
-vi.mock('../../review-status.js', () => ({ getReviewStatusSync: mocks.getReviewStatusSync }));
-
 import {
   createMailboxItem,
   listMailboxItems,
@@ -19,6 +17,7 @@ import {
   parseMailboxMarkdown,
   renderMailboxItem,
 } from '../agent-mailbox.js';
+import { registerMailboxStatusReader } from '../mailbox-status-source.js';
 
 describe('agent mailbox', () => {
   let workspacePath: string;
@@ -26,6 +25,7 @@ describe('agent mailbox', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    registerMailboxStatusReader(issueId => mocks.getReviewStatusSync(issueId));
     workspacePath = await mkdtemp(join(tmpdir(), 'agent-mailbox-'));
     feedbackDir = join(workspacePath, '.pan', 'feedback');
     await mkdir(feedbackDir, { recursive: true });

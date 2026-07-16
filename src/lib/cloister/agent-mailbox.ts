@@ -9,6 +9,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { getWorkspacePanPaths, readFeedback } from '../pan-dir/index.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { Effect } from 'effect';
+import { readMailboxActionStatus, type MailboxActionStatus } from './mailbox-status-source.js';
 
 export type MailboxRole = 'work';
 export type MailboxState = 'pending' | 'delivered' | 'acknowledged';
@@ -49,12 +50,6 @@ export interface CreateMailboxItemOptions extends MailboxAddress {
 export interface MailboxTransitionOptions extends MailboxAddress {
   filePath: string;
   at?: string;
-}
-
-interface LegacyActionStatus {
-  reviewStatus?: string;
-  testStatus?: string;
-  verificationStatus?: string;
 }
 
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/;
@@ -136,7 +131,7 @@ function legacySummary(filename: string, body: string): string {
   return firstMeaningful?.replace(/^#+\s*/, '').slice(0, 160) || filename;
 }
 
-function legacyRequiresAction(source: string, status: LegacyActionStatus | null): boolean {
+function legacyRequiresAction(source: string, status: MailboxActionStatus | null): boolean {
   if (!status) return false;
   if (source.includes('review')) return status.reviewStatus === 'blocked' || status.reviewStatus === 'failed';
   if (source.includes('test') || source.includes('uat')) return status.testStatus === 'failed' || status.testStatus === 'dispatch_failed';
@@ -144,16 +139,11 @@ function legacyRequiresAction(source: string, status: LegacyActionStatus | null)
   return false;
 }
 
-async function currentActionStatus(issueId: string): Promise<LegacyActionStatus | null> {
-  const { getReviewStatusSync } = await import('../review-status.js');
-  return getReviewStatusSync(issueId);
-}
-
 export async function listMailboxItems(options: MailboxAddress): Promise<MailboxItem[]> {
   const workspacePath = resolveWorkspacePath(options);
   if (!workspacePath) return [];
   const files = await Effect.runPromise(readFeedback(workspacePath));
-  let legacyStatus: LegacyActionStatus | null | undefined;
+  let legacyStatus: MailboxActionStatus | null | undefined;
   const items: MailboxItem[] = [];
 
   for (const file of files) {
@@ -166,7 +156,7 @@ export async function listMailboxItems(options: MailboxAddress): Promise<Mailbox
     }
 
     if (options.role !== 'work') continue;
-    legacyStatus ??= await currentActionStatus(options.issueId);
+    legacyStatus ??= readMailboxActionStatus(options.issueId);
     const source = legacySource(file.filename);
     if (!legacyRequiresAction(source, legacyStatus)) continue;
     items.push({

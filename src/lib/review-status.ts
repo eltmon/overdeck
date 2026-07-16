@@ -17,6 +17,7 @@ import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
 import type { ScopeDriftRecord } from './vbrief/continue-state.js';
+import { registerMailboxStatusReader } from './cloister/mailbox-status-source.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -192,6 +193,7 @@ export function mergeGateEligibility(
 // PAN-2579: register the cycle-free status-map reader used by concurrency.ts for
 // warm-idle advancing classification (see cloister/review-status-source.ts).
 registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
+registerMailboxStatusReader(issueId => getReviewStatusSync(issueId));
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
