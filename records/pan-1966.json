@@ -562,6 +562,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T19:40:05.056Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T19:57:21.458Z"
     }
   ],
   "feedback": [],
@@ -653,22 +658,22 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T19:57:06.950Z",
+  "updated": "2026-07-16T19:57:21.482Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:57:06.671Z",
+    "updatedAt": "2026-07-16T19:57:18.701Z",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "lastVerifiedCommit": "e6c7f946156764b213be4732dde5ec75d33b1401",
     "reviewRequestedAt": "2026-07-16T19:57:06.241Z",
-    "reviewSpawnedAt": "2026-07-16T19:40:03.536Z",
+    "reviewSpawnedAt": "2026-07-16T19:57:18.699Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -773,7 +778,7 @@
       },
       "costAtCloseOut": {
         "usd": 320.865993,
-        "pricingAsOf": "2026-07-16T19:57:06.807Z"
+        "pricingAsOf": "2026-07-16T19:57:18.989Z"
       }
     },
     "merges": [
@@ -781,7 +786,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 26,
