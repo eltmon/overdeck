@@ -308,6 +308,14 @@ The merge agent uses a **SQLite-backed per-project queue** (`merge_queue` table)
 6. **Pushes to remote**
 7. **Reports results, advances queue** to next issue
 
+### Strike Landing and Recovery
+
+A strike agent commits and pushes only `strike/<id>`, then runs `pan strike-ready <id>`. That command authenticates the strike workspace and pushed remote HEAD and records a durable handoff. On its next patrol, Deacon claims the marker and sends the branch through the same serialized merge queue, rebase checks, configured quality gates, forge merge, and post-merge lifecycle used by the verified merge door. Flywheel does not own or need to observe this handoff.
+
+When main moves, a rebase conflicts, or a configured gate fails, Deacon records the strike HEAD, current main HEAD, and concrete failure, then returns a recovery request to the warm `strike-<id>` session. The strike agent rebases, resolves the failure, reruns the configured gates, pushes a fresh `strike/<id>` HEAD, and runs `pan strike-ready <id>` again. Deacon allows three failed landing cycles; it never retries or consumes another cycle until the agent signals a fresh remote HEAD.
+
+Deacon changes the landing state to `needs_you` when the third cycle fails, the failure requires infrastructure or permission changes, or recovery feedback cannot reach the strike session. The needs-you feedback includes the ordered history of every attempted strike HEAD, main HEAD, failed check or conflict, and delivery outcome, so the operator can act without reconstructing the incident.
+
 ## Merge Queue Priority
 
 The merge queue (SQLite-backed, per-project) supports priority ordering:

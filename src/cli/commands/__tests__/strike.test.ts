@@ -87,7 +87,8 @@ describe('strikeCommand', () => {
     expect(prompt).not.toMatch(/merge fast-forward/);
     expect(prompt).not.toMatch(/push\s+origin\s+main/);
     expect(prompt).toContain('git push origin strike/pan-1234');
-    expect(prompt).toContain('pan tell flywheel-orchestrator');
+    expect(prompt).toContain('pan strike-ready PAN-1234');
+    expect(prompt).not.toContain('pan tell flywheel-orchestrator');
     // Strike must explicitly not call the normal review-pipeline form.
     expect(prompt).toContain('Do NOT call `pan done`');
   });

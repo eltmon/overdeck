@@ -11,8 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 60;
-
+export const SCHEMA_VERSION = 61;
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
   try {
@@ -1731,6 +1730,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     `);
   }
 
+  if (currentVersion < 61) for (const column of ['strike_ready_head TEXT', 'strike_ready_at TEXT', 'strike_landing_state TEXT', 'strike_recovery_count INTEGER DEFAULT 0', 'strike_landing_attempts TEXT']) try { db.exec(`ALTER TABLE review_status ADD COLUMN ${column}`); } catch { /* already exists */ }
   // v59 -> v60: add release status columns to review_status.
   if (currentVersion < 60) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN release_status TEXT`); } catch { /* already exists */ }

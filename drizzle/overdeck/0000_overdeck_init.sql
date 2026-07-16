@@ -341,7 +341,12 @@ CREATE TABLE `review_status` (
 	`blocker_reasons` text,
 	`last_verified_commit` text,
 	`merge_step` text,
-	`auto_merge` integer
+	`auto_merge` integer,
+	`strike_ready_head` text,
+	`strike_ready_at` integer,
+	`strike_landing_state` text,
+	`strike_recovery_count` integer DEFAULT 0,
+	`strike_landing_attempts` text
 );
 --> statement-breakpoint
 CREATE INDEX `review_status_updated_idx` ON `review_status` (`updated_at`);--> statement-breakpoint

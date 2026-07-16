@@ -127,6 +127,11 @@ function projectPipeline(
     deaconIgnoredAt: status.deaconIgnoredAt,
     deaconIgnoredReason: status.deaconIgnoredReason,
     reviewerVerdicts: (status as { reviewerVerdicts?: unknown }).reviewerVerdicts,
+    strikeReadyHead: status.strikeReadyHead,
+    strikeReadyAt: status.strikeReadyAt,
+    strikeLandingState: status.strikeLandingState,
+    strikeRecoveryCount: status.strikeRecoveryCount,
+    strikeLandingAttempts: status.strikeLandingAttempts,
   };
 }
 
