@@ -79,17 +79,18 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T21:25:32.676Z",
+  "updated": "2026-07-16T21:25:33.333Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:25:32.622Z",
+    "updatedAt": "2026-07-16T21:25:33.194Z",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "5c805146dafd9378c79a81eba4889b415f9e7eb4",
@@ -221,7 +222,7 @@
       },
       "costAtCloseOut": {
         "usd": 119.639678,
-        "pricingAsOf": "2026-07-16T21:25:32.648Z"
+        "pricingAsOf": "2026-07-16T21:25:33.250Z"
       }
     },
     "merges": [
