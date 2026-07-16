@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T12:39:48.055Z",
+  "updated": "2026-07-16T12:42:40.576Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -128,16 +128,8 @@
   },
   "reviewMode": "full",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "document-strike-landing": {
-        "writerId": "agent-pan-2702",
-        "agentId": "agent-pan-2702",
-        "pid": 2210119,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:39:48.055Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2702",
@@ -213,6 +205,16 @@
         "itemId": "redrive-failed-strikes",
         "outcome": "completed",
         "releasedAt": "2026-07-16T12:39:36.756Z"
+      },
+      {
+        "writerId": "agent-pan-2702",
+        "agentId": "agent-pan-2702",
+        "pid": 2210119,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:39:48.055Z",
+        "itemId": "document-strike-landing",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T12:42:40.576Z"
       }
     ],
     "statusReasons": {
@@ -246,6 +248,8 @@
     "redrive-failed-strikes.redrive-failed-strikes.ac2": "completed",
     "redrive-failed-strikes.redrive-failed-strikes.ac3": "completed",
     "redrive-failed-strikes.redrive-failed-strikes.ac4": "completed",
-    "document-strike-landing": "running"
+    "document-strike-landing": "completed",
+    "document-strike-landing.document-strike-landing.ac1": "completed",
+    "document-strike-landing.document-strike-landing.ac2": "completed"
   }
 }
