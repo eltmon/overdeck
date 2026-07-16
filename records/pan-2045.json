@@ -183,6 +183,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T21:48:26.183Z"
+    },
+    {
+      "timestamp": "2026-07-16T21:48:56.615Z",
+      "reason": "end",
+      "note": "No code changes required: repeated test feedback was stale at 434eea49. Current pushed b5c1422654 passes 215 files and 2,031 tests; stale specialists were cancelled and review restarted at current HEAD."
     }
   ],
   "feedback": [],
@@ -321,21 +326,21 @@
     "recordedAt": "2026-07-16T21:48:55.460Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:48:55.467Z",
+  "updated": "2026-07-16T21:48:56.720Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:48:17.824Z",
+    "updatedAt": "2026-07-16T21:48:56.643Z",
     "reviewNotes": "Production MessagesTimeline CSS was changed solely for happy-dom assertions, violating an explicit must-not requirement.",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
-    "reviewRequestedAt": "2026-07-16T21:46:50.805Z",
+    "reviewRequestedAt": "2026-07-16T21:48:56.640Z",
     "reviewSpawnedAt": "2026-07-16T21:48:17.822Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -469,7 +474,7 @@
         "src/dashboard/frontend/src/test-utils/strictFetchMock.ts",
         "src/dashboard/frontend/vitest.config.ts"
       ],
-      "recordedAt": "2026-07-16T21:46:49.907Z"
+      "recordedAt": "2026-07-16T21:48:55.460Z"
     },
     "strikeRecoveryCount": 0
   },
@@ -478,15 +483,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1084066,
-            "output": 2838,
-            "cacheRead": 871296,
+            "input": 1208813,
+            "output": 3056,
+            "cacheRead": 990848,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 38127002,
-            "output": 38670,
-            "cacheRead": 37217280,
+            "input": 39881776,
+            "output": 39458,
+            "cacheRead": 38961920,
             "cacheWrite": 0
           }
         },
@@ -516,33 +521,33 @@
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 919086,
-            "output": 18973,
-            "cacheRead": 3503104,
+            "input": 1049954,
+            "output": 22559,
+            "cacheRead": 4096000,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 343612,
-            "output": 3800,
-            "cacheRead": 759808,
+            "input": 493633,
+            "output": 4517,
+            "cacheRead": 819712,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 758575,
-            "output": 19032,
-            "cacheRead": 1727488,
+            "input": 912325,
+            "output": 19671,
+            "cacheRead": 1787392,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 511905,
-            "output": 5793,
-            "cacheRead": 1480192,
+            "input": 613841,
+            "output": 6189,
+            "cacheRead": 1518080,
             "cacheWrite": 0
           }
         },
@@ -573,15 +578,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1084066,
-          "output": 2838,
-          "cacheRead": 871296,
+          "input": 1208813,
+          "output": 3056,
+          "cacheRead": 990848,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 52885811,
-          "output": 474936,
-          "cacheRead": 164500992,
+          "input": 55177160,
+          "output": 481062,
+          "cacheRead": 166996224,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -604,8 +609,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 185.988367,
-        "pricingAsOf": "2026-07-16T21:48:18.061Z"
+        "usd": 190.153308,
+        "pricingAsOf": "2026-07-16T21:48:56.660Z"
       }
     },
     "merges": [
@@ -613,7 +618,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
