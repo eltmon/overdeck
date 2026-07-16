@@ -1,23 +1,61 @@
 {
   "issueId": "PAN-2168",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-06-29T12:57:55.944Z",
+  "updated": "2026-07-16T05:45:43.630Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-06-29T12:57:55.944Z"
+    "updatedAt": "2026-07-16T05:45:43.583Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 7520,
+            "output": 256,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 33215,
+            "output": 94263,
+            "cacheRead": 13880363,
+            "cacheWrite": 364448
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 7520,
+          "output": 256,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-opus-4-8": {
+          "input": 33215,
+          "output": 94263,
+          "cacheRead": 13880363,
+          "cacheWrite": 364448
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 11.740637,
+        "pricingAsOf": "2026-07-16T05:45:43.626Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-opus-4-8"
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
 }
