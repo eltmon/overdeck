@@ -289,6 +289,24 @@ the bridge listens on `${OVERDECK_HOME}/sockets/agent-<id>.sock`, and
 config is actually wired; supervisor-only sessions must not receive this Enter
 keystroke.
 
+## Decisions — the canonical operator-decision surface
+
+Everything that shows the operator a pending decision reads
+`src/dashboard/frontend/src/lib/useDecisions.ts` (`useDecisions()` for the
+Decisions list, `usePendingInputSubjects()` as the drop-in for consumers of
+`selectPendingInputSubjects`). It is the only place that joins the two domains a
+decision can arrive from: **agents**, which reach the store through the event
+pipeline into `agentsById`, and **conversations**, which are not rows in the
+agents table and arrive over REST from `/api/conversations/pending-input`.
+
+Never read `selectPendingInputSubjects` directly in a new surface — it sees
+agents alone, so a question from a conversation or the flywheel would be visible
+in one place and missing from another. That was the PAN-2765 defect.
+
+See [docs/ASKUSERQUESTION-DASHBOARD.md](docs/ASKUSERQUESTION-DASHBOARD.md) for
+the full pipeline, the `agentTurnEnded` kind, and why a transcript must be
+resolved by the agent's own session id rather than "newest file in the dir".
+
 ## Dashboard Server Architecture (Effect + Raw WebSocket)
 
 The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus a

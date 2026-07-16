@@ -54,6 +54,28 @@ When you click a feature, the main panel shows all agent sessions unified into o
 
 Click a section header to view it full-screen. Press `Esc` or use the browser back button to return. The isolated view includes model display and a prominent keyboard hint.
 
+## Decisions
+
+Agents stop and wait for you: a question, a plan to approve, a permission
+request, a rate-limit dialog, or simply a finished turn. **Decisions** is the one
+place that lists all of them, whether they come from a pipeline agent, a
+conversation, or the flywheel.
+
+Anything waiting on you is marked wherever it appears. A node awaiting your reply
+carries a pulsing amber indicator — click it to bring the dialog back, including
+one you dismissed with `Esc` — and the whole issue row is shaded so you can spot
+it without opening the tree.
+
+The list separates **Blocking work** from **Waiting**. Blocking means the agent
+has stopped until you answer, so it is burning wall-clock and nothing else will
+move; waiting means work continues around your decision. Within each group the
+oldest is first, since that is the one costing the most. Each row shows the
+actual question rather than just its kind, so you can often decide without
+opening anything. **Answer** re-opens the dialog for that subject.
+
+Dismissing a dialog never removes its entry here — that is the point of the
+surface. A dismissed question is still an open one.
+
 ## Badge Bar
 
 Quick-access badges appear below the feature header:
