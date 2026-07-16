@@ -12,7 +12,8 @@ export async function fetchRegisteredProjects(): Promise<RegisteredProject[]> {
   const res = await fetch('/api/registered-projects');
   if (!res.ok) throw new Error('Failed to fetch registered projects');
   const data = await res.json();
-  return Array.isArray(data) ? data : [];
+  if (!Array.isArray(data)) throw new Error('Invalid registered projects response');
+  return data;
 }
 
 export function findRegisteredProject(

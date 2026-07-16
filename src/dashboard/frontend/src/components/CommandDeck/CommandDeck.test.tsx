@@ -73,7 +73,7 @@ function deferred<T>() {
 
 let latestStageProps: any;
 let resourceProjectsResponse: unknown;
-let registeredProjectsResponse: RegisteredProjectFixture[] | Promise<RegisteredProjectFixture[]> = defaultRegisteredProjects;
+let registeredProjectsResponse: unknown | Promise<unknown> = defaultRegisteredProjects;
 let registeredProjectsRequestError: Error | null = null;
 let conversationCreateResponse: { ok: boolean; body: unknown } = {
   ok: true,
@@ -538,6 +538,16 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
 
     expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-project');
+  });
+
+  it('treats a malformed registered-project response as a load failure', async () => {
+    registeredProjectsResponse = { projects: defaultRegisteredProjects };
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t load projects');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('activity-feed')).not.toBeInTheDocument();
   });
 
   it('navigates from the unknown-project state to a registered project or the deck root', async () => {
