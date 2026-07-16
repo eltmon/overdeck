@@ -97,17 +97,17 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T19:04:18.468Z",
+  "updated": "2026-07-16T19:05:54.664Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:04:17.653Z",
+    "updatedAt": "2026-07-16T19:05:54.564Z",
     "reviewNotes": "[correctness] Resource-derived project names bypass the registered-project guard — `src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx:35`",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
@@ -157,28 +157,6 @@
         "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
       ],
       "recordedAt": "2026-07-16T18:48:47.449Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/security.md",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/correctness.md",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/performance.md",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/requirements.md",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      }
     },
     "strikeRecoveryCount": 0
   },
@@ -243,17 +221,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 168,
-            "output": 31745,
-            "cacheRead": 16950687,
-            "cacheWrite": 237342
+            "input": 1064,
+            "output": 37574,
+            "cacheRead": 18579670,
+            "cacheWrite": 246467
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2015432,
-            "output": 141748,
-            "cacheRead": 50099712,
+            "input": 2018252,
+            "output": 141896,
+            "cacheRead": 50330112,
             "cacheWrite": 0
           }
         }
@@ -266,21 +244,21 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 8175569,
-          "output": 256187,
-          "cacheRead": 72132096,
+          "input": 8178389,
+          "output": 256335,
+          "cacheRead": 72362496,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 178,
-          "output": 34747,
-          "cacheRead": 17456043,
-          "cacheWrite": 369078
+          "input": 1074,
+          "output": 40576,
+          "cacheRead": 19085026,
+          "cacheWrite": 378203
         }
       },
       "costAtCloseOut": {
-        "usd": 99.661771,
-        "pricingAsOf": "2026-07-16T19:04:17.726Z"
+        "usd": 100.20420299999999,
+        "pricingAsOf": "2026-07-16T19:05:54.644Z"
       }
     },
     "merges": [
