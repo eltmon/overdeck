@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T12:19:59.725Z",
+  "updated": "2026-07-16T12:20:02.282Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -102,16 +102,8 @@
   },
   "reviewMode": "full",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "merge-strike-through-door": {
-        "writerId": "agent-pan-2702",
-        "agentId": "agent-pan-2702",
-        "pid": 1921487,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:19:59.725Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2702",
@@ -156,6 +148,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2702 dead)",
         "releasedAt": "2026-07-16T12:11:57.049Z"
+      },
+      {
+        "writerId": "agent-pan-2702",
+        "agentId": "agent-pan-2702",
+        "pid": 1921487,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:19:59.725Z",
+        "itemId": "merge-strike-through-door",
+        "outcome": "completed",
+        "reason": "Added discriminated strike merge requests, authenticated marker/branch validation, strike recovery targeting, persistent queue convergence, and normal-gate no-loss matrix",
+        "releasedAt": "2026-07-16T12:20:02.282Z"
       }
     ],
     "statusReasons": {
@@ -164,8 +167,8 @@
         "updatedAt": "2026-07-16T12:03:46.631Z"
       },
       "merge-strike-through-door": {
-        "reason": "stale claim released (agent-pan-2702 dead)",
-        "updatedAt": "2026-07-16T12:11:57.049Z"
+        "reason": "Added discriminated strike merge requests, authenticated marker/branch validation, strike recovery targeting, persistent queue convergence, and normal-gate no-loss matrix",
+        "updatedAt": "2026-07-16T12:20:02.282Z"
       }
     }
   },
@@ -175,6 +178,10 @@
     "persist-strike-ready.persist-strike-ready.ac2": "completed",
     "persist-strike-ready.persist-strike-ready.ac3": "completed",
     "persist-strike-ready.persist-strike-ready.ac4": "completed",
-    "merge-strike-through-door": "running"
+    "merge-strike-through-door": "completed",
+    "merge-strike-through-door.merge-strike-through-door.ac1": "completed",
+    "merge-strike-through-door.merge-strike-through-door.ac2": "completed",
+    "merge-strike-through-door.merge-strike-through-door.ac3": "completed",
+    "merge-strike-through-door.merge-strike-through-door.ac4": "completed"
   }
 }
