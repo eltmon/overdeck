@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T07:03:06.789Z",
+  "updated": "2026-07-16T07:14:28.596Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -95,8 +95,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "wire-resource-discovery": {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 2946617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:14:28.596Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -199,6 +207,7 @@
     "wire-enumerate-in-flight": "completed",
     "wire-enumerate-in-flight.wire-enumerate-in-flight.ac1": "completed",
     "wire-enumerate-in-flight.wire-enumerate-in-flight.ac2": "completed",
-    "wire-enumerate-in-flight.wire-enumerate-in-flight.ac3": "completed"
+    "wire-enumerate-in-flight.wire-enumerate-in-flight.ac3": "completed",
+    "wire-resource-discovery": "running"
   }
 }
