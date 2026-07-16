@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-16T17:41:22.711Z",
+  "updated": "2026-07-16T17:42:17.232Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -99,7 +99,8 @@
     "reducer-liveness-gate.reducer-liveness-gate.ac3": "completed",
     "reducer-liveness-gate.reducer-liveness-gate.ac4": "completed",
     "emitter-liveness-threading": "running",
-    "enrichment-convergence-reemit": "running"
+    "enrichment-convergence-reemit": "running",
+    "docs-pending-input-invariant": "running"
   },
   "swarm": {
     "slotAssignments": [],
@@ -113,6 +114,18 @@
         "slotIndex": 3,
         "agentId": "agent-pan-2633-slot-3",
         "completedAt": "2026-07-13T21:22:34.343Z"
+      }
+    }
+  },
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "docs-pending-input-invariant": {
+        "writerId": "agent-pan-2633",
+        "agentId": "agent-pan-2633",
+        "pid": 2321557,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T17:42:17.232Z"
       }
     }
   }
