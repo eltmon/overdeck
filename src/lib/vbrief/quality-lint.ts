@@ -323,7 +323,7 @@ function lintDeferredFileSizeRatchet(doc: VBriefDocument): QualityIssue[] {
       issues.push(issue(
         candidate.id,
         'deferred-file-size-ratchet',
-        `Item ${candidate.id} requires file-size-backed lint after changing baselined file ${deferredFile}, but defers ${FILE_SIZE_BASELINE_PATH} reconciliation to item ${reconciliation.id}. Include the baseline in ${candidate.id} metadata.files_scope and reconcile it in the same commit, or use an intermediate verification command that excludes the file-size ratchet.`,
+        `Item ${candidate.id} requires file-size-backed lint after changing baselined file ${deferredFile}, but defers ${FILE_SIZE_BASELINE_PATH} reconciliation to item ${reconciliation.id}. Include the baseline in ${candidate.id} metadata.files_scope and reconcile it in the same commit, or use an intermediate verification command that excludes the file-size ratchet. For an active plan, return the issue to planning, preserve stable item IDs, apply one of these repairs, and re-finalize before rerunning inspection.`,
       ));
     }
   }
