@@ -5003,3 +5003,36 @@ each agent per operator allowance if it recurs.
   my typo, killed) — no validation at dispatch. File when the drain quiets.
 
 Critical path unchanged: **2771** (frees 4 taskless agents) + **2777** (frees 3 docker-blocked issues).
+
+---
+
+## Tick 46 — 2026-07-16 ~05:50Z — PostHog SHIPPED; PAN-2777 LANDED+PROVEN; kickoff root cause FOUND
+
+### ✅ PostHog landed + PAN-2599 CLOSED (operator directive complete)
+#2776 squash-merged `3e1b10ebae` (was a DRAFT — `gh pr ready` first). Close-out comment records the
+scope decision: PRD sketched more (server-side capture, LLM analytics); operator directed the SDK PR
+as completion.
+
+### ✅ DEPLOYED — PAN-2499 Issue View + PostHog now LIVE
+Build exit 0 → `pan restart --health-timeout 180000` → pid 1921445, systemd, health 200, boot 17s
+after dist. **The fleet SURVIVED this restart** — no post-boot reap sweep; all 9 strikes intact.
+
+### ✅ PAN-2777 landed `0c818f484e` — the docker blocker is DEAD, proven in production
+Strike's rework was exactly the BLOCKED-verdict prescription (root-run `init-perms` chown ordered
+before init, heals pre-existing volumes, copyfile reverted). My verification: root cause proven
+in-container, heal verified live, **full init run EXIT=0** (was exit 1 / 1618 failures), tests 3/3.
+Re-rendered + rebuilt 2168/2255/2532 → **all three agents SPAWNED** where pan start used to hard-refuse.
+
+### 🎯 THE DRAIN IS DOWN TO ONE BUG — and its root cause is now PROVEN
+All 7 previously-parked issues now have live agents — **all taskless on PAN-2771**:
+1966, 2768, 2698, 2702, 2168, 2255, 2532.
+**Root cause (dashboard.log):** work-agent kickoffs fail `PTY supervisor delivery failed ... socket-missing`
+— the kickoff path (`deliverInitialPromptWithRetry`, spawn.ts:398 + deacon redelivery) targets the
+**PTY supervisor socket, which codex app-server agents don't have** (Claude Code transport).
+**Proof by contrast: strike spawns deliver fine** (bridge log `path:'app-server'`; every strike tonight
+kickoff=true). The strike path has an app-server delivery branch; the work-agent path doesn't.
+Strike-pan-2771's first fix (stop-on-failure, 557c2bafee) = ask #1 only — told it SCOPE INCOMPLETE with
+the proven root cause + exact fix (route kickoff via app-server for codex agents; keep PTY for claude);
+delivery verified (userMessages=6). **When 2771 lands, every parked issue moves.**
+
+**Landed this session: 35 merges** (+2774, 2776/PostHog, 2778/PAN-2777). Strikes active: 2710, 2741, 2771.
