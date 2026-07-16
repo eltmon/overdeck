@@ -38,6 +38,28 @@ export function withConcurrencyLimitPromise<T>(
   });
 }
 
+interface SettledTtlEntry<T> {
+  promise: Promise<T>;
+  settledAt: number | null;
+}
+
+/** Cache settled values for a TTL while preserving single-flight for pending work regardless of age. */
+export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => number = Date.now) {
+  const entries = new Map<K, SettledTtlEntry<V>>();
+  return (key: K, load: () => Promise<V>): Promise<V> => {
+    const cached = entries.get(key);
+    if (cached && (cached.settledAt === null || now() - cached.settledAt < ttlMs)) return cached.promise;
+
+    const entry: SettledTtlEntry<V> = { promise: load(), settledAt: null };
+    entries.set(key, entry);
+    entry.promise.then(
+      () => { entry.settledAt = now(); },
+      () => { if (entries.get(key) === entry) entries.delete(key); },
+    );
+    return entry.promise;
+  };
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**

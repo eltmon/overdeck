@@ -43,6 +43,21 @@ describe('pipeline membership service', () => {
     expect(gather).toHaveBeenCalledTimes(2);
   });
 
+  it('keeps a slow membership gather single-flight beyond the TTL', async () => {
+    let resolve!: (signals: []) => void;
+    const gather = vi.fn(() => new Promise<[]>((done) => { resolve = done; }));
+    const getMembership = createPipelineMembershipService({ gather, now: Date.now });
+    const project = { name: 'slow', path: '/slow', github_repo: 'owner/slow', issue_prefix: 'PAN' };
+
+    const first = getMembership(project);
+    await vi.advanceTimersByTimeAsync(PIPELINE_MEMBERSHIP_TTL_MS * 2);
+    const second = getMembership(project);
+
+    expect(gather).toHaveBeenCalledOnce();
+    resolve([]);
+    await expect(Promise.all([first, second])).resolves.toEqual([[], []]);
+  });
+
   it('treats non-GitHub projects as empty without invoking the GitHub gatherer', async () => {
     const gather = vi.fn();
     const getMembership = createPipelineMembershipService({ gather, now: Date.now });

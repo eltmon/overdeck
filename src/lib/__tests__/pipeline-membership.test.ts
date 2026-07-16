@@ -82,9 +82,9 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
     expect(r.labelDrift).toBe('stale_absent');
   });
 
-  it('closed zombie PR does not request a missing phase label', () => {
+  it('closed zombie PR reports missing or stale phase-label drift', () => {
     expect(resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true, phaseLabel: null })).labelDrift)
-      .toBeNull();
+      .toBe('stale_absent');
     expect(resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true, phaseLabel: 'in-review' })).labelDrift)
       .toBe('stale_present');
   });

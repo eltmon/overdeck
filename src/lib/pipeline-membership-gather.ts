@@ -7,7 +7,7 @@ import {
   listIssuesWithAnyLabelPromise,
   listOpenIssuesWithLabelsPromise,
 } from './github-app.js';
-import { withConcurrencyLimitPromise } from './concurrency.js';
+import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { listSpecs } from './pan-dir/specs.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
@@ -47,14 +47,12 @@ interface GitHubPullRequestRow {
 }
 
 const OPEN_PR_CACHE_TTL_MS = 30_000;
-const openPrCache = new Map<string, { expiresAt: number; value: Promise<PullRequestRow[]> }>();
+const cachedOpenPullRequests = createSettledTtlPromiseCache<string, PullRequestRow[]>(OPEN_PR_CACHE_TTL_MS);
 
 /** Share one short-lived repository PR snapshot across dashboard consumers. */
 export function listOpenPullRequestsSnapshot(owner: string, repo: string): Promise<PullRequestRow[]> {
   const key = `${owner}/${repo}`.toLowerCase();
-  const cached = openPrCache.get(key);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
-  const value = execFileAsync('gh', [
+  return cachedOpenPullRequests(key, () => execFileAsync('gh', [
     'api', '--paginate', '--slurp', `repos/${owner}/${repo}/pulls?state=open&per_page=100`,
   ], {
     encoding: 'utf-8', timeout: 30_000, maxBuffer: 16 * 1024 * 1024,
@@ -67,12 +65,7 @@ export function listOpenPullRequestsSnapshot(owner: string, repo: string): Promi
     headRefName: pr.head.ref,
     headRepoFullName: pr.head.repo?.full_name ?? '',
     baseRefName: pr.base.ref,
-  })));
-  openPrCache.set(key, { expiresAt: Date.now() + OPEN_PR_CACHE_TTL_MS, value });
-  value.catch(() => {
-    if (openPrCache.get(key)?.value === value) openPrCache.delete(key);
-  });
-  return value;
+  }))));
 }
 
 interface MergedHeadGraphqlResponse {
@@ -111,8 +104,11 @@ export async function listMergedPullRequestHeadsBatched(
     for (let index = 0; index < headChunk.length; index++) {
       if (!Array.isArray(repository[`h${index}`]?.nodes)) throw new Error(`Missing merged-PR alias h${index}`);
     }
+    const normalizedOwner = owner.toLowerCase();
+    const normalizedRepo = repo.toLowerCase();
     mergedHeads.push(...headChunk.filter((_head, index) => repository[`h${index}`]?.nodes?.some((pr) =>
-      pr.headRepository?.name === repo && pr.headRepository.owner?.login === owner)));
+      pr.headRepository?.name?.toLowerCase() === normalizedRepo
+      && pr.headRepository.owner?.login?.toLowerCase() === normalizedOwner)));
   }
   return mergedHeads;
 }

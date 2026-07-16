@@ -210,6 +210,18 @@ describe('gatherProjectLensSignals', () => {
     )).resolves.toEqual([]);
   });
 
+  it('matches merged PR repository identity without case sensitivity', async () => {
+    const runGraphql = vi.fn().mockResolvedValue(JSON.stringify({
+      data: { repository: {
+        h0: { nodes: [{ headRepository: { name: 'overdeck', owner: { login: 'eltmon' } } }] },
+      } },
+    }));
+
+    await expect(listMergedPullRequestHeadsBatched(
+      'EltMon', 'OverDeck', ['feature/pan-12'], runGraphql,
+    )).resolves.toEqual(['feature/pan-12']);
+  });
+
   it('resolves every candidate issue state in one project-scoped GraphQL call', async () => {
     const runGraphql = vi.fn().mockResolvedValue(JSON.stringify({
       data: { repository: { i0: { state: 'OPEN' }, i1: { state: 'CLOSED' } } },

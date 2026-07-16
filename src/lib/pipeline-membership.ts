@@ -101,7 +101,7 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     // verifying-on-main, planning, in-progress, in-review, in-planning.
     const labelDrift = s.phaseLabel !== null && (bucket === 'clean_terminal' || !s.issueOpen)
       ? 'stale_present'
-      : s.issueOpen && s.hasOpenPr && s.phaseLabel === null
+      : s.hasOpenPr && s.phaseLabel === null
         ? 'stale_absent'
         : null;
     return {
