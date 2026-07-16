@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __testInternals } from '../../../src/cli/commands/start.js';
 import {
   createPlanningProgress,
+  createPrepProgress,
   PrepStepTimeoutError,
   runStateReconcile,
   START_PREP_STEP_POLICIES,
@@ -53,7 +54,7 @@ describe('pan start prep step wiring', () => {
     expect(prep.step).toHaveBeenNthCalledWith(1, 'state-reconcile', 60_000, expect.any(Function), { awaitQuiescence: false });
     expect(prep.step).toHaveBeenNthCalledWith(2, 'sync-main', 240_000, expect.any(Function), { awaitQuiescence: true });
     expect(prep.step).toHaveBeenNthCalledWith(3, 'tracker-context', 60_000, expect.any(Function), { awaitQuiescence: true });
-    expect(prep.step).toHaveBeenNthCalledWith(4, 'spawn', 600_000, expect.any(Function), { awaitQuiescence: false });
+    expect(prep.step).toHaveBeenNthCalledWith(4, 'spawn', 600_000, expect.any(Function), { awaitQuiescence: true });
     expect(events).toEqual([
       'step:state-reconcile',
       'fn:state-reconcile',
@@ -133,26 +134,57 @@ describe('pan start prep step wiring', () => {
     );
   });
 
-  it.each([
-    ['state-reconcile', 60_000],
-    ['spawn', 600_000],
-  ] as const)('fails fast when %s exceeds its budget', async (phase, budgetMs) => {
+  it('fails fast when state reconciliation exceeds its budget', async () => {
     const prep = createTimeoutPrep();
     const spinner = { warn: vi.fn() };
     const resultPromise = runStartPrepStep(
       prep,
       spinner,
-      phase,
+      'state-reconcile',
       () => new Promise<never>(() => undefined),
     );
     const rejection = expect(resultPromise).rejects.toMatchObject({
       name: 'PrepStepTimeoutError',
-      message: `Prep step '${phase}' exceeded its ${budgetMs / 1_000}s budget`,
+      message: "Prep step 'state-reconcile' exceeded its 60s budget",
     });
 
-    await vi.advanceTimersByTimeAsync(budgetMs);
+    await vi.advanceTimersByTimeAsync(60_000);
 
     await rejection;
     expect(spinner.warn).not.toHaveBeenCalled();
+  });
+
+  it('waits for spawn quiescence before returning its timeout', async () => {
+    const prep = createPrepProgress(
+      { text: '' },
+      { stream: { isTTY: false, write: vi.fn() } },
+    );
+    const spinner = { warn: vi.fn() };
+    let receivedSignal: AbortSignal | undefined;
+    let finishSpawn!: () => void;
+    let settled = false;
+    const resultPromise = runStartPrepStep(
+      prep,
+      spinner,
+      'spawn',
+      (signal) => {
+        receivedSignal = signal;
+        return new Promise<void>((resolve) => { finishSpawn = resolve; });
+      },
+    );
+    void resultPromise.then(() => { settled = true; }, () => { settled = true; });
+
+    await vi.advanceTimersByTimeAsync(600_000);
+
+    expect(receivedSignal?.aborted).toBe(true);
+    expect(settled).toBe(false);
+    expect(spinner.warn).not.toHaveBeenCalled();
+
+    finishSpawn();
+    await expect(resultPromise).rejects.toMatchObject({
+      name: 'PrepStepTimeoutError',
+      message: "Prep step 'spawn' exceeded its 600s budget",
+    });
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

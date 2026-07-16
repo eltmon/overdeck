@@ -90,10 +90,10 @@ export function createPrepProgress(
 }
 
 export const START_PREP_STEP_POLICIES = {
-  'state-reconcile': { budgetMs: 60_000, timeout: 'fail-fast' },
-  'sync-main': { budgetMs: 240_000, timeout: 'degrade' },
-  'tracker-context': { budgetMs: 60_000, timeout: 'degrade' },
-  spawn: { budgetMs: 600_000, timeout: 'fail-fast' },
+  'state-reconcile': { budgetMs: 60_000, timeout: 'fail-fast', awaitQuiescence: false },
+  'sync-main': { budgetMs: 240_000, timeout: 'degrade', awaitQuiescence: true },
+  'tracker-context': { budgetMs: 60_000, timeout: 'degrade', awaitQuiescence: true },
+  spawn: { budgetMs: 600_000, timeout: 'fail-fast', awaitQuiescence: true },
 } as const;
 
 export type StartPrepStepName = keyof typeof START_PREP_STEP_POLICIES;
@@ -135,7 +135,7 @@ export async function runStartPrepStep<T>(
   const policy = START_PREP_STEP_POLICIES[name];
   try {
     return await prep.step(name, policy.budgetMs, fn, {
-      awaitQuiescence: policy.timeout === 'degrade',
+      awaitQuiescence: policy.awaitQuiescence,
     });
   } catch (error) {
     if (error instanceof PrepStepTimeoutError && policy.timeout === 'degrade') {
