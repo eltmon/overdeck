@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T11:56:59.380Z",
+  "updated": "2026-07-16T11:57:07.759Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -216,5 +216,24 @@
     "appimage-smoke-verify": "completed",
     "appimage-smoke-verify.appimage-smoke-verify.ac1": "completed",
     "appimage-smoke-verify.appimage-smoke-verify.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "apps/desktop/.gitignore",
+      "apps/desktop/package.json",
+      "apps/desktop/scripts/prepare-server-resources.mjs",
+      "apps/desktop/tests/package-structure.test.ts",
+      "docs/DESKTOP-APP.md"
+    ],
+    "actualChangedFiles": [
+      "apps/desktop/.gitignore",
+      "apps/desktop/package.json",
+      "apps/desktop/scripts/prepare-server-resources.mjs",
+      "apps/desktop/tests/package-structure.test.ts",
+      "docs/DESKTOP-APP.md"
+    ],
+    "recordedAt": "2026-07-16T11:57:07.758Z"
   }
 }
