@@ -196,23 +196,23 @@
     "recordedAt": "2026-07-16T20:57:38.756Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T20:57:40.648Z",
+  "updated": "2026-07-16T20:57:41.805Z",
   "pipeline": {
     "issueId": "PAN-1987",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:57:39.678Z",
+    "updatedAt": "2026-07-16T20:57:41.754Z",
     "reviewNotes": "[correctness] Tree rename can target a different project — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx:232`",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
     "lastVerifiedCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e",
     "reviewRequestedAt": "2026-07-16T20:57:39.601Z",
-    "reviewSpawnedAt": "2026-07-16T20:48:57.018Z",
+    "reviewSpawnedAt": "2026-07-16T20:57:40.685Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -279,9 +279,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1629684,
-            "output": 21803,
-            "cacheRead": 5100032,
+            "input": 1633554,
+            "output": 22163,
+            "cacheRead": 5377024,
             "cacheWrite": 0
           }
         },
@@ -342,9 +342,9 @@
           "cacheWrite": 175114
         },
         "openai/gpt-5.6-sol": {
-          "input": 10704335,
-          "output": 383076,
-          "cacheRead": 100588544,
+          "input": 10708205,
+          "output": 383436,
+          "cacheRead": 100865536,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -355,8 +355,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 128.160374,
-        "pricingAsOf": "2026-07-16T20:57:39.765Z"
+        "usd": 128.32901999999999,
+        "pricingAsOf": "2026-07-16T20:57:41.785Z"
       }
     },
     "merges": [
