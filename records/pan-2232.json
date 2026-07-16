@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-16T18:08:41.814Z",
+  "updated": "2026-07-16T18:10:33.667Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:08:41.724Z",
-    "inspectNotes": "Inspecting item wi-1-spawn",
+    "updatedAt": "2026-07-16T18:10:33.553Z",
+    "inspectNotes": "Inspection error for bead wi-1-spawn: tmux session inspect-pan-2232-wi-1-spawn exited before producing a verdict. No verdict was produced.",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -36,11 +36,19 @@
             "cacheWrite": 152114
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 20,
+            "output": 7240,
+            "cacheRead": 1210318,
+            "cacheWrite": 108736
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 904264,
-            "output": 43631,
-            "cacheRead": 10734592,
+            "input": 921780,
+            "output": 45485,
+            "cacheRead": 12482048,
             "cacheWrite": 0
           }
         }
@@ -52,16 +60,22 @@
           "cacheRead": 5117465,
           "cacheWrite": 152114
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 20,
+          "output": 7240,
+          "cacheRead": 1210318,
+          "cacheWrite": 108736
+        },
         "openai/gpt-5.6-sol": {
-          "input": 904264,
-          "output": 43631,
-          "cacheRead": 10734592,
+          "input": 921780,
+          "output": 45485,
+          "cacheRead": 12482048,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.924995,
-        "pricingAsOf": "2026-07-16T18:08:41.796Z"
+        "usd": 21.528266,
+        "pricingAsOf": "2026-07-16T18:10:33.634Z"
       }
     },
     "merges": [],
