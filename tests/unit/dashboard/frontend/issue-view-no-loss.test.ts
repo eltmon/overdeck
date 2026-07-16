@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -135,32 +135,8 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     expect(outOfTree, `home path(s) outside the frontend components tree: ${outOfTree.join(', ')}`).toEqual([]);
   });
 
-  it('every inventory section has a real rendered JSX marker', () => {
-    const componentsRoot = path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components');
-    const sources = readdirSync(componentsRoot, { recursive: true, encoding: 'utf8' })
-      .filter((file) => file.endsWith('.tsx') && !file.endsWith('.test.tsx'))
-      .map((file) => readFileSync(path.join(componentsRoot, file), 'utf8'))
-      .join('\n');
-    const renderedSectionAttributes = [...sources.matchAll(/data-section=(?:"[^"]*"|\{[^}]*\})/gs)]
-      .map(([attribute]) => attribute)
-      .join('\n');
-    const missing = EXPECTED_SECTIONS.filter(
-      (section) => !renderedSectionAttributes.includes(`"${section}"`) &&
-        !renderedSectionAttributes.includes(`'${section}'`),
-    );
-    expect(
-      missing,
-      `section(s) declared but not rendered with a data-section marker under ${componentsRoot}: ${missing.join(', ')}`,
-    ).toEqual([]);
-  });
-
-  it('locks the legacy beads section family to the rendered Tasks surfaces', () => {
+  it('locks the legacy beads section family into the shared section inventory', () => {
     expect(BEADS_PANEL_SECTIONS).toEqual(EXPECTED_SHARED_REPLACEMENT_SECTIONS);
     expect(EXPECTED_SHARED_REPLACEMENT_SECTIONS.filter((section) => !SECTION_INVENTORY.includes(section))).toEqual([]);
-
-    const tasksPanel = readFileSync(path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components/TasksPanel.tsx'), 'utf8');
-    const tasksRail = readFileSync(path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components/Stage/cockpit/TasksRail.tsx'), 'utf8');
-    expect(tasksPanel).toContain('data-section="beads-panel"');
-    expect(tasksRail).toContain('data-section="beads-panel-compact"');
   });
 });

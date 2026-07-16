@@ -37,7 +37,7 @@ import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projecti
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
 import { getSystemHealthSnapshot } from '../../services/system-health-service.js';
 import { httpHandler } from '../http-handler.js';
-import { validateOrigin } from '../origin-validation.js';
+import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { sessionExists, killSession } from '../../../../lib/tmux.js';
 import {
   appendAgentLifecycleLog,
@@ -181,10 +181,8 @@ export const postAgentsRoute = HttpRouter.add(
   '/api/agents',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
-    }
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
 
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
@@ -265,7 +263,7 @@ export const postAgentsRoute = HttpRouter.add(
 
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
-    const clearGates = originCheck.ok && (body as any).clearGates === true;
+    const clearGates = (body as any).clearGates === true;
     const initialAgentState = yield* getAgentState(agentSessionName);
     const startGateBlock = evaluateAgentStartGate(agentSessionName, initialAgentState);
     if (startGateBlock) {
@@ -587,16 +585,40 @@ export const postAgentsRoute = HttpRouter.add(
       console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
-    if (isRemote && workspaceMetadata) {
-      return yield* handleRemoteAgentSpawn({
+    let gatesCommitted = false;
+    const commitClearedGates = async (): Promise<void> => {
+      if (!startGateBlock || gatesCommitted) return;
+      gatesCommitted = true;
+      if (startGateBlock.paused) {
+        await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'unpause', source: 'dashboard' })));
+      }
+      if (startGateBlock.troubled) {
+        await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'untroubled', source: 'dashboard' })));
+      }
+      await appendAgentLifecycleLog(agentSessionName, 'agent.start_gates_cleared', {
         issueId,
-        workspacePath,
-        workspaceMetadata,
-        spawnModel,
-        projectPath,
-        spawnGuardrails,
-        lifecycle,
+        paused: startGateBlock.paused,
+        troubled: startGateBlock.troubled,
       });
+    };
+
+    if (isRemote && workspaceMetadata) {
+      const response = yield* Effect.promise(() => spawnAfterClearingStartGates({
+        agentSessionName,
+        gate: startGateBlock,
+        initialState: initialAgentState,
+        spawn: () => Effect.runPromise(handleRemoteAgentSpawn({
+          issueId,
+          workspacePath,
+          workspaceMetadata,
+          spawnModel,
+          projectPath,
+          spawnGuardrails,
+          lifecycle,
+        })),
+      }));
+      yield* Effect.promise(commitClearedGates);
+      return response;
     }
 
     // Local workspace
@@ -696,7 +718,6 @@ export const postAgentsRoute = HttpRouter.add(
     }
 
     // Spawn pan start command
-    let gatesCommitted = false;
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
       const activityId = await spawnAfterClearingStartGates({
         agentSessionName,
@@ -704,20 +725,7 @@ export const postAgentsRoute = HttpRouter.add(
         initialState: initialAgentState,
         spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd }),
       });
-      if (startGateBlock && !gatesCommitted) {
-        gatesCommitted = true;
-        if (startGateBlock.paused) {
-          await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'unpause', source: 'dashboard' })));
-        }
-        if (startGateBlock.troubled) {
-          await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'untroubled', source: 'dashboard' })));
-        }
-        await appendAgentLifecycleLog(agentSessionName, 'agent.start_gates_cleared', {
-          issueId,
-          paused: startGateBlock.paused,
-          troubled: startGateBlock.troubled,
-        });
-      }
+      await commitClearedGates();
       return activityId;
     };
 

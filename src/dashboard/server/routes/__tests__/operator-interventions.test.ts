@@ -4,6 +4,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { EventStoreService } from '../../services/domain-services.js';
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
 import { ReadModelService, type ReadModelServiceShape } from '../../read-model.js';
+import { jsonResponse } from '../../http-helpers.js';
 
 const fsMocks = vi.hoisted(() => ({
   appendFile: vi.fn(),
@@ -46,6 +47,12 @@ const trackerMocks = vi.hoisted(() => ({
 const operatorInterventionMocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(() => Promise.resolve()),
 }));
+
+const dashboardAuthMocks = vi.hoisted(() => ({
+  rejectUnsafeDashboardMutationRequest: vi.fn(),
+}));
+
+vi.mock('../dashboard-auth.js', () => dashboardAuthMocks);
 
 const sharedMocks = vi.hoisted(() => ({
   getIssueDataService: vi.fn(() => ({
@@ -317,6 +324,7 @@ describe('operator.intervention dashboard routes', () => {
     // returning [] means "not found among cached issues", so the guard is skipped
     // and the request reaches the start-gate (clearGates) logic under test.
     issueServiceMock.getIssues.mockReturnValue([]);
+    dashboardAuthMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -431,5 +439,24 @@ describe('operator.intervention dashboard routes', () => {
     expect(response.status).toBe(409);
     expect(agentMocks.clearAgentPausedSync).not.toHaveBeenCalled();
     expect(agentMocks.clearAgentTroubledSync).not.toHaveBeenCalled();
+  });
+
+  it('does not accept clearGates when the canonical mutation authorization rejects the request', async () => {
+    dashboardAuthMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(
+      jsonResponse({ error: 'Invalid CSRF token' }, { status: 403 }),
+    );
+    agentMocks.getAgentState.mockReturnValue(
+      Effect.succeed({ ...agentState, paused: true, pausedReason: 'operator' }),
+    );
+
+    const { response } = await requestAgents('/api/agents', {
+      headers: { origin: 'http://localhost' },
+      body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
+    });
+
+    expect(response.status).toBe(403);
+    expect(dashboardAuthMocks.rejectUnsafeDashboardMutationRequest).toHaveBeenCalledOnce();
+    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
+    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
   });
 });
