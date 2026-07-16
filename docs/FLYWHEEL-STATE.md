@@ -5439,3 +5439,9 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Wedge is INTERMITTENT, not total:** some claude-code+CLIProxy review convoys complete (2045), others wedge on autocompact thrash. Still genuinely wedged (lastActivity frozen): 1966 whole convoy (~46min), 1897-review-performance (~45min), 1491-review (~256min, old). These block 1966/1897/1491.
 - **Restarting wedged convoys pre-fix is FUTILE** — a fresh claude-code+CLIProxy convoy re-wedges on the same large-file autocompact thrash. Leave wedged 1966/1897 for operator's compact-window root-cause fix. NOTE: killing tmux does NOT delete the JSONL transcript (survives on disk), so evidence is safe regardless.
 - Operator has 2 open questions from me: (1) kill/restart 1966 wedge, (2) 150k compact window for review convoys. Holding on both (irreversible/operator-owned) until they respond.
+
+## Tick 71 — 2026-07-16 ~18:56 — quiet; DoD deploy+close-out OWED and HELD
+- No new merges (1897 CHANGES REQUESTED, 1966 wedged 59min, 1897-perf wedged 58min). Wedge unchanged — operator compact-window fix still pending.
+- **DoD DEPLOY OWED for 6 merges** (1987, 2772, 2760, 2619, 2773, 2045) — all landed after last deploy a081a9ce59. Live dashboard is STALE relative to them. Close-out can't fully pass (deploy row) until deployed.
+- **DEPLOY HELD ON PURPOSE:** restarting the live dashboard mid-operator-debug would disconnect their active session (convo-disconnect blast radius) and disrupt wedge debugging. Waiting for operator OK or a natural break. When cleared: git fetch, checked-clean FF-only, npm run build, pan restart --dashboard --resume --health-timeout 120000, then pan close each of the 6.
+- Session merge tally holds at 6.
