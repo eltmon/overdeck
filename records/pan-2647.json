@@ -2,7 +2,7 @@
   "issueId": "PAN-2647",
   "schemaVersion": 2,
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-16T19:28:50.583Z",
+  "updated": "2026-07-16T19:29:02.993Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2647: fix(health): replace false-positive system health model and harden Health page contract",
       "timestamp": "2026-07-16T19:28:50.583Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
