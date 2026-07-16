@@ -139,15 +139,7 @@
       "timestamp": "2026-07-16T21:30:25.190Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T21:30:22Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2619\n\n# Review Synthesis — PAN-2619 — 2026-07-16T17:31:00-04:00\n\n## Verdict: CHANGES REQUESTED — correctness reviewer failed before producing a report\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/context.json\n- Branch: feature/pan-2619\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619\n- HEAD reviewed: 2f50757534e026b0c6eb8adb20c55d739328e0b7\n- Cycle number: 4\n- Prior cycle SHA: 527600642793acab98d2c574fd40b91ead884c2b\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/security.md | 0 |\n| correctness | failed: reviewer session ended before writing a report | — | — |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Reviewer failed before producing a report\nThe correctness reviewer session ended before writing a report. Reviewer failures block approval because correctness coverage is unavailable. This infrastructure failure is not a code finding and therefore is not demotable by the cycle-four convergence gate.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-2f507575/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2619 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -164,17 +156,17 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:36:22.030Z",
+  "updated": "2026-07-16T21:36:26.346Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "blocked",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:36:21.983Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed test",
+    "updatedAt": "2026-07-16T21:36:22.253Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed test",
     "testNotes": "See .pan/test/result.json for full evidence. Code fix verified correct (typecheck, lint, targeted XTerminal.test.tsx PASS). FAILED because broad --changed vitest gate fails on unrelated pre-existing App.test.tsx defect (commit 2f4648e673, untouched by this diff), and required browser UAT could not run: workspace container /ws/terminal rejects upgrades with 403 via frontend Traefik/Vite proxy path, and PTY spawn segfaults (node:22-alpine/musl vs glibc-only @lydell/node-pty-linux-x64). Both pre-existing env defects, out of test-role scope. No host dashboard fallback used. Flywheel notified via pan tell.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "lastVerifiedCommit": "e3568752da539e8a69a62d6d2079775d86ca3c40",
@@ -307,7 +299,7 @@
       },
       "costAtCloseOut": {
         "usd": 90.552676,
-        "pricingAsOf": "2026-07-16T21:36:22.004Z"
+        "pricingAsOf": "2026-07-16T21:36:23.235Z"
       }
     },
     "merges": [
