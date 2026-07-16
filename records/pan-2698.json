@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T04:08:21.475Z",
+  "updated": "2026-07-16T07:25:00.720Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -51,5 +51,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "extract-role-mcp-parser": {
+        "writerId": "agent-pan-2698",
+        "agentId": "agent-pan-2698",
+        "pid": 3083840,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:25:00.720Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "extract-role-mcp-parser": "running"
+  }
 }
