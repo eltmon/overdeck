@@ -77,7 +77,13 @@ describe('gatherProjectLensSignals', () => {
   it('keeps forbidden disposable-state and synchronous process imports out of the gatherer', async () => {
     const entry = fileURLToPath(new URL('../../../src/lib/pipeline-membership-gather.ts', import.meta.url));
     const graph = await collectRelativeImportGraph(entry);
-    const forbiddenModule = /(?:^|\/)(?:review-status|agent-state|tmux|db)(?:\/|\.|$)/;
+    const forbiddenModule = /\/database\/|review-status|agent-state|tmux/;
+    expect([
+      '/repo/src/lib/database/agents-db.ts',
+      '/repo/src/lib/review-status-normalize.ts',
+      '/repo/src/lib/overdeck/agent-state-sync.ts',
+      '/repo/src/lib/runtimes/tmux-cli.ts',
+    ].every((path) => forbiddenModule.test(path))).toBe(true);
     expect([...graph].filter((path) => forbiddenModule.test(path))).toEqual([]);
 
     const source = await readFile(entry, 'utf-8');
