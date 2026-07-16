@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:14:01.822Z",
+  "updated": "2026-07-16T12:14:04.228Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,8 +110,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 22,
-    "claims": {},
+    "sequence": 23,
+    "claims": {
+      "lint-guard-fr5": {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1801593,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:14:04.228Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -281,6 +289,10 @@
       "no-loss-audit-test": {
         "reason": "Runtime drift table and six-consumer inventory are pinned without violating the source-introspection guard.",
         "updatedAt": "2026-07-16T12:14:01.822Z"
+      },
+      "lint-guard-fr5": {
+        "reason": "Implementation pushed in 124117eab7",
+        "updatedAt": "2026-07-16T12:14:04.228Z"
       }
     }
   },
@@ -330,6 +342,7 @@
     "no-loss-audit-test": "completed",
     "no-loss-audit-test.no-loss-audit-test.ac1": "completed",
     "no-loss-audit-test.no-loss-audit-test.ac2": "completed",
-    "no-loss-audit-test.no-loss-audit-test.ac3": "completed"
+    "no-loss-audit-test.no-loss-audit-test.ac3": "completed",
+    "lint-guard-fr5": "running"
   }
 }
