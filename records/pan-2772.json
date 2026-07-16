@@ -77,7 +77,7 @@
     "recordedAt": "2026-07-16T19:18:10.850Z"
   },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T22:23:32.333Z",
+  "updated": "2026-07-16T23:23:42.209Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "passed",
@@ -86,7 +86,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T22:23:32.327Z",
+    "updatedAt": "2026-07-16T23:23:42.200Z",
     "reviewNotes": "All four reviewers passed with no findings; all 15 in-scope requirements are implemented.",
     "testNotes": "Reconciled from green GitHub Actions CI on 37b94ab2: build (22) (https://github.com/eltmon/overdeck/actions/runs/29527465635/job/87719350705)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -239,7 +239,7 @@
       },
       "costAtCloseOut": {
         "usd": 133.078931,
-        "pricingAsOf": "2026-07-16T22:23:32.329Z"
+        "pricingAsOf": "2026-07-16T23:23:42.203Z"
       }
     },
     "merges": [
