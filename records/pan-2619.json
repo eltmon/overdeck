@@ -166,7 +166,9 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/App.test.tsx"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "src/dashboard/frontend/src/components/XTerminal.test.tsx",
@@ -174,14 +176,15 @@
       "src/dashboard/frontend/src/index.css"
     ],
     "actualChangedFiles": [
+      "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/XTerminal.test.tsx",
       "src/dashboard/frontend/src/components/XTerminal.tsx",
       "src/dashboard/frontend/src/index.css"
     ],
-    "recordedAt": "2026-07-16T21:16:56.333Z"
+    "recordedAt": "2026-07-16T21:43:42.875Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:43:37.263Z",
+  "updated": "2026-07-16T21:43:42.877Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "passed",
