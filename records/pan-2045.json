@@ -242,7 +242,7 @@
     "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:06:21.192Z",
+  "updated": "2026-07-16T21:06:24.113Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "passed",
@@ -252,7 +252,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:48:26.557Z",
+    "updatedAt": "2026-07-16T21:06:24.069Z",
     "reviewNotes": "both prior blockers are repaired; the only new raw finding is demoted by the mandatory cycle-3 convergence gate",
     "testNotes": "See .pan/test/result.json for full evidence. Frontend suite deterministically fails (73/2008) on unmocked network requests caught by new test-setup.ts fetch guard; typecheck/lint pass; UAT not required.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -459,17 +459,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 126,
-            "output": 31802,
-            "cacheRead": 10344495,
-            "cacheWrite": 206171
+            "input": 132,
+            "output": 33902,
+            "cacheRead": 10966329,
+            "cacheWrite": 209006
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5591530,
-            "output": 262856,
-            "cacheRead": 89783296,
+            "input": 6835707,
+            "output": 293603,
+            "cacheRead": 99016192,
             "cacheWrite": 0
           }
         }
@@ -488,21 +488,21 @@
           "cacheWrite": 165070
         },
         "openai/gpt-5.6-sol": {
-          "input": 13514632,
-          "output": 405519,
-          "cacheRead": 118050816,
+          "input": 14758809,
+          "output": 436266,
+          "cacheRead": 127283712,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 128,
-          "output": 31949,
-          "cacheRead": 10372944,
-          "cacheWrite": 297122
+          "input": 134,
+          "output": 34049,
+          "cacheRead": 10994778,
+          "cacheWrite": 299957
         }
       },
       "costAtCloseOut": {
-        "usd": 149.758807,
-        "pricingAsOf": "2026-07-16T20:48:26.586Z"
+        "usd": 161.671017,
+        "pricingAsOf": "2026-07-16T21:06:24.090Z"
       }
     },
     "merges": [
@@ -511,7 +511,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
