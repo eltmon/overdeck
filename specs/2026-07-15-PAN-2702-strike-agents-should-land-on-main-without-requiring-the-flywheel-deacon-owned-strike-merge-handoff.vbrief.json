@@ -4,17 +4,17 @@
     "created": "2026-07-15T12:53:44.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2702: Strike agents should land on main without requiring the Flywheel — deacon-owned strike merge handoff",
-    "updated": "2026-07-15T12:58:43.965Z"
+    "updated": "2026-07-16T07:28:01.573Z"
   },
   "plan": {
     "id": "pan-2702",
     "title": "Strike agents should land on main without requiring the Flywheel — deacon-owned strike merge handoff",
-    "status": "proposed",
+    "status": "approved",
     "uid": "8ba3e958-9adc-4948-8c4d-c30f49cdd8cd",
     "author": "agent:gpt-5.6-sol",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-15T12:53:44.000Z",
-    "updated": "2026-07-15T12:58:43.965Z",
+    "updated": "2026-07-16T07:28:01.573Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2702",
@@ -428,5 +428,5 @@
       "canonicalFilename": "2026-07-15-PAN-2702-strike-agents-should-land-on-main-without-requiring-the-flywheel-deacon-owned-strike-merge-handoff.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
