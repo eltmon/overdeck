@@ -319,7 +319,7 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:27:08.784Z",
+  "updated": "2026-07-16T21:27:09.365Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -329,7 +329,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:27:08.738Z",
+    "updatedAt": "2026-07-16T21:27:09.276Z",
+    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -465,7 +466,7 @@
       },
       "costAtCloseOut": {
         "usd": 216.59758,
-        "pricingAsOf": "2026-07-16T21:27:08.778Z"
+        "pricingAsOf": "2026-07-16T21:27:09.305Z"
       }
     },
     "merges": [
