@@ -296,7 +296,7 @@
     "recordedAt": "2026-07-16T21:46:49.907Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:46:51.014Z",
+  "updated": "2026-07-16T21:46:52.877Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -306,7 +306,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:46:50.908Z",
+    "updatedAt": "2026-07-16T21:46:52.109Z",
     "reviewNotes": "Production MessagesTimeline CSS was changed solely for happy-dom assertions, violating an explicit must-not requirement.",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
@@ -580,7 +580,7 @@
       },
       "costAtCloseOut": {
         "usd": 184.86023,
-        "pricingAsOf": "2026-07-16T21:46:50.997Z"
+        "pricingAsOf": "2026-07-16T21:46:52.327Z"
       }
     },
     "merges": [
