@@ -173,8 +173,8 @@ describe('SessionFeedSidebar', () => {
 
     const section = screen.getByText('Just Now').closest('section');
     expect(section).not.toBeNull();
-    const entries = within(section as HTMLElement).getAllByRole('button');
-    expect(entries.map((button) => button.textContent)).toEqual([
+    const entries = within(section as HTMLElement).getAllByTestId('activity-feed-card');
+    expect(entries.map((entryEl) => entryEl.textContent)).toEqual([
       'Newer activityin_progressfeature-pan-1389 · PAN-1389·1m agoMemory',
       'Older activityin_progressfeature-pan-1389 · PAN-1389·3m agoMemory',
     ]);
