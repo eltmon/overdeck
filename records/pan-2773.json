@@ -182,6 +182,11 @@
       "reason": "feedback",
       "note": "[2026-07-16T20:39Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-16T20:39:19.929Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T20:42:09.358Z"
     }
   ],
   "feedback": [],
@@ -229,23 +234,23 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T20:42:08.040Z",
+  "updated": "2026-07-16T20:42:09.358Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:42:07.512Z",
+    "updatedAt": "2026-07-16T20:42:08.075Z",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
     "lastVerifiedCommit": "5e1dd8fd05bc8404540af53e1c2c14273da1c231",
     "reviewRequestedAt": "2026-07-16T19:33:54.654Z",
-    "reviewSpawnedAt": "2026-07-16T20:38:56.919Z",
+    "reviewSpawnedAt": "2026-07-16T20:42:08.074Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -389,7 +394,7 @@
       },
       "costAtCloseOut": {
         "usd": 199.524951,
-        "pricingAsOf": "2026-07-16T20:42:07.563Z"
+        "pricingAsOf": "2026-07-16T20:42:08.105Z"
       }
     },
     "merges": [
