@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T07:27:35.738Z",
+  "updated": "2026-07-16T07:28:50.112Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "package-structure-tests": {
+        "writerId": "agent-pan-2768",
+        "agentId": "agent-pan-2768",
+        "pid": 3115771,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:28:50.112Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2768",
@@ -137,6 +145,7 @@
     "stage-full-sync-sources.stage-full-sync-sources.ac2": "completed",
     "ship-cli-extraresources": "completed",
     "ship-cli-extraresources.ship-cli-extraresources.ac1": "completed",
-    "ship-cli-extraresources.ship-cli-extraresources.ac2": "completed"
+    "ship-cli-extraresources.ship-cli-extraresources.ac2": "completed",
+    "package-structure-tests": "running"
   }
 }
