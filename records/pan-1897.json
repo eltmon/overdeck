@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-1897",
   "schemaVersion": 2,
-  "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T17:43:00.443Z",
-  "pipeline": {
-    "issueId": "PAN-1897",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-06-23T14:40:20.192Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-fable-5",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,63 @@
       "note": "Planning session started for PAN-1897: bug(cli): pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error)",
       "timestamp": "2026-07-16T17:42:56.526Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-06-23T14:40:20.192Z",
+  "updated": "2026-07-16T18:14:22.084Z",
+  "pipeline": {
+    "issueId": "PAN-1897",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T18:14:21.943Z",
+    "strikeRecoveryCount": 0
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 676,
+            "output": 152,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 6330,
+            "output": 34257,
+            "cacheRead": 4109255,
+            "cacheWrite": 165841
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 676,
+          "output": 152,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 6330,
+          "output": 34257,
+          "cacheRead": 4109255,
+          "cacheWrite": 165841
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 7.9584209999999995,
+        "pricingAsOf": "2026-07-16T18:14:22.067Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
 }
