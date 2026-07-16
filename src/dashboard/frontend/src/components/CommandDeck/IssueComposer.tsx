@@ -13,6 +13,7 @@ import { useCallback, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { SendHorizontal, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import posthog from 'posthog-js';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { StartAgentResponse } from '../../types';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
@@ -93,12 +94,18 @@ export function IssueComposer({ issueId, sessions }: IssueComposerProps) {
       }
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, message) => {
+      posthog.capture('agent_spawned', {
+        issue_id: issueId,
+        spawn_mode: mode.kind,
+        has_message: Boolean(message),
+      });
       clearDraft(issueId);
       void queryClient.invalidateQueries({ queryKey: ['agents'] });
       setTimeout(() => queryClient.invalidateQueries({ queryKey: ['agents'] }), 2000);
     },
     onError: (err: Error) => {
+      posthog.captureException(err, { issue_id: issueId });
       toast.error(err.message, { duration: 8000 });
     },
   });

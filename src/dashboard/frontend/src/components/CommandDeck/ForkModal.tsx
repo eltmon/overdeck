@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, GitBranchPlus, HelpCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import posthog from 'posthog-js';
 import {
   getDefaultConversationModel,
   FALLBACK_DEFAULT_CONVERSATION_MODEL,
@@ -503,21 +504,29 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
             className={styles.forkConfirmBtn}
             disabled={confirmDisabled}
             title={handoffUnavailable ? 'Source-authored handoff requires a running source conversation' : undefined}
-            onClick={() => onConfirm(
-              conversation,
-              launchModel,
-              summaryModel,
-              apiForkMode,
-              localSummaryOnly,
-              isSummaryFork && !fastSummary && includeThinkingInSummary,
-              forkTitle.trim() || undefined,
-              launchHarness,
-              summaryHarness,
-              handoffFocusValue,
-              isHandoffFork ? handoffAuthor : undefined,
-              isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
-              isHandoffFork && handoffAuthor === 'external' ? summaryHarness : undefined,
-            )}
+            onClick={() => {
+              posthog.capture('conversation_forked', {
+                fork_intent: intent,
+                fork_mode: apiForkMode,
+                fast_summary: localSummaryOnly,
+                launch_harness: launchHarness,
+              });
+              onConfirm(
+                conversation,
+                launchModel,
+                summaryModel,
+                apiForkMode,
+                localSummaryOnly,
+                isSummaryFork && !fastSummary && includeThinkingInSummary,
+                forkTitle.trim() || undefined,
+                launchHarness,
+                summaryHarness,
+                handoffFocusValue,
+                isHandoffFork ? handoffAuthor : undefined,
+                isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
+                isHandoffFork && handoffAuthor === 'external' ? summaryHarness : undefined,
+              );
+            }}
           >
             <GitBranchPlus size={13} />
             {isPending ? 'Continuing…' : 'Continue'}
