@@ -206,7 +206,7 @@
     "recordedAt": "2026-07-16T20:57:38.756Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T21:23:50.321Z",
+  "updated": "2026-07-16T22:23:32.375Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "passed",
@@ -216,7 +216,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:22:22.239Z",
+    "updatedAt": "2026-07-16T22:23:32.355Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-1987-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -389,7 +389,7 @@
       },
       "costAtCloseOut": {
         "usd": 134.875987,
-        "pricingAsOf": "2026-07-16T21:22:22.241Z"
+        "pricingAsOf": "2026-07-16T22:23:32.370Z"
       }
     },
     "merges": [
@@ -397,7 +397,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
