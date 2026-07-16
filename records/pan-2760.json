@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T17:38:18.983Z",
+  "updated": "2026-07-16T17:53:55.362Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "pending",
@@ -59,18 +59,34 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "roster-add-crew": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2760",
         "agentId": "agent-pan-2760",
         "pid": 2199075,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:38:18.983Z"
+        "claimedAt": "2026-07-16T17:38:18.983Z",
+        "itemId": "roster-add-crew",
+        "outcome": "completed",
+        "reason": "Added roster and empty-state crew creation, preserved board creation and kind-override guard, and verified 21 focused tests plus typecheck.",
+        "releasedAt": "2026-07-16T17:53:55.362Z"
+      }
+    ],
+    "statusReasons": {
+      "roster-add-crew": {
+        "reason": "Added roster and empty-state crew creation, preserved board creation and kind-override guard, and verified 21 focused tests plus typecheck.",
+        "updatedAt": "2026-07-16T17:53:55.362Z"
       }
     }
   },
   "statusOverrides": {
-    "roster-add-crew": "running"
+    "roster-add-crew": "completed",
+    "roster-add-crew.roster-add-crew.ac1": "completed",
+    "roster-add-crew.roster-add-crew.ac2": "completed",
+    "roster-add-crew.roster-add-crew.ac3": "completed",
+    "roster-add-crew.roster-add-crew.ac4": "completed",
+    "roster-add-crew.roster-add-crew.ac5": "completed"
   }
 }
