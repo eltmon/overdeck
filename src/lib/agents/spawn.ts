@@ -79,7 +79,6 @@ import {
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
-import { confirmWorkMailboxDeliveryBestEffort, prepareWorkMailbox, type MailboxItem } from '../cloister/agent-mailbox.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
@@ -616,15 +615,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       harness: resolvedHarness,
     });
   }
-  let preparedMailboxItems: MailboxItem[] = [];
-  if ((role === 'work' || role === 'strike') && prompt) {
-    const prepared = await prepareWorkMailbox(prompt, {
-      issueId: options.issueId,
-      workspacePath: options.workspace,
-    });
-    prompt = prepared.message;
-    preparedMailboxItems = prepared.items;
-  }
 
   // Write prompt to file for complex prompts (avoids shell escaping issues)
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
@@ -785,9 +775,6 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       await Effect.runPromise(stopAgent(agentId));
       throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
     }
-  }
-  if (prompt && preparedMailboxItems.length > 0) {
-    await confirmWorkMailboxDeliveryBestEffort(preparedMailboxItems, `${agentId}/${options.issueId}`);
   }
 
   // For codex work agents, poll for the first rollout JSONL in the background

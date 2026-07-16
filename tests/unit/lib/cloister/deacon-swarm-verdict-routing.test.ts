@@ -200,7 +200,7 @@ describe('swarm verdict feedback routing', () => {
     );
   });
 
-  it('leaves feedback pending for delayed escalation when no target is resolved', async () => {
+  it('surfaces needs-you instead of falling back silently when no target is resolved', async () => {
     const workspacePath = await writePlan(plan([
       slotItem('wi-a'),
       slotItem('wi-b'),
@@ -222,6 +222,10 @@ describe('swarm verdict feedback routing', () => {
 
     expect(result.agentMessageSent).toBe(false);
     expect(mockMessageAgent).not.toHaveBeenCalled();
-    expect(mockSurfaceIssueFeedbackNeedsYou).not.toHaveBeenCalled();
+    expect(mockSurfaceIssueFeedbackNeedsYou).toHaveBeenCalledWith('PAN-2203', 'No live feedback target for PAN-2203 for item wi-c', {
+      specialist: 'review-agent',
+      feedbackPath: '/tmp/workspace/.pan/feedback/001-review-agent-changes-requested.md',
+      slotItemId: 'wi-c',
+    });
   });
 });

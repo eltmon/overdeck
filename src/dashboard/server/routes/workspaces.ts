@@ -68,7 +68,6 @@ import { EventStoreService } from '../services/domain-services.js';
 import {
   enqueuePendingFeedbackDelivery,
   markPendingFeedbackDelivered,
-  markPendingFeedbackTransportDelivered,
 } from '../pending-feedback.js';
 import {
   getReviewStatusSync,
@@ -93,8 +92,6 @@ import {
   getAgentStateSync,
   spawnRun,
 } from '../../../lib/agents.js';
-import { resolveIssueFeedbackTarget } from '../../../lib/cloister/feedback-target.js';
-import { markMailboxItemDelivered } from '../../../lib/cloister/agent-mailbox.js';
 import { getActiveSessionModelSync } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
@@ -231,16 +228,19 @@ async function deliverQueuedFeedback(
   filePath: string,
   message: string,
 ): Promise<void> {
-  await enqueuePendingFeedbackDelivery({ issueId, role: 'work', kind, filePath, message, createdAt: new Date().toISOString() });
-  const target = await resolveIssueFeedbackTarget(issueId);
-  if (!('agentId' in target)) return;
-  try { await messageAgent(target.agentId, message); } catch { return; }
-  await markPendingFeedbackTransportDelivered(issueId, kind);
-  try { await markMailboxItemDelivered({ issueId, role: 'work', filePath }); await markPendingFeedbackDelivered(issueId, kind); }
-  catch (error) { console.warn(
-    `[dashboard] Feedback reached ${target.agentId}, but mailbox state update failed for ${issueId}: ${error instanceof Error ? error.message : String(error)}`,
-  ); }
+  const agentId = `agent-${issueId.toLowerCase()}`;
+  await enqueuePendingFeedbackDelivery({
+    issueId,
+    agentId,
+    kind,
+    filePath,
+    message,
+    createdAt: new Date().toISOString(),
+  });
+  await messageAgent(agentId, message);
+  await markPendingFeedbackDelivered(issueId, kind);
 }
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PORT = parseInt(process.env.API_PORT || process.env.PORT || '3011', 10);
