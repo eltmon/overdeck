@@ -4887,3 +4887,54 @@ tick 41. **Redirect to a file and check the exit code directly — never pipe th
 **Drain: 32 merged / 27 closed out.** Filed (17): PAN-2762 closed (operator-fixed).
 Outstanding, NOT re-asked: (1) PAN-2710 bypass verdict; (2) **v0.45.20 — unblocked**.
 **OWED: deploy** — blocked on the primary tree being clean; retry next tick.
+
+---
+
+## Tick 43 — 2026-07-16 ~04:40Z — PAN-2499 MERGED; the pipeline was never slow, it was BLOCKED
+
+### ✅ PAN-2499 MERGED `4697f17630` — main CI **green** (58 files, +5387/-2137)
+Real verdict, unlike PAN-2710: `reviewNotes` AND `testNotes` both populated, tests run from the
+workspace at the reviewed commit, CI 10/10, MERGEABLE/CLEAN.
+⚠️ **MY MISTAKE:** I printed the stale-verdict check and **merged in the same command without reading it**.
+`testNotes` claimed HEAD `1107d2c626`; the merged head was `d53cfd7a1a`. The delta was merges-of-main
++ a baseline chore + one dashboard fix, and **CI WAS green on the actual merged head**, so the landed
+code was verified — but NOT by the convoy, and `testNotes` asserted "matches reviewedAtCommit" when
+that had become false. **File the stale-verdict gap.** Never print a gate check and act in the same breath.
+
+### 🎯 PAN-2710's REAL review vindicated the whole night's refusal
+Convoy ran (5 sessions, artifacts written). Verdicts: security **clean**, correctness **clean** (2 advisories),
+requirements **PARTIAL 17/18**, performance **BLOCKING**:
+1. ⊗ `stale-check-retrigger-service.ts:113` — `setInterval(() => void tickOnce(...), 60s)` **never awaits
+   the prior tick**; each candidate runs 2 serial `gh` calls at 30s timeout. Ticks overlap ⇒ **unbounded
+   subprocess growth in the dashboard's long-lived poller.**
+2. ! `:28` — process-lifetime dedup state **never evicts** (leak).
+3. `stale-check-github.ts:37` — `--status failure` **silently ignores** ERROR/TIMED_OUT/CANCELLED/etc.
+   that `FAILING_CHECK_CONCLUSIONS` treats as failing ⇒ the feature under-delivers its own FR-3.
+**The bypass said "ship it"; four reviewers reading the code said BLOCKED.** Merging on `review_status=passed`
+would have put an unbounded subprocess spawner + a leak into the dashboard. **PAN-2746 is proven, concretely.**
+Findings posted to the issue; struck.
+
+### 🚨 THE PIPELINE WAS NEVER SLOW — 7 issues were BLOCKED, silently, by 3 substrate bugs
+- **PAN-2770** (docker init exits 127: `prepare`→`husky` not linked; `ENOENT ... failed to link`) blocks
+  **FIVE**: 2168, 2255, 2532, **1966, 2768**. `pan start` treats unhealthy stack as a HARD REFUSAL ⇒ a
+  container install hiccup silently converts a ready issue into one that CANNOT be worked.
+  **CORRECTION:** I first blamed PAN-2569 (handoff). Wrong — `plan.status` stays `proposed` *because*
+  the docker gate refuses. **PAN-2770 is the dominant blocker.**
+- **PAN-2771** (kickoff never delivered) leaves agents **running with NO task**: 2698, 2702, and now
+  **1966, 2768** via `--host --yes`. `agent-pan-2698`'s whole event log is 1 line, no userMessage.
+- **PAN-2741** (verification feedback = git-hint noise) ⇒ PAN-1491 `needs-you: verification stuck 3/3`.
+All three struck. **Fixing substrate > restarting symptoms** — restarts just reproduce the failure.
+
+### 🔁 PAN-2757 REPRODUCED — it killed my own PAN-2710 strike
+`strike-pan-2710`: last event `04:29:52 item/autoApprovalReview/started` (mid-turn) → reaped
+`04:30:07 "orphaned: tmux session missing"`. **15 SECONDS.** $0.98 burned. Work survived
+(`5e5c62bee1`). Same as `strike-pan-2753` earlier. Re-struck.
+
+### ⚠️ BLOCKED ON DOCTRINE: 4 taskless agents need `pan tell`, which I may not use
+`pan start` itself prints: `pan tell PAN-1966 "continue from your kickoff brief"`. My constraints forbid
+`pan tell`/`kill`/`resume`. So `agent-pan-1966/2768/2698/2702` sit **running with no task**, burning slots.
+The system fix (PAN-2771) is in flight — waiting for it is doctrinally correct; the cost is 4 idle slots.
+**Operator decision.**
+
+**Merged tonight: 33.** Filed (20): +PAN-2762(closed) 2763 2768 2769 2770 2771.
+Live strikes: 2710, 2741, 2748, 2749, 2752, 2753, 2770, 2771.
