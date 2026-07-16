@@ -12,7 +12,7 @@ import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
 import { UatStackTreeGroup } from './UatStackTreeGroup';
-import { useWorkspaceQuery, useReviewStatusQuery } from '../ZoneCOverviewTabs/queries';
+import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import { createUatActionHandler } from './uat-action-handlers';
 import {
   ContextMenuRoot,
@@ -28,9 +28,8 @@ import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
-import { ShipProgress } from '../../issue-view/ShipProgress';
 import { BeadsPanel } from '../../issue-view/BeadsPanel';
-import { deriveShip } from '../../issue-view/derivations';
+import { IssueView, RailShipProgress } from '../../issue-view/IssueView';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import styles from '../styles/command-deck.module.css';
 
@@ -206,6 +205,7 @@ function ResourceStrip({
     }
 
     if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
+    if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
     for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
     }
@@ -920,16 +920,6 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
   merged: 'pipeMerged',
 };
 
-/**
- * PAN-2499 WI-3: compact rail row for the server-side merge door.
- * Appears only while the door is working or terminal; clicking focuses the issue.
- */
-function CompactShipRow({ issueId, onClick }: { issueId: string; onClick: () => void }) {
-  const { data } = useReviewStatusQuery(issueId);
-  const ship = deriveShip(data);
-  return <ShipProgress ship={ship} compact onClick={onClick} />;
-}
-
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
   const trimmedTitle = title?.trim() ?? '';
@@ -1085,7 +1075,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   return (
     <ContextMenuRoot>
-      <div
+      <IssueView
+        issueId={feature.issueId}
+        density="rail"
         className={`${styles.featureItemWrapper} ${edgeClass} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
         data-component="feature-item"
         data-issue-id={feature.issueId}
@@ -1244,7 +1236,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       )}
 
       {expanded && (
-        <CompactShipRow issueId={feature.issueId} onClick={() => onSelect?.()} />
+        <RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} />
       )}
       {expanded && hasExpandableChildren && (
         <div className={styles.sessionList}>
@@ -1356,7 +1348,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           }))}
         />
       )}
-    </div>
+    </IssueView>
     <FeatureContextMenu
       feature={feature}
       workSessionId={workSessionId}

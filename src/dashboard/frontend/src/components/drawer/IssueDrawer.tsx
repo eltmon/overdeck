@@ -22,6 +22,7 @@ import { VBriefViewer } from '../vbrief/VBriefViewer';
 import type { VBriefDocument } from '../vbrief/types';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
+import { IssueView } from '../issue-view/IssueView';
 
 const ACTIVITY_PHASE_DOT_CLASSES = {
   work: 'bg-primary',
@@ -156,7 +157,7 @@ export function IssueDrawer() {
   const drawer = useDashboardStore((state) => state.drawer);
   const closeIssue = useDashboardStore((state) => state.closeIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
-  const { issue, agents } = useDrawerData();
+  const { issue, agents, beads } = useDrawerData();
 
   // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
   // survives a Conversation ⇄ Terminal tab switch; falls back to the default
@@ -237,6 +238,7 @@ export function IssueDrawer() {
         className="flex h-screen w-[min(980px,calc(100vw-48px))] max-w-[calc(100vw-48px)] origin-right scale-100 flex-col overflow-hidden border-l border-border bg-background opacity-100 shadow-[-24px_0_64px_rgb(0_0_0_/_40%)] animate-[issue-drawer-slide-in_200ms_ease-in-out]"
         onClick={(event) => event.stopPropagation()}
       >
+        <IssueView issueId={drawer.issueId} density="console" className="contents">
         <header className="flex h-[52px] items-center gap-[12px] border-b border-border px-[22px]">
           <div className="min-w-0 flex-1">
             <div className="truncate font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
@@ -289,12 +291,12 @@ export function IssueDrawer() {
                 <DrawerWorkspaceSection issueId={drawer.issueId} />
                 <ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" />
                 <VerificationGates issueId={drawer.issueId} />
-                <BeadsPanel issueId={drawer.issueId} />
+                <BeadsPanel issueId={drawer.issueId} items={beads} />
                 <DrawerReviewSpecialists />
               </div>
             ) : drawer.tab === 'beads' ? (
               <div data-testid="drawer-tab-panel-beads">
-                <BeadsPanel issueId={drawer.issueId} />
+                <BeadsPanel issueId={drawer.issueId} items={beads} />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
               <DrawerPlanPanel issueId={drawer.issueId} />
@@ -323,6 +325,7 @@ export function IssueDrawer() {
           <DrawerActivityRail />
         </div>
         <DrawerActionBar />
+        </IssueView>
       </aside>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatRelativeTime } from '../../lib/formatRelativeTime'
+import { cn } from '../../lib/utils'
 import styles from '../Stage/cockpit/beadsRail.module.css'
 
 /**
@@ -39,6 +40,13 @@ interface BeadsResponse {
   syncError: string | null
 }
 
+export interface BeadsPanelItem {
+  id: string
+  title: string
+  status: 'open' | 'current' | 'done'
+  duration: string
+}
+
 const DIFFICULTIES = ['trivial', 'simple', 'medium', 'complex', 'expert']
 
 function difficultyOf(labels: string[]): string | null {
@@ -70,7 +78,50 @@ function BlockedNote({ blockedBy }: { blockedBy: string[] }) {
   )
 }
 
-export function BeadsPanel({ issueId, onOpenFull = () => undefined, compact = false }: { issueId: string; onOpenFull?: () => void; compact?: boolean }) {
+function DrawerStatusMarker({ status }: { status: BeadsPanelItem['status'] }) {
+  if (status === 'done') {
+    return (
+      <span data-testid="drawer-bead-status-done" className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-success text-[9px] font-bold leading-none text-white">
+        ✓
+      </span>
+    )
+  }
+  if (status === 'current') {
+    return (
+      <span data-testid="drawer-bead-status-current" className="relative flex h-[18px] w-[18px] items-center justify-center">
+        <span className="drawer-bead-current-ping absolute h-[18px] w-[18px] rounded-full border-[1.5px] border-info" />
+        <span className="h-[10px] w-[10px] rounded-full bg-info" />
+      </span>
+    )
+  }
+  return <span data-testid="drawer-bead-status-open" className="h-[18px] w-[18px] rounded-full border border-border bg-background/60" />
+}
+
+function DrawerBeads({ items }: { items: BeadsPanelItem[] }) {
+  return (
+    <section data-component="drawer-beads-list" data-testid="drawer-beads-list" className="overflow-hidden rounded-[var(--radius)] border border-border bg-card">
+      <div className="border-b border-border px-[14px] py-[10px] text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Beads</div>
+      {items.length === 0 ? (
+        <div className="px-[14px] py-[16px] text-[12px] text-muted-foreground">No beads yet.</div>
+      ) : (
+        <div className="divide-y divide-border/60">
+          {items.map((item) => (
+            <div key={item.id} className="grid grid-cols-[18px_1fr_auto_auto] items-center gap-[10px] px-[14px] py-[10px]">
+              <DrawerStatusMarker status={item.status} />
+              <span className={cn('min-w-0 truncate text-[12px] leading-[18px] text-foreground', item.status === 'done' && 'text-muted-foreground line-through decoration-[rgba(255,255,255,0.18)]')}>
+                {item.title}
+              </span>
+              <span className="font-mono text-[10px] text-muted-foreground">{item.id}</span>
+              <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{item.duration}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+export function BeadsPanel({ issueId, onOpenFull = () => undefined, compact = false, items }: { issueId: string; onOpenFull?: () => void; compact?: boolean; items?: BeadsPanelItem[] }) {
   const queryClient = useQueryClient()
   const [showAllCompleted, setShowAllCompleted] = useState(false)
   const { data, isLoading, refetch, isRefetching } = useQuery<BeadsResponse>({
@@ -107,6 +158,8 @@ export function BeadsPanel({ issueId, onOpenFull = () => undefined, compact = fa
       </button>
     )
   }
+
+  if (items) return <DrawerBeads items={items} />
 
   return (
     <aside data-section="beads-panel" className={styles.rail} aria-label="Beads progress">

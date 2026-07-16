@@ -22,7 +22,7 @@ import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
-import { ReviewPolicyControl } from '../../ReviewPolicyControl'
+import { IssueView } from '../../issue-view/IssueView'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -854,7 +854,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   }, [])
 
   return (
-    <div className={styles.missionWrap}>
+    <IssueView issueId={issueId} density="cockpit" className={styles.missionWrap}>
       <header className="rounded-[22px] border border-border bg-card p-4">
         <div className={styles.headerTop}>
           <div className={styles.headerTitle}>
@@ -885,7 +885,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               {/* PAN-1874: per-issue review mode / re-review scope override (same
                   control as the session-view IssueHeader; PAN-2499's unified view
                   inventories it once). */}
-              <ReviewPolicyControl issueId={issueId} />
               <MergeCta issueId={issueId} rs={review.data} />
               <IssueActionMegaMenu issueId={issueId} />
             </div>
@@ -982,6 +981,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         </main>
         <BeadsPanel issueId={issueId} onOpenFull={() => selectTab('beads')} />
       </div>
-    </div>
+    </IssueView>
   )
 }
