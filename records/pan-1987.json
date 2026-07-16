@@ -53,7 +53,7 @@
     "recordedAt": "2026-07-16T19:14:41.281Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T19:23:13.771Z",
+  "updated": "2026-07-16T19:24:10.613Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -63,10 +63,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:23:13.691Z",
+    "updatedAt": "2026-07-16T19:24:10.487Z",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
-    "reviewRequestedAt": "2026-07-16T19:23:08.285Z",
+    "reviewRequestedAt": "2026-07-16T19:24:07.658Z",
     "reviewSpawnedAt": "2026-07-16T19:14:50.508Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -134,9 +134,9 @@
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 885701,
-            "output": 29775,
-            "cacheRead": 5308928,
+            "input": 1278683,
+            "output": 38865,
+            "cacheRead": 5657088,
             "cacheWrite": 0
           }
         },
@@ -189,9 +189,9 @@
           "cacheWrite": 175114
         },
         "openai/gpt-5.6-sol": {
-          "input": 7080711,
-          "output": 245235,
-          "cacheRead": 65380864,
+          "input": 7473693,
+          "output": 254325,
+          "cacheRead": 65729024,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -202,8 +202,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 88.303184,
-        "pricingAsOf": "2026-07-16T19:23:13.747Z"
+        "usd": 90.714874,
+        "pricingAsOf": "2026-07-16T19:24:10.564Z"
       }
     },
     "merges": [
