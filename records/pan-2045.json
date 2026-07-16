@@ -70,15 +70,7 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T19:56:58Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2045\n\n# Review Synthesis — PAN-2045 — 2026-07-16T19:56:00Z\n\n## Verdict: CHANGES REQUESTED — the committed frontend suite is red, and the branch changes a root-suite test that the issue explicitly excludes\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-de813b2c/context.json\n- Branch: feature/pan-2045\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045\n- HEAD reviewed: de813b2c3a337d844b86e762c8d56674755c67c4\n- Cycle number: 2\n- Prior cycle SHA: 3f52315f859661f6cc4484a0c09c5e4383e7dc83\n- PR merge base: ec483d94c24fc8a76d27e7ee7e170926d741dd8f\n- PR commit count: 9\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-de813b2c/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-de813b2c/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-de813b2c/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-de813b2c/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] The documented green frontend suite is reproducibly red — `src/dashboard/frontend/vitest.config.ts:90`\nThe branch changes the committed frontend test environment and documents two green 2,008-test runs, but `npm --prefix src/dashboard/frontend test` exits 1 at the reviewed HEAD. A focused `src/App.test.tsx` run crashes because its complete `./lib/store` mock omits `selectPendingInputSubjects`, which `useDecisions()` now consumes. The failure also reproduces under jsdom, so the stale mock is not a happy-dom divergence, but the PR's changed test configuration and benchmark documentation cannot claim a reproducible green complete suite while the documented command fails. The fix must restore the App test's canonical decision-selector contract and rerun the complete suite without narrowing or suppressing the failure.\n\n### [requirements] Root non-frontend test suite was changed — `src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts:22`\nThe issue explicitly requires no changes to the root non-frontend Vitest suite or its configuration. This branch changes `conversation-forks-enter-nudge.test.ts` by importing and calling `recordConversationHandoff()`, restoring mocks, and adjusting fixture setup. The edit may be independently reasonable and the focused test passes, but it is directly outside PAN-2045's allowed scope and must be removed from this branch or delivered through separately scoped work.\n\n## Non-blocking Findings\nNone.\n\n## Cycle Resolution\nThe two cycle-1 blockers are repaired in the cycle diff. `IssueMissionControl.test.tsx` now owns rendered requests, fails on unexpected endpoints, and cancels QueryClient work before cleanup. `WorkspaceStatusCard.test.tsx` now correlates the warning-color setter invocation with the phase icon's own style object, so the phase label cannot satisfy the assertion.\n\nThe proportionality gate did not fire: two blockers across nine PR commits is below the 27-blocker threshold. The convergence gate does not apply until cycle 3.\n\n## Clean Sub-roles\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-de813b2c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2045 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/App.test.tsx",
@@ -207,7 +199,7 @@
     "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T20:15:03.821Z",
+  "updated": "2026-07-16T20:15:04.733Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
