@@ -11,33 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:34:13.288Z",
+  "updated": "2026-07-16T07:35:04.338Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:34:13.228Z",
-    "inspectNotes": "Inspecting item codex-config-mcp-servers"
+    "updatedAt": "2026-07-16T07:35:04.283Z",
+    "inspectNotes": "Inspection error for bead codex-config-mcp-servers: tmux session inspect-pan-2698-codex-config-mcp-servers exited before producing a verdict. No verdict was produced."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 626025,
-            "output": 1775,
-            "cacheRead": 539648,
+            "input": 742300,
+            "output": 1929,
+            "cacheRead": 652544,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 5425355,
-            "output": 13105,
-            "cacheRead": 5283328,
+            "input": 6243951,
+            "output": 14122,
+            "cacheRead": 6094592,
             "cacheWrite": 0
           }
         },
@@ -60,15 +60,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 626025,
-          "output": 1775,
-          "cacheRead": 539648,
+          "input": 742300,
+          "output": 1929,
+          "cacheRead": 652544,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5425355,
-          "output": 13105,
-          "cacheRead": 5283328,
+          "input": 6243951,
+          "output": 14122,
+          "cacheRead": 6094592,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -85,8 +85,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 11.544751,
-        "pricingAsOf": "2026-07-16T07:34:13.274Z"
+        "usd": 12.017553,
+        "pricingAsOf": "2026-07-16T07:35:04.323Z"
       }
     },
     "merges": [],
