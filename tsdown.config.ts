@@ -34,7 +34,7 @@ export default defineConfig({
   },
   deps: {
     alwaysBundle: (id) => id.startsWith('@overdeck/'),
-    neverBundle: ['@homebridge/node-pty-prebuilt-multiarch'],
+    neverBundle: ['@lydell/node-pty'],
   },
   outDir: 'dist',
 });

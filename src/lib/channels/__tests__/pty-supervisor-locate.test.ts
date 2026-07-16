@@ -17,12 +17,12 @@ beforeEach(() => {
   tmpRoot = join(tmpdir(), `pty-locate-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   stagedDir = join(tmpRoot, 'staged', 'supervisor');
   home = join(tmpRoot, 'overdeck-home');
-  mkdirSync(join(stagedDir, 'vendor', '@homebridge', 'node-pty-prebuilt-multiarch', 'prebuilds'), { recursive: true });
+  mkdirSync(join(stagedDir, 'vendor', '@lydell', 'node-pty'), { recursive: true });
   writeFileSync(join(stagedDir, 'pty-supervisor.js'), '#!/usr/bin/env node\nconsole.log("supervisor");\n');
   writeFileSync(join(stagedDir, 'paths-abc123.js'), 'export const x = 1;\n');
   writeFileSync(
-    join(stagedDir, 'vendor', '@homebridge', 'node-pty-prebuilt-multiarch', 'package.json'),
-    '{"name":"@homebridge/node-pty-prebuilt-multiarch"}\n',
+    join(stagedDir, 'vendor', '@lydell', 'node-pty', 'package.json'),
+    '{"name":"@lydell/node-pty"}\n',
   );
   mkdirSync(home, { recursive: true });
 });
@@ -39,7 +39,7 @@ describe('materializePtySupervisorRuntime', () => {
     expect(entry.startsWith(join(home, 'runtime', 'pty-supervisor'))).toBe(true);
     const runtimeDir = join(entry, '..');
     expect(existsSync(join(runtimeDir, 'paths-abc123.js'))).toBe(true);
-    expect(existsSync(join(runtimeDir, 'node_modules', '@homebridge', 'node-pty-prebuilt-multiarch', 'package.json'))).toBe(true);
+    expect(existsSync(join(runtimeDir, 'node_modules', '@lydell', 'node-pty', 'package.json'))).toBe(true);
     // The staging-only vendor/ name must not leak into the runtime tree.
     expect(existsSync(join(runtimeDir, 'vendor'))).toBe(false);
   });

@@ -8,7 +8,7 @@
  * transient FUSE mount that disappears when the app quits, and the staged
  * dashboard node_modules carry an Electron-ABI node-pty that host node cannot
  * load. So the desktop packaging stages a host-runnable copy — the supervisor
- * chunk closure plus a pristine multiarch-prebuilt node-pty — next to the
+ * chunk closure plus the platform-specific Node-API node-pty prebuild — next to the
  * server bundle (server/supervisor/, see
  * apps/desktop/scripts/prepare-server-resources.mjs), and this module copies
  * it onto real disk under ${OVERDECK_HOME}/runtime/ before first use
