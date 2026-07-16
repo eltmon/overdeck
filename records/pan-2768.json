@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T07:32:17.967Z",
+  "updated": "2026-07-16T07:32:32.730Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -63,8 +63,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "appimage-smoke-verify": {
+        "writerId": "agent-pan-2768",
+        "agentId": "agent-pan-2768",
+        "pid": 3195485,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:32:32.730Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2768",
@@ -176,6 +184,7 @@
     "docs-desktop-app": "completed",
     "docs-desktop-app.docs-desktop-app.ac1": "completed",
     "docs-desktop-app.docs-desktop-app.ac2": "completed",
-    "docs-desktop-app.docs-desktop-app.ac3": "completed"
+    "docs-desktop-app.docs-desktop-app.ac3": "completed",
+    "appimage-smoke-verify": "running"
   }
 }
