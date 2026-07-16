@@ -348,10 +348,16 @@ describe('initial kickoff transcript confirmation', () => {
         baseState.id,
         'Full work instructions for PAN-2771',
         caller,
-        'supervisor',
+        undefined,
         {
           ...baseOptions,
-          getState: vi.fn(async () => ({ ...baseState, harness: 'codex', role: 'work', workspace })),
+          getState: vi.fn(async () => ({
+            ...baseState,
+            harness: 'codex',
+            role: 'work',
+            workspace,
+            deliveryMethod: 'supervisor',
+          })),
           deliver,
           snapshot: vi.fn(),
         },
