@@ -366,20 +366,21 @@
     "recordedAt": "2026-07-16T21:48:55.460Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T22:04:49.671Z",
+  "updated": "2026-07-16T22:06:48.234Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-16T22:00:30.702Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-16T22:06:48.153Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed production-only test accommodation; retrying after reviewer infrastructure and transport failures",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
+    "reviewedAtCommit": "75308e1da097e58f951443adb96d87982af9cd04",
     "lastVerifiedCommit": "75308e1da097e58f951443adb96d87982af9cd04",
     "reviewRequestedAt": "2026-07-16T21:48:56.640Z",
     "reviewSpawnedAt": "2026-07-16T22:00:24.289Z",
@@ -530,9 +531,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 58511724,
-            "output": 45317,
-            "cacheRead": 57524224,
+            "input": 60616761,
+            "output": 46133,
+            "cacheRead": 59621888,
             "cacheWrite": 0
           }
         },
@@ -554,9 +555,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5926360,
-            "output": 106636,
-            "cacheRead": 23924736,
+            "input": 7771114,
+            "output": 133453,
+            "cacheRead": 28755456,
             "cacheWrite": 0
           }
         },
@@ -625,9 +626,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 77048429,
-          "output": 575944,
-          "cacheRead": 200286208,
+          "input": 80998220,
+          "output": 603577,
+          "cacheRead": 207214592,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -650,8 +651,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 226.189585,
-        "pricingAsOf": "2026-07-16T22:00:30.777Z"
+        "usd": 239.743402,
+        "pricingAsOf": "2026-07-16T22:06:48.166Z"
       }
     },
     "merges": [
