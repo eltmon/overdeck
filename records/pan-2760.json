@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T17:54:28.059Z",
+  "updated": "2026-07-16T18:03:23.169Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "collapsed-row-remove": {
-        "writerId": "agent-pan-2760",
-        "agentId": "agent-pan-2760",
-        "pid": 2787737,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:54:28.059Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2760",
@@ -80,12 +72,27 @@
         "outcome": "completed",
         "reason": "Added roster and empty-state crew creation, preserved board creation and kind-override guard, and verified 21 focused tests plus typecheck.",
         "releasedAt": "2026-07-16T17:53:55.362Z"
+      },
+      {
+        "writerId": "agent-pan-2760",
+        "agentId": "agent-pan-2760",
+        "pid": 2787737,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T17:54:28.059Z",
+        "itemId": "collapsed-row-remove",
+        "outcome": "completed",
+        "reason": "Added collapsed-row removal, atomic heir hand-off, preserved removal guards, and edit affordance; focused tests and typecheck pass.",
+        "releasedAt": "2026-07-16T18:03:23.169Z"
       }
     ],
     "statusReasons": {
       "roster-add-crew": {
         "reason": "Added roster and empty-state crew creation, preserved board creation and kind-override guard, and verified 21 focused tests plus typecheck.",
         "updatedAt": "2026-07-16T17:53:55.362Z"
+      },
+      "collapsed-row-remove": {
+        "reason": "Added collapsed-row removal, atomic heir hand-off, preserved removal guards, and edit affordance; focused tests and typecheck pass.",
+        "updatedAt": "2026-07-16T18:03:23.169Z"
       }
     }
   },
@@ -96,6 +103,11 @@
     "roster-add-crew.roster-add-crew.ac3": "completed",
     "roster-add-crew.roster-add-crew.ac4": "completed",
     "roster-add-crew.roster-add-crew.ac5": "completed",
-    "collapsed-row-remove": "running"
+    "collapsed-row-remove": "completed",
+    "collapsed-row-remove.collapsed-row-remove.ac1": "completed",
+    "collapsed-row-remove.collapsed-row-remove.ac2": "completed",
+    "collapsed-row-remove.collapsed-row-remove.ac3": "completed",
+    "collapsed-row-remove.collapsed-row-remove.ac4": "completed",
+    "collapsed-row-remove.collapsed-row-remove.ac5": "completed"
   }
 }
