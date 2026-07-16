@@ -256,6 +256,11 @@
       "reason": "feedback",
       "note": "[2026-07-13T06:15Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-07-13T06:15:18.607Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-16T07:26:06.217Z"
     }
   ],
   "feedback": [],
@@ -308,7 +313,7 @@
     "recordedAt": "2026-07-11T10:51:47.612Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T07:24:51.915Z",
+  "updated": "2026-07-16T07:26:06.218Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "reviewing",
