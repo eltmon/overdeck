@@ -74,7 +74,7 @@ export function TasksPanel({ issueId }: TasksPanelProps) {
 
   if (isLoading) {
     return (
-      <div className="py-3 text-center text-muted-foreground text-xs">
+      <div data-section="beads-panel" className="py-3 text-center text-muted-foreground text-xs">
         <Loader2 className="w-4 h-4 animate-spin mx-auto mb-1" />
         Loading tasks...
       </div>
@@ -82,7 +82,7 @@ export function TasksPanel({ issueId }: TasksPanelProps) {
   }
 
   return (
-    <div className="space-y-2 p-4">
+    <div data-section="beads-panel" className="space-y-2 p-4">
       {/* Header with counts and view toggle */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-3">

@@ -121,6 +121,7 @@
 |----------|-------------|
 | [SETTINGS-UI-DESIGN.md](./SETTINGS-UI-DESIGN.md) | Settings page design and implementation |
 | [god-view.md](./god-view.md) | God View — real-time agent activity command center (PAN-341) |
+| [ISSUE-VIEW.md](./ISSUE-VIEW.md) | Shared issue-view kit: read-only model, rail/cockpit/console density map, no-loss surface lock, and recovery start CTA |
 | [DESKTOP-APP.md](./DESKTOP-APP.md) | Electron desktop app — tray, notifications, auto-start, IPC bridge, protocol handler |
 | [React Architecture Diagram](./diagrams/react-architecture.png) | Dashboard frontend component hierarchy (src/dashboard/frontend/src) — Zustand state, Effect RPC transport, feature pages, shared components, custom hooks |
 
@@ -250,6 +251,7 @@
 - **"settings"** / **"settings page"** → SETTINGS-UI-DESIGN.md
 - **"dashboard"** → README.md
 - **"UI"** / **"frontend"** → SETTINGS-UI-DESIGN.md
+- **"issue view"** / **"density"** / **"no-loss surface"** / **"StartAgentCta"** → ISSUE-VIEW.md
 - **"desktop app"** / **"electron"** / **"tray"** / **"command palette"** → DESKTOP-APP.md
 
 ### Planning

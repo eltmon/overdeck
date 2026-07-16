@@ -3775,7 +3775,7 @@ for the case it actually exists for.
 ### Live agent set (re-derived THIS tick — it moves constantly)
 | Agent | State |
 | --- | --- |
-| PAN-2597 | `review=reviewing`, convoy up | 
+| PAN-2597 | `review=reviewing`, convoy up |
 | PAN-2499 | work + review-supervisor, `review=pending` |
 | PAN-2568 | work, `review=pending` |
 | PAN-2598 | **`review=blocked`** — work agent live and running `npm test` on the feedback |
@@ -3915,7 +3915,7 @@ ready=1` → merged onto green main. **Proof the re-drive path works on genuinel
 **RUN-63: 20 merged, 20 closed out.**
 
 ### Cohort scoreboard — the drain is converging
-| Issue | Was (tick 12) | Now | 
+| Issue | Was (tick 12) | Now |
 | --- | --- | --- |
 | PAN-1234 | stalled since 07-13, no agent | ✅ **MERGED + CLOSED** |
 | PAN-2598 | stalled, 5 conflicts | `review=reviewing` (recovered from `blocked`) |

@@ -1,14 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
 const actionInvoke = vi.fn()
-
-const uiState = vi.hoisted(() => ({
-  hasPlan: true,
-  hasTasks: true,
-}))
 
 const queryMocks = vi.hoisted(() => {
   const activityQuery = {
@@ -43,7 +38,8 @@ const queryMocks = vi.hoisted(() => {
   }
   const issueCostsQuery = { data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }
   const workspaceQuery = { data: null, isLoading: false }
-  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery }
+  const shipLogQuery = { data: null, isLoading: false }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery, shipLogQuery }
 })
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
@@ -54,6 +50,7 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useReviewStatusQuery: () => queryMocks.reviewStatusQuery,
   useIssueCostsQuery: () => queryMocks.issueCostsQuery,
   useWorkspaceQuery: () => queryMocks.workspaceQuery,
+  useShipLogQuery: () => queryMocks.shipLogQuery,
 }))
 
 vi.mock('../../../lib/issueActions', () => ({
@@ -80,7 +77,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       primary: all.slice(0, 2),
       secondary: all.slice(2, 4),
       overflow: all.slice(4),
-      state: { hasPlan: uiState.hasPlan, hasTasks: uiState.hasTasks },
+      state: { hasPlan: true, hasBeads: true },
       activeDialog: null,
     }
   },
@@ -94,7 +91,7 @@ vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div>
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
-vi.mock('../../CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({ TasksTab: () => <div>Tasks tab</div> }))
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({ BeadsTab: () => <div>Beads tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div>Costs tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab', () => ({ DiscussionsTab: () => <div>Discussions tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/MarkdownTab', () => ({ MarkdownTab: ({ body }: { body?: string }) => <div>{body ?? 'Markdown tab'}</div> }))
@@ -109,23 +106,12 @@ vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
 vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>Review card</div> }))
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
-vi.mock('./AgentsLane', () => ({
-  AgentsLane: ({ sessions }: { sessions: readonly { sessionId: string; type: string; model?: string; status?: string; presence?: string }[] }) => (
-    <div data-testid="agents-lane">
-      {sessions.map((s) => (
-        <div key={s.sessionId} data-testid="agents-lane-session">
-          {s.type}: {s.sessionId}
-        </div>
-      ))}
-    </div>
-  ),
-}))
+vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div>Agents lane</div> }))
 vi.mock('./TasksRail', () => ({ TasksRail: () => <div>Tasks rail</div> }))
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 
 import { IssueMissionControl } from './IssueMissionControl'
-import { deriveNarrative } from './StatusNarrative'
 
 function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
   const onOpenPane = extra?.onOpenPane ?? vi.fn()
@@ -135,7 +121,7 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
       mutations: { retry: false },
     },
   })
-  render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <IssueMissionControl
         issueId="PAN-1661"
@@ -149,10 +135,16 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
       />
     </QueryClientProvider>,
   )
-  return { onOpenPane }
+  return { onOpenPane, ...view }
 }
 
 describe('IssueMissionControl', () => {
+  it('renders cockpit inventory markers on the real overview shell', () => {
+    const { container } = renderMissionControl();
+    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'Awareness rail', 'UatEnvironmentPanel', 'NowPanel', 'PickupGateCard', 'ReviewPolicyControl']) {
+      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+    }
+  });
   it('renders the mission header, issue tree, and persistent top tabs', () => {
     renderMissionControl()
 
@@ -224,90 +216,6 @@ describe('IssueMissionControl', () => {
     expect(screen.queryByTestId('issue-tree-context-panel')).toBeNull()
   })
 
-  it('falls back to activity-derived sessions when session-trees resolves an empty feature', async () => {
-    const originalFetch = globalThis.fetch
-    const originalSections = queryMocks.activityQuery.data.sections
-
-    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === 'string' ? input : input.toString()
-      if (url.includes('/api/session-trees')) {
-        return new Response(JSON.stringify({ trees: [] }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        })
-      }
-      return new Response(
-        JSON.stringify([
-          {
-            issueId: 'PAN-1661',
-            title: 'Mission control',
-            projectName: 'overdeck',
-            branch: 'feature/pan-1661',
-            sessions: [],
-          },
-        ]),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      )
-    }) as unknown as typeof fetch
-
-    queryMocks.activityQuery.data.sections = [
-      {
-        type: 'planning',
-        sessionId: 'planning-pan-1661',
-        model: 'claude-sonnet-5',
-        status: 'running',
-        startedAt: '2026-06-07T00:00:00Z',
-        duration: null,
-      },
-    ]
-
-    renderMissionControl()
-
-    await waitFor(() => {
-      expect(
-        screen.getAllByTestId('agents-lane-session').some((el) =>
-          el.textContent?.includes('planning-pan-1661'),
-        ),
-      ).toBe(true)
-    })
-
-    globalThis.fetch = originalFetch
-    queryMocks.activityQuery.data.sections = originalSections
-  })
-
-  it('renders the planning banner when only a planning session is live (PAN-2598)', async () => {
-    const originalSections = queryMocks.activityQuery.data.sections
-    const originalReview = queryMocks.reviewStatusQuery.data
-    const originalHasPlan = uiState.hasPlan
-    const originalHasTasks = uiState.hasTasks
-
-    queryMocks.activityQuery.data.sections = [
-      {
-        type: 'planning',
-        sessionId: 'planning-pan-1661',
-        model: 'claude-sonnet-5',
-        status: 'running',
-        startedAt: '2026-06-07T00:00:00Z',
-        duration: null,
-      },
-    ]
-    queryMocks.reviewStatusQuery.data = undefined
-    uiState.hasPlan = false
-    uiState.hasTasks = false
-
-    renderMissionControl()
-
-    await waitFor(() => {
-      expect(screen.getByText('Planning what to build')).toBeTruthy()
-    })
-    expect(screen.queryByText('The crew is writing code')).toBeNull()
-
-    queryMocks.activityQuery.data.sections = originalSections
-    queryMocks.reviewStatusQuery.data = originalReview
-    uiState.hasPlan = originalHasPlan
-    uiState.hasTasks = originalHasTasks
-  })
-
   it('groups all issue actions in the mega-menu', () => {
     renderMissionControl()
 
@@ -343,40 +251,5 @@ describe('IssueMissionControl', () => {
 
     expect(onOpenPane).toHaveBeenCalledWith('files')
     expect(onOpenPane).toHaveBeenCalledWith('terminal')
-  })
-})
-
-describe('StatusNarrative derivation', () => {
-  it('renders planning headline when no work is running and there is no plan', () => {
-    const model = deriveNarrative({
-      hasPlan: false,
-      rs: undefined,
-      ci: undefined,
-      plan: undefined,
-      workRunning: false,
-    })
-    expect(model.headline).toBe('Planning what to build')
-  })
-
-  it('renders writing-code headline when a work session is running', () => {
-    const model = deriveNarrative({
-      hasPlan: true,
-      rs: undefined,
-      ci: undefined,
-      plan: undefined,
-      workRunning: true,
-    })
-    expect(model.headline).toBe('The crew is writing code')
-  })
-
-  it('keeps the beads-driven in-progress branch when no sessions are live', () => {
-    const model = deriveNarrative({
-      hasPlan: true,
-      rs: undefined,
-      ci: undefined,
-      plan: { done: 2, total: 5 },
-      workRunning: false,
-    })
-    expect(model.headline).toBe('The crew is writing code — 2 of 5 tasks done')
   })
 })

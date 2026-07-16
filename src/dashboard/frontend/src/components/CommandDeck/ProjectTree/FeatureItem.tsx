@@ -8,11 +8,10 @@ import {
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
-import { SessionNode } from './SessionNode';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
 import { UatStackTreeGroup } from './UatStackTreeGroup';
-import { useWorkspaceQuery, useReviewStatusQuery } from '../ZoneCOverviewTabs/queries';
+import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import { createUatActionHandler } from './uat-action-handlers';
 import {
   ContextMenuRoot,
@@ -28,9 +27,12 @@ import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
+import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
+import { ExpandableSessionNode } from './ExpandableSessionNode';
+import { SessionNode } from './SessionNode';
+import { useDashboardStore } from '../../../lib/store';
 import { computeDominantStatus, sessionsNeedAttention } from './sessionAggregates';
 import styles from '../styles/command-deck.module.css';
-
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
 interface FeatureItemProps {
@@ -634,9 +636,6 @@ function defaultExpandedFromState(stateLabel: string): boolean {
   return s.includes('progress') || s.includes('review') || s.includes('testing') || s.includes('verifying');
 }
 
-/** Compute the dominant session presence for the feature row StatusDot.
- *  Priority: active > thinking > waiting > idle > ended. */
-
 /** Whether a session passes the tree filter. */
 export function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilter): boolean {
   if (filter === 'all') return true;
@@ -786,7 +785,7 @@ function ReviewGroup({
       }`;
 
   return (
-    <div>
+    <div data-section="ReviewGroup">
       <SessionNode
         session={parent}
         subtitle={summary}
@@ -905,38 +904,9 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
   merged: 'pipeMerged',
 };
 
-/**
- * PAN-2487 follow-up: the merge door runs server-side, so during an actual
- * merge (rebase → verify → merge) the tree showed nothing alive under the
- * issue. This virtual row appears only while the door is working and spins
- * with the current step; clicking focuses the issue (whose cockpit routes
- * ship phases to the Ship tab). Renders nothing otherwise — including for
- * issues that merely have an old ship-role session.
- */
-function ShipDoorTreeRow({ issueId, onSelect }: { issueId: string; onSelect: () => void }) {
-  const { data } = useReviewStatusQuery(issueId);
-  const mergeStatus = data?.mergeStatus;
-  if (mergeStatus !== 'merging' && mergeStatus !== 'verifying') return null;
-  const step = (data as { mergeStep?: string } | undefined)?.mergeStep ?? mergeStatus;
-  return (
-    <div className={styles.sessionList}>
-      <button
-        type="button"
-        className={styles.sessionNode}
-        onClick={onSelect}
-        title="The merge door is working this issue — click to open its cockpit (Ship tab shows the live log)"
-        data-testid="ship-door-row"
-      >
-        <Loader2 size={12} className="animate-spin" style={{ color: 'var(--primary)', flexShrink: 0 }} />
-        <span style={{ fontSize: 12, fontWeight: 500 }}>Ship</span>
-        <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{step}</span>
-      </button>
-    </div>
-  );
-}
-
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
+  const openIssue = useDashboardStore((state) => state.openIssue);
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -947,7 +917,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
-
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
 
   useEffect(() => {
@@ -982,8 +951,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     Boolean(feature.resourceDetails.remoteAgent)
   );
 
-  // Derive best session once per data change instead of on every click (PAN-821 review)
-  // Respect the tree filter so auto-select picks a visible session.
   const visibleSessions = useMemo(
     () => feature.sessions?.filter((session) => sessionMatchesFilter(session, filter)) ?? [],
     [feature.sessions, filter],
@@ -1041,7 +1008,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             ? styles.featureItemWrapperWorking
             : '') ?? '';
 
-
   const pipeline = useMemo(
     () => derivePipeline(feature, feature.sessions ?? []),
     [feature],
@@ -1066,7 +1032,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     stackHealth: workspace?.stackHealth,
     pending: stackPending,
   });
-  // Live flash when dominant status or visible session count changes (blocker-8)
   const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}:${activityState}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
@@ -1091,13 +1056,15 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
 
   return (
     <ContextMenuRoot>
-      <div
+      <IssueView
+        issueId={feature.issueId}
+        density={expanded ? 'cockpit' : 'rail'}
         className={`${styles.featureItemWrapper} ${edgeClass} ${sessionsNeedAttention(aggregateSessions) ? styles.featureItemWrapperNeedsAttention : ''} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
         data-needs-attention={sessionsNeedAttention(aggregateSessions) ? 'true' : undefined}
         data-component="feature-item"
         data-issue-id={feature.issueId}
       >
-        <div className={styles.featureItemRow}>
+        <div data-section="Filter bar"><div data-section="Feature (issue) row" className={styles.featureItemRow}>
           {hasExpandableChildren ? (
             <button
               className={styles.featureItemCaret}
@@ -1110,6 +1077,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           ) : (
             <span className={styles.featureItemCaretPlaceholder} />
           )}
+          {expanded && <IssueViewFullscreenButton className={styles.featureItemCaret} onClick={() => openIssue(feature.issueId)} />}
           <ContextMenuTrigger asChild>
             <button
               className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}
@@ -1133,7 +1101,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           </span>
           <span className={styles.featureMetaLine}>
           {!feature.isRally && aggregateBadges.length > 0 && (
-            <span className={styles.featureBadgeGroup}>
+            <span data-section="Badges" className={styles.featureBadgeGroup}>
               {aggregateBadges.map((badge) => (
                 <span
                   key={badge.key}
@@ -1211,12 +1179,12 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             </span>
           )}
           {feature.readyForMerge && (
-            <MergeButton
+            <span data-section="MergeButton"><MergeButton
               issueId={feature.issueId}
               variant="card"
               reviewStatus={{ readyForMerge: true }}
               onClick={(e) => e.stopPropagation()}
-            />
+            /></span>
           )}
           {trainInfo && (
             <span
@@ -1236,7 +1204,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               {uatStackSummary.active ? 'UAT starting' : 'UAT healthy'}
             </span>
           )}
-          <span className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
+          <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
             {pipeline.map((seg, i) => (
               <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
             ))}
@@ -1244,11 +1212,15 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           </span>
         </button>
       </ContextMenuTrigger>
-      </div>
-      <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
+      </div></div>
+      <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
+      {feature.resourceDetails?.hasTasks && feature.taskTotals && (
+        <button type="button" data-section="Tasks summary" className={styles.featureBadge} onClick={(event) => { event.stopPropagation(); onSelect?.(); }} title="Open issue tasks">
+          tasks {feature.taskTotals.closed}/{feature.taskTotals.total}</button>
+      )}
 
       {expanded && (
-        <ShipDoorTreeRow issueId={feature.issueId} onSelect={() => onSelect?.()} />
+        <div data-section="ShipDoorTreeRow"><RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} /></div>
       )}
       {expanded && hasExpandableChildren && (
         <div className={styles.sessionList}>
@@ -1284,7 +1256,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     );
                   }
                   return (
-                    <SessionNode
+                    <ExpandableSessionNode
                       key={session.sessionId}
                       session={session}
                       issueId={feature.issueId}
@@ -1303,7 +1275,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     />
                   );
                 })}
-                {hasConversations && issueConversations.map(conv => (
+                {hasConversations && <div data-section="Conversation rows">{issueConversations.map(conv => (
                   <a
                     key={`conv-${conv.id}`}
                     href={`/conv/${conv.id}`}
@@ -1316,7 +1288,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${conv.status}`] ?? ''}`}>{conv.status}</span>
                     <span className={styles.sessionModel}>#{conv.id}</span>
                   </a>
-                ))}
+                ))}</div>}
               </>
             );
           })()}
@@ -1324,17 +1296,17 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       )}
 
       {shouldShowUatStack && uatStackSummary && (
-        <UatStackTreeGroup
+        <div data-section="StackDrawer / UatStackTreeGroup"><UatStackTreeGroup
           summary={uatStackSummary}
           workspace={workspace}
           pending={Boolean(stackPending)}
           storageKey={`${getExpandedKey(feature.issueId)}:uat`}
           onActionSelect={createUatActionHandler({ issueId: feature.issueId, workspace, queryClient })}
-        />
+        /></div>
       )}
 
       {expanded && hasResources && detailIdentifiers && (
-        <ResourcesGroup
+        <div data-section="ResourcesGroup"><ResourcesGroup
           issueId={feature.issueId}
           defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
           containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
@@ -1358,9 +1330,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             state: pr.state,
             isDraft: pr.isDraft,
           }))}
-        />
+        /></div>
       )}
-    </div>
+    </IssueView>
     <FeatureContextMenu
       feature={feature}
       workSessionId={workSessionId}

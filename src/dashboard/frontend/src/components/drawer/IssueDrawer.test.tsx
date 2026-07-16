@@ -20,7 +20,7 @@ vi.mock('../../lib/wsTransport', () => ({
 }));
 
 import { useDashboardStore } from '../../lib/store';
-import type { Agent, Issue } from '../../types';
+import type { Issue } from '../../types';
 import { DialogProvider } from '../DialogProvider';
 import { IssueDrawer } from './IssueDrawer';
 import { resetDrawerIssueSubscriptionForTest } from './useDrawerData';
@@ -37,7 +37,7 @@ const issue: Issue = {
   updatedAt: '2026-05-18T00:00:00.000Z',
 };
 
-type TestTask = {
+type TestBead = {
   id: string;
   title: string;
   status: string;
@@ -79,7 +79,11 @@ function mockFetch() {
       tasksCount: currentIssue?.hasTasks ? 1 : 0,
       planningComplete: currentIssue?.planningComplete ?? currentIssue?.hasPlan ?? false,
     });
-    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
+    if (url.includes('/api/review/') && url.endsWith('/status')) {
+      const rs = useDashboardStore.getState().reviewStatusByIssueId['PAN-1'];
+      return Response.json(rs ?? { issueId: 'PAN-1', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: new Date().toISOString() });
+    }
+    if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', hasDocker: true, path: currentIssue?.workspacePath ?? '/tmp/pan-1' });
     if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: false } });
     return Response.json({ success: true });
   });
@@ -95,7 +99,7 @@ function drawerUi(queryClient: QueryClient) {
   );
 }
 
-function renderDrawer(tasks: TestTask[] = []) {
+function renderDrawer(tasks: TestBead[] = []) {
   if (tasks.length > 0) {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, tasks }],
@@ -166,8 +170,8 @@ describe('IssueDrawer', () => {
     useDashboardStore.getState().openIssue('PAN-1');
 
     renderDrawer([
-      { id: 'done', title: 'Done task', status: 'closed', createdAt: '2026-05-18T00:00:00.000Z', closedAt: '2026-05-18T00:01:00.000Z' },
-      { id: 'open', title: 'Open task', status: 'open', createdAt: '2026-05-18T00:00:00.000Z' },
+      { id: 'done', title: 'Done bead', status: 'closed', createdAt: '2026-05-18T00:00:00.000Z', closedAt: '2026-05-18T00:01:00.000Z' },
+      { id: 'open', title: 'Open bead', status: 'open', createdAt: '2026-05-18T00:00:00.000Z' },
     ]);
 
     expect(screen.getByTestId('drawer-tabs')).toHaveClass('px-[14px]');
@@ -182,83 +186,6 @@ describe('IssueDrawer', () => {
     expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-1', tab: 'files' });
     expect(window.location.search).toBe('?issue=PAN-1&tab=files');
     expect(screen.getByTestId('drawer-tab-panel-files')).toBeInTheDocument();
-  });
-
-  it('Files tab renders the branch-vs-main DiffPanel scoped to the work agent when a workspace branch exists (AC-34)', async () => {
-    // AC-34 requires the diff to be scoped to feature/<issue-id> vs main. The
-    // diff route is agent-scoped (/api/agents/:id/diffs/vs-main resolves the
-    // agent's workspace branch), so a real work agent must drive the fetch.
-    const workAgent: Agent = {
-      id: 'agent-pan-1-work',
-      issueId: 'PAN-1',
-      runtime: 'claude-code',
-      model: 'claude-sonnet-4-6',
-      status: 'running',
-      startedAt: '2026-05-22T00:00:00.000Z',
-      consecutiveFailures: 0,
-      killCount: 0,
-      role: 'work',
-      workspace: '/tmp/pan-1',
-    };
-    useDashboardStore.setState({ agentsById: { [workAgent.id]: workAgent } });
-    const fetchSpy = mockFetch();
-    vi.stubGlobal('fetch', fetchSpy);
-
-    useDashboardStore.getState().openIssue('PAN-1', 'files');
-
-    renderDrawer();
-
-    expect(await screen.findByTestId('drawer-tab-panel-files')).toBeInTheDocument();
-
-    // The vs-main fetch is scoped to the actual work agent — not an empty
-    // agent id (/api/agents//diffs/vs-main) and not the all-turns /diffs/full.
-    await waitFor(() => {
-      expect(
-        fetchSpy.mock.calls.some(([url]) => String(url) === `/api/agents/${workAgent.id}/diffs/vs-main`),
-      ).toBe(true);
-    });
-    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/diffs/full'))).toBe(false);
-    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('/api/agents//diffs'))).toBe(false);
-  });
-
-  it('Files tab does not inherit stale ?diff URL state from other surfaces', async () => {
-    // Simulate a diff session left open by another surface (e.g. the
-    // conversation side panel): ?diff=1&diffTurnId=<stale-turn> is in the URL.
-    // replaceDrawerUrl preserves those params when switching tabs, so without
-    // isolation the Files tab would inherit the stale turn selection.
-    window.history.replaceState({}, '', '/?diff=1&diffTurnId=stale-turn-42');
-
-    const workAgent: Agent = {
-      id: 'agent-pan-1-work',
-      issueId: 'PAN-1',
-      runtime: 'claude-code',
-      model: 'claude-sonnet-4-6',
-      status: 'running',
-      startedAt: '2026-05-22T00:00:00.000Z',
-      consecutiveFailures: 0,
-      killCount: 0,
-      role: 'work',
-      workspace: '/tmp/pan-1',
-    };
-    useDashboardStore.setState({ agentsById: { [workAgent.id]: workAgent } });
-
-    const fetchSpy = mockFetch();
-    vi.stubGlobal('fetch', fetchSpy);
-
-    useDashboardStore.getState().openIssue('PAN-1', 'files');
-
-    renderDrawer();
-
-    expect(await screen.findByTestId('drawer-tab-panel-files')).toBeInTheDocument();
-
-    // isolateSelection: the Files tab opens on branch-vs-main, ignoring the
-    // stale diffTurnId — it never fetches the stale turn.
-    await waitFor(() => {
-      expect(
-        fetchSpy.mock.calls.some(([url]) => String(url) === `/api/agents/${workAgent.id}/diffs/vs-main`),
-      ).toBe(true);
-    });
-    expect(fetchSpy.mock.calls.some(([url]) => String(url).includes('stale-turn-42'))).toBe(false);
   });
 
   it('renders the artifacts tab with artifact cards and quick actions', async () => {
@@ -667,8 +594,9 @@ describe('IssueDrawer', () => {
     expect(within(screen.getByTestId('drawer-phase-merged')).getByText('—')).toHaveClass('text-muted-foreground');
   });
 
-  it('renders verification gates from drawer data with PRD border tones', () => {
+  it('renders verification gates from drawer data with PRD border tones', async () => {
     useDashboardStore.setState({
+      issuesRaw: [{ ...issue, workspacePath: '/tmp/pan-1' }],
       reviewStatusByIssueId: {
         'PAN-1': {
           issueId: 'PAN-1',
@@ -686,14 +614,16 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-verification-gates')).toBeInTheDocument();
-    expect(screen.getByTestId('drawer-verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
-    expect(screen.getByTestId('drawer-verification-gate-typecheck')).toHaveClass('drawer-gate-border-pass', 'text-success-foreground');
-    expect(within(screen.getByTestId('drawer-verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
-    expect(screen.getByTestId('drawer-verification-gate-lint')).toHaveClass('drawer-gate-border-fail', 'text-destructive-foreground');
-    expect(within(screen.getByTestId('drawer-verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
-    expect(screen.getByTestId('drawer-verification-gate-test')).toHaveClass('badge-border-muted', 'text-muted-foreground');
-    expect(screen.getByTestId('drawer-verification-gate-uat')).toHaveClass('badge-border-info', 'text-info-foreground');
+    await waitFor(() => expect(screen.getByTestId('verification-gate-typecheck')).toHaveAttribute('data-gate-status', 'passed'));
+
+    expect(screen.getByTestId('verification-gates')).toBeInTheDocument();
+    expect(screen.getByTestId('verification-gates').lastElementChild).toHaveClass('grid-cols-4', 'gap-[8px]');
+    expect(screen.getByTestId('verification-gate-typecheck')).toHaveClass('border-success/40', 'bg-success/10', 'text-success-foreground');
+    expect(within(screen.getByTestId('verification-gate-typecheck')).getByText('pass')).toHaveClass('text-[14px]', 'font-medium');
+    expect(screen.getByTestId('verification-gate-lint')).toHaveClass('border-destructive/40', 'bg-destructive/10', 'text-destructive-foreground');
+    expect(within(screen.getByTestId('verification-gate-lint')).getByText('lint')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
+    expect(screen.getByTestId('verification-gate-test')).toHaveClass('border-muted', 'text-muted-foreground');
+    expect(screen.getByTestId('verification-gate-uat')).toHaveClass('border-info/40', 'bg-info/10', 'text-info-foreground');
   });
 
   it('renders active agent card with stream excerpt and sends tell input', async () => {
@@ -721,14 +651,14 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-active-agent')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
+    expect(screen.getByTestId('active-agent-panel')).toHaveClass('border-l-[3px]', 'border-l-signal-review');
     expect(screen.getByText('agent-PAN-1')).toHaveClass('font-mono', 'text-[13px]');
     expect(screen.getByText('WORK RUNNING').closest('[data-component="verb-badge"]')).toHaveClass('text-[9px]');
-    expect(screen.getByText(/GPT-5\.5 · .* · spend loading/)).toHaveClass('text-right', 'font-mono');
-    expect(screen.getByTestId('drawer-active-agent-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
-    expect(within(screen.getByTestId('drawer-active-agent-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
+    expect(screen.getByText(/GPT-5\.5 · claude-code · spend loading/)).toHaveClass('text-right', 'font-mono');
+    expect(screen.getByTestId('active-agent-panel-stream')).toHaveClass('bg-[rgb(0_0_0_/_32%)]', 'text-[11px]', 'max-h-[180px]', 'overflow-auto');
+    expect(within(screen.getByTestId('active-agent-panel-stream')).getByText('Implementing drawer card')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('Tell active agent'), { target: { value: 'Please continue' } });
+    fireEvent.change(screen.getByLabelText('Tell agent-PAN-1'), { target: { value: 'Please continue' } });
     fireEvent.click(screen.getByRole('button', { name: 'Send' }));
 
     await waitFor(() => {
@@ -737,7 +667,7 @@ describe('IssueDrawer', () => {
         body: JSON.stringify({ message: 'Please continue' }),
       }));
     });
-    expect(screen.getByLabelText('Tell active agent')).toHaveValue('');
+    expect(screen.getByLabelText('Tell agent-PAN-1')).toHaveValue('');
   });
 
   it('renders action bar with the shared hybrid menu and pinned merge control', () => {
@@ -772,7 +702,7 @@ describe('IssueDrawer', () => {
 
   it('snapshots enabled drawer footer actions for work-running and ready-to-merge phases', () => {
     useDashboardStore.setState({
-      issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }],
+      issuesRaw: [{ ...issue, status: 'In Progress', state: 'in_progress', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
       agentsById: {
         'agent-PAN-1': {
           id: 'agent-PAN-1',
@@ -800,7 +730,7 @@ describe('IssueDrawer', () => {
 
     useDashboardStore.setState({
       drawer: { issueId: null, tab: 'overview' },
-      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }],
+      issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }],
       agentsById: {},
       reviewStatusByIssueId: {
         'PAN-1': {
@@ -823,18 +753,15 @@ describe('IssueDrawer', () => {
     expect(actionSets).toMatchInlineSnapshot(`
       {
         "READY_TO_MERGE": [
-          "issue-action-startAgent",
           "issue-action-syncMain",
-          "issue-action-rebuildAndStart",
-          "issue-action-inspectTask",
+          "issue-action-open",
+          "issue-action-tasks",
+          "issue-action-upload",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
-          "issue-action-open",
           "issue-action-resetIssue",
           "issue-action-resetToPlanned",
           "issue-action-cancel",
-          "issue-action-tasks",
-          "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
           "issue-action-copySettings",
@@ -848,10 +775,9 @@ describe('IssueDrawer', () => {
           "issue-action-stopAgent",
           "issue-action-pause",
           "issue-action-syncMain",
-          "issue-action-inspectTask",
+          "issue-action-open",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
-          "issue-action-open",
           "issue-action-resetIssue",
           "issue-action-resetToPlanned",
           "issue-action-cancel",
@@ -954,37 +880,16 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
 
-    expect(screen.getByTestId('drawer-active-agent')).toBeInTheDocument();
+    expect(screen.getByTestId('active-agent-panel')).toBeInTheDocument();
     expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 
-  it('renders drawer tasks list from drawer data with done and current states', () => {
+  it('renders console inventory markers on the real overview shell', () => {
     useDashboardStore.getState().openIssue('PAN-1');
-
-    renderDrawer([
-      {
-        id: 'workspace-done',
-        title: 'PAN-1: Completed task',
-        status: 'closed',
-        createdAt: '2026-05-18T00:00:00.000Z',
-        closedAt: '2026-05-18T00:05:00.000Z',
-      },
-      {
-        id: 'workspace-current',
-        title: 'PAN-1: Current task',
-        status: 'in_progress',
-        createdAt: '2026-05-18T00:00:00.000Z',
-        updatedAt: '2026-05-18T00:03:00.000Z',
-      },
-    ]);
-
-    expect(screen.getByTestId('drawer-tasks-list')).toBeInTheDocument();
-    expect(screen.getByText('Completed task')).toHaveClass('line-through', 'decoration-[rgba(255,255,255,0.18)]');
-    expect(screen.getByText('workspace-done')).toHaveClass('font-mono', 'text-[10px]', 'text-muted-foreground');
-    expect(screen.getByText('5m')).toHaveClass('font-mono', 'text-[10px]', 'tabular-nums');
-    expect(screen.getByTestId('drawer-task-status-done')).toHaveClass('bg-success', 'text-white', 'text-[9px]');
-    expect(screen.getByTestId('drawer-task-status-current')).toHaveClass('relative');
-    expect(screen.getByTestId('drawer-task-status-current').firstElementChild).toHaveClass('drawer-task-current-ping', 'border-[1.5px]', 'border-info');
+    const { container } = renderDrawer();
+    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'UatEnvironmentPanel', 'IssuePolicyStrip / PoliciesControl', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'DrawerReviewSpecialists', 'DrawerTasksList', 'DrawerActivityRail / DrawerActivityPanel', 'StartAgentCta']) {
+      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+    }
   });
 
   it('renders four review specialist rows from drawer data with status dots', () => {

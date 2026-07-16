@@ -1,18 +1,23 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { cp, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { saveAgentStateSync, determineModel, getProviderAuthMode, getAgentState } from '../../../../lib/agents.js';
+import {
+  saveAgentStateSync, saveAgentState, determineModel, getProviderAuthMode, getAgentState,
+  clearAgentPaused, clearAgentTroubled,
+} from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
+import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
-import { listAgentStates } from '../../../../lib/agents/queries.js';
 import { canUseHarnessSync } from '../../../../lib/harness-policy.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
+import { appendOperatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../../lib/issue-id.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
@@ -32,7 +37,7 @@ import { saveAgentStateAndEmitEventProgram } from '../../services/agent-projecti
 import { IssueLifecycle } from '../../services/issue-lifecycle.js';
 import { getSystemHealthSnapshot } from '../../services/system-health-service.js';
 import { httpHandler } from '../http-handler.js';
-import { validateOrigin } from '../origin-validation.js';
+import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { sessionExists, killSession } from '../../../../lib/tmux.js';
 import {
   appendAgentLifecycleLog,
@@ -42,13 +47,13 @@ import {
   evaluateAgentStartGate,
   evaluateSpawnGuardrails,
   execAsync,
-  execFileAsync,
   getIssueDataService,
   getProjectPath,
   invalidateAgentsCache,
   readJsonBody,
   spawnPanCommandDetached,
   updateRegistryForAgentStart,
+  type AgentStartGateDecision,
 } from './shared.js';
 import {
   handleContainerOrchestration,
@@ -82,6 +87,98 @@ export function spawnGuardrailResourcesHint(hint?: string): string {
   return hint ? `${hint} ${resourcesHint}` : resourcesHint;
 }
 
+// ─── Start-agent gate resolution (PAN-2499) ───────────────────────────────────
+
+/**
+ * Evaluate the persistent start gate for an agent and, if the request is
+ * operator-origin and `clearGates` is set, clear the paused/troubled gates
+ * through the same write paths used by `pan unpause` and `pan untroubled`.
+ *
+ * Returns the gate decision when the agent is still blocked, or `null` when
+ * the agent may proceed. Emits `operator.intervention` events when a gate is
+ * actually cleared.
+ */
+export function resolveStartAgentGateForRoute(input: {
+  agentSessionName: string;
+  issueId: string;
+  clearGates: boolean;
+  originOk: boolean;
+}): Effect.Effect<AgentStartGateDecision | null, never> {
+  let gate: AgentStartGateDecision | null = null;
+
+  return Effect.gen(function* () {
+    const state = yield* getAgentState(input.agentSessionName);
+    gate = evaluateAgentStartGate(input.agentSessionName, state);
+    if (!gate) return null;
+
+    const shouldClear = input.originOk && input.clearGates;
+    if (!shouldClear) return gate;
+    if (!state) return gate;
+
+    let cleared = false;
+    if (state.paused === true) {
+      yield* clearAgentPaused(input.agentSessionName);
+      yield* Effect.promise(() =>
+        appendOperatorInterventionEvent({
+          issueId: input.issueId,
+          kind: 'unpause',
+          source: 'dashboard start-agent',
+        }),
+      );
+      cleared = true;
+    }
+
+    if (state.troubled === true || (state.consecutiveFailures ?? 0) > 0) {
+      yield* clearAgentTroubled(input.agentSessionName);
+      yield* Effect.promise(() =>
+        appendOperatorInterventionEvent({
+          issueId: input.issueId,
+          kind: 'untroubled',
+          source: 'dashboard start-agent',
+        }),
+      );
+      cleared = true;
+    }
+
+    if (!cleared) return gate;
+
+    gate = evaluateAgentStartGate(input.agentSessionName, yield* getAgentState(input.agentSessionName));
+    return gate;
+  }).pipe(
+    Effect.catch((err) => {
+      console.error(`[start-agent] Failed to clear gates for ${input.issueId}: ${err instanceof Error ? err.message : String(err)}`);
+      return Effect.succeed(gate);
+    }),
+  );
+}
+
+/**
+ * Clear the persistent start gates immediately before spawning, restoring the
+ * complete original state if either clear or the spawn itself fails.
+ */
+export async function spawnAfterClearingStartGates<T>(input: {
+  agentSessionName: string;
+  gate: AgentStartGateDecision | null;
+  initialState: AgentState | null;
+  spawn: () => Promise<T>;
+  isSuccessful?: (result: T) => boolean;
+}): Promise<T> {
+  try {
+    if (input.gate?.paused) await Effect.runPromise(clearAgentPaused(input.agentSessionName));
+    if (input.gate?.troubled) await Effect.runPromise(clearAgentTroubled(input.agentSessionName));
+    const result = await input.spawn();
+    if (input.isSuccessful && !input.isSuccessful(result) && input.gate && input.initialState) {
+      await Effect.runPromise(saveAgentState(input.initialState));
+    }
+    return result;
+  } catch (error) {
+    if (input.gate && input.initialState) {
+      await Effect.runPromise(saveAgentState(input.initialState));
+    }
+    throw error;
+  }
+}
+
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
 
 export const postAgentsRoute = HttpRouter.add(
@@ -89,10 +186,8 @@ export const postAgentsRoute = HttpRouter.add(
   '/api/agents',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
-    const originCheck = validateOrigin(request);
-    if (!originCheck.ok) {
-      return jsonResponse({ ok: false, error: originCheck.error }, { status: 403 });
-    }
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
 
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
@@ -173,15 +268,19 @@ export const postAgentsRoute = HttpRouter.add(
 
     const issueLower = parsedIssueId.normalized;
     const agentSessionName = `agent-${issueLower}`;
-    const startGateBlock = evaluateAgentStartGate(agentSessionName, yield* getAgentState(agentSessionName));
+    const clearGates = (body as any).clearGates === true;
+    const initialAgentState = yield* getAgentState(agentSessionName);
+    const startGateBlock = evaluateAgentStartGate(agentSessionName, initialAgentState);
     if (startGateBlock) {
-      yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_gate', {
-        issueId,
-        paused: startGateBlock.paused,
-        troubled: startGateBlock.troubled,
-        reason: startGateBlock.error,
-      }));
-      return jsonResponse(startGateBlock, { status: 409 });
+      if (!clearGates) {
+        yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.start_blocked_gate', {
+          issueId,
+          paused: startGateBlock.paused,
+          troubled: startGateBlock.troubled,
+          reason: startGateBlock.error,
+        }));
+        return jsonResponse(startGateBlock, { status: 409 });
+      }
     }
 
     const workspaceMetadata = loadWorkspaceMetadataFn(issueId);
@@ -315,7 +414,7 @@ export const postAgentsRoute = HttpRouter.add(
     }
     const providerAuthMode = yield* Effect.promise(() => getProviderAuthMode(spawnModel));
     if (providerAuthMode === 'subscription') {
-      const codexAuth = yield* checkCodexAuthStatus({ agentStates: listAgentStates() });
+      const codexAuth = yield* checkCodexAuthStatus();
       if (codexAuth.status === 'expired' || codexAuth.status === 'burned') {
         return jsonResponse({
           success: false,
@@ -491,16 +590,42 @@ export const postAgentsRoute = HttpRouter.add(
       console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
     }
 
-    if (isRemote && workspaceMetadata) {
-      return yield* handleRemoteAgentSpawn({
+    let gatesCommitted = false;
+    const commitClearedGates = async (): Promise<void> => {
+      if (!startGateBlock || gatesCommitted) return;
+      gatesCommitted = true;
+      if (startGateBlock.paused) {
+        await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'unpause', source: 'dashboard' })));
+      }
+      if (startGateBlock.troubled) {
+        await Effect.runPromise(eventStore.appendAsync(operatorInterventionEvent({ issueId, kind: 'untroubled', source: 'dashboard' })));
+      }
+      await appendAgentLifecycleLog(agentSessionName, 'agent.start_gates_cleared', {
         issueId,
-        workspacePath,
-        workspaceMetadata,
-        spawnModel,
-        projectPath,
-        spawnGuardrails,
-        lifecycle,
+        paused: startGateBlock.paused,
+        troubled: startGateBlock.troubled,
       });
+    };
+
+    if (isRemote && workspaceMetadata) {
+      const response = yield* Effect.promise(() => spawnAfterClearingStartGates({
+        agentSessionName,
+        gate: startGateBlock,
+        initialState: initialAgentState,
+        spawn: () => Effect.runPromise(handleRemoteAgentSpawn({
+          issueId,
+          workspacePath,
+          workspaceMetadata,
+          spawnModel,
+          projectPath,
+          spawnGuardrails,
+          lifecycle,
+        })),
+        isSuccessful: (remoteResponse) => remoteResponse.status >= 200 && remoteResponse.status < 300,
+      }));
+      if (response.status < 200 || response.status >= 300) return response;
+      yield* Effect.promise(commitClearedGates);
+      return response;
     }
 
     // Local workspace
@@ -600,14 +725,16 @@ export const postAgentsRoute = HttpRouter.add(
     }
 
     // Spawn pan start command
-    const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => spawnPanCommandDetached({
-      agentSessionName,
-      issueId,
-      role,
-      workspacePath,
-      args,
-      cwd,
-    });
+    const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
+      const activityId = await spawnAfterClearingStartGates({
+        agentSessionName,
+        gate: gatesCommitted ? null : startGateBlock,
+        initialState: initialAgentState,
+        spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd }),
+      });
+      await commitClearedGates();
+      return activityId;
+    };
 
     // Use IssueLifecycle service to transition issue to "In Progress" (PAN-449)
     const updateIssueStatus = async () => {

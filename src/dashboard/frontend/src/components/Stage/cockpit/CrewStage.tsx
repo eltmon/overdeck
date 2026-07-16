@@ -14,6 +14,7 @@
  */
 
 import type { SessionNode } from '@overdeck/contracts'
+import { ActiveAgentPanel } from '../../issue-view/ActiveAgentPanel'
 import { compactModelName, initialsFor } from '../../../lib/model-names'
 
 type CrewState = 'working' | 'listening' | 'reviewing' | 'idle' | 'done'
@@ -131,7 +132,7 @@ export function CrewStage({ sessions, onSelectSession }: {
   const liveListeners = tiers.filter((member) => member.state === 'working' || member.state === 'listening').length
 
   return (
-    <div className="rounded-[14px] border border-border bg-card p-4" data-testid="crew-stage">
+    <div className="rounded-[14px] border border-border bg-card p-4" data-testid="crew-stage" data-section="CrewStage">
       <div className="mb-3 flex items-baseline justify-between">
         <div className="font-['Space_Grotesk'] text-[13.5px] font-semibold text-foreground">The crew</div>
         <div className="text-[11px] text-muted-foreground">glow = actively spending · teal ring = reading the stream · faded = finished</div>
@@ -166,6 +167,14 @@ export function CrewStage({ sessions, onSelectSession }: {
             </button>
           ))}
         </div>
+      )}
+      {tiers[0] && (
+        <ActiveAgentPanel
+          agentId={tiers[0].session.sessionId}
+          density="cockpit"
+          className="mt-3"
+          title="Active work agent"
+        />
       )}
     </div>
   )

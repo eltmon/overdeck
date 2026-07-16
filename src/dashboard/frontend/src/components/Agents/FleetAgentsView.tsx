@@ -14,6 +14,7 @@ import TopBar from '../primitives/TopBar';
 import Button from '../primitives/Button';
 import type { VerbBadgeProps } from '../primitives/VerbBadge';
 import { IssueActionMenu } from '../IssueActionMenu';
+import { StartAgentCta } from '../issue-view';
 
 const ROLE_ORDER = {
   plan: 0,
@@ -520,7 +521,10 @@ export function FleetAgentsView({ onNavigateToIssues }: { onNavigateToIssues?: (
                     stuckMessage={agent.lastFailureReason ?? agent.error ?? 'Agent requires attention.'}
                     onOpenIssue={agent.issueId ? () => openAgentIssue(agent.issueId!) : undefined}
                     actionMenu={agent.issueId ? (
-                      <IssueActionMenu issueId={agent.issueId} mode="overflow-only" agentScopeOnly className="inline-flex" />
+                      <div className="inline-flex items-center gap-2">
+                        <StartAgentCta issueId={agent.issueId} density="rail" surface="inline" />
+                        <IssueActionMenu issueId={agent.issueId} mode="overflow-only" agentScopeOnly className="inline-flex" />
+                      </div>
                     ) : undefined}
                   />
                   </AgentCardBoundary>

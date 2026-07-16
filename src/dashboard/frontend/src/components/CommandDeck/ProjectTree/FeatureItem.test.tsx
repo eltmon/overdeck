@@ -8,6 +8,7 @@ import { FeatureItem, isWorkOrSpecialistSession, pickBestSession } from './Featu
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 import { resolveUatActions } from '../uat-actions';
 import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { useDashboardStore } from '../../../lib/store';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -290,6 +291,7 @@ describe('pickBestSession', () => {
 describe('FeatureItem', () => {
   beforeEach(() => {
     localStorage.clear();
+    useDashboardStore.setState({ drawer: { issueId: null, tab: 'overview' } });
     vi.restoreAllMocks();
     vi.mocked(refreshDashboardState).mockClear();
     vi.stubGlobal('fetch', vi.fn(async () => ({
@@ -759,6 +761,31 @@ describe('FeatureItem', () => {
     expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBe('true');
     fireEvent.click(screen.getByTestId('chevron-down'));
     expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
+  });
+
+  it('grows the rail to cockpit and opens the console drawer without selecting a tab', () => {
+    const onSelect = vi.fn();
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    );
+    const issueView = () => container.querySelector('[data-component="feature-item"]');
+    expect(issueView()).toHaveAttribute('data-density', 'rail');
+
+    fireEvent.click(screen.getByTestId('chevron-right'));
+    expect(issueView()).toHaveAttribute('data-density', 'cockpit');
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand issue full screen' }));
+    expect(issueView()).toHaveAttribute('data-density', 'cockpit');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-821', tab: 'overview' });
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('chevron-down'));
+    expect(issueView()).toHaveAttribute('data-density', 'rail');
   });
 
   it('restores expansion state from localStorage on mount', () => {
