@@ -24,15 +24,19 @@ export function bootReconciliationSkipReason(agent: BootReconciliationAgent): Bo
     return 'merged';
   }
 
+  // Must mirror handleAgentStoppedEvent's mid-flight gate in deacon-auto-resume.ts:
+  // a handed-off agent is resumable only when review or test found something to fix.
+  // Any weaker rule here makes the boot dialog offer candidates the executor then
+  // refuses, so the operator is asked a question whose answer is already decided.
   const completedMarkerExists =
     existsSync(join(getAgentDir(agent.id), 'completed')) ||
     existsSync(join(getAgentDir(agent.id), 'completed.processed'));
-  if (
-    completedMarkerExists &&
-    review?.reviewStatus === 'passed' &&
-    review.testStatus === 'passed'
-  ) {
-    return 'completed';
+  if (completedMarkerExists) {
+    const needsFix =
+      review?.reviewStatus === 'blocked' ||
+      review?.reviewStatus === 'failed' ||
+      review?.testStatus === 'failed';
+    if (!needsFix) return 'completed';
   }
 
   return null;

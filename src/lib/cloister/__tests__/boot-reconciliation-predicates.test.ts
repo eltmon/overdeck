@@ -95,7 +95,7 @@ describe('bootReconciliationSkipReason', () => {
     })).toBe('merged');
   });
 
-  it('returns completed only when a completion marker exists and review and test both passed', () => {
+  it('returns completed when a completion marker exists and review and test both passed', () => {
     const agentDir = join(testHome, 'agents', 'agent-pan-2284');
     mkdirSync(agentDir, { recursive: true });
     writeFileSync(join(agentDir, 'completed'), '');
@@ -134,6 +134,62 @@ describe('bootReconciliationSkipReason', () => {
     mocks.reviewStatuses.set('PAN-2284', reviewStatus({
       reviewStatus: 'blocked',
       testStatus: 'passed',
+    }));
+
+    expect(bootReconciliationSkipReason({
+      id: 'agent-pan-2284',
+      issueId: 'PAN-2284',
+      workspace,
+    })).toBeNull();
+  });
+
+  // The boot dialog's candidate list must agree with the resume executor
+  // (handleAgentStoppedEvent). It previously skipped only on passed/passed, so a
+  // handed-off agent awaiting review offered itself as a candidate and was then
+  // refused as "pipeline mid-flight" — the dialog asked a settled question.
+  it.each([
+    ['pending', 'pending'],
+    ['passed', 'pending'],
+    ['pending', 'passed'],
+  ] as const)(
+    'returns completed for a handed-off agent mid-flight in the pipeline (review=%s, test=%s)',
+    (reviewStatusValue, testStatusValue) => {
+      const agentDir = join(testHome, 'agents', 'agent-pan-2284');
+      mkdirSync(agentDir, { recursive: true });
+      writeFileSync(join(agentDir, 'completed'), '');
+      mocks.reviewStatuses.set('PAN-2284', reviewStatus({
+        reviewStatus: reviewStatusValue,
+        testStatus: testStatusValue,
+      }));
+
+      expect(bootReconciliationSkipReason({
+        id: 'agent-pan-2284',
+        issueId: 'PAN-2284',
+        workspace,
+      })).toBe('completed');
+    },
+  );
+
+  it('returns null when a completion marker exists but test failed', () => {
+    const agentDir = join(testHome, 'agents', 'agent-pan-2284');
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'completed'), '');
+    mocks.reviewStatuses.set('PAN-2284', reviewStatus({
+      reviewStatus: 'passed',
+      testStatus: 'failed',
+    }));
+
+    expect(bootReconciliationSkipReason({
+      id: 'agent-pan-2284',
+      issueId: 'PAN-2284',
+      workspace,
+    })).toBeNull();
+  });
+
+  it('returns null when no completion marker exists, so a crashed mid-work agent stays resumable', () => {
+    mocks.reviewStatuses.set('PAN-2284', reviewStatus({
+      reviewStatus: 'pending',
+      testStatus: 'pending',
     }));
 
     expect(bootReconciliationSkipReason({
