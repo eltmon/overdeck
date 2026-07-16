@@ -62,6 +62,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T12:09:09.863Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:11:00.844Z"
     }
   ],
   "feedback": [],
@@ -85,36 +90,36 @@
     "recordedAt": "2026-07-16T11:57:07.758Z"
   },
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T12:10:09.182Z",
+  "updated": "2026-07-16T12:11:00.844Z",
   "pipeline": {
     "issueId": "PAN-2768",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T12:10:09.106Z",
+    "updatedAt": "2026-07-16T12:10:59.730Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2768-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2789",
     "lastVerifiedCommit": "2921e14930f16e47819e12f8a991c3d9ef2529a1",
     "reviewRequestedAt": "2026-07-16T12:10:08.732Z",
-    "reviewSpawnedAt": "2026-07-16T12:09:06.356Z"
+    "reviewSpawnedAt": "2026-07-16T12:10:59.730Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2309162,
-            "output": 5889,
-            "cacheRead": 2107648,
+            "input": 2342471,
+            "output": 6115,
+            "cacheRead": 2115200,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 30688116,
-            "output": 47611,
-            "cacheRead": 29840384,
+            "input": 31210919,
+            "output": 49532,
+            "cacheRead": 30348032,
             "cacheWrite": 0
           }
         },
@@ -129,15 +134,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2309162,
-          "output": 5889,
-          "cacheRead": 2107648,
+          "input": 2342471,
+          "output": 6115,
+          "cacheRead": 2115200,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 30688116,
-          "output": 47611,
-          "cacheRead": 29840384,
+          "input": 31210919,
+          "output": 49532,
+          "cacheRead": 30348032,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -148,8 +153,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 28.663853,
-        "pricingAsOf": "2026-07-16T12:10:09.139Z"
+        "usd": 29.051082,
+        "pricingAsOf": "2026-07-16T12:10:59.793Z"
       }
     },
     "merges": [
