@@ -75,6 +75,14 @@ export interface AgentEnrichment {
   pendingInputCount: number
   pendingInputKinds: PendingInputKind[]
   pendingAskUserQuestion?: PendingAskUserQuestionSnapshot
+  /**
+   * Payload for an outstanding ExitPlanMode. The scan has always produced this
+   * and the poller has always emitted `enrichment.pendingProposedPlan`, but the
+   * field was never on this interface — so it read `undefined` forever and no
+   * plan ever reached the store from the agent path. It compiled because the
+   * root tsconfig excluded the dashboard from typecheck.
+   */
+  pendingProposedPlan?: { toolUseId: string; askedAt: string; plan: string }
   resolution: string
   resolutionCount: number
   /**
@@ -588,6 +596,9 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     pendingInputCount: pendingInputKinds.length,
     pendingInputKinds,
     pendingAskUserQuestion,
+    // Suppressed alongside every other pending surface: when a specialist owns
+    // the issue the work agent is parked, not asking.
+    pendingProposedPlan: shouldSuppressPendingInput ? undefined : scan.pendingProposedPlan,
     resolution: runtimeState?.resolution || 'working',
     resolutionCount: runtimeState?.resolutionCount || 0,
     jsonlScan: scan,

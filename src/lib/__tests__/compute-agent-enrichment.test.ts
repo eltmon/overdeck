@@ -255,3 +255,52 @@ describe('computeAgentEnrichment interactive turn-end', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 })
+
+/**
+ * The plan payload was a dead wire: the scan produced it and the poller emitted
+ * `enrichment.pendingProposedPlan`, but the field was never on AgentEnrichment,
+ * so it read `undefined` forever and no plan reached the store from the agent
+ * path. It compiled because the root tsconfig excluded the dashboard.
+ */
+describe('computeAgentEnrichment plan payload', () => {
+  const getAgentRuntimeStateMock = vi.mocked(agents.getAgentRuntimeState)
+  const getAgentStateSyncMock = vi.mocked(agents.getAgentStateSync)
+  const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
+
+  const scanWithPlan = {
+    askUserQuestions: [],
+    enterPlanModeOpen: false,
+    exitPlanModePending: true,
+    pendingProposedPlan: { toolUseId: 'toolu_plan', askedAt: '2026-07-16T03:00:00.000Z', plan: 'Revert 58e23c4.' },
+  }
+
+  function arrange(role: string, agentId: string) {
+    const dir = makeAgentDir(role)
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(dir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state: 'active', resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    return dir
+  }
+
+  it('carries the proposed plan through to the enrichment', async () => {
+    const agentId = 'agent-pan-2748'
+    const dir = arrange('work', agentId)
+
+    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, scanWithPlan))
+
+    expect(e.pendingProposedPlan?.toolUseId).toBe('toolu_plan')
+    expect(e.pendingInputKinds).toContain('exitPlanMode')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('suppresses the plan while a specialist owns the issue', async () => {
+    const agentId = 'agent-pan-2749'
+    const dir = arrange('work', agentId)
+
+    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, true, scanWithPlan))
+
+    expect(e.pendingProposedPlan).toBeUndefined()
+    rmSync(dir, { recursive: true, force: true })
+  })
+})
