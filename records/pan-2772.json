@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T18:37:06.259Z",
+  "updated": "2026-07-16T18:49:04.406Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "agent-gate-restart": {
-        "writerId": "agent-pan-2772",
-        "agentId": "agent-pan-2772",
-        "pid": 777360,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:37:06.259Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -130,6 +122,16 @@
         "outcome": "completed",
         "reason": "Added an injectable agentRestartBlockReason helper that skips gates for uninitiated or forced restarts, quotes active deploy-window blockers in a standalone refusal, exempts the flywheel from its own deployment ownership, and preserves verification blocking. Seven fully injected unit cases, typecheck, lint, and diff checks pass.",
         "releasedAt": "2026-07-16T18:36:49.689Z"
+      },
+      {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 777360,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:37:06.259Z",
+        "itemId": "agent-gate-restart",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:49:04.406Z"
       }
     ],
     "statusReasons": {
@@ -185,6 +187,10 @@
     "agent-gate-helper.agent-gate-helper.ac2": "completed",
     "agent-gate-helper.agent-gate-helper.ac3": "completed",
     "agent-gate-helper.agent-gate-helper.ac4": "completed",
-    "agent-gate-restart": "running"
+    "agent-gate-restart": "completed",
+    "agent-gate-restart.agent-gate-restart.ac1": "completed",
+    "agent-gate-restart.agent-gate-restart.ac2": "completed",
+    "agent-gate-restart.agent-gate-restart.ac3": "completed",
+    "agent-gate-restart.agent-gate-restart.ac4": "completed"
   }
 }
