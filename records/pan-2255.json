@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T06:28:38.519Z",
+  "updated": "2026-07-16T06:37:13.817Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
@@ -45,18 +45,33 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "mailbox-contract": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2255",
         "agentId": "agent-pan-2255",
         "pid": 2353478,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:28:38.519Z"
+        "claimedAt": "2026-07-16T06:28:38.519Z",
+        "itemId": "mailbox-contract",
+        "outcome": "completed",
+        "reason": "Added issue-role YAML mailbox envelopes, legacy action-status fallback, idempotent delivery/acknowledgement transitions, and focused tests",
+        "releasedAt": "2026-07-16T06:37:13.817Z"
+      }
+    ],
+    "statusReasons": {
+      "mailbox-contract": {
+        "reason": "Added issue-role YAML mailbox envelopes, legacy action-status fallback, idempotent delivery/acknowledgement transitions, and focused tests",
+        "updatedAt": "2026-07-16T06:37:13.817Z"
       }
     }
   },
   "statusOverrides": {
-    "mailbox-contract": "running"
+    "mailbox-contract": "completed",
+    "mailbox-contract.mailbox-contract.ac1": "completed",
+    "mailbox-contract.mailbox-contract.ac2": "completed",
+    "mailbox-contract.mailbox-contract.ac3": "completed",
+    "mailbox-contract.mailbox-contract.ac4": "completed"
   }
 }
