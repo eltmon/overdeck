@@ -13,13 +13,14 @@
  *   terminal state. The pipeline is everything that needs attention to reach a
  *   correct, consistent end state — not just the happy-path in-flight set.
  *
- * Built from durable lenses only (L1–L4), so membership survives the cutover and
+ * Built from durable lenses only (L1–L4 + L6-spec), so membership survives the cutover and
  * a fresh `~/.overdeck` (no `state.json`) by construction:
  *
  *   L1  open PR              · L1-merged  a merged PR exists (the merge oracle)
  *   L2  unmerged branch      · `git merge-tree` vs main (blind to squash — always
  *                              paired with L1-merged, which wins)
  *   L3  issue open           · L4  current-phase label
+ *   L6-spec  vBRIEF exists   · durable plan on the `overdeck-state` branch
  *
  * L5 (agents / DB / state.json) is a *liveness accelerator* only — it can
  * annotate "is an agent running right now," but it NEVER decides membership.
@@ -44,6 +45,8 @@ export interface IssueLensSignals {
   branchUnmerged: boolean;
   /** L4 — current-phase label (in-review/in-progress/planned/verifying-on-main/…), else null. */
   phaseLabel: string | null;
+  /** L6-spec — a durable vBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
+  hasVbriefSpec: boolean;
 }
 
 export type PipelineBucket =
@@ -127,6 +130,12 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     // work landed via a non-PR path (merge-agent / direct commit, §2e); the open
     // issue still needs closing out.
     return result('post_merge_limbo', 'open issue whose branch is already in main but with no merged PR — landed via a non-PR path; run close-out');
+  }
+  if (s.hasVbriefSpec) {
+    return result(
+      'planned_backlog',
+      'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
+    );
   }
   return result('clean_terminal', 'open issue with no branch and no PR — backlog, never started');
 }
