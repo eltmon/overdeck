@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-15T23:54:10.674Z",
+  "updated": "2026-07-16T00:01:52.195Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -163,7 +163,12 @@
     "active-agent-panel.active-agent-panel.ac2": "completed",
     "active-agent-panel.active-agent-panel.ac3": "completed",
     "active-agent-panel.active-agent-panel.ac4": "completed",
-    "issue-view-wrapper": "running"
+    "issue-view-wrapper": "completed",
+    "issue-view-wrapper.issue-view-wrapper.ac1": "completed",
+    "issue-view-wrapper.issue-view-wrapper.ac2": "completed",
+    "issue-view-wrapper.issue-view-wrapper.ac3": "completed",
+    "issue-view-wrapper.issue-view-wrapper.ac4": "completed",
+    "issue-view-wrapper.issue-view-wrapper.ac5": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -189,16 +194,8 @@
     }
   },
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "issue-view-wrapper": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 351021,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-15T23:54:10.674Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -298,6 +295,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2499 dead)",
         "releasedAt": "2026-07-15T15:12:49.168Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 351021,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-15T23:54:10.674Z",
+        "itemId": "issue-view-wrapper",
+        "outcome": "completed",
+        "reason": "Shared IssueView now owns the rail, cockpit, and console density boundary via DENSITY_SECTIONS; all three shells adopt it, policy control is shared, no-loss shell tests pass, and FeatureItem ratchet fell to 1366 lines. Commit 08c17dd04c is pushed.",
+        "releasedAt": "2026-07-16T00:01:52.195Z"
       }
     ],
     "statusReasons": {
@@ -334,8 +342,8 @@
         "updatedAt": "2026-07-15T14:51:04.496Z"
       },
       "issue-view-wrapper": {
-        "reason": "stale claim released (agent-pan-2499 dead)",
-        "updatedAt": "2026-07-15T15:12:49.168Z"
+        "reason": "Shared IssueView now owns the rail, cockpit, and console density boundary via DENSITY_SECTIONS; all three shells adopt it, policy control is shared, no-loss shell tests pass, and FeatureItem ratchet fell to 1366 lines. Commit 08c17dd04c is pushed.",
+        "updatedAt": "2026-07-16T00:01:52.195Z"
       }
     }
   },
