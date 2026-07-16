@@ -66,17 +66,17 @@
     "recordedAt": "2026-07-16T17:53:59.399Z"
   },
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-16T18:08:05.091Z",
+  "updated": "2026-07-16T18:11:52.868Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-16T18:08:02.941Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T18:11:51.818Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Bead reducer-liveness-gate ack: commit df35ff8b merges 438a42c8f7, which adds shouldForceReemitPendingInput to the enrichment poller (agent-enrichment-service.ts) — the convergence-guarantee bead, separate from this ones scope. No changes to event-reducers.ts or its tests; reducer behavior verified against AC1-4 remains unaffected and still holds.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2793",
@@ -197,10 +197,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 189,
-            "output": 8702,
-            "cacheRead": 3414209,
-            "cacheWrite": 158373
+            "input": 193,
+            "output": 9526,
+            "cacheRead": 3736083,
+            "cacheWrite": 159919
           }
         },
         "work": {
@@ -244,10 +244,10 @@
           "cacheWrite": 418542
         },
         "anthropic/claude-sonnet-5": {
-          "input": 19142,
-          "output": 13032,
-          "cacheRead": 5189451,
-          "cacheWrite": 262053
+          "input": 19146,
+          "output": 13856,
+          "cacheRead": 5511325,
+          "cacheWrite": 263599
         },
         "custom/kimi-k2.7-code": {
           "input": 656824,
@@ -257,8 +257,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 61.883652,
-        "pricingAsOf": "2026-07-16T18:08:03.146Z"
+        "usd": 61.96014,
+        "pricingAsOf": "2026-07-16T18:11:51.896Z"
       }
     },
     "merges": [
