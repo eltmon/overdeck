@@ -3,43 +3,52 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T18:15:11.300Z",
-  "updated": "2026-07-16T18:51:56.079Z",
+  "updated": "2026-07-16T18:52:10.919Z",
   "pipeline": {
     "issueId": "PAN-2794",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:51:55.932Z",
+    "updatedAt": "2026-07-16T18:52:10.706Z",
+    "mergeNotes": "Strike merge trigger is not registered",
     "strikeReadyHead": "20caf91dc06c60b8ca3d93e33dc4d8015c9849e3",
     "strikeReadyAt": "2026-07-16T18:51:55.931Z",
-    "strikeLandingState": "ready",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-16T18:52:10.706Z",
+        "strikeHead": "20caf91dc06c60b8ca3d93e33dc4d8015c9849e3",
+        "mainHead": "c110a3a597fd068702f011801c61917c4f92523f",
+        "outcome": "failed",
+        "detail": "Strike merge trigger is not registered"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 1712687,
-            "output": 65180,
-            "cacheRead": 18697728,
+            "input": 1715885,
+            "output": 65450,
+            "cacheRead": 19064320,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1712687,
-          "output": 65180,
-          "cacheRead": 18697728,
+          "input": 1715885,
+          "output": 65450,
+          "cacheRead": 19064320,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.867698999999998,
-        "pricingAsOf": "2026-07-16T18:51:56.065Z"
+        "usd": 20.075085,
+        "pricingAsOf": "2026-07-16T18:52:10.873Z"
       }
     },
     "merges": [],
