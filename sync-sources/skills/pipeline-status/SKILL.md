@@ -26,10 +26,10 @@ allowed-tools:
 
 ## What this skill does
 
-Produces a single dense table that shows every PAN issue currently in
-`In Progress` or `In Review` (plus any active planning sessions), with one
-column per workflow phase. The format is optimized for being readable across
-a room: short rows, one-glyph cells, no fluff.
+Produces a single dense table for every issue returned by the authoritative
+pipeline-membership read door (plus active planning sessions), with one column
+per workflow phase. This includes exception-queue drift such as `zombie_pr`
+and `post_merge_limbo`, even when tracker or review-status state is stale.
 
 This is the **first thing** to show when the user asks for status. Anything
 more detailed (`pan status`, `agent-status`) goes underneath.
@@ -37,11 +37,11 @@ more detailed (`pan status`, `agent-status`) goes underneath.
 ## Output format
 
 ```
-ISSUE      TITLE                                                  MODEL              AGENT  REVIEW  TEST  VERIFY  MERGE  READY
-──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-PAN-1028   TTS: first speech utterance gets clipped (PipeWire)    kimi-k2.6          ✓      ·       ·     -       ·      ·
-PAN-945    Planning artifact path mismatch                        gpt-5.4            ✓      ◐       ◐     ◐       ✓*     ·
-PAN-1024   Lazy-load per-turn diff summaries (484 MB fix)         gpt-5.4            ✓      ·       ·     -       ·      ·
+ISSUE      BUCKET              TITLE                                      MODEL              AGENT  REVIEW  TEST  VERIFY  MERGE  READY
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+PAN-1028   in_flight           TTS: first speech utterance gets clipped   kimi-k2.6          ✓      ·       ·     -       ·      ·
+PAN-945    post_merge_limbo    Planning artifact path mismatch            gpt-5.4            ·      ·       ·     ·       ✓*     ·
+PAN-1024   zombie_pr           Lazy-load per-turn diff summaries          gpt-5.4            ·      ·       ·     ·       ·      ·
 
 PLANNING (Opus drafting vBRIEFs)
 PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-4-6  ◐ planning
@@ -63,7 +63,8 @@ PAN-1015   Remove claudish routing in favor of CLIProxy           claude-sonnet-
 
 | Column | Source | Meaning |
 |--------|--------|---------|
-| ISSUE | `/api/issues` `identifier` | PAN-NNNN |
+| ISSUE | `/api/pipeline/membership` `issueId` | PAN-NNNN; the membership endpoint defines the row universe |
+| BUCKET | `/api/pipeline/membership` `bucket` | `in_flight`, `zombie_pr`, `post_merge_limbo`, or `planned_backlog` |
 | TITLE | `/api/issues` `title` | truncated to ~52 chars |
 | MODEL | `~/.overdeck/agents/agent-pan-NNN/state.json` `.model` | Which model the work agent is using |
 | AGENT | tmux + `state.json` `.status` | `✓` if agent tmux session is alive AND `status: running` |
@@ -84,9 +85,8 @@ don't appear via `/api/issues` filtering.
 
 ### 1. Generate the table
 
-Run this script. It hits the local dashboard API, the SQLite review-status DB,
-and tmux + agent state files. No manual curl, no manual gh — single source
-of truth is the dashboard's existing API surface.
+Run this script. It gets the row universe from `GET /api/pipeline/membership`,
+then joins issue titles, review status, tmux, and agent state as annotations.
 
 ```bash
 python3 - <<'PY'
@@ -97,9 +97,18 @@ PANO_DB = Path.home() / ".overdeck" / "panopticon.db"
 AGENTS = Path.home() / ".overdeck" / "agents"
 
 issues_data = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues']))
-panissues = [i for i in issues_data
-             if i.get('source')=='github' and i.get('sourceRepo')=='eltmon/overdeck'
-             and ((i.get('state','') or '').lower().replace(' ','_') in ('in_progress','in_review'))]
+membership = json.loads(subprocess.check_output([
+    'curl','-s','http://localhost:3011/api/pipeline/membership?project=overdeck'
+]))
+issues_by_id = {(i.get('identifier') or '').upper(): i for i in issues_data}
+panissues = []
+for member in membership:
+    if not member.get('inPipeline'): continue
+    issue = dict(issues_by_id.get(member['issueId'].upper(), {
+        'identifier': member['issueId'], 'title': '(missing tracker issue)', 'labels': []
+    }))
+    issue['pipelineBucket'] = member['bucket']
+    panissues.append(issue)
 
 db = sqlite3.connect(PANO_DB)
 
@@ -139,9 +148,9 @@ def tier(i):
 
 panissues.sort(key=lambda i: (tier(i), -int(''.join(c for c in i['identifier'] if c.isdigit()) or 0)))
 
-W = {'id':10,'title':52,'model':22,'agent':6,'review':7,'tests':6,'verify':7,'merge':7}
+W = {'id':10,'bucket':18,'title':44,'model':22,'agent':6,'review':7,'tests':6,'verify':7,'merge':7}
 print()
-print(f"{'ISSUE':<{W['id']}}  {'TITLE':<{W['title']}}  {'MODEL':<{W['model']}}  {'AGENT':<{W['agent']}}  {'REVIEW':<{W['review']}}  {'TEST':<{W['tests']}}  {'VERIFY':<{W['verify']}}  {'MERGE':<{W['merge']}}  {'READY'}")
+print(f"{'ISSUE':<{W['id']}}  {'BUCKET':<{W['bucket']}}  {'TITLE':<{W['title']}}  {'MODEL':<{W['model']}}  {'AGENT':<{W['agent']}}  {'REVIEW':<{W['review']}}  {'TEST':<{W['tests']}}  {'VERIFY':<{W['verify']}}  {'MERGE':<{W['merge']}}  {'READY'}")
 print('─' * 130)
 for i in panissues:
     iid = i['identifier']
@@ -155,7 +164,7 @@ for i in panissues:
     if len(amodel) > W['model']: amodel = amodel[:W['model']-1] + '…'
     agent_cell = '✓' if agent_alive and astatus=='running' else ('◐' if astatus=='running' else '·')
     verify_cell = '·' if (review != 'passed' and not merge) else cell(verify)
-    print(f"{iid:<{W['id']}}  {title:<{W['title']}}  {amodel:<{W['model']}}  "
+    print(f"{iid:<{W['id']}}  {i['pipelineBucket']:<{W['bucket']}}  {title:<{W['title']}}  {amodel:<{W['model']}}  "
           f"{agent_cell:<{W['agent']}}  {cell(review):<{W['review']}}  {cell(test):<{W['tests']}}  "
           f"{verify_cell:<{W['verify']}}  {cell(merge):<{W['merge']}}  "
           f"{'✓' if ready else '·'}")
@@ -226,8 +235,9 @@ For deeper detail beyond the pipeline view:
 
 ## Notes
 
-- The table reads from `/api/issues` — works only when the dashboard is up on
-  `localhost:3011`. If the dashboard is down, fall back to `pan status` text.
+- The table's issue universe comes only from `/api/pipeline/membership`; it uses
+  `/api/issues`, review status, tmux, and agent files only to annotate those
+  members. If the dashboard is down, fall back to `pan status` text.
 - A `*` after a value flags a known data-drift case (e.g. `mergeStatus=merged`
   surviving a PR revert per PAN-1027). Document the underlying issue inline so
   the reader knows why the cell can't be trusted.
