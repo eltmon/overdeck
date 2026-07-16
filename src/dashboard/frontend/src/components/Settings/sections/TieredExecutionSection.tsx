@@ -121,6 +121,7 @@ export function TieredExecutionSection({
     // Keep invalid hand-authored config inspectable; guarded UI actions cannot save this state.
   }
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
+  const [addCrewPromptOpen, setAddCrewPromptOpen] = useState(false);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [kindDraft, setKindDraft] = useState<typeof ITEM_KINDS[number]>('docs');
   const [crewDraft, setCrewDraft] = useState('');
@@ -167,26 +168,41 @@ export function TieredExecutionSection({
     updateTieredExecution(serializeCrews(nextCrews, nextAssign, nextRest));
   };
 
-  const handleAssignment = (difficulty: typeof DIFFICULTIES[number], crewId: string) => {
+  const finalDifficultyGuard = (difficulty: typeof DIFFICULTIES[number]): string | null => {
     const currentCrewId = assign[difficulty];
     const currentCrewDifficulties = DIFFICULTIES.filter((entry) => assign[entry] === currentCrewId);
     const currentCrewKinds = Object.entries(byKind).filter(([, id]) => id === currentCrewId).map(([kind]) => kind);
-    if (crewId !== currentCrewId && currentCrewDifficulties.length === 1 && currentCrewKinds.length > 0) {
-      setAssignmentError(`Move or remove ${currentCrewKinds.join(', ')} kind overrides before reassigning this crew's final difficulty.`);
+    if (currentCrewDifficulties.length === 1 && currentCrewKinds.length > 0) {
+      return `Move or remove ${currentCrewKinds.join(', ')} kind overrides before reassigning this crew's final difficulty.`;
+    }
+    return null;
+  };
+
+  const createCrew = (difficulty: typeof DIFFICULTIES[number] | null) => {
+    const id = `crew-${crypto.randomUUID()}`;
+    const crew: Crew = { id, model: DEFAULT_MODEL, harness: 'claude-code' };
+    const nextAssign = difficulty === null || crews.length === 0
+      ? Object.fromEntries(DIFFICULTIES.map((entry) => [entry, id])) as CrewAssignments
+      : { ...assign, [difficulty]: id };
+    setAssignmentError(null);
+    setAddCrewPromptOpen(false);
+    setOpenCrewId(deriveTierName(DIFFICULTIES.filter((entry) => nextAssign[entry] === id)));
+    writeCrews([...crews, crew], nextAssign);
+  };
+
+  const handleAssignment = (difficulty: typeof DIFFICULTIES[number], crewId: string) => {
+    const currentCrewId = assign[difficulty];
+    const guardMessage = crewId === currentCrewId ? null : finalDifficultyGuard(difficulty);
+    if (guardMessage) {
+      setAssignmentError(guardMessage);
       return;
     }
     setAssignmentError(null);
-    if (crewId !== 'new') {
-      writeCrews(crews, { ...assign, [difficulty]: crewId });
+    if (crewId === 'new') {
+      createCrew(difficulty);
       return;
     }
-    const id = `crew-${crypto.randomUUID()}`;
-    const crew: Crew = { id, model: DEFAULT_MODEL, harness: 'claude-code' };
-    const nextAssign = crews.length === 0
-      ? Object.fromEntries(DIFFICULTIES.map((entry) => [entry, id])) as CrewAssignments
-      : { ...assign, [difficulty]: id };
-    setOpenCrewId(deriveTierName(DIFFICULTIES.filter((entry) => nextAssign[entry] === id)));
-    writeCrews([...crews, crew], nextAssign);
+    writeCrews(crews, { ...assign, [difficulty]: crewId });
   };
 
   const handleSupervisorPatch = (patch: Partial<NonNullable<TieredExecutionConfig['supervisor']>>) => {
@@ -363,8 +379,54 @@ export function TieredExecutionSection({
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-foreground">The crews</span>
-            <span className="text-[11px] text-muted-foreground">click a crew to edit · new crews start on Haiku 4.5, never a frontier model</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-muted-foreground">new crews start on Haiku 4.5, never a frontier model</span>
+              {crews.length > 0 && (
+                <button
+                  type="button"
+                  aria-expanded={addCrewPromptOpen}
+                  onClick={() => setAddCrewPromptOpen(!addCrewPromptOpen)}
+                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  + Add crew
+                </button>
+              )}
+            </div>
           </div>
+          {addCrewPromptOpen && crews.length > 0 && (
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3" aria-label="Add crew prompt">
+              <p className="text-xs font-medium text-foreground">The new crew starts on Haiku 4.5. Which difficulty does it take over?</p>
+              <div className="mt-3 grid gap-2 grid-cols-2 @xl:grid-cols-5">
+                {DIFFICULTIES.map((difficulty) => {
+                  const currentCrew = crews.find((entry) => entry.id === assign[difficulty]);
+                  const guardMessage = finalDifficultyGuard(difficulty);
+                  return (
+                    <div key={difficulty} className="space-y-1">
+                      <button
+                        type="button"
+                        aria-label={`Assign ${difficulty} to new crew`}
+                        disabled={guardMessage !== null}
+                        title={guardMessage ?? undefined}
+                        onClick={() => createCrew(difficulty)}
+                        className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span className="block font-medium capitalize">{difficulty}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{currentCrew ? crewLabel(currentCrew) : 'unassigned'}</span>
+                      </button>
+                      {guardMessage && <p className="text-[10px] leading-tight text-destructive">{guardMessage}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddCrewPromptOpen(false)}
+                className="mt-3 text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
           {crews.length > 0 ? crews.map((crew) => (
             <CrewRow
               key={crew.id}
@@ -378,8 +440,16 @@ export function TieredExecutionSection({
               onRemove={() => writeCrews(crews.filter((entry) => entry.id !== crew.id), assign)}
             />
           )) : (
-            <div className="px-4 py-3 rounded-lg border border-border/70 text-xs text-muted-foreground">
-              Choose “+ new crew…” on the board to create the first crew.
+            <div className="rounded-lg border border-border/70 px-4 py-3">
+              <p className="text-xs text-muted-foreground">No crews yet — every difficulty needs one before tiered execution can route work.</p>
+              <button
+                type="button"
+                onClick={() => createCrew(null)}
+                className="mt-3 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                + Add crew
+              </button>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">Your first crew takes every difficulty; reassign on the board afterwards.</p>
             </div>
           )}
         </div>
