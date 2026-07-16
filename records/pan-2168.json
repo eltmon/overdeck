@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T06:33:50.440Z",
+  "updated": "2026-07-16T06:35:42.222Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "open-questions-anchor": {
-        "writerId": "agent-pan-2168",
-        "agentId": "agent-pan-2168",
-        "pid": 2410680,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:33:50.440Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2168",
@@ -80,12 +72,27 @@
         "outcome": "completed",
         "reason": "Added sticky reveal request/consume/subscribe signal with listener unsubscribe coverage; focused tests, typecheck, and lint pass",
         "releasedAt": "2026-07-16T06:33:16.102Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 2410680,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:33:50.440Z",
+        "itemId": "open-questions-anchor",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2168 dead)",
+        "releasedAt": "2026-07-16T06:35:42.214Z"
       }
     ],
     "statusReasons": {
       "reveal-signal-module": {
         "reason": "Added sticky reveal request/consume/subscribe signal with listener unsubscribe coverage; focused tests, typecheck, and lint pass",
         "updatedAt": "2026-07-16T06:33:16.102Z"
+      },
+      "open-questions-anchor": {
+        "reason": "stale claim released (agent-pan-2168 dead)",
+        "updatedAt": "2026-07-16T06:35:42.214Z"
       }
     }
   },
@@ -94,6 +101,6 @@
     "reveal-signal-module.reveal-signal-module.ac1": "completed",
     "reveal-signal-module.reveal-signal-module.ac2": "completed",
     "reveal-signal-module.reveal-signal-module.ac3": "completed",
-    "open-questions-anchor": "running"
+    "open-questions-anchor": "pending"
   }
 }
