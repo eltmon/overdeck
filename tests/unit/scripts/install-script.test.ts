@@ -53,6 +53,18 @@ exit 0
 }
 
 describe('install.sh', () => {
+  it('pins checksum-verified jq binaries for common Linux and macOS architectures', async () => {
+    const script = await readFile(installer, 'utf8');
+
+    expect(script).toContain('JQ_VERSION=1.8.1');
+    expect(script).toContain('jq-linux-amd64');
+    expect(script).toContain('jq-linux-arm64');
+    expect(script).toContain('jq-macos-amd64');
+    expect(script).toContain('jq-macos-arm64');
+    expect(script).toContain('checksum verification failed');
+    expect(script).toContain('mv "$JQ_TMP" "$BIN_DIR/jq"');
+  });
+
   it('installs Overdeck into a user-owned prefix without sudo', async () => {
     const result = await fakeInstall(24);
 
