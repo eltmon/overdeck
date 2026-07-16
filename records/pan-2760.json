@@ -97,20 +97,43 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T18:56:03.171Z",
+  "updated": "2026-07-16T18:57:20.030Z",
   "pipeline": {
     "issueId": "PAN-2760",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:56:01.914Z",
+    "updatedAt": "2026-07-16T18:57:19.974Z",
+    "reviewNotes": "[correctness] A new crew collapses into an existing Haiku crew on rerender — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:183`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "lastVerifiedCommit": "78b732233cb0e03b42239f35698a1843ccd25937",
     "reviewRequestedAt": "2026-07-16T18:36:33.187Z",
     "reviewSpawnedAt": "2026-07-16T18:56:01.913Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/security.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/correctness.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/performance.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/requirements.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -158,9 +181,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1855171,
-            "output": 274584,
-            "cacheRead": 34665472,
+            "input": 1862037,
+            "output": 274750,
+            "cacheRead": 34889728,
             "cacheWrite": 0
           }
         }
@@ -173,15 +196,15 @@
           "cacheWrite": 520882
         },
         "openai/gpt-5.6-sol": {
-          "input": 3331756,
-          "output": 387829,
-          "cacheRead": 49019392,
+          "input": 3338622,
+          "output": 387995,
+          "cacheRead": 49243648,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 66.956343,
-        "pricingAsOf": "2026-07-16T18:56:02.001Z"
+        "usd": 67.107781,
+        "pricingAsOf": "2026-07-16T18:57:20.023Z"
       }
     },
     "merges": [
