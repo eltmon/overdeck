@@ -19,6 +19,17 @@ services:
       - devnet
       - overdeck
 
+  # Docker creates named-volume roots as root. Repair ownership on every init so
+  # this also heals volumes created before PAN-2777.
+  init-perms:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    command: chown node:node /workspaces/overdeck/node_modules
+    volumes:
+      - container-node-modules:/workspaces/overdeck/node_modules
+
   # Init service: runs bun install + server build once for all workspaces
   # Frontend and server depend on this completing successfully
   init:
@@ -27,6 +38,9 @@ services:
       dockerfile: Dockerfile
     user: node
     working_dir: /workspaces/overdeck
+    depends_on:
+      init-perms:
+        condition: service_completed_successfully
     environment:
       - NODE_ENV=development
       - HUSKY=0
@@ -51,6 +65,10 @@ services:
       "
     volumes:
       - ../:/workspaces/overdeck:cached
+      # Worktree .git files point into the primary checkout's common metadata.
+      # The dashboard build reads the current commit, so expose that metadata
+      # read-only at the same absolute path used by the worktree pointer.
+      - {{PROJECT_PATH}}/.git:{{PROJECT_PATH}}/.git:ro
       # Shared host-side bun package cache (PAN-1764). Services run as `user: node`
       # (HOME=/home/node) — the old `bun-store:/root/...` named volume was never
       # read, and `docker compose down -v` (workspace rebuild) wiped it anyway.
