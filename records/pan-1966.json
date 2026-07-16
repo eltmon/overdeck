@@ -368,22 +368,45 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T14:29:05.107Z",
+  "updated": "2026-07-16T14:31:18.175Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T14:29:03.807Z",
+    "updatedAt": "2026-07-16T14:31:18.132Z",
+    "reviewNotes": "[correctness] Incomplete GraphQL data is classified as a closed issue — `src/lib/pipeline-membership-gather.ts:86`",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "lastVerifiedCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb",
     "reviewRequestedAt": "2026-07-16T14:24:05.694Z",
-    "reviewSpawnedAt": "2026-07-16T14:29:03.807Z"
+    "reviewSpawnedAt": "2026-07-16T14:29:03.807Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/security.md",
+        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/correctness.md",
+        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
+      },
+      "performance": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/performance.md",
+        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/requirements.md",
+        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -396,9 +419,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 104266268,
-            "output": 197213,
-            "cacheRead": 101510144,
+            "input": 106884723,
+            "output": 211392,
+            "cacheRead": 103874048,
             "cacheWrite": 0
           }
         },
@@ -427,9 +450,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 104266268,
-          "output": 197213,
-          "cacheRead": 101510144,
+          "input": 106884723,
+          "output": 211392,
+          "cacheRead": 103874048,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -446,8 +469,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 78.700889,
-        "pricingAsOf": "2026-07-16T14:29:03.844Z"
+        "usd": 81.580966,
+        "pricingAsOf": "2026-07-16T14:31:18.165Z"
       }
     },
     "merges": [
