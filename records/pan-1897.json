@@ -52,41 +52,23 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T19:40:42.676Z",
+  "updated": "2026-07-16T20:47:37.505Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:40:41.932Z",
+    "updatedAt": "2026-07-16T20:47:37.467Z",
     "reviewNotes": "Degraded sync-main timeout can spawn against a workspace still being mutated",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "reviewRequestedAt": "2026-07-16T19:36:58.340Z",
     "reviewSpawnedAt": "2026-07-16T19:37:06.432Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "d69644fbbb85a687327a570a0739c88d09917acd"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "d69644fbbb85a687327a570a0739c88d09917acd"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "d69644fbbb85a687327a570a0739c88d09917acd"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "d69644fbbb85a687327a570a0739c88d09917acd"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -110,9 +92,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 256271,
-            "output": 9587,
-            "cacheRead": 2736128,
+            "input": 260981,
+            "output": 9781,
+            "cacheRead": 2931712,
             "cacheWrite": 0
           }
         },
@@ -158,9 +140,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1887144,
-            "output": 158946,
-            "cacheRead": 41174528,
+            "input": 3644179,
+            "output": 389004,
+            "cacheRead": 76574720,
             "cacheWrite": 0
           }
         }
@@ -179,9 +161,9 @@
           "cacheWrite": 165841
         },
         "openai/gpt-5.6-sol": {
-          "input": 4082154,
-          "output": 236028,
-          "cacheRead": 51293184,
+          "input": 5843899,
+          "output": 466280,
+          "cacheRead": 86888960,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -192,8 +174,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 61.330714,
-        "pricingAsOf": "2026-07-16T19:40:41.999Z"
+        "usd": 94.844887,
+        "pricingAsOf": "2026-07-16T20:47:37.491Z"
       }
     },
     "merges": [
