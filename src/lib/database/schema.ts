@@ -12,7 +12,6 @@ import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
 export const SCHEMA_VERSION = 61;
-
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
   try {
