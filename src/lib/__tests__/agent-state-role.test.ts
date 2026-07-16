@@ -529,9 +529,11 @@ describe('AgentState role persistence', () => {
     rmSync(workspace, { recursive: true, force: true });
   });
 
-  it('PAN-2017: fails and stops a strike spawn when kickoff delivery fails', async () => {
+  it.each([
+    ['strike', 'strike-pan-2771'],
+    ['work', 'agent-pan-2771'],
+  ] as const)('PAN-2771: fails and stops a %s spawn when kickoff delivery fails', async (role, agentId) => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-strike-kickoff-fail-'));
-    const agentId = 'strike-pan-2017';
     const agentDir = join(tempHome, 'agents', agentId);
     const readyPath = join(agentDir, 'ready.json');
     const fifoPath = join(agentDir, 'rpc.in');
@@ -597,12 +599,12 @@ describe('AgentState role persistence', () => {
     try {
       const { getAgentStateSync, spawnAgent } = await import('../agents.js');
       const spawn = spawnAgent({
-        issueId: 'PAN-2017',
+        issueId: 'PAN-2771',
         workspace,
-        role: 'strike',
+        role,
         harness: 'ohmypi',
         model: 'claude-sonnet-4-6',
-        prompt: 'do the strike',
+        prompt: 'do the work',
       });
 
       await expect(spawn).rejects.toThrow(/kickoff delivery failed/);
@@ -617,7 +619,7 @@ describe('AgentState role persistence', () => {
         lastFailureReason: 'kickoff delivery failed',
       });
       expect(emitActivityEntry).not.toHaveBeenCalledWith(expect.objectContaining({
-        message: 'Work agent started for PAN-2017',
+        message: 'Work agent started for PAN-2771',
       }));
     } finally {
       process.env.HOME = originalHome;
