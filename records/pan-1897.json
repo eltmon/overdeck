@@ -52,18 +52,17 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T20:58:25.182Z",
+  "updated": "2026-07-16T20:59:57.063Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:58:25.160Z",
-    "reviewNotes": "Degraded sync-main timeout can spawn against a workspace still being mutated",
+    "updatedAt": "2026-07-16T20:59:57.020Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "5c805146dafd9378c79a81eba4889b415f9e7eb4",
@@ -140,9 +139,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3671351,
-            "output": 392405,
-            "cacheRead": 78497280,
+            "input": 3729059,
+            "output": 395779,
+            "cacheRead": 80652288,
             "cacheWrite": 0
           }
         }
@@ -161,9 +160,9 @@
           "cacheWrite": 165841
         },
         "openai/gpt-5.6-sol": {
-          "input": 5871071,
-          "output": 469681,
-          "cacheRead": 88811520,
+          "input": 5928779,
+          "output": 473055,
+          "cacheRead": 90966528,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -174,8 +173,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 96.044057,
-        "pricingAsOf": "2026-07-16T20:58:25.168Z"
+        "usd": 97.511321,
+        "pricingAsOf": "2026-07-16T20:59:57.056Z"
       }
     },
     "merges": [
