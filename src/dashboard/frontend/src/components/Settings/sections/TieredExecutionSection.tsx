@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Route } from 'lucide-react';
 import { type Harness, type SettingsConfig, type TieredExecutionConfig } from '../types';
 import type { SaveStatus } from '../hooks/useAutosavePipeline';
@@ -6,7 +6,6 @@ import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import {
   blendedCost,
   crewLabel,
-  deriveTierName,
   DIFFICULTIES,
   importCrews,
   providerDefaultHarness,
@@ -23,6 +22,14 @@ interface TieredExecutionSectionProps {
   saveErrorMessage?: string | null;
   saveStatus?: SaveStatus;
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
+}
+
+interface EditableCrewState {
+  acceptedConfigKeys: readonly string[];
+  persistedCrewConfigKey: string;
+  crews: readonly Crew[];
+  assign: CrewAssignments;
+  rest: CrewRest;
 }
 
 const ITEM_KINDS = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
@@ -60,6 +67,14 @@ function normalizeTieredExecution(
     tiers: { ...(config?.tiers ?? {}) },
     by_kind: config?.by_kind ?? config?.byKind ?? {},
   };
+}
+
+function configKey(config: TieredExecutionConfig): string {
+  return JSON.stringify(config);
+}
+
+function persistedCrewConfigKey(config: TieredExecutionConfig): string {
+  return JSON.stringify({ tiers: config.tiers, by_kind: config.by_kind });
 }
 
 function csvToList(value: string): string[] {
@@ -113,7 +128,20 @@ export function TieredExecutionSection({
 }: TieredExecutionSectionProps) {
   const config = formData.tiered_execution;
   const normalizedConfig = normalizeTieredExecution(config);
-  const { crews, assign, rest } = importCrews(normalizedConfig);
+  const normalizedConfigKey = configKey(normalizedConfig);
+  const normalizedPersistedCrewConfigKey = persistedCrewConfigKey(normalizedConfig);
+  const importedCrewState = importCrews(normalizedConfig);
+  const editableCrewStateRef = useRef<EditableCrewState | null>(null);
+  const cachedCrewState = editableCrewStateRef.current;
+  const editableCrewState = cachedCrewState?.acceptedConfigKeys.includes(normalizedConfigKey)
+    ? cachedCrewState
+    : cachedCrewState?.persistedCrewConfigKey === normalizedPersistedCrewConfigKey
+      ? {
+          ...cachedCrewState,
+          rest: { ...importedCrewState.rest, by_kind: cachedCrewState.rest.by_kind },
+        }
+      : importedCrewState;
+  const { crews, assign, rest } = editableCrewState;
   let outgoingConfig: TieredExecutionConfig = normalizedConfig;
   try {
     outgoingConfig = serializeCrews(crews, assign, rest);
@@ -121,6 +149,9 @@ export function TieredExecutionSection({
     // Keep invalid hand-authored config inspectable; guarded UI actions cannot save this state.
   }
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
+  const [addCrewPromptOpen, setAddCrewPromptOpen] = useState(false);
+  const [removePromptCrewId, setRemovePromptCrewId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<{ crewId: string; message: string } | null>(null);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [kindDraft, setKindDraft] = useState<typeof ITEM_KINDS[number]>('docs');
   const [crewDraft, setCrewDraft] = useState('');
@@ -164,29 +195,103 @@ export function TieredExecutionSection({
   };
 
   const writeCrews = (nextCrews: readonly Crew[], nextAssign: CrewAssignments, nextRest: CrewRest = rest) => {
-    updateTieredExecution(serializeCrews(nextCrews, nextAssign, nextRest));
+    const nextConfig = serializeCrews(nextCrews, nextAssign, nextRest);
+    const normalizedNextConfig = normalizeTieredExecution(nextConfig);
+    editableCrewStateRef.current = {
+      acceptedConfigKeys: [normalizedConfigKey, configKey(normalizedNextConfig)],
+      persistedCrewConfigKey: persistedCrewConfigKey(normalizedNextConfig),
+      crews: [...nextCrews],
+      assign: { ...nextAssign },
+      rest: nextRest,
+    };
+    updateTieredExecution(nextConfig);
+  };
+
+  const finalDifficultyGuard = (difficulty: typeof DIFFICULTIES[number]): string | null => {
+    const currentCrewId = assign[difficulty];
+    const currentCrewDifficulties = DIFFICULTIES.filter((entry) => assign[entry] === currentCrewId);
+    const currentCrewKinds = Object.entries(byKind).filter(([, id]) => id === currentCrewId).map(([kind]) => kind);
+    if (currentCrewDifficulties.length === 1 && currentCrewKinds.length > 0) {
+      return `Move or remove ${currentCrewKinds.join(', ')} kind overrides before reassigning this crew's final difficulty.`;
+    }
+    return null;
+  };
+
+  const createCrew = (difficulty: typeof DIFFICULTIES[number] | null) => {
+    const id = `crew-${crypto.randomUUID()}`;
+    const crew: Crew = { id, model: DEFAULT_MODEL, harness: 'claude-code' };
+    const nextAssign = difficulty === null || crews.length === 0
+      ? Object.fromEntries(DIFFICULTIES.map((entry) => [entry, id])) as CrewAssignments
+      : { ...assign, [difficulty]: id };
+    const nextRest: CrewRest = rest.supervisor ? rest : {
+      ...rest,
+      supervisor: {
+        model: DEFAULT_SUPERVISOR_MODEL,
+        harness: 'claude-code',
+        subscribe: 'flagged',
+        owns_inspection: true,
+      },
+    };
+    setAssignmentError(null);
+    setAddCrewPromptOpen(false);
+    setOpenCrewId(id);
+    writeCrews([...crews, crew], nextAssign, nextRest);
   };
 
   const handleAssignment = (difficulty: typeof DIFFICULTIES[number], crewId: string) => {
     const currentCrewId = assign[difficulty];
-    const currentCrewDifficulties = DIFFICULTIES.filter((entry) => assign[entry] === currentCrewId);
-    const currentCrewKinds = Object.entries(byKind).filter(([, id]) => id === currentCrewId).map(([kind]) => kind);
-    if (crewId !== currentCrewId && currentCrewDifficulties.length === 1 && currentCrewKinds.length > 0) {
-      setAssignmentError(`Move or remove ${currentCrewKinds.join(', ')} kind overrides before reassigning this crew's final difficulty.`);
+    const guardMessage = crewId === currentCrewId ? null : finalDifficultyGuard(difficulty);
+    if (guardMessage) {
+      setAssignmentError(guardMessage);
       return;
     }
     setAssignmentError(null);
-    if (crewId !== 'new') {
-      writeCrews(crews, { ...assign, [difficulty]: crewId });
+    if (crewId === 'new') {
+      createCrew(difficulty);
       return;
     }
-    const id = `crew-${crypto.randomUUID()}`;
-    const crew: Crew = { id, model: DEFAULT_MODEL, harness: 'claude-code' };
-    const nextAssign = crews.length === 0
-      ? Object.fromEntries(DIFFICULTIES.map((entry) => [entry, id])) as CrewAssignments
-      : { ...assign, [difficulty]: id };
-    setOpenCrewId(deriveTierName(DIFFICULTIES.filter((entry) => nextAssign[entry] === id)));
-    writeCrews([...crews, crew], nextAssign);
+    writeCrews(crews, { ...assign, [difficulty]: crewId });
+  };
+
+  const handleRequestRemove = (crewId: string) => {
+    const ownedKinds = Object.entries(byKind).filter(([, id]) => id === crewId).map(([kind]) => kind);
+    if (ownedKinds.length > 0) {
+      setRemovePromptCrewId(null);
+      setRemoveError({ crewId, message: 'Move or remove these kind overrides before removing this crew.' });
+      return;
+    }
+    if (crews.length === 1) {
+      setRemovePromptCrewId(null);
+      setRemoveError({ crewId, message: 'This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.' });
+      return;
+    }
+    const ownedDifficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crewId);
+    if (ownedDifficulties.length > 0) {
+      setRemoveError(null);
+      setRemovePromptCrewId(crewId);
+      return;
+    }
+    setRemoveError(null);
+    setRemovePromptCrewId(null);
+    writeCrews(crews.filter((crew) => crew.id !== crewId), assign);
+  };
+
+  const handleRemoveWithHeir = (crewId: string, heirId: string) => {
+    const ownedKinds = Object.entries(byKind).filter(([, id]) => id === crewId).map(([kind]) => kind);
+    if (ownedKinds.length > 0) {
+      setRemovePromptCrewId(null);
+      setRemoveError({ crewId, message: 'Move or remove these kind overrides before removing this crew.' });
+      return;
+    }
+
+    const nextAssign = { ...assign };
+    for (const difficulty of DIFFICULTIES) {
+      if (nextAssign[difficulty] === crewId) nextAssign[difficulty] = heirId;
+    }
+    setRemoveError(null);
+    setRemovePromptCrewId(null);
+    if (openCrewId === crewId) setOpenCrewId(null);
+    writeCrews(crews.filter((crew) => crew.id !== crewId), nextAssign);
   };
 
   const handleSupervisorPatch = (patch: Partial<NonNullable<TieredExecutionConfig['supervisor']>>) => {
@@ -363,23 +468,112 @@ export function TieredExecutionSection({
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm font-medium text-foreground">The crews</span>
-            <span className="text-[11px] text-muted-foreground">click a crew to edit · new crews start on Haiku 4.5, never a frontier model</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-muted-foreground">new crews start on Haiku 4.5, never a frontier model</span>
+              {crews.length > 0 && (
+                <button
+                  type="button"
+                  aria-expanded={addCrewPromptOpen}
+                  onClick={() => setAddCrewPromptOpen(!addCrewPromptOpen)}
+                  className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  + Add crew
+                </button>
+              )}
+            </div>
           </div>
-          {crews.length > 0 ? crews.map((crew) => (
-            <CrewRow
-              key={crew.id}
-              crew={crew}
-              owned={DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id)}
-              ownedKinds={Object.entries(byKind).filter(([, crewId]) => crewId === crew.id).map(([kind]) => kind)}
-              settings={formData}
-              open={openCrewId === crew.id}
-              onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
-              onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
-              onRemove={() => writeCrews(crews.filter((entry) => entry.id !== crew.id), assign)}
-            />
-          )) : (
-            <div className="px-4 py-3 rounded-lg border border-border/70 text-xs text-muted-foreground">
-              Choose “+ new crew…” on the board to create the first crew.
+          {addCrewPromptOpen && crews.length > 0 && (
+            <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3" aria-label="Add crew prompt">
+              <p className="text-xs font-medium text-foreground">The new crew starts on Haiku 4.5. Which difficulty does it take over?</p>
+              <div className="mt-3 grid gap-2 grid-cols-2 @xl:grid-cols-5">
+                {DIFFICULTIES.map((difficulty) => {
+                  const currentCrew = crews.find((entry) => entry.id === assign[difficulty]);
+                  const guardMessage = finalDifficultyGuard(difficulty);
+                  return (
+                    <div key={difficulty} className="space-y-1">
+                      <button
+                        type="button"
+                        aria-label={`Assign ${difficulty} to new crew`}
+                        disabled={guardMessage !== null}
+                        title={guardMessage ?? undefined}
+                        onClick={() => createCrew(difficulty)}
+                        className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <span className="block font-medium capitalize">{difficulty}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{currentCrew ? `now ${crewLabel(currentCrew)}` : 'unassigned'}</span>
+                      </button>
+                      {guardMessage && <p className="text-[10px] leading-tight text-destructive">{guardMessage}</p>}
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddCrewPromptOpen(false)}
+                className="mt-3 text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+          {crews.length > 0 ? crews.map((crew) => {
+            const ownedDifficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id);
+            const otherCrews = crews.filter((entry) => entry.id !== crew.id);
+            return <Fragment key={crew.id}>
+              <CrewRow
+                crew={crew}
+                owned={ownedDifficulties}
+                ownedKinds={Object.entries(byKind).filter(([, crewId]) => crewId === crew.id).map(([kind]) => kind)}
+                settings={formData}
+                open={openCrewId === crew.id}
+                onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
+                onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
+                onRequestRemove={() => handleRequestRemove(crew.id)}
+              />
+              {removeError?.crewId === crew.id && (
+                <p className="px-4 text-xs text-destructive">{removeError.message}</p>
+              )}
+              {removePromptCrewId === crew.id && (
+                <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
+                  <p className="text-xs font-medium text-foreground">
+                    Removing {crewLabel(crew)} — give {ownedDifficulties.join(' · ')} to:
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {otherCrews.map((heir) => {
+                      const cost = blendedCost(heir);
+                      return <button
+                        key={heir.id}
+                        type="button"
+                        aria-label={`Give ${ownedDifficulties.join(' · ')} to ${crewLabel(heir)}`}
+                        onClick={() => handleRemoveWithHeir(crew.id, heir.id)}
+                        className="rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span className="block font-medium">{crewLabel(heir)}</span>
+                        <span className="mt-0.5 block text-[11px] text-muted-foreground">{cost == null ? 'cost unknown' : `≈ $${cost.toFixed(1)}/1M`}</span>
+                      </button>;
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRemovePromptCrewId(null)}
+                    className="mt-3 text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </Fragment>;
+          }) : (
+            <div className="rounded-lg border border-border/70 px-4 py-3">
+              <p className="text-xs text-muted-foreground">No crews yet — every difficulty needs one before tiered execution can route work.</p>
+              <button
+                type="button"
+                onClick={() => createCrew(null)}
+                className="mt-3 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                + Add crew
+              </button>
+              <p className="mt-1.5 text-[11px] text-muted-foreground">Your first crew takes every difficulty; reassign on the board afterwards.</p>
             </div>
           )}
         </div>
