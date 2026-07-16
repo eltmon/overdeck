@@ -25,17 +25,18 @@
   ],
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T08:33:07.542Z",
+  "updated": "2026-07-16T08:34:59.422Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T08:33:07.376Z",
+    "updatedAt": "2026-07-16T08:34:59.379Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2786",
+    "lastVerifiedCommit": "f78263ef7ac3a220851c06e84b0d8547a4ee7522",
     "reviewRequestedAt": "2026-07-16T08:33:04.850Z",
     "reviewSpawnedAt": "2026-07-16T08:33:07.374Z"
   },
@@ -50,9 +51,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 22196957,
-            "output": 23355,
-            "cacheRead": 21462528,
+            "input": 23646347,
+            "output": 31453,
+            "cacheRead": 22694144,
             "cacheWrite": 0
           }
         },
@@ -81,9 +82,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 22196957,
-          "output": 23355,
-          "cacheRead": 21462528,
+          "input": 23646347,
+          "output": 31453,
+          "cacheRead": 22694144,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -100,8 +101,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 26.844696,
-        "pricingAsOf": "2026-07-16T08:33:07.493Z"
+        "usd": 28.792314,
+        "pricingAsOf": "2026-07-16T08:34:59.415Z"
       }
     },
     "merges": [
