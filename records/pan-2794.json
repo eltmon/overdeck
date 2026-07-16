@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T18:15:11.300Z",
-  "updated": "2026-07-16T20:11:43.128Z",
+  "updated": "2026-07-16T20:12:11.915Z",
   "pipeline": {
     "issueId": "PAN-2794",
     "reviewStatus": "pending",
@@ -12,11 +12,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:11:42.876Z",
+    "updatedAt": "2026-07-16T20:12:11.844Z",
+    "mergeNotes": "Strike merge trigger is not registered",
     "strikeReadyHead": "3d265b08c31035e4ebff6bdf4a69ca8885a4d4bf",
     "strikeReadyAt": "2026-07-16T20:02:33.509Z",
-    "strikeLandingState": "ready",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-16T18:52:10.706Z",
@@ -29,6 +30,13 @@
         "timestamp": "2026-07-16T19:43:33.181Z",
         "strikeHead": "1ca49892bfda43daf847ffe46b8a9bebdb0e01e5",
         "mainHead": "ec483d94c24fc8a76d27e7ee7e170926d741dd8f",
+        "outcome": "failed",
+        "detail": "Strike merge trigger is not registered"
+      },
+      {
+        "timestamp": "2026-07-16T20:12:11.843Z",
+        "strikeHead": "3d265b08c31035e4ebff6bdf4a69ca8885a4d4bf",
+        "mainHead": "c11346c335438b587bf748e7f28c68ad644d42b7",
         "outcome": "failed",
         "detail": "Strike merge trigger is not registered"
       }
@@ -56,7 +64,7 @@
       },
       "costAtCloseOut": {
         "usd": 34.897723,
-        "pricingAsOf": "2026-07-16T20:11:42.990Z"
+        "pricingAsOf": "2026-07-16T20:12:11.886Z"
       }
     },
     "merges": [],
