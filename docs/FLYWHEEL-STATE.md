@@ -5412,3 +5412,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Session merge tally: PAN-1987, 2772, 2760, 2619 (4).** All fresh-verified against exact feature code, all GitHub CI green.
 - **CLOSE-OUT OWED (DoD):** 1987, 2772, 2760, 2619 all need post-merge verify-on-main + deploy + teardown. Batch after main CI settles.
 - Still driving: 1897, 1966 (stale review→re-trigger), 2045, 2773 — reviews synthesizing. Harness now claude-code for new spawns; watch first claude-code convoy for stalls.
+
+## Tick 67 — 2026-07-16 ~18:10 — PAN-2773 merged (6 total); 2045 rebase handed to work agent
+- **PAN-2773 MERGED → 3ac755abc0** — CLEAN, FRESH APPROVED (run c9ec5767==head), all CI green. Session tally: 1987, 2772, 2760, 2619, 2773 = 5 merged. (Correction to header: 5, not 6.)
+- **PAN-2045**: FRESH APPROVED but went DIRTY after 2773 moved main — real code conflict in ChatMarkdown.test.tsx (main hardened the test with an explicit findByRole await; 2045 had the old waitFor-only form). Resolution = take main's superset (drops the hunk out of the feature diff, so APPROVED verdict holds).
+- **OPERATIONAL LESSON (persist):** the flywheel-orchestrator PRE-COMMIT guard (`guard-flywheel-orchestrator-commit.sh`) blocks the flywheel from committing code — a merge-conflict resolution commit is NOT exempt (the merge also staged .beads/). So the flywheel CANNOT hand-resolve a work agent's merge conflict. Correct path: abort the manual merge (recoverable), and hand the DIRTY branch back to its WORK agent to rebase+resolve+push (work agents pass the guard).
+- **Session-drift caveat:** `pan resume` REFUSED 2045 (codex→claude-code session drift, rotation disabled PAN-1980). Must `pan start --fresh` for a new claude-code session, then `pan tell` the precise minimal rebase task so it doesn't re-litigate the whole approved issue. 2045 fresh agent alive on claude-code+gpt-5.6-sol, told to rebase+resolve(keep main's block)+push only.
+- 1966 claude-code canary convoy HEALTHY (2/4 sub-reviews written, progressing, no stall).
