@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T18:54:19.602Z",
+  "updated": "2026-07-16T18:58:05.783Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -76,8 +76,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "docs-project-rename": {
+        "writerId": "agent-pan-1987",
+        "agentId": "agent-pan-1987",
+        "pid": 1681202,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:58:05.783Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1987",
@@ -162,6 +170,7 @@
     "ui-rename-tree-row.ui-rename-tree-row.ac1": "completed",
     "ui-rename-tree-row.ui-rename-tree-row.ac2": "completed",
     "ui-rename-tree-row.ui-rename-tree-row.ac3": "completed",
-    "ui-rename-tree-row.ui-rename-tree-row.ac4": "completed"
+    "ui-rename-tree-row.ui-rename-tree-row.ac4": "completed",
+    "docs-project-rename": "running"
   }
 }
