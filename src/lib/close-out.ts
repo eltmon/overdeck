@@ -6,7 +6,7 @@
  */
 
 import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from 'fs';
-import { join, dirname } from 'path';
+import { basename, join, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -33,7 +33,7 @@ const execAsync = promisify(exec);
 
 export function buildPendingMailboxCloseOutComment(items: MailboxItem[]): string {
   const details = items.map(item =>
-    `- ${item.source}: ${item.summary} (${item.createdAt}) — ${item.filePath}`).join('\n');
+    `- ${item.source}: ${item.summary} (${item.createdAt}) — .pan/feedback/${basename(item.filePath)}`).join('\n');
   return `During close-out the system identified ${items.length} undelivered message(s):\n\n${details}\n\nThese were never delivered to a working agent. If this issue is reopened: treat them as likely stale — but consider whether an uncaught message contributed to a premature closure. Do not treat them as current instructions.`;
 }
 

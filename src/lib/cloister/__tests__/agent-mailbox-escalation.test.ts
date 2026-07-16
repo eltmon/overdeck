@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MailboxItem } from '../agent-mailbox.js';
-import { patrolPendingMailboxEscalations, type MailboxEscalationDeps } from '../agent-mailbox-escalation.js';
+import {
+  listMailboxEscalationWorkspaces,
+  patrolPendingMailboxEscalations,
+  type MailboxEscalationDeps,
+} from '../agent-mailbox-escalation.js';
 
 describe('mailbox escalation policy window', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -13,6 +17,19 @@ describe('mailbox escalation policy window', () => {
       legacy: false, markdownBody: '# Review',
     };
   }
+
+  it('discovers stopped and completed work-agent workspaces for escalation', () => {
+    const states = [
+      { role: 'work', status: 'stopped', issueId: 'PAN-2255', workspace: '/stopped' },
+      { role: 'work', status: 'completed', issueId: 'PAN-2256', workspace: '/completed' },
+      { role: 'review', status: 'stopped', issueId: 'PAN-2257', workspace: '/review' },
+    ] as Parameters<typeof listMailboxEscalationWorkspaces>[0];
+
+    expect(listMailboxEscalationWorkspaces(states)).toEqual([
+      { issueId: 'PAN-2255', workspacePath: '/stopped' },
+      { issueId: 'PAN-2256', workspacePath: '/completed' },
+    ]);
+  });
 
   it('waits one patrol cycle, skips escalation after resume, and escalates once without a target', async () => {
     vi.setSystemTime(new Date('2026-07-16T12:00:00Z'));

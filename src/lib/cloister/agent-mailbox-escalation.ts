@@ -8,6 +8,14 @@ interface MailboxWorkspace {
   workspacePath: string;
 }
 
+type MailboxAgentState = ReturnType<typeof listAgentStates>[number];
+
+export function listMailboxEscalationWorkspaces(states: MailboxAgentState[]): MailboxWorkspace[] {
+  return states
+    .filter(state => state.role === 'work' && Boolean(state.issueId && state.workspace))
+    .map(state => ({ issueId: state.issueId, workspacePath: state.workspace }));
+}
+
 export interface MailboxEscalationDeps {
   listWorkspaces: () => MailboxWorkspace[];
   listItems: (issueId: string, workspacePath: string) => Promise<MailboxItem[]>;
@@ -17,11 +25,7 @@ export interface MailboxEscalationDeps {
 }
 
 const defaultDeps: MailboxEscalationDeps = {
-  listWorkspaces: () => listAgentStates()
-    .filter(state => state.role === 'work'
-      && Boolean(state.issueId && state.workspace)
-      && ['starting', 'running'].includes(state.status))
-    .map(state => ({ issueId: state.issueId, workspacePath: state.workspace })),
+  listWorkspaces: () => listMailboxEscalationWorkspaces(listAgentStates()),
   listItems: (issueId, workspacePath) => listMailboxItems({ issueId, role: 'work', workspacePath }),
   resolveTarget: resolveIssueFeedbackTarget,
   alreadyEscalated: issueId => getReviewStatusSync(issueId)?.stuckReason === 'feedback_delivery_needs_you',
@@ -52,8 +56,8 @@ export async function patrolPendingMailboxEscalations(options: {
     while (nextIndex < workspaces.length) {
       const workspace = workspaces[nextIndex++];
       const issueId = workspace.issueId.toUpperCase();
-    const overdue = (await deps.listItems(issueId, workspace.workspacePath)).find(item =>
-      item.state === 'pending' && item.actionRequired && now - Date.parse(item.createdAt) >= options.policyWindowMs);
+      const overdue = (await deps.listItems(issueId, workspace.workspacePath)).find(item =>
+        item.state === 'pending' && item.actionRequired && now - Date.parse(item.createdAt) >= options.policyWindowMs);
       if (!overdue) continue;
 
       const target = await deps.resolveTarget(issueId);

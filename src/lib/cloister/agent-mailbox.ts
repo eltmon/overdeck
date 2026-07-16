@@ -3,12 +3,11 @@
  * The YAML frontmatter is the mailbox envelope; the markdown body remains the message.
  */
 
-import { readFile, rename, writeFile } from 'fs/promises';
+import { readFile, readdir, rename, stat, writeFile } from 'fs/promises';
 import { isAbsolute, join } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
-import { getWorkspacePanPaths, readFeedback } from '../pan-dir/index.js';
+import { getReadableWorkspacePanPaths, getWorkspacePanPaths } from '../pan-dir/index.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { Effect } from 'effect';
 import { readMailboxActionStatus, type MailboxActionStatus } from './mailbox-status-source.js';
 
 export type MailboxRole = 'work';
@@ -60,6 +59,20 @@ export interface PreparedWorkMailbox {
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/;
 const NUMBERED_FEEDBACK = /^\d{3}-(.+)\.md$/;
 const transitionQueues = new Map<string, Promise<void>>();
+const mailboxReadCache = new Map<string, {
+  mtimeMs: number;
+  size: number;
+  content: string;
+  parsed: ReturnType<typeof parseMailboxMarkdown>;
+}>();
+const MAILBOX_FILE_READ_CONCURRENCY = 8;
+
+interface MailboxFeedbackFile {
+  filename: string;
+  path: string;
+  content: string;
+  parsed: ReturnType<typeof parseMailboxMarkdown>;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -145,16 +158,56 @@ function legacyRequiresAction(source: string, status: MailboxActionStatus | null
   return false;
 }
 
+async function readMailboxFeedback(workspacePath: string): Promise<MailboxFeedbackFile[]> {
+  const feedbackDir = getReadableWorkspacePanPaths(workspacePath).feedbackDir;
+  let filenames: string[];
+  try {
+    filenames = (await readdir(feedbackDir, { withFileTypes: true }))
+      .filter(entry => entry.isFile() && NUMBERED_FEEDBACK.test(entry.name))
+      .map(entry => entry.name)
+      .sort();
+  } catch {
+    return [];
+  }
+
+  const livePaths = new Set(filenames.map(filename => join(feedbackDir, filename)));
+  for (const path of mailboxReadCache.keys()) {
+    if (path.startsWith(`${feedbackDir}/`) && !livePaths.has(path)) mailboxReadCache.delete(path);
+  }
+
+  const results = new Array<MailboxFeedbackFile>(filenames.length);
+  let nextIndex = 0;
+  async function readNext(): Promise<void> {
+    while (nextIndex < filenames.length) {
+      const index = nextIndex++;
+      const filename = filenames[index];
+      const path = join(feedbackDir, filename);
+      const fileStat = await stat(path);
+      let cached = mailboxReadCache.get(path);
+      if (!cached || cached.mtimeMs !== fileStat.mtimeMs || cached.size !== fileStat.size) {
+        const content = await readFile(path, 'utf8');
+        cached = { mtimeMs: fileStat.mtimeMs, size: fileStat.size, content, parsed: parseMailboxMarkdown(content) };
+        mailboxReadCache.set(path, cached);
+      }
+      results[index] = { filename, path, content: cached.content, parsed: cached.parsed };
+    }
+  }
+  await Promise.all(Array.from(
+    { length: Math.min(MAILBOX_FILE_READ_CONCURRENCY, filenames.length) },
+    () => readNext(),
+  ));
+  return results;
+}
+
 export async function listMailboxItems(options: MailboxAddress): Promise<MailboxItem[]> {
   const workspacePath = resolveWorkspacePath(options);
   if (!workspacePath) return [];
-  const files = await Effect.runPromise(readFeedback(workspacePath));
+  const files = await readMailboxFeedback(workspacePath);
   let legacyStatus: MailboxActionStatus | null | undefined;
   const items: MailboxItem[] = [];
 
   for (const file of files) {
-    if (!NUMBERED_FEEDBACK.test(file.filename)) continue;
-    const parsed = parseMailboxMarkdown(file.content);
+    const parsed = file.parsed;
     if (parsed.metadata) {
       if (parsed.metadata.issueId.toUpperCase() !== options.issueId.toUpperCase() || parsed.metadata.role !== options.role) continue;
       items.push({ ...parsed.metadata, filePath: file.path, legacy: false, markdownBody: parsed.markdownBody });

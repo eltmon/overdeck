@@ -241,6 +241,8 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     expect(body).toContain('During close-out the system identified 2 undelivered message(s)');
     expect(body).toContain('Fix $(touch /tmp/pwned) and `whoami`');
     expect(body).toContain('treat them as likely stale');
+    expect(body).toContain('.pan/feedback/001-review.md');
+    expect(body).not.toContain(workspacePath);
     const removalCall = mocks.exec.mock.calls.findIndex(call => String(call[0]).startsWith('git worktree remove'));
     expect(removalCall).toBeGreaterThanOrEqual(0);
     expect(mocks.trackerAddComment.mock.invocationCallOrder[0]).toBeLessThan(
