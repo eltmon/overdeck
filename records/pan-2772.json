@@ -10,8 +10,54 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/reload.test.ts",
+      "src/cli/commands/__tests__/restart-agent-gate.test.ts",
+      "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+      "src/lib/deploy/deploy-window.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "src/cli/commands/reload.ts",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/XTerminal.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
+      "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/ws-terminal.ts",
+      "src/lib/deploy/agent-restart-gate.ts",
+      "sync-sources/skills/pan-reload/SKILL.md",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
+      "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "src/cli/commands/__tests__/reload.test.ts",
+      "src/cli/commands/__tests__/restart-agent-gate.test.ts",
+      "src/cli/commands/reload.ts",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+      "src/dashboard/frontend/src/components/XTerminal.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
+      "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/ws-terminal.ts",
+      "src/lib/deploy/agent-restart-gate.ts",
+      "src/lib/deploy/deploy-window.ts",
+      "sync-sources/skills/pan-reload/SKILL.md",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
+      "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+    ],
+    "recordedAt": "2026-07-16T19:18:10.850Z"
+  },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T19:18:10.851Z",
+  "updated": "2026-07-16T19:18:13.888Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -20,7 +66,55 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T17:38:36.477Z",
+    "updatedAt": "2026-07-16T19:18:13.748Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2801",
+    "reviewRequestedAt": "2026-07-16T19:18:13.747Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/cli/commands/__tests__/reload.test.ts",
+        "src/cli/commands/__tests__/restart-agent-gate.test.ts",
+        "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+        "src/lib/deploy/deploy-window.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "CLAUDE.md",
+        "src/cli/commands/reload.ts",
+        "src/cli/commands/restart.ts",
+        "src/cli/index.ts",
+        "src/dashboard/frontend/src/components/XTerminal.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
+        "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/ws-terminal.ts",
+        "src/lib/deploy/agent-restart-gate.ts",
+        "sync-sources/skills/pan-reload/SKILL.md",
+        "sync-sources/skills/pan-restart/SKILL.md",
+        "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
+        "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+      ],
+      "actualChangedFiles": [
+        "CLAUDE.md",
+        "src/cli/commands/__tests__/reload.test.ts",
+        "src/cli/commands/__tests__/restart-agent-gate.test.ts",
+        "src/cli/commands/reload.ts",
+        "src/cli/commands/restart.ts",
+        "src/cli/index.ts",
+        "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+        "src/dashboard/frontend/src/components/XTerminal.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
+        "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
+        "src/dashboard/server/main.ts",
+        "src/dashboard/server/ws-terminal.ts",
+        "src/lib/deploy/agent-restart-gate.ts",
+        "src/lib/deploy/deploy-window.ts",
+        "sync-sources/skills/pan-reload/SKILL.md",
+        "sync-sources/skills/pan-restart/SKILL.md",
+        "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
+        "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+      ],
+      "recordedAt": "2026-07-16T19:18:10.850Z"
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -33,6 +127,14 @@
             "cacheRead": 3823931,
             "cacheWrite": 167646
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 2091135,
+            "output": 158724,
+            "cacheRead": 53021184,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -41,14 +143,22 @@
           "output": 42778,
           "cacheRead": 3823931,
           "cacheWrite": 167646
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 2091135,
+          "output": 158724,
+          "cacheRead": 53021184,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.088679,
-        "pricingAsOf": "2026-07-16T17:38:36.540Z"
+        "usd": 49.816666,
+        "pricingAsOf": "2026-07-16T19:18:13.806Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2801"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -219,51 +329,5 @@
     "docs-terminal-reconnect": "completed",
     "docs-terminal-reconnect.docs-terminal-reconnect.ac1": "completed",
     "docs-terminal-reconnect.docs-terminal-reconnect.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/cli/commands/__tests__/reload.test.ts",
-      "src/cli/commands/__tests__/restart-agent-gate.test.ts",
-      "src/dashboard/frontend/src/components/XTerminal.test.tsx",
-      "src/lib/deploy/deploy-window.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "CLAUDE.md",
-      "src/cli/commands/reload.ts",
-      "src/cli/commands/restart.ts",
-      "src/cli/index.ts",
-      "src/dashboard/frontend/src/components/XTerminal.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
-      "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/ws-terminal.ts",
-      "src/lib/deploy/agent-restart-gate.ts",
-      "sync-sources/skills/pan-reload/SKILL.md",
-      "sync-sources/skills/pan-restart/SKILL.md",
-      "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
-      "tests/unit/lib/deploy/agent-restart-gate.test.ts"
-    ],
-    "actualChangedFiles": [
-      "CLAUDE.md",
-      "src/cli/commands/__tests__/reload.test.ts",
-      "src/cli/commands/__tests__/restart-agent-gate.test.ts",
-      "src/cli/commands/reload.ts",
-      "src/cli/commands/restart.ts",
-      "src/cli/index.ts",
-      "src/dashboard/frontend/src/components/XTerminal.test.tsx",
-      "src/dashboard/frontend/src/components/XTerminal.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
-      "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/ws-terminal.ts",
-      "src/lib/deploy/agent-restart-gate.ts",
-      "src/lib/deploy/deploy-window.ts",
-      "sync-sources/skills/pan-reload/SKILL.md",
-      "sync-sources/skills/pan-restart/SKILL.md",
-      "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
-      "tests/unit/lib/deploy/agent-restart-gate.test.ts"
-    ],
-    "recordedAt": "2026-07-16T19:18:10.850Z"
   }
 }
