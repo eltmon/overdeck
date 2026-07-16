@@ -308,6 +308,95 @@ describe('applyEvent — agent.status_changed', () => {
     })
     expect(next.turnDiffSummariesByAgentId['agent-1']).toBeUndefined()
   })
+
+  // PAN-2633 — pending-input wipe must be gated on tmux liveness for idle-alive agents.
+  const agentWithPendingInput: AgentSnapshot = {
+    ...baseAgent,
+    hasPendingQuestion: true,
+    pendingQuestionCount: 1,
+    pendingQuestionPrompt: 'Approve this plan?',
+    pendingQuestionReason: 'plan-approval',
+    pendingInputCount: 2,
+    pendingInputKinds: ['auq', 'plan'],
+    pendingAskUserQuestion: { question: 'Approve this plan?', options: [{ label: 'Yes', value: 'yes' }] } as any,
+    pendingProposedPlan: { planId: 'plan-1', title: 'Plan' } as any,
+  }
+
+  it('preserves pending-input fields on stopped status when tmux session is live', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'stopped', hasLiveTmuxSession: true },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBe(true)
+    expect(agent.pendingQuestionCount).toBe(1)
+    expect(agent.pendingQuestionPrompt).toBe('Approve this plan?')
+    expect(agent.pendingQuestionReason).toBe('plan-approval')
+    expect(agent.pendingInputCount).toBe(2)
+    expect(agent.pendingInputKinds).toEqual(['auq', 'plan'])
+    expect(agent.pendingAskUserQuestion).toEqual(agentWithPendingInput.pendingAskUserQuestion)
+    expect(agent.pendingProposedPlan).toEqual(agentWithPendingInput.pendingProposedPlan)
+  })
+
+  it('deletes pending-input fields on stopped status when tmux session is not live', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'stopped', hasLiveTmuxSession: false },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBeUndefined()
+    expect(agent.pendingQuestionCount).toBeUndefined()
+    expect(agent.pendingQuestionPrompt).toBeUndefined()
+    expect(agent.pendingQuestionReason).toBeUndefined()
+    expect(agent.pendingInputCount).toBeUndefined()
+    expect(agent.pendingInputKinds).toBeUndefined()
+    expect(agent.pendingAskUserQuestion).toBeUndefined()
+    expect(agent.pendingProposedPlan).toBeUndefined()
+  })
+
+  it('deletes pending-input fields on stopped status when hasLiveTmuxSession is absent', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'stopped' },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBeUndefined()
+    expect(agent.pendingQuestionCount).toBeUndefined()
+    expect(agent.pendingQuestionPrompt).toBeUndefined()
+    expect(agent.pendingQuestionReason).toBeUndefined()
+    expect(agent.pendingInputCount).toBeUndefined()
+    expect(agent.pendingInputKinds).toBeUndefined()
+    expect(agent.pendingAskUserQuestion).toBeUndefined()
+    expect(agent.pendingProposedPlan).toBeUndefined()
+  })
+
+  it('preserves pending-input fields while running regardless of hasLiveTmuxSession', () => {
+    const state = makeState({ agentsById: { 'agent-1': agentWithPendingInput } })
+    const next = applyEvent(state, {
+      type: 'agent.status_changed',
+      sequence: 5,
+      timestamp: ts(),
+      payload: { agentId: 'agent-1', status: 'running', hasLiveTmuxSession: false },
+    })
+    const agent = next.agentsById['agent-1']!
+    expect(agent.hasPendingQuestion).toBe(true)
+    expect(agent.pendingQuestionCount).toBe(1)
+    expect(agent.pendingQuestionPrompt).toBe('Approve this plan?')
+    expect(agent.pendingQuestionReason).toBe('plan-approval')
+    expect(agent.pendingInputCount).toBe(2)
+    expect(agent.pendingInputKinds).toEqual(['auq', 'plan'])
+    expect(agent.pendingAskUserQuestion).toEqual(agentWithPendingInput.pendingAskUserQuestion)
+    expect(agent.pendingProposedPlan).toEqual(agentWithPendingInput.pendingProposedPlan)
+  })
 })
 
 describe('applyEvent — agent.turn_diff_completed', () => {
