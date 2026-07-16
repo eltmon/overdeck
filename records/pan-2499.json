@@ -21,33 +21,33 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:11:18.666Z",
+  "updated": "2026-07-16T00:14:07.531Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T00:11:18.624Z",
-    "inspectNotes": "Inspection error for bead issue-view-wrapper: tmux session inspect-pan-2499-issue-view-wrapper exited before producing a verdict. No verdict was produced."
+    "updatedAt": "2026-07-16T00:14:07.455Z",
+    "inspectNotes": "Both prior blockers are fixed. (1) IssueView.tsx now types IssueViewProps as Omit<HTMLAttributes<HTMLDivElement>,'children'> and spreads ...rootProps onto the root div (data-component defaults to 'issue-view' but is overridable) — FeatureItem's data-component/data-issue-id now actually reach the DOM, and a new render+dispatchEvent test in IssueView.test.tsx verifies both the attribute and an onClick handler forward correctly. (2) The FR-0 gate is now real: densitySections.ts is hand-authored per density instead of self-deriving from ISSUE_VIEW_INVENTORY, IssueView.tsx no longer emits hidden decoy spans, and dozens of real production elements (ReviewGroup, Badges, MergeButton, ResourceStrip, SessionNode, AgentsLane, CrewStage, HappenedFeed, StatusNarrative, IssueMissionControl tabs, IssueDrawer panels, etc.) now carry genuine data-section markers verified in source. New tests in IssueMissionControl.test.tsx and IssueDrawer.test.tsx render the real shells and assert data-section presence in the DOM, not just the static map against itself. AC5: verified directly — FeatureItem.tsx is 1366 lines matching its baseline exactly (no growth), and IssueDrawer.tsx (319 lines) / IssueMissionControl.tsx (986 lines) are both under the 1000-line ceiling in scripts/lint-file-size.sh and correctly absent from file-size-baseline.txt (no stale entries), so lint passes. Minor non-blocking nit for the review convoy: FeatureItem.tsx's 'Filter bar' data-section wraps the same DOM as 'Feature (issue) row' (no distinct filter-bar UI exists in that file) and SessionNode.tsx stacks three section markers (SessionNode / SessionNode context menu / ModelResolutionCard) on one identical wrapper — these satisfy AC2's literal text but are imprecise placements worth tightening, not a functional or gate-integrity violation."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3175310,
-            "output": 5773,
-            "cacheRead": 2869632,
+            "input": 3378182,
+            "output": 5918,
+            "cacheRead": 3066880,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 29288454,
-            "output": 55520,
-            "cacheRead": 28304384,
+            "input": 31622404,
+            "output": 56311,
+            "cacheRead": 30624512,
             "cacheWrite": 0
           }
         },
@@ -69,10 +69,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16849,
-            "output": 22224,
-            "cacheRead": 3565779,
-            "cacheWrite": 364673
+            "input": 16865,
+            "output": 35533,
+            "cacheRead": 4875085,
+            "cacheWrite": 402944
           }
         },
         "work": {
@@ -86,15 +86,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3175310,
-          "output": 5773,
-          "cacheRead": 2869632,
+          "input": 3378182,
+          "output": 5918,
+          "cacheRead": 3066880,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 29288454,
-          "output": 55520,
-          "cacheRead": 28304384,
+          "input": 31622404,
+          "output": 56311,
+          "cacheRead": 30624512,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -104,10 +104,10 @@
           "cacheWrite": 438365
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16849,
-          "output": 22224,
-          "cacheRead": 3565779,
-          "cacheWrite": 364673
+          "input": 16865,
+          "output": 35533,
+          "cacheRead": 4875085,
+          "cacheWrite": 402944
         },
         "custom/kimi-k2.7-code": {
           "input": 3398495,
@@ -117,8 +117,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 82.260802,
-        "pricingAsOf": "2026-07-16T00:11:18.656Z"
+        "usd": 84.004367,
+        "pricingAsOf": "2026-07-16T00:14:07.515Z"
       }
     },
     "merges": [],
