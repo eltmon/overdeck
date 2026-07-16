@@ -223,6 +223,8 @@ For every slot-eligible item, also declare:
 - `verify_commands: string[]` — commands a slot can run before merging, scoped as tightly as the item allows.
 - `expected_outputs: string[]` — observable evidence those commands must produce, such as a named test file passing or typecheck completing without errors.
 
+**Ratchet-backed verification must be satisfiable from each item's committed tree.** If an item shrinks or removes a file tracked by `scripts/file-size-baseline.txt` and requires `npm run lint`, `lint:file-size`, or `scripts/lint-file-size.sh` to pass, that same item must include `scripts/file-size-baseline.txt` in `metadata.files_scope` and reconcile the lowered baseline in its commit. Never defer the baseline update to a later item while requiring the intermediate commit to pass the stale-baseline guard. If preserving a pure-move commit is essential, use an intermediate verification command that excludes the file-size ratchet and reserve full lint plus baseline reconciliation for the final item; acceptance criteria and file scope must state that choice consistently.
+
 ### Difficulty Estimation
 
 For each sub-task, estimate difficulty using this rubric:
