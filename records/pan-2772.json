@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T17:41:00.575Z",
+  "updated": "2026-07-16T17:41:12.026Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,8 +54,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "xterminal-patient-reconnect": {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 2269282,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T17:41:12.025Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -80,6 +88,7 @@
     "reconnect-policy": "completed",
     "reconnect-policy.reconnect-policy.ac1": "completed",
     "reconnect-policy.reconnect-policy.ac2": "completed",
-    "reconnect-policy.reconnect-policy.ac3": "completed"
+    "reconnect-policy.reconnect-policy.ac3": "completed",
+    "xterminal-patient-reconnect": "running"
   }
 }
