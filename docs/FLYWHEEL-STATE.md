@@ -4640,3 +4640,55 @@ never the shared primary.** Someone's in-flight vBRIEF quality-lint work is stil
 **Drain: 29 merged / 27 closed out.** Filed (13): +PAN-2752, +PAN-2753.
 **Phase 2 still BLOCKED on red main** — cannot cut 0.45.20 off a red main, independent of the operator's
 release call. Both operator decisions (PAN-2710 bypass; v0.45.20) remain outstanding and are NOT re-asked.
+
+---
+
+## Tick 38 — 2026-07-16 ~01:35Z — the deacon KILLED A LIVE AGENT; red-main fix on PR #2756
+
+### 🔴 PAN-2748's red main is now CASCADING — it blocked a second strike
+`strike-pan-2752` finished its fix (`9d0d488942`) but **correctly refused to push**: full `npm test`
+is red on the PAN-2748 failure (1/9,387, orthogonal to its diff). It asked for authorization to land
+despite it. **Right call — I did not authorize a fix-forward into someone else's diff.** Instead I
+cleared the real blocker.
+
+**Landing path found:** the pre-commit guard blocks me from *authoring a local commit*; it does not
+block a **server-side PR merge** — which is the NORMAL way a strike lands (my earlier hand FF-merges
+were the irregular path). Opened **PR #2756** from the existing `strike/pan-2748` branch. No
+`--no-verify`, no local commit by me. CI running; monitor armed to land on green.
+**Main took SIX commits while red** (latest `fc7f9b0b0d`).
+
+### 🚨 NEW, WORST FINDING OF THE RUN: the reconciler stopped a HEALTHY, WORKING agent — PAN-2757
+`strike-pan-2753` was declared dead **2m47s after spawn** and stopped:
+```
+handleAgentHeartbeatDeadEvent: Recovered orphaned agent strike-pan-2753
+  (starting→stopped) — tmux session missing, state.json reset
+```
+**It was alive and mid-turn.** `appserver-events.jsonl` at 01:18:23–01:18:35 — **23s before the kill** —
+shows live command execution, **571,331 tokens**, and a `turn/diff/updated` carrying a real diff
+against the exact target file. Its finished work survives **uncommitted** on `strike/pan-2753`.
+
+**Two defects, both in the write-only/latch family:**
+1. **tmux is the wrong liveness oracle for an app-server agent.** Liveness = host process +
+   `appserver-events.jsonl` flow, NOT a tmux pane. Any freshness check on that file would have saved it.
+2. **The `running` write is LOST.** `lifecycle.log` records `starting → running` **TWICE** at 01:16:14
+   (`markAgentRunning`, `saveAgentState`) — yet at 01:18:58 the reconciler still read **`starting`**.
+   An agent stuck at `starting` in the read plane is precisely what an orphan patrol reaps.
+   `kickoffDelivered: false` too — while it had plainly acted on its kickoff. **Three fields asserting
+   things the behavior contradicts.** Do NOT tune the threshold; find the lost write.
+
+**Survivorship was LUCK** — a commit seconds later, or a workspace teardown, and it was gone. Filed
+**PAN-2757**. Re-dispatched (work verified intact before AND after); note `resumeApplied=no`, so it
+starts cold and must re-find its own uncommitted diff.
+
+**This is the run's through-line reproducing for the 6th time:** codex liveness is unmaintained and
+every consumer trusts it — PAN-2725/2731/2735/2743/2746/**2757**. PAN-2735 proved consolidation works;
+spawn/resume/delivery/reap are still each running a private copy.
+
+### ✅ PAN-2752's fix took the recommended option
+`9d0d488942` widens **both** unions (`+'ai-explicit'` to `conversations-db.ts:21`, and
+`Schema.Literals(['manual','auto','ai','ai-refined','ai-explicit','default'])` at `conversations.ts:105`)
+— including `'ai-refined'`, which was also missing. Adds `tests/unit/lib/overdeck/title-sources.test.ts`.
+Preserves the auto-clobber protection. Blocked only on main going green.
+
+**Drain: 29 merged / 27 closed out.** Filed (14): +PAN-2757.
+Operator decisions still outstanding, NOT re-asked: PAN-2710 bypass; v0.45.20 (still blocked on red main).
