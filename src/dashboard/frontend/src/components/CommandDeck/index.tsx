@@ -31,6 +31,7 @@ import { WS_METHODS } from '@overdeck/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, UnknownProjectState } from './UnknownProjectState';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -55,19 +56,6 @@ async function fetchVersion(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error('Failed to fetch version');
   return res.json();
-}
-
-interface RegisteredProject {
-  key: string;
-  name?: string;
-  path: string;
-}
-
-async function fetchRegisteredProjects(): Promise<RegisteredProject[]> {
-  const res = await fetch('/api/registered-projects');
-  if (!res.ok) throw new Error('Failed to fetch registered projects');
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
 }
 
 async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
@@ -1222,23 +1210,11 @@ export function CommandDeck({
   }, [projectsWithSessions, selectedProject]);
 
   const selectedRegisteredProject = useMemo(
-    () => registeredProjects.find((project) =>
-      project.key === selectedProject || project.name === selectedProject,
-    ),
+    () => findRegisteredProject(registeredProjects, selectedProject),
     [registeredProjects, selectedProject],
   );
-  const selectedProjectIsKnown = useMemo(() => {
-    if (!selectedProject) return false;
-    if (selectedProject === NO_PROJECT_KEY) return true;
-    return projectsWithSessions.some((project) => project.name === selectedProject)
-      || selectedRegisteredProject !== undefined;
-  }, [projectsWithSessions, selectedProject, selectedRegisteredProject]);
-  const showUnknownProject = Boolean(
-    selectedProject
-      && projectsFetched
-      && registeredProjectsFetched
-      && !selectedProjectIsKnown,
-  );
+  const showUnknownProject = Boolean(selectedProject && projectsFetched && registeredProjectsFetched
+    && !isKnownProject(selectedProject, projectsWithSessions, registeredProjects));
 
   // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
   // For a real project: its scoped conversations + issue ids. For the special
@@ -1455,36 +1431,7 @@ export function CommandDeck({
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
           {showUnknownProject ? (
-            <div className={styles.contentEmpty}>
-              <div className={styles.unknownProject}>
-                <Compass size={48} aria-hidden="true" />
-                <h2>Unknown project</h2>
-                <p><code>{selectedProject}</code> is not a registered project.</p>
-                {registeredProjects.length > 0 && (
-                  <div className={styles.unknownProjectList} aria-label="Registered projects">
-                    {registeredProjects.map((project) => {
-                      const projectName = project.name ?? project.key;
-                      return (
-                        <button
-                          key={project.key}
-                          type="button"
-                          onClick={() => onSelectProject?.(projectName)}
-                        >
-                          {projectName}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className={styles.unknownProjectBack}
-                  onClick={() => onSelectProject?.(null)}
-                >
-                  Back to Command Deck
-                </button>
-              </div>
-            </div>
+            <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />
           ) : selectedProject ? (
             <Stage
               key={selectedProject}
