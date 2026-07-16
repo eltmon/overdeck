@@ -314,15 +314,7 @@
       "timestamp": "2026-07-16T02:51:10.637Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T02:51:10Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2499\n\n# Review Synthesis — PAN-2499 — 2026-07-15T23:16:00-04:00\n\n## Verdict: CHANGES REQUESTED — remote preflight rejection clears operator start gates without starting an agent\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-ead3b32e/context.json\n- Branch: feature/pan-2499\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499\n- HEAD reviewed: ead3b32ecb03895eade031b3692cf578c40be44d\n- Cycle number: 10\n- Prior cycle SHA: 7390121aec0dd078cb919a943e33f61ce3697836\n- PR base SHA: 45ac781581fd983d7c40c0171dd9cbb530cab659\n- PR commits: 43\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-ead3b32e/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-ead3b32e/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-ead3b32e/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-ead3b32e/requirements.md | 0 after convergence gate |\n\n## Blocking Findings\n\n### [correctness] Remote preflight rejection permanently clears start gates without starting an agent — `src/dashboard/server/routes/agents/spawn.ts:605`\nThe remote path added since the prior cycle wraps all of `handleRemoteAgentSpawn(...)` in `spawnAfterClearingStartGates(...)` and commits the cleared gates whenever that Effect resolves. Remote preflight failures such as the spend-cap HTTP 429 are returned as ordinary `Response` values, so they do not reject, do not restore the initial state, and still cause `commitClearedGates()` to emit unpause or untroubled events. The operator receives a spawn error while the persistent safety gate is silently removed. Remote preflight checks must run before gate clearing, or every non-success response must restore the initial gate state and suppress gate-cleared events.\n\n## Non-blocking Findings\n\n### Correctness\n\n- [demoted: previously reviewed] Errored agents render as nonexistent in `src/dashboard/frontend/src/components/issue-view/ActiveAgentPanel.tsx:48`. The component sends `error` and `unknown` statuses to the “No active agent” fallback, hiding diagnostics and recovery controls. This PR-introduced code did not change since the prior synthesis SHA, so cycle-10 convergence rules prevent it from blocking this cycle.\n- The cockpit conversation tab selects the first work/strike session rather than the active or most recent session in `src/dashboard/frontend/src/components/Stage/cockpit/MissionConversationTab.tsx:16`, which can display a historical run as the active agent.\n\n### Performance\n\n- `src/dashboard/frontend/src/components/issue-view/useIssueView.ts:171` repeatedly scans global agents and cost sessions for each issue session, making model construction O(S × (A + C)) and causing unrelated agent-store updates to rebuild mounted issue views. This remains advisory without profiler evidence of user-visible impact.\n\n### Requirements\n\n- [demoted: previously reviewed] The promised shared `BeadsPanel` and its cross-density wiring remain absent for WI-4b / FR-5. This exact requirements gap was already blocking in the prior synthesis, and no implementation file cited by the finding changed since the prior SHA; cycle-10 convergence rules therefore prevent it from blocking this cycle.\n\n## Scope Note\nThe requirements report correctly classifies the BeadsPanel gap as `in_pr_scope`, but the cycle-10 convergence gate controls promotion: the same gap appeared in the previous synthesis and the implementation remained unchanged. The correctness error-state finding is likewise inside the PR diff but outside the current cycle diff. Both remain visible for follow-up without contributing to this cycle's verdict.\n\n## Clean Sub-roles\n- security\n- performance (no blocking findings)\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-ead3b32e/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2499 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -459,17 +451,18 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:52:06.679Z",
+  "updated": "2026-07-16T02:52:08.116Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:52:06.622Z",
+    "updatedAt": "2026-07-16T02:52:06.896Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed lint",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "ead3b32ecb03895eade031b3692cf578c40be44d",
     "reviewRequestedAt": "2026-07-16T02:49:41.644Z",
@@ -702,7 +695,7 @@
       },
       "costAtCloseOut": {
         "usd": 183.096026,
-        "pricingAsOf": "2026-07-16T02:52:06.664Z"
+        "pricingAsOf": "2026-07-16T02:52:07.017Z"
       }
     },
     "merges": [
