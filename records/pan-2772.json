@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T18:32:07.962Z",
+  "updated": "2026-07-16T18:36:49.689Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "agent-gate-helper": {
-        "writerId": "agent-pan-2772",
-        "agentId": "agent-pan-2772",
-        "pid": 453718,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:32:07.962Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "Close code 4503 now enters the patient reconnect cycle with a calm planned-restart banner, while generic disconnects retain their existing message. A fake-timer test proves the one-second retry, muted styling, absence of connection-lost text, and banner clearing after snapshot recovery; focused tests, typecheck, lint, and diff checks pass.",
         "releasedAt": "2026-07-16T18:31:53.081Z"
+      },
+      {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 453718,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:32:07.962Z",
+        "itemId": "agent-gate-helper",
+        "outcome": "completed",
+        "reason": "Added an injectable agentRestartBlockReason helper that skips gates for uninitiated or forced restarts, quotes active deploy-window blockers in a standalone refusal, exempts the flywheel from its own deployment ownership, and preserves verification blocking. Seven fully injected unit cases, typecheck, lint, and diff checks pass.",
+        "releasedAt": "2026-07-16T18:36:49.689Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "restart-close-code-ux": {
         "reason": "Close code 4503 now enters the patient reconnect cycle with a calm planned-restart banner, while generic disconnects retain their existing message. A fake-timer test proves the one-second retry, muted styling, absence of connection-lost text, and banner clearing after snapshot recovery; focused tests, typecheck, lint, and diff checks pass.",
         "updatedAt": "2026-07-16T18:31:53.081Z"
+      },
+      "agent-gate-helper": {
+        "reason": "Added an injectable agentRestartBlockReason helper that skips gates for uninitiated or forced restarts, quotes active deploy-window blockers in a standalone refusal, exempts the flywheel from its own deployment ownership, and preserves verification blocking. Seven fully injected unit cases, typecheck, lint, and diff checks pass.",
+        "updatedAt": "2026-07-16T18:36:49.689Z"
       }
     }
   },
@@ -165,6 +172,10 @@
     "restart-close-code-ux": "completed",
     "restart-close-code-ux.restart-close-code-ux.ac1": "completed",
     "restart-close-code-ux.restart-close-code-ux.ac2": "completed",
-    "agent-gate-helper": "running"
+    "agent-gate-helper": "completed",
+    "agent-gate-helper.agent-gate-helper.ac1": "completed",
+    "agent-gate-helper.agent-gate-helper.ac2": "completed",
+    "agent-gate-helper.agent-gate-helper.ac3": "completed",
+    "agent-gate-helper.agent-gate-helper.ac4": "completed"
   }
 }
