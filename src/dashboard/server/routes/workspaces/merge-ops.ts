@@ -40,7 +40,7 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
-import { ensureAgentReadyForMerge, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
+import { ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -479,7 +479,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           method: 'squash',
         });
 
-        setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
         completePendingOperation(issueId, null);
 
         const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
@@ -774,7 +774,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
         updatedAt: new Date().toISOString(),
       };
       upsertMergeSetSync(mergeSet);
-      setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+      setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
       completePendingOperation(issueId, null);
 
       const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
@@ -875,7 +875,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           }
           if (prState.merged) {
             console.log(`[merge] PR #${githubPrRef.number} for ${issueId} is already merged — running post-merge lifecycle`);
-            setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+            setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
             completePendingOperation(issueId, null);
             const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
             await postMergeLifecycle(issueId, projectPath, branchName);
@@ -1202,7 +1202,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
     // postMergeLifecycle spawns a deploy script that may kill this server process,
     // so queue processing must happen before that point.
     appendShipLog(issueId, `✓ MERGED — running post-merge cleanup (labels, docker teardown, verify-on-main)`, 'post-merge-cleanup');
-    setReviewStatus(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', mergeNotes: undefined, readyForMerge: false });
+    setReviewStatus(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
     completePendingOperation(issueId, null);
 
     // Dequeue next merge before lifecycle (which may kill the process)

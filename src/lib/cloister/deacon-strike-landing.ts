@@ -31,7 +31,23 @@ export interface StrikeLandingDeps {
   writeFeedback: (issueId: string, workspacePath: string, markdownBody: string) => Promise<boolean>;
   needsYou: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
   now: () => string;
+  schedule: (work: () => Promise<void>) => void;
 }
+
+export class StrikeLandingSupervisor {
+  private readonly pending: Array<() => Promise<void>> = [];
+  private active = 0;
+  constructor(private readonly concurrency = 2) {}
+  enqueue(work: () => Promise<void>): void { this.pending.push(work); this.drain(); }
+  private drain(): void {
+    while (this.active < this.concurrency && this.pending.length > 0) {
+      const work = this.pending.shift()!;
+      this.active += 1;
+      void work().catch(error => console.error('[strike-landing] supervised work failed:', error)).finally(() => { this.active -= 1; this.drain(); });
+    }
+  }
+}
+const strikeLandingSupervisor = new StrikeLandingSupervisor();
 
 function defaultDeps(): StrikeLandingDeps {
   return {
@@ -47,6 +63,7 @@ function defaultDeps(): StrikeLandingDeps {
     writeFeedback: async (issueId, workspacePath, markdownBody) => (await Effect.runPromise(writeFeedbackFile({ issueId, workspacePath, specialist: 'merge-agent', outcome: 'needs-you', summary: 'Strike landing needs operator attention', markdownBody }))).success,
     needsYou: surfaceIssueFeedbackNeedsYou,
     now: () => new Date().toISOString(),
+    schedule: work => strikeLandingSupervisor.enqueue(work),
   };
 }
 
@@ -89,10 +106,17 @@ export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps>
     const claimed = deps.setStatus(issueId, { strikeLandingState: 'landing' });
     if (claimed.strikeReadyHead !== head || claimed.strikeLandingState !== 'landing') continue;
 
+    deps.schedule(async () => executeStrikeLanding(issueId, head, claimed, deps));
+    actions.push(`[strike-landing] claimed ${issueId} at ${head}`);
+  }
+  return actions;
+}
+
+async function executeStrikeLanding(issueId: string, head: string, claimed: ReviewStatus, deps: StrikeLandingDeps): Promise<void> {
     const project = deps.resolveProject(issueId);
     if (!project) {
-      actions.push(await handleFailure(issueId, head, `Strike landing could not resolve a configured project for ${issueId}`, '', '', claimed, deps));
-      continue;
+      await handleFailure(issueId, head, `Strike landing could not resolve a configured project for ${issueId}`, '', '', claimed, deps);
+      return;
     }
     const request: StrikeMergeRequest = {
       kind: 'strike', markerHead: head,
@@ -103,12 +127,9 @@ export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps>
     const result = await deps.mergeIssue(issueId, request);
     if (result.mergeStatus === 'merged') {
       deps.setStatus(issueId, { strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
-      actions.push(`[strike-landing] landed ${issueId} at ${head}`);
     } else if (result.success || result.mergeStatus === 'queued' || result.mergeStatus === 'merging' || result.mergeStatus === 'merged') {
-      actions.push(`[strike-landing] ${issueId} at ${head} is ${result.mergeStatus ?? 'in progress'}`);
+      return;
     } else {
-      actions.push(await handleFailure(issueId, head, result.error ?? 'Strike landing failed', project.projectPath, request.workspacePath, claimed, deps));
+      await handleFailure(issueId, head, result.error ?? 'Strike landing failed', project.projectPath, request.workspacePath, claimed, deps);
     }
-  }
-  return actions;
 }

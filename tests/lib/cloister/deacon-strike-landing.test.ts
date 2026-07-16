@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { patrolStrikeLandings, type StrikeLandingDeps } from '../../../src/lib/cloister/deacon-strike-landing.js';
+import { patrolStrikeLandings, StrikeLandingSupervisor, type StrikeLandingDeps } from '../../../src/lib/cloister/deacon-strike-landing.js';
 import type { ReviewStatus } from '../../../src/lib/review-status.js';
 
 const head = 'a'.repeat(40);
@@ -8,8 +8,9 @@ function ready(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   return { issueId: 'PAN-2702', reviewStatus: 'pending', testStatus: 'pending', readyForMerge: false, updatedAt: 't', strikeReadyHead: head, strikeLandingState: 'ready', ...overrides };
 }
 
-function deps(result: { success: boolean; mergeStatus?: string; error?: string } = { success: true, mergeStatus: 'merged' }): StrikeLandingDeps & { readonly state: ReviewStatus; setState: (state: ReviewStatus) => void } {
+function deps(result: { success: boolean; mergeStatus?: string; error?: string } = { success: true, mergeStatus: 'merged' }): StrikeLandingDeps & { readonly state: ReviewStatus; setState: (state: ReviewStatus) => void; flush: () => Promise<void> } {
   const container = { state: ready() };
+  const scheduled: Promise<void>[] = [];
   return {
     get state() { return container.state; },
     setState: (state) => { container.state = state; },
@@ -23,6 +24,8 @@ function deps(result: { success: boolean; mergeStatus?: string; error?: string }
     writeFeedback: vi.fn().mockResolvedValue(true),
     needsYou: vi.fn().mockResolvedValue(undefined),
     now: () => '2026-07-16T00:00:00.000Z',
+    schedule: work => { scheduled.push(work()); },
+    flush: () => Promise.all(scheduled).then(() => undefined),
   };
 }
 
@@ -30,25 +33,28 @@ describe('patrolStrikeLandings', () => {
   it('claims a ready marker and invokes the strike merge door', async () => {
     const d = deps({ success: true, mergeStatus: 'queued' });
     const actions = await patrolStrikeLandings(d);
+    await d.flush();
     expect(d.mergeIssue).toHaveBeenCalledWith('PAN-2702', {
       kind: 'strike', markerHead: head, workspacePath: '/repo/workspaces/feature-pan-2702-strike',
       branchName: 'strike/pan-2702', recoveryTarget: 'strike-pan-2702',
     });
     expect(d.state.strikeLandingState).toBe('landing');
-    expect(actions[0]).toContain('queued');
+    expect(actions).toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
   });
 
   it('allows only one observer to claim the same HEAD', async () => {
     const d = deps({ success: true, mergeStatus: 'queued' });
     await Promise.all([patrolStrikeLandings(d), patrolStrikeLandings(d)]);
+    await d.flush();
     expect(d.mergeIssue).toHaveBeenCalledTimes(1);
   });
 
   it('marks a terminal merge landed and clears readiness', async () => {
     const d = deps();
     const actions = await patrolStrikeLandings(d);
+    await d.flush();
     expect(d.state).toMatchObject({ strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
-    expect(actions).toEqual([`[strike-landing] landed PAN-2702 at ${head}`]);
+    expect(actions).toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
   });
 
   it.each([
@@ -63,7 +69,8 @@ describe('patrolStrikeLandings', () => {
 
   it('re-drives an actionable failure with complete recovery instructions', async () => {
     const d = deps({ success: false, error: 'Rebase conflicts in src/a.ts' });
-    await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] PAN-2702 at ${head} recovering (1/3)`]);
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
+    await d.flush();
     expect(d.state).toMatchObject({ strikeLandingState: 'recovering', strikeRecoveryCount: 1 });
     expect(d.state.strikeLandingAttempts).toEqual([{ timestamp: '2026-07-16T00:00:00.000Z', strikeHead: head, mainHead: 'main-head', outcome: 'failed', detail: 'Rebase conflicts in src/a.ts' }]);
     expect(d.deliverRecovery).toHaveBeenCalledWith('strike-pan-2702', expect.stringContaining('push only strike/pan-2702'));
@@ -84,7 +91,8 @@ describe('patrolStrikeLandings', () => {
   ])('surfaces needs-you once for %s with ordered history', async (_label, error, priorCount) => {
     const d = deps({ success: false, error });
     d.setState(ready({ strikeRecoveryCount: priorCount, strikeLandingAttempts: [{ timestamp: 'old', strikeHead: 'old-head', mainHead: 'old-main', outcome: 'failed', detail: 'old failure' }] }));
-    await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] PAN-2702 at ${head} needs-you`]);
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] claimed PAN-2702 at ${head}`]);
+    await d.flush();
     expect(d.state.strikeLandingState).toBe('needs_you');
     expect(d.writeFeedback).toHaveBeenCalledTimes(1);
     expect(d.needsYou).toHaveBeenCalledWith('PAN-2702', expect.stringContaining('old-head'), expect.objectContaining({ attempts: expect.any(Array) }));
@@ -96,7 +104,22 @@ describe('patrolStrikeLandings', () => {
     const d = deps({ success: false, error: 'gate failed' });
     vi.mocked(d.deliverRecovery).mockRejectedValue(new Error('operator paused'));
     await patrolStrikeLandings(d);
+    await d.flush();
     expect(d.state).toMatchObject({ strikeLandingState: 'needs_you', strikeRecoveryCount: 1 });
     expect(d.state.strikeLandingAttempts?.[0].detail).toContain('recovery delivery failed: operator paused');
+  });
+
+  it('bounds independently supervised landing work', async () => {
+    const supervisor = new StrikeLandingSupervisor(2);
+    const releases: Array<() => void> = [];
+    const started: number[] = [];
+    for (let index = 0; index < 3; index += 1) supervisor.enqueue(async () => {
+      started.push(index);
+      await new Promise<void>(resolve => releases.push(resolve));
+    });
+    await vi.waitFor(() => expect(started).toEqual([0, 1]));
+    releases.shift()!();
+    await vi.waitFor(() => expect(started).toEqual([0, 1, 2]));
+    releases.forEach(release => release());
   });
 });

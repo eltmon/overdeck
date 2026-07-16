@@ -8,6 +8,9 @@ export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
 }
 export type TriggerMergeRequest = { kind: 'normal' } | StrikeMergeRequest;
+export function mergeCompletionStatus(request: TriggerMergeRequest): Pick<ReviewStatus, 'strikeLandingState' | 'strikeReadyHead' | 'strikeReadyAt'> | Record<string, never> {
+  return request.kind === 'strike' ? { strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined } : {};
+}
 export interface MergeEligibilityResult {
   success: false; statusCode: number; error: string; reviewStatus?: string; testStatus?: string; mergeStatus?: string;
 }
