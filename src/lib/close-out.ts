@@ -8,7 +8,7 @@
 import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
-import { exec, execFile } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect, Data } from 'effect';
 import {
@@ -27,9 +27,9 @@ import { findWorkspacePath } from './lifecycle/archive-planning.js';
 import { teardownWorkspaceDockerByNamePromise } from './workspace-manager/docker.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
 import { listMailboxItems, type MailboxItem } from './cloister/agent-mailbox.js';
+import { createTracker } from './tracker/factory.js';
 
 const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
 
 export function buildPendingMailboxCloseOutComment(items: MailboxItem[]): string {
   const details = items.map(item =>
@@ -248,6 +248,15 @@ export interface CloseOutContext {
   owner?: string;
   repo?: string;
   number?: number;
+  publishComment?: (issueId: string, body: string) => Promise<void>;
+}
+
+async function publishCloseOutComment(ctx: CloseOutContext, body: string): Promise<void> {
+  if (ctx.publishComment) return ctx.publishComment(ctx.issueId, body);
+  const tracker = ctx.isGitHub
+    ? createTracker({ type: 'github', owner: ctx.owner, repo: ctx.repo })
+    : createTracker({ type: 'linear' });
+  await Effect.runPromise(tracker.addComment(ctx.issueId, body).pipe(Effect.asVoid));
 }
 
 const CLOSED_OUT_LABEL = 'closed-out';
@@ -349,16 +358,14 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
         .filter(item => item.state === 'pending');
       if (pendingMail.length > 0) {
         const comment = buildPendingMailboxCloseOutComment(pendingMail);
-        await execFileAsync('gh', [
-          'issue',
-          'comment',
-          String(ctx.number),
-          '--repo',
-          `${ctx.owner}/${ctx.repo}`,
-          '--body',
-          comment,
-        ], { cwd: ctx.projectPath });
-        steps.push({ name: 'Comment pending mailbox', status: 'passed', message: `Commented ${pendingMail.length} undelivered message(s)` });
+        try {
+          await publishCloseOutComment(ctx, comment);
+          steps.push({ name: 'Comment pending mailbox', status: 'passed', message: `Commented ${pendingMail.length} undelivered message(s)` });
+        } catch (err) {
+          const message = `Pending mailbox comment failed; workspace preserved for retry: ${(err as Error).message}`;
+          steps.push({ name: 'Comment pending mailbox', status: 'failed', message });
+          return { success: false, issueId: ctx.issueId, steps, error: message };
+        }
       }
     }
 

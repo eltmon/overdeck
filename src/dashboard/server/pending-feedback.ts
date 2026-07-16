@@ -36,6 +36,18 @@ interface PendingFeedbackStore {
   deliveries: PendingFeedbackDelivery[];
 }
 
+function normalizeDelivery(value: unknown): PendingFeedbackDelivery | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const delivery = value as Partial<PendingFeedbackDelivery>;
+  if (
+    typeof delivery.issueId !== 'string' || typeof delivery.kind !== 'string' ||
+    typeof delivery.filePath !== 'string' || typeof delivery.message !== 'string' ||
+    typeof delivery.createdAt !== 'string'
+  ) return null;
+  if (!['review-blocked', 'review-failed', 'test-failed'].includes(delivery.kind)) return null;
+  return { ...delivery, role: 'work' } as PendingFeedbackDelivery;
+}
+
 async function readStore(filePath: string): Promise<PendingFeedbackStore> {
   if (!existsSync(filePath)) {
     return { deliveries: [] };
@@ -45,7 +57,11 @@ async function readStore(filePath: string): Promise<PendingFeedbackStore> {
     const raw = await readFile(filePath, 'utf-8');
     if (!raw.trim()) return { deliveries: [] };
     const parsed = JSON.parse(raw) as PendingFeedbackStore;
-    return { deliveries: Array.isArray(parsed.deliveries) ? parsed.deliveries : [] };
+    return {
+      deliveries: Array.isArray(parsed.deliveries)
+        ? parsed.deliveries.map(normalizeDelivery).filter((item): item is PendingFeedbackDelivery => item !== null)
+        : [],
+    };
   } catch {
     return { deliveries: [] };
   }

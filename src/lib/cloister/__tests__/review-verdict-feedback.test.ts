@@ -53,9 +53,7 @@ describe('deliverReviewVerdictFeedback', () => {
       needsYou: true,
       reason: 'No live feedback target for PAN-1917',
     });
-    mocks.markWorkspaceStuck.mockImplementation(() => {
-      throw new Error('SQLITE_READONLY: attempt to write a readonly database');
-    });
+    mocks.markWorkspaceStuck.mockReturnValue(undefined);
     mocks.messageAgent.mockResolvedValue(undefined);
   });
 
@@ -71,6 +69,13 @@ describe('deliverReviewVerdictFeedback', () => {
       feedbackPath: '/tmp/overdeck/workspaces/feature-pan-1917/.pan/feedback/001-review-agent-blocked.md',
       agentMessageSent: false,
     }));
-    expect(mocks.markWorkspaceStuck).not.toHaveBeenCalled();
+    expect(mocks.markWorkspaceStuck).toHaveBeenCalledWith(
+      'PAN-1917',
+      'feedback_delivery_needs_you',
+      expect.objectContaining({
+        reason: 'No live feedback target for PAN-1917',
+        specialist: 'review-agent',
+      }),
+    );
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
@@ -164,5 +164,31 @@ describe('pending feedback recovery (PAN-585)', () => {
     const stored = JSON.parse(await readFile(queueFile, 'utf-8'));
     expect(stored.deliveries).toHaveLength(1);
     expect(stored.deliveries[0].issueId).toBe('PAN-586');
+  });
+
+  it('normalizes legacy queue entries without a role before replay', async () => {
+    queueFile = await setupQueueFile();
+    await writeFile(queueFile, JSON.stringify({ deliveries: [{
+      issueId: 'PAN-585', kind: 'review-blocked', filePath: '/tmp/legacy.md',
+      message: 'legacy feedback', createdAt: '2026-04-27T06:00:00Z',
+    }] }));
+    const markMailboxDelivered = vi.fn(async delivery => {
+      expect(delivery.role).toBe('work');
+    });
+
+    await processPendingFeedbackDeliveries({
+      filePath: queueFile,
+      now: Date.parse('2026-04-27T06:05:00Z'),
+      _deliver: vi.fn(async () => {}),
+      _resolveTarget: vi.fn(async () => ({ agentId: 'agent-pan-585' })),
+      _markMailboxDelivered: markMailboxDelivered,
+      _loadStatuses: vi.fn(() => ({
+        'PAN-585': { issueId: 'PAN-585', reviewStatus: 'blocked' },
+      })) as any,
+      _getStatus: vi.fn() as any,
+    });
+
+    expect(markMailboxDelivered).toHaveBeenCalledOnce();
+    await expect(readFile(queueFile, 'utf-8')).rejects.toThrow();
   });
 });

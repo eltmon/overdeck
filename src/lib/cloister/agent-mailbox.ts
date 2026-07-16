@@ -3,7 +3,7 @@
  * The YAML frontmatter is the mailbox envelope; the markdown body remains the message.
  */
 
-import { readFile, writeFile } from 'fs/promises';
+import { readFile, rename, writeFile } from 'fs/promises';
 import { isAbsolute, join } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { getWorkspacePanPaths, readFeedback } from '../pan-dir/index.js';
@@ -52,8 +52,14 @@ export interface MailboxTransitionOptions extends MailboxAddress {
   at?: string;
 }
 
+export interface PreparedWorkMailbox {
+  message: string;
+  items: MailboxItem[];
+}
+
 const FRONTMATTER = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/;
 const NUMBERED_FEEDBACK = /^\d{3}-(.+)\.md$/;
+const transitionQueues = new Map<string, Promise<void>>();
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -173,11 +179,18 @@ async function transitionMailboxItem(
   options: MailboxTransitionOptions,
   target: 'delivered' | 'acknowledged',
 ): Promise<MailboxItem> {
-  const workspacePath = resolveWorkspacePath(options);
-  if (!workspacePath) throw new Error(`Workspace not found for ${options.issueId}`);
+  const workspacePath = isAbsolute(options.filePath) ? null : resolveWorkspacePath(options);
+  if (!isAbsolute(options.filePath) && !workspacePath) throw new Error(`Workspace not found for ${options.issueId}`);
   const absolutePath = isAbsolute(options.filePath)
     ? options.filePath
-    : join(getWorkspacePanPaths(workspacePath).feedbackDir, options.filePath);
+    : join(getWorkspacePanPaths(workspacePath!).feedbackDir, options.filePath);
+  const previous = transitionQueues.get(absolutePath) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>(resolve => { release = resolve; });
+  const queued = previous.then(() => current);
+  transitionQueues.set(absolutePath, queued);
+  await previous;
+  try {
   const content = await readFile(absolutePath, 'utf8');
   const parsed = parseMailboxMarkdown(content);
   if (!parsed.metadata) throw new Error(`Feedback file has no mailbox metadata: ${absolutePath}`);
@@ -195,8 +208,16 @@ async function transitionMailboxItem(
   }
   const item = { ...metadata, legacy: false, markdownBody: parsed.markdownBody } satisfies MailboxItem;
   const rendered = renderMailboxItem(item);
-  if (rendered !== content) await writeFile(absolutePath, rendered, 'utf8');
+  if (rendered !== content) {
+    const temporaryPath = `${absolutePath}.${process.pid}.${Date.now()}.tmp`;
+    await writeFile(temporaryPath, rendered, 'utf8');
+    await rename(temporaryPath, absolutePath);
+  }
   return item;
+  } finally {
+    release();
+    if (transitionQueues.get(absolutePath) === queued) transitionQueues.delete(absolutePath);
+  }
 }
 
 export function markMailboxItemDelivered(options: MailboxTransitionOptions): Promise<MailboxItem> {
@@ -207,12 +228,15 @@ export function markMailboxItemAcknowledged(options: MailboxTransitionOptions): 
   return transitionMailboxItem(options, 'acknowledged');
 }
 
-/** Build the deterministic pull section used by fresh spawns and resumes. */
-export async function drainWorkMailbox(options: Omit<MailboxAddress, 'role'>): Promise<string> {
+/** Render the deterministic pull section without advancing durable mailbox state. */
+export async function prepareWorkMailbox(
+  message: string,
+  options: Omit<MailboxAddress, 'role'>,
+): Promise<PreparedWorkMailbox> {
   const address = { ...options, role: 'work' as const };
   const items = (await listMailboxItems(address)).filter(item =>
     item.state === 'pending' || (item.state === 'delivered' && item.actionRequired));
-  if (items.length === 0) return '';
+  if (items.length === 0) return { message, items: [] };
 
   const lines = [
     '## Pending issue mailbox',
@@ -223,19 +247,28 @@ export async function drainWorkMailbox(options: Omit<MailboxAddress, 'role'>): P
     lines.push('', `- ${item.source}: ${item.summary}`, `  File: ${item.filePath}`);
   }
 
+  return { message: `${lines.join('\n')}\n\n---\n\n${message}`, items };
+}
+
+/** Advance only mailbox items whose rendered message reached the agent. */
+export async function confirmWorkMailboxDelivery(items: MailboxItem[]): Promise<void> {
   for (const item of items) {
     if (item.legacy) continue;
-    const transition = { ...address, filePath: item.filePath };
+    const transition = { issueId: item.issueId, role: item.role, filePath: item.filePath };
     if (item.state === 'pending') await markMailboxItemDelivered(transition);
-    else await markMailboxItemAcknowledged(transition);
+    else if (item.state === 'delivered') await markMailboxItemAcknowledged(transition);
   }
-  return lines.join('\n');
+}
+
+/** Build the pull section without claiming that transport has succeeded. */
+export async function drainWorkMailbox(options: Omit<MailboxAddress, 'role'>): Promise<string> {
+  const prepared = await prepareWorkMailbox('', options);
+  return prepared.items.length > 0 ? prepared.message.replace(/\n\n---\n\n$/, '') : '';
 }
 
 export async function prependWorkMailbox(
   message: string,
   options: Omit<MailboxAddress, 'role'>,
 ): Promise<string> {
-  const section = await drainWorkMailbox(options);
-  return section ? `${section}\n\n---\n\n${message}` : message;
+  return (await prepareWorkMailbox(message, options)).message;
 }

@@ -266,8 +266,14 @@ async function relayCiFailureFeedbackPromise(
     const target = await resolveIssueFeedbackTarget(issueId);
     if ('agentId' in target) {
       await messageAgent(target.agentId, message);
-      await markMailboxItemDelivered({ issueId, role: 'work', filePath: fileResult.filePath });
       agentMessageSent = true;
+      try {
+        await markMailboxItemDelivered({ issueId, role: 'work', filePath: fileResult.filePath });
+      } catch (err) {
+        console.warn(
+          `[ci-failure-feedback] Live message sent but mailbox state update failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
     }
   } catch (err) {
     console.warn(

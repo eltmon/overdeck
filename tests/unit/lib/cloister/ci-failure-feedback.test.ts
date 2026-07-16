@@ -275,6 +275,19 @@ describe('relayCiFailureFeedback', () => {
     expect(markdownBody).toContain('*(No log excerpt available.)*');
   });
 
+  it('reports transport success when mailbox persistence fails afterward', async () => {
+    makeGhMocks();
+    mockMarkMailboxItemDelivered.mockRejectedValueOnce(new Error('read-only filesystem'));
+
+    const result = await Effect.runPromise(relayCiFailureFeedback({
+      issueId: 'PAN-1801', repo: 'test-owner/test-repo', prNumber: 42,
+      headSha: 'abc123def456', headRef: 'feature/pan-1801', source: 'check_run:test',
+    }));
+
+    expect(result.agentMessageSent).toBe(true);
+    expect(mockMessageAgent).toHaveBeenCalledOnce();
+  });
+
   it('includes a status source even when no failing run is found', async () => {
     const execFileMock = makeExecFileMock([
       {

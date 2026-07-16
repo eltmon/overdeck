@@ -18,7 +18,9 @@ export interface MailboxEscalationDeps {
 
 const defaultDeps: MailboxEscalationDeps = {
   listWorkspaces: () => listAgentStates()
-    .filter(state => state.role === 'work' && Boolean(state.issueId && state.workspace))
+    .filter(state => state.role === 'work'
+      && Boolean(state.issueId && state.workspace)
+      && ['starting', 'running', 'stopped'].includes(state.status))
     .map(state => ({ issueId: state.issueId, workspacePath: state.workspace })),
   listItems: (issueId, workspacePath) => listMailboxItems({ issueId, role: 'work', workspacePath }),
   resolveTarget: resolveIssueFeedbackTarget,

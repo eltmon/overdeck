@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   ),
   findWorkspacePath: vi.fn(),
   listMailboxItems: vi.fn(async () => []),
+  trackerAddComment: vi.fn(() => Effect.void),
+  createTracker: vi.fn(),
 }));
 
 vi.mock('child_process', async (importOriginal) => {
@@ -63,6 +65,10 @@ vi.mock('../cloister/agent-mailbox.js', () => ({
   listMailboxItems: mocks.listMailboxItems,
 }));
 
+vi.mock('../tracker/factory.js', () => ({
+  createTracker: mocks.createTracker,
+}));
+
 import { executeCloseOut } from '../close-out.js';
 
 describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
@@ -72,6 +78,7 @@ describe('executeCloseOut terminal journal marker (PAN-2054)', () => {
     projectPath = mkdtempSync(join(tmpdir(), 'pan-close-out-'));
     vi.clearAllMocks();
     mocks.loadReviewStatuses.mockReturnValue({});
+    mocks.createTracker.mockReturnValue({ addComment: mocks.trackerAddComment });
     mocks.exec.mockImplementation((command: string, _opts: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof _opts === 'function' ? _opts : callback;
       if (command.includes('git branch --list')) cb?.(null, { stdout: '', stderr: '' });
@@ -148,6 +155,7 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     projectPath = mkdtempSync(join(tmpdir(), 'pan-close-out-'));
     vi.clearAllMocks();
     mocks.loadReviewStatuses.mockReturnValue({});
+    mocks.createTracker.mockReturnValue({ addComment: mocks.trackerAddComment });
     mocks.stopWorkspaceDocker.mockReturnValue(Effect.void);
     mocks.teardownWorkspaceDockerByNamePromise.mockResolvedValue({
       networkRemoved: true,
@@ -227,19 +235,49 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     ]);
 
     await Effect.runPromise(executeCloseOut({ issueId, projectPath, isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 2510 }));
-    expect(mocks.execFile).toHaveBeenCalledTimes(1);
-    const [file, args] = mocks.execFile.mock.calls[0] as [string, string[]];
-    expect(file).toBe('gh');
-    expect(args.slice(0, 6)).toEqual(['issue', 'comment', '2510', '--repo', 'eltmon/overdeck', '--body']);
-    const body = args[6];
+    expect(mocks.createTracker).toHaveBeenCalledWith({ type: 'github', owner: 'eltmon', repo: 'overdeck' });
+    const [commentedIssue, body] = mocks.trackerAddComment.mock.calls[0] as [string, string];
+    expect(commentedIssue).toBe(issueId);
     expect(body).toContain('During close-out the system identified 2 undelivered message(s)');
     expect(body).toContain('Fix $(touch /tmp/pwned) and `whoami`');
     expect(body).toContain('treat them as likely stale');
     const removalCall = mocks.exec.mock.calls.findIndex(call => String(call[0]).startsWith('git worktree remove'));
     expect(removalCall).toBeGreaterThanOrEqual(0);
-    expect(mocks.execFile.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(mocks.trackerAddComment.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.exec.mock.invocationCallOrder[removalCall],
     );
+  });
+
+  it('publishes pending mailbox items through Linear before teardown', async () => {
+    const issueId = 'MIN-2510';
+    const workspacePath = join(projectPath, 'workspaces', 'feature-min-2510');
+    mkdirSync(workspacePath, { recursive: true });
+    mocks.findWorkspacePath.mockReturnValue(workspacePath);
+    mocks.listMailboxItems.mockResolvedValue([
+      { issueId, role: 'work', source: 'review-agent', summary: 'Fix review', actionRequired: true, state: 'pending', createdAt: '2026-07-16T12:00:00Z', filePath: `${workspacePath}/.pan/feedback/001-review.md`, legacy: false, markdownBody: '' },
+    ]);
+
+    const result = await Effect.runPromise(executeCloseOut({ issueId, projectPath, isGitHub: false }));
+    expect(result.steps.find(step => step.name === 'Comment pending mailbox')?.status).toBe('passed');
+    expect(mocks.createTracker).toHaveBeenCalledWith({ type: 'linear' });
+    expect(mocks.trackerAddComment).toHaveBeenCalledWith(issueId, expect.stringContaining('1 undelivered message(s)'));
+  });
+
+  it('preserves the workspace when pending-mail publication fails', async () => {
+    const issueId = 'PAN-2510';
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-2510');
+    mkdirSync(workspacePath, { recursive: true });
+    mocks.findWorkspacePath.mockReturnValue(workspacePath);
+    mocks.listMailboxItems.mockResolvedValue([
+      { issueId, role: 'work', source: 'review-agent', summary: 'Fix review', actionRequired: true, state: 'pending', createdAt: '2026-07-16T12:00:00Z', filePath: `${workspacePath}/.pan/feedback/001-review.md`, legacy: false, markdownBody: '' },
+    ]);
+    mocks.trackerAddComment.mockReturnValueOnce(Effect.fail(new Error('tracker unavailable')));
+
+    const result = await Effect.runPromise(executeCloseOut({ issueId, projectPath, isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 2510 }));
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('workspace preserved for retry');
+    expect(mocks.teardownWorkspaceDockerByNamePromise).not.toHaveBeenCalled();
+    expect(mocks.exec.mock.calls.some(call => String(call[0]).startsWith('git worktree remove'))).toBe(false);
   });
 
   it('records a warning but does not abort when network removal cannot be verified', async () => {
