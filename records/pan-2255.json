@@ -196,9 +196,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T08:22:12.359Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:22Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T08:22:54.915Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T08:22:54Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2255\n\n# Review Synthesis — PAN-2255 — 2026-07-16T04:20:07-04:00\n\n## Verdict: CHANGES REQUESTED — three reviewer roles failed to produce usable terminal outcomes\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-77aa2726/context.json\n- Branch: feature/pan-2255\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255\n- HEAD reviewed: 77aa2726424bd85960715163c243852c33f7c568\n- Cycle number: 6\n- Prior cycle SHA: 4e0253e9a3865d0279e1177930c5c3573f95f3fb\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed: role run already running | — | infrastructure failure |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-77aa2726/correctness.md | 0 after convergence gate |\n| performance | failed: reviewer tmux session not found | — | infrastructure failure |\n| requirements | failed: role run already running | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer role failed\nThe security role reported `Role run agent-pan-2255-review-security already running` instead of producing a usable terminal result for this dispatch. Review policy forbids approval when a reviewer fails, even though a later duplicate ready signal referenced an existing report.\n\n### [performance] Reviewer role failed\nThe performance role failed while attempting to stop its reviewer session because `agent-pan-2255-review-performance` could not be found. Review policy forbids approval when a reviewer fails, even though a later duplicate ready signal referenced an existing report.\n\n### [requirements] Reviewer role failed\nThe requirements role reported `Role run agent-pan-2255-review-requirements already running` instead of producing a usable terminal result for this dispatch. Review policy forbids approval when a reviewer fails, even though a later duplicate ready signal referenced an existing report.\n\n## Non-blocking Findings\n\n### Correctness\n\n- [demoted: previously reviewed] Mailbox persistence failure makes a successful spawn or resume fail — `src/lib/agents/spawn.ts:789` and `src/lib/agents/resume.ts:489`. The prompt transport can succeed before `confirmWorkMailboxDelivery` rejects, causing the lifecycle caller to observe failure despite a live agent. The cycle-6 diff from `4e0253e9a3865d0279e1177930c5c3573f95f3fb` to HEAD changes only `src/lib/cloister/__tests__/review-verdict-feedback.test.ts`; neither cited production path changed, so this blocker is not promotable under the mandatory convergence gate.\n- Verification feedback can be reported as failed after successful prompt delivery — `src/lib/cloister/verification-runner.ts:196`. A mailbox transition failure can reject after transport succeeds, potentially causing duplicate delivery on retry.\n- Immediate queued delivery can replay twice when only the mailbox transition fails — `src/dashboard/server/routes/workspaces.ts:239`. The queue does not record confirmed transport before the mailbox transition, so a restart can resend an already-delivered message.\n\n## Clean Sub-roles\n\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-77aa2726/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2255 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/dashboard-types-baseline.txt",
@@ -279,7 +292,7 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T08:22:12.359Z",
+  "updated": "2026-07-16T08:22:54.915Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "reviewing",
