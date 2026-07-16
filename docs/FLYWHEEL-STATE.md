@@ -5250,3 +5250,48 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   2255 held on operator keep/revert. 2760/2772/2773 = dormant filed bugs, no agents (not in-flight).
 - **Pipeline genuinely drained to 1491 + 1966** (both working) + 2255 (operator decision).
 - **Session: 49 merges, 21 close-outs.**
+
+---
+
+## Tick 58 — 2026-07-16 ~17:35Z — pipeline drained to 2 issues, BOTH wedged on codex review-path deaths (PAN-2775)
+
+- After the resume-on deploy, the drain is down to **PAN-1491 + PAN-1966**, and BOTH are blocked by the
+  same unsolved substrate bug — codex hosts dying in the REVIEW path:
+  - **1966**: 3/4 convoy reviewers PASS (performance/requirements/security), but the **correctness
+    reviewer died at 17:03Z** (stopped, pane gone) right after starting, producing no correctness.md ⇒
+    the synthesis parent waits forever ⇒ no APPROVED verdict ⇒ no merge. Convoy has re-run rounds
+    (4d7202ba→3580c137); correctness dies each round. CI green, PR #2790 CLEAN. `pan review request
+    PAN-1966` HANGS (2min timeout, no new convoy spawned) — the re-trigger path itself wedges.
+  - **1491**: work agent (claude-code after --fresh) reached pan done and a review convoy ran, but the
+    convoy also died mid-flight — review run e26572ba has ONLY correctness.md, no synthesis, and NO open
+    PR. Work agent now sits "⏸ manual mode on", delivered nudges land in the composer but don't submit.
+    3 fresh/nudge cycles this session; fix commit ae0b48d390 safe on branch.
+- **This is PAN-2775 (codex host death) as the FINAL drain blocker.** Not a code problem in either issue
+  — the substrate kills reviewers/agents mid-turn. Re-driving cannot fix a substrate bug. Both PARKED
+  pending the operator's PAN-2775 substrate fix. Evidence already on PAN-2775 (resume-lies + silent death
+  + no exit instrumentation). New this tick: the death also hits (a) convoy sub-reviewers ⇒ synthesis
+  wedge, and (b) `pan review request` itself hangs.
+- Server pid 1714664 stable (PAN-2792 holding — no dashboard kills). 2702/2768 closed. 2255 held on
+  operator. Loop cadence slowed to heartbeat — nothing advances until the substrate is fixed.
+- **Session: 49 merges, 21 close-outs. Pipeline at rest: 2 substrate-blocked, 1 operator-decision.**
+
+---
+
+## Tick 59 — 2026-07-16 ~17:42Z — OPERATOR LIFTED DRAIN → intake authorized; launched 11-issue PAN set
+
+- **Operator directive (3 parts):** (1) PAN-2255 PARKED (reverted 6573791e69, spec deleted 905a2b4aa1,
+  issue+PRD retained) — do NOT re-drive/close/treat-as-regression. (2) Prune closed-issue residue. (3)
+  DRIVE open set aggressively (intake overrides DRAIN): 806,1897,1987,2045,2232,2252,2619,2760,2772,2773,2633.
+- **Launched 11/11 (806 held):** work agents live = 1987,2232,2619,2633(--force),2760,2772,2773 (+1491,1966
+  continuing); auto-planning = 1897,2045,2252 (work auto-starts on finalize). All gpt-5.6-sol/codex, fresh
+  (resume lies — started --fresh per directive). Memory 37G avail.
+- **PAN-806 HELD**: carries a standing AI objection ("not ready to plan as written" re: git-history-rewrite
+  guard). Surfaced to operator for drive-anyway-vs-replan decision. Did NOT start it blind.
+- **Residue prune (item 2): backend already clean** — 0 state.json dirs on disk, 0 agents in /api/agents,
+  `pan admin db gc-agents` reaps 0 for 1969/1970/1971/1976/1978/1996/1997/2040. The RESUME SESSION buttons
+  are STALE FRONTEND view (pre-16:57-restart cache), not reapable data-layer residue → refresh clears; if
+  persistent = frontend bug to file. (sqlite3 CLI can't read the node:sqlite WAL DB — use /api, not sqlite3.)
+- **SUBSTRATE CAVEAT**: PAN-2775 codex-death still live — it's what wedges 1491 (manual-mode, nudges don't
+  submit) + 1966 (correctness reviewer died → synthesis wedge → no merge). Expect some of the 9 to wedge at
+  review→merge identically until the substrate fix lands. Shepherding per tick.
+- **Session: 49 merges, 21 close-outs. Fleet: 9 work + 3 planning active.**

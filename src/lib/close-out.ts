@@ -6,7 +6,7 @@
  */
 
 import { existsSync, mkdirSync, cpSync, rmSync, readFileSync } from 'fs';
-import { basename, join, dirname } from 'path';
+import { join, dirname } from 'path';
 import { homedir } from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -26,16 +26,8 @@ import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-is
 import { findWorkspacePath } from './lifecycle/archive-planning.js';
 import { teardownWorkspaceDockerByNamePromise } from './workspace-manager/docker.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
-import { listMailboxItems, type MailboxItem } from './cloister/agent-mailbox.js';
-import { createTracker } from './tracker/factory.js';
 
 const execAsync = promisify(exec);
-
-export function buildPendingMailboxCloseOutComment(items: MailboxItem[]): string {
-  const details = items.map(item =>
-    `- ${item.source}: ${item.summary} (${item.createdAt}) — .pan/feedback/${basename(item.filePath)}`).join('\n');
-  return `During close-out the system identified ${items.length} undelivered message(s):\n\n${details}\n\nThese were never delivered to a working agent. If this issue is reopened: treat them as likely stale — but consider whether an uncaught message contributed to a premature closure. Do not treat them as current instructions.`;
-}
 
 // Planning/pipeline artifact paths ignored when deciding whether a branch
 // still holds unmerged CODE. `.pan/` is the current artifact home (PAN-967);
@@ -248,15 +240,6 @@ export interface CloseOutContext {
   owner?: string;
   repo?: string;
   number?: number;
-  publishComment?: (issueId: string, body: string) => Promise<void>;
-}
-
-async function publishCloseOutComment(ctx: CloseOutContext, body: string): Promise<void> {
-  if (ctx.publishComment) return ctx.publishComment(ctx.issueId, body);
-  const tracker = ctx.isGitHub
-    ? createTracker({ type: 'github', owner: ctx.owner, repo: ctx.repo })
-    : createTracker({ type: 'linear' });
-  await Effect.runPromise(tracker.addComment(ctx.issueId, body).pipe(Effect.asVoid));
 }
 
 const CLOSED_OUT_LABEL = 'closed-out';
@@ -352,22 +335,6 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
     const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
     const agentSession = `agent-${issueLower}`;
     let cleaned = false;
-
-    if (workspacePath && existsSync(workspacePath)) {
-      const pendingMail = (await listMailboxItems({ issueId: ctx.issueId, role: 'work', workspacePath }))
-        .filter(item => item.state === 'pending');
-      if (pendingMail.length > 0) {
-        const comment = buildPendingMailboxCloseOutComment(pendingMail);
-        try {
-          await publishCloseOutComment(ctx, comment);
-          steps.push({ name: 'Comment pending mailbox', status: 'passed', message: `Commented ${pendingMail.length} undelivered message(s)` });
-        } catch (err) {
-          const message = `Pending mailbox comment failed; workspace preserved for retry: ${(err as Error).message}`;
-          steps.push({ name: 'Comment pending mailbox', status: 'failed', message });
-          return { success: false, issueId: ctx.issueId, steps, error: message };
-        }
-      }
-    }
 
     // Kill tmux sessions for this issue
     const exactPatterns = [agentSession, `test-${issueLower}`, `merge-${issueLower}`];

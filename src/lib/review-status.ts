@@ -17,7 +17,7 @@ import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
 import type { ScopeDriftRecord } from './vbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
-import { registerMailboxStatusReader } from './cloister/mailbox-status-source.js';
+
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
     notifyPipelineSync({ type, issueId });
@@ -192,7 +192,7 @@ export function mergeGateEligibility(
 // PAN-2579: register the cycle-free status-map reader used by concurrency.ts for
 // warm-idle advancing classification (see cloister/review-status-source.ts).
 registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
-registerMailboxStatusReader(issueId => getReviewStatusSync(issueId));
+
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
@@ -794,14 +794,15 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     } catch { /* non-fatal — the message below still carries the summary */ }
 
     const message = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\n${feedbackPath ? `MUST READ: ${feedbackPath}\n\n` : ''}${notes ? `${notes.slice(0, 400)}\n\n` : ''}Fix the failing tests, commit and push, then re-run pan done ${issueId}. Do NOT stop at the prompt.`;
-    const { resolveIssueFeedbackTarget } = await import('./cloister/feedback-target.js');
+    const { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } = await import('./cloister/feedback-target.js');
     const target = await resolveIssueFeedbackTarget(issueId);
     if ('agentId' in target) {
       const { messageAgent } = await import('./agents.js');
       await messageAgent(target.agentId, message, 'internal', { owesRework: true });
-      if (feedbackPath) try { const { markMailboxItemDelivered } = await import('./cloister/agent-mailbox.js'); await markMailboxItemDelivered({ issueId, role: 'work', filePath: feedbackPath }); } catch (error) { console.warn(`[review-status] test feedback reached ${target.agentId}, but mailbox state remains pending for ${issueId}: ${error instanceof Error ? error.message : String(error)}`); }
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
-    } else console.warn(`[review-status] ${target.reason}; issue-role mailbox remains pending`);
+    } else {
+      await surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
+    }
   } catch (err) {
     console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
   }
