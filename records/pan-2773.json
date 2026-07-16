@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:24:55.862Z",
+  "updated": "2026-07-16T18:25:36.445Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-troubleshooting": {
-        "writerId": "agent-pan-2773",
-        "agentId": "agent-pan-2773",
-        "pid": 4074624,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:24:55.861Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2773",
@@ -149,6 +141,17 @@
         "outcome": "completed",
         "reason": "Unknown slugs now wait for both project sources, render an explicit recovery state, suppress Stage and Awareness, and accept registered keys or names; focused CommandDeck tests and frontend typecheck passed.",
         "releasedAt": "2026-07-16T18:24:38.915Z"
+      },
+      {
+        "writerId": "agent-pan-2773",
+        "agentId": "agent-pan-2773",
+        "pid": 4074624,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:24:55.861Z",
+        "itemId": "docs-troubleshooting",
+        "outcome": "completed",
+        "reason": "Troubleshooting now explains unknown or stale Command Deck slugs, recovery navigation, inline creation failures with preserved queries, and pan projects list for registered keys; documentation diff check passed.",
+        "releasedAt": "2026-07-16T18:25:36.445Z"
       }
     ],
     "statusReasons": {
@@ -171,6 +174,10 @@
       "unknown-project-guard": {
         "reason": "Unknown slugs now wait for both project sources, render an explicit recovery state, suppress Stage and Awareness, and accept registered keys or names; focused CommandDeck tests and frontend typecheck passed.",
         "updatedAt": "2026-07-16T18:24:38.915Z"
+      },
+      "docs-troubleshooting": {
+        "reason": "Troubleshooting now explains unknown or stale Command Deck slugs, recovery navigation, inline creation failures with preserved queries, and pan projects list for registered keys; documentation diff check passed.",
+        "updatedAt": "2026-07-16T18:25:36.445Z"
       }
     }
   },
@@ -197,6 +204,8 @@
     "unknown-project-guard.unknown-project-guard.ac2": "completed",
     "unknown-project-guard.unknown-project-guard.ac3": "completed",
     "unknown-project-guard.unknown-project-guard.ac4": "completed",
-    "docs-troubleshooting": "running"
+    "docs-troubleshooting": "completed",
+    "docs-troubleshooting.docs-troubleshooting.ac1": "completed",
+    "docs-troubleshooting.docs-troubleshooting.ac2": "completed"
   }
 }
