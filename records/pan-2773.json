@@ -319,7 +319,7 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:23:55.662Z",
+  "updated": "2026-07-16T21:24:40.921Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "passed",
@@ -328,60 +328,19 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-16T21:23:55.593Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
-    "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T21:24:40.896Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-16T21:24:40.896Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
     "lastVerifiedCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
-    "reviewRequestedAt": "2026-07-16T19:33:54.654Z",
     "reviewSpawnedAt": "2026-07-16T21:21:45.096Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
-      ],
-      "declaredScope": [
-        "reference/troubleshooting.mdx",
-        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/Stage/stage.module.css"
-      ],
-      "actualChangedFiles": [
-        "reference/troubleshooting.mdx",
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/Stage/stage.module.css",
-        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
-      ],
-      "recordedAt": "2026-07-16T18:48:47.449Z"
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -389,15 +348,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 57434,
-            "output": 255,
-            "cacheRead": 33024,
+            "input": 90861,
+            "output": 434,
+            "cacheRead": 40576,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 4482194,
-            "output": 16350,
-            "cacheRead": 4109056,
+            "input": 4652003,
+            "output": 16521,
+            "cacheRead": 4276480,
             "cacheWrite": 0
           }
         },
@@ -476,15 +435,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 57434,
-          "output": 255,
-          "cacheRead": 33024,
+          "input": 90861,
+          "output": 434,
+          "cacheRead": 40576,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 24572567,
-          "output": 656296,
-          "cacheRead": 152565504,
+          "input": 24742376,
+          "output": 656467,
+          "cacheRead": 152732928,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -501,8 +460,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 213.857896,
-        "pricingAsOf": "2026-07-16T21:23:55.615Z"
+        "usd": 213.958663,
+        "pricingAsOf": "2026-07-16T21:24:40.912Z"
       }
     },
     "merges": [
