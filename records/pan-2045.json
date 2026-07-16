@@ -242,17 +242,17 @@
     "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T20:28:13.783Z",
+  "updated": "2026-07-16T20:28:20.623Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:28:12.696Z",
+    "updatedAt": "2026-07-16T20:28:20.606Z",
     "reviewNotes": "both prior blockers are repaired; the only new raw finding is demoted by the mandatory cycle-3 convergence gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
@@ -387,24 +387,6 @@
       ],
       "recordedAt": "2026-07-16T20:15:02.866Z"
     },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -476,9 +458,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4827412,
-            "output": 181913,
-            "cacheRead": 71446528,
+            "input": 4841899,
+            "output": 184043,
+            "cacheRead": 72194560,
             "cacheWrite": 0
           }
         }
@@ -497,9 +479,9 @@
           "cacheWrite": 165070
         },
         "openai/gpt-5.6-sol": {
-          "input": 12750514,
-          "output": 324576,
-          "cacheRead": 99714048,
+          "input": 12765001,
+          "output": 326706,
+          "cacheRead": 100462080,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -510,8 +492,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 131.438938,
-        "pricingAsOf": "2026-07-16T20:28:12.722Z"
+        "usd": 131.949289,
+        "pricingAsOf": "2026-07-16T20:28:20.612Z"
       }
     },
     "merges": [
@@ -520,7 +502,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
