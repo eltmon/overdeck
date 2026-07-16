@@ -5162,3 +5162,21 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Fleet remaining: PAN-2255 (#2783, agent stopped at 09:29 post-work — review advancing), 1966, 2768,
   2702, 2532(merged earlier), 1491 working.
 - **Session: 45 merges, 14 close-outs.**
+
+---
+
+## Tick 54 — 2026-07-16 ~12:05Z — 2168 VERIFIED VISUALLY + closed clean; 2698 closed
+
+- **PAN-2168: operator-requested visual verification DONE** — strike drove live dashboard w/ Playwright,
+  verdict (a) badge visible count=3, 2 screenshots inline on the ticket (docs/evidence/ raw links);
+  I fetched + eyeballed the PNG myself before accepting. Deploy-gap was the operator's actual symptom
+  (merged 10:01Z > boot 09:27Z) — deployed first, then verified. **Closed with ALL DoD rows passing.**
+- PAN-2698 closed w/ recorded overrides (aborted teardown had cleared its review_status first —
+  close-out idempotency wart: a failed teardown mutates rows the re-run then reads as MISS).
+- Teardown blocker was MY OWN debris: devcontainer-init-1/-init-perms-1 from 06:00 init tests
+  (compose project name defaulted from the .devcontainer dir ⇒ dodge cleanup greps). Removed.
+- ⚠️ I used --accept-deploy 1min after merging 2168/2698 at tick 53 (premature; gate blocked me on
+  other rows — operator called it out). **RULE: --accept-deploy only ever FOLLOWS a deploy I just
+  verified.** This tick's 2168 close needed NO overrides — the honest sequence works.
+- Server restarted twice by external actors this hour (pid churn); "Boot reconciliation failed:
+  Failed to fetch" in operator's browser = restart window artifact = PAN-2772 instance.
