@@ -424,17 +424,17 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:37:21.243Z",
+  "updated": "2026-07-16T02:41:47.772Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:37:20.694Z",
+    "updatedAt": "2026-07-16T02:41:47.699Z",
     "reviewNotes": "[security] `clearGates` permits unauthenticated removal of operator safety gates — `src/dashboard/server/routes/agents/spawn.ts:268`",
     "verificationNotes": "Verification FAILED at lint (57944ms):\n\nprompt-trailer\n> bash scripts/check-prompt-change-trailer.sh\n\nprompt-trailer: no roles/*.md or docs/flywheel-brief.md changes; ok\n\n> @overdeck/core@0.45.20 lint:file-size\n> bash scripts/lint-file-size.sh\n\n✓ file-size guard passed (no new god files; no baselined file grew)\n\n> @overdeck/core@0.45.20 lint:source-introspection\n> bash scripts/lint-source-introspection.sh\n\n✗ tests/unit/dashboard/frontend/issue-view-no-loss.test.ts has 2 source-introspection read(s) but is not baselined.\n\nsource-introspection guard failed. Rewrite the test to exercise runtime behavior, or use --regen only in an audited accept-new-offender commit.\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (73%)\n  - rolldown-plugin-dts:fake-js (20%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/merge-agent.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (72%)\n  - rolldown-plugin-dts:generate (21%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
@@ -575,28 +575,6 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-16T02:07:47.991Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-7390121a/security.md",
-        "atCommit": "7390121aec0dd078cb919a943e33f61ce3697836"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-7390121a/correctness.md",
-        "atCommit": "7390121aec0dd078cb919a943e33f61ce3697836"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-7390121a/performance.md",
-        "atCommit": "7390121aec0dd078cb919a943e33f61ce3697836"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-7390121a/requirements.md",
-        "atCommit": "7390121aec0dd078cb919a943e33f61ce3697836"
-      }
     }
   },
   "closeOut": {
@@ -604,15 +582,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 14511121,
-            "output": 12496,
-            "cacheRead": 12791168,
+            "input": 14775267,
+            "output": 12716,
+            "cacheRead": 13043840,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 153120754,
-            "output": 287954,
-            "cacheRead": 148939776,
+            "input": 157944622,
+            "output": 293126,
+            "cacheRead": 153719552,
             "cacheWrite": 0
           }
         },
@@ -659,15 +637,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 14511121,
-          "output": 12496,
-          "cacheRead": 12791168,
+          "input": 14775267,
+          "output": 12716,
+          "cacheRead": 13043840,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 153120754,
-          "output": 287954,
-          "cacheRead": 148939776,
+          "input": 157944622,
+          "output": 293126,
+          "cacheRead": 153719552,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -690,8 +668,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 169.777963,
-        "pricingAsOf": "2026-07-16T02:37:20.727Z"
+        "usd": 172.543471,
+        "pricingAsOf": "2026-07-16T02:41:47.762Z"
       }
     },
     "merges": [
