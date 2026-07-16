@@ -376,6 +376,11 @@
       "timestamp": "2026-07-16T13:05:34.366Z",
       "reason": "end",
       "note": "All review findings fixed; exact verification command passes locally (543 backend files, 5021 tests; 89 frontend files, 1036 tests). Resetting repeated frontend verifier hang after backend completed green."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T15:37:03.975Z"
     }
   ],
   "feedback": [
@@ -462,7 +467,7 @@
     "recordedAt": "2026-07-16T13:05:33.565Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T13:37:07.459Z",
+  "updated": "2026-07-16T15:37:04.010Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
@@ -718,7 +723,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.5",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
     "b8-orchestrator-doc.ac1": "completed",
