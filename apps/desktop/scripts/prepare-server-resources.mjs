@@ -6,8 +6,8 @@
  * sibling rolldown chunks, and spawns the deacon/worker entries by path.
  * Shipping server.js alone (the pre-PAN-2561 packaging) can never boot.
  *
- * This script assembles apps/desktop/server/ (gitignored) from the repo-root
- * build output:
+ * This script assembles the gitignored desktop packaging payload from the
+ * repo-root build output:
  *   - dist/dashboard/*.js       → server/          (entry + full chunk graph)
  *   - dist/dashboard/public/    → server/public/
  *   - server/package.json       ({type: "module"} so the chunks load as ESM)
@@ -17,6 +17,8 @@
  *     broken package), then installed at the repo's installed versions.
  *     @lydell/node-pty ships Node-API prebuilds, so the packaged server child
  *     can use the same platform package under stock Node and Electron.
+ *   - dist/cli/ + chunk closure → cli/              (self-contained CLI runtime)
+ *   - sync-sources/             → sync-sources/     (full sync payload, not hooks only)
  *
  * Deliberately skipped externals: bun-only modules (never imported under
  * Node), and playwright (lazy import for artifact thumbnails, PAN-1645 —
