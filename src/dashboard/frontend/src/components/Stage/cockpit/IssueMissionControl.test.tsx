@@ -1,9 +1,16 @@
-import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
 const actionInvoke = vi.fn()
+let queryClient: QueryClient | undefined
+
+afterEach(() => {
+  cleanup()
+  queryClient?.clear()
+  queryClient = undefined
+})
 
 const queryMocks = vi.hoisted(() => {
   const activityQuery = {
@@ -115,14 +122,15 @@ import { IssueMissionControl } from './IssueMissionControl'
 
 function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
   const onOpenPane = extra?.onOpenPane ?? vi.fn()
-  const queryClient = new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: { gcTime: 0, retry: false },
       mutations: { retry: false },
     },
   })
+  queryClient = client
   const view = render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={client}>
       <IssueMissionControl
         issueId="PAN-1661"
         title="Mission control"
