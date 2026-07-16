@@ -1326,10 +1326,16 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     data-testid={`conversation-${conv.id}`}
                     title={conv.title ?? conv.name}
                   >
-                    <MessageSquare size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, fontWeight: 500 }}>{conv.title || 'Conversation'}</span>
-                    <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{conv.status}</span>
-                    <span style={{ fontSize: 10, color: 'var(--muted-foreground)', fontVariantNumeric: 'tabular-nums' }}>#{conv.id}</span>
+                    <span className={styles.sessionToggleSlot} />
+                    <span className={styles.sessionDotSlot} />
+                    <span className={styles.sessionIconSlot}>
+                      <MessageSquare size={12} />
+                    </span>
+                    <span className={styles.sessionLabel}>{conv.title || 'Conversation'}</span>
+                    <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${conv.status}`] ?? ''}`}>
+                      {conv.status}
+                    </span>
+                    <span className={styles.sessionModel}>#{conv.id}</span>
                   </a>
                 ))}
               </>
