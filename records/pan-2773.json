@@ -361,7 +361,7 @@
     "recordedAt": "2026-07-16T21:54:06.876Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:59:19.086Z",
+  "updated": "2026-07-16T22:01:01.174Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -371,11 +371,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:59:19.029Z",
+    "updatedAt": "2026-07-16T22:01:01.129Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2773-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "lastVerifiedCommit": "c9ec576763f8addd6fce1d12cd45a2ece4debd41",
-    "reviewRequestedAt": "2026-07-16T21:59:18.615Z",
+    "reviewRequestedAt": "2026-07-16T22:01:00.784Z",
     "reviewSpawnedAt": "2026-07-16T21:54:08.748Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -451,9 +451,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6303368,
-            "output": 88877,
-            "cacheRead": 20306944,
+            "input": 6354512,
+            "output": 94507,
+            "cacheRead": 22279680,
             "cacheWrite": 0
           }
         },
@@ -522,9 +522,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 31292482,
-          "output": 839432,
-          "cacheRead": 185728512,
+          "input": 31343626,
+          "output": 845062,
+          "cacheRead": 187701248,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -541,8 +541,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 270.565769,
-        "pricingAsOf": "2026-07-16T21:59:19.035Z"
+        "usd": 271.976757,
+        "pricingAsOf": "2026-07-16T22:01:01.133Z"
       }
     },
     "merges": [
