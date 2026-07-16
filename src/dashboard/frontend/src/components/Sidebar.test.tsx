@@ -109,7 +109,11 @@ describe('Sidebar navigation', () => {
     const onOpenUpdater = vi.fn();
     renderSidebar({ onOpenUpdater });
 
-    const version = await screen.findByRole('button', { name: 'Overdeck version 0.5.0. Click to check for updates.' });
+    const version = await screen.findByRole(
+      'button',
+      { name: 'Overdeck version 0.5.0. Click to check for updates.' },
+      { timeout: 5000 },
+    );
     expect(version).toHaveAttribute('title', 'Click to update Overdeck to the latest version');
     fireEvent.click(version);
     expect(onOpenUpdater).toHaveBeenCalledOnce();

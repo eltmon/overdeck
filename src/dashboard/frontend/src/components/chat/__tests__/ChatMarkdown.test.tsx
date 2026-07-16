@@ -121,9 +121,10 @@ describe('ChatMarkdown file links', () => {
 
     const { rerender } = renderMarkdown(<ChatMarkdown text="Visit [site](https://example.com)." cwd="/tmp/project" />, true);
 
-    await waitFor(() =>
-      expect(screen.getByRole('link', { name: 'site' })).toHaveAttribute('href', 'https://example.com/'),
-    );
+    await screen.findByRole('link', { name: 'site' });
+    await waitFor(() => {
+      expect(screen.getByRole('link', { name: 'site' })).toHaveAttribute('href', 'https://example.com/');
+    });
     const external = screen.getByRole('link', { name: 'site' });
     expect(external).toHaveAttribute('target', '_blank');
     expect(external).toHaveAttribute('rel', 'noopener noreferrer');

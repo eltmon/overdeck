@@ -129,6 +129,7 @@ vi.mock('./lib/store', () => ({
   selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
+  selectPendingInputSubjects: () => [],
   selectIssues: (state: { issues: unknown[] }) => state.issues,
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
   selectPendingInputSubjects: () => [],

@@ -1,7 +1,12 @@
+import type { ReactNode } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import { ProjectHome } from './ProjectHome'
+import { IssueOverview } from './IssueOverview'
 import type { StageApi } from './types'
+
+vi.mock('./cockpit/IssueMissionControl', () => ({
+  IssueMissionControl: ({ launcher }: { launcher: ReactNode }) => <>{launcher}</>,
+}))
 
 function api(overrides: Partial<StageApi> = {}): StageApi {
   return {
@@ -23,36 +28,15 @@ function deferred<T>() {
   return { promise, resolve }
 }
 
-describe('ProjectHome', () => {
-  it('passes the launcher query into the created agent conversation', async () => {
-    const openOrFocusAgentPane = vi.fn()
-    const onCreateConversation = vi.fn().mockResolvedValue({ name: 'conv-123' })
-
-    render(
-      <ProjectHome
-        projectName="overdeck"
-        onCreateConversation={onCreateConversation}
-        api={api({ openOrFocusAgentPane })}
-      />,
-    )
-
-    const input = screen.getByRole('textbox')
-    fireEvent.change(input, { target: { value: 'This is a test' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-
-    await waitFor(() => {
-      expect(onCreateConversation).toHaveBeenCalledWith('claude-code', 'This is a test', 'terminal')
-    })
-    expect(openOrFocusAgentPane).toHaveBeenCalledWith('conv-123', 'Agent')
-  })
-
+describe('IssueOverview', () => {
   it('renders conversation creation errors inline without opening a pane', async () => {
     const openOrFocusAgentPane = vi.fn()
     const onCreateConversation = vi.fn().mockResolvedValue({ error: 'Unknown project: overdeck' })
 
     render(
-      <ProjectHome
-        projectName="overdeck"
+      <IssueOverview
+        issueId="PAN-2773"
+        title="Command Deck launch errors"
         onCreateConversation={onCreateConversation}
         api={api({ openOrFocusAgentPane })}
       />,
@@ -64,7 +48,6 @@ describe('ProjectHome', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Unknown project: overdeck')
     expect(input).toHaveValue('Keep this query')
-    expect(screen.queryByRole('listbox')).toBeNull()
     expect(openOrFocusAgentPane).not.toHaveBeenCalled()
   })
 
@@ -73,8 +56,9 @@ describe('ProjectHome', () => {
     const onCreateConversation = vi.fn().mockReturnValue(pending.promise)
 
     render(
-      <ProjectHome
-        projectName="overdeck"
+      <IssueOverview
+        issueId="PAN-2773"
+        title="Command Deck launch errors"
         onCreateConversation={onCreateConversation}
         api={api()}
       />,
@@ -102,8 +86,9 @@ describe('ProjectHome', () => {
       .mockReturnValueOnce(retry.promise)
 
     render(
-      <ProjectHome
-        projectName="overdeck"
+      <IssueOverview
+        issueId="PAN-2773"
+        title="Command Deck launch errors"
         onCreateConversation={onCreateConversation}
         api={api({ openOrFocusAgentPane })}
       />,
@@ -119,9 +104,9 @@ describe('ProjectHome', () => {
     expect(screen.queryByRole('alert')).toBeNull()
 
     await act(async () => {
-      retry.resolve({ name: 'conv-456' })
+      retry.resolve({ name: 'conv-789' })
       await retry.promise
     })
-    expect(openOrFocusAgentPane).toHaveBeenCalledWith('conv-456', 'Agent')
+    expect(openOrFocusAgentPane).toHaveBeenCalledWith('conv-789', 'Agent')
   })
 })

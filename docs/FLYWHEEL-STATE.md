@@ -5405,3 +5405,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Posture now:** let IN-FLIGHT codex reviews finish (don't kill working convoys); NEW spawns = claude-code+CLIProxy. WATCH the first claude-code review convoy — if synthesis stalls with server HEALTHY, capture pane+transcript+cliproxy.log window immediately and report (that's NEW evidence, not the old wedge).
 - Merges landed earlier this session on the (now-reverted) codex path remain valid: PAN-1987 (1e1efdb358), PAN-2772 (7b24be7f82) — both fresh APPROVED against exact head, CI green.
 - **Merge queue:** PAN-2760 PR#2797 FRESH APPROVED (run 42df3363==head), all checks green EXCEPT `test` still PENDING → hold until test passes, then merge. Do NOT --admin over pending test.
+
+## Tick 66 — 2026-07-16 ~17:55 — two more merges (2760, 2619)
+- **PAN-2760 MERGED → 92dfb73638** — FRESH APPROVED (run 42df3363==head), waited out pending `test` job to green (did NOT --admin over pending test), then merged clean.
+- **PAN-2619 MERGED → 7c46c64e02** — APPROVED review at e3568752; head advanced to 416d0cb2 but VERIFIED the only delta is docs/FLYWHEEL-STATE.md — feature src diff (XTerminal.tsx+index.css, 24/7) byte-identical at both heads. Browser UAT infra-blocked (PAN-2809), reviewed+CI-green, merged per tick-64b decision rule (honest disposition).
+- **Session merge tally: PAN-1987, 2772, 2760, 2619 (4).** All fresh-verified against exact feature code, all GitHub CI green.
+- **CLOSE-OUT OWED (DoD):** 1987, 2772, 2760, 2619 all need post-merge verify-on-main + deploy + teardown. Batch after main CI settles.
+- Still driving: 1897, 1966 (stale review→re-trigger), 2045, 2773 — reviews synthesizing. Harness now claude-code for new spawns; watch first claude-code convoy for stalls.

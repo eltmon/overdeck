@@ -177,13 +177,24 @@ describe('XTerminal', () => {
     });
   });
 
-  it('allows the terminal frame to shrink inside constrained flex layouts (PAN-2619)', () => {
+  it('keeps padding off the measured terminal host (PAN-2619)', async () => {
     const { container } = render(<XTerminal sessionName="test-session" />);
     const frame = container.firstElementChild;
-    const terminalSurface = container.querySelector('.absolute.inset-2');
+    const terminalHost = container.querySelector('.xterm-host') as HTMLDivElement;
+    const terminalMock = Terminal as unknown as {
+      instances: Array<{ open: ReturnType<typeof vi.fn> }>;
+    };
+
+    await waitFor(() => {
+      expect(terminalMock.instances).toHaveLength(1);
+    });
+    const term = terminalMock.instances[0];
 
     expect(frame).toHaveClass('min-w-0', 'min-h-0', 'overflow-hidden');
-    expect(terminalSurface).not.toHaveStyle({ padding: '8px' });
+    expect(terminalHost).toHaveClass('xterm-host', 'absolute', 'inset-0');
+    expect(term.open).toHaveBeenCalledWith(terminalHost);
+    // FitAddon subtracts padding from the generated .xterm element, not this measured host.
+    expect(terminalHost.style.padding).toBe('');
   });
 
   it('loads auto-copy setting from localStorage', async () => {
@@ -340,7 +351,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement | null;
     expect(terminalSurface).toBeTruthy();
 
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
@@ -357,7 +368,7 @@ describe('XTerminal', () => {
 
     const term = (Terminal as unknown as { instances: Array<{ selection: string }> }).instances[0];
     term.selection = 'selected output';
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement;
     const rightMouseDown = new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
     const stopPropagation = vi.spyOn(rightMouseDown, 'stopPropagation');
 
@@ -385,7 +396,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement | null;
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
     fireEvent.click(await screen.findByText('Paste'));
 
