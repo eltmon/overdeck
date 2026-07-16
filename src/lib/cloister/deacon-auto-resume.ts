@@ -41,13 +41,13 @@ import {
   killSession,
   listPaneValues,
   listSessionNames,
-  querySessionSync,
   sessionExists,
   sessionExistsSync,
 } from '../tmux.js';
 import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { getDispatchableItems } from '../vbrief/dag.js';
 import type { VBriefItem } from '../vbrief/types.js';
+import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
 
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
@@ -57,7 +57,6 @@ export interface AutoResumeNotifierDeps {
 export type { BootReconciliationApplyResult, BootReconciliationOutcome, BootReconciliationOutcomeReason } from './boot-reconciliation-outcomes.js';
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
-const consecutiveMissingSessionQueries = new Map<string, number>();
 
 const emptyBootReconciliationApplyResult = (): BootReconciliationApplyResult => ({ resumed: [], outcomes: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 });
 
@@ -142,22 +141,8 @@ export async function handleAgentHeartbeatDeadEvent(
     return [];
   }
 
-  const sessionQuery = querySessionSync(agentId);
-  if (sessionQuery.status === 'error') {
-    consecutiveMissingSessionQueries.delete(agentId);
-    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — tmux query failed (${sessionQuery.detail})`);
-    return [];
-  }
-  if (sessionQuery.status === 'exists') {
-    consecutiveMissingSessionQueries.delete(agentId);
-  } else {
-    const missCount = (consecutiveMissingSessionQueries.get(agentId) ?? 0) + 1;
-    consecutiveMissingSessionQueries.set(agentId, missCount);
-    if (missCount < 2) {
-      logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} retained after first confirmed tmux miss (${sessionQuery.detail})`);
-      return [];
-    }
-  }
+  const [sessionQuery, retainReason] = queryConfirmedSession(agentId);
+  if (retainReason) { logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} ${retainReason}`); return []; }
 
   // PAN-1557: convoy reviewers are interactive — they own a tmux session
   // (remain-on-exit on) like other specialists, so liveness is the session's
@@ -210,8 +195,7 @@ export async function handleAgentHeartbeatDeadEvent(
 
   // Orphaned — crashed agent with no tmux session
   const oldStatus = state.status;
-  const missingSessionDetail = sessionQuery.status === 'missing' ? sessionQuery.detail : 'pane confirmed dead';
-  consecutiveMissingSessionQueries.delete(agentId);
+  const missingSessionDetail = consumeConfirmedSessionDetail(agentId, sessionQuery);
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
   await Effect.runPromise(saveAgentState(state));
@@ -1022,10 +1006,8 @@ export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Prom
   const actions: string[] = [];
   const agents = listAllAgents();
 
-  // Orphans: agents the registry says are running/starting but have no live tmux.
-  const orphanCandidates = agents
-    .filter((agent) => agent.status === 'running' || agent.status === 'starting')
-    .map((agent) => agent.id);
+  // Query every nominally live agent; the handler requires two confirmed misses before reaping.
+  const orphanCandidates = agents.filter((agent) => agent.status === 'running' || agent.status === 'starting').map((agent) => agent.id);
 
   for (const agentId of orphanCandidates) {
     const result = await handleAgentHeartbeatDeadEvent(agentId, 'reconcile', deps);
