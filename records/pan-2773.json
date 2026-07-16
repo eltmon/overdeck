@@ -349,7 +349,7 @@
     "recordedAt": "2026-07-16T21:44:39.479Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:44:59.437Z",
+  "updated": "2026-07-16T21:45:44.061Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "failed",
@@ -359,62 +359,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:44:59.350Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-2773-review already running. Use 'pan tell' to message it.",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-07-16T21:35:41.918Z"
-      }
-    ],
+    "updatedAt": "2026-07-16T21:45:42.719Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "lastVerifiedCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
-    "reviewRequestedAt": "2026-07-16T21:44:40.419Z",
     "reviewSpawnedAt": "2026-07-16T21:44:45.040Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
-      ],
-      "declaredScope": [
-        "reference/troubleshooting.mdx",
-        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/Stage/stage.module.css"
-      ],
-      "actualChangedFiles": [
-        "reference/troubleshooting.mdx",
-        "scripts/file-size-baseline.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/Stage/stage.module.css",
-        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
-      ],
-      "recordedAt": "2026-07-16T21:44:39.479Z"
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -500,9 +448,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6169768,
-            "output": 403374,
-            "cacheRead": 113337344,
+            "input": 6177325,
+            "output": 404942,
+            "cacheRead": 114275328,
             "cacheWrite": 0
           }
         }
@@ -515,9 +463,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 25109557,
-          "output": 684113,
-          "cacheRead": 162893312,
+          "input": 25117114,
+          "output": 685681,
+          "cacheRead": 163831296,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -534,8 +482,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 222.886065,
-        "pricingAsOf": "2026-07-16T21:44:59.399Z"
+        "usd": 223.439882,
+        "pricingAsOf": "2026-07-16T21:45:43.065Z"
       }
     },
     "merges": [
