@@ -11,20 +11,36 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:31:35.877Z",
+  "updated": "2026-07-16T07:31:44.473Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T04:08:21.424Z"
+    "updatedAt": "2026-07-16T07:31:44.219Z",
+    "inspectNotes": "Inspecting item codex-config-mcp-servers"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 71823,
+            "output": 648,
+            "cacheRead": 38016,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 541230,
+            "output": 1662,
+            "cacheRead": 487680,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 256,
@@ -35,6 +51,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 71823,
+          "output": 648,
+          "cacheRead": 38016,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 541230,
+          "output": 1662,
+          "cacheRead": 487680,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 256,
           "output": 21409,
@@ -43,15 +71,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 7.506575,
-        "pricingAsOf": "2026-07-16T04:08:21.469Z"
+        "usd": 8.068025,
+        "pricingAsOf": "2026-07-16T07:31:44.417Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 5,
     "claims": {
