@@ -4,17 +4,17 @@
     "created": "2026-07-16T05:02:38Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2773: bug(command-deck): conversation create fails silently on unknown project slug — console-only error, no UI feedback",
-    "updated": "2026-07-16T05:06:22.081Z"
+    "updated": "2026-07-16T17:39:15.808Z"
   },
   "plan": {
     "id": "pan-2773",
     "title": "bug(command-deck): conversation create fails silently on unknown project slug — console-only error, no UI feedback",
-    "status": "proposed",
+    "status": "approved",
     "uid": "21acdc74-3f82-4579-ae52-c6baefdde0f4",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-16T05:02:38Z",
-    "updated": "2026-07-16T05:06:22.081Z",
+    "updated": "2026-07-16T17:39:15.808Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2773",
@@ -479,5 +479,5 @@
       "canonicalFilename": "2026-07-16-PAN-2773-bug-command-deck-conversation-create-fails-silently-on-unknown-project-slug-console-only-error-no-ui-feedback.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
