@@ -502,6 +502,7 @@ beforeEach(async () => {
   await resetDb();
   TEST_HOME = join(tmpdir(), `pan-416-route-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   mkdirSync(TEST_HOME, { recursive: true });
+  process.env.HOME = TEST_HOME;
   process.env.OVERDECK_HOME = TEST_HOME;
 });
 
@@ -607,7 +608,7 @@ describe('conversations route — DB integration', () => {
       createConversation({
         name: 'pi-switch-model',
         tmuxSession: 'conv-pi-switch-model',
-        cwd: process.cwd(),
+        cwd: TEST_HOME,
         harness: 'pi',
         model: 'old-model',
         claudeSessionId: 'pi-session-jsonl',
@@ -637,7 +638,7 @@ describe('conversations route — DB integration', () => {
       createConversation({
         name: 'claude-switch-model',
         tmuxSession: 'conv-claude-switch-model',
-        cwd: process.cwd(),
+        cwd: TEST_HOME,
         harness: 'claude-code',
         model: 'old-model',
         claudeSessionId: 'claude-session-jsonl',
