@@ -17,6 +17,7 @@ import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
 import type { ScopeDriftRecord } from './vbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
+import type { InspectionStatusFields } from './inspection-status.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
@@ -40,16 +41,12 @@ export interface BlockerReason {
   detectedAt: string;
 }
 
-export interface ReviewStatus extends StrikeLandingStatus {
+export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusFields {
   issueId: string;
   reviewStatus: 'pending' | 'reviewing' | 'passed' | 'failed' | 'blocked' | 'skipped';
   testStatus: 'pending' | 'testing' | 'passed' | 'failed' | 'skipped' | 'dispatch_failed';
   mergeStatus?: 'pending' | 'queued' | 'merging' | 'verifying' | 'merged' | 'failed';
   releaseStatus?: 'pending' | 'releasing' | 'passed' | 'failed' | 'partial' | 'rolled_back' | 'skipped';
-  inspectStatus?: 'pending' | 'inspecting' | 'passed' | 'failed' | 'error';
-  inspectNotes?: string;
-  inspectStartedAt?: string;
-  inspectBeadId?: string;
   uatStatus?: 'pending' | 'testing' | 'passed' | 'failed';
   uatNotes?: string;
   verificationStatus?: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';

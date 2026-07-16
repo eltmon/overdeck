@@ -132,11 +132,13 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
   it('wires runPatrol between failed-merge retry and stale merge reconciliation', () => {
     const source = readFileSync(join(process.cwd(), 'src/lib/cloister/deacon.ts'), 'utf-8');
     const failedMergeIndex = source.indexOf('const failedMergeRetryActions = await checkFailedMergeRetry();');
-    const strikeLandingIndex = source.indexOf("import('./deacon-strike-landing.js')).patrolStrikeLandings()");
+    const strikeLandingIndex = source.indexOf('for (const a of await patrolStrikeLandings())');
     const swarmIndex = source.indexOf('const swarmActions = await coordinateSwarmSlots();');
     const staleMergeIndex = source.indexOf('const staleMergeActions = await reconcileStaleMergeStatus();');
 
     expect(failedMergeIndex).toBeGreaterThanOrEqual(0);
+    expect(source).toContain("import { patrolStrikeLandings } from './deacon-strike-landing.js';");
+    expect(source).not.toContain("import('./deacon-strike-landing.js')");
     expect(strikeLandingIndex).toBeGreaterThan(failedMergeIndex);
     expect(swarmIndex).toBeGreaterThan(strikeLandingIndex);
     expect(staleMergeIndex).toBeGreaterThan(swarmIndex);
