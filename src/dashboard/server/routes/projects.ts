@@ -322,6 +322,7 @@ async function collectSessionTreeNodes(
         awaitingInput: awaitingInput !== null,
         awaitingInputPrompt: awaitingInput?.prompt,
         awaitingInputReason: awaitingInput?.reason,
+        pendingInputKinds: context.agentSnapshotsById?.get(checkId)?.pendingInputKinds,
         hasJsonl: !!jsonlPath,
         harness: state.harness,
         deliveryMethod: state.deliveryMethod,

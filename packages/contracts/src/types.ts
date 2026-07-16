@@ -610,6 +610,8 @@ export const SessionNode = Schema.Struct({
   awaitingInput: Schema.optional(Schema.Boolean),
   awaitingInputPrompt: Schema.optional(Schema.String),
   awaitingInputReason: Schema.optional(Schema.String),
+  /** Which blocking surfaces are open — names the wait in the node's indicator. */
+  pendingInputKinds: Schema.optional(Schema.Array(Schema.String)),
   roundMetadata: Schema.optional(ReviewerRoundMetadata),
   deliveryMethod: Schema.optional(Schema.Literals(['auto', 'channels', 'tmux'])),
   // Pause gate (PAN-1779 issue-tree redesign): a paused agent is deliberately

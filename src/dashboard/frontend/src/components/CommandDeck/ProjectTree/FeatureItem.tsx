@@ -8,7 +8,6 @@ import {
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
 import type { Harness } from '../../shared/ModelPicker';
-import { type StatusDotStatus } from '../StatusDot';
 import { ResourcesGroup } from './ResourcesGroup';
 import { getUatStackSummary } from '../UatStackStatus';
 import { UatStackTreeGroup } from './UatStackTreeGroup';
@@ -32,6 +31,7 @@ import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../is
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import { SessionNode } from './SessionNode';
 import { useDashboardStore } from '../../../lib/store';
+import { computeDominantStatus, sessionsNeedAttention } from './sessionAggregates';
 import styles from '../styles/command-deck.module.css';
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
@@ -636,26 +636,6 @@ function defaultExpandedFromState(stateLabel: string): boolean {
   return s.includes('progress') || s.includes('review') || s.includes('testing') || s.includes('verifying');
 }
 
-/** Compute the dominant session presence for the feature row StatusDot.
- *  Priority: active > thinking > waiting > idle > ended. */
-function computeDominantStatus(sessions: readonly SessionNodeType[]): StatusDotStatus {
-  let hasIdle = false;
-  let hasThinking = false;
-  let hasWaiting = false;
-  for (const s of sessions) {
-    if (s.awaitingInput === true) hasWaiting = true;
-    if (s.presence === 'active' && s.awaitingInput !== true) return 'active';
-    if (s.presence === 'idle') hasIdle = true;
-    const st = (s.status || '').toLowerCase();
-    if (st.includes('thinking')) hasThinking = true;
-    if (st.includes('waiting')) hasWaiting = true;
-  }
-  if (hasThinking) return 'thinking';
-  if (hasWaiting) return 'waiting';
-  if (hasIdle) return 'idle';
-  return 'ended';
-}
-
 /** Whether a session passes the tree filter. */
 export function sessionMatchesFilter(session: SessionNodeType, filter: TreeSessionFilter): boolean {
   if (filter === 'all') return true;
@@ -1079,7 +1059,8 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       <IssueView
         issueId={feature.issueId}
         density={expanded ? 'cockpit' : 'rail'}
-        className={`${styles.featureItemWrapper} ${edgeClass} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
+        className={`${styles.featureItemWrapper} ${edgeClass} ${sessionsNeedAttention(aggregateSessions) ? styles.featureItemWrapperNeedsAttention : ''} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
+        data-needs-attention={sessionsNeedAttention(aggregateSessions) ? 'true' : undefined}
         data-component="feature-item"
         data-issue-id={feature.issueId}
       >
@@ -1302,10 +1283,10 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     data-testid={`conversation-${conv.id}`}
                     title={conv.title ?? conv.name}
                   >
-                    <MessageSquare size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, fontWeight: 500 }}>{conv.title || 'Conversation'}</span>
-                    <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>{conv.status}</span>
-                    <span style={{ fontSize: 10, color: 'var(--muted-foreground)', fontVariantNumeric: 'tabular-nums' }}>#{conv.id}</span>
+                    <span className={styles.sessionIconSlot}><MessageSquare size={12} /></span>
+                    <span className={styles.sessionLabel}>{conv.title || 'Conversation'}</span>
+                    <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${conv.status}`] ?? ''}`}>{conv.status}</span>
+                    <span className={styles.sessionModel}>#{conv.id}</span>
                   </a>
                 ))}</div>}
               </>

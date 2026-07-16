@@ -620,6 +620,14 @@
   white-space: nowrap;
 }
 
+/* PAN-2765 — a descendant session is waiting on the operator. Amber = a human
+   must act. This tints the row rather than taking the left border, which
+   already carries pipeline status. Declared before .featureItemWrapperSelected
+   so an explicit selection still wins at equal specificity. */
+.featureItemWrapperNeedsAttention {
+  background: color-mix(in srgb, var(--warning) 8%, transparent);
+}
+
 .featureItemWrapperSelected {
   background: color-mix(in srgb, var(--primary) 8%, transparent);
 }

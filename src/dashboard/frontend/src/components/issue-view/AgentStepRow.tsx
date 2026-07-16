@@ -30,6 +30,7 @@ import { useLiveFlash } from '../../lib/useLiveFlash';
 import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useDashboardStore } from '../../lib/store';
+import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import { useResolvedModels, resolveWorkTypeKey } from '../../lib/useResolvedModels';
 import { useAvailableModels, type Harness, type ModelGroup } from '../shared/ModelPicker';
 import { StatusDot, type StatusDotStatus } from '../CommandDeck/StatusDot';
@@ -49,6 +50,7 @@ import {
   ContextMenuSubContent,
 } from '../shared/ContextMenu';
 import { AGENT_ROW_SECTIONS } from './inventory';
+import { AwaitingInputIndicator } from '../AwaitingInputIndicator';
 import railStyles from '../CommandDeck/styles/command-deck.module.css';
 import cockpitStyles from '../Stage/cockpit/agentsLane.module.css';
 
@@ -569,6 +571,7 @@ export function AgentStepRow({
   const resolvedModels = useResolvedModels();
   const costOf = useSessionCost(issueId);
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
+  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   const lastActivity = runtime?.lastActivity;
   const [isStopping, setIsStopping] = useState(false);
 
@@ -824,6 +827,13 @@ export function AgentStepRow({
             <span className={railStyles.sessionSubtitle}>{subtitle}</span>
           )}
           <LiveLastHeard lastActivity={lastActivity} />
+          {session.awaitingInput === true && (
+            <AwaitingInputIndicator
+              kinds={session.pendingInputKinds}
+              size={12}
+              onClick={() => requestAskUserQuestionReopen(session.sessionId)}
+            />
+          )}
           {!['stopped', 'unknown', 'idle', 'completed', 'running', 'working', 'thinking', 'paused'].includes(String(statusCssKey)) && (
             <span
               className={`${railStyles.sessionStatus} ${railStyles[`sessionStatus_${statusCssKey}`] ?? ''}`}

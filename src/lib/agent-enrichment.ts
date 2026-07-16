@@ -49,6 +49,10 @@ export type PendingInputKind =
   | 'enterPlanMode'
   | 'sessionResume'
   | 'rateLimit'
+  // An interactive session ended its turn — the operator's move. This is the
+  // only kind for a question asked in prose, which carries no tool call and no
+  // modal, and is therefore invisible to every other detector.
+  | 'agentTurnEnded'
 
 export interface PendingAskUserQuestionSnapshot {
   toolUseId: string
@@ -518,7 +522,28 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
       }
     : null
 
-  const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection
+  // An interactive session does not finish — it yields the turn. The Stop hook
+  // reports that as `activity: idle`, which until now carried no operator
+  // signal, so an agent that asked its question in prose sat silent: a prose
+  // question writes no AskUserQuestion tool_use and puts no modal in the pane,
+  // so questionDetection, paneDetection and runtimeDetection all miss it.
+  //
+  // Scoped to interactive roles deliberately. A work/review/test agent's idle
+  // can mean between-items or complete; flagging those would flood the surface
+  // and destroy the signal this exists to carry.
+  const isInteractiveRole = role === 'plan' || agentId.startsWith('conv-')
+  const turnEndedWaiting = isInteractiveRole && runtimeState?.state === 'idle'
+  const turnEndedDetection: AwaitingInputDetection | null = turnEndedWaiting
+    ? {
+        reason: 'other',
+        prompt: normalizeAwaitingInputPrompt('Agent finished its turn and is waiting for your reply'),
+      }
+    : null
+
+  // turnEndedDetection is last: a real question or modal describes the wait far
+  // better than the generic turn-end phrasing, so it only speaks when nothing
+  // more specific did.
+  const detection = questionDetection ?? runtimeDetection ?? paneDetection ?? fallbackDetection ?? turnEndedDetection
   const shouldSuppressPendingInput = hasActiveSpecialist === true && !isOwnActiveSpecialist(role)
   const hasPendingQuestion = !shouldSuppressPendingInput && detection !== null
 
@@ -545,6 +570,9 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     }
     if (exitPlanModePending) pendingInputKinds.push('exitPlanMode')
     if (enterPlanModeOpen && !exitPlanModePending) pendingInputKinds.push('enterPlanMode')
+    // Only when nothing more specific is open — an agent parked on a permission
+    // prompt is idle too, and must read as the permission, not as a bare turn-end.
+    if (turnEndedWaiting && pendingInputKinds.length === 0) pendingInputKinds.push('agentTurnEnded')
     // PAN-1520 (covers #1197) — promote pane-detected session-resume dialogs
     // into the unified pending-input set so the indicator fires.
     // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.

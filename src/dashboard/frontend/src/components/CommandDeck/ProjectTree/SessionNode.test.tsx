@@ -548,3 +548,53 @@ describe('SessionNode', () => {
     expect(screen.getByText('Restart')).toBeInTheDocument();
   });
 });
+
+/**
+ * PAN-2765 — a planning session can sit for half an hour with a question on
+ * screen. Without this indicator the node reads as merely idle, which is how the
+ * live PAN-2760 planning agent went unanswered for 36 minutes.
+ */
+describe('SessionNode awaiting-input indicator', () => {
+  it('renders a clickable indicator when the session is awaiting input', () => {
+    render(
+      <SessionNode
+        session={makeSession({
+          type: 'planning',
+          sessionId: 'planning-pan-2760',
+          awaitingInput: true,
+          pendingInputKinds: ['agentTurnEnded'],
+        })}
+        issueId="PAN-2760"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Answer the agent/i })).toBeTruthy();
+  });
+
+  it('names the specific wait when a real question is open', () => {
+    render(
+      <SessionNode
+        session={makeSession({
+          type: 'planning',
+          sessionId: 'planning-pan-2761',
+          awaitingInput: true,
+          pendingInputKinds: ['askUserQuestion'],
+        })}
+        issueId="PAN-2761"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /Question waiting/i })).toBeTruthy();
+  });
+
+  it('renders no indicator when the session is not awaiting input', () => {
+    render(
+      <SessionNode
+        session={makeSession({ type: 'planning', sessionId: 'planning-pan-2762' })}
+        issueId="PAN-2762"
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /waiting|Answer the agent/i })).toBeNull();
+  });
+});

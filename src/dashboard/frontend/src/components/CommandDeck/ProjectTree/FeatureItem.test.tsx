@@ -122,6 +122,10 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
+    sessionIconSlot: 'sessionIconSlot',
+    sessionLabel: 'sessionLabel',
+    sessionModel: 'sessionModel',
+    sessionStatus: 'sessionStatus',
   },
 }));
 
@@ -1201,6 +1205,11 @@ describe('FeatureItem', () => {
     const activeLink = screen.getByTestId('conversation-42');
     expect(activeLink).toHaveAttribute('href', '/conv/42');
     expect(activeLink).toHaveTextContent('My conv');
+    expect(activeLink.children).toHaveLength(4);
+    expect(activeLink.children[0]).toHaveClass('sessionIconSlot');
+    expect(activeLink.children[1]).toHaveClass('sessionLabel');
+    expect(activeLink.children[2]).toHaveClass('sessionStatus');
+    expect(activeLink.children[3]).toHaveClass('sessionModel');
 
     const endedLink = screen.getByTestId('conversation-43');
     expect(endedLink).toHaveAttribute('href', '/conv/43');
@@ -1236,5 +1245,32 @@ describe('FeatureItem', () => {
     const link = screen.getByTestId('conversation-7');
     expect(link).toHaveAttribute('href', '/conv/7');
     expect(link).toHaveTextContent('Only conv');
+  });
+});
+
+/**
+ * PAN-2765 — a wait can be buried a level down in the tree. The issue row must
+ * say so without the operator expanding it, which is how the live PAN-2760
+ * planning question went unseen.
+ */
+describe('FeatureItem needs-attention shading', () => {
+  it('shades the issue row when a descendant session awaits input', () => {
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ type: 'planning', sessionId: 'planning-pan-821', awaitingInput: true })],
+        })}
+      />,
+    );
+
+    expect(container.querySelector('[data-needs-attention="true"]')).not.toBeNull();
+  });
+
+  it('does not shade the issue row when no descendant awaits input', () => {
+    const { container } = renderFeature(
+      <FeatureItem feature={makeFeature({ sessions: [makeSession()] })} />,
+    );
+
+    expect(container.querySelector('[data-needs-attention="true"]')).toBeNull();
   });
 });
