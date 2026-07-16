@@ -1,5 +1,5 @@
 import { Compass } from 'lucide-react';
-import { NO_PROJECT_KEY, type ProjectData } from './projectsData';
+import { NO_PROJECT_KEY } from './projectsData';
 import styles from './styles/command-deck.module.css';
 
 export interface RegisteredProject {
@@ -26,11 +26,9 @@ export function findRegisteredProject(
 
 export function isKnownProject(
   selectedProject: string,
-  projects: readonly ProjectData[],
   registeredProjects: readonly RegisteredProject[],
 ): boolean {
   return selectedProject === NO_PROJECT_KEY
-    || projects.some((project) => project.name === selectedProject)
     || findRegisteredProject(registeredProjects, selectedProject) !== undefined;
 }
 

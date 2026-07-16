@@ -1213,8 +1213,8 @@ export function CommandDeck({
     () => findRegisteredProject(registeredProjects, selectedProject),
     [registeredProjects, selectedProject],
   );
-  const showUnknownProject = Boolean(selectedProject && projectsFetched && registeredProjectsFetched
-    && !isKnownProject(selectedProject, projectsWithSessions, registeredProjects));
+  const isProjectValidationPending = Boolean(selectedProject && (!projectsFetched || !registeredProjectsFetched));
+  const showUnknownProject = Boolean(selectedProject && !isProjectValidationPending && !isKnownProject(selectedProject, registeredProjects));
 
   // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
   // For a real project: its scoped conversations + issue ids. For the special
@@ -1430,7 +1430,9 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {showUnknownProject ? (
+          {isProjectValidationPending ? (
+            <div className={styles.contentEmpty} role="status">Loading project…</div>
+          ) : showUnknownProject ? (
             <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />
           ) : selectedProject ? (
             <Stage
@@ -1440,9 +1442,7 @@ export function CommandDeck({
               resolveSession={resolveSession}
               onCreateConversation={createDeckConversation}
               onActiveConversationChange={setSelectedConversation}
-              terminalCwd={
-                selectedRegisteredProject?.path
-              }
+              terminalCwd={selectedRegisteredProject?.path}
               renderHome={(api) => (
                 <ProjectHome
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
@@ -1486,7 +1486,7 @@ export function CommandDeck({
         {/* Awareness rail (PAN-1591) — the merged feed: one column with a
             Needs-you / Project / Global scope switcher, replacing the separate
             Project Activity + global Activity Feed columns. */}
-        {selectedProject && !showUnknownProject && (
+        {selectedProject && !isProjectValidationPending && !showUnknownProject && (
           awarenessCollapsed ? (
             <button
               type="button"

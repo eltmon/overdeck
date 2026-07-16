@@ -71,6 +71,7 @@ function deferred<T>() {
 }
 
 let latestStageProps: any;
+let resourceProjectsResponse: unknown;
 let registeredProjectsResponse: RegisteredProjectFixture[] | Promise<RegisteredProjectFixture[]> = defaultRegisteredProjects;
 let conversationCreateResponse: { ok: boolean; body: unknown } = {
   ok: true,
@@ -248,7 +249,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
       if (url === '/api/issues/resource-allocated') {
         return {
           ok: true,
-          json: async () => [
+          json: async () => resourceProjectsResponse ?? [
             {
               issueId: 'PAN-821',
               title: 'Test Feature',
@@ -419,6 +420,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     latestStageProps = undefined;
+    resourceProjectsResponse = undefined;
     registeredProjectsResponse = defaultRegisteredProjects;
     conversationCreateResponse = {
       ok: true,
@@ -466,6 +468,14 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
   });
 
+  it('rejects a resource-derived project that is not registered', async () => {
+    registeredProjectsResponse = [defaultRegisteredProjects[1]!];
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByRole('heading', { name: 'Unknown project' })).toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+  });
+
   it('accepts a selected project that matches a registered key', async () => {
     renderCommandDeck({ selectedProject: 'test-key' });
 
@@ -480,12 +490,29 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
   });
 
-  it('does not flash the unknown-project state while project queries are unresolved', async () => {
+  it('does not mount the project deck while resource projects are unresolved', async () => {
+    const pendingProjects = deferred<unknown[]>();
+    resourceProjectsResponse = pendingProjects.promise;
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Loading project…');
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+
+    await act(async () => {
+      pendingProjects.resolve([]);
+      await pendingProjects.promise;
+    });
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-project');
+  });
+
+  it('does not flash the unknown-project state while registered projects are unresolved', async () => {
     const pendingProjects = deferred<RegisteredProjectFixture[]>();
     registeredProjectsResponse = pendingProjects.promise;
     renderCommandDeck({ selectedProject: 'missing-project' });
 
+    expect(screen.getByRole('status')).toHaveTextContent('Loading project…');
     expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
 
     await act(async () => {
       pendingProjects.resolve(defaultRegisteredProjects);
