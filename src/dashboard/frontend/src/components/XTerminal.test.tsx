@@ -646,6 +646,29 @@ describe('XTerminal - patient reconnect', () => {
     expect(term.writeln).not.toHaveBeenCalled();
   });
 
+  it('treats close code 4503 as a planned restart and clears the banner after recovery', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 4503, reason: 'server-restarting' }));
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Dashboard restarting — reconnecting automatically…');
+    expect(status).toHaveClass('text-muted-foreground');
+    expect(status).not.toHaveTextContent('Connection lost');
+
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    act(() => {
+      MockWebSocket.instances[1].onmessage?.({
+        data: `\u0000${JSON.stringify({ type: 'snapshot', data: 'healthy', cols: 80, rows: 24 })}`,
+      });
+    });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('shows a manual Reconnect button when the five-minute window expires', async () => {
     const onDisconnect = vi.fn();
     render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);

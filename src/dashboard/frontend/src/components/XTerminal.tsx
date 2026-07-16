@@ -80,6 +80,8 @@ interface XTerminalProps {
 
 type ConnectionStatus = 'connected' | 'reconnecting' | 'restarting' | 'failed';
 
+const SERVER_RESTARTING_CLOSE_CODE = 4503;
+
 interface TerminalSnapshotMessage {
   type: 'snapshot';
   cols: number;
@@ -704,6 +706,12 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         return;
       }
 
+      // 4503 = the dashboard is intentionally restarting. Retry with the same
+      // patient policy as an unexpected close, but tell the operator it is planned.
+      const retryStatus: ConnectionStatus = event.code === SERVER_RESTARTING_CLOSE_CODE
+        ? 'restarting'
+        : 'reconnecting';
+
       // For normal close (1000) or unexpected close, attempt reconnection.
       // The server sends 1000 when the PTY exits, which can happen if the
       // tmux session is killed and recreated during workspace setup retries.
@@ -714,7 +722,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
 
       if (delay !== null) {
         policy.attempt += 1;
-        setConnectionStatus('reconnecting');
+        setConnectionStatus(retryStatus);
 
         reconnectTimer.current = setTimeout(() => {
           connect();
@@ -923,7 +931,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
               {connectionStatus === 'failed'
                 ? 'Connection unavailable.'
                 : connectionStatus === 'restarting'
-                  ? 'Server restarting — reconnecting…'
+                  ? 'Dashboard restarting — reconnecting automatically…'
                   : 'Connection lost — reconnecting…'}
             </span>
             {connectionStatus === 'failed' && (
