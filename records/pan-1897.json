@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T19:36:48.122Z",
+  "updated": "2026-07-16T19:36:56.018Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "pending",
@@ -171,5 +171,33 @@
     "docs-pan-start-prep": "completed",
     "docs-pan-start-prep.docs-pan-start-prep.ac1": "completed",
     "docs-pan-start-prep.docs-pan-start-prep.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/cli/commands/start-prep-progress.ts",
+      "src/cli/commands/start.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "sync-sources/skills/pan-start/SKILL.md",
+      "tests/unit/cli/start-prep-progress.test.ts",
+      "tests/unit/cli/start-prep-wiring.test.ts",
+      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+    ],
+    "actualChangedFiles": [
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/start-prep-progress.ts",
+      "src/cli/commands/start.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "sync-sources/skills/pan-start/SKILL.md",
+      "tests/unit/cli/start-prep-progress.test.ts",
+      "tests/unit/cli/start-prep-wiring.test.ts",
+      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+    ],
+    "recordedAt": "2026-07-16T19:36:56.017Z"
   }
 }
