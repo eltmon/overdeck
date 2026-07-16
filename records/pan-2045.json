@@ -204,7 +204,7 @@
     "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T20:15:15.151Z",
+  "updated": "2026-07-16T20:16:35.901Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -214,11 +214,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:15:15.106Z",
+    "updatedAt": "2026-07-16T20:16:35.867Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
-    "reviewRequestedAt": "2026-07-16T20:15:14.731Z",
+    "reviewRequestedAt": "2026-07-16T20:16:33.172Z",
     "reviewSpawnedAt": "2026-07-16T20:15:04.758Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -370,9 +370,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3347326,
-            "output": 63104,
-            "cacheRead": 12213248,
+            "input": 3538918,
+            "output": 63586,
+            "cacheRead": 12687360,
             "cacheWrite": 0
           }
         },
@@ -418,9 +418,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4637296,
-            "output": 180494,
-            "cacheRead": 70586880,
+            "input": 4827412,
+            "output": 181913,
+            "cacheRead": 71446528,
             "cacheWrite": 0
           }
         }
@@ -439,9 +439,9 @@
           "cacheWrite": 165070
         },
         "openai/gpt-5.6-sol": {
-          "input": 10517800,
-          "output": 291196,
-          "cacheRead": 90270720,
+          "input": 10899508,
+          "output": 293097,
+          "cacheRead": 91604480,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -452,8 +452,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 114.552304,
-        "pricingAsOf": "2026-07-16T20:15:15.111Z"
+        "usd": 117.184754,
+        "pricingAsOf": "2026-07-16T20:16:35.870Z"
       }
     },
     "merges": [
