@@ -296,18 +296,18 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:11:17.017Z",
+  "updated": "2026-07-16T02:11:17.693Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:11:16.952Z",
-    "reviewNotes": "[correctness] “Expand issue full screen” does not expand the issue view — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx:1099`",
+    "updatedAt": "2026-07-16T02:11:17.628Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2499-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "2584f04dd47c386811e301e185bba85b50a15e93",
     "reviewRequestedAt": "2026-07-16T02:07:48.843Z",
@@ -540,7 +540,7 @@
       },
       "costAtCloseOut": {
         "usd": 151.042144,
-        "pricingAsOf": "2026-07-16T02:11:17.008Z"
+        "pricingAsOf": "2026-07-16T02:11:17.686Z"
       }
     },
     "merges": [
