@@ -57,6 +57,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T21:16:31.863Z"
+    },
+    {
+      "timestamp": "2026-07-16T21:16:57.413Z",
+      "reason": "end",
+      "note": "No deviations. No skipped work or newly discovered hazards. Moved terminal padding from the measured host to the FitAddon-aware .xterm element, added the regression test, and verified the full suite, typecheck, and targeted XTerminal tests."
     }
   ],
   "feedback": [
@@ -84,37 +89,34 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:16:56.334Z",
+  "updated": "2026-07-16T21:16:57.930Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "blocked",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:16:31.001Z",
+    "updatedAt": "2026-07-16T21:16:57.585Z",
     "reviewNotes": "Correctness reviewer timed out before producing a report; security, performance, and requirements passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
-    "reviewRequestedAt": "2026-07-16T21:14:06.888Z",
+    "reviewRequestedAt": "2026-07-16T21:16:57.434Z",
     "reviewSpawnedAt": "2026-07-16T21:14:08.103Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      }
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+        "src/dashboard/frontend/src/components/XTerminal.tsx",
+        "src/dashboard/frontend/src/index.css"
+      ],
+      "actualChangedFiles": [
+        "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+        "src/dashboard/frontend/src/components/XTerminal.tsx",
+        "src/dashboard/frontend/src/index.css"
+      ],
+      "recordedAt": "2026-07-16T21:16:56.333Z"
     },
     "strikeRecoveryCount": 0
   },
@@ -123,15 +125,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 170793,
-            "output": 782,
-            "cacheRead": 127232,
+            "input": 225857,
+            "output": 1059,
+            "cacheRead": 160768,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 3234978,
-            "output": 8455,
-            "cacheRead": 2998784,
+            "input": 3596011,
+            "output": 10092,
+            "cacheRead": 3346432,
             "cacheWrite": 0
           }
         },
@@ -185,10 +187,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 44,
-            "output": 5825,
-            "cacheRead": 2975738,
-            "cacheWrite": 131441
+            "input": 46,
+            "output": 5986,
+            "cacheRead": 3137326,
+            "cacheWrite": 132701
           }
         },
         "work": {
@@ -202,15 +204,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 170793,
-          "output": 782,
-          "cacheRead": 127232,
+          "input": 225857,
+          "output": 1059,
+          "cacheRead": 160768,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 9045527,
-          "output": 224416,
-          "cacheRead": 42548736,
+          "input": 9406560,
+          "output": 226053,
+          "cacheRead": 42896384,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -220,15 +222,15 @@
           "cacheWrite": 327850
         },
         "anthropic/claude-sonnet-5": {
-          "input": 44,
-          "output": 5825,
-          "cacheRead": 2975738,
-          "cacheWrite": 131441
+          "input": 46,
+          "output": 5986,
+          "cacheRead": 3137326,
+          "cacheWrite": 132701
         }
       },
       "costAtCloseOut": {
-        "usd": 77.71091,
-        "pricingAsOf": "2026-07-16T21:16:31.016Z"
+        "usd": 78.037851,
+        "pricingAsOf": "2026-07-16T21:16:57.863Z"
       }
     },
     "merges": [
