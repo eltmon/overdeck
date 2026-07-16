@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T06:44:32.711Z",
+  "updated": "2026-07-16T06:46:55.971Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -72,18 +72,29 @@
   },
   "reviewMode": "full",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "persist-strike-ready": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2702",
         "agentId": "agent-pan-2702",
         "pid": 2493853,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:44:32.711Z"
+        "claimedAt": "2026-07-16T06:44:32.711Z",
+        "itemId": "persist-strike-ready",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2702 dead)",
+        "releasedAt": "2026-07-16T06:46:55.953Z"
+      }
+    ],
+    "statusReasons": {
+      "persist-strike-ready": {
+        "reason": "stale claim released (agent-pan-2702 dead)",
+        "updatedAt": "2026-07-16T06:46:55.953Z"
       }
     }
   },
   "statusOverrides": {
-    "persist-strike-ready": "running"
+    "persist-strike-ready": "pending"
   }
 }
