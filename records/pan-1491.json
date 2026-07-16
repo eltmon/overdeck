@@ -281,6 +281,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T11:53:53.606Z"
+    },
+    {
+      "timestamp": "2026-07-16T12:07:30.129Z",
+      "reason": "end",
+      "note": "Deviation: the unsharded npm test command was terminated with SIGTERM 143 during Vitest, so the identical root suite was completed as two shards (9,404 passed, 50 skipped across 1,022 files) and the frontend suite passed 32/32. The required rebase introduced one duplicate no-loss matrix entry, which was removed, and the pre-rebase remote lineage was preserved with an ours-strategy merge to avoid force-pushing. Hazard: Bun reports a pre-existing duplicate @effect/vitest dependency warning. Delivered metric-aware flywheel substrate-bug prioritization with normalized criterion impact, persistence, API/CLI/UI surfaces, orchestration guidance, docs, migrations, and tests. Typecheck and lint pass."
     }
   ],
   "feedback": [],
@@ -355,7 +360,7 @@
     "recordedAt": "2026-07-16T12:07:29.315Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T12:07:29.316Z",
+  "updated": "2026-07-16T12:07:30.301Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
@@ -365,7 +370,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:30:16.413Z",
+    "updatedAt": "2026-07-16T12:07:30.234Z",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "scopeDrift": {
@@ -422,15 +427,21 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 990232,
-            "output": 2533,
-            "cacheRead": 554752,
+            "input": 1691213,
+            "output": 5273,
+            "cacheRead": 1143168,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
             "input": 58618153,
             "output": 212286,
             "cacheRead": 53562624,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 8154278,
+            "output": 8462,
+            "cacheRead": 7910400,
             "cacheWrite": 0
           }
         },
@@ -513,15 +524,21 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 990232,
-          "output": 2533,
-          "cacheRead": 554752,
+          "input": 1691213,
+          "output": 5273,
+          "cacheRead": 1143168,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
           "input": 61797291,
           "output": 252931,
           "cacheRead": 55126272,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 8154278,
+          "output": 8462,
+          "cacheRead": 7910400,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -586,8 +603,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 145.235924,
-        "pricingAsOf": "2026-07-16T07:30:16.514Z"
+        "usd": 150.664374,
+        "pricingAsOf": "2026-07-16T12:07:30.280Z"
       }
     },
     "merges": [
