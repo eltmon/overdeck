@@ -34,9 +34,6 @@ export function OpenQuestionsIndicator({ onActivate }: OpenQuestionsIndicatorPro
       }
     };
     void refreshCurrentStatus();
-    const interval = window.setInterval(() => {
-      void refreshCurrentStatus();
-    }, 5000);
     const unsubscribe = subscribeFlywheelStatus((next) => {
       revision += 1;
       activeController?.abort();
@@ -47,7 +44,6 @@ export function OpenQuestionsIndicator({ onActivate }: OpenQuestionsIndicatorPro
       cancelled = true;
       revision += 1;
       activeController?.abort();
-      window.clearInterval(interval);
       unsubscribe();
     };
   }, []);

@@ -293,6 +293,7 @@ function PendingAutoMergesBanner({ onNavigateIssue }: { onNavigateIssue?: (issue
 export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
   const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
+  const [openQuestionsRevealPending, setOpenQuestionsRevealPending] = useState(false);
   const [leftWidth, setLeftWidth] = useState<number>(getStoredSplitWidth);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const leftWidthRef = useRef(leftWidth);
@@ -398,9 +399,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
   useEffect(() => {
     const revealOpenQuestions = () => {
       setActiveTab('status');
-      requestAnimationFrame(() => {
-        document.getElementById('flywheel-open-questions')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
+      setOpenQuestionsRevealPending(true);
     };
     if (consumePendingReveal()) revealOpenQuestions();
     return subscribeRevealOpenQuestions(() => {
@@ -408,6 +407,17 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       revealOpenQuestions();
     });
   }, []);
+
+  useEffect(() => {
+    if (!openQuestionsRevealPending || activeTab !== 'status') return;
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById('flywheel-open-questions');
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setOpenQuestionsRevealPending(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab, effectiveStatus, openQuestionsRevealPending]);
 
   const freshness = effectiveStatus ? getLastTickFreshness(effectiveStatus.lastTickAt, nowMs) : null;
 

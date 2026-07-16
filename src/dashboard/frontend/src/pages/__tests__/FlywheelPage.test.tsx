@@ -108,6 +108,7 @@ describe('FlywheelPage', () => {
       animationFrameCallback = callback;
       return 1;
     });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
     Element.prototype.scrollIntoView = scrollIntoView;
     scrollIntoView.mockReset();
     mocks.listener = undefined;
@@ -406,11 +407,16 @@ describe('FlywheelPage', () => {
     expect(screen.queryByText(/No active run/)).not.toBeInTheDocument();
   });
 
-  it('consumes a pending reveal on mount and scrolls the questions into view', () => {
+  it('retains a pending reveal until status renders the questions anchor', () => {
     requestRevealOpenQuestions();
     renderFlywheelPage(<FlywheelPage />);
 
+    act(() => animationFrameCallback?.(0));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    animationFrameCallback = undefined;
     act(() => mocks.listener?.(status));
+    expect(animationFrameCallback).toBeDefined();
     act(() => animationFrameCallback?.(0));
 
     expect(screen.getByRole('tab', { name: 'Status' })).toHaveAttribute('aria-selected', 'true');

@@ -82,7 +82,7 @@ describe('OpenQuestionsIndicator', () => {
     expect(onActivate).toHaveBeenCalledOnce();
   });
 
-  it('aborts an unfinished refresh before starting the next one and on cleanup', async () => {
+  it('hydrates once without steady polling and aborts the request on cleanup', async () => {
     vi.useFakeTimers();
     const signals: AbortSignal[] = [];
     vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => {
@@ -93,13 +93,12 @@ describe('OpenQuestionsIndicator', () => {
     const { unmount } = render(<OpenQuestionsIndicator onActivate={vi.fn()} />);
     expect(signals).toHaveLength(1);
 
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(signals).toHaveLength(2);
-    expect(signals[0]?.aborted).toBe(true);
-    expect(signals[1]?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
 
     unmount();
-    expect(signals[1]?.aborted).toBe(true);
+    expect(signals[0]?.aborted).toBe(true);
   });
 
   it('does not let an older HTTP response overwrite a newer pushed snapshot', async () => {
