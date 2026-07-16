@@ -5,7 +5,9 @@ import { formatBucketLabel, groupByContiguousLabel } from '../../lib/sessionFeed
 import { BucketSection } from './BucketSection';
 import type { SessionFeedEntry, SessionFeedTab } from './types';
 import { useMergedFeed } from './useMergedFeed';
-import { useDashboardStore, selectPendingInputSubjects, selectIssues } from '../../lib/store';
+import { useDashboardStore, selectIssues } from '../../lib/store';
+import { usePendingInputSubjects } from '../../lib/useDecisions';
+import { DecisionsPanel } from '../DecisionsPanel';
 import { describePendingInput } from '../../lib/pendingInput';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 
@@ -71,7 +73,9 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
   }, [scope]);
 
   // Pending-input subjects drive the "Needs you" count badge on the scope switch.
-  const pendingSubjects = useDashboardStore(selectPendingInputSubjects);
+  // Conversations live behind a different door than agents; this union is the
+  // only enumeration that sees both, so the count cannot under-report.
+  const pendingSubjects = usePendingInputSubjects();
   const needsCount = scopeSwitcher ? pendingSubjects.length : 0;
 
   // Resolve the effective scope of the underlying feed. Without the switcher we
@@ -125,7 +129,14 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
         </div>
       )}
 
-      <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} showEmpty={scopeSwitcher && scope === 'needs'} />
+      {scopeSwitcher && scope === 'needs' ? (
+        // The dedicated Decisions view: grouped by consequence, and deliberately
+        // NOT filtered by dismissal — dismissing a dialog must never lose the
+        // decision, which is the whole point of having somewhere to find it again.
+        <DecisionsPanel />
+      ) : (
+        <NeedsYouSection issueIds={effIssueIds} unscoped={effUnscoped} />
+      )}
 
       {showFeed && (
         <>
@@ -171,7 +182,7 @@ export function SessionFeedSidebar({ onClose, onSelect = navigateToFeedEntry, no
  * Activity) unless `unscoped` (home Activity Feed). PAN-1395 / PAN-1520.
  */
 function NeedsYouSection({ issueIds, unscoped, showEmpty = false }: { issueIds?: readonly string[]; unscoped?: boolean; showEmpty?: boolean }) {
-  const subjects = useDashboardStore(selectPendingInputSubjects);
+  const subjects = usePendingInputSubjects();
   const issues = useDashboardStore(selectIssues);
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   // PAN-1563 — honor the same answered/dismissed state the dialog uses so an

@@ -1,9 +1,19 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import type { ReactElement } from 'react';
 import type { MemoryObservation } from '@overdeck/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../lib/store';
 import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar } from '../SessionFeedSidebar';
 import type { ConversationSessionFeedEntry, GitSessionFeedEntry } from '../types';
+
+// The sidebar's pending-input count now spans two domains: agents from the read
+// model and conversations from the REST door, which it reads via react-query.
+// Every call site renders through a provider so the union can be fetched.
+function render(ui: ReactElement) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const hookSources = vi.hoisted(() => ({
   conversations: { entries: [] as ConversationSessionFeedEntry[], isLoading: false, error: null as Error | null },
