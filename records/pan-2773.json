@@ -12,6 +12,11 @@
       "timestamp": "2026-07-16T18:38:19.114Z",
       "reason": "end",
       "note": "Implemented structured conversation-create results, inline launcher errors with preserved queries, pending-request keyboard/pointer suppression, retry clearing, success-only pane opening, menu closure after submission, explicit unknown-project recovery for unregistered keys or names, and troubleshooting docs. Verification passed: focused frontend tests (31/31), npm run typecheck, npm run lint, and npm test (1022 root files plus frontend issue-action suite). The unknown-project item spans three commits because its first committed implementation hit the god-file push guard; the fix extracted the state and lowered the now-stale baseline in follow-up commits without rewriting history."
+    },
+    {
+      "timestamp": "2026-07-16T18:48:48.339Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -59,29 +64,30 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:48:47.450Z",
+  "updated": "2026-07-16T18:48:48.513Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:47:11.660Z",
+    "updatedAt": "2026-07-16T18:48:48.436Z",
     "reviewNotes": "Approved: no blocking findings; one transient query-failure edge case remains advisory.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
-    "reviewRequestedAt": "2026-07-16T18:38:19.131Z",
+    "reviewRequestedAt": "2026-07-16T18:48:48.435Z",
     "reviewSpawnedAt": "2026-07-16T18:38:20.308Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
         "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
-        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx"
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
       ],
       "declaredScopeUntouched": [
         "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
@@ -114,9 +120,10 @@
         "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
         "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
         "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/Stage/stage.module.css"
+        "src/dashboard/frontend/src/components/Stage/stage.module.css",
+        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
       ],
-      "recordedAt": "2026-07-16T18:38:15.942Z"
+      "recordedAt": "2026-07-16T18:48:47.449Z"
     },
     "strikeRecoveryCount": 0
   },
@@ -179,11 +186,19 @@
             "cacheWrite": 131736
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 28,
+            "output": 4862,
+            "cacheRead": 1938679,
+            "cacheWrite": 136369
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1678547,
-            "output": 118196,
-            "cacheRead": 40834048,
+            "input": 1876216,
+            "output": 119788,
+            "cacheRead": 41688576,
             "cacheWrite": 0
           }
         }
@@ -196,21 +211,21 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 5002059,
-          "output": 176073,
-          "cacheRead": 49699328,
+          "input": 5199728,
+          "output": 177665,
+          "cacheRead": 50553856,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 10,
-          "output": 3002,
-          "cacheRead": 505356,
-          "cacheWrite": 131736
+          "input": 38,
+          "output": 7864,
+          "cacheRead": 2444035,
+          "cacheWrite": 268105
         }
       },
       "costAtCloseOut": {
-        "usd": 65.873139,
-        "pricingAsOf": "2026-07-16T18:47:11.715Z"
+        "usd": 68.113843,
+        "pricingAsOf": "2026-07-16T18:48:48.485Z"
       }
     },
     "merges": [
