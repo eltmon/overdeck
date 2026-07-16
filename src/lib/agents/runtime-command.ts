@@ -299,7 +299,7 @@ async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<b
   return false;
 }
 
-interface CodexAppServerStatus {
+export interface CodexAppServerStatus {
   state?: string;
 }
 
@@ -320,7 +320,7 @@ function readAppServerToken(agentId: string): string | null {
   }
 }
 
-async function postAppServerStatus(agentId: string): Promise<CodexAppServerStatus> {
+export async function getCodexAppServerStatus(agentId: string): Promise<CodexAppServerStatus> {
   const socketPath = join(getOverdeckHome(), 'sockets', `appserver-${agentId}.sock`);
   const token = readAppServerToken(agentId);
   if (!existsSync(socketPath)) throw new Error(`app-server socket missing for ${agentId}`);
@@ -391,7 +391,7 @@ export async function waitForCodexAppServerReady(
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
   const sessionExistsForAgent = deps.sessionExists ?? (async (id: string) => Effect.runPromise(sessionExists(id)));
-  const readStatus = deps.readStatus ?? postAppServerStatus;
+  const readStatus = deps.readStatus ?? getCodexAppServerStatus;
   const deadline = now() + timeoutSec * 1000;
   let lastState = 'unknown';
   let lastError = '';

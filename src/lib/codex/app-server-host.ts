@@ -17,6 +17,8 @@ import {
 } from './app-server-manager.js';
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js';
 import { codexHome, writeThreadId } from '../runtimes/codex.js';
+import { calculateCostSync, getPricingSync } from '../cost.js';
+import { recordAgentActivitySync } from '../agents/agent-state.js';
 
 type JsonRecord = Record<string, unknown>;
 
@@ -49,6 +51,7 @@ export interface CodexAppServerHostOptions {
   manager?: AppServerHostManager;
   stdin?: Readable;
   stdout?: Writable;
+  recordActivity?: (agentId: string, activity: { at?: string; costSoFar?: number }) => boolean;
 }
 
 interface HostOpResult {
@@ -65,6 +68,7 @@ export class CodexAppServerHost {
   private token: string | undefined;
   private threadModel: string | undefined;
   private state: 'starting' | 'ready' | 'closed' = 'starting';
+  private lastActivityPersistedAt = 0;
 
   constructor(private readonly options: CodexAppServerHostOptions) {
     this.overdeckHome = options.overdeckHome ?? process.env.OVERDECK_HOME ?? join(homedir(), '.overdeck');
@@ -223,6 +227,7 @@ export class CodexAppServerHost {
       const threadId = extractThreadId(message);
       if (message.method === 'thread/started' && threadId) writeThreadId(this.options.agentId, threadId);
       this.renderNotification(message);
+      this.recordObservedActivity(message);
       void this.appendEvent('notification', message as JsonRecord);
     });
     this.manager.on('request', (message: AppServerMessage) => {
@@ -245,6 +250,21 @@ export class CodexAppServerHost {
       void this.appendEvent('exit', asRecord(exit));
       void this.closeServer();
     });
+  }
+
+  private recordObservedActivity(message: AppServerMessage): void {
+    const now = Date.now();
+    const force = message.method === 'turn/completed';
+    if (!force && now - this.lastActivityPersistedAt < 5_000) return;
+
+    const costSoFar = codexNotificationCost(message, this.threadModel);
+    const record = this.options.recordActivity ?? recordAgentActivitySync;
+    if (record(this.options.agentId, {
+      at: new Date(now).toISOString(),
+      ...(costSoFar === undefined ? {} : { costSoFar }),
+    })) {
+      this.lastActivityPersistedAt = now;
+    }
   }
 
   startPaneInput(): void {
@@ -386,6 +406,27 @@ export class CodexAppServerHost {
     if (this.state === 'starting') return 'starting';
     return 'ready';
   }
+}
+
+export function codexNotificationCost(message: AppServerMessage, model?: string): number | undefined {
+  if (message.method !== 'thread/tokenUsage/updated' || !model) return undefined;
+  const params = asRecord(message.params);
+  const tokenUsage = asRecord(params.tokenUsage);
+  const total = asRecord(tokenUsage.total);
+  const inputTokens = numberValue(total.inputTokens);
+  const cachedInputTokens = numberValue(total.cachedInputTokens);
+  const outputTokens = numberValue(total.outputTokens);
+  const pricing = getPricingSync('openai', model);
+  if (!pricing || (inputTokens === 0 && cachedInputTokens === 0 && outputTokens === 0)) return undefined;
+  return calculateCostSync({
+    inputTokens: Math.max(0, inputTokens - cachedInputTokens),
+    cacheReadTokens: cachedInputTokens,
+    outputTokens,
+  }, pricing);
+}
+
+function numberValue(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
 }
 
 function sendJson(res: ServerResponse, status: number, body: JsonRecord): void {

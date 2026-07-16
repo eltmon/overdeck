@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CodexAppServerHost } from '../app-server-host.js';
+import { CodexAppServerHost, codexNotificationCost } from '../app-server-host.js';
 import type { CodexAppServerState, ThreadOptions, TurnOptions } from '../app-server-manager.js';
 
 class FakeManager extends EventEmitter {
@@ -211,6 +211,25 @@ describe('CodexAppServerHost', () => {
       expect.objectContaining({ type: 'notification', method: 'thread/started' }),
       expect.objectContaining({ type: 'notification', method: 'item/completed' }),
     ]));
+  });
+
+  it('projects app-server notifications into agent activity without tmux', async () => {
+    const manager = new FakeManager();
+    const recordActivity = vi.fn(() => true);
+    makeHost(manager, { model: 'gpt-5.6-sol', recordActivity });
+
+    manager.emit('notification', {
+      method: 'thread/tokenUsage/updated',
+      params: { tokenUsage: { total: { inputTokens: 2_000, cachedInputTokens: 1_000, outputTokens: 100 } } },
+    });
+
+    expect(recordActivity).toHaveBeenCalledWith('agent-host-test', expect.objectContaining({
+      at: expect.any(String),
+      costSoFar: codexNotificationCost({
+        method: 'thread/tokenUsage/updated',
+        params: { tokenUsage: { total: { inputTokens: 2_000, cachedInputTokens: 1_000, outputTokens: 100 } } },
+      }, 'gpt-5.6-sol'),
+    }));
   });
 
   it('passes per-turn model changes through natively on turn/start', async () => {

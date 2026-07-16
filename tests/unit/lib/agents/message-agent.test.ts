@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   sessionExists: vi.fn(),
   listPaneValues: vi.fn(),
   waitForAgentIdle: vi.fn(),
+  getCodexAppServerStatus: vi.fn(),
   appendOperatorInterventionEvent: vi.fn(),
   logAgentLifecycleSync: vi.fn(),
 }));
@@ -54,6 +55,7 @@ vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
   getOhmypiLauncherFields: vi.fn(),
   getRoleRuntimeBaseCommand: vi.fn(),
   hasAgentRuntimeInSubtree: vi.fn(),
+  getCodexAppServerStatus: mocks.getCodexAppServerStatus,
   waitForPromptReady: vi.fn(),
 }));
 
@@ -112,6 +114,7 @@ describe('messageAgent', () => {
     mocks.listPaneValues.mockReturnValue(Effect.succeed([]));
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
+    mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
   });
 
   afterEach(() => {
@@ -151,6 +154,8 @@ describe('messageAgent', () => {
       workspace: '/repo',
       harness: 'codex',
     });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'running' });
+    mocks.sessionExists.mockReturnValue(Effect.succeed(false));
     await messageAgent('agent-pan-2701', 'review feedback', 'pan-tell');
 
     expect(mocks.deliverAgentMessage).not.toHaveBeenCalled();
@@ -170,6 +175,8 @@ describe('messageAgent', () => {
       workspace: '/repo',
       harness: 'codex',
     });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'ready' });
+    mocks.sessionExists.mockReturnValue(Effect.succeed(false));
     mkdirSync('/tmp/agent-pan-2701', { recursive: true });
     writeFileSync('/tmp/agent-pan-2701/turn-completed', new Date().toISOString());
 
@@ -191,6 +198,8 @@ describe('messageAgent', () => {
       workspace: '/repo',
       harness: 'codex',
     });
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'ready' });
+    mocks.sessionExists.mockReturnValue(Effect.succeed(false));
     mkdirSync('/tmp/agent-pan-2701', { recursive: true });
     writeFileSync('/tmp/agent-pan-2701/turn-completed', new Date().toISOString());
 

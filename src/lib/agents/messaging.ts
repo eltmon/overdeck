@@ -35,6 +35,7 @@ import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   claudeSystemPromptFiles,
   getCodexLauncherFields,
+  getCodexAppServerStatus,
   getOhmypiLauncherFields,
   getRoleRuntimeBaseCommand,
   hasAgentRuntimeInSubtree,
@@ -346,6 +347,33 @@ export async function messageAgent(
     return;
   }
 
+  const expectedHarness = agentState?.harness ?? 'claude-code';
+  if (expectedHarness === 'codex') {
+    let appServerState: string | undefined;
+    try {
+      appServerState = (await getCodexAppServerStatus(normalizedId)).state;
+    } catch {
+      // A missing/unresponsive app-server may still be a legacy Codex TUI.
+      // Continue through the tmux liveness path for that transport.
+    }
+    if (appServerState && appServerState !== 'closed' && appServerState !== 'error') {
+      const promptReady = claimCodexIdleTurn(normalizedId);
+      if (!promptReady) {
+        queueAgentMail(normalizedId, message, true);
+        logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
+        console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
+        await appendTellInterventionForUserSource(normalizedId, caller);
+        return;
+      }
+
+      const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
+      await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
+      queueAgentMail(normalizedId, message);
+      await appendTellInterventionForUserSource(normalizedId, caller);
+      return;
+    }
+  }
+
   if (!(await Effect.runPromise(sessionExists(normalizedId)))) {
     throw new Error(`Agent ${normalizedId} not running`);
   }
@@ -358,7 +386,6 @@ export async function messageAgent(
   // runs as a descendant. Walk the pane's process subtree and treat the pane
   // as live if any descendant is the expected runtime for the saved harness.
   const panePids = await Effect.runPromise(listPaneValues(normalizedId, '#{pane_pid}'));
-  const expectedHarness = agentState?.harness ?? 'claude-code';
   if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
     console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
     const { resumeAgent } = await import('../agents.js');
@@ -376,17 +403,8 @@ export async function messageAgent(
   // that marker makes the idle signal one-shot: the next message starts a turn,
   // and further messages queue until the hook reports the next completion.
   // Claude Code continues to use its hook-driven runtime mirror (PAN-1594).
-  const promptReady = expectedHarness === 'codex'
-    ? claimCodexIdleTurn(normalizedId)
-    : await waitForAgentIdle(normalizedId, 5000);
+  const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
-    if (expectedHarness === 'codex') {
-      queueAgentMail(normalizedId, message, true);
-      logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
-      console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
-      await appendTellInterventionForUserSource(normalizedId, caller);
-      return;
-    }
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
   }
 

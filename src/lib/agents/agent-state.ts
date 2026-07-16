@@ -347,6 +347,26 @@ export function saveAgentStateSync(state: AgentState): void {
   }
 }
 
+/**
+ * Persist observed harness activity through the agent-state write door without
+ * re-running lifecycle side effects such as harness/model record mirroring.
+ */
+export function recordAgentActivitySync(
+  agentId: string,
+  activity: { at?: string; costSoFar?: number },
+): boolean {
+  const state = getAgentStateSync(agentId);
+  if (!state) return false;
+
+  state.lastActivity = activity.at ?? new Date().toISOString();
+  if (activity.costSoFar !== undefined && Number.isFinite(activity.costSoFar)) {
+    state.costSoFar = activity.costSoFar;
+  }
+  saveOverdeckAgentStateSync(state);
+  writeAgentStateJsonSync(state);
+  return true;
+}
+
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
   const stateFile = getRollbackAgentStatePath(state.id);
