@@ -4,17 +4,17 @@
     "created": "2026-07-16T02:42:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2760: fix(dashboard): make crew create and delete discoverable in Tiered Execution settings",
-    "updated": "2026-07-16T21:23:22.357Z"
+    "updated": "2026-07-16T21:23:24.630Z"
   },
   "plan": {
     "id": "pan-2760",
     "title": "fix(dashboard): make crew create and delete discoverable in Tiered Execution settings",
-    "status": "approved",
+    "status": "running",
     "uid": "40b13e63-492c-4136-8a84-0284467caf6d",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-16T02:42:40Z",
-    "updated": "2026-07-16T21:23:22.357Z",
+    "updated": "2026-07-16T21:23:24.630Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2760",
