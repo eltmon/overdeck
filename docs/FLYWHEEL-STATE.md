@@ -5380,3 +5380,12 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   uncommitted edits (~16:05; they recovered from checkpoints, no loss). RULE: never reset --hard primary;
   `git status` first, `git merge --ff-only` if clean, surface if dirty. Two actors on main = check before touching.
 - **Session: 50 merges + 1 operator-directed strike landing, 21 close-outs.**
+
+## Tick 64 — 2026-07-16 ~17:23 — codex path proven: TWO real merges
+- Harness flip to codex working end-to-end. First fleet merges post-flip:
+  - **PAN-1987 MERGED → 1e1efdb358** (fresh APPROVED run 8dbd15a7==head, all CI green, overdeck/review+test pass).
+  - **PAN-2772 MERGED → 7b24be7f82** (fresh APPROVED run 96ab92d9==head, CI green, mergeState CLEAN). Freshness invariant (review run suffix==PR headRefOid) satisfied for both — no PAN-2499 stale-verdict risk.
+- Fleet driving on codex: 2760 respawned FRESH on codex (was claude-code resumable; harness=codex model=gpt-5.6-sol confirmed) to address CHANGES REQUESTED; 2045 work agent alive (tmux 17:22); 2619/2773/1897/1966/1491 review convoys spinning on codex.
+- Pending fresh reviews not yet synthesized: 1966 (verdict none), 1897, 1491. UNSTABLE (fixing): 2773, 2619. CHANGES REQUESTED (driving): 2760, 2045.
+- Resources healthy: mem 32G avail, 15 devnets (<31 limit).
+- Close-out for 1987/2772 pending main CI green (2772 run in_progress at report time).

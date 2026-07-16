@@ -1373,7 +1373,7 @@ export function CommandDeck({
                   </div>
                 ) : selectedProjectData ? (
                   <ProjectNode
-                    key={selectedProjectData.path}
+                    key={selectedProjectData.path} projectKey={selectedProjectData.key}
                     name={selectedProjectData.name}
                     features={selectedProjectData.features}
                     selectedFeature={selectedFeature}

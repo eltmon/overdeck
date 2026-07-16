@@ -330,7 +330,14 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 **Terminal architecture** (`ws-terminal.ts` + `XTerminal.tsx`):
 - Server: raw `WebSocketServer` with `noServer: true`, deferred PTY spawn (waits for
   client resize dimensions), `node-pty` spawns `tmux attach-session`
-- Client: raw `WebSocket` API with exponential backoff reconnection
+- Client: raw `WebSocket` API with a five-minute patient reconnect window from
+  `terminalReconnectPolicy.ts`: delays are 1s, 2s, 4s, then a flat 5s.
+- Reconnect state stays outside xterm scrollback in a status overlay; exhaustion keeps
+  the terminal mounted and offers a manual Reconnect action.
+- Close code `4404` means the tmux session is still gone after the server-side wait and
+  is fatal. Close code `4503` means the dashboard is gracefully restarting, so the UI
+  shows calm "Dashboard restarting" copy and uses the same patient reconnect policy;
+  `handleShutdownSignal` broadcasts `4503` before server teardown.
 - PTY waits for tmux session to exist (`waitForTmuxSession`) before spawning
 - Data flows immediately on attach — no stale data suppression
 - Dimension toggle at 200ms forces correct-size repaint

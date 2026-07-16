@@ -79,7 +79,11 @@ vi.mock('./ProjectTree/ProjectNode', () => ({
   ProjectNode: (props: any) => {
     // Simulate tab switch to projects when rendered
     return (
-      <div data-testid="project-node" data-selected={props.selectedProject === props.name ? 'true' : 'false'}>
+      <div
+        data-testid="project-node"
+        data-project-key={props.projectKey}
+        data-selected={props.selectedProject === props.name ? 'true' : 'false'}
+      >
         <button data-testid={`project-${props.name}`} onClick={() => props.onSelectProject?.(props.name)}>
           {props.name}
         </button>
@@ -232,7 +236,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
           ok: true,
           json: async () => [
             { key: 'test-project', name: 'test-project', path: '/path/to/test-project' },
-            { key: 'other-project', name: 'other-project', path: '/path/to/other-project' },
+            { key: 'other-project', name: 'Other Project', path: '/path/to/other-project' },
           ],
         };
       }
@@ -393,6 +397,15 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     const stage = screen.getByTestId('stage');
     expect(stage).toHaveAttribute('data-deck', 'test-project');
     expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
+  });
+
+  it('passes the immutable registration key to the project tree node', async () => {
+    renderCommandDeck({ selectedProject: 'Other Project' });
+
+    expect(await screen.findByTestId('project-node')).toHaveAttribute(
+      'data-project-key',
+      'other-project',
+    );
   });
 
   it('opens an issue tab in the deck when a tree issue is selected', async () => {

@@ -32,6 +32,10 @@ pan restart
 pan restart --cliproxy
 pan restart --traefik
 pan restart --full       # nuclear — stops & restarts everything
+
+# Explicit force cases
+pan restart --force              # bypass the agent deploy-window gate
+pan restart --cliproxy --force   # redownload the pinned CLIProxy binary
 ```
 
 Each stage is health-gated: the command waits for `GET /api/health` (dashboard)
@@ -44,6 +48,12 @@ with a `[stage] reason` message on timeout.
   then polls until the health check passes.
 - `pan restart --dashboard` NEVER touches CLIProxy, Traefik, or TLDR — that
   scope contract is enforced by tests.
+- Agent-issued dashboard and full restarts consult the deploy-window gate before
+  acquiring the restart lock. Active verification, merge, post-merge, flywheel,
+  restart, or `pan dev` ownership refuses the restart because it would disconnect
+  live conversations and terminals; `--force` explicitly bypasses this gate.
+- For `--cliproxy`, `--force` has a separate meaning: it redownloads the binary at
+  the pinned version before restarting it.
 - If the dashboard restart fails, shared sidecars are left running so recovery
   is possible with another `pan restart` once the root cause is fixed.
 - NEVER use `pkill -f "node.*server"` — it can kill unrelated Node processes.

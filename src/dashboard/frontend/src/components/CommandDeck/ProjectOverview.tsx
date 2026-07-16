@@ -1,6 +1,7 @@
-import { useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@overdeck/contracts';
+import { Pencil } from 'lucide-react';
 import { useDashboardStore } from '../../lib/store';
 import { getPipelineIssuePhase, type PipelineIssuePhase } from '../../lib/pipeline-state';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
@@ -390,7 +391,7 @@ export function ProjectOverview({
         overflow: 'auto',
       }}
     >
-      <HeroBillboard projectName={projectName} metrics={metrics} />
+      <HeroBillboard projectName={projectName} projectKey={projectKey} metrics={metrics} />
 
       <ProjectCiHealthSection health={ciHealth} />
 
@@ -618,7 +619,70 @@ const HERO_TONE_COLOR: Record<HeroTone, string> = {
   muted: 'var(--foreground)',
 };
 
-function HeroBillboard({ projectName, metrics }: { projectName: string; metrics: HeroMetric[] }) {
+function HeroBillboard({
+  projectName,
+  projectKey,
+  metrics,
+}: {
+  projectName: string;
+  projectKey?: string;
+  metrics: HeroMetric[];
+}) {
+  const queryClient = useQueryClient();
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [renameError, setRenameError] = useState<string | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const draftNameRef = useRef('');
+  const committingRef = useRef(false);
+
+  const renameMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const projectIdentifier = projectKey ?? projectName;
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectIdentifier)}/rename`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json().catch(() => null) as { error?: string } | null;
+      if (!res.ok) throw new Error(data?.error || 'Failed to rename project');
+    },
+    onSuccess: async () => {
+      setEditingName(false);
+      setRenameError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['command-deck-projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['registered-projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['session-trees'] }),
+      ]);
+    },
+    onError: (error: Error) => {
+      committingRef.current = false;
+      setRenameError(error.message);
+    },
+  });
+
+  const beginRename = useCallback(() => {
+    committingRef.current = false;
+    draftNameRef.current = projectName;
+    setDraftName(projectName);
+    setRenameError(null);
+    setEditingName(true);
+    setTimeout(() => editInputRef.current?.select(), 0);
+  }, [projectName]);
+
+  const commitRename = useCallback(() => {
+    if (committingRef.current) return;
+    committingRef.current = true;
+    renameMutation.mutate(draftNameRef.current);
+  }, [renameMutation]);
+
+  const cancelRename = useCallback(() => {
+    setEditingName(false);
+    setDraftName('');
+    setRenameError(null);
+  }, []);
+
   // Tight, container-responsive glance row. No outer card and an auto-fill grid
   // (min 132px tiles) so it lays out by the PANE width — tiles never crush to
   // ~100px and truncate their labels the way the fixed 5-column MetricStrip did
@@ -626,7 +690,43 @@ function HeroBillboard({ projectName, metrics }: { projectName: string; metrics:
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div className="flex items-baseline gap-2">
-        <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
+        {editingName ? (
+          <>
+            <input
+              ref={editInputRef}
+              value={draftName}
+              onChange={(event) => {
+                setDraftName(event.target.value);
+                draftNameRef.current = event.target.value;
+                setRenameError(null);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') commitRename();
+                if (event.key === 'Escape') cancelRename();
+              }}
+              onBlur={commitRename}
+              aria-label={`Rename ${projectName}`}
+              disabled={renameMutation.isPending}
+              className="h-7 rounded-md border border-input bg-background px-2 text-[15px] font-bold text-foreground outline-none focus:ring-1 focus:ring-ring"
+            />
+            {renameError && (
+              <span role="alert" className="text-xs text-destructive">{renameError}</span>
+            )}
+          </>
+        ) : (
+          <>
+            <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: 'var(--foreground)' }}>{projectName}</h2>
+            <button
+              type="button"
+              onClick={beginRename}
+              title="Rename project"
+              aria-label={`Rename ${projectName}`}
+              className="inline-flex items-center text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <Pencil size={12} />
+            </button>
+          </>
+        )}
         <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>pipeline overview</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 6 }}>
