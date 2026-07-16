@@ -398,7 +398,7 @@
     "recordedAt": "2026-07-16T22:16:41.470Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T22:29:49.139Z",
+  "updated": "2026-07-16T22:31:06.036Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -408,12 +408,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T22:29:49.093Z",
+    "updatedAt": "2026-07-16T22:31:05.997Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2045-review",
     "testNotes": "Gates run from /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045 (branch feature/pan-2045, HEAD 434eea49). typecheck: PASSED (root `npm run typecheck`, frontend `npx tsc --noEmit`). lint: PASSED (`npm run lint`, exit 0). test: FAILED. Ran the actual configured gate command `OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main` in src/dashboard/frontend (setup-file changes make Vitest treat the whole suite as changed) plus two unscoped full-suite runs (`npx vitest run --configLoader runner`) to check determinism. All three runs failed with the identical, reproducible signature: 7 test files / 73 tests failing (a bare full-suite run without OVERDECK_VERIFICATION hit 96/2008 once, but the core failures were identical and reproducible across every run). Deterministic failures are in src/components/chat/__tests__/ConversationPanel.test.tsx (rename-flow describe block, ~20 cases) and src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx (~13 cases) -- both pre-existing files NOT touched by this PR's diff (confirmed via `git diff origin/main...HEAD --stat`). Every failure is the same assertion at src/test-setup.ts:26 (`expect(requests).toEqual([])` in the new global guardedFetch afterEach, added by this PR) tripping on real unmocked GET requests: `/api/conversations/test-conv/diffs` and `/api/conversations/pending-input`. This is the same class of defect the branch's own completed code review already flagged as a blocking correctness finding (.pan/review/agent-pan-2045-review-434eea49/correctness.md: 'the happy-dom suite still passes while real network work fails outside Vitest', verdict CHANGES REQUESTED) -- except broader: the happy-dom+guardedFetch migration now makes the full suite fail outright rather than silently pass, and the vBRIEF's own acceptance criterion green-full-suite-happy-dom.ac1 ('zero failed test cases') is unmet. Root (non-frontend) vitest suite (`npx vitest run --no-file-parallelism`) did not finish within the session -- host was severely overloaded (load avg ~28 on 24 cores, 6GB swapped) from ~26 concurrent agent workspaces, but this is moot: the frontend failure alone fails the combined `test` quality gate (root && frontend must both pass) regardless of root's outcome, and this PR does not touch root-suite code. UAT: not required -- PAN-2045 is a pure test-infrastructure/perf issue (Vitest jsdom->happy-dom environment and pool tuning); the GitHub issue body, comments, and vBRIEF NonGoals describe no UI-facing behavior change, so no browser verification applies. No code was edited; only read-only gate commands were run.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
     "lastVerifiedCommit": "9257982bd41a571009bdbaa68d4a06879776898e",
-    "reviewRequestedAt": "2026-07-16T22:29:48.730Z",
+    "reviewRequestedAt": "2026-07-16T22:31:05.658Z",
     "reviewSpawnedAt": "2026-07-16T22:16:43.115Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -680,7 +680,7 @@
       },
       "costAtCloseOut": {
         "usd": 262.069308,
-        "pricingAsOf": "2026-07-16T22:29:49.099Z"
+        "pricingAsOf": "2026-07-16T22:31:06.000Z"
       }
     },
     "merges": [
