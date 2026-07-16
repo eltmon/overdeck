@@ -66,20 +66,38 @@
     "recordedAt": "2026-07-16T21:13:53.247Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:14:16.847Z",
+  "updated": "2026-07-16T21:16:31.025Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "testing",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:14:16.821Z",
-    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "updatedAt": "2026-07-16T21:16:31.001Z",
+    "reviewNotes": "Correctness reviewer timed out before producing a report; security, performance, and requirements passed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "reviewRequestedAt": "2026-07-16T21:14:06.888Z",
     "reviewSpawnedAt": "2026-07-16T21:14:08.103Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -87,15 +105,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 144659,
-            "output": 696,
-            "cacheRead": 119680,
+            "input": 170793,
+            "output": 782,
+            "cacheRead": 127232,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 2132404,
-            "output": 3923,
-            "cacheRead": 2056960,
+            "input": 3234978,
+            "output": 8455,
+            "cacheRead": 2998784,
             "cacheWrite": 0
           }
         },
@@ -147,6 +165,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 44,
+            "output": 5825,
+            "cacheRead": 2975738,
+            "cacheWrite": 131441
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 2592716,
@@ -158,15 +184,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 144659,
-          "output": 696,
-          "cacheRead": 119680,
+          "input": 170793,
+          "output": 782,
+          "cacheRead": 127232,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7942953,
-          "output": 219884,
-          "cacheRead": 41606912,
+          "input": 9045527,
+          "output": 224416,
+          "cacheRead": 42548736,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -174,11 +200,17 @@
           "output": 47384,
           "cacheRead": 11848883,
           "cacheWrite": 327850
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 44,
+          "output": 5825,
+          "cacheRead": 2975738,
+          "cacheWrite": 131441
         }
       },
       "costAtCloseOut": {
-        "usd": 75.3182,
-        "pricingAsOf": "2026-07-16T21:14:16.829Z"
+        "usd": 77.71091,
+        "pricingAsOf": "2026-07-16T21:16:31.016Z"
       }
     },
     "merges": [
