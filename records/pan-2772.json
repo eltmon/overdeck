@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T18:06:09.254Z",
+  "updated": "2026-07-16T18:25:52.828Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "server-restart-broadcast": {
-        "writerId": "agent-pan-2772",
-        "agentId": "agent-pan-2772",
-        "pid": 3281099,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:06:09.254Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -97,6 +89,17 @@
         "outcome": "completed",
         "reason": "Added a calm terminal reconnect status overlay, replaced retry/exhaustion scrollback messages with coarse React state, kept the terminal mounted on exhaustion, and added an immediate Reconnect action that clears after healthy snapshot data. Focused tests, typecheck, lint, and diff checks pass.",
         "releasedAt": "2026-07-16T18:05:56.483Z"
+      },
+      {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 3281099,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:06:09.254Z",
+        "itemId": "server-restart-broadcast",
+        "outcome": "completed",
+        "reason": "Broadcasts retryable WebSocket close code 4503 with reason server-restarting to every open attached or pre-attach terminal client before graceful shutdown, logs the notified count, and treats notification failure as best effort. Unit test, build, typecheck, lint, diff check, and isolated Node 22 boot/shutdown verification pass.",
+        "releasedAt": "2026-07-16T18:25:52.827Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +114,10 @@
       "reconnect-affordance": {
         "reason": "Added a calm terminal reconnect status overlay, replaced retry/exhaustion scrollback messages with coarse React state, kept the terminal mounted on exhaustion, and added an immediate Reconnect action that clears after healthy snapshot data. Focused tests, typecheck, lint, and diff checks pass.",
         "updatedAt": "2026-07-16T18:05:56.483Z"
+      },
+      "server-restart-broadcast": {
+        "reason": "Broadcasts retryable WebSocket close code 4503 with reason server-restarting to every open attached or pre-attach terminal client before graceful shutdown, logs the notified count, and treats notification failure as best effort. Unit test, build, typecheck, lint, diff check, and isolated Node 22 boot/shutdown verification pass.",
+        "updatedAt": "2026-07-16T18:25:52.827Z"
       }
     }
   },
@@ -128,6 +135,9 @@
     "reconnect-affordance.reconnect-affordance.ac1": "completed",
     "reconnect-affordance.reconnect-affordance.ac2": "completed",
     "reconnect-affordance.reconnect-affordance.ac3": "completed",
-    "server-restart-broadcast": "running"
+    "server-restart-broadcast": "completed",
+    "server-restart-broadcast.server-restart-broadcast.ac1": "completed",
+    "server-restart-broadcast.server-restart-broadcast.ac2": "completed",
+    "server-restart-broadcast.server-restart-broadcast.ac3": "completed"
   }
 }
