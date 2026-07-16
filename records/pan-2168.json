@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T06:28:29.905Z",
+  "updated": "2026-07-16T06:33:16.102Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -59,18 +59,32 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "reveal-signal-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2168",
         "agentId": "agent-pan-2168",
         "pid": 2352358,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:28:29.905Z"
+        "claimedAt": "2026-07-16T06:28:29.905Z",
+        "itemId": "reveal-signal-module",
+        "outcome": "completed",
+        "reason": "Added sticky reveal request/consume/subscribe signal with listener unsubscribe coverage; focused tests, typecheck, and lint pass",
+        "releasedAt": "2026-07-16T06:33:16.102Z"
+      }
+    ],
+    "statusReasons": {
+      "reveal-signal-module": {
+        "reason": "Added sticky reveal request/consume/subscribe signal with listener unsubscribe coverage; focused tests, typecheck, and lint pass",
+        "updatedAt": "2026-07-16T06:33:16.102Z"
       }
     }
   },
   "statusOverrides": {
-    "reveal-signal-module": "running"
+    "reveal-signal-module": "completed",
+    "reveal-signal-module.reveal-signal-module.ac1": "completed",
+    "reveal-signal-module.reveal-signal-module.ac2": "completed",
+    "reveal-signal-module.reveal-signal-module.ac3": "completed"
   }
 }
