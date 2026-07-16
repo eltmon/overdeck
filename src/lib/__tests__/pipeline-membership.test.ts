@@ -63,6 +63,24 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
     expect(r.inPipeline).toBe(false);
   });
 
+  it('label drift stale_present: closed issue retains an in-progress phase label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: false, phaseLabel: 'in-progress' }));
+    expect(r.bucket).toBe('clean_terminal');
+    expect(r.labelDrift).toBe('stale_present');
+  });
+
+  it('label drift stale_absent: open PR has no phase label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, hasOpenPr: true, phaseLabel: null }));
+    expect(r.bucket).toBe('in_flight');
+    expect(r.labelDrift).toBe('stale_absent');
+  });
+
+  it('label drift absent: open PR has the in-review phase label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, hasOpenPr: true, phaseLabel: 'in-review' }));
+    expect(r.bucket).toBe('in_flight');
+    expect(r.labelDrift).toBeNull();
+  });
+
   it('squash-merge pairing: branch reads UNMERGED (L2) but a merged PR exists → post_merge_limbo, L1-merged wins', () => {
     const r = resolvePipelineMembership(
       sig({ issueOpen: true, hasConventionBranch: true, branchUnmerged: true, hasMergedPr: true }),

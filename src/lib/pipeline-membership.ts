@@ -63,6 +63,8 @@ export interface PipelineMembership {
   bucket: PipelineBucket;
   /** Human-readable reason(s) the issue landed in its bucket. */
   reasons: string[];
+  /** Whether the durable phase label disagrees with the issue/PR lifecycle. */
+  labelDrift: 'stale_present' | 'stale_absent' | null;
   /** The durable lenses as evaluated for this issue (for display / debugging). */
   lenses: {
     L1_openPr: boolean;
@@ -95,13 +97,23 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     L3_issueOpen: s.issueOpen,
     L4_phaseLabel: s.phaseLabel,
   };
-  const result = (bucket: PipelineBucket, reason: string): PipelineMembership => ({
-    issueId: s.issueId,
-    inPipeline: bucket !== 'clean_terminal',
-    bucket,
-    reasons: [reason],
-    lenses,
-  });
+  const result = (bucket: PipelineBucket, reason: string): PipelineMembership => {
+    // Canonical phase labels from STALE_PIPELINE_LABELS in label-reconciler.ts:
+    // verifying-on-main, planning, in-progress, in-review, in-planning.
+    const labelDrift = s.phaseLabel !== null && (bucket === 'clean_terminal' || !s.issueOpen)
+      ? 'stale_present'
+      : s.hasOpenPr && s.phaseLabel === null
+        ? 'stale_absent'
+        : null;
+    return {
+      issueId: s.issueId,
+      inPipeline: bucket !== 'clean_terminal',
+      bucket,
+      reasons: [reason],
+      labelDrift,
+      lenses,
+    };
+  };
 
   if (!s.issueOpen) {
     // Closed ⇒ terminal, regardless of lingering state — except an open PR, which
