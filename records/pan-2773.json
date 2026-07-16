@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T17:55:45.890Z",
+  "updated": "2026-07-16T17:56:44.718Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T17:55:45.813Z",
-    "inspectNotes": "Inspecting item create-result-type",
+    "updatedAt": "2026-07-16T17:56:44.167Z",
+    "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -38,17 +38,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 6,
-            "output": 1834,
-            "cacheRead": 246532,
-            "cacheWrite": 128906
+            "input": 10,
+            "output": 3002,
+            "cacheRead": 505356,
+            "cacheWrite": 131736
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 433827,
-            "output": 31490,
-            "cacheRead": 11716608,
+            "input": 448389,
+            "output": 36208,
+            "cacheRead": 12929024,
             "cacheWrite": 0
           }
         }
@@ -61,21 +61,21 @@
           "cacheWrite": 174911
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6,
-          "output": 1834,
-          "cacheRead": 246532,
-          "cacheWrite": 128906
+          "input": 10,
+          "output": 3002,
+          "cacheRead": 505356,
+          "cacheWrite": 131736
         },
         "openai/gpt-5.6-sol": {
-          "input": 433827,
-          "output": 31490,
-          "cacheRead": 11716608,
+          "input": 448389,
+          "output": 36208,
+          "cacheRead": 12929024,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.632601,
-        "pricingAsOf": "2026-07-16T17:55:45.873Z"
+        "usd": 20.523687,
+        "pricingAsOf": "2026-07-16T17:56:44.385Z"
       }
     },
     "merges": [],
