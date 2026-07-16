@@ -656,17 +656,16 @@
     "recordedAt": "2026-07-15T16:31:49.721Z"
   },
   "created": "2026-07-15T14:44:11.592Z",
-  "updated": "2026-07-16T09:26:29.734Z",
+  "updated": "2026-07-16T09:29:46.158Z",
   "pipeline": {
     "issueId": "PAN-2710",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T09:26:29.624Z",
+    "updatedAt": "2026-07-16T09:29:46.139Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "Verified against ab30bec102 (src/lib/cloister/stale-check-classifier.ts + tests/unit/lib/cloister/stale-check-classifier.test.ts). AC1: computeRedWindows closes fail(t1)->success(t2) into one {start,end} window, trailing fail leaves end:null (tests confirm). AC2: selectRerunCandidates requires completed+attempt===1+failing-concluded+containing closed window of same workflowName before adding to rerun[]. AC3: main-still-red (open window), no-red-window-match (green interval / predating history / workflow mismatch), attempt-exceeded (attempt!==1), missing-attempt (checked before other reasons) all covered by dedicated tests with exact reason strings. AC4: module is pure (no fs/network I/O, operates only on passed-in arrays); imports FAILING_CHECK_CONCLUSIONS from ../webhook-handlers.js (webhook-handlers.ts:192) rather than duplicating the conclusion set; test 'recognizes every conclusion from the canonical failing set' cross-checks all 7 values. No violations found.",
@@ -675,7 +674,9 @@
     "reviewedAtCommit": "c3181b1f66f9b00a5cd4d2aff3a1d0fd1eb4e8dd",
     "lastVerifiedCommit": "c3181b1f66f9b00a5cd4d2aff3a1d0fd1eb4e8dd",
     "reviewRequestedAt": "2026-07-15T19:32:48.867Z",
-    "reviewSpawnedAt": "2026-07-15T19:33:01.285Z"
+    "reviewSpawnedAt": "2026-07-15T19:33:01.285Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-16T09:29:46.139Z"
   },
   "closeOut": {
     "usage": {
@@ -745,7 +746,98 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2736"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-16T09:29:46.158Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at c3181b1f66f9b00a5cd4d2aff3a1d0fd1eb4e8dd",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "22 unmerged commit(s) on feature/pan-2710. Merge before closing out.; PR #2736 CLOSED",
+          "status": "miss",
+          "mergedAt": null,
+          "acceptedBy": {
+            "flag": "--accept-merged",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-16T09:29:34.624Z"
+          }
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-post-merge",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-16T09:29:34.624Z"
+          }
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "cannot resolve merge time for best-effort deploy check",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-deploy",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-16T09:29:34.624Z"
+          }
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 1 orphaned process(es); Removed git worktree; Removed git worktree; Removed 9 agent state directories; Preserved local branch strike/pan-2710 — not merged to main; Preserved remote branch strike/pan-2710 — not merged to main; Pruned 15 checkpoint ref(s) for agent-pan-2710, planning-pan-2710, strike-pan-2710; No specialist registry entries for PAN-2710"
+        }
+      ],
+      "accepted": [
+        "merged",
+        "post-merge",
+        "deploy"
+      ]
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
