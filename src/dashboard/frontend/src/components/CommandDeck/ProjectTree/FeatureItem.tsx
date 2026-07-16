@@ -1326,15 +1326,9 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
                     data-testid={`conversation-${conv.id}`}
                     title={conv.title ?? conv.name}
                   >
-                    <span className={styles.sessionToggleSlot} />
-                    <span className={styles.sessionDotSlot} />
-                    <span className={styles.sessionIconSlot}>
-                      <MessageSquare size={12} />
-                    </span>
+                    <span className={styles.sessionIconSlot}><MessageSquare size={12} /></span>
                     <span className={styles.sessionLabel}>{conv.title || 'Conversation'}</span>
-                    <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${conv.status}`] ?? ''}`}>
-                      {conv.status}
-                    </span>
+                    <span className={`${styles.sessionStatus} ${styles[`sessionStatus_${conv.status}`] ?? ''}`}>{conv.status}</span>
                     <span className={styles.sessionModel}>#{conv.id}</span>
                   </a>
                 ))}
