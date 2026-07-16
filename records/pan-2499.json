@@ -21,33 +21,33 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:11:00.672Z",
+  "updated": "2026-07-16T00:11:18.666Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T00:11:00.630Z",
-    "inspectNotes": "Inspecting item issue-view-wrapper"
+    "updatedAt": "2026-07-16T00:11:18.624Z",
+    "inspectNotes": "Inspection error for bead issue-view-wrapper: tmux session inspect-pan-2499-issue-view-wrapper exited before producing a verdict. No verdict was produced."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2983290,
-            "output": 5487,
-            "cacheRead": 2687232,
+            "input": 3175310,
+            "output": 5773,
+            "cacheRead": 2869632,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 28247421,
-            "output": 54492,
-            "cacheRead": 27271680,
+            "input": 29288454,
+            "output": 55520,
+            "cacheRead": 28304384,
             "cacheWrite": 0
           }
         },
@@ -86,15 +86,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2983290,
-          "output": 5487,
-          "cacheRead": 2687232,
+          "input": 3175310,
+          "output": 5773,
+          "cacheRead": 2869632,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 28247421,
-          "output": 54492,
-          "cacheRead": 27271680,
+          "input": 29288454,
+          "output": 55520,
+          "cacheRead": 28304384,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -117,8 +117,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 81.671965,
-        "pricingAsOf": "2026-07-16T00:11:00.665Z"
+        "usd": 82.260802,
+        "pricingAsOf": "2026-07-16T00:11:18.656Z"
       }
     },
     "merges": [],
