@@ -5389,3 +5389,11 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Pending fresh reviews not yet synthesized: 1966 (verdict none), 1897, 1491. UNSTABLE (fixing): 2773, 2619. CHANGES REQUESTED (driving): 2760, 2045.
 - Resources healthy: mem 32G avail, 15 devnets (<31 limit).
 - Close-out for 1987/2772 pending main CI green (2772 run in_progress at report time).
+
+## Tick 64b — PAN-2619 test disposition + infra follow-ups filed
+- PAN-2619 **test** role reported TESTS FAILED, but all three failures are pre-existing/environmental — NOT defects in the XTerminal padding fix (typecheck/lint/targeted XTerminal.test.tsx pass). Verified each:
+  - Container live-terminal UAT unrunnable: node-pty (`@lydell/node-pty` 1.2.0-beta.14, glibc prebuilt) segfaults (139) on musl devcontainer base (`node:22-alpine`/`node:20-alpine`); + Vite/Traefik WS proxy drops Origin → `/ws/terminal` 403. → filed **PAN-2809**.
+  - Workspace `vitest --changed` fails on `App.test.tsx` (selectPendingInputSubjects mock, from 2f4648e673) while **GitHub CI `test` on main is GREEN** — workspace-vs-CI harness divergence, NOT red-main. → filed **PAN-2810**.
+- 2619 itself is mid-fix: work agent alive (17:30, codex), head e3568752 past stale review run 2f507575 → review will re-run. No override now.
+- **DECISION RULE for 2619 close-out:** its AC-mandated browser UAT is un-runnable in-container (PAN-2809). When 2619's review APPROVES + code CI green, close with an HONEST `pan close --accept-<uat/verification>` citing PAN-2809 as the reason — do NOT block 2619 indefinitely on infra that affects all containerized workspaces. Only ever accept AFTER review approves the code.
+- Both PAN-2809/2810 filed as backstop-as-symptom, NOT driven (DRAIN in force outside authorized set).
