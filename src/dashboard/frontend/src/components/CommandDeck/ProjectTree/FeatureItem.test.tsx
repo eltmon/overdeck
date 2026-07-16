@@ -1211,3 +1211,30 @@ describe('FeatureItem', () => {
     expect(link).toHaveTextContent('Only conv');
   });
 });
+
+/**
+ * PAN-2765 — a wait can be buried a level down in the tree. The issue row must
+ * say so without the operator expanding it, which is how the live PAN-2760
+ * planning question went unseen.
+ */
+describe('FeatureItem needs-attention shading', () => {
+  it('shades the issue row when a descendant session awaits input', () => {
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({
+          sessions: [makeSession({ type: 'planning', sessionId: 'planning-pan-821', awaitingInput: true })],
+        })}
+      />,
+    );
+
+    expect(container.querySelector('[data-needs-attention="true"]')).not.toBeNull();
+  });
+
+  it('does not shade the issue row when no descendant awaits input', () => {
+    const { container } = renderFeature(
+      <FeatureItem feature={makeFeature({ sessions: [makeSession()] })} />,
+    );
+
+    expect(container.querySelector('[data-needs-attention="true"]')).toBeNull();
+  });
+});

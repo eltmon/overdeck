@@ -174,3 +174,84 @@ describe('computeAgentEnrichment cached-scan replay', () => {
     rmSync(agentDir, { recursive: true, force: true })
   })
 })
+
+/**
+ * An interactive session does not finish — it yields the turn. A question asked
+ * in prose leaves no AskUserQuestion tool_use and no modal in the pane, so every
+ * other detector misses it and the agent sits silent. Observed live on
+ * planning-pan-2760: 36 minutes idle with three options on screen, and the
+ * dashboard reporting hasPendingQuestion:false.
+ */
+describe('computeAgentEnrichment interactive turn-end', () => {
+  const getAgentRuntimeStateMock = vi.mocked(agents.getAgentRuntimeState)
+  const getAgentStateSyncMock = vi.mocked(agents.getAgentStateSync)
+  const detectAwaitingInputForAgentMock = vi.mocked(agentInputDetection.detectAwaitingInputForAgent)
+
+  function arrange(role: string, agentId: string, state: string) {
+    const agentDir = makeAgentDir(role)
+    vi.spyOn(agents, 'getAgentDir').mockReturnValue(agentDir)
+    getAgentStateSyncMock.mockReturnValue({ id: agentId, role } as ReturnType<typeof agents.getAgentStateSync>)
+    getAgentRuntimeStateMock.mockReturnValue(Effect.succeed({ state, resolution: 'working', resolutionCount: 0 }))
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+    return agentDir
+  }
+
+  it('flags an idle plan-role agent as waiting on the operator', async () => {
+    const agentId = 'planning-pan-2760'
+    const dir = arrange('plan', agentId, 'idle')
+
+    const e = await Effect.runPromise(
+      computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN),
+    )
+
+    expect(e.pendingInputKinds).toContain('agentTurnEnded')
+    expect(e.hasPendingQuestion).toBe(true)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('does NOT flag an idle work-role agent — its idle can mean between-items', async () => {
+    const agentId = 'agent-pan-2760'
+    const dir = arrange('work', agentId, 'idle')
+
+    const e = await Effect.runPromise(
+      computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN),
+    )
+
+    expect(e.pendingInputKinds).not.toContain('agentTurnEnded')
+    expect(e.hasPendingQuestion).toBe(false)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('does NOT flag an actively working plan agent', async () => {
+    const agentId = 'planning-pan-2761'
+    const dir = arrange('plan', agentId, 'active')
+
+    const e = await Effect.runPromise(
+      computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN),
+    )
+
+    expect(e.pendingInputKinds).not.toContain('agentTurnEnded')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('prefers the real question over the generic turn-end when both are true', async () => {
+    const agentId = 'planning-pan-2762'
+    const dir = arrange('plan', agentId, 'idle')
+
+    const scan = {
+      askUserQuestions: [{
+        toolId: 'toolu_real',
+        timestamp: '2026-07-15T12:00:00.000Z',
+        questions: [{ question: 'Which approach?', header: 'Approach', multiSelect: false, options: [{ label: 'A', description: 'a' }] }],
+      }],
+      enterPlanModeOpen: false,
+      exitPlanModePending: false,
+    }
+    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, scan))
+
+    expect(e.pendingInputKinds).toContain('askUserQuestion')
+    expect(e.pendingInputKinds).not.toContain('agentTurnEnded')
+    expect(e.pendingQuestionReason).toBe('user_question')
+    rmSync(dir, { recursive: true, force: true })
+  })
+})

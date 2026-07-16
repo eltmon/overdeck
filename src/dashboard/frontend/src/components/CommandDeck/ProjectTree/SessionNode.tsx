@@ -33,6 +33,8 @@ import { StatusDot, type StatusDotStatus } from '../StatusDot';
 import { useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../../shared/ModelPicker/ModelPicker';
 import { useResolvedModels, resolveWorkTypeKey } from '../../../lib/useResolvedModels';
 import { useDashboardStore } from '../../../lib/store';
+import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
+import { AwaitingInputIndicator } from '../../AwaitingInputIndicator';
 import { useSharedTick } from '../../../lib/useSharedTick';
 import { toolNameToPhase, isSpinnerPhase, type WorkingPhase } from '../../../lib/workingPhase';
 import { formatRelativeTime } from '../../../lib/formatRelativeTime';
@@ -630,6 +632,7 @@ export function SessionNode({
   // PAN-1779: a pause gate beats every other presentation — a paused agent is
   // deliberately parked (deacon will not auto-resume it), never just "stopped".
   const isPaused = session.paused === true;
+  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   const dotStatus = isPaused ? 'waiting' : session.awaitingInput ? 'waiting' : deriveDotStatus(runtime, session.presence);
   const activity = effectiveActivity(runtime, session.presence);
   const isLive = session.presence === 'active' || session.presence === 'idle' || session.presence === 'suspended';
@@ -740,6 +743,16 @@ export function SessionNode({
           <span className={styles.sessionLabel} title={sessionLabelTitle}>
             {sessionLabel}
           </span>
+          {session.awaitingInput === true && (
+            // The node's only "you are the blocker" affordance. A prose question
+            // leaves no other trace on the row, so without this an agent can sit
+            // for half an hour with a question on screen and read as merely idle.
+            <AwaitingInputIndicator
+              kinds={session.pendingInputKinds}
+              size={12}
+              onClick={() => requestAskUserQuestionReopen(session.sessionId)}
+            />
+          )}
           {sessionModel && (
             <span className={styles.sessionModel} title={sessionLabelTitle}>{sessionModel}</span>
           )}
