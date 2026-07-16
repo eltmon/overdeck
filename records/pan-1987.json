@@ -201,18 +201,18 @@
     "recordedAt": "2026-07-16T20:57:38.756Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T21:03:41.198Z",
+  "updated": "2026-07-16T21:03:41.990Z",
   "pipeline": {
     "issueId": "PAN-1987",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:03:41.181Z",
-    "reviewNotes": "[correctness] Tree rename can target a different project — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx:232`",
+    "updatedAt": "2026-07-16T21:03:41.972Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-1987-review",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
     "lastVerifiedCommit": "8dbd15a7e22662be0ecb173e12b13e96ae4cc6f9",
@@ -361,7 +361,7 @@
       },
       "costAtCloseOut": {
         "usd": 130.573662,
-        "pricingAsOf": "2026-07-16T21:03:41.189Z"
+        "pricingAsOf": "2026-07-16T21:03:41.984Z"
       }
     },
     "merges": [
