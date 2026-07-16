@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T19:14:31.878Z",
+  "updated": "2026-07-16T19:14:41.282Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -176,5 +176,48 @@
     "docs-project-rename": "completed",
     "docs-project-rename.docs-project-rename.ac1": "completed",
     "docs-project-rename.docs-project-rename.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/routes/project-rename.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx"
+    ],
+    "declaredScope": [
+      "configuration/projects.mdx",
+      "src/cli/commands/project.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+      "src/dashboard/server/routes/__tests__/projects-rename.test.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/projects.ts",
+      "sync-sources/skills/pan-projects/SKILL.md",
+      "tests/unit/lib/projects-rename.test.ts"
+    ],
+    "actualChangedFiles": [
+      "configuration/projects.mdx",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/project.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/server/routes/__tests__/projects-rename.test.ts",
+      "src/dashboard/server/routes/project-rename.ts",
+      "src/dashboard/server/routes/projects.ts",
+      "src/lib/projects.ts",
+      "sync-sources/skills/pan-projects/SKILL.md",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/projects-rename.test.ts"
+    ],
+    "recordedAt": "2026-07-16T19:14:41.281Z"
   }
 }
