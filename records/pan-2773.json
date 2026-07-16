@@ -57,17 +57,17 @@
     "recordedAt": "2026-07-16T18:38:15.942Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:47:05.760Z",
+  "updated": "2026-07-16T18:47:11.721Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:47:04.606Z",
+    "updatedAt": "2026-07-16T18:47:11.660Z",
     "reviewNotes": "Approved: no blocking findings; one transient query-failure edge case remains advisory.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
@@ -116,24 +116,6 @@
       ],
       "recordedAt": "2026-07-16T18:38:15.942Z"
     },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -149,9 +131,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 418342,
-            "output": 7736,
-            "cacheRead": 2741760,
+            "input": 419166,
+            "output": 9042,
+            "cacheRead": 2908672,
             "cacheWrite": 0
           }
         },
@@ -212,9 +194,9 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 5001235,
-          "output": 174767,
-          "cacheRead": 49532416,
+          "input": 5002059,
+          "output": 176073,
+          "cacheRead": 49699328,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -225,8 +207,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 65.746383,
-        "pricingAsOf": "2026-07-16T18:47:04.667Z"
+        "usd": 65.873139,
+        "pricingAsOf": "2026-07-16T18:47:11.715Z"
       }
     },
     "merges": [
@@ -235,7 +217,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
     "claims": {},
