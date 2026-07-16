@@ -36,7 +36,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T12:03:44.133Z",
+  "updated": "2026-07-16T12:03:46.631Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   },
   "reviewMode": "full",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "persist-strike-ready": {
-        "writerId": "agent-pan-2702",
-        "agentId": "agent-pan-2702",
-        "pid": 1625382,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:03:44.133Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2702",
@@ -129,16 +121,31 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2702 dead)",
         "releasedAt": "2026-07-16T07:32:57.608Z"
+      },
+      {
+        "writerId": "agent-pan-2702",
+        "agentId": "agent-pan-2702",
+        "pid": 1625382,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:03:44.133Z",
+        "itemId": "persist-strike-ready",
+        "outcome": "completed",
+        "reason": "Added authenticated pan strike-ready signal, durable SQLite and issue-record projection, idempotent HEAD handling, and updated strike handoff instructions",
+        "releasedAt": "2026-07-16T12:03:46.631Z"
       }
     ],
     "statusReasons": {
       "persist-strike-ready": {
-        "reason": "stale claim released (agent-pan-2702 dead)",
-        "updatedAt": "2026-07-16T07:32:57.608Z"
+        "reason": "Added authenticated pan strike-ready signal, durable SQLite and issue-record projection, idempotent HEAD handling, and updated strike handoff instructions",
+        "updatedAt": "2026-07-16T12:03:46.631Z"
       }
     }
   },
   "statusOverrides": {
-    "persist-strike-ready": "running"
+    "persist-strike-ready": "completed",
+    "persist-strike-ready.persist-strike-ready.ac1": "completed",
+    "persist-strike-ready.persist-strike-ready.ac2": "completed",
+    "persist-strike-ready.persist-strike-ready.ac3": "completed",
+    "persist-strike-ready.persist-strike-ready.ac4": "completed"
   }
 }
