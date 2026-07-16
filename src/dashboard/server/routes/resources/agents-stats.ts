@@ -165,11 +165,11 @@ export function getAgentStatsSnapshotEffect(
     const costQuery = deps.queryCostEvents ?? queryCostEventsSync;
 
     for (const agent of agents) {
-      const recentStartTs = new Date(nowMs - BURN_WINDOW_MS).toISOString();
-      costEventsByAgent.set(agent.id, [
-        ...costQuery({ agentId: agent.id }),
-        ...costQuery({ agentId: agent.id, startTs: recentStartTs }),
-      ]);
+      // One query per agent: computeAgentCostStats derives the burn window from
+      // event timestamps itself, so a second startTs-bounded query was pure
+      // duplicate work — and concatenating it double-counted recent events in
+      // totalUsd/burn (every recent event appeared twice).
+      costEventsByAgent.set(agent.id, costQuery({ agentId: agent.id }));
     }
 
     return buildAgentStatsSnapshot({
