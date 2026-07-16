@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T04:08:39.680Z",
+  "updated": "2026-07-16T06:44:32.711Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -70,5 +70,20 @@
       "mode": "off"
     }
   },
-  "reviewMode": "full"
+  "reviewMode": "full",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "persist-strike-ready": {
+        "writerId": "agent-pan-2702",
+        "agentId": "agent-pan-2702",
+        "pid": 2493853,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:44:32.711Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "persist-strike-ready": "running"
+  }
 }
