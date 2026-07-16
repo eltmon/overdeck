@@ -78,6 +78,14 @@
         "to": "sync-sources"
       },
       {
+        "from": "cli",
+        "to": "dist",
+        "filter": [
+          "**/*",
+          "!**/*.map"
+        ]
+      },
+      {
         "from": "server",
         "to": "server",
         "filter": [
