@@ -21,11 +21,24 @@
       "timestamp": "2026-07-16T08:32:29.971Z",
       "reason": "end",
       "note": "No deviations. Delivered the global live Flywheel open-questions indicator, stable section anchor, cold/warm reveal scrolling, AppChrome navigation wiring, and focused tests. Corrected a legacy rendered-surface fixture exposed by the new global consumer. Full tests, typecheck, and lint pass; all commits are pushed."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:35Z] review-agent → FAILED — seq 2",
+      "timestamp": "2026-07-16T08:35:27.290Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-16T08:35:27Z",
+      "markdownBody": "# Review FAILED for PAN-2168\n\n# Review Synthesis — PAN-2168 — 2026-07-16T04:34:53-04:00\n\n## Verdict: CHANGES REQUESTED — five-second polling permits unbounded overlapping requests\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-f78263ef/context.json`\n- Branch: `feature/pan-2168`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168`\n- HEAD reviewed: `f78263ef7ac3a220851c06e84b0d8547a4ee7522`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-f78263ef/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-f78263ef/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-f78263ef/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-f78263ef/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [performance] Five-second polling permits unbounded overlapping requests — `src/dashboard/frontend/src/components/OpenQuestionsIndicator.tsx:20`\nThe new always-mounted app-bar indicator starts an immediate request and then invokes the same asynchronous refresh every five seconds without awaiting, aborting, timing out, or guarding an existing request. If `/api/flywheel/current` remains pending, outstanding client requests and server work grow for every open dashboard tab; the component also receives push updates, and the existing Flywheel page starts a second poll when active. The cited implementation is entirely new in this PR, so the finding survives the PR scope gate. Bound polling concurrency and cancel active work during cleanup, or reuse a shared deduplicated status source.\n\n## Non-blocking Findings\n\n### [correctness] A handled reveal remains pending and replays after remount — `src/dashboard/frontend/src/pages/FlywheelPage.tsx:398`\nThe live subscription handles a reveal request but does not consume the module-level pending flag. After navigating away and returning, the stale request is consumed again and forces the Status tab and Open Questions scroll. This is advisory for this cycle because the primary activation path works, but the signal contract should consume a request once it has been handled and gain a mounted-then-remounted regression test.\n\n### [correctness] An older HTTP refresh can overwrite a newer WebSocket status — `src/dashboard/frontend/src/components/OpenQuestionsIndicator.tsx:20`\nAn HTTP request started before a WebSocket snapshot may resolve afterward and replace newer state; overlapping HTTP refreshes can likewise resolve out of order. This can briefly regress or hide the app-bar count until another update arrives. This is advisory for this cycle, but the bounded-refresh fix should also prevent superseded HTTP results from replacing newer status.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-f78263ef/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2168 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T08:35:05.996Z",
+  "updated": "2026-07-16T08:35:27.290Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
