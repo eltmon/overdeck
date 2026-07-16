@@ -6,7 +6,6 @@ import { Effect } from 'effect';
 import {
   getIssueStatePromise,
   listOpenIssuesWithLabelsPromise,
-  listPullRequestsForHeadPromise,
 } from './github-app.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { listSpecs } from './pan-dir/specs.js';
@@ -25,11 +24,48 @@ interface GitHubPullRequestRow {
 }
 
 export const PIPELINE_ISSUE_STATE_CONCURRENCY = 8;
+export const PIPELINE_PR_HEAD_BATCH_SIZE = 50;
+
+interface MergedHeadGraphqlResponse {
+  data?: {
+    repository?: Record<string, { totalCount?: number }>;
+  };
+}
+
+async function runGitHubGraphql(query: string): Promise<string> {
+  const { stdout } = await execFileAsync('gh', ['api', 'graphql', '-f', `query=${query}`], {
+    encoding: 'utf-8',
+    timeout: 30_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  return stdout;
+}
+
+export async function listMergedPullRequestHeadsBatched(
+  owner: string,
+  repo: string,
+  heads: string[],
+  runGraphql: (query: string) => Promise<string> = runGitHubGraphql,
+): Promise<string[]> {
+  const mergedHeads: string[] = [];
+  for (let start = 0; start < heads.length; start += PIPELINE_PR_HEAD_BATCH_SIZE) {
+    const chunk = heads.slice(start, start + PIPELINE_PR_HEAD_BATCH_SIZE);
+    const fields = chunk.map((head, index) =>
+      `h${index}: pullRequests(states: MERGED, headRefName: ${JSON.stringify(head)}, first: 1) { totalCount }`);
+    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
+    const response = JSON.parse(await runGraphql(query)) as MergedHeadGraphqlResponse;
+    const repository = response.data?.repository ?? {};
+    for (let index = 0; index < chunk.length; index += 1) {
+      if ((repository[`h${index}`]?.totalCount ?? 0) > 0) mergedHeads.push(chunk[index]!);
+    }
+  }
+  return mergedHeads;
+}
 
 export interface PipelineMembershipGatherDeps {
   listOpenIssues(owner: string, repo: string): Promise<Array<{ number: number; labels: string[] }>>;
   listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
-  hasMergedPullRequestForHead(owner: string, repo: string, head: string): Promise<boolean>;
+  listMergedPullRequestHeads(owner: string, repo: string, heads: string[]): Promise<string[]>;
   getIssueState(owner: string, repo: string, number: number): Promise<{ state: 'open' | 'closed' }>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
   run(command: string, args: string[], cwd?: string): Promise<string>;
@@ -52,8 +88,7 @@ const defaultDeps: PipelineMembershipGatherDeps = {
       headRefName: pr.head.ref,
     }));
   },
-  hasMergedPullRequestForHead: async (owner, repo, head) =>
-    (await listPullRequestsForHeadPromise(owner, repo, head, 'all')).some((pr) => pr.merged),
+  listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
   getIssueState: getIssueStatePromise,
   listSpecIssueIds: async (projectPath) =>
     (await Effect.runPromise(listSpecs(projectPath))).map((entry) => entry.issueId),
@@ -149,17 +184,20 @@ export async function gatherProjectLensSignals(
   }
   for (const id of specIssues) candidates.add(id);
 
+  const candidateHeads = [...new Set([...candidates].flatMap((id) =>
+    [...(headRefsByIssue.get(id) ?? new Set([`feature/${id.toLowerCase()}`]))]))];
+  const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
+  for (const [id, heads] of headRefsByIssue) {
+    if ([...heads].some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
+  }
+  for (const id of candidates) {
+    if (!headRefsByIssue.has(id) && mergedHeads.has(`feature/${id.toLowerCase()}`)) mergedPrIssues.add(id);
+  }
+
   const candidateStates = await mapWithConcurrency(
     [...candidates],
     PIPELINE_ISSUE_STATE_CONCURRENCY,
     async (id) => {
-      const heads = headRefsByIssue.get(id) ?? new Set([`feature/${id.toLowerCase()}`]);
-      for (const head of heads) {
-        if (await deps.hasMergedPullRequestForHead(owner, repo, head)) {
-          mergedPrIssues.add(id);
-          break;
-        }
-      }
       return [
         id,
         labelsByIssue.has(id) || (await deps.getIssueState(owner, repo, issueNumber(id))).state === 'open',
