@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T06:45:11.728Z",
+  "updated": "2026-07-16T06:48:07.173Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
@@ -87,16 +87,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "drain-spawn-resume": {
-        "writerId": "agent-pan-2255",
-        "agentId": "agent-pan-2255",
-        "pid": 2504622,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:45:11.727Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2255",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "Persisted issue-role feedback deliveries, resolved live agents at send time, marked mailbox delivery after successful sends, and deferred escalation when no target exists",
         "releasedAt": "2026-07-16T06:44:56.987Z"
+      },
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2504622,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:45:11.727Z",
+        "itemId": "drain-spawn-resume",
+        "outcome": "completed",
+        "reason": "Prepended pending mailbox feedback to work/strike spawn and resume prompts with idempotent delivered/acknowledged transitions; Deacon auto-resume inherits the shared path",
+        "releasedAt": "2026-07-16T06:48:07.173Z"
       }
     ],
     "statusReasons": {
@@ -129,6 +132,10 @@
       "feedback-producers": {
         "reason": "Persisted issue-role feedback deliveries, resolved live agents at send time, marked mailbox delivery after successful sends, and deferred escalation when no target exists",
         "updatedAt": "2026-07-16T06:44:56.987Z"
+      },
+      "drain-spawn-resume": {
+        "reason": "Prepended pending mailbox feedback to work/strike spawn and resume prompts with idempotent delivered/acknowledged transitions; Deacon auto-resume inherits the shared path",
+        "updatedAt": "2026-07-16T06:48:07.173Z"
       }
     }
   },
@@ -143,6 +150,10 @@
     "feedback-producers.feedback-producers.ac2": "completed",
     "feedback-producers.feedback-producers.ac3": "completed",
     "feedback-producers.feedback-producers.ac4": "completed",
-    "drain-spawn-resume": "running"
+    "drain-spawn-resume": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac1": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac2": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac3": "completed",
+    "drain-spawn-resume.drain-spawn-resume.ac4": "completed"
   }
 }
