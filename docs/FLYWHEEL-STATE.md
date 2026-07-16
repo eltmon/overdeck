@@ -5092,3 +5092,18 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   reap logs. NOT a per-transport redesign (that's PAN-2775 follow-up).
 - 2710 strike was a 122m zombie (nudge dead-lettered — idle codex, no next turn) → killed + re-struck.
 - Main CI green on `94742d9678`.
+
+---
+
+## Tick 50 — 2026-07-16 ~08:50Z — FLEET DELIVERS: 4 autonomous PRs; PAN-2532 MERGED; reaper keeps killing its fixers
+
+- **The unblocked fleet produced 4 PRs on its own**: #2782 (2532), #2783 (2255), #2785 (2698), #2786 (2168).
+  **PAN-2532 MERGED `a8a588be18`** — real convoy verdict (synthesis APPROVED, artifacts on disk,
+  host-reconciled journal approval; reviewNotes=null is a notes-threading gap, NOT the 2746 bypass —
+  checked artifacts before merging). First fully-autonomous fleet merge of the run.
+- PAN-2255 review=blocked (real finding — let the agent iterate). 2698/2168 in review.
+- **PAN-2757's reaper has now killed THREE of its own fixer strikes** (~20min in, every time). 3rd
+  strike died with the final step UNCOMMITTED (extract confirmed-session-query.ts, −18 lines, baseline
+  edit). Strike #4 dispatched with SURVIVAL PROTOCOL: commit+push within first 2 minutes, then verify.
+- PAN-2168 work agent reaped twice tonight; resumed twice; now in review anyway (work committed each time).
+- 2710 strike idle 48m again post-nudge; its origin branch has the full 1007-line perf-fix diff — review it next tick if it stays silent.

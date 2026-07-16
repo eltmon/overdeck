@@ -41,27 +41,25 @@ export function PipelineRow({ entry, issueCosts, onSelectFeature }: PipelineRowP
         'group grid cursor-pointer items-center gap-3 rounded-[10px] border bg-card/40 px-3 py-2.5 transition-colors hover:border-[#2c3547] hover:bg-accent/40',
         needsYou ? 'border-amber-500/40' : 'border-border',
       )}
-      style={{ gridTemplateColumns: '88px 1fr 200px 90px 34px' }}
+      style={{ gridTemplateColumns: '78px 1fr 74px 34px' }}
     >
       <span className="truncate font-mono text-[11.5px] text-muted-foreground">{feature.issueId}</span>
 
       <span className="min-w-0">
         <span className="block truncate text-[13px] font-semibold text-foreground">{feature.title}</span>
-        <span className="block truncate text-[11px] text-muted-foreground">{sublineFor(entry)}</span>
-      </span>
-
-      <span className="flex min-w-0 flex-col gap-[3px]">
-        <span
-          className={cn(
-            'inline-flex w-fit max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px]',
-            chip.bgClass,
-            chip.textClass,
-          )}
-        >
-          <span className={cn('h-[7px] w-[7px] shrink-0 rounded-full', chip.dotClass, chip.animate && 'animate-pulse')} />
-          <span className="truncate">{chip.label}</span>
+        <span className="mt-[3px] flex min-w-0 items-center gap-1.5 overflow-hidden text-[10.5px] text-muted-foreground">
+          <span
+            className={cn(
+              'inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px]',
+              chip.bgClass,
+              chip.textClass,
+            )}
+          >
+            <span className={cn('h-[7px] w-[7px] shrink-0 rounded-full', chip.dotClass, chip.animate && 'animate-pulse')} />
+            {chip.label}
+          </span>
+          <span className="truncate">{[sublineFor(entry), whoLineFor(entry)].filter(Boolean).join(' · ')}</span>
         </span>
-        <span className="truncate text-[10.5px] text-muted-foreground">{whoLineFor(entry)}</span>
       </span>
 
       <span className="min-w-0 text-right">
