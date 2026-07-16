@@ -32,9 +32,22 @@
       "timestamp": "2026-07-16T11:57:10.745Z",
       "reason": "end",
       "note": "Initial AppImage verification exposed a missing resources/package.json manifest that the staging smoke fixture had masked; fixed and reverified. The kickoff-required rebase also required a history-preserving remote-branch merge after a non-fast-forward push rejection. No work was skipped or deferred. Delivered the self-contained packaged CLI and full sync payload, package-structure regression guards, desktop runtime documentation, and a clean AppImage verification where bundled Electron printed CLI version 0.45.20. npm run typecheck, npm run lint, and npm test pass."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T12:00Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T12:00:06.058Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T12:00:06Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2768\n\n# Review Synthesis — PAN-2768 — 2026-07-16T07:59:32-04:00\n\n## Verdict: CHANGES REQUESTED — FR-5 lacks the required built-AppImage CLI smoke verification\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/.pan/review/agent-pan-2768-review-565d03f2/context.json`\n- Branch: `feature/pan-2768`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768`\n- HEAD reviewed: `565d03f27d7430fdade5ae3b03eaad3d1d363656`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/.pan/review/agent-pan-2768-review-565d03f2/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/.pan/review/agent-pan-2768-review-565d03f2/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/.pan/review/agent-pan-2768-review-565d03f2/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/.pan/review/agent-pan-2768-review-565d03f2/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] Built AppImage CLI smoke verification is absent — `apps/desktop/package.json:81`\nFR-5 is explicitly classified `in_pr_scope`, but the changed Linux packaging path still ends after electron-builder and manifest stamping. The new preparation smoke at `apps/desktop/scripts/prepare-server-resources.mjs:445` invokes the staged CLI with the build host's `process.execPath`; it does not launch `resources/dist/cli/index.js` from the built AppImage using the packaged Electron executable with `ELECTRON_RUN_AS_NODE=1`. The PR can therefore pass while the shipped AppImage cannot launch `pan`. Add a post-build Linux artifact smoke step that exercises a harmless CLI command from the packaged resource layout under bundled Electron-as-Node and fails the packaging verification path if launch fails.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- correctness\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/.pan/review/agent-pan-2768-review-565d03f2/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2768 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -55,7 +68,7 @@
     "recordedAt": "2026-07-16T11:57:07.758Z"
   },
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T11:58:57.332Z",
+  "updated": "2026-07-16T12:00:06.059Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "reviewing",
