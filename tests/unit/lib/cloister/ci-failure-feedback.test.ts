@@ -12,6 +12,8 @@ vi.mock('node:child_process', () => ({
 
 const mockGetAgentStateSync = vi.fn();
 const mockMessageAgent = vi.fn();
+const mockResolveIssueFeedbackTarget = vi.fn();
+const mockMarkMailboxItemDelivered = vi.fn();
 
 vi.mock('../../../../src/lib/agents.js', () => ({
   getAgentStateSync: (...args: Parameters<typeof mockGetAgentStateSync>) => mockGetAgentStateSync(...args),
@@ -28,6 +30,14 @@ const mockWriteFeedbackFile = vi.fn();
 
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
   writeFeedbackFile: (...args: Parameters<typeof mockWriteFeedbackFile>) => mockWriteFeedbackFile(...args),
+}));
+
+vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
+  resolveIssueFeedbackTarget: (...args: Parameters<typeof mockResolveIssueFeedbackTarget>) => mockResolveIssueFeedbackTarget(...args),
+}));
+
+vi.mock('../../../../src/lib/cloister/agent-mailbox.js', () => ({
+  markMailboxItemDelivered: (...args: Parameters<typeof mockMarkMailboxItemDelivered>) => mockMarkMailboxItemDelivered(...args),
 }));
 
 function makeExecFileMock(
@@ -75,6 +85,8 @@ beforeEach(() => {
     relativePath: '.pan/feedback/001-ci-monitor-failed.md',
   }));
   mockMessageAgent.mockResolvedValue(undefined);
+  mockResolveIssueFeedbackTarget.mockResolvedValue({ agentId: 'agent-pan-1801' });
+  mockMarkMailboxItemDelivered.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -177,8 +189,13 @@ describe('relayCiFailureFeedback', () => {
     expect(mockMessageAgent).toHaveBeenCalledTimes(1);
   });
 
-  it('skips feedback when no work agent exists', async () => {
+  it('leaves mailbox feedback pending when no live work agent exists', async () => {
     mockGetAgentStateSync.mockReturnValue(null);
+    mockResolveIssueFeedbackTarget.mockResolvedValue({
+      needsYou: true,
+      reason: 'No live feedback target for PAN-1801',
+    });
+    makeGhMocks();
 
     const result = await Effect.runPromise(relayCiFailureFeedback({
       issueId: 'PAN-1801',
@@ -190,11 +207,12 @@ describe('relayCiFailureFeedback', () => {
     }));
 
     expect(result.agentMessageSent).toBe(false);
-    expect(execFile).not.toHaveBeenCalled();
-    expect(mockWriteFeedbackFile).not.toHaveBeenCalled();
+    expect(mockWriteFeedbackFile).toHaveBeenCalledOnce();
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+    expect(mockMarkMailboxItemDelivered).not.toHaveBeenCalled();
   });
 
-  it('skips feedback for non-work agent roles', async () => {
+  it('uses the shared issue-role resolver instead of a stale non-work agent role', async () => {
     mockGetAgentStateSync.mockReturnValue({
       id: 'agent-pan-1801',
       issueId: 'PAN-1801',
@@ -204,6 +222,7 @@ describe('relayCiFailureFeedback', () => {
       model: 'claude-sonnet-4-6',
       startedAt: new Date().toISOString(),
     });
+    makeGhMocks();
 
     const result = await Effect.runPromise(relayCiFailureFeedback({
       issueId: 'PAN-1801',
@@ -214,8 +233,9 @@ describe('relayCiFailureFeedback', () => {
       source: 'check_run:test',
     }));
 
-    expect(result.agentMessageSent).toBe(false);
-    expect(execFile).not.toHaveBeenCalled();
+    expect(result.agentMessageSent).toBe(true);
+    expect(mockResolveIssueFeedbackTarget).toHaveBeenCalledWith('PAN-1801');
+    expect(mockMessageAgent).toHaveBeenCalledWith('agent-pan-1801', expect.any(String));
   });
 
   it('still messages the agent when gh log fetch fails', async () => {

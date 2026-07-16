@@ -11,7 +11,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
-import { resolveIssueFeedbackTarget } from './feedback-target.js';
+import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { markMailboxItemDelivered } from './agent-mailbox.js';
 
 const execFileAsync = promisify(execFile);
@@ -157,6 +157,11 @@ async function deliverReviewVerdictFeedbackPromise(
         }
       } else {
         console.warn(`[review-verdict-feedback] ${target.reason}; issue-role mailbox remains pending`);
+        await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
+          specialist: 'review-agent',
+          feedbackPath: fileResult.filePath,
+          slotItemId: opts.slotItemId,
+        });
       }
     } catch (err) {
       console.warn(`[review-verdict-feedback] Could not resolve a feedback target for ${issueId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
