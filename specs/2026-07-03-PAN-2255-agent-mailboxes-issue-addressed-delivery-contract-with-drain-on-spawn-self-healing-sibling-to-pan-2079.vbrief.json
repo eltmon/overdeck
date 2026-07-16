@@ -4,17 +4,17 @@
     "created": "2026-07-03T05:39:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2255: Agent mailboxes: issue-addressed delivery contract with drain-on-spawn self-healing (sibling to PAN-2079)",
-    "updated": "2026-07-16T07:28:42.639Z"
+    "updated": "2026-07-16T07:28:44.292Z"
   },
   "plan": {
     "id": "pan-2255",
     "title": "Agent mailboxes: issue-addressed delivery contract with drain-on-spawn self-healing (sibling to PAN-2079)",
-    "status": "approved",
+    "status": "running",
     "uid": "6a2cb7d5-d01c-4662-a519-e17bc353c3db",
     "author": "agent:gpt-5.5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-03T05:39:39Z",
-    "updated": "2026-07-16T07:28:42.639Z",
+    "updated": "2026-07-16T07:28:44.292Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2255",
