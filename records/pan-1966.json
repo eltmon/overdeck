@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T06:11:27.564Z",
+  "updated": "2026-07-16T06:12:55.697Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "resolver-label-drift": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 2234685,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:11:27.564Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Added durable hasVbriefSpec lens, planned-backlog classification, and open/closed unit coverage; focused suite and typecheck pass",
         "releasedAt": "2026-07-16T06:11:13.626Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 2234685,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:11:27.564Z",
+        "itemId": "resolver-label-drift",
+        "outcome": "completed",
+        "reason": "Added pure labelDrift annotation for stale-present and stale-absent phase labels with three focused cases; 13-case suite and typecheck pass",
+        "releasedAt": "2026-07-16T06:12:55.697Z"
       }
     ],
     "statusReasons": {
       "resolver-planned-lens": {
         "reason": "Added durable hasVbriefSpec lens, planned-backlog classification, and open/closed unit coverage; focused suite and typecheck pass",
         "updatedAt": "2026-07-16T06:11:13.626Z"
+      },
+      "resolver-label-drift": {
+        "reason": "Added pure labelDrift annotation for stale-present and stale-absent phase labels with three focused cases; 13-case suite and typecheck pass",
+        "updatedAt": "2026-07-16T06:12:55.697Z"
       }
     }
   },
@@ -88,6 +95,9 @@
     "resolver-planned-lens.resolver-planned-lens.ac1": "completed",
     "resolver-planned-lens.resolver-planned-lens.ac2": "completed",
     "resolver-planned-lens.resolver-planned-lens.ac3": "completed",
-    "resolver-label-drift": "running"
+    "resolver-label-drift": "completed",
+    "resolver-label-drift.resolver-label-drift.ac1": "completed",
+    "resolver-label-drift.resolver-label-drift.ac2": "completed",
+    "resolver-label-drift.resolver-label-drift.ac3": "completed"
   }
 }
