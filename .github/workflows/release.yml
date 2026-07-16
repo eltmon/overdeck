@@ -156,9 +156,9 @@ jobs:
             exit 0
           fi
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
-            npm publish --provenance --access public
+            npm publish --ignore-scripts --provenance --access public
           else
-            npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
+            npm publish --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
 
       - name: Build contracts
@@ -174,9 +174,9 @@ jobs:
             exit 0
           fi
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
-            npm publish --provenance --access public
+            npm publish --ignore-scripts --provenance --access public
           else
-            npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
+            npm publish --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
 
       - name: Publish desktop to npm
@@ -190,9 +190,9 @@ jobs:
             exit 0
           fi
           if [ "${{ needs.classify.outputs.npm_tag }}" = "latest" ]; then
-            npm publish --provenance --access public
+            npm publish --ignore-scripts --provenance --access public
           else
-            npm publish --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
+            npm publish --ignore-scripts --provenance --access public --tag "${{ needs.classify.outputs.npm_tag }}"
           fi
 
       # The deprecate step is dropped intentionally: it required a long-lived
