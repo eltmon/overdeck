@@ -1,9 +1,95 @@
 {
   "issueId": "PAN-2255",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-16T06:59:38.439Z",
+      "reason": "end",
+      "note": "Implemented issue-role feedback mailboxes, live-delivery optimization, spawn/resume drain, delayed escalation, and close-out stale warnings; focused suites, typecheck, and lint gates pass"
+    }
+  ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/dashboard-types-baseline.txt",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/__tests__/feedback-writer.test.ts",
+      "src/lib/cloister/__tests__/review-verdict-feedback.test.ts",
+      "src/lib/cloister/agent-mailbox-escalation.ts",
+      "src/lib/cloister/mailbox-status-source.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/lib/agents/supervisor-channels.ts",
+      "src/lib/cloister/__tests__/config.test.ts",
+      "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/lifecycle/close-issue.ts",
+      "src/lib/pan-dir/feedback.ts",
+      "tests/cloister/verification-runner.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts"
+    ],
+    "declaredScope": [
+      "src/dashboard/server/__tests__/pending-feedback.test.ts",
+      "src/dashboard/server/pending-feedback.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "src/lib/__tests__/agent-mailbox-drain.test.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/agents/supervisor-channels.ts",
+      "src/lib/cloister/__tests__/agent-mailbox-escalation.test.ts",
+      "src/lib/cloister/__tests__/agent-mailbox.test.ts",
+      "src/lib/cloister/__tests__/config.test.ts",
+      "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
+      "src/lib/cloister/agent-mailbox.ts",
+      "src/lib/cloister/ci-failure-feedback.ts",
+      "src/lib/cloister/config.ts",
+      "src/lib/cloister/deacon-auto-resume.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/feedback-writer.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/close-out.ts",
+      "src/lib/lifecycle/close-issue.ts",
+      "src/lib/pan-dir/feedback.ts",
+      "src/lib/review-status.ts",
+      "tests/cloister/verification-runner.test.ts",
+      "tests/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/cloister/feedback-target.test.ts"
+    ],
+    "actualChangedFiles": [
+      "scripts/dashboard-types-baseline.txt",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/__tests__/pending-feedback.test.ts",
+      "src/dashboard/server/pending-feedback.ts",
+      "src/dashboard/server/routes/workspaces.ts",
+      "src/lib/__tests__/agent-mailbox-drain.test.ts",
+      "src/lib/__tests__/close-out.test.ts",
+      "src/lib/agents/resume.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/cloister/__tests__/agent-mailbox-escalation.test.ts",
+      "src/lib/cloister/__tests__/agent-mailbox.test.ts",
+      "src/lib/cloister/__tests__/feedback-writer.test.ts",
+      "src/lib/cloister/__tests__/review-verdict-feedback.test.ts",
+      "src/lib/cloister/agent-mailbox-escalation.ts",
+      "src/lib/cloister/agent-mailbox.ts",
+      "src/lib/cloister/ci-failure-feedback.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/feedback-writer.ts",
+      "src/lib/cloister/mailbox-status-source.ts",
+      "src/lib/cloister/review-verdict-feedback.ts",
+      "src/lib/cloister/verification-runner.ts",
+      "src/lib/close-out.ts",
+      "src/lib/review-status.ts"
+    ],
+    "recordedAt": "2026-07-16T06:59:35.993Z"
+  },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T06:59:35.994Z",
+  "updated": "2026-07-16T06:59:38.579Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
@@ -13,23 +99,24 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T06:43:29.369Z",
-    "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead."
+    "updatedAt": "2026-07-16T06:59:38.528Z",
+    "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2783"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 805385,
-            "output": 1760,
-            "cacheRead": 684288,
+            "input": 2851879,
+            "output": 3707,
+            "cacheRead": 2668928,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 11309849,
-            "output": 20162,
-            "cacheRead": 11106816,
+            "input": 30822495,
+            "output": 37147,
+            "cacheRead": 30471936,
             "cacheWrite": 0
           }
         },
@@ -43,24 +130,24 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 10,
-            "output": 1946,
-            "cacheRead": 751949,
-            "cacheWrite": 177327
+            "input": 12,
+            "output": 2716,
+            "cacheRead": 957725,
+            "cacheWrite": 178172
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 805385,
-          "output": 1760,
-          "cacheRead": 684288,
+          "input": 2851879,
+          "output": 3707,
+          "cacheRead": 2668928,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 11309849,
-          "output": 20162,
-          "cacheRead": 11106816,
+          "input": 30822495,
+          "output": 37147,
+          "cacheRead": 30471936,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -70,18 +157,20 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 10,
-          "output": 1946,
-          "cacheRead": 751949,
-          "cacheWrite": 177327
+          "input": 12,
+          "output": 2716,
+          "cacheRead": 957725,
+          "cacheWrite": 178172
         }
       },
       "costAtCloseOut": {
-        "usd": 7.786621,
-        "pricingAsOf": "2026-07-16T06:43:29.413Z"
+        "usd": 18.767333,
+        "pricingAsOf": "2026-07-16T06:59:38.574Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2783"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -196,84 +285,5 @@
     "closeout-pending-comment.closeout-pending-comment.ac3": "completed",
     "closeout-pending-comment.closeout-pending-comment.ac4": "completed",
     "closeout-pending-comment.closeout-pending-comment.ac5": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/dashboard-types-baseline.txt",
-      "scripts/file-size-baseline.txt",
-      "src/lib/cloister/__tests__/feedback-writer.test.ts",
-      "src/lib/cloister/__tests__/review-verdict-feedback.test.ts",
-      "src/lib/cloister/agent-mailbox-escalation.ts",
-      "src/lib/cloister/mailbox-status-source.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/lib/agents/supervisor-channels.ts",
-      "src/lib/cloister/__tests__/config.test.ts",
-      "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
-      "src/lib/cloister/config.ts",
-      "src/lib/cloister/deacon-auto-resume.ts",
-      "src/lib/cloister/feedback-target.ts",
-      "src/lib/lifecycle/close-issue.ts",
-      "src/lib/pan-dir/feedback.ts",
-      "tests/cloister/verification-runner.test.ts",
-      "tests/lib/cloister/review-verdict-feedback.test.ts",
-      "tests/unit/lib/cloister/feedback-target.test.ts"
-    ],
-    "declaredScope": [
-      "src/dashboard/server/__tests__/pending-feedback.test.ts",
-      "src/dashboard/server/pending-feedback.ts",
-      "src/dashboard/server/routes/workspaces.ts",
-      "src/lib/__tests__/agent-mailbox-drain.test.ts",
-      "src/lib/__tests__/close-out.test.ts",
-      "src/lib/agents/resume.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/agents/supervisor-channels.ts",
-      "src/lib/cloister/__tests__/agent-mailbox-escalation.test.ts",
-      "src/lib/cloister/__tests__/agent-mailbox.test.ts",
-      "src/lib/cloister/__tests__/config.test.ts",
-      "src/lib/cloister/__tests__/pan-871-auto-resume.test.ts",
-      "src/lib/cloister/agent-mailbox.ts",
-      "src/lib/cloister/ci-failure-feedback.ts",
-      "src/lib/cloister/config.ts",
-      "src/lib/cloister/deacon-auto-resume.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/feedback-target.ts",
-      "src/lib/cloister/feedback-writer.ts",
-      "src/lib/cloister/review-verdict-feedback.ts",
-      "src/lib/cloister/verification-runner.ts",
-      "src/lib/close-out.ts",
-      "src/lib/lifecycle/close-issue.ts",
-      "src/lib/pan-dir/feedback.ts",
-      "src/lib/review-status.ts",
-      "tests/cloister/verification-runner.test.ts",
-      "tests/lib/cloister/review-verdict-feedback.test.ts",
-      "tests/unit/lib/cloister/feedback-target.test.ts"
-    ],
-    "actualChangedFiles": [
-      "scripts/dashboard-types-baseline.txt",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/server/__tests__/pending-feedback.test.ts",
-      "src/dashboard/server/pending-feedback.ts",
-      "src/dashboard/server/routes/workspaces.ts",
-      "src/lib/__tests__/agent-mailbox-drain.test.ts",
-      "src/lib/__tests__/close-out.test.ts",
-      "src/lib/agents/resume.ts",
-      "src/lib/agents/spawn.ts",
-      "src/lib/cloister/__tests__/agent-mailbox-escalation.test.ts",
-      "src/lib/cloister/__tests__/agent-mailbox.test.ts",
-      "src/lib/cloister/__tests__/feedback-writer.test.ts",
-      "src/lib/cloister/__tests__/review-verdict-feedback.test.ts",
-      "src/lib/cloister/agent-mailbox-escalation.ts",
-      "src/lib/cloister/agent-mailbox.ts",
-      "src/lib/cloister/ci-failure-feedback.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/feedback-writer.ts",
-      "src/lib/cloister/mailbox-status-source.ts",
-      "src/lib/cloister/review-verdict-feedback.ts",
-      "src/lib/cloister/verification-runner.ts",
-      "src/lib/close-out.ts",
-      "src/lib/review-status.ts"
-    ],
-    "recordedAt": "2026-07-16T06:59:35.993Z"
   }
 }
