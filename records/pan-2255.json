@@ -36,9 +36,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T07:11:23.822Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:14Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:14:27.954Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T07:14:27Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2255\n\n# Review Synthesis — PAN-2255 — 2026-07-16T03:13:35-04:00\n\n## Verdict: CHANGES REQUESTED — mailbox state advances before delivery is confirmed\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-ed65a258/context.json`\n- Branch: `feature/pan-2255`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255`\n- HEAD reviewed: `ed65a258299886a34e9d2f738f44fc460c69be2a`\n- Cycle number: 2\n- Prior cycle SHA: `9ee8c17066a271f8227031a8ebb4e87241520425`\n- PR merge base: `46d5c1bb47202c1c27721ac2205df61f878491f6`\n- PR commit count: 12\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-ed65a258/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-ed65a258/correctness.md` | 3 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-ed65a258/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-ed65a258/requirements.md` | 2, deduplicated below with correctness |\n\n## Blocking Findings\n\n### [correctness, requirements] Mail is transitioned before spawn or resume delivery succeeds — `src/lib/cloister/agent-mailbox.ts:226`\n`drainWorkMailbox` changes pending items to delivered and delivered action-required items to acknowledged while constructing the prompt. Spawn and resume call it before their later launch or message-delivery operation can succeed, so a failed delivery can suppress the item from later mailbox drains and escalation. Make rendering side-effect free, return the included item references, and transition them only after confirmed kickoff or resume delivery; add success and failure regression coverage. This blocks FR-3, FR-4, FR-5, NFR-2, and NFR-3 and is newly introduced in the PR diff.\n\n### [correctness] Mailbox persistence failures turn successful live deliveries into failures — `src/lib/cloister/ci-failure-feedback.ts:268`\nThe CI path records `agentMessageSent = true` only after `markMailboxItemDelivered` succeeds, while the verification path lets the same bookkeeping failure abort after transport succeeded. A filesystem write failure can therefore misreport or retry a successfully delivered message. Record transport success immediately, isolate the mailbox transition in its own error handling, and do not let persistence failure change the transport result or abort verification. The cited paths are introduced by the PR.\n\n### [correctness, requirements] Non-GitHub close-out uses an unconditional GitHub comment path — `src/lib/close-out.ts:347`\nPending mailbox handling always invokes `gh issue comment` even though close-out supports non-GitHub trackers and its GitHub identifiers are optional. For a Linear issue this cannot publish the required pending-mail record and the thrown command also bypasses the teardown operations later in the same cleanup block. Route the comment through the configured tracker implementation, and handle publication failure with an explicit policy that preserves FR-6's comment-before-teardown guarantee without accidentally skipping unrelated cleanup. Add backend coverage for both tracker kinds. This is in PR scope and blocks FR-6 and NFR-1.\n\n## Non-blocking Findings\n\n### [correctness] Legacy restart queue entries cannot be marked delivered — `src/dashboard/server/pending-feedback.ts:143`\nPersisted entries from the prior schema can lack `role`, so replay may send the message, fail strict mailbox validation, retain the entry, and resend it on every startup. Normalize and validate the legacy shape on read, defaulting its missing role as appropriate.\n\n### [correctness] Mailbox transitions can regress under concurrent writers — `src/lib/cloister/agent-mailbox.ts:181`\nThe unlocked read-modify-write transition can let a delayed delivery overwrite an acknowledgement. Serialize transitions per file, re-read under the lock, enforce monotonic state rank, and atomically replace the file.\n\n### [performance] Mailbox patrol scans every historical work-agent workspace — `src/lib/cloister/agent-mailbox-escalation.ts:20`\nThe recurring Deacon patrol starts from every retained work-agent record and serially reads feedback directories, so filesystem work grows with historical registry size instead of active mailbox workload. Restrict candidates to lifecycle states that can still own pending delivery, or maintain a bounded candidate index.\n\n## Clean Sub-roles\n- Security: the prior shell-injection blocker is fixed with argument-array execution and metacharacter regression coverage.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-ed65a258/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2255 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/dashboard-types-baseline.txt",
@@ -119,7 +132,7 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T07:12:07.053Z",
+  "updated": "2026-07-16T07:14:27.955Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "reviewing",
