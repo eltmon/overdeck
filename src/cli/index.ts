@@ -96,7 +96,7 @@ import { registerInstallCommand } from './commands/install.js';
 import { registerAdminCommands } from './commands/admin/index.js';
 import { registerConversationsCommands } from './commands/conversations/index.js';
 import { registerOhmypiAuthCommands } from './commands/ohmypi-auth.js';
-import { projectAddCommand, projectListCommand, projectRemoveCommand, projectInitCommand, projectShowCommand } from './commands/project.js';
+import { registerProjectCommands } from './commands/project.js';
 import { doctorCommand } from './commands/doctor.js';
 import { systemHealthCommand } from './commands/system-health.js';
 import { updateCommand } from './commands/update.js';
@@ -1304,38 +1304,6 @@ program
   .option('--resume', 'Enable agent auto-resume on boot — auto-resume is OFF by default (PAN-1963)')
   .option('--no-resume', 'Disable agent auto-resume on restart (now the default; flag kept for explicitness)')
   .action(restartCommand);
-
-function registerProjectCommands(command: Command): void {
-  command
-    .command('add <path>')
-    .description('Register a project with Overdeck')
-    .option('--name <name>', 'Project name')
-    .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
-    .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
-    .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
-    .action(projectAddCommand);
-
-  command
-    .command('list')
-    .description('List all registered projects')
-    .option('--json', 'Output as JSON')
-    .action(projectListCommand);
-
-  command
-    .command('show <key>')
-    .description('Show details for a specific project')
-    .action(projectShowCommand);
-
-  command
-    .command('remove <nameOrPath>')
-    .description('Remove a project from the registry')
-    .action(projectRemoveCommand);
-
-  command
-    .command('init')
-    .description('Initialize projects.yaml with example configuration')
-    .action(projectInitCommand);
-}
 
 // Project management commands
 const project = program.command('project').description('Project registry for multi-project workspace support');
