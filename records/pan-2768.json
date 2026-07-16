@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T06:52:38.153Z",
+  "updated": "2026-07-16T06:54:12.300Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "stage-full-sync-sources": {
-        "writerId": "agent-pan-2768",
-        "agentId": "agent-pan-2768",
-        "pid": 2628639,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:52:38.153Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2768",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Staged the full CLI import closure and assets, pinned and installed external dependencies, stripped source maps, and verified an isolated temp-directory smoke run.",
         "releasedAt": "2026-07-16T06:52:20.533Z"
+      },
+      {
+        "writerId": "agent-pan-2768",
+        "agentId": "agent-pan-2768",
+        "pid": 2628639,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:52:38.153Z",
+        "itemId": "stage-full-sync-sources",
+        "outcome": "completed",
+        "reason": "Replaced hooks-only staging with the complete sync-sources tree and documented why packaged pan sync requires every payload directory.",
+        "releasedAt": "2026-07-16T06:54:12.300Z"
       }
     ],
     "statusReasons": {
       "stage-cli-runtime": {
         "reason": "Staged the full CLI import closure and assets, pinned and installed external dependencies, stripped source maps, and verified an isolated temp-directory smoke run.",
         "updatedAt": "2026-07-16T06:52:20.533Z"
+      },
+      "stage-full-sync-sources": {
+        "reason": "Replaced hooks-only staging with the complete sync-sources tree and documented why packaged pan sync requires every payload directory.",
+        "updatedAt": "2026-07-16T06:54:12.300Z"
       }
     }
   },
@@ -89,6 +96,8 @@
     "stage-cli-runtime.stage-cli-runtime.ac2": "completed",
     "stage-cli-runtime.stage-cli-runtime.ac3": "completed",
     "stage-cli-runtime.stage-cli-runtime.ac4": "completed",
-    "stage-full-sync-sources": "running"
+    "stage-full-sync-sources": "completed",
+    "stage-full-sync-sources.stage-full-sync-sources.ac1": "completed",
+    "stage-full-sync-sources.stage-full-sync-sources.ac2": "completed"
   }
 }
