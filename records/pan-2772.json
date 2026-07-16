@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T18:05:56.483Z",
+  "updated": "2026-07-16T18:06:09.254Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,8 +54,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "server-restart-broadcast": {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 3281099,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:06:09.254Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -119,6 +127,7 @@
     "reconnect-affordance": "completed",
     "reconnect-affordance.reconnect-affordance.ac1": "completed",
     "reconnect-affordance.reconnect-affordance.ac2": "completed",
-    "reconnect-affordance.reconnect-affordance.ac3": "completed"
+    "reconnect-affordance.reconnect-affordance.ac3": "completed",
+    "server-restart-broadcast": "running"
   }
 }
