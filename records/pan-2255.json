@@ -474,21 +474,21 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T11:52:43.276Z",
+  "updated": "2026-07-16T11:52:53.118Z",
   "pipeline": {
     "issueId": "PAN-2255",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T11:50:30.877Z",
+    "updatedAt": "2026-07-16T11:52:53.045Z",
     "reviewNotes": "Agent re-review request (2/25): Serialized all pending-feedback journal mutations and isolated mailbox accounting after successful transport; targeted tests, typecheck, and lint gates pass.",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
-    "reviewedAtCommit": "aadf7c313884122b0dd747ca3035df93f57008c0",
+    "reviewedAtCommit": "6ff696806c07ad0ff3be94bb5cccc156bf89afb2",
     "lastVerifiedCommit": "6ff696806c07ad0ff3be94bb5cccc156bf89afb2",
     "reviewRequestedAt": "2026-07-16T11:39:59.401Z",
     "reviewSpawnedAt": "2026-07-16T11:50:24.022Z"
@@ -498,15 +498,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 9257819,
-            "output": 11716,
-            "cacheRead": 8668032,
+            "input": 9317303,
+            "output": 11769,
+            "cacheRead": 8724736,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 156012015,
-            "output": 286083,
-            "cacheRead": 150551296,
+            "input": 159715467,
+            "output": 295870,
+            "cacheRead": 154067456,
             "cacheWrite": 0
           }
         },
@@ -537,15 +537,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 9257819,
-          "output": 11716,
-          "cacheRead": 8668032,
+          "input": 9317303,
+          "output": 11769,
+          "cacheRead": 8724736,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 156012015,
-          "output": 286083,
-          "cacheRead": 150551296,
+          "input": 159715467,
+          "output": 295870,
+          "cacheRead": 154067456,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -562,8 +562,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 113.225879,
-        "pricingAsOf": "2026-07-16T11:50:30.986Z"
+        "usd": 116.214029,
+        "pricingAsOf": "2026-07-16T11:52:53.101Z"
       }
     },
     "merges": [
@@ -571,8 +571,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 10,
     "claims": {},
