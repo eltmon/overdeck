@@ -71,7 +71,11 @@ describe('writeFeedbackFile', () => {
     expect(mocks.writeFeedback).toHaveBeenCalledWith(
       '/tmp/overdeck/workspaces/feature-pan-1917',
       expect.stringMatching(/^\d{3}-review-agent-failed\.md$/),
-      '# Review FAILED for PAN-1917',
+      expect.stringContaining('issueId: PAN-1917'),
     );
+    const written = mocks.writeFeedback.mock.calls[0][2] as string;
+    expect(written).toContain('role: work');
+    expect(written).toContain('state: pending');
+    expect(written).toContain('# Review FAILED for PAN-1917');
   });
 });
