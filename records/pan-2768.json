@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T07:24:47.759Z",
+  "updated": "2026-07-16T07:24:50.469Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "ship-cli-extraresources": {
-        "writerId": "agent-pan-2768",
-        "agentId": "agent-pan-2768",
-        "pid": 3081001,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:24:47.759Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2768",
@@ -106,6 +98,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2768 dead)",
         "releasedAt": "2026-07-16T06:57:55.956Z"
+      },
+      {
+        "writerId": "agent-pan-2768",
+        "agentId": "agent-pan-2768",
+        "pid": 3081001,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:24:47.759Z",
+        "itemId": "ship-cli-extraresources",
+        "outcome": "completed",
+        "reason": "Mapped the staged cli tree to packaged resources/dist with source maps excluded while preserving the npm files list.",
+        "releasedAt": "2026-07-16T07:24:50.469Z"
       }
     ],
     "statusReasons": {
@@ -118,8 +121,8 @@
         "updatedAt": "2026-07-16T06:54:12.300Z"
       },
       "ship-cli-extraresources": {
-        "reason": "stale claim released (agent-pan-2768 dead)",
-        "updatedAt": "2026-07-16T06:57:55.956Z"
+        "reason": "Mapped the staged cli tree to packaged resources/dist with source maps excluded while preserving the npm files list.",
+        "updatedAt": "2026-07-16T07:24:50.469Z"
       }
     }
   },
@@ -132,6 +135,8 @@
     "stage-full-sync-sources": "completed",
     "stage-full-sync-sources.stage-full-sync-sources.ac1": "completed",
     "stage-full-sync-sources.stage-full-sync-sources.ac2": "completed",
-    "ship-cli-extraresources": "running"
+    "ship-cli-extraresources": "completed",
+    "ship-cli-extraresources.ship-cli-extraresources.ac1": "completed",
+    "ship-cli-extraresources.ship-cli-extraresources.ac2": "completed"
   }
 }
