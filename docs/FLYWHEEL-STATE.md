@@ -5107,3 +5107,26 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   edit). Strike #4 dispatched with SURVIVAL PROTOCOL: commit+push within first 2 minutes, then verify.
 - PAN-2168 work agent reaped twice tonight; resumed twice; now in review anyway (work committed each time).
 - 2710 strike idle 48m again post-nudge; its origin branch has the full 1007-line perf-fix diff — review it next tick if it stays silent.
+
+---
+
+## Tick 51 — 2026-07-16 ~09:15Z — PRE-COMPACTION CHECKPOINT (context near limit)
+
+### LIVE STATE (verify on resume — it moves)
+- **PR #2787 (PAN-2757 reaper fix)**: build+lint PASS, test pending; monitor armed. ON GREEN:
+  `gh pr merge 2787 --squash` → `git pull && bun install && npm run build && pan restart --dashboard
+  --health-timeout 180000` (STRICT &&) → then close out PAN-2757 with --accept flags. **This deploy
+  ends the reaper kills (11 victims tonight: +2255 @08:50, +2698 @09:11 — both resumed after).**
+- **strike/pan-2710**: full feature+perf-fixes branch (all 3 review findings addressed: runTickIfIdle
+  overlap guard, eviction, FAILING_CHECK_CONCLUSIONS). Gates running (task bs1b430x3). ON GREEN:
+  PR strike/pan-2710→main, monitor, merge (supersedes #2736), close PAN-2710. The strike AGENT is a
+  serial staller (76m+ idle) — cut it out, land its branch.
+- **Fleet**: 8/8 resumed/running (2698,1966,2768,2702,2168,2255,2532,1491). Fleet PRs open:
+  #2783 (2255, review=blocked — agent iterating), #2785 (2698), #2786 (2168). Merge each on REAL
+  verdict (check reviewNotes/artifacts — 2532's null notes was a threading gap, artifacts proved real).
+- **Close-outs owed after next deploy**: PAN-2757. Already closed tonight: 2499 2741 2748 2752 2753
+  2770 2771 2777 2781 2599(PostHog #2776 merged 3e1b10ebae).
+- **Operator settings**: pan tell PERMITTED; drain-only; PostHog directive DONE; kimi key DEAD (1491
+  runs fresh session now).
+- **Session tally: 41 merges.** Substrate chain COMPLETE: kickoff (2771+2781 proven live, 8/8 fleet
+  working), docker init (2770+2777), gate output (2741), reaper (2757 — pending deploy).
