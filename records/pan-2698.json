@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:40:03.145Z",
+  "updated": "2026-07-16T07:40:14.938Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -95,8 +95,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "docs-role-mcp-provisioning": {
+        "writerId": "agent-pan-2698",
+        "agentId": "agent-pan-2698",
+        "pid": 3316134,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:40:14.938Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2698",
@@ -180,6 +188,7 @@
     "thread-role-mcp-spawns.thread-role-mcp-spawns.ac4": "completed",
     "warn-ohmypi-mcp-drop": "completed",
     "warn-ohmypi-mcp-drop.warn-ohmypi-mcp-drop.ac1": "completed",
-    "warn-ohmypi-mcp-drop.warn-ohmypi-mcp-drop.ac2": "completed"
+    "warn-ohmypi-mcp-drop.warn-ohmypi-mcp-drop.ac2": "completed",
+    "docs-role-mcp-provisioning": "running"
   }
 }
