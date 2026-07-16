@@ -31,6 +31,7 @@ import { TroubledBadges } from './TroubledBadges';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import { SessionNode } from './SessionNode';
+import { useDashboardStore } from '../../../lib/store';
 import styles from '../styles/command-deck.module.css';
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
@@ -925,6 +926,7 @@ const PIPE_CLASS: Record<PipeSegState, string> = {
 
 export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, onSelectSession, title, cost, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, containerStats }: FeatureItemProps) {
   const queryClient = useQueryClient();
+  const openIssue = useDashboardStore((state) => state.openIssue);
   const trimmedTitle = title?.trim() ?? '';
   const displayTitle = trimmedTitle || '(untitled)';
   const titleClassName = trimmedTitle
@@ -935,7 +937,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
-  const [fullScreen, setFullScreen] = useState(false);
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
 
   useEffect(() => {
@@ -1058,7 +1059,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     e.stopPropagation();
     const next = !expanded;
     setExpanded(next);
-    if (!next) setFullScreen(false);
     writeExpanded(feature.issueId, next);
   }, [expanded, feature.issueId]);
 
@@ -1078,7 +1078,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     <ContextMenuRoot>
       <IssueView
         issueId={feature.issueId}
-        density={fullScreen ? 'console' : expanded ? 'cockpit' : 'rail'}
+        density={expanded ? 'cockpit' : 'rail'}
         className={`${styles.featureItemWrapper} ${edgeClass} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
         data-component="feature-item"
         data-issue-id={feature.issueId}
@@ -1096,7 +1096,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           ) : (
             <span className={styles.featureItemCaretPlaceholder} />
           )}
-          {expanded && <IssueViewFullscreenButton className={styles.featureItemCaret} onClick={() => setFullScreen(true)} />}
+          {expanded && <IssueViewFullscreenButton className={styles.featureItemCaret} onClick={() => openIssue(feature.issueId)} />}
           <ContextMenuTrigger asChild>
             <button
               className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}

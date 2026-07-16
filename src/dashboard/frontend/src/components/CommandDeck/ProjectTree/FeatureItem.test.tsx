@@ -8,6 +8,7 @@ import { FeatureItem, isWorkOrSpecialistSession, pickBestSession } from './Featu
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './ProjectNode';
 import { resolveUatActions } from '../uat-actions';
 import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
+import { useDashboardStore } from '../../../lib/store';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -286,6 +287,7 @@ describe('pickBestSession', () => {
 describe('FeatureItem', () => {
   beforeEach(() => {
     localStorage.clear();
+    useDashboardStore.setState({ drawer: { issueId: null, tab: 'overview' } });
     vi.restoreAllMocks();
     vi.mocked(refreshDashboardState).mockClear();
     vi.stubGlobal('fetch', vi.fn(async () => ({
@@ -757,7 +759,7 @@ describe('FeatureItem', () => {
     expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
   });
 
-  it('grows the same issue view rail to cockpit and console without opening a tab', () => {
+  it('grows the rail to cockpit and opens the console drawer without selecting a tab', () => {
     const onSelect = vi.fn();
     const { container } = renderFeature(
       <FeatureItem
@@ -774,7 +776,8 @@ describe('FeatureItem', () => {
     expect(onSelect).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand issue full screen' }));
-    expect(issueView()).toHaveAttribute('data-density', 'console');
+    expect(issueView()).toHaveAttribute('data-density', 'cockpit');
+    expect(useDashboardStore.getState().drawer).toEqual({ issueId: 'PAN-821', tab: 'overview' });
     expect(onSelect).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('chevron-down'));
