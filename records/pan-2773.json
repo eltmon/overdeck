@@ -57,21 +57,22 @@
     "recordedAt": "2026-07-16T18:38:15.942Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:43:48.304Z",
+  "updated": "2026-07-16T18:47:04.673Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "failed",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:43:48.221Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (40306ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2773\n\n ❯ src/components/chat/__tests__/ChatMarkdown.test.tsx (8 tests | 1 failed) 1714ms\n     × keeps Streamdown-rendered external links safe and blocks scriptable hrefs 1049ms\n\n Test Files  1 failed | 72 passed (73)\n      Tests  1 failed | 864 passed (865)\n   Start at  14:43:26\n   Duration  15.37s (transform 58.47s, setup 27.89s, import 133.29s, tests 73.35s, environment 68.22s)\n\nNo test files found, exiting with code 0\n\n\n--- stderr ---\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  src/components/chat/__tests__/ChatMarkdown.test.tsx > ChatMarkdown file links > keeps Streamdown-rendered external links safe and blocks scriptable hrefs\nError: \u001b[2mexpect(\u001b[22m\u001b[31melement\u001b[39m\u001b[2m).toHaveAttribute(\u001b[22m\u001b[32m\u001b[32m\"href\"\u001b[32m\u001b[39m\u001b[2m, \u001b[22m\u001b[32m\u001b[32m\"https://example.com/\"\u001b[32m\u001b[39m\u001b[2m) // element.getAttribute(\"href\") === \"https://example.com/\"\u001b[22m\n\nExpected the element to have attribute:\n\u001b[32m  href=\"https://example.com/\"\u001b[39m\nReceived:\n\u001b[31m  href=\"https://example.com\"\u001b[39m\n\nIgnored nodes: comments, script, style\n\u001b[36m<html>\u001b[39m\n  \u001b[36m<head />\u001b[39m\n  \u001b[36m<body>\u001b[39m\n    \u001b[36m<div>\u001b[39m\n      \u001b[36m<div\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"_chatMarkdown_10de07\"\u001b[39m\n      \u001b[36m>\u001b[39m\n        \u001b[36m<div\u001b[39m\n          \u001b[33mclass\u001b[39m=\u001b[32m\"space-y-4 whitespace-normal [&>*:first-child]:mt-0 [&>*:last-child]:mb-0\"\u001b[39m\n        \u001b[36m>\u001b[39m\n          \u001b[36m<p>\u001b[39m\n            \u001b[0mVisit \u001b[0m\n            \u001b[36m<a\u001b[39m\n              \u001b[3\n…(1288 chars elided)…\n/wait-for.js:118:16\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\ninclude: tests/**/*.test.ts, tests/**/*.spec.ts, src/**/__tests__/**/*.test.ts, packages/**/src/__tests__/**/*.test.ts\nexclude:  **/node_modules/**, **/dist/**, src/dashboard/frontend/**, **/*.slow.test.ts, tests/playwright/conversation-supervisor-uat.test.ts, src/lib/vbrief/__tests__/create-beads.test.ts, src/dashboard/server/routes/__tests__/agents-switch-model.test.ts, src/dashboard/server/routes/__tests__/cloister-config.test.ts, src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts, src/dashboard/server/routes/__tests__/operator-interventions.test.ts, src/dashboard/server/services/__tests__/issue-lifecycle.test.ts, tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts, tests/unit/lib/cloister/deacon-swarm-hold.test.ts, tests/cli/commands/work/reopen.test.ts, tests/unit/cli/commands/pause.test.ts, tests/unit/lib/cloister/deacon-swarm-doneness.test.ts, tests/cli/commands/work/start-workspace-rollback.test.ts\n\n",
+    "updatedAt": "2026-07-16T18:47:04.606Z",
+    "reviewNotes": "Approved: no blocking findings; one transient query-failure edge case remains advisory.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
+    "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
     "reviewRequestedAt": "2026-07-16T18:38:19.131Z",
     "reviewSpawnedAt": "2026-07-16T18:38:20.308Z",
     "scopeDrift": {
@@ -115,6 +116,24 @@
       ],
       "recordedAt": "2026-07-16T18:38:15.942Z"
     },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -130,17 +149,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 257067,
-            "output": 2614,
-            "cacheRead": 637952,
+            "input": 418342,
+            "output": 7736,
+            "cacheRead": 2741760,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 897065,
-            "output": 16428,
-            "cacheRead": 2741248,
+            "input": 1272568,
+            "output": 22672,
+            "cacheRead": 4110336,
             "cacheWrite": 0
           }
         },
@@ -178,9 +197,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1480837,
-            "output": 114518,
-            "cacheRead": 39312384,
+            "input": 1678547,
+            "output": 118196,
+            "cacheRead": 40834048,
             "cacheWrite": 0
           }
         }
@@ -193,9 +212,9 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 4266747,
-          "output": 159723,
-          "cacheRead": 44537856,
+          "input": 5001235,
+          "output": 174767,
+          "cacheRead": 49532416,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -206,8 +225,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 59.125343,
-        "pricingAsOf": "2026-07-16T18:43:48.285Z"
+        "usd": 65.746383,
+        "pricingAsOf": "2026-07-16T18:47:04.667Z"
       }
     },
     "merges": [
