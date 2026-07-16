@@ -72,16 +72,17 @@
     "recordedAt": "2026-07-16T19:18:10.850Z"
   },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T20:20:54.756Z",
+  "updated": "2026-07-16T20:21:05.934Z",
   "pipeline": {
     "issueId": "PAN-2772",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:20:50.961Z",
+    "updatedAt": "2026-07-16T20:21:05.901Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2801",
     "lastVerifiedCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b",
     "reviewRequestedAt": "2026-07-16T20:20:47.752Z",
@@ -131,6 +132,28 @@
         "tests/unit/lib/deploy/agent-restart-gate.test.ts"
       ],
       "recordedAt": "2026-07-16T19:18:10.850Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/security.md",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/correctness.md",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/performance.md",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/requirements.md",
+        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
+      }
     },
     "strikeRecoveryCount": 0
   },
@@ -210,7 +233,7 @@
       },
       "costAtCloseOut": {
         "usd": 124.478628,
-        "pricingAsOf": "2026-07-16T20:20:51.461Z"
+        "pricingAsOf": "2026-07-16T20:21:05.913Z"
       }
     },
     "merges": [
