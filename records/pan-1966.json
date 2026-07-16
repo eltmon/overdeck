@@ -441,60 +441,37 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T15:01:01.827Z",
+  "updated": "2026-07-16T15:03:21.424Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T15:01:01.003Z",
-    "reviewNotes": "[correctness] Non-GitHub projects are reported as successfully resolved clean-terminal projects — `src/dashboard/server/services/pipeline-membership.ts:18`",
+    "updatedAt": "2026-07-16T15:03:21.367Z",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "lastVerifiedCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb",
     "reviewRequestedAt": "2026-07-16T14:24:05.694Z",
-    "reviewSpawnedAt": "2026-07-16T14:58:21.448Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/security.md",
-        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/correctness.md",
-        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/performance.md",
-        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-eba415ca/requirements.md",
-        "atCommit": "eba415cabfc31ff7c8e29f6677e67626437b76cb"
-      }
-    }
+    "reviewSpawnedAt": "2026-07-16T14:58:21.448Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 7642454,
-            "output": 15280,
-            "cacheRead": 6854784,
+            "input": 7675942,
+            "output": 15451,
+            "cacheRead": 6862336,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 116402565,
-            "output": 246631,
-            "cacheRead": 112809472,
+            "input": 119025856,
+            "output": 250474,
+            "cacheRead": 115403776,
             "cacheWrite": 0
           }
         },
@@ -517,15 +494,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 7642454,
-          "output": 15280,
-          "cacheRead": 6854784,
+          "input": 7675942,
+          "output": 15451,
+          "cacheRead": 6862336,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 116402565,
-          "output": 246631,
-          "cacheRead": 112809472,
+          "input": 119025856,
+          "output": 250474,
+          "cacheRead": 115403776,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -542,8 +519,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 90.017938,
-        "pricingAsOf": "2026-07-16T15:01:01.037Z"
+        "usd": 91.575315,
+        "pricingAsOf": "2026-07-16T15:03:21.420Z"
       }
     },
     "merges": [
