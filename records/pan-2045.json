@@ -17,18 +17,18 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:23:21.278Z",
+  "updated": "2026-07-16T18:23:37.629Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:23:21.131Z",
-    "inspectNotes": "Inspecting item switch-happy-dom",
+    "updatedAt": "2026-07-16T18:23:37.512Z",
+    "inspectNotes": "Inspection error for bead switch-happy-dom: tmux session inspect-pan-2045-switch-happy-dom exited before producing a verdict. No verdict was produced.",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -52,9 +52,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 767731,
-            "output": 21369,
-            "cacheRead": 10413056,
+            "input": 775653,
+            "output": 22025,
+            "cacheRead": 11042816,
             "cacheWrite": 0
           }
         }
@@ -73,15 +73,15 @@
           "cacheWrite": 165070
         },
         "openai/gpt-5.6-sol": {
-          "input": 767731,
-          "output": 21369,
-          "cacheRead": 10413056,
+          "input": 775653,
+          "output": 22025,
+          "cacheRead": 11042816,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.543776,
-        "pricingAsOf": "2026-07-16T18:23:21.245Z"
+        "usd": 17.917946,
+        "pricingAsOf": "2026-07-16T18:23:37.603Z"
       }
     },
     "merges": [],
