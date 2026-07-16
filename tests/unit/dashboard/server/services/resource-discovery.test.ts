@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   findSpecByIssue: vi.fn(),
+  gatherProjectLensSignals: vi.fn(),
   getAgentRuntimeState: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
@@ -22,6 +23,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('node:child_process', () => ({
   execFile: mocks.execFile,
+}));
+
+vi.mock('../../../../../src/lib/pipeline-membership-gather.js', () => ({
+  gatherProjectLensSignals: mocks.gatherProjectLensSignals,
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -94,6 +99,7 @@ beforeEach(() => {
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
+  mocks.gatherProjectLensSignals.mockResolvedValue([]);
   mocks.resolveAgentGitInfo.mockResolvedValue({
     actualBranch: null,
     branchDrifted: false,
@@ -314,7 +320,13 @@ describe('resource-discovery terminal issue filtering', () => {
     ]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-2054']));
 
-    await expect(discoverResourceAllocatedIssues()).resolves.toEqual([]);
+    await expect(discoverResourceAllocatedIssues()).resolves.toEqual([
+      expect.objectContaining({
+        issueId: 'PAN-2054',
+        pipelineBucket: 'clean_terminal',
+        resourceDrift: true,
+      }),
+    ]);
 
     resetResourceAllocatedIssuesCacheForTests();
     mocks.getGitHubConfig.mockReturnValue({ repos: [{ owner: 'eltmon', repo: 'overdeck' }] });
@@ -329,6 +341,16 @@ describe('resource-discovery terminal issue filtering', () => {
         baseRefName: 'main',
       },
     ];
+    mocks.gatherProjectLensSignals.mockResolvedValue([{
+      issueId: 'PAN-2054',
+      issueOpen: false,
+      hasOpenPr: true,
+      hasMergedPr: false,
+      hasConventionBranch: false,
+      branchUnmerged: false,
+      phaseLabel: null,
+      hasVbriefSpec: false,
+    }]);
 
     const withOpenPr = await discoverResourceAllocatedIssues();
 
@@ -341,11 +363,13 @@ describe('resource-discovery terminal issue filtering', () => {
     );
     expect(withOpenPr.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
     expect(withOpenPr[0]?.resourceSources).toContain('pr');
+    expect(withOpenPr[0]?.pipelineBucket).toBe('zombie_pr');
+    expect(withOpenPr[0]?.resourceDrift).toBe(false);
   });
 });
 
 describe('resource-discovery review-status batching', () => {
-  it('loads review status only for active tree candidates instead of every terminal tracker issue', async () => {
+  it('loads review status annotations but excludes tracker-state-only candidates', async () => {
     const terminalIssues = Array.from({ length: 1000 }, (_, index) => ({
       identifier: `PAN-${10_000 + index}`,
       title: `Terminal ${index}`,
@@ -365,7 +389,7 @@ describe('resource-discovery review-status batching', () => {
     const activeIds = activeIssues.map((issue) => issue.identifier);
     expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledTimes(1);
     expect(mocks.loadReadyForMergeFlags).toHaveBeenCalledWith(activeIds);
-    expect(discovered.map((issue) => issue.issueId)).toEqual(activeIds);
+    expect(discovered).toEqual([]);
   });
 
   it('loads ready-for-merge status for a terminal issue that still has an open PR', async () => {
@@ -594,7 +618,7 @@ describe('resource-discovery vbrief recency signal', () => {
     expect(discovered[0]?.resourceSources).toContain('vbrief');
   });
 
-  it('excludes an inactive issue when its vBRIEF spec is stale', async () => {
+  it('preserves a stale vBRIEF resource as orphan-resource drift', async () => {
     mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
       if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
         return [{ name: 'feature-pan-9005', isDirectory: () => true }];
@@ -605,7 +629,9 @@ describe('resource-discovery vbrief recency signal', () => {
 
     const discovered = await discoverResourceAllocatedIssues();
 
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
+    expect(discovered).toEqual([
+      expect.objectContaining({ issueId: 'PAN-9005', pipelineBucket: 'clean_terminal', resourceDrift: true }),
+    ]);
   });
 });
 
