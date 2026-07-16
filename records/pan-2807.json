@@ -2,7 +2,7 @@
   "issueId": "PAN-2807",
   "schemaVersion": 2,
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-16T20:17:51.768Z",
+  "updated": "2026-07-16T20:17:52.474Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2807: SQLite schema migrations silently fail — live DB at user_version=0 with v9/v11 artifacts missing, v10/v12 present",
       "timestamp": "2026-07-16T20:17:51.768Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
