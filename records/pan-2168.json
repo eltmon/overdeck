@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T07:37:20.708Z",
+  "updated": "2026-07-16T07:40:09.904Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "open-questions-indicator": {
-        "writerId": "agent-pan-2168",
-        "agentId": "agent-pan-2168",
-        "pid": 3270669,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:37:20.707Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2168",
@@ -102,6 +94,17 @@
         "outcome": "completed",
         "reason": "Added a stable DOM anchor to the Open Questions section and asserted the anchored section contains every question; full tests, typecheck, and lint pass.",
         "releasedAt": "2026-07-16T07:36:54.163Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3270669,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:37:20.707Z",
+        "itemId": "open-questions-indicator",
+        "outcome": "completed",
+        "reason": "Added a live amber app-bar indicator that seeds and refreshes Flywheel status, reacts to RPC snapshots, self-hides at zero, and requests reveal/navigation on activation; focused tests and required gates pass.",
+        "releasedAt": "2026-07-16T07:40:09.904Z"
       }
     ],
     "statusReasons": {
@@ -112,6 +115,10 @@
       "open-questions-anchor": {
         "reason": "Added a stable DOM anchor to the Open Questions section and asserted the anchored section contains every question; full tests, typecheck, and lint pass.",
         "updatedAt": "2026-07-16T07:36:54.163Z"
+      },
+      "open-questions-indicator": {
+        "reason": "Added a live amber app-bar indicator that seeds and refreshes Flywheel status, reacts to RPC snapshots, self-hides at zero, and requests reveal/navigation on activation; focused tests and required gates pass.",
+        "updatedAt": "2026-07-16T07:40:09.904Z"
       }
     }
   },
@@ -124,7 +131,11 @@
     "open-questions-anchor.open-questions-anchor.ac1": "completed",
     "open-questions-anchor.open-questions-anchor.ac2": "completed",
     "open-questions-anchor.open-questions-anchor.ac3": "completed",
-    "open-questions-indicator": "running"
+    "open-questions-indicator": "completed",
+    "open-questions-indicator.open-questions-indicator.ac1": "completed",
+    "open-questions-indicator.open-questions-indicator.ac2": "completed",
+    "open-questions-indicator.open-questions-indicator.ac3": "completed",
+    "open-questions-indicator.open-questions-indicator.ac4": "completed"
   },
   "sessionHistory": [
     {
