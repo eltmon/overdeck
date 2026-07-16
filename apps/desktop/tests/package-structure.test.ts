@@ -66,6 +66,40 @@ describe("package.json", () => {
     const scripts = pkg.scripts as Record<string, string> | undefined;
     expect(scripts?.["build:publish"]).toBeDefined();
   });
+
+  it("smoke-tests the built AppImage CLI before stamping Linux manifests", () => {
+    const pkg = readPkg();
+    const scripts = pkg.scripts as Record<string, string> | undefined;
+
+    expect(scripts?.["dist:linux"]).toContain("electron-builder --linux AppImage");
+    expect(scripts?.["dist:linux"]).toContain("node scripts/smoke-appimage-cli.mjs");
+    expect(scripts?.["dist:linux"]?.indexOf("smoke-appimage-cli.mjs")).toBeLessThan(
+      scripts?.["dist:linux"]?.indexOf("stamp-update-manifests.mjs") ?? -1,
+    );
+  });
+
+  it("ships the staged CLI and preserves every existing extra resource", () => {
+    const pkg = readPkg();
+    const build = pkg.build as Record<string, unknown> | undefined;
+    const extraResources = build?.extraResources as
+      | Array<{ from?: string; to?: string; filter?: string[] }>
+      | undefined;
+
+    expect(extraResources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ from: "drizzle", to: "drizzle" }),
+        expect.objectContaining({ from: "sync-sources", to: "sync-sources" }),
+        expect.objectContaining({
+          from: "cli",
+          to: "dist",
+          filter: expect.arrayContaining(["**/*", "!**/*.map"]),
+        }),
+        expect.objectContaining({ from: "cli/package.json", to: "package.json" }),
+        expect.objectContaining({ from: "server", to: "server" }),
+        expect.objectContaining({ from: "resources", to: "resources" }),
+      ]),
+    );
+  });
 });
 
 describe("bin/overdeck.mjs", () => {
@@ -107,5 +141,39 @@ describe("scripts/stamp-update-manifests.mjs", () => {
 
     expect(script).toContain("fileURLToPath(new URL('../dist/', import.meta.url))");
     expect(script).not.toContain("distDir.pathname");
+  });
+});
+
+describe("scripts/prepare-server-resources.mjs", () => {
+  const scriptPath = Path.join(desktopDir, "scripts/prepare-server-resources.mjs");
+
+  it("stages and smoke-runs the packaged CLI runtime", () => {
+    const script = FS.readFileSync(scriptPath, "utf8");
+
+    expect(script).toContain('const cliDir = join(desktopDir, "cli")');
+    expect(script).toContain('cpSync(distCli, join(cliDir, "cli")');
+    expect(script).toContain('join(smokeRuntime, "cli/index.js")');
+    expect(script).toContain("Staged CLI smoke run failed");
+  });
+
+  it("stages the full sync-sources tree instead of only hooks", () => {
+    const script = FS.readFileSync(scriptPath, "utf8");
+
+    expect(script).toContain('cpSync(join(repoRoot, "sync-sources"), hooksStageDir, { recursive: true })');
+    expect(script).not.toContain('cpSync(join(repoRoot, "sync-sources", "hooks")');
+  });
+});
+
+describe("scripts/smoke-appimage-cli.mjs", () => {
+  it("extracts the AppImage and runs its CLI under bundled Electron-as-Node", () => {
+    const script = FS.readFileSync(
+      Path.join(desktopDir, "scripts/smoke-appimage-cli.mjs"),
+      "utf8",
+    );
+
+    expect(script).toContain('execFileSync(appImage, ["--appimage-extract"]');
+    expect(script).toContain('"resources", "dist", "cli", "index.js"');
+    expect(script).toContain('ELECTRON_RUN_AS_NODE: "1"');
+    expect(script).toContain('[cliEntry, "--version"]');
   });
 });
