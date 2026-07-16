@@ -187,19 +187,21 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T07:42:56.322Z",
+  "updated": "2026-07-16T07:47:19.699Z",
   "pipeline": {
     "issueId": "PAN-2255",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:42:56.251Z",
+    "updatedAt": "2026-07-16T07:47:19.652Z",
+    "reviewNotes": "Agent re-review request (1/25): Addressed feedback: confirm mailbox delivery only after successful transport, isolate live-delivery persistence failures, and publish close-out warnings through GitHub or Linear tracker adapters",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
+    "lastVerifiedCommit": "29b621edab524e0b9fb5ba1671ab7141ad552b62",
     "reviewRequestedAt": "2026-07-16T07:33:42.967Z",
     "reviewSpawnedAt": "2026-07-16T07:33:48.445Z"
   },
@@ -208,15 +210,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 5310794,
-            "output": 6502,
-            "cacheRead": 4976640,
+            "input": 5349864,
+            "output": 6762,
+            "cacheRead": 5014400,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 53369457,
-            "output": 98960,
-            "cacheRead": 51805184,
+            "input": 55694570,
+            "output": 104618,
+            "cacheRead": 54093056,
             "cacheWrite": 0
           }
         },
@@ -239,15 +241,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 5310794,
-          "output": 6502,
-          "cacheRead": 4976640,
+          "input": 5349864,
+          "output": 6762,
+          "cacheRead": 5014400,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53369457,
-          "output": 98960,
-          "cacheRead": 51805184,
+          "input": 55694570,
+          "output": 104618,
+          "cacheRead": 54093056,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -264,8 +266,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 37.356917,
-        "pricingAsOf": "2026-07-16T07:42:56.315Z"
+        "usd": 38.856798,
+        "pricingAsOf": "2026-07-16T07:47:19.693Z"
       }
     },
     "merges": [
