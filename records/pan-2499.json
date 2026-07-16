@@ -165,20 +165,21 @@
     "recordedAt": "2026-07-16T01:13:10.379Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T01:13:14.991Z",
+  "updated": "2026-07-16T01:13:16.049Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T01:13:13.662Z",
+    "updatedAt": "2026-07-16T01:13:15.285Z",
     "inspectNotes": "Both prior blockers are fixed. (1) IssueView.tsx now types IssueViewProps as Omit<HTMLAttributes<HTMLDivElement>,'children'> and spreads ...rootProps onto the root div (data-component defaults to 'issue-view' but is overridable) — FeatureItem's data-component/data-issue-id now actually reach the DOM, and a new render+dispatchEvent test in IssueView.test.tsx verifies both the attribute and an onClick handler forward correctly. (2) The FR-0 gate is now real: densitySections.ts is hand-authored per density instead of self-deriving from ISSUE_VIEW_INVENTORY, IssueView.tsx no longer emits hidden decoy spans, and dozens of real production elements (ReviewGroup, Badges, MergeButton, ResourceStrip, SessionNode, AgentsLane, CrewStage, HappenedFeed, StatusNarrative, IssueMissionControl tabs, IssueDrawer panels, etc.) now carry genuine data-section markers verified in source. New tests in IssueMissionControl.test.tsx and IssueDrawer.test.tsx render the real shells and assert data-section presence in the DOM, not just the static map against itself. AC5: verified directly — FeatureItem.tsx is 1366 lines matching its baseline exactly (no growth), and IssueDrawer.tsx (319 lines) / IssueMissionControl.tsx (986 lines) are both under the 1000-line ceiling in scripts/lint-file-size.sh and correctly absent from file-size-baseline.txt (no stale entries), so lint passes. Minor non-blocking nit for the review convoy: FeatureItem.tsx's 'Filter bar' data-section wraps the same DOM as 'Feature (issue) row' (no distinct filter-bar UI exists in that file) and SessionNode.tsx stacks three section markers (SessionNode / SessionNode context menu / ModelResolutionCard) on one identical wrapper — these satisfy AC2's literal text but are imprecise placements worth tightening, not a functional or gate-integrity violation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "reviewRequestedAt": "2026-07-16T01:13:13.463Z",
+    "reviewSpawnedAt": "2026-07-16T01:13:15.283Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -403,7 +404,7 @@
       },
       "costAtCloseOut": {
         "usd": 115.93599400000001,
-        "pricingAsOf": "2026-07-16T01:13:13.856Z"
+        "pricingAsOf": "2026-07-16T01:13:15.660Z"
       }
     },
     "merges": [
