@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T07:36:54.163Z",
+  "updated": "2026-07-16T07:37:20.708Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -59,8 +59,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "open-questions-indicator": {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3270669,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:37:20.707Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2168",
@@ -115,7 +123,8 @@
     "open-questions-anchor": "completed",
     "open-questions-anchor.open-questions-anchor.ac1": "completed",
     "open-questions-anchor.open-questions-anchor.ac2": "completed",
-    "open-questions-anchor.open-questions-anchor.ac3": "completed"
+    "open-questions-anchor.open-questions-anchor.ac3": "completed",
+    "open-questions-indicator": "running"
   },
   "sessionHistory": [
     {
