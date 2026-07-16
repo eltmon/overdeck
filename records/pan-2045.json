@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:24:45.225Z",
+  "updated": "2026-07-16T18:29:13.893Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -90,16 +90,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "fix-style-serialization-tests": {
-        "writerId": "agent-pan-2045",
-        "agentId": "agent-pan-2045",
-        "pid": 4061032,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:24:45.224Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2045",
@@ -133,6 +125,16 @@
         "outcome": "completed",
         "reason": "Pinned happy-dom 20.10.6, switched Vitest environment to happy-dom, preserved setup ordering, and made prompt/scrollIntoView/ResizeObserver/matchMedia fallbacks conditional. Three issueActions gate files pass: 3 files, 32 tests.",
         "releasedAt": "2026-07-16T18:22:51.572Z"
+      },
+      {
+        "writerId": "agent-pan-2045",
+        "agentId": "agent-pan-2045",
+        "pid": 4061032,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:24:45.224Z",
+        "itemId": "fix-style-serialization-tests",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:29:13.893Z"
       }
     ],
     "statusReasons": {
@@ -162,6 +164,8 @@
     "switch-happy-dom.switch-happy-dom.ac1": "completed",
     "switch-happy-dom.switch-happy-dom.ac2": "completed",
     "switch-happy-dom.switch-happy-dom.ac3": "completed",
-    "fix-style-serialization-tests": "running"
+    "fix-style-serialization-tests": "completed",
+    "fix-style-serialization-tests.fix-style-serialization-tests.ac1": "completed",
+    "fix-style-serialization-tests.fix-style-serialization-tests.ac2": "completed"
   }
 }
