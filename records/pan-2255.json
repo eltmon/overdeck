@@ -6,9 +6,22 @@
       "timestamp": "2026-07-16T06:59:38.439Z",
       "reason": "end",
       "note": "Implemented issue-role feedback mailboxes, live-delivery optimization, spawn/resume drain, delayed escalation, and close-out stale warnings; focused suites, typecheck, and lint gates pass"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:04Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:04:02.788Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T07:04:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2255\n\n# Review Synthesis — PAN-2255 — 2026-07-16T03:03:29-04:00\n\n## Verdict: CHANGES REQUESTED — close-out permits shell command injection from mailbox content\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-9ee8c170/context.json`\n- Branch: `feature/pan-2255`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255`\n- HEAD reviewed: `9ee8c17066a271f8227031a8ebb4e87241520425`\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR merge base: `46d5c1bb47202c1c27721ac2205df61f878491f6`\n- PR commit count: 10\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-9ee8c170/security.md` | 1 |\n| correctness | failed | — | 1 infrastructure failure |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-9ee8c170/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-9ee8c170/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [security] Workspace mailbox content permits command execution during close-out — `src/lib/close-out.ts:351`\nThe new close-out path interpolates a comment containing workspace-controlled mailbox metadata into an `execAsync` shell command. `JSON.stringify` does not prevent shell expansion inside double quotes, so content such as `$(command)` or backticks can execute with the Overdeck user's privileges. This line is newly added in the PR diff. Invoke `gh` without a shell by using an argument array through `execFile` or `spawn`, and add a regression test proving shell metacharacters are passed literally.\n\n### [correctness] Reviewer failed before producing a report\nThe correctness reviewer session ended before writing a usable report. Convoy policy requires every reviewer report to be readable before approval, so correctness coverage is incomplete for this cycle.\n\n## Non-blocking Findings\n\n### [performance] Mailbox patrol scans every historical work-agent workspace — `src/lib/cloister/agent-mailbox-escalation.ts:20`\nThe recurring Deacon patrol starts from every retained work-agent record and serially reads feedback directories, so filesystem work grows with historical registry size instead of active mailbox workload. This is advisory for this cycle; restrict candidates to lifecycle states that can own pending delivery, or maintain a bounded candidate index.\n\n## Clean Sub-roles\n- Requirements: all 10 in-PR-scope requirements and non-goals were reported implemented.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-9ee8c170/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2255 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/dashboard-types-baseline.txt",
@@ -89,7 +102,7 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T07:00:09.798Z",
+  "updated": "2026-07-16T07:04:02.788Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "reviewing",
