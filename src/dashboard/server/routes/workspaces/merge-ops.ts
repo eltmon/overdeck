@@ -20,6 +20,7 @@ import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { registerStrikeMergeTrigger } from '../../../../lib/cloister/deacon-strike-landing.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
@@ -1226,13 +1227,12 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   } finally {
     advanceQueue();
   }
-
 }
 
 setMergeQueueTriggerHandler(triggerMerge);
+registerStrikeMergeTrigger(triggerMerge);
 
 // ─── Route: POST /api/issues/:issueId/merge ───────────────────────────────
-
 const postWorkspaceMergeRoute = HttpRouter.add(
   'POST',
   '/api/issues/:issueId/merge',
