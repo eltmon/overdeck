@@ -27,9 +27,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T18:48:56.390Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T18:56Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T18:56:42.511Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T18:56:42Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2773\n\n# Review Synthesis — PAN-2773 — 2026-07-16T18:48:56Z\n\n## Verdict: CHANGES REQUESTED — resource-derived project names bypass the registered-project guard\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/context.json`\n- Branch: `feature/pan-2773`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773`\n- HEAD reviewed: `28fba3ec41adcfc0fa4f36e28bd3f230df1ae973`\n- Cycle number: 2\n- Prior cycle SHA: `e4df3ed248ca09f817c750675385c3be2c48b9bf`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Resource-derived project names bypass the registered-project guard — `src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx:27`\n\n`isKnownProject()` treats a selected slug as known when it appears in `projectsWithSessions`, even if `findRegisteredProject()` cannot resolve it against `/api/registered-projects`. Resource-derived project data can outlive a rename, removal, or machine-local registration, so the exact stale or unregistered URL this change is meant to recover can still mount the functional `Stage`. Conversation creation then submits an unregistered project key and receives the existing server-side 400 instead of presenting registered-project recovery choices.\n\nThe finding is inside the PR diff because `UnknownProjectState.tsx` is a newly added file. This is review cycle 2, so the cycle-3 convergence gate does not demote it. Define known projects from `NO_PROJECT_KEY` plus the registered-project key/name match, and add a regression test where the slug exists in resource-derived project data but not in the registered-project response; `UnknownProjectState` must render and `Stage` must remain unmounted.\n\n## Non-blocking Findings\n\n### [correctness] Functional Stage mounts while project validation is pending — `src/dashboard/frontend/src/components/CommandDeck/index.tsx:1216`\n\n`showUnknownProject` remains false until both project queries have settled, while the render branch mounts `Stage` for any non-null selection. A slow project query therefore exposes the functional deck temporarily for an unvalidated slug. Render a neutral pending state while validation is unresolved, and strengthen the existing deferred-query test to assert that `Stage` is absent during that interval.\n\n### [requirements] Untraced Streamdown test maintenance — `src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx`\n\nThe branch changes an unrelated external-link assertion without a requirement trace. The change affects test synchronization rather than shipped behavior, so it remains a non-blocking `≉` scope note from the requirements reviewer.\n\n## Clean Sub-roles\n\n- Security found no vulnerabilities or advisories.\n- Performance found no regressions or advisories.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-28fba3ec/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2773 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -74,7 +87,7 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:56:41.713Z",
+  "updated": "2026-07-16T18:56:42.511Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "blocked",
