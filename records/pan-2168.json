@@ -38,36 +38,36 @@
     }
   ],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T08:35:27.290Z",
+  "updated": "2026-07-16T08:43:02.761Z",
   "pipeline": {
     "issueId": "PAN-2168",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T08:35:05.933Z",
+    "updatedAt": "2026-07-16T08:43:02.703Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2168-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2786",
     "lastVerifiedCommit": "f78263ef7ac3a220851c06e84b0d8547a4ee7522",
     "reviewRequestedAt": "2026-07-16T08:35:05.583Z",
-    "reviewSpawnedAt": "2026-07-16T08:33:07.374Z"
+    "reviewSpawnedAt": "2026-07-16T08:35:22.483Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1756574,
-            "output": 4586,
-            "cacheRead": 1566848,
+            "input": 2133762,
+            "output": 5014,
+            "cacheRead": 1904512,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 23646347,
-            "output": 31453,
-            "cacheRead": 22694144,
+            "input": 31367345,
+            "output": 37220,
+            "cacheRead": 30116864,
             "cacheWrite": 0
           }
         },
@@ -90,15 +90,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1756574,
-          "output": 4586,
-          "cacheRead": 1566848,
+          "input": 2133762,
+          "output": 5014,
+          "cacheRead": 1904512,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23646347,
-          "output": 31453,
-          "cacheRead": 22694144,
+          "input": 31367345,
+          "output": 37220,
+          "cacheRead": 30116864,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -115,8 +115,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 28.792314,
-        "pricingAsOf": "2026-07-16T08:35:05.965Z"
+        "usd": 34.168074,
+        "pricingAsOf": "2026-07-16T08:43:02.755Z"
       }
     },
     "merges": [
