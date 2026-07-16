@@ -53,7 +53,7 @@
     "recordedAt": "2026-07-16T19:14:41.281Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T19:18:30.365Z",
+  "updated": "2026-07-16T19:20:18.653Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -63,10 +63,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:18:26.363Z",
+    "updatedAt": "2026-07-16T19:20:18.563Z",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
-    "reviewRequestedAt": "2026-07-16T19:18:11.507Z",
+    "reviewRequestedAt": "2026-07-16T19:20:15.346Z",
     "reviewSpawnedAt": "2026-07-16T19:14:50.508Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -126,9 +126,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 355464,
-            "output": 6826,
-            "cacheRead": 1599488,
+            "input": 473544,
+            "output": 6926,
+            "cacheRead": 1643520,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 885701,
+            "output": 29775,
+            "cacheRead": 5308928,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 556179,
+            "output": 18198,
+            "cacheRead": 4089856,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 979597,
+            "output": 21725,
+            "cacheRead": 3554816,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 779892,
+            "output": 15494,
+            "cacheRead": 2407424,
             "cacheWrite": 0
           }
         },
@@ -157,9 +189,9 @@
           "cacheWrite": 175114
         },
         "openai/gpt-5.6-sol": {
-          "input": 3348272,
-          "output": 155779,
-          "cacheRead": 49334784,
+          "input": 6667721,
+          "output": 241071,
+          "cacheRead": 64739840,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -170,8 +202,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 58.934269,
-        "pricingAsOf": "2026-07-16T19:18:27.444Z"
+        "usd": 85.792802,
+        "pricingAsOf": "2026-07-16T19:20:18.616Z"
       }
     },
     "merges": [
