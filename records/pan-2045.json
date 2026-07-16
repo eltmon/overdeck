@@ -76,8 +76,8 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
-      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx"
     ],
     "declaredScopeUntouched": [
       "src/dashboard/frontend/src/*.test.ts",
@@ -186,6 +186,7 @@
       "bun.lock",
       "docs/TESTING.md",
       "src/dashboard/frontend/package.json",
+      "src/dashboard/frontend/src/App.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/WorkspaceStatusCard.test.tsx",
@@ -196,13 +197,12 @@
       "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
       "src/dashboard/frontend/src/components/primitives/AgentCard.test.tsx",
       "src/dashboard/frontend/src/test-setup.ts",
-      "src/dashboard/frontend/vitest.config.ts",
-      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
+      "src/dashboard/frontend/vitest.config.ts"
     ],
-    "recordedAt": "2026-07-16T19:46:37.938Z"
+    "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T20:14:55.501Z",
+  "updated": "2026-07-16T20:15:02.870Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "failed",
