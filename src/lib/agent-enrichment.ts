@@ -73,6 +73,12 @@ export interface AgentEnrichment {
   pendingAskUserQuestion?: PendingAskUserQuestionSnapshot
   resolution: string
   resolutionCount: number
+  /**
+   * The JSONL scan this enrichment was derived from. The poller caches it per
+   * agent and replays it while the file's mtime is unchanged, so a static
+   * session costs no I/O without anyone having to fabricate an empty scan.
+   */
+  jsonlScan?: PendingInputsScan
 }
 
 // PAN-1520 / PAN-1834 — promote pane-detected blocking surfaces into the
@@ -282,6 +288,12 @@ async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQue
   return detection.askUserQuestions
 }
 
+export const EMPTY_PENDING_INPUTS_SCAN: PendingInputsScan = Object.freeze({
+  askUserQuestions: [],
+  enterPlanModeOpen: false,
+  exitPlanModePending: false,
+})
+
 export interface PendingInputsScan {
   readonly askUserQuestions: PendingQuestion[]
   /** Outstanding EnterPlanMode tool_use ids without a matching ExitPlanMode (plan being drafted). */
@@ -432,7 +444,7 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
-  skipJsonlScan?: boolean,
+  cachedScan?: PendingInputsScan | null,
 ): Promise<AgentEnrichment> {
   const isPlanning = agentId.startsWith('planning-')
 
@@ -449,25 +461,29 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   const runtimeState = await Effect.runPromise(getAgentRuntimeState(agentId))
 
   // Get pending questions + other blocking surfaces, filtered by agent start time.
-  // Skip JSONL scan when mtime is unchanged (optimization for static TUI sessions).
-  let pendingQuestions: PendingQuestion[] = []
-  let enterPlanModeOpen = false
-  let exitPlanModePending = false
-  if (!skipJsonlScan) {
+  // The caller (the enrichment poller) hands back the previous scan while the
+  // JSONL's mtime is unchanged — an unchanged file cannot produce a different
+  // scan, so replaying it costs no I/O and stays truthful. It must never be
+  // replaced by an empty scan: an agent blocked on a question writes nothing,
+  // so its mtime never moves again, and a fabricated "nothing is pending" would
+  // latch permanently and strand the operator's dialog.
+  let scan: PendingInputsScan = EMPTY_PENDING_INPUTS_SCAN
+  if (cachedScan) {
+    scan = cachedScan
+  } else {
     const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
-    if (jsonlPath) {
-      const scan = await scanPendingInputsPromise(jsonlPath)
-      pendingQuestions = [...scan.askUserQuestions]
-      enterPlanModeOpen = scan.enterPlanModeOpen
-      exitPlanModePending = scan.exitPlanModePending
-    }
-    if (pendingQuestions.length > 0 && startedAt) {
-      const agentStartTime = new Date(startedAt).getTime()
-      pendingQuestions = pendingQuestions.filter(q => {
-        const qTime = new Date(q.timestamp).getTime()
-        return !isNaN(qTime) && qTime >= agentStartTime
-      })
-    }
+    if (jsonlPath) scan = await scanPendingInputsPromise(jsonlPath)
+  }
+
+  let pendingQuestions: PendingQuestion[] = [...scan.askUserQuestions]
+  const enterPlanModeOpen = scan.enterPlanModeOpen
+  const exitPlanModePending = scan.exitPlanModePending
+  if (pendingQuestions.length > 0 && startedAt) {
+    const agentStartTime = new Date(startedAt).getTime()
+    pendingQuestions = pendingQuestions.filter(q => {
+      const qTime = new Date(q.timestamp).getTime()
+      return !isNaN(qTime) && qTime >= agentStartTime
+    })
   }
 
   const questionDetection: AwaitingInputDetection | null = pendingQuestions.length > 0
@@ -546,6 +562,7 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     pendingAskUserQuestion,
     resolution: runtimeState?.resolution || 'working',
     resolutionCount: runtimeState?.resolutionCount || 0,
+    jsonlScan: scan,
   }
 }
 
@@ -559,10 +576,10 @@ export const computeAgentEnrichment = (
   agentId: string,
   startedAt?: string,
   hasActiveSpecialist?: boolean,
-  skipJsonlScan?: boolean,
+  cachedScan?: PendingInputsScan | null,
 ): Effect.Effect<AgentEnrichment, FsError> =>
   Effect.tryPromise({
-    try: () => computeAgentEnrichmentPromise(agentId, startedAt, hasActiveSpecialist, skipJsonlScan),
+    try: () => computeAgentEnrichmentPromise(agentId, startedAt, hasActiveSpecialist, cachedScan),
     catch: (cause) =>
       new FsError({
         path: getAgentDir(agentId),

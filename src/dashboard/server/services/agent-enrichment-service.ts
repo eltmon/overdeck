@@ -14,7 +14,7 @@
 
 import { Effect } from 'effect'
 import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
-import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment } from '../../../lib/agent-enrichment.js'
+import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
 import { getReviewStatusSync } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getEventStore } from '../event-store.js'
@@ -30,8 +30,14 @@ type RunningAgent = AgentState & { tmuxActive: boolean }
 interface EnrichmentServiceState {
   timer: ReturnType<typeof setInterval> | null
   lastEnrichment: Map<string, AgentEnrichment>
-  /** Last known JSONL file mtime per agent — skip re-scan if unchanged */
-  lastMtime: Map<string, number | null>
+  /**
+   * Last JSONL scan per agent, keyed by the mtime it was taken at. While the
+   * mtime is unchanged the file's contents are unchanged, so the scan is
+   * replayed instead of re-read. Caching the scan (rather than passing a
+   * "skip the scan" flag) is what keeps a static session cheap without ever
+   * asserting "nothing is pending" from a scan that never ran.
+   */
+  lastScan: Map<string, { mtime: number; scan: PendingInputsScan }>
   /** Agent IDs for which we've already emitted agent.created this server lifetime */
   seenAgentIds: Set<string>
   /** Agent IDs for which we've already emitted a status reconciliation event */
@@ -173,26 +179,31 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
           reviewStatus?.mergeStatus === 'merging'
       }
 
-      // Skip JSONL scan if file mtime is unchanged (avoids I/O on static sessions).
+      // Replay the previous JSONL scan while the file's mtime is unchanged
+      // (avoids I/O on static sessions).
       // getAgentJsonlMtime returns an Effect — it MUST be run, not awaited directly
       // (awaiting a non-thenable Effect yields the Effect object, never the value).
       const currentMtime = await Effect.runPromise(getAgentJsonlMtime(agentId))
-      const prevMtime = state.lastMtime.get(agentId)
       const previousEnrichment = state.lastEnrichment.get(agentId)
-      const jsonlUnchanged = prevMtime !== undefined && currentMtime === prevMtime && previousEnrichment?.hasPendingQuestion !== true
-      state.lastMtime.set(agentId, currentMtime)
+      const previousScan = state.lastScan.get(agentId)
+      const cachedScan =
+        currentMtime !== null && previousScan?.mtime === currentMtime ? previousScan.scan : null
 
       let enrichment: AgentEnrichment
       try {
-        // If JSONL hasn't changed, only re-check runtime state (resolution)
-        // by passing a flag that skips the expensive JSONL scan.
         // computeAgentEnrichment returns an Effect — it MUST be run, not awaited
         // directly (awaiting a non-thenable Effect yields the Effect object, so
         // every enrichment field came back undefined → hasPendingQuestion/
         // pendingAskUserQuestion silently dropped for every agent). PAN-1395.
-        enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, jsonlUnchanged))
+        enrichment = await Effect.runPromise(computeAgentEnrichment(agentId, startedAt, hasActiveSpecialist, cachedScan))
       } catch {
         return
+      }
+
+      if (currentMtime !== null && enrichment.jsonlScan) {
+        state.lastScan.set(agentId, { mtime: currentMtime, scan: enrichment.jsonlScan })
+      } else if (currentMtime === null) {
+        state.lastScan.delete(agentId)
       }
 
       // PAN-1834 — on the rising edge of an agent becoming blocked on input,
@@ -244,7 +255,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
   for (const id of state.lastEnrichment.keys()) {
     if (!activeIds.has(id)) {
       state.lastEnrichment.delete(id)
-      state.lastMtime.delete(id)
+      state.lastScan.delete(id)
     }
   }
 }
@@ -259,7 +270,7 @@ const POLL_INTERVAL_MS = 10_000
 const serviceState: EnrichmentServiceState = {
   timer: null,
   lastEnrichment: new Map(),
-  lastMtime: new Map(),
+  lastScan: new Map(),
   seenAgentIds: new Set(),
   reconciledAgentIds: new Set(),
 }
@@ -280,5 +291,5 @@ export function stopAgentEnrichmentService(): void {
     serviceState.timer = null
   }
   serviceState.lastEnrichment.clear()
-  serviceState.lastMtime.clear()
+  serviceState.lastScan.clear()
 }
