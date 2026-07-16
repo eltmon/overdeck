@@ -5274,3 +5274,24 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Server pid 1714664 stable (PAN-2792 holding — no dashboard kills). 2702/2768 closed. 2255 held on
   operator. Loop cadence slowed to heartbeat — nothing advances until the substrate is fixed.
 - **Session: 49 merges, 21 close-outs. Pipeline at rest: 2 substrate-blocked, 1 operator-decision.**
+
+---
+
+## Tick 59 — 2026-07-16 ~17:42Z — OPERATOR LIFTED DRAIN → intake authorized; launched 11-issue PAN set
+
+- **Operator directive (3 parts):** (1) PAN-2255 PARKED (reverted 6573791e69, spec deleted 905a2b4aa1,
+  issue+PRD retained) — do NOT re-drive/close/treat-as-regression. (2) Prune closed-issue residue. (3)
+  DRIVE open set aggressively (intake overrides DRAIN): 806,1897,1987,2045,2232,2252,2619,2760,2772,2773,2633.
+- **Launched 11/11 (806 held):** work agents live = 1987,2232,2619,2633(--force),2760,2772,2773 (+1491,1966
+  continuing); auto-planning = 1897,2045,2252 (work auto-starts on finalize). All gpt-5.6-sol/codex, fresh
+  (resume lies — started --fresh per directive). Memory 37G avail.
+- **PAN-806 HELD**: carries a standing AI objection ("not ready to plan as written" re: git-history-rewrite
+  guard). Surfaced to operator for drive-anyway-vs-replan decision. Did NOT start it blind.
+- **Residue prune (item 2): backend already clean** — 0 state.json dirs on disk, 0 agents in /api/agents,
+  `pan admin db gc-agents` reaps 0 for 1969/1970/1971/1976/1978/1996/1997/2040. The RESUME SESSION buttons
+  are STALE FRONTEND view (pre-16:57-restart cache), not reapable data-layer residue → refresh clears; if
+  persistent = frontend bug to file. (sqlite3 CLI can't read the node:sqlite WAL DB — use /api, not sqlite3.)
+- **SUBSTRATE CAVEAT**: PAN-2775 codex-death still live — it's what wedges 1491 (manual-mode, nudges don't
+  submit) + 1966 (correctness reviewer died → synthesis wedge → no merge). Expect some of the 9 to wedge at
+  review→merge identically until the substrate fix lands. Shepherding per tick.
+- **Session: 49 merges, 21 close-outs. Fleet: 9 work + 3 planning active.**
