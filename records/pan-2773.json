@@ -10,8 +10,49 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
+    ],
+    "declaredScope": [
+      "reference/troubleshooting.mdx",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+      "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/Stage/stage.module.css"
+    ],
+    "actualChangedFiles": [
+      "reference/troubleshooting.mdx",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+      "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/Stage/stage.module.css"
+    ],
+    "recordedAt": "2026-07-16T18:38:15.942Z"
+  },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:38:15.944Z",
+  "updated": "2026-07-16T18:38:19.299Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -21,8 +62,51 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T17:56:44.167Z",
+    "updatedAt": "2026-07-16T18:38:19.131Z",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
+    "reviewRequestedAt": "2026-07-16T18:38:19.131Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
+      ],
+      "declaredScope": [
+        "reference/troubleshooting.mdx",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/stage.module.css"
+      ],
+      "actualChangedFiles": [
+        "reference/troubleshooting.mdx",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/stage.module.css"
+      ],
+      "recordedAt": "2026-07-16T18:38:15.942Z"
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -46,9 +130,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 448389,
-            "output": 36208,
-            "cacheRead": 12929024,
+            "input": 1477115,
+            "output": 113870,
+            "cacheRead": 38915072,
             "cacheWrite": 0
           }
         }
@@ -67,18 +151,20 @@
           "cacheWrite": 131736
         },
         "openai/gpt-5.6-sol": {
-          "input": 448389,
-          "output": 36208,
-          "cacheRead": 12929024,
+          "input": 1477115,
+          "output": 113870,
+          "cacheRead": 38915072,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 20.523687,
-        "pricingAsOf": "2026-07-16T17:56:44.385Z"
+        "usd": 40.990201,
+        "pricingAsOf": "2026-07-16T18:38:19.195Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2798"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -207,46 +293,5 @@
     "docs-troubleshooting": "completed",
     "docs-troubleshooting.docs-troubleshooting.ac1": "completed",
     "docs-troubleshooting.docs-troubleshooting.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
-    ],
-    "declaredScope": [
-      "reference/troubleshooting.mdx",
-      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
-      "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
-      "src/dashboard/frontend/src/components/Stage/index.tsx",
-      "src/dashboard/frontend/src/components/Stage/stage.module.css"
-    ],
-    "actualChangedFiles": [
-      "reference/troubleshooting.mdx",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
-      "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
-      "src/dashboard/frontend/src/components/Stage/index.tsx",
-      "src/dashboard/frontend/src/components/Stage/stage.module.css"
-    ],
-    "recordedAt": "2026-07-16T18:38:15.942Z"
   }
 }
