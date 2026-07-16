@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:19:00.339Z",
+  "updated": "2026-07-16T18:20:26.181Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -74,16 +74,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "baseline-jsdom-timing": {
-        "writerId": "agent-pan-2045",
-        "agentId": "agent-pan-2045",
-        "pid": 3782199,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:19:00.338Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2045",
@@ -95,12 +87,27 @@
         "outcome": "completed",
         "reason": "Added deterministic Testing Library cleanup and QueryClient.clear() teardown; configured query gcTime=0/retry=false. Solo run exits 0 in 4.44s with 9 passed, 0 failed, 0 skipped.",
         "releasedAt": "2026-07-16T18:18:47.492Z"
+      },
+      {
+        "writerId": "agent-pan-2045",
+        "agentId": "agent-pan-2045",
+        "pid": 3782199,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:19:00.338Z",
+        "itemId": "baseline-jsdom-timing",
+        "outcome": "completed",
+        "reason": "Measured the full jsdom frontend suite at 26.94s wall-clock: 214 files and 2,008 tests passed. Recorded the dated before row in docs/TESTING.md.",
+        "releasedAt": "2026-07-16T18:20:26.181Z"
       }
     ],
     "statusReasons": {
       "fix-imc-open-handle": {
         "reason": "Added deterministic Testing Library cleanup and QueryClient.clear() teardown; configured query gcTime=0/retry=false. Solo run exits 0 in 4.44s with 9 passed, 0 failed, 0 skipped.",
         "updatedAt": "2026-07-16T18:18:47.492Z"
+      },
+      "baseline-jsdom-timing": {
+        "reason": "Measured the full jsdom frontend suite at 26.94s wall-clock: 214 files and 2,008 tests passed. Recorded the dated before row in docs/TESTING.md.",
+        "updatedAt": "2026-07-16T18:20:26.181Z"
       }
     }
   },
@@ -109,6 +116,8 @@
     "fix-imc-open-handle.fix-imc-open-handle.ac1": "completed",
     "fix-imc-open-handle.fix-imc-open-handle.ac2": "completed",
     "fix-imc-open-handle.fix-imc-open-handle.ac3": "completed",
-    "baseline-jsdom-timing": "running"
+    "baseline-jsdom-timing": "completed",
+    "baseline-jsdom-timing.baseline-jsdom-timing.ac1": "completed",
+    "baseline-jsdom-timing.baseline-jsdom-timing.ac2": "completed"
   }
 }
