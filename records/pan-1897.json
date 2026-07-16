@@ -239,22 +239,45 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T22:49:59.002Z",
+  "updated": "2026-07-16T22:50:04.879Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T22:49:57.908Z",
+    "updatedAt": "2026-07-16T22:50:04.862Z",
+    "reviewNotes": "[correctness] The spawn budget cannot terminate or bound `spawnAgent` — `src/cli/commands/start.ts:1221`",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96",
     "reviewRequestedAt": "2026-07-16T21:44:10.689Z",
     "reviewSpawnedAt": "2026-07-16T22:49:57.908Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-4ad533fd/security.md",
+        "atCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-4ad533fd/correctness.md",
+        "atCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96"
+      },
+      "performance": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-4ad533fd/performance.md",
+        "atCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-4ad533fd/requirements.md",
+        "atCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -381,7 +404,7 @@
       },
       "costAtCloseOut": {
         "usd": 192.782309,
-        "pricingAsOf": "2026-07-16T22:49:57.915Z"
+        "pricingAsOf": "2026-07-16T22:50:04.866Z"
       }
     },
     "merges": [
