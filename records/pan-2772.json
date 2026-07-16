@@ -77,16 +77,16 @@
     "recordedAt": "2026-07-16T19:18:10.850Z"
   },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T21:09:08.590Z",
+  "updated": "2026-07-16T21:22:07.296Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-16T21:08:17.110Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T21:22:07.270Z",
     "reviewNotes": "All four reviewers passed with no findings; all 15 in-scope requirements are implemented.",
     "testNotes": "Reconciled from green GitHub Actions CI on 37b94ab2: build (22) (https://github.com/eltmon/overdeck/actions/runs/29527465635/job/87719350705)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -141,24 +141,6 @@
       ],
       "recordedAt": "2026-07-16T19:18:10.850Z"
     },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "96ab92d998dea7ef9c3f520958dbe9e8810fc4d1"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "96ab92d998dea7ef9c3f520958dbe9e8810fc4d1"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "96ab92d998dea7ef9c3f520958dbe9e8810fc4d1"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "96ab92d998dea7ef9c3f520958dbe9e8810fc4d1"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -166,15 +148,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 29422,
-            "output": 151,
-            "cacheRead": 7552,
+            "input": 63767,
+            "output": 231,
+            "cacheRead": 36608,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 3088362,
-            "output": 11336,
-            "cacheRead": 2755840,
+            "input": 3394056,
+            "output": 12259,
+            "cacheRead": 3056896,
             "cacheWrite": 0
           }
         },
@@ -237,15 +219,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 29422,
-          "output": 151,
-          "cacheRead": 7552,
+          "input": 63767,
+          "output": 231,
+          "cacheRead": 36608,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 14856668,
-          "output": 497584,
-          "cacheRead": 98714368,
+          "input": 15162362,
+          "output": 498507,
+          "cacheRead": 99015424,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -256,8 +238,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 132.877523,
-        "pricingAsOf": "2026-07-16T21:08:17.151Z"
+        "usd": 133.078931,
+        "pricingAsOf": "2026-07-16T21:22:07.287Z"
       }
     },
     "merges": [
@@ -265,7 +247,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 18,
