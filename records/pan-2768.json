@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T11:56:32.517Z",
+  "updated": "2026-07-16T11:56:35.067Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -73,16 +73,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "appimage-smoke-verify": {
-        "writerId": "agent-pan-2768",
-        "agentId": "agent-pan-2768",
-        "pid": 1466332,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T11:56:32.517Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2768",
@@ -160,6 +152,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2768 dead)",
         "releasedAt": "2026-07-16T07:32:57.608Z"
+      },
+      {
+        "writerId": "agent-pan-2768",
+        "agentId": "agent-pan-2768",
+        "pid": 1466332,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T11:56:32.517Z",
+        "itemId": "appimage-smoke-verify",
+        "outcome": "completed",
+        "reason": "Built root bundles and apps/desktop/dist/Overdeck-0.45.20.AppImage; clean extraction contained resources/package.json, resources/dist/cli/index.js, and resources/dist/node_modules; bundled Electron with ELECTRON_RUN_AS_NODE=1 ran the packaged CLI --version, printed 0.45.20, and exited 0. The first artifact run exposed the missing resources/package.json manifest; fixed via cli/package.json→package.json extraResources mapping with regression coverage in pushed commit 2d4f872d80. npm run typecheck, npm run lint, and npm test all pass.",
+        "releasedAt": "2026-07-16T11:56:35.067Z"
       }
     ],
     "statusReasons": {
@@ -184,8 +187,8 @@
         "updatedAt": "2026-07-16T07:32:17.967Z"
       },
       "appimage-smoke-verify": {
-        "reason": "stale claim released (agent-pan-2768 dead)",
-        "updatedAt": "2026-07-16T07:32:57.608Z"
+        "reason": "Built root bundles and apps/desktop/dist/Overdeck-0.45.20.AppImage; clean extraction contained resources/package.json, resources/dist/cli/index.js, and resources/dist/node_modules; bundled Electron with ELECTRON_RUN_AS_NODE=1 ran the packaged CLI --version, printed 0.45.20, and exited 0. The first artifact run exposed the missing resources/package.json manifest; fixed via cli/package.json→package.json extraResources mapping with regression coverage in pushed commit 2d4f872d80. npm run typecheck, npm run lint, and npm test all pass.",
+        "updatedAt": "2026-07-16T11:56:35.067Z"
       }
     }
   },
@@ -210,6 +213,8 @@
     "docs-desktop-app.docs-desktop-app.ac1": "completed",
     "docs-desktop-app.docs-desktop-app.ac2": "completed",
     "docs-desktop-app.docs-desktop-app.ac3": "completed",
-    "appimage-smoke-verify": "running"
+    "appimage-smoke-verify": "completed",
+    "appimage-smoke-verify.appimage-smoke-verify.ac1": "completed",
+    "appimage-smoke-verify.appimage-smoke-verify.ac2": "completed"
   }
 }
