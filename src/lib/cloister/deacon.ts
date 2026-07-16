@@ -2424,10 +2424,9 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
     } catch { /* non-fatal */ }
 
     // 2. Find processes with cwd inside the workspace. NEVER select by open
-    //    files (`lsof +D`): Bun's hardlinked node_modules make the dashboard
-    //    server itself and every conversation's PTY supervisor appear to hold
-    //    files "in" any workspace via mmap'd native addons, so an open-file
-    //    kill list takes down the whole platform — see src/lib/process-cwd.ts.
+    //    files (`lsof +D`): Bun's hardlinked node_modules make the dashboard and
+    //    every PTY supervisor appear to hold files "in" any workspace via mmap'd
+    //    native addons — that kill list downs the platform (src/lib/process-cwd.ts).
     const pids = await pidsWithCwdUnder(workspacePath);
 
     // 3. Filter out protected PIDs (agent tmux panes and descendants)
