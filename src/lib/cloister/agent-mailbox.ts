@@ -216,3 +216,36 @@ export function markMailboxItemDelivered(options: MailboxTransitionOptions): Pro
 export function markMailboxItemAcknowledged(options: MailboxTransitionOptions): Promise<MailboxItem> {
   return transitionMailboxItem(options, 'acknowledged');
 }
+
+/** Build the deterministic pull section used by fresh spawns and resumes. */
+export async function drainWorkMailbox(options: Omit<MailboxAddress, 'role'>): Promise<string> {
+  const address = { ...options, role: 'work' as const };
+  const items = (await listMailboxItems(address)).filter(item =>
+    item.state === 'pending' || (item.state === 'delivered' && item.actionRequired));
+  if (items.length === 0) return '';
+
+  const lines = [
+    '## Pending issue mailbox',
+    '',
+    'Read every feedback file listed below before continuing with normal work.',
+  ];
+  for (const item of items) {
+    lines.push('', `- ${item.source}: ${item.summary}`, `  File: ${item.filePath}`);
+  }
+
+  for (const item of items) {
+    if (item.legacy) continue;
+    const transition = { ...address, filePath: item.filePath };
+    if (item.state === 'pending') await markMailboxItemDelivered(transition);
+    else await markMailboxItemAcknowledged(transition);
+  }
+  return lines.join('\n');
+}
+
+export async function prependWorkMailbox(
+  message: string,
+  options: Omit<MailboxAddress, 'role'>,
+): Promise<string> {
+  const section = await drainWorkMailbox(options);
+  return section ? `${section}\n\n---\n\n${message}` : message;
+}

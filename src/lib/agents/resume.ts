@@ -51,6 +51,7 @@ import {
   assertWorkspaceStackHealthyForSpawn,
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
+import { prependWorkMailbox } from '../cloister/agent-mailbox.js';
 
 /**
  * Resume a suspended agent (PAN-80)
@@ -386,7 +387,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       });
       return { success: false, error: resumeMessage.error };
     }
-    const effectiveMessage = resumeMessage.message ?? defaultResumeMessage;
+    let effectiveMessage = resumeMessage.message ?? defaultResumeMessage;
+    if (agentState.role === 'work' || agentState.role === 'strike') {
+      effectiveMessage = await prependWorkMailbox(effectiveMessage, {
+        issueId,
+        workspacePath: agentState.workspace,
+      });
+    }
 
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,

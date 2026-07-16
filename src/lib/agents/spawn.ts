@@ -79,6 +79,7 @@ import {
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
+import { prependWorkMailbox } from '../cloister/agent-mailbox.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
@@ -613,6 +614,12 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       agentId,
       role,
       harness: resolvedHarness,
+    });
+  }
+  if ((role === 'work' || role === 'strike') && prompt) {
+    prompt = await prependWorkMailbox(prompt, {
+      issueId: options.issueId,
+      workspacePath: options.workspace,
     });
   }
 
