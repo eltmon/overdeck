@@ -611,7 +611,10 @@ function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { stat
 
 export function querySessionSync(name: string): SessionQueryResult {
   try {
-    tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
+    // Explicit stdio: execFileSync echoes the child's stderr to the parent
+    // unless stdio is specified, so a routine "can't find session" probe
+    // failure would otherwise spam the dashboard log.
+    tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
     return { status: 'exists' };
   } catch (cause) {
     return sessionQueryFailure(cause);
@@ -661,7 +664,9 @@ export function createSessionSync(
 export function killSessionSync(name: string): void {
   // Exact-match target — a bare name prefix-matches and would kill e.g.
   // `agent-pan-977-review` when asked to kill `agent-pan-977`.
-  tmuxExecSync(['kill-session', '-t', exactSession(name)]);
+  // Explicit stdio: killing a maybe-dead session is routine, and without it
+  // execFileSync echoes tmux's "can't find session" stderr into the server log.
+  tmuxExecSync(['kill-session', '-t', exactSession(name)], { stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 
