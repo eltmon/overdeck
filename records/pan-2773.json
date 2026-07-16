@@ -94,17 +94,17 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T19:12:07.703Z",
+  "updated": "2026-07-16T19:12:40.735Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:12:06.271Z",
+    "updatedAt": "2026-07-16T19:12:40.637Z",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
@@ -169,9 +169,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 857970,
-            "output": 26137,
-            "cacheRead": 7692288,
+            "input": 1105625,
+            "output": 27437,
+            "cacheRead": 8220672,
             "cacheWrite": 0
           }
         },
@@ -225,9 +225,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2161761,
-            "output": 147837,
-            "cacheRead": 52102656,
+            "input": 2166470,
+            "output": 148543,
+            "cacheRead": 52538368,
             "cacheWrite": 0
           }
         }
@@ -240,9 +240,9 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 8321898,
-          "output": 262276,
-          "cacheRead": 74135040,
+          "input": 8574262,
+          "output": 264282,
+          "cacheRead": 75099136,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -253,8 +253,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 101.98625,
-        "pricingAsOf": "2026-07-16T19:12:06.411Z"
+        "usd": 103.79029799999999,
+        "pricingAsOf": "2026-07-16T19:12:40.720Z"
       }
     },
     "merges": [
