@@ -127,6 +127,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T08:55:09.750Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T09:10:20.494Z"
     }
   ],
   "feedback": [],
@@ -162,23 +167,23 @@
     "recordedAt": "2026-07-16T07:45:53.765Z"
   },
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T09:10:18.793Z",
+  "updated": "2026-07-16T09:10:20.494Z",
   "pipeline": {
     "issueId": "PAN-2698",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T09:10:18.399Z",
+    "updatedAt": "2026-07-16T09:10:18.873Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Inspection error for bead codex-config-mcp-servers: tmux session inspect-pan-2698-codex-config-mcp-servers exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2785",
     "lastVerifiedCommit": "5d854d7d791798fae62289b955f422b2d1e8bda5",
     "reviewRequestedAt": "2026-07-16T08:55:04.547Z",
-    "reviewSpawnedAt": "2026-07-16T08:55:08.619Z"
+    "reviewSpawnedAt": "2026-07-16T09:10:18.873Z"
   },
   "closeOut": {
     "usage": {
@@ -242,7 +247,7 @@
       },
       "costAtCloseOut": {
         "usd": 39.969451,
-        "pricingAsOf": "2026-07-16T09:10:18.442Z"
+        "pricingAsOf": "2026-07-16T09:10:18.965Z"
       }
     },
     "merges": [
