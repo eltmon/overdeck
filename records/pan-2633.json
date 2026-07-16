@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-16T17:53:51.190Z",
+  "updated": "2026-07-16T17:53:59.401Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -159,5 +159,35 @@
         "forced": true
       }
     }
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md"
+    ],
+    "declaredScope": [
+      "docs/ASKUSERQUESTION-DASHBOARD.md",
+      "docs/PENDING-INPUT.md",
+      "packages/contracts/src/event-reducers.ts",
+      "src/dashboard/server/deacon-main.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/agents/lifecycle-stop.ts",
+      "src/dashboard/server/routes/agents/shared.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts",
+      "tests/dashboard/event-reducers.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PENDING-INPUT.md",
+      "packages/contracts/src/event-reducers.ts",
+      "src/dashboard/server/deacon-main.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/routes/agents/lifecycle-stop.ts",
+      "src/dashboard/server/routes/agents/shared.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts",
+      "tests/dashboard/event-reducers.test.ts"
+    ],
+    "recordedAt": "2026-07-16T17:53:59.399Z"
   }
 }
