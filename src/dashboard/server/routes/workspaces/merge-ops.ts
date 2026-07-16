@@ -20,7 +20,7 @@ import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { messageAgent, getAgentState, spawnAgent } from '../../../../lib/agents.js';
+import { registerStrikeMergeTrigger, registerStrikeOwnershipProbe } from '../../../../lib/cloister/deacon-strike-landing.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
@@ -29,7 +29,6 @@ import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAl
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
-import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
 import { findPlan } from '../../../../lib/vbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge } from '../../../../lib/github-app.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
@@ -41,60 +40,11 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
+import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
   status.trim() !== '' && !isStatePlaneOnlyStatus(status);
-
-async function ensureWorkAgentReadyForMerge(
-  issueId: string,
-  workspacePath: string,
-  rebaseMsg: string,
-): Promise<{ recovered: boolean; agentId: string; detail: string }> {
-  const agentId = `agent-${issueId.toLowerCase()}`;
-  const lifecycle = getWorkAgentLifecycleStateSync(agentId);
-
-  if (lifecycle.hasLiveTmuxSession) {
-    await messageAgent(agentId, rebaseMsg);
-    return { recovered: true, agentId, detail: 'Work agent already running; sent merge preparation request.' };
-  }
-
-  const agentState = await Effect.runPromise(getAgentState(agentId));
-  if (agentState) {
-    try {
-      await messageAgent(agentId, rebaseMsg);
-      const updatedLifecycle = getWorkAgentLifecycleStateSync(agentId);
-      return {
-        recovered: true,
-        agentId,
-        detail: updatedLifecycle.canResumeSession
-          ? 'Resumed work agent and sent merge preparation request.'
-          : 'Restarted work agent and sent merge preparation request.',
-      };
-    } catch (err: any) {
-      if (!lifecycle.canStartFresh) {
-        throw err;
-      }
-    }
-  }
-
-  if (!lifecycle.canStartFresh) {
-    throw new Error(lifecycle.reason || `Work agent ${agentId} cannot be resumed or started for merge preparation.`);
-  }
-
-  const state = await spawnAgent({
-    issueId,
-    workspace: workspacePath,
-    role: 'work',
-    prompt: rebaseMsg,
-  });
-
-  return {
-    recovered: true,
-    agentId,
-    detail: `Started fresh work agent ${state.id} and sent merge preparation request.`,
-  };
-}
 
 /**
  * Check whether origin/branchName already contains origin/targetBranch.
@@ -376,22 +326,35 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
   const nextIssueId = dequeueMerge(projectKey, completedIssueId);
   if (nextIssueId) {
     console.log(`[merge] Dequeuing next merge: ${nextIssueId}`);
-    triggerMerge(nextIssueId).catch(err =>
+    const status = getReviewStatusSync(nextIssueId);
+    const strikeRequest: StrikeMergeRequest | undefined = status?.strikeReadyHead && (status.strikeLandingState === 'ready' || status.strikeLandingState === 'landing') ? {
+      kind: 'strike', markerHead: status.strikeReadyHead,
+      workspacePath: join(getProjectPath(undefined, extractPrefixSync(nextIssueId) ?? nextIssueId.split('-')[0]), 'workspaces', `feature-${nextIssueId.toLowerCase()}-strike`),
+      branchName: `strike/${nextIssueId.toLowerCase()}`, recoveryTarget: `strike-${nextIssueId.toLowerCase()}`,
+    } : undefined;
+    triggerMerge(nextIssueId, strikeRequest).catch(err =>
       console.error(`[merge] Queue error for ${nextIssueId}: ${err}`)
     );
   }
 }
 
-export async function triggerMerge(issueId: string): Promise<TriggerMergeResult> {
+export async function triggerMerge(issueId: string, request: TriggerMergeRequest = { kind: 'normal' }): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatusSync(issueId);
-  if (!reviewStatus?.readyForMerge) {
-    return {
-      success: false,
-      statusCode: 400,
-      error: 'Cannot merge: review and tests have not passed yet',
-      reviewStatus: reviewStatus?.reviewStatus || 'pending',
-      testStatus: reviewStatus?.testStatus || 'pending',
-    };
+  if (request.kind === 'strike') {
+    if (activeStrikeMerge(getCurrentMerge((extractPrefixSync(issueId) ?? issueId.split('-')[0]).toLowerCase()) === issueId.toUpperCase() ? issueId.toUpperCase() : null, getPendingOperation(issueId))) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
+    const projectPath = getProjectPath(undefined, extractPrefixSync(issueId) ?? issueId.split('-')[0]);
+    const strikeError = await validateStrikeMergeRequest(issueId, request, reviewStatus, {
+      projectPath,
+      git: async (args, cwd) => (await execFileAsync('git', args, { cwd, encoding: 'utf-8' })).stdout.trim(),
+    });
+    if (strikeError) {
+      setReviewStatus(issueId, { mergeNotes: strikeError });
+      return { success: false, statusCode: 409, error: strikeError };
+    }
+  } else {
+    const pendingOp = reviewStatus?.mergeStatus === 'merging' ? getPendingOperation(issueId) : null;
+    const ineligible = normalMergeEligibility(reviewStatus, pendingOp?.type === 'merge' && pendingOp?.status === 'running');
+    if (ineligible) return ineligible;
   }
 
   // NOTE: Commit status reporting moved to AFTER rebase — see below.
@@ -421,15 +384,6 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
 
   if (reviewStatus?.mergeStatus === 'merging') {
     const pendingOp = getPendingOperation(issueId);
-    const activelyMerging = pendingOp?.type === 'merge' && pendingOp?.status === 'running';
-    if (activelyMerging) {
-      return {
-        success: false,
-        statusCode: 400,
-        error: 'Merge already in progress',
-        mergeStatus: 'merging',
-      };
-    }
     console.log(
       `[merge] Clearing stuck mergeStatus for ${issueId} (pending op: ${pendingOp?.status ?? 'absent'})`
     );
@@ -449,6 +403,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
   const projectKey = issuePrefix.toLowerCase();
   const normalizedId = issueId.toUpperCase();
   const currentlyMerging = getCurrentMerge(projectKey);
+  if (request.kind === 'strike' && currentlyMerging === normalizedId) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);
@@ -469,13 +424,17 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
   const workspaceInfo = getWorkspaceInfoForIssue(issueId);
 
   // Use the actual resolved workspace path (handles legacy feature-484 naming)
-  const workspacePath = (!workspaceInfo.isRemote && workspaceInfo.localPath)
-    ? workspaceInfo.localPath
-    : join(projectPath, 'workspaces', `feature-${issueLower}`);
+  const workspacePath = request.kind === 'strike'
+    ? request.workspacePath
+    : (!workspaceInfo.isRemote && workspaceInfo.localPath)
+      ? workspaceInfo.localPath
+      : join(projectPath, 'workspaces', `feature-${issueLower}`);
   const workspaceDirName = basename(workspacePath);
-  const branchName = workspaceDirName.startsWith('feature-')
-    ? `feature/${workspaceDirName.slice('feature-'.length)}`
-    : `feature/${issueLower}`;
+  const branchName = request.kind === 'strike'
+    ? request.branchName
+    : workspaceDirName.startsWith('feature-')
+      ? `feature/${workspaceDirName.slice('feature-'.length)}`
+      : `feature/${issueLower}`;
 
   setReviewStatus(issueId, { mergeStatus: 'merging', mergeStep: 'validating-pr' });
 
@@ -492,7 +451,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
   };
 
   try {
-    if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+    if (request.kind === 'normal' && workspaceInfo.isRemote && workspaceInfo.vmName) {
       console.log(
         `[merge] Remote workspace detected for ${issueId}, using review artifact merge...`
       );
@@ -522,7 +481,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           method: 'squash',
         });
 
-        setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+        setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
         completePendingOperation(issueId, null);
 
         const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
@@ -817,7 +776,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
         updatedAt: new Date().toISOString(),
       };
       upsertMergeSetSync(mergeSet);
-      setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+      setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
       completePendingOperation(issueId, null);
 
       const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
@@ -918,7 +877,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
           }
           if (prState.merged) {
             console.log(`[merge] PR #${githubPrRef.number} for ${issueId} is already merged — running post-merge lifecycle`);
-            setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false });
+            setReviewStatus(issueId, { mergeStatus: 'merged', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
             completePendingOperation(issueId, null);
             const { postMergeLifecycle } = await import('../../../../lib/cloister/merge-agent.js');
             await postMergeLifecycle(issueId, projectPath, branchName);
@@ -941,8 +900,10 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
     const { postMergeLifecycle } = await import(
       '../../../../lib/cloister/merge-agent.js'
     );
-    const agentId = `agent-${issueId.toLowerCase()}`;
-    const rebaseMsg = `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
+    const agentId = request.kind === 'strike' ? request.recoveryTarget : `agent-${issueId.toLowerCase()}`;
+    const rebaseMsg = request.kind === 'strike'
+      ? `STRIKE LANDING REQUEST: Rebase ${branchName} onto ${targetBranch}, resolve conflicts, run the full quality gates, push ${branchName}, then run pan strike-ready ${issueId} to persist the new HEAD. Do NOT merge or push main.`
+      : `MERGE REQUESTED: The human has clicked MERGE for ${issueId}. Please rebase onto ${targetBranch} and push:\n\n1. git fetch origin ${targetBranch}\n2. git rebase origin/${targetBranch}\n3. If conflicts: resolve them, git add, git rebase --continue\n4. git push --force-with-lease\n\nAfter pushing, the server will handle verification and merge automatically. Do NOT run gh pr merge yourself.`;
 
     setReviewStatus(issueId, { mergeStep: 'rebasing' });
     console.log(`[merge] Rebasing ${branchName} onto ${targetBranch} for ${issueId} (agent=${await Effect.runPromise(sessionExists(agentId)) ? 'running' : 'stopped'})...`);
@@ -963,7 +924,10 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
       rebaseResult = { success: true, newHead: currentHead };
     } else {
       try {
-        const recovery = await ensureWorkAgentReadyForMerge(issueId, workspacePath, rebaseMsg);
+        const recovery = await ensureAgentReadyForMerge(issueId, workspacePath, rebaseMsg, {
+          agentId,
+          allowFreshStart: request.kind !== 'strike',
+        });
         console.log(`[merge] ${recovery.detail}`);
 
         // Poll for the push: check if remote HEAD changed
@@ -1240,7 +1204,7 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
     // postMergeLifecycle spawns a deploy script that may kill this server process,
     // so queue processing must happen before that point.
     appendShipLog(issueId, `✓ MERGED — running post-merge cleanup (labels, docker teardown, verify-on-main)`, 'post-merge-cleanup');
-    setReviewStatus(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', mergeNotes: undefined, readyForMerge: false });
+    setReviewStatus(issueId, { mergeStatus: 'merged', mergeStep: 'post-merge-cleanup', mergeNotes: undefined, readyForMerge: false, ...mergeCompletionStatus(request) });
     completePendingOperation(issueId, null);
 
     // Dequeue next merge before lifecycle (which may kill the process)
@@ -1265,13 +1229,10 @@ export async function triggerMerge(issueId: string): Promise<TriggerMergeResult>
   } finally {
     advanceQueue();
   }
-
 }
 
-setMergeQueueTriggerHandler(triggerMerge);
-
+setMergeQueueTriggerHandler(triggerMerge); registerStrikeMergeTrigger(triggerMerge); registerStrikeOwnershipProbe(issueId => (getPendingOperation(issueId)?.type === 'merge' && getPendingOperation(issueId)?.status === 'running') || getAllActiveQueues().some(queue => queue.current === issueId.toUpperCase() || queue.queue.includes(issueId.toUpperCase())));
 // ─── Route: POST /api/issues/:issueId/merge ───────────────────────────────
-
 const postWorkspaceMergeRoute = HttpRouter.add(
   'POST',
   '/api/issues/:issueId/merge',

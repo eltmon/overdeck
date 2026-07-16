@@ -141,6 +141,11 @@ describe('buildIssueRecord', () => {
       lastVerifiedCommit: 'def456',
       autoMerge: true,
       deaconIgnored: false,
+      strikeReadyHead: 'feedface',
+      strikeReadyAt: '2026-06-15T00:00:01.000Z',
+      strikeLandingState: 'recovering',
+      strikeRecoveryCount: 2,
+      strikeLandingAttempts: [{ timestamp: 't', strikeHead: 'feedface', mainHead: 'abc', outcome: 'failed', detail: 'conflict' }],
       updatedAt: '2026-06-15T00:00:00.000Z',
     };
 
@@ -152,6 +157,9 @@ describe('buildIssueRecord', () => {
     expect(record.pipeline.prNumber).toBe(1908);
     expect(record.pipeline.mergeStatus).toBe('merged');
     expect(record.pipeline.releaseStatus).toBe('partial');
+    expect(record.pipeline.strikeReadyHead).toBe('feedface');
+    expect(record.pipeline.strikeRecoveryCount).toBe(2);
+    expect(record.pipeline.strikeLandingAttempts).toHaveLength(1);
     expect(record.pipeline).not.toHaveProperty('verificationCycleCount');
     expect(record.pipeline).not.toHaveProperty('mergeRetryCount');
   });

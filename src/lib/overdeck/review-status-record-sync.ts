@@ -111,6 +111,11 @@ function durableSubset(p: PanIssuePipelineRecord): DurableStatusFields {
     deaconIgnored: p.deaconIgnored,
     deaconIgnoredAt: p.deaconIgnoredAt,
     deaconIgnoredReason: p.deaconIgnoredReason,
+    strikeReadyHead: p.strikeReadyHead,
+    strikeReadyAt: p.strikeReadyAt,
+    strikeLandingState: p.strikeLandingState,
+    strikeRecoveryCount: p.strikeRecoveryCount,
+    strikeLandingAttempts: p.strikeLandingAttempts,
     closedOut: p.closedOut,
     closedOutAt: p.closedOutAt,
   };

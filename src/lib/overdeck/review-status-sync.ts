@@ -70,6 +70,11 @@ interface DbRow {
   last_verified_commit: string | null;
   merge_step: string | null;
   auto_merge: number | null;
+  strike_ready_head: string | null;
+  strike_ready_at: number | null;
+  strike_landing_state: string | null;
+  strike_recovery_count: number | null;
+  strike_landing_attempts: string | null;
 }
 
 function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -121,6 +126,13 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
       row.auto_merge === null || row.auto_merge === undefined
         ? undefined
         : row.auto_merge === 1,
+    strikeReadyHead: row.strike_ready_head ?? undefined,
+    strikeReadyAt: msToIso(row.strike_ready_at),
+    strikeLandingState: (row.strike_landing_state as ReviewStatus['strikeLandingState']) ?? undefined,
+    strikeRecoveryCount: row.strike_recovery_count ?? undefined,
+    strikeLandingAttempts: row.strike_landing_attempts
+      ? JSON.parse(row.strike_landing_attempts) as ReviewStatus['strikeLandingAttempts']
+      : undefined,
     history: history.length > 0 ? history : undefined,
   });
 }
@@ -171,9 +183,11 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         reviewed_at_commit, review_spawned_at, conflict_resolution_dispatched_at,
         test_retry_count, review_retry_count, recovery_started_at,
         deacon_ignored, deacon_ignored_at, deacon_ignored_reason,
-        blocker_reasons, last_verified_commit, merge_step, auto_merge
+        blocker_reasons, last_verified_commit, merge_step, auto_merge,
+        strike_ready_head, strike_ready_at, strike_landing_state,
+        strike_recovery_count, strike_landing_attempts
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -215,7 +229,12 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         blocker_reasons = excluded.blocker_reasons,
         last_verified_commit = excluded.last_verified_commit,
         merge_step = excluded.merge_step,
-        auto_merge = excluded.auto_merge
+        auto_merge = excluded.auto_merge,
+        strike_ready_head = excluded.strike_ready_head,
+        strike_ready_at = excluded.strike_ready_at,
+        strike_landing_state = excluded.strike_landing_state,
+        strike_recovery_count = excluded.strike_recovery_count,
+        strike_landing_attempts = excluded.strike_landing_attempts
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -258,6 +277,11 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.lastVerifiedCommit ?? null,
       s.mergeStep ?? null,
       s.autoMerge === undefined ? null : s.autoMerge ? 1 : 0,
+      s.strikeReadyHead ?? null,
+      isoToMs(s.strikeReadyAt),
+      s.strikeLandingState ?? null,
+      s.strikeRecoveryCount ?? null,
+      s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
     );
 
     if (s.history && s.history.length > 0) {

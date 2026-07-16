@@ -71,6 +71,11 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL"); } catch { /* table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_status` text'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_notes` text'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text'); } catch { /* already exists or table absent */ }
   ensureReleaseSetTablesSync(db);
   db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init

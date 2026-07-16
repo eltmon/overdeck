@@ -17,7 +17,7 @@ import { dirname, join } from 'node:path';
 import { hostname } from 'node:os';
 
 import { queueAutoCommit } from './auto-commit.js';
-import { resolveStateReadHomeSync } from '../state-read-home.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js'; import type { StrikeLandingStatus } from '../strike-landing.js';
 import {
   getProjectSync,
   resolveProjectFromIssueSync,
@@ -145,7 +145,7 @@ export interface PanIssueRecoveryTrip {
   needsYouEmittedAt?: string;
 }
 
-export interface PanIssuePipelineRecord {
+export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   issueId: string;
   reviewStatus: string;
   testStatus: string;

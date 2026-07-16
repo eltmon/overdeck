@@ -110,7 +110,7 @@ import { createComplianceCommand } from './commands/compliance.js';
 import { createRegistryCommand } from './commands/registry.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
-import { strikeCommand } from './commands/strike.js';
+import { strikeCommand } from './commands/strike.js'; import { registerStrikeReadyCommand } from './commands/strike-ready.js';
 import { configureKnowledgeCommand } from './commands/knowledge.js';
 import { planFinalizeCommand } from './commands/plan-finalize.js';
 import { planDoneCommand } from './commands/plan-done.js';
@@ -582,13 +582,13 @@ program
 
 program
   .command('strike <ids...>')
-  .description('Spawn strike agent(s) — drop in, implement, merge directly to main, verify on main. Bypasses plan/review/test/ship.')
+  .description('Spawn strike agent(s) — implement and push a strike branch for Deacon to land through the verified merge door. Bypasses plan/review/test/ship.')
   .option('--model <model>', 'Model override (defaults to roles.strike.model from config)')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
-  .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default medium)')
+  .option('--effort <level>', 'Strike effort: low | medium | high | xhigh | max (default high)')
   .option('--dry-run', 'Print what would happen without spawning')
   .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
-configureKnowledgeCommand(program);
+registerStrikeReadyCommand(program); configureKnowledgeCommand(program);
 registerSwarmCommands(program); registerTaskCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);

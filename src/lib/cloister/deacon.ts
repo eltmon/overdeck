@@ -3085,7 +3085,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   const failedMergeRetryActions = await checkFailedMergeRetry();
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
-
+  for (const a of await (await import('./deacon-strike-landing.js')).patrolStrikeLandings()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // PAN-2203: deterministic swarm coordination. This pass derives active
   // swarms from workspaces + vBRIEF readiness; later beads fill in merge,
   // dispatch, recovery, and cooldown behavior.
