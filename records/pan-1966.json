@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:14:06.493Z",
+  "updated": "2026-07-16T12:14:08.830Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,8 +110,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "docs-pipeline-membership": {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1802733,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:14:08.830Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -296,6 +304,10 @@
       "lint-guard-fr5": {
         "reason": "Lint guard enforces six delegations, legacy predicate bans, and durable-only imports.",
         "updatedAt": "2026-07-16T12:14:06.493Z"
+      },
+      "docs-pipeline-membership": {
+        "reason": "Implementation pushed in a032f04182",
+        "updatedAt": "2026-07-16T12:14:08.830Z"
       }
     }
   },
@@ -349,6 +361,7 @@
     "lint-guard-fr5": "completed",
     "lint-guard-fr5.lint-guard-fr5.ac1": "completed",
     "lint-guard-fr5.lint-guard-fr5.ac2": "completed",
-    "lint-guard-fr5.lint-guard-fr5.ac3": "completed"
+    "lint-guard-fr5.lint-guard-fr5.ac3": "completed",
+    "docs-pipeline-membership": "running"
   }
 }
