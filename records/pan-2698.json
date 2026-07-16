@@ -12,9 +12,22 @@
       "timestamp": "2026-07-16T07:45:54.497Z",
       "reason": "end",
       "note": "Inspection infrastructure failed twice for codex-config-mcp-servers before producing a verdict; both failures were reported. No implementation deviations. Added shared role MCP parsing, Codex TOML provisioning across spawn/resume/recovery, ohmypi drop warnings, regression coverage, and per-harness documentation. Full typecheck, lint, 9,383 root tests, and 32 frontend tests pass."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:49Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:49:34.584Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T07:49:34Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2698\n\n# Review Synthesis — PAN-2698 — 2026-07-16T08:00:00Z\n\n## Verdict: CHANGES REQUESTED — Codex MCP provisioning executes a mutable npm package selector\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2698/.pan/review/agent-pan-2698-review-59fa03e5/context.json`\n- Branch: `feature/pan-2698`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2698`\n- HEAD reviewed: `59fa03e557f815a35bf441b508df07eeb95010ab`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2698/.pan/review/agent-pan-2698-review-59fa03e5/security.md` | 1 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2698/.pan/review/agent-pan-2698-review-59fa03e5/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2698/.pan/review/agent-pan-2698-review-59fa03e5/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2698/.pan/review/agent-pan-2698-review-59fa03e5/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [security] Codex MCP provisioning executes a mutable npm package selector — `src/lib/runtimes/codex.ts:343`\nThe PR's new Codex MCP serialization path makes the test role's `npx -y @playwright/mcp@latest` declaration executable by Codex agents. Because `latest` is mutable, a compromised package, publisher account, or tag can cause unreviewed code to execute with the agent's OS identity and sandbox permissions. This finding is inside the PR diff: the cited Codex provisioning loop is newly added and expands execution of the mutable declaration to Codex role sessions. Pin the launched package to a reviewed immutable version with integrity controls, and prevent mutable npm selectors from being silently provisioned as executable MCP commands.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- correctness\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2698/.pan/review/agent-pan-2698-review-59fa03e5/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2698 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -47,7 +60,7 @@
     "recordedAt": "2026-07-16T07:45:53.765Z"
   },
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:46:23.978Z",
+  "updated": "2026-07-16T07:49:34.585Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "reviewing",
