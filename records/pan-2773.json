@@ -356,23 +356,67 @@
     "recordedAt": "2026-07-16T21:54:06.876Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:54:06.879Z",
+  "updated": "2026-07-16T21:54:08.708Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "reviewing",
-    "testStatus": "passed",
-    "verificationStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:51:24.524Z",
+    "updatedAt": "2026-07-16T21:54:07.845Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (69691ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2773\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/src/dashboard/frontend\n\n ❯ src/components/Sidebar.test.tsx (14 tests | 1 failed) 2329ms\n     × makes the version a separate, descriptive updater action 1245ms\nNo test files found, exiting with code 0\n\n\n Test Files  1 failed | 72 passed (73)\n      Tests  1 failed | 874 passed (875)\n   Start at  17:50:41\n   Duration  24.65s (transform 115.24s, setup 45.27s, import 249.38s, tests 103.24s, environment 86.96s)\n\n\n--- stderr ---\ninclude: tests/**/*.test.ts, tests/**/*.spec.ts, src/**/__tests__/**/*.test.ts, packages/**/src/__tests__/**/*.test.ts\nexclude:  **/node_modules/**, **/dist/**, src/dashboard/frontend/**, **/*.slow.test.ts, tests/playwright/conversation-supervisor-uat.test.ts, src/lib/vbrief/__tests__/create-beads.test.ts, src/dashboard/server/routes/__tests__/agents-switch-model.test.ts, src/dashboard/server/routes/__tests__/cloister-config.test.ts, src/dashboard/server/routes/__tests__/conversations-fork-recovery.test.ts, src/dashboard/server/routes/__tests__/operator-interventions.test.ts, src/dashboard/server/services/__tests__/issue-lifecycle.test.ts, tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts, tests/unit/lib/cloister/deacon-swarm-hold.test.ts, tests/cli/commands/work/reopen.test.ts, tests/unit/cli/commands/pause.test.ts, tests/unit/lib/cloister/deacon-swarm-doneness.test.ts, tests/cli/commands/work/start-workspace-rollback.test.ts\n\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  src/component\n…(13934 chars elided)…\n39m=\u001b[32m\"http://www.w3.org/2000/svg\"\u001b[39m\n            \u001b[36m>\u001b[39m\n              \u001b[36m<path\u001b[39m\n                \u001b[33md\u001b[39m=\u001b[32m\"M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8\"\u001b[39m\n              \u001b[36m/>\u001b[39m\n              \u001b[36m<path\u001b[39m\n                \u001b[33md\u001b[39m=\u001b[32m\"M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2...\n ❯ waitForWrapper ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/wait-for.js:163:27\n ❯ ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:86:33\n ❯ src/components/Sidebar.test.tsx:112:34\n    110|     renderSidebar({ onOpenUpdater });\n    111|\n    112|     const version = await screen.findByRole('button', { name: 'Overdec…\n       |                                  ^\n    113|     expect(version).toHaveAttribute('title', 'Click to update Overdeck…\n    114|     fireEvent.click(version);\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "lastVerifiedCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
-    "reviewRequestedAt": "2026-07-16T21:48:48.781Z",
+    "reviewRequestedAt": "2026-07-16T21:54:07.726Z",
     "reviewSpawnedAt": "2026-07-16T21:51:24.521Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+        "src/dashboard/frontend/src/components/Sidebar.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
+      ],
+      "declaredScope": [
+        "reference/troubleshooting.mdx",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/stage.module.css"
+      ],
+      "actualChangedFiles": [
+        "reference/troubleshooting.mdx",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/Sidebar.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/stage.module.css",
+        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
+      ],
+      "recordedAt": "2026-07-16T21:54:06.876Z"
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -410,33 +454,33 @@
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 3257361,
-            "output": 82836,
-            "cacheRead": 14657536,
+            "input": 4158699,
+            "output": 102024,
+            "cacheRead": 17110528,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 1425868,
-            "output": 20943,
-            "cacheRead": 3993600,
+            "input": 2121029,
+            "output": 36501,
+            "cacheRead": 6187520,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 2175338,
-            "output": 59034,
-            "cacheRead": 4374528,
+            "input": 2652923,
+            "output": 82200,
+            "cacheRead": 8253952,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1368143,
-            "output": 16887,
-            "cacheRead": 3083776,
+            "input": 1984939,
+            "output": 30171,
+            "cacheRead": 4272128,
             "cacheWrite": 0
           }
         },
@@ -458,9 +502,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6331445,
-            "output": 407325,
-            "cacheRead": 114792960,
+            "input": 6560248,
+            "output": 414020,
+            "cacheRead": 117852160,
             "cacheWrite": 0
           }
         }
@@ -473,9 +517,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 25271234,
-          "output": 688064,
-          "cacheRead": 164348928,
+          "input": 28190917,
+          "output": 765955,
+          "cacheRead": 177122816,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -492,8 +536,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 225.228697,
-        "pricingAsOf": "2026-07-16T21:51:24.633Z"
+        "usd": 248.550786,
+        "pricingAsOf": "2026-07-16T21:54:08.013Z"
       }
     },
     "merges": [
