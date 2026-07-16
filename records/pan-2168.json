@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T08:22:20.234Z",
+  "updated": "2026-07-16T08:22:22.644Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "flywheel-page-consume-reveal": {
-        "writerId": "agent-pan-2168",
-        "agentId": "agent-pan-2168",
-        "pid": 3939586,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T08:22:20.234Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2168",
@@ -124,6 +116,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2168 dead)",
         "releasedAt": "2026-07-16T07:42:53.692Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3939586,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T08:22:20.234Z",
+        "itemId": "flywheel-page-consume-reveal",
+        "outcome": "completed",
+        "reason": "FlywheelPage now consumes cold and warm reveal signals, selects Status, and smooth-scrolls the anchored questions section; both cases are covered by focused tests and all gates pass.",
+        "releasedAt": "2026-07-16T08:22:22.644Z"
       }
     ],
     "statusReasons": {
@@ -140,8 +143,8 @@
         "updatedAt": "2026-07-16T07:40:09.904Z"
       },
       "flywheel-page-consume-reveal": {
-        "reason": "stale claim released (agent-pan-2168 dead)",
-        "updatedAt": "2026-07-16T07:42:53.692Z"
+        "reason": "FlywheelPage now consumes cold and warm reveal signals, selects Status, and smooth-scrolls the anchored questions section; both cases are covered by focused tests and all gates pass.",
+        "updatedAt": "2026-07-16T08:22:22.644Z"
       }
     }
   },
@@ -159,7 +162,11 @@
     "open-questions-indicator.open-questions-indicator.ac2": "completed",
     "open-questions-indicator.open-questions-indicator.ac3": "completed",
     "open-questions-indicator.open-questions-indicator.ac4": "completed",
-    "flywheel-page-consume-reveal": "running"
+    "flywheel-page-consume-reveal": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac1": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac2": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac3": "completed",
+    "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac4": "completed"
   },
   "sessionHistory": [
     {
