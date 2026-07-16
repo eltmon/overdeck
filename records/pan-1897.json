@@ -79,17 +79,17 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T21:16:11.697Z",
+  "updated": "2026-07-16T21:25:32.676Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:16:10.172Z",
+    "updatedAt": "2026-07-16T21:25:32.622Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "5c805146dafd9378c79a81eba4889b415f9e7eb4",
@@ -101,10 +101,16 @@
     "usage": {
       "byStage": {
         "codex": {
+          "openai/codex-auto-review": {
+            "input": 29575,
+            "output": 127,
+            "cacheRead": 7552,
+            "cacheWrite": 0
+          },
           "openai/gpt-5.6-sol": {
-            "input": 1623973,
-            "output": 6715,
-            "cacheRead": 1423104,
+            "input": 2197989,
+            "output": 8151,
+            "cacheRead": 1927424,
             "cacheWrite": 0
           }
         },
@@ -174,18 +180,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5141080,
-            "output": 425490,
-            "cacheRead": 86664192,
+            "input": 6015291,
+            "output": 437419,
+            "cacheRead": 89571328,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 29575,
+          "output": 127,
+          "cacheRead": 7552,
+          "cacheWrite": 0
+        },
         "openai/gpt-5.6-sol": {
-          "input": 9171427,
-          "output": 520027,
-          "cacheRead": 100557056,
+          "input": 10619654,
+          "output": 533392,
+          "cacheRead": 103968512,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -208,8 +220,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 112.813465,
-        "pricingAsOf": "2026-07-16T21:16:10.284Z"
+        "usd": 119.639678,
+        "pricingAsOf": "2026-07-16T21:25:32.648Z"
       }
     },
     "merges": [
@@ -217,7 +229,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
