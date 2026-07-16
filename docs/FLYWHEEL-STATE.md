@@ -4938,3 +4938,38 @@ The system fix (PAN-2771) is in flight — waiting for it is doctrinally correct
 
 **Merged tonight: 33.** Filed (20): +PAN-2762(closed) 2763 2768 2769 2770 2771.
 Live strikes: 2710, 2741, 2748, 2749, 2752, 2753, 2770, 2771.
+
+---
+
+## Tick 44 — 2026-07-16 ~05:15Z — PAN-2770 LANDED+APPLIED; root-cause report delivered; PostHog directive
+
+### 🎯 OPERATOR DIRECTIVES (new, tonight)
+1. **Drain the pipeline — no new intake** unless absolutely necessary (re-read run-63 brief; confirmed).
+2. **`pan tell` now PERMITTED** for me (operator lifted the ban; rationale: still prefer substrate fixes).
+3. **PostHog PR #2776 — ACCEPT + complete PAN-2599.** Reviewed diff in full: clean (only us.i.posthog.com,
+   publishable phc_ key, identified_only, no server changes, payloads carry ids not content). ONE red gate:
+   file-size ratchet — capture calls grew AwaitingMergePage.tsx 1012→1017. **struck PAN-2599** with spec:
+   shrink ≥5 lines on the PR branch, do NOT bump baseline, land #2776.
+
+### ✅ PAN-2770 merged `b045abff22` + APPLIED to all 5 blocked workspaces
+`pan workspace rebuild` does NOT re-render compose (ensure-devcontainer skips if `.devcontainer/` exists).
+The sanctioned door: **`pan workspace render-devcontainer <feature>`**. TRAP: it renders from the LOCAL
+checkout's template — local main was behind + diverged (my absorbed tick commit), so first render was a
+no-op (`ignore-scripts=0`). `git rebase origin/main` (local-only dup, skipped clean) → re-render → all 5
+now `ignore-scripts=1`. Batch `pan start` for 2168/2255/2532/1966/2768 running in background.
+
+### 📄 PAN-2775 filed — the agents-dying investigation (operator asked: is Drew related?)
+**YES — one umbrella: restart churn + a liveness oracle that fails toward "dead".**
+- 7 SIGTERM restarts since 18:40 EDT (conv 1043); first false-reap sweep 22:40:13Z = same minute.
+- **The live flywheel itself was falsely reaped at 22:40:13** (36s after the 22:39:37 boot). Convoy 5x.
+- `sessionExistsSync` returns false on ANY exec failure ⇒ under boot load, query failure = death verdict.
+- **UNSOLVED:** 04:34:5xZ triple kill — 2710/2741/2771 died same wall-second MID-WORK; sibling 2770
+  streamed 688 events straight through. Ruled out (w/ evidence): OOM, capacity, deacon, restart, tmux-server
+  death, provider drop. Suspect not cleared: my own `pan kill PAN-2698` probe ran in that window.
+- Merge audit: `1e28209495` (pan launcher w/o PATH) = CONFIRMED regression (Drew's AppImage, PAN-2768).
+- **TIMEZONE TRAP AGAIN:** dashboard.log timestamps are LOCAL, no Z. Grep with local times.
+- Re-dispatched killed strikes 2741/2771. Cross-linked sibling conv's PAN-2772 (complementary) ↔ 2775.
+
+### Board: strikes live: 2599(PostHog), 2710, 2741, 2748?, 2749?, 2752?, 2753?, 2771 | PAN-2774 merged
+Kickoff-delivery (PAN-2771) still unfixed — watch the 5 batch starts for `kickoff not confirmed`; tell
+each agent per operator allowance if it recurs.
