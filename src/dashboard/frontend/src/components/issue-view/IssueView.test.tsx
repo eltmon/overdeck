@@ -13,6 +13,10 @@ vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useReviewStatusQuery: () => ({ data: undefined }),
 }));
 
+vi.mock('./StartAgentCta', () => ({
+  StartAgentCta: ({ density }: { density: IssueViewDensity }) => <span data-section="StartAgentCta">start {density}</span>,
+}));
+
 describe('IssueView', () => {
   it('keeps one view instance while rail expands through cockpit and console', () => {
     function Harness() {

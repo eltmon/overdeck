@@ -4,6 +4,7 @@ import { ShipProgress } from './ShipProgress';
 import { deriveShip } from './derivations';
 import { useReviewStatusQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
 import type { IssueViewDensity } from './inventory';
+import { StartAgentCta } from './StartAgentCta';
 
 interface IssueViewProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   issueId: string;
@@ -24,6 +25,7 @@ export function IssueView({ issueId, density, children, ...rootProps }: IssueVie
           <ReviewPolicyControl issueId={issueId} />
         </div>
       )}
+      <StartAgentCta issueId={issueId} density={density} />
       {children}
     </div>
   );
