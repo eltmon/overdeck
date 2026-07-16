@@ -261,6 +261,11 @@
       "reason": "resume",
       "agentModel": "kimi-k2.7-code",
       "timestamp": "2026-07-16T07:26:06.217Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "kimi-k2.7-code",
+      "timestamp": "2026-07-16T07:26:26.602Z"
     }
   ],
   "feedback": [],
@@ -313,7 +318,7 @@
     "recordedAt": "2026-07-11T10:51:47.612Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T07:26:06.218Z",
+  "updated": "2026-07-16T07:26:26.603Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "reviewing",
