@@ -5338,3 +5338,24 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   2619,2633,2760,2772,2773). DRAIN in force for all else — NO backlog/sequencer/order-book pickup.
 - **Harness question still OPEN** (openai.harness=claude-code → PAN-1865 fleet wedge; awaiting operator).
 - **Session: 50 merges, 21 close-outs.**
+
+---
+
+## Tick 62 — 2026-07-16 ~20:10Z — LANDED PAN-2806/2802/2794 (operator-directed recoverable merge) + deployed
+
+- **Operator gave verified-head signal**: strike/pan-2794 @ 3d265b08 (prod build + single-chunk regression
+  + Node22 boot/health + typecheck/lint + full suite all passed). Directed flywheel to own recoverable
+  landing (split registry can't land its own repair — chicken-and-egg).
+- **LANDED via merge `c11346c335`**: main had diverged (becf4bcc) so FF impossible → `git merge --no-ff
+  origin/strike/pan-2794` in isolated worktree (CONFLICT-FREE), bun install + `npm run build` GREEN, pushed
+  with `OVERDECK_OPERATOR_PUSH=1` (the sanctioned operator escape hatch; file-size+ratchet guards passed).
+  All 3 strike commits now on main: 20caf91d (2794 inspect), 1ca4 (2802 re-arm), 3d265b08 (2806 unify module).
+- **DEPLOYED**: primary FF→c11346c335, build, `pan restart --dashboard --resume` → pid 138448, build
+  c11346c335, healthy. Unified strike-landing module now live.
+- **2794 content is landed** (moot to "land" again); reset its stuck cycle. **NOTE: the deacon still marks
+  2794/2207/2610 `feedback_delivery_needs_you` — that's a SEPARATE bug (merge-agent tries to deliver
+  feedback to a DEAD strike session JSONL, ENOENT), NOT the 2806 module-split. 2806 fixed trigger
+  registration; the dead-session feedback-delivery bug persists and may affect future strikes.**
+- **2232 still needs its OTHER blocker PAN-2795** (ratchet-vs-clean-tree-lint contract) — strike wedged on
+  the claude-code+gpt-5.6 harness. Harness flip remains the keystone for the fleet.
+- **Session: 50 merges (+ 1 operator-directed strike landing), 21 close-outs.**
