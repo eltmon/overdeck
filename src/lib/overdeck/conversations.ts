@@ -102,7 +102,7 @@ export type  ConversationName = typeof ConversationName.Type;
 export const Harness     = Schema.Literals(['claude-code', 'pi', 'codex', 'kimi']);
 export type  Harness     = typeof Harness.Type;
 
-export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'default']);
+export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'ai-refined', 'ai-explicit', 'default']);
 export type  TitleSource = typeof TitleSource.Type;
 
 export const FavoriteType = Schema.Literals(['conversation', 'project']);
