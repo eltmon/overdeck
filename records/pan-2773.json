@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T17:39:48.287Z",
+  "updated": "2026-07-16T17:54:02.850Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -54,18 +54,32 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "create-result-type": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2773",
         "agentId": "agent-pan-2773",
         "pid": 2238215,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:39:48.287Z"
+        "claimedAt": "2026-07-16T17:39:48.287Z",
+        "itemId": "create-result-type",
+        "outcome": "completed",
+        "reason": "Returned structured { name } or { error } results, preserved console/toast signals, updated all consumers, added regression coverage, and passed focused frontend tests plus npm run typecheck.",
+        "releasedAt": "2026-07-16T17:54:02.850Z"
+      }
+    ],
+    "statusReasons": {
+      "create-result-type": {
+        "reason": "Returned structured { name } or { error } results, preserved console/toast signals, updated all consumers, added regression coverage, and passed focused frontend tests plus npm run typecheck.",
+        "updatedAt": "2026-07-16T17:54:02.850Z"
       }
     }
   },
   "statusOverrides": {
-    "create-result-type": "running"
+    "create-result-type": "completed",
+    "create-result-type.create-result-type.ac1": "completed",
+    "create-result-type.create-result-type.ac2": "completed",
+    "create-result-type.create-result-type.ac3": "completed"
   }
 }
