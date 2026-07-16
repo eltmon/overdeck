@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +17,19 @@ const project: ProjectConfig = {
   issue_prefix: 'PAN',
   github_repo: 'eltmon/overdeck',
 };
+
+async function collectRelativeImportGraph(entry: string, visited = new Set<string>()): Promise<Set<string>> {
+  if (visited.has(entry)) return visited;
+  visited.add(entry);
+  const source = await readFile(entry, 'utf-8');
+  const imports = [...source.matchAll(/(?:import|export)\s+(?:type\s+)?(?:[^'";]+?\s+from\s+)?['"](\.[^'"]+)['"]/g)];
+  for (const match of imports) {
+    const specifier = match[1]!;
+    const target = resolve(dirname(entry), specifier.replace(/\.js$/, '.ts'));
+    await collectRelativeImportGraph(target, visited);
+  }
+  return visited;
+}
 
 function deps(): PipelineMembershipGatherDeps {
   return {
@@ -60,7 +75,12 @@ describe('gatherProjectLensSignals', () => {
   });
 
   it('keeps forbidden disposable-state and synchronous process imports out of the gatherer', async () => {
-    const source = await readFile(new URL('../../../src/lib/pipeline-membership-gather.ts', import.meta.url), 'utf-8');
-    expect(source).not.toMatch(/review-status|agent-state|tmux|overdeck\.db|execSync|spawnSync/);
+    const entry = fileURLToPath(new URL('../../../src/lib/pipeline-membership-gather.ts', import.meta.url));
+    const graph = await collectRelativeImportGraph(entry);
+    const forbiddenModule = /(?:^|\/)(?:review-status|agent-state|tmux|db)(?:\/|\.|$)/;
+    expect([...graph].filter((path) => forbiddenModule.test(path))).toEqual([]);
+
+    const source = await readFile(entry, 'utf-8');
+    expect(source).not.toMatch(/execSync|spawnSync/);
   });
 });
