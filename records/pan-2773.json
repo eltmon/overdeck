@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:10:24.495Z",
+  "updated": "2026-07-16T18:24:38.916Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "unknown-project-guard": {
-        "writerId": "agent-pan-2773",
-        "agentId": "agent-pan-2773",
-        "pid": 3494915,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:10:24.494Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2773",
@@ -138,6 +130,17 @@
         "outcome": "completed",
         "reason": "IssueOverview now tracks launch busy/error state, suppresses duplicate in-flight submissions, renders server errors inline while retaining the query, clears errors on retry, and opens panes only for successful creation. Three focused tests and typecheck passed.",
         "releasedAt": "2026-07-16T18:10:17.438Z"
+      },
+      {
+        "writerId": "agent-pan-2773",
+        "agentId": "agent-pan-2773",
+        "pid": 3494915,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:10:24.494Z",
+        "itemId": "unknown-project-guard",
+        "outcome": "completed",
+        "reason": "Unknown slugs now wait for both project sources, render an explicit recovery state, suppress Stage and Awareness, and accept registered keys or names; focused CommandDeck tests and frontend typecheck passed.",
+        "releasedAt": "2026-07-16T18:24:38.915Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "issueoverview-inline-error": {
         "reason": "IssueOverview now tracks launch busy/error state, suppresses duplicate in-flight submissions, renders server errors inline while retaining the query, clears errors on retry, and opens panes only for successful creation. Three focused tests and typecheck passed.",
         "updatedAt": "2026-07-16T18:10:17.438Z"
+      },
+      "unknown-project-guard": {
+        "reason": "Unknown slugs now wait for both project sources, render an explicit recovery state, suppress Stage and Awareness, and accept registered keys or names; focused CommandDeck tests and frontend typecheck passed.",
+        "updatedAt": "2026-07-16T18:24:38.915Z"
       }
     }
   },
@@ -177,6 +184,10 @@
     "issueoverview-inline-error.issueoverview-inline-error.ac1": "completed",
     "issueoverview-inline-error.issueoverview-inline-error.ac2": "completed",
     "issueoverview-inline-error.issueoverview-inline-error.ac3": "completed",
-    "unknown-project-guard": "running"
+    "unknown-project-guard": "completed",
+    "unknown-project-guard.unknown-project-guard.ac1": "completed",
+    "unknown-project-guard.unknown-project-guard.ac2": "completed",
+    "unknown-project-guard.unknown-project-guard.ac3": "completed",
+    "unknown-project-guard.unknown-project-guard.ac4": "completed"
   }
 }
