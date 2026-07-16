@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:13:46.301Z",
+  "updated": "2026-07-16T12:13:48.508Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "wire-pan-pending": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 1794938,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:13:46.301Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -198,6 +190,17 @@
         "outcome": "completed",
         "reason": "Issue DTO membership, frontend authoritative gate, fallback, and tests are pushed.",
         "releasedAt": "2026-07-16T12:13:44.022Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1794938,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:13:46.301Z",
+        "itemId": "wire-pan-pending",
+        "outcome": "completed",
+        "reason": "Pending command uses durable membership and preserves ready/blocked annotations.",
+        "releasedAt": "2026-07-16T12:13:48.508Z"
       }
     ],
     "statusReasons": {
@@ -231,8 +234,8 @@
         "updatedAt": "2026-07-16T12:13:44.022Z"
       },
       "wire-pan-pending": {
-        "reason": "Implementation pushed in 4c9871e54a",
-        "updatedAt": "2026-07-16T12:13:46.301Z"
+        "reason": "Pending command uses durable membership and preserves ready/blocked annotations.",
+        "updatedAt": "2026-07-16T12:13:48.508Z"
       }
     }
   },
@@ -269,6 +272,9 @@
     "wire-pipeline-state-frontend.wire-pipeline-state-frontend.ac2": "completed",
     "wire-pipeline-state-frontend.wire-pipeline-state-frontend.ac3": "completed",
     "wire-pipeline-state-frontend.wire-pipeline-state-frontend.ac4": "completed",
-    "wire-pan-pending": "running"
+    "wire-pan-pending": "completed",
+    "wire-pan-pending.wire-pan-pending.ac1": "completed",
+    "wire-pan-pending.wire-pan-pending.ac2": "completed",
+    "wire-pan-pending.wire-pan-pending.ac3": "completed"
   }
 }
