@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T18:08:30.088Z",
+  "updated": "2026-07-16T18:08:42.519Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "pending",
@@ -54,8 +54,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "padding-regression-test": {
+        "writerId": "agent-pan-2619",
+        "agentId": "agent-pan-2619",
+        "pid": 3409376,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:08:42.519Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2619",
@@ -75,6 +83,7 @@
     "move-xterm-padding.move-xterm-padding.ac2": "completed",
     "move-xterm-padding.move-xterm-padding.ac3": "completed",
     "move-xterm-padding.move-xterm-padding.ac4": "completed",
-    "move-xterm-padding.move-xterm-padding.ac5": "completed"
+    "move-xterm-padding.move-xterm-padding.ac5": "completed",
+    "padding-regression-test": "running"
   }
 }
