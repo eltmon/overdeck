@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:29:13.893Z",
+  "updated": "2026-07-16T18:29:31.344Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -90,8 +90,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "fix-accessible-name-tests": {
+        "writerId": "agent-pan-2045",
+        "agentId": "agent-pan-2045",
+        "pid": 261387,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:29:31.344Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2045",
@@ -166,6 +174,7 @@
     "switch-happy-dom.switch-happy-dom.ac3": "completed",
     "fix-style-serialization-tests": "completed",
     "fix-style-serialization-tests.fix-style-serialization-tests.ac1": "completed",
-    "fix-style-serialization-tests.fix-style-serialization-tests.ac2": "completed"
+    "fix-style-serialization-tests.fix-style-serialization-tests.ac2": "completed",
+    "fix-accessible-name-tests": "running"
   }
 }
