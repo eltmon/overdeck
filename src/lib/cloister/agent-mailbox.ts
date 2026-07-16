@@ -69,6 +69,7 @@ const mailboxDirectoryCache = new Map<string, { mtimeMs: number; filenames: stri
 const MAILBOX_READ_CACHE_MAX_ENTRIES = 512;
 const MAILBOX_DIRECTORY_CACHE_MAX_ENTRIES = 128;
 const MAILBOX_FILE_READ_CONCURRENCY = 8;
+const MAILBOX_CONFIRM_CONCURRENCY = 4;
 
 function setBoundedCache<K, V>(cache: Map<K, V>, key: K, value: V, maxEntries: number): void {
   cache.delete(key);
@@ -356,11 +357,32 @@ export async function prepareWorkMailbox(
 
 /** Advance only mailbox items whose rendered message reached the agent. */
 export async function confirmWorkMailboxDelivery(items: MailboxItem[]): Promise<void> {
-  for (const item of items) {
-    if (item.legacy) continue;
-    const transition = { issueId: item.issueId, role: item.role, filePath: item.filePath };
-    if (item.state === 'pending') await markMailboxItemDelivered(transition);
-    else if (item.state === 'delivered') await markMailboxItemAcknowledged(transition);
+  const transitionable = items.filter(item => !item.legacy);
+  let nextIndex = 0;
+  async function confirmNext(): Promise<void> {
+    while (nextIndex < transitionable.length) {
+      const item = transitionable[nextIndex++];
+      const transition = { issueId: item.issueId, role: item.role, filePath: item.filePath };
+      if (item.state === 'pending') await markMailboxItemDelivered(transition);
+      else if (item.state === 'delivered') await markMailboxItemAcknowledged(transition);
+    }
+  }
+  await Promise.all(Array.from(
+    { length: Math.min(MAILBOX_CONFIRM_CONCURRENCY, transitionable.length) },
+    () => confirmNext(),
+  ));
+}
+
+/** Preserve successful prompt transport when mailbox accounting cannot be persisted. */
+export async function confirmWorkMailboxDeliveryBestEffort(
+  items: MailboxItem[],
+  context: string,
+  confirm: (items: MailboxItem[]) => Promise<void> = confirmWorkMailboxDelivery,
+): Promise<void> {
+  try {
+    await confirm(items);
+  } catch (error) {
+    console.warn(`[${context}] Mailbox delivery confirmation failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

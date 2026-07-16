@@ -8,6 +8,7 @@ vi.mock('../projects.js', () => ({ resolveProjectFromIssueSync: vi.fn(() => null
 import {
   createMailboxItem,
   confirmWorkMailboxDelivery,
+  confirmWorkMailboxDeliveryBestEffort,
   markMailboxItemAcknowledged,
   markMailboxItemDelivered,
   parseMailboxMarkdown,
@@ -75,5 +76,20 @@ describe('work-agent mailbox drain', () => {
     ]);
 
     expect(parseMailboxMarkdown(await readFile(filePath, 'utf8')).metadata?.state).toBe('acknowledged');
+  });
+
+  it('preserves successful spawn and resume transport when mailbox persistence fails', async () => {
+    const confirm = vi.fn(async () => { throw new Error('workspace read-only'); });
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const pending = createMailboxItem({
+      issueId: 'PAN-2255', role: 'work', source: 'review-agent', summary: 'Fix review',
+      actionRequired: true, filePath: '/tmp/review.md', markdownBody: '# Review',
+    });
+
+    await expect(confirmWorkMailboxDeliveryBestEffort([pending], 'agent-pan-2255/PAN-2255', confirm)).resolves.toBeUndefined();
+
+    expect(confirm).toHaveBeenCalledOnce();
+    expect(pending.state).toBe('pending');
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining('agent-pan-2255/PAN-2255'));
   });
 });

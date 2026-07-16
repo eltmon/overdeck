@@ -51,7 +51,7 @@ import {
   assertWorkspaceStackHealthyForSpawn,
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
-import { confirmWorkMailboxDelivery, prepareWorkMailbox, type MailboxItem } from '../cloister/agent-mailbox.js';
+import { confirmWorkMailboxDeliveryBestEffort, prepareWorkMailbox, type MailboxItem } from '../cloister/agent-mailbox.js';
 
 /**
  * Resume a suspended agent (PAN-80)
@@ -487,7 +487,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     }
 
     if (messageDelivered && preparedMailboxItems.length > 0) {
-      await confirmWorkMailboxDelivery(preparedMailboxItems);
+      await confirmWorkMailboxDeliveryBestEffort(preparedMailboxItems, `${normalizedId}/${agentState.issueId}`);
     }
 
     const resumedAt = new Date().toISOString();

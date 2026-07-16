@@ -79,7 +79,7 @@ import {
 import { stopAgent } from './termination.js';
 import { createFreshSessionIdentity, logLauncherSessionPinned } from '../session-history.js';
 import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
-import { confirmWorkMailboxDelivery, prepareWorkMailbox, type MailboxItem } from '../cloister/agent-mailbox.js';
+import { confirmWorkMailboxDeliveryBestEffort, prepareWorkMailbox, type MailboxItem } from '../cloister/agent-mailbox.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions = {}): Promise<AgentState> {
   const workspace = options.workspace ?? defaultRunWorkspace(issueId);
@@ -787,7 +787,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     }
   }
   if (prompt && preparedMailboxItems.length > 0) {
-    await confirmWorkMailboxDelivery(preparedMailboxItems);
+    await confirmWorkMailboxDeliveryBestEffort(preparedMailboxItems, `${agentId}/${options.issueId}`);
   }
 
   // For codex work agents, poll for the first rollout JSONL in the background
