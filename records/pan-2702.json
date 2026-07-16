@@ -57,11 +57,93 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T12:55:57.377Z"
+    },
+    {
+      "timestamp": "2026-07-16T13:04:41.248Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/strike.test.ts",
+      "src/cli/commands/strike.ts",
+      "src/dashboard/server/routes/workspaces/merge-strike.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
+      "src/lib/overdeck/__tests__/review-status-record-sync.test.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/pan-dir/__tests__/records.test.ts",
+      "src/lib/strike-landing.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/services/auto-merge-executor.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/feedback-writer.ts",
+      "tests/dashboard/review-status.test.ts",
+      "tests/unit/dashboard/server/routes/no-op-rebase.test.ts"
+    ],
+    "declaredScope": [
+      "docs/QUICK-REFERENCE.md",
+      "docs/SPECIALIST_WORKFLOW.md",
+      "roles/strike.md",
+      "src/cli/commands/__tests__/strike-ready.test.ts",
+      "src/cli/commands/strike-ready.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/dashboard/server/services/auto-merge-executor.ts",
+      "src/lib/cloister/deacon-strike-landing.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/feedback-writer.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/overdeck/review-status-sync.ts",
+      "src/lib/pan-dir/record.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/review-status.ts",
+      "tests/dashboard/review-status.test.ts",
+      "tests/lib/cloister/deacon-strike-landing.test.ts",
+      "tests/unit/dashboard/server/routes/no-op-rebase.test.ts",
+      "tests/unit/dashboard/server/routes/strike-merge.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/QUICK-REFERENCE.md",
+      "docs/SPECIALIST_WORKFLOW.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "roles/strike.md",
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/strike-ready.test.ts",
+      "src/cli/commands/__tests__/strike.test.ts",
+      "src/cli/commands/strike-ready.ts",
+      "src/cli/commands/strike.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/routes/workspaces/merge-ops.ts",
+      "src/dashboard/server/routes/workspaces/merge-strike.ts",
+      "src/lib/cloister/deacon-strike-landing.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/overdeck/__tests__/review-status-record-sync.test.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/overdeck/review-status-record-sync.ts",
+      "src/lib/overdeck/review-status-sync.ts",
+      "src/lib/pan-dir/__tests__/records.test.ts",
+      "src/lib/pan-dir/record.ts",
+      "src/lib/pan-dir/records.ts",
+      "src/lib/review-status.ts",
+      "src/lib/strike-landing.ts",
+      "tests/lib/cloister/deacon-strike-landing.test.ts",
+      "tests/unit/dashboard/server/routes/strike-merge.test.ts",
+      "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts"
+    ],
+    "recordedAt": "2026-07-16T13:04:38.427Z"
+  },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T13:04:38.428Z",
+  "updated": "2026-07-16T13:04:41.393Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -71,61 +153,64 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T12:23:42.656Z",
-    "inspectNotes": "AC1 unmet: strike requests never reach triggerMerge(). Only dequeueNextMerge() (merge-ops.ts:322-336) builds a StrikeMergeRequest, but it's only invoked via advanceQueue() after another triggerMerge() call for the SAME project's queue completes, dequeuing entries populated solely by enqueueMerge() (called only at merge-ops.ts:406,418 inside triggerMerge itself). pan strike-ready (src/cli/commands/strike-ready.ts:70-80) only persists strikeReadyHead/strikeLandingState via setStatus -- it never calls enqueueMerge or triggerMerge. Every other triggerMerge call site (flywheel.ts:610, merge-ops.ts:1250 route handler, auto-merge-executor.ts:55/111 defaultMergeIssue, merge-queue-service.ts:25 resumeQueuedMerges) invokes triggerMerge(issueId) with no request arg, defaulting to {kind:'normal'}. Grepped repo-wide for strikeLandingState/strikeReadyHead outside merge-ops.ts/merge-strike.ts and found no patrol, route, or watcher that enqueues or triggers a merge for a freshly-ready strike marker. Result: a strike marked ready has no code path that ever constructs {kind:'strike',...} and calls triggerMerge -- the AC1 scenario (given a valid durable strike marker, the merge door resolves/gates/merges/invokes postMergeLifecycle) is unreachable dead code. Required fix: wire an actual trigger -- e.g. strikeReadyCommand or a server-side watcher on strikeLandingState==='ready' must enqueueMerge + call triggerMerge(issueId, strikeRequest), or add a dedicated endpoint/patrol that detects readiness and invokes the merge door. AC2 (stale-marker rejection, validateStrikeMergeRequest in merge-strike.ts:20-42) and AC3 (no-loss eligibility matrix, normalMergeEligibility + strike-merge.test.ts) verified correct in isolation; AC4 (main-push guard) unaffected by this diff. Minor non-blocking nit: 'Already merged' check now exists twice (merge-strike.ts:16 inside normalMergeEligibility, and unchanged original at merge-ops.ts ~391) -- harmless redundancy, not a functional loss."
+    "updatedAt": "2026-07-16T13:04:41.340Z",
+    "inspectNotes": "AC1 unmet: strike requests never reach triggerMerge(). Only dequeueNextMerge() (merge-ops.ts:322-336) builds a StrikeMergeRequest, but it's only invoked via advanceQueue() after another triggerMerge() call for the SAME project's queue completes, dequeuing entries populated solely by enqueueMerge() (called only at merge-ops.ts:406,418 inside triggerMerge itself). pan strike-ready (src/cli/commands/strike-ready.ts:70-80) only persists strikeReadyHead/strikeLandingState via setStatus -- it never calls enqueueMerge or triggerMerge. Every other triggerMerge call site (flywheel.ts:610, merge-ops.ts:1250 route handler, auto-merge-executor.ts:55/111 defaultMergeIssue, merge-queue-service.ts:25 resumeQueuedMerges) invokes triggerMerge(issueId) with no request arg, defaulting to {kind:'normal'}. Grepped repo-wide for strikeLandingState/strikeReadyHead outside merge-ops.ts/merge-strike.ts and found no patrol, route, or watcher that enqueues or triggers a merge for a freshly-ready strike marker. Result: a strike marked ready has no code path that ever constructs {kind:'strike',...} and calls triggerMerge -- the AC1 scenario (given a valid durable strike marker, the merge door resolves/gates/merges/invokes postMergeLifecycle) is unreachable dead code. Required fix: wire an actual trigger -- e.g. strikeReadyCommand or a server-side watcher on strikeLandingState==='ready' must enqueueMerge + call triggerMerge(issueId, strikeRequest), or add a dedicated endpoint/patrol that detects readiness and invokes the merge door. AC2 (stale-marker rejection, validateStrikeMergeRequest in merge-strike.ts:20-42) and AC3 (no-loss eligibility matrix, normalMergeEligibility + strike-merge.test.ts) verified correct in isolation; AC4 (main-push guard) unaffected by this diff. Minor non-blocking nit: 'Already merged' check now exists twice (merge-strike.ts:16 inside normalMergeEligibility, and unchanged original at merge-ops.ts ~391) -- harmless redundancy, not a functional loss.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2791"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1245960,
-            "output": 4116,
-            "cacheRead": 1033856,
+            "input": 2641204,
+            "output": 7266,
+            "cacheRead": 2238592,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 27583055,
-            "output": 55377,
-            "cacheRead": 26801152,
+            "input": 50304035,
+            "output": 79190,
+            "cacheRead": 48924416,
             "cacheWrite": 0
           }
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 32,
-            "output": 12843,
-            "cacheRead": 2180408,
-            "cacheWrite": 127339
+            "input": 34,
+            "output": 13931,
+            "cacheRead": 2336196,
+            "cacheWrite": 128604
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1245960,
-          "output": 4116,
-          "cacheRead": 1033856,
+          "input": 2641204,
+          "output": 7266,
+          "cacheRead": 2238592,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 27583055,
-          "output": 55377,
-          "cacheRead": 26801152,
+          "input": 50304035,
+          "output": 79190,
+          "cacheRead": 48924416,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 32,
-          "output": 12843,
-          "cacheRead": 2180408,
-          "cacheWrite": 127339
+          "input": 34,
+          "output": 13931,
+          "cacheRead": 2336196,
+          "cacheWrite": 128604
         }
       },
       "costAtCloseOut": {
-        "usd": 19.854325,
-        "pricingAsOf": "2026-07-16T12:23:42.741Z"
+        "usd": 34.664131,
+        "pricingAsOf": "2026-07-16T13:04:41.387Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2791"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -261,82 +346,5 @@
     "document-strike-landing": "completed",
     "document-strike-landing.document-strike-landing.ac1": "completed",
     "document-strike-landing.document-strike-landing.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "drizzle/overdeck/0000_overdeck_init.sql",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/__tests__/strike.test.ts",
-      "src/cli/commands/strike.ts",
-      "src/dashboard/server/routes/workspaces/merge-strike.ts",
-      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-      "src/lib/overdeck/__tests__/review-status-record-sync.test.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/pan-dir/__tests__/records.test.ts",
-      "src/lib/strike-landing.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/server/services/auto-merge-executor.ts",
-      "src/lib/cloister/feedback-target.ts",
-      "src/lib/cloister/feedback-writer.ts",
-      "tests/dashboard/review-status.test.ts",
-      "tests/unit/dashboard/server/routes/no-op-rebase.test.ts"
-    ],
-    "declaredScope": [
-      "docs/QUICK-REFERENCE.md",
-      "docs/SPECIALIST_WORKFLOW.md",
-      "roles/strike.md",
-      "src/cli/commands/__tests__/strike-ready.test.ts",
-      "src/cli/commands/strike-ready.ts",
-      "src/cli/index.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/dashboard/server/services/auto-merge-executor.ts",
-      "src/lib/cloister/deacon-strike-landing.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/feedback-target.ts",
-      "src/lib/cloister/feedback-writer.ts",
-      "src/lib/database/schema.ts",
-      "src/lib/overdeck/review-status-record-sync.ts",
-      "src/lib/overdeck/review-status-sync.ts",
-      "src/lib/pan-dir/record.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/review-status.ts",
-      "tests/dashboard/review-status.test.ts",
-      "tests/lib/cloister/deacon-strike-landing.test.ts",
-      "tests/unit/dashboard/server/routes/no-op-rebase.test.ts",
-      "tests/unit/dashboard/server/routes/strike-merge.test.ts",
-      "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/QUICK-REFERENCE.md",
-      "docs/SPECIALIST_WORKFLOW.md",
-      "drizzle/overdeck/0000_overdeck_init.sql",
-      "roles/strike.md",
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/__tests__/strike-ready.test.ts",
-      "src/cli/commands/__tests__/strike.test.ts",
-      "src/cli/commands/strike-ready.ts",
-      "src/cli/commands/strike.ts",
-      "src/cli/index.ts",
-      "src/dashboard/server/routes/workspaces/merge-ops.ts",
-      "src/dashboard/server/routes/workspaces/merge-strike.ts",
-      "src/lib/cloister/deacon-strike-landing.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
-      "src/lib/database/schema.ts",
-      "src/lib/overdeck/__tests__/review-status-record-sync.test.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/overdeck/review-status-record-sync.ts",
-      "src/lib/overdeck/review-status-sync.ts",
-      "src/lib/pan-dir/__tests__/records.test.ts",
-      "src/lib/pan-dir/record.ts",
-      "src/lib/pan-dir/records.ts",
-      "src/lib/review-status.ts",
-      "src/lib/strike-landing.ts",
-      "tests/lib/cloister/deacon-strike-landing.test.ts",
-      "tests/unit/dashboard/server/routes/strike-merge.test.ts",
-      "tests/unit/lib/cloister/deacon-swarm-enumerate.test.ts"
-    ],
-    "recordedAt": "2026-07-16T13:04:38.427Z"
   }
 }
