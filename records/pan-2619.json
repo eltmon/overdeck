@@ -62,6 +62,11 @@
       "timestamp": "2026-07-16T21:16:57.413Z",
       "reason": "end",
       "note": "No deviations. No skipped work or newly discovered hazards. Moved terminal padding from the measured host to the FitAddon-aware .xterm element, added the regression test, and verified the full suite, typecheck, and targeted XTerminal tests."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T21:17:01.480Z"
     }
   ],
   "feedback": [],
@@ -81,7 +86,7 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:17:00.917Z",
+  "updated": "2026-07-16T21:17:01.481Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "reviewing",
