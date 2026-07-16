@@ -18,7 +18,7 @@ export { DatabaseError };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type TitleSource = 'auto' | 'ai' | 'ai-refined' | 'manual' | 'default';
+export type TitleSource = 'auto' | 'ai' | 'ai-refined' | 'ai-explicit' | 'manual' | 'default';
 
 export interface ForkRequest {
   parentConversationName: string;
@@ -846,4 +846,3 @@ export function removeFavorite(type: FavoriteType, itemId: string): void {
   const db = getDatabase();
   db.prepare(`DELETE FROM favorites WHERE type = ? AND item_id = ?`).run(type, itemId);
 }
-
