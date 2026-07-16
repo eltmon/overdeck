@@ -68,16 +68,16 @@
     "recordedAt": "2026-07-16T11:57:07.758Z"
   },
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T12:02:17.441Z",
+  "updated": "2026-07-16T12:03:46.107Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T12:02:17.277Z",
+    "updatedAt": "2026-07-16T12:03:46.037Z",
     "verificationNotes": "Verification FAILED at test (139298ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2768\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/src/dashboard/frontend\n\n\n Test Files  214 passed (214)\n      Tests  2008 passed (2008)\n   Start at  08:00:48\n   Duration  25.00s (transform 57.32s, setup 64.03s, import 167.53s, tests 99.80s, environment 173.27s)\n\n\n--- stderr ---\nError: useConfirm must be used within DialogProvider\n    at useConfirm (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/src/dashboard/frontend/src/components/DialogProvider.tsx:36:19)\n    at /home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/src/dashboard/frontend/src/components/DialogProvider.test.tsx:249:26\n    at TestComponent (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/@testing-library+react@16.3.2/node_modules/@testing-library/react/dist/pure.js:330:27)\n    at renderWithHooks (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:15486:18)\n    at mountIndeterminateComponent (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:20103:13)\n    at beginWork (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/react-dom@18.3.1/\n…(5416 chars elided)…\nct-dom.development.js:20103:13)\n    at beginWork (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:21626:16)\n    at HTMLUnknownElement.callCallback (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/react-dom@18.3.1/node_modules/react-dom/cjs/react-dom.development.js:4164:14)\n    at HTMLUnknownElement.callTheUserObjectsOperation (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/jsdom@27.4.0/node_modules/jsdom/lib/jsdom/living/generated/EventListener.js:26:30)\n    at innerInvokeEventListeners (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/jsdom@27.4.0/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:360:16)\n    at invokeEventListeners (/home/eltmon/Projects/overdeck/workspaces/feature-pan-2768/node_modules/.bun/jsdom@27.4.0/node_modules/jsdom/lib/jsdom/living/events/EventTarget-impl.js:296:3)\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2789",
     "reviewRequestedAt": "2026-07-16T11:58:00.717Z",
@@ -88,15 +88,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1896790,
-            "output": 5406,
-            "cacheRead": 1713152,
+            "input": 2028114,
+            "output": 5542,
+            "cacheRead": 1835264,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 21073024,
-            "output": 38848,
-            "cacheRead": 20316416,
+            "input": 22481409,
+            "output": 39523,
+            "cacheRead": 21718016,
             "cacheWrite": 0
           }
         },
@@ -111,15 +111,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1896790,
-          "output": 5406,
-          "cacheRead": 1713152,
+          "input": 2028114,
+          "output": 5542,
+          "cacheRead": 1835264,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21073024,
-          "output": 38848,
-          "cacheRead": 20316416,
+          "input": 22481409,
+          "output": 39523,
+          "cacheRead": 21718016,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -130,8 +130,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 23.183359,
-        "pricingAsOf": "2026-07-16T12:02:17.390Z"
+        "usd": 23.938334,
+        "pricingAsOf": "2026-07-16T12:03:46.096Z"
       }
     },
     "merges": [
