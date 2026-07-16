@@ -77,6 +77,7 @@ export interface ProjectFeature {
 }
 
 interface ProjectNodeProps {
+  projectKey: string;
   name: string;
   features: ProjectFeature[];
   selectedFeature: string | null;
@@ -210,7 +211,7 @@ function ProjectNodeMenu({
   );
 }
 
-export function ProjectNode({ name, features, selectedFeature, onSelectFeature, onSelectProject, selectedProject, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, containerStats }: ProjectNodeProps) {
+export function ProjectNode({ projectKey, name, features, selectedFeature, onSelectFeature, onSelectProject, selectedProject, selectedSessionId, onSelectSession, issueTitles, issueCosts, filter = 'all', onStopSession, onViewTerminal, onPauseSession, onResumeSession, onUnpauseSession, onRestartSession, onDeepWipe, onOpenStateDir, onViewJsonl, onCleanupOrphanedResources, onOpenPlanDialog, onNewConversation, containerStats }: ProjectNodeProps) {
   const visibleFeatures = useMemo(() => {
     if (filter === 'all') return features;
     return features.filter((feature) =>
@@ -229,7 +230,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
 
   const renameMutation = useMutation({
     mutationFn: async (newName: string) => {
-      const response = await fetch(`/api/projects/${encodeURIComponent(name)}/rename`, {
+      const response = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/rename`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName }),

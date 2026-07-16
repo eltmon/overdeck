@@ -100,6 +100,7 @@ describe('ProjectNode', () => {
   it('shows only alive features when alive filter is active', () => {
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[
           makeFeature('PAN-854', [makeSession({ presence: 'active', status: 'running' })]),
@@ -119,6 +120,7 @@ describe('ProjectNode', () => {
   it('shows only failed features when failed filter is active', () => {
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[
           makeFeature('PAN-854', [makeSession({ presence: 'active', status: 'running' })]),
@@ -140,6 +142,7 @@ describe('ProjectNode', () => {
 
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[makeFeature('PAN-854')]}
         selectedFeature={null}
@@ -159,6 +162,7 @@ describe('ProjectNode', () => {
 
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[]}
         selectedFeature={null}
@@ -180,6 +184,7 @@ describe('ProjectNode', () => {
 
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[makeFeature('PAN-854')]}
         selectedFeature={null}
@@ -202,6 +207,7 @@ describe('ProjectNode', () => {
   it('offers project rename from the context menu', () => {
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[]}
         selectedFeature={null}
@@ -218,6 +224,7 @@ describe('ProjectNode', () => {
     const onSelectProject = vi.fn();
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[makeFeature('PAN-854')]}
         selectedFeature={null}
@@ -249,7 +256,8 @@ describe('ProjectNode', () => {
     vi.stubGlobal('fetch', fetchMock);
     const { queryClient } = render(
       <ProjectNode
-        name="overdeck"
+        projectKey="overdeck"
+        name="Overdeck CLI"
         features={[]}
         selectedFeature={null}
         onSelectFeature={() => {}}
@@ -257,9 +265,9 @@ describe('ProjectNode', () => {
     );
     const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
-    fireEvent.contextMenu(screen.getByRole('button', { name: /overdeck/i }));
+    fireEvent.contextMenu(screen.getByRole('button', { name: /overdeck cli/i }));
     fireEvent.click(screen.getByRole('button', { name: 'Rename project' }));
-    const input = screen.getByRole('textbox', { name: 'Rename overdeck' });
+    const input = screen.getByRole('textbox', { name: 'Rename Overdeck CLI' });
     fireEvent.change(input, { target: { value: 'Overdeck App' } });
     fireEvent.keyDown(input, { key: 'Enter' });
     fireEvent.blur(input);
@@ -284,6 +292,7 @@ describe('ProjectNode', () => {
     vi.stubGlobal('fetch', fetchMock);
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[]}
         selectedFeature={null}
@@ -310,6 +319,7 @@ describe('ProjectNode', () => {
     ));
     render(
       <ProjectNode
+        projectKey="overdeck"
         name="overdeck"
         features={[]}
         selectedFeature={null}

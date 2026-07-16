@@ -1,7 +1,8 @@
 import { Effect } from 'effect';
+import * as Result from 'effect/Result';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { listProjectsSync, renameProjectSync } from '../../../lib/projects.js';
+import { ProjectRenameError, renameProject } from '../../../lib/projects.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -20,33 +21,26 @@ export const postProjectRenameRoute = HttpRouter.add(
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
 
-    const projectKey = (yield* HttpRouter.params)['projectKey'] ?? '';
-    const projects = listProjectsSync();
-    const project = projects.find(({ key }) => key === projectKey)
-      ?? projects.find(({ config }) => config.name === projectKey);
-    if (!project) return jsonResponse({ error: 'Project not found' }, { status: 404 });
-
+    const projectIdentifier = (yield* HttpRouter.params)['projectKey'] ?? '';
     const body = (yield* readJsonBody) as { name?: unknown };
     if (typeof body.name !== 'string') {
       return jsonResponse({ error: 'Project name must be a string' }, { status: 400 });
     }
 
-    try {
-      renameProjectSync(project.key, body.name);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.startsWith('Unknown project:')) {
-        return jsonResponse({ error: message }, { status: 404 });
+    const result = yield* Effect.result(renameProject(projectIdentifier, body.name));
+    if (Result.isFailure(result)) {
+      if (!(result.failure instanceof ProjectRenameError)) {
+        return yield* Effect.fail(result.failure);
       }
-      if (message === 'Project name must not be empty') {
-        return jsonResponse({ error: message }, { status: 400 });
+      if (result.failure.reason === 'not-found') {
+        return jsonResponse({ error: 'Project not found' }, { status: 404 });
       }
-      if (message.includes('conflicts with existing project')) {
-        return jsonResponse({ error: message }, { status: 409 });
+      if (result.failure.reason === 'empty') {
+        return jsonResponse({ error: result.failure.message }, { status: 400 });
       }
-      throw err;
+      return jsonResponse({ error: result.failure.message }, { status: 409 });
     }
 
-    return jsonResponse({ key: project.key, name: body.name.trim() });
+    return jsonResponse(result.success);
   })),
 );

@@ -102,6 +102,20 @@ describe('POST /api/projects/:projectKey/rename', () => {
     expect(getProjectSync('alpha')?.name).toBe('New Alpha');
   });
 
+  it('prefers a registration key over another project\'s matching display name', async () => {
+    registerProjectSync('myn', { name: 'Mind Your Now', path: '/projects/myn' });
+    registerProjectSync('other', { name: 'myn', path: '/projects/other' });
+
+    const result = await requestProjectRename('myn', { name: 'Renamed Key Project' });
+
+    expect(result).toEqual({
+      status: 200,
+      body: { key: 'myn', name: 'Renamed Key Project' },
+    });
+    expect(getProjectSync('myn')?.name).toBe('Renamed Key Project');
+    expect(getProjectSync('other')?.name).toBe('myn');
+  });
+
   it('returns 404 for an unknown project', async () => {
     await expect(requestProjectRename('missing', { name: 'New Name' })).resolves.toEqual({
       status: 404,

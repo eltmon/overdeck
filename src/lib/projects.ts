@@ -233,6 +233,25 @@ export interface ResolvedProject {
   linearTeam?: string;
 }
 
+export type ProjectRenameErrorReason = 'not-found' | 'empty' | 'conflict';
+
+export class ProjectRenameError extends Error {
+  constructor(
+    readonly reason: ProjectRenameErrorReason,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ProjectRenameError';
+  }
+}
+
+interface ProjectRenamePlan {
+  key: string;
+  name: string;
+  config: ProjectsConfig;
+  changed: boolean;
+}
+
 // Mtime-based cache: re-parse projects.yaml only when the file changes on disk.
 // Without this cache, every call to resolveProjectFromIssue (enrichment service,
 // deacon patrol, status updates — dozens of times per minute) re-read and re-parsed
@@ -308,24 +327,56 @@ export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hol
   registerProjectSync(key, updated);
 }
 
-export function renameProjectSync(key: string, newName: string): void {
-  const config = loadProjectsConfigSync();
-  const project = config.projects[key];
-  if (!project) throw new Error(`Unknown project: ${key}`);
+function prepareProjectRename(
+  config: ProjectsConfig,
+  projectIdentifier: string,
+  newName: string,
+): ProjectRenamePlan | ProjectRenameError {
+  const key = config.projects[projectIdentifier]
+    ? projectIdentifier
+    : Object.entries(config.projects).find(([, project]) => project.name === projectIdentifier)?.[0];
+  if (!key) {
+    return new ProjectRenameError('not-found', `Unknown project: ${projectIdentifier}`);
+  }
 
+  const project = config.projects[key]!;
   const name = newName.trim();
-  if (!name) throw new Error('Project name must not be empty');
-  if (name === project.name) return;
+  if (!name) {
+    return new ProjectRenameError('empty', 'Project name must not be empty');
+  }
+  if (name === project.name) {
+    return { key, name, config, changed: false };
+  }
 
   const normalizedName = name.toLowerCase();
   for (const [otherKey, otherProject] of Object.entries(config.projects)) {
     if (otherKey === key) continue;
     if (otherKey.toLowerCase() === normalizedName || otherProject.name.toLowerCase() === normalizedName) {
-      throw new Error(`Project name '${name}' conflicts with existing project '${otherKey}'`);
+      return new ProjectRenameError(
+        'conflict',
+        `Project name '${name}' conflicts with existing project '${otherKey}'`,
+      );
     }
   }
 
-  registerProjectSync(key, { ...project, name });
+  return {
+    key,
+    name,
+    config: {
+      ...config,
+      projects: {
+        ...config.projects,
+        [key]: { ...project, name },
+      },
+    },
+    changed: true,
+  };
+}
+
+export function renameProjectSync(key: string, newName: string): void {
+  const plan = prepareProjectRename(loadProjectsConfigSync(), key, newName);
+  if (plan instanceof ProjectRenameError) throw plan;
+  if (plan.changed) saveProjectsConfigSync(plan.config);
 }
 
 export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
@@ -753,6 +804,28 @@ export const listProjects = (): Effect.Effect<Array<{ key: string; config: Proje
       Object.entries(config.projects).map(([key, projectConfig]) => ({ key, config: projectConfig })),
     ),
   );
+
+/**
+ * Rename a project's display name by registration key or exact display name.
+ * Loads and persists the registry once so long-lived callers avoid sync I/O.
+ */
+export const renameProject = (
+  projectIdentifier: string,
+  newName: string,
+): Effect.Effect<
+  { key: string; name: string },
+  ProjectRenameError | ConfigParseError | FsError
+> =>
+  Effect.gen(function* () {
+    const plan = prepareProjectRename(
+      yield* loadProjectsConfig(),
+      projectIdentifier,
+      newName,
+    );
+    if (plan instanceof ProjectRenameError) return yield* Effect.fail(plan);
+    if (plan.changed) yield* saveProjectsConfig(plan.config);
+    return { key: plan.key, name: plan.name };
+  });
 
 /** Effect variant of {@link registerProjectSync}. */
 export const registerProject = (key: string, projectConfig: ProjectConfig): Effect.Effect<void, ConfigParseError | FsError> =>
