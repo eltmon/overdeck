@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:13:41.731Z",
+  "updated": "2026-07-16T12:13:44.022Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "wire-pipeline-state-frontend": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 1794340,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:13:41.731Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -187,6 +179,17 @@
         "reason": "Override stale flywheel-orchestrator claim: implementation is pushed in ce406f7c59 and focused tests/typecheck pass.",
         "forced": true,
         "releasedAt": "2026-07-16T12:13:39.505Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1794340,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:13:41.731Z",
+        "itemId": "wire-pipeline-state-frontend",
+        "outcome": "completed",
+        "reason": "Issue DTO membership, frontend authoritative gate, fallback, and tests are pushed.",
+        "releasedAt": "2026-07-16T12:13:44.022Z"
       }
     ],
     "statusReasons": {
@@ -216,8 +219,8 @@
         "forced": true
       },
       "wire-pipeline-state-frontend": {
-        "reason": "Implementation pushed in 1c7b6d9942",
-        "updatedAt": "2026-07-16T12:13:41.731Z"
+        "reason": "Issue DTO membership, frontend authoritative gate, fallback, and tests are pushed.",
+        "updatedAt": "2026-07-16T12:13:44.022Z"
       }
     }
   },
@@ -249,6 +252,10 @@
     "wire-resource-discovery.wire-resource-discovery.ac2": "completed",
     "wire-resource-discovery.wire-resource-discovery.ac3": "completed",
     "wire-resource-discovery.wire-resource-discovery.ac4": "completed",
-    "wire-pipeline-state-frontend": "running"
+    "wire-pipeline-state-frontend": "completed",
+    "wire-pipeline-state-frontend.wire-pipeline-state-frontend.ac1": "completed",
+    "wire-pipeline-state-frontend.wire-pipeline-state-frontend.ac2": "completed",
+    "wire-pipeline-state-frontend.wire-pipeline-state-frontend.ac3": "completed",
+    "wire-pipeline-state-frontend.wire-pipeline-state-frontend.ac4": "completed"
   }
 }
