@@ -1,9 +1,31 @@
 {
   "issueId": "PAN-2168",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:23:26.027Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:49:29.395Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:20:37.437Z"
+    },
+    {
+      "timestamp": "2026-07-16T08:32:29.971Z",
+      "reason": "end",
+      "note": "No deviations. Delivered the global live Flywheel open-questions indicator, stable section anchor, cold/warm reveal scrolling, AppChrome navigation wiring, and focused tests. Corrected a legacy rendered-surface fixture exposed by the new global consumer. Full tests, typecheck, and lint pass; all commits are pushed."
+    }
+  ],
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T08:32:19.731Z",
+  "updated": "2026-07-16T08:32:30.113Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -12,11 +34,26 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T05:45:43.583Z"
+    "updatedAt": "2026-07-16T08:32:30.062Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2786"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 1651828,
+            "output": 4345,
+            "cacheRead": 1464192,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 21386209,
+            "output": 22721,
+            "cacheRead": 20655616,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
             "input": 7520,
@@ -35,6 +72,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 1651828,
+          "output": 4345,
+          "cacheRead": 1464192,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 21386209,
+          "output": 22721,
+          "cacheRead": 20655616,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
           "input": 7520,
           "output": 256,
@@ -49,11 +98,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 11.740637,
-        "pricingAsOf": "2026-07-16T05:45:43.626Z"
+        "usd": 26.40304,
+        "pricingAsOf": "2026-07-16T08:32:30.107Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2786"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -186,22 +237,5 @@
     "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac1": "completed",
     "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac2": "completed",
     "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac3": "completed"
-  },
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-16T07:23:26.027Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-16T07:49:29.395Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-16T08:20:37.437Z"
-    }
-  ]
+  }
 }
