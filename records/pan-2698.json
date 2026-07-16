@@ -90,21 +90,21 @@
     "recordedAt": "2026-07-16T07:45:53.765Z"
   },
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:59:11.146Z",
+  "updated": "2026-07-16T08:03:36.259Z",
   "pipeline": {
     "issueId": "PAN-2698",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:59:11.085Z",
-    "reviewNotes": "[security] Codex MCP provisioning executes a mutable npm `latest` package — `src/lib/runtimes/codex.ts:343`",
+    "updatedAt": "2026-07-16T08:03:36.148Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed security finding in 35190f9f: Playwright MCP pinned to 0.0.78 and Codex rejects mutable npx selectors; current main merge is pushed at c76f4e1a",
     "inspectNotes": "Inspection error for bead codex-config-mcp-servers: tmux session inspect-pan-2698-codex-config-mcp-servers exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2785",
-    "lastVerifiedCommit": "59fa03e557f815a35bf441b508df07eeb95010ab",
+    "lastVerifiedCommit": "c76f4e1a905d3add7fd0a747841f60591a9e34ca",
     "reviewRequestedAt": "2026-07-16T07:51:11.867Z",
     "reviewSpawnedAt": "2026-07-16T07:51:14.720Z"
   },
@@ -113,15 +113,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2701873,
-            "output": 3805,
-            "cacheRead": 2505472,
+            "input": 3041467,
+            "output": 4069,
+            "cacheRead": 2836864,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 34410563,
-            "output": 42444,
-            "cacheRead": 33794048,
+            "input": 39013987,
+            "output": 43911,
+            "cacheRead": 38382592,
             "cacheWrite": 0
           }
         },
@@ -144,15 +144,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2701873,
-          "output": 3805,
-          "cacheRead": 2505472,
+          "input": 3041467,
+          "output": 4069,
+          "cacheRead": 2836864,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 34410563,
-          "output": 42444,
-          "cacheRead": 33794048,
+          "input": 39013987,
+          "output": 43911,
+          "cacheRead": 38382592,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -169,8 +169,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 29.052721000000002,
-        "pricingAsOf": "2026-07-16T07:59:11.137Z"
+        "usd": 31.465403000000002,
+        "pricingAsOf": "2026-07-16T08:03:36.217Z"
       }
     },
     "merges": [
