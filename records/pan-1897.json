@@ -152,6 +152,11 @@
       "reason": "feedback",
       "note": "[2026-07-16T22:27Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-16T22:27:07.117Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T22:30:58.205Z"
     }
   ],
   "feedback": [],
@@ -184,22 +189,22 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T22:30:57.065Z",
+  "updated": "2026-07-16T22:30:58.205Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T22:30:56.637Z",
+    "updatedAt": "2026-07-16T22:30:57.088Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96",
     "reviewRequestedAt": "2026-07-16T21:44:10.689Z",
-    "reviewSpawnedAt": "2026-07-16T22:26:54.715Z",
+    "reviewSpawnedAt": "2026-07-16T22:30:57.087Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -326,7 +331,7 @@
       },
       "costAtCloseOut": {
         "usd": 183.837379,
-        "pricingAsOf": "2026-07-16T22:30:56.668Z"
+        "pricingAsOf": "2026-07-16T22:30:57.103Z"
       }
     },
     "merges": [
