@@ -346,17 +346,17 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:16:28.263Z",
+  "updated": "2026-07-16T02:18:19.901Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:16:28.007Z",
+    "updatedAt": "2026-07-16T02:18:19.823Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "82daafcb4a1389c9fe46822c4eae4748126fad09",
     "reviewRequestedAt": "2026-07-16T02:11:21.541Z",
@@ -508,9 +508,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 129895393,
-            "output": 229093,
-            "cacheRead": 126476544,
+            "input": 131936509,
+            "output": 236244,
+            "cacheRead": 128397056,
             "cacheWrite": 0
           }
         },
@@ -563,9 +563,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 129895393,
-          "output": 229093,
-          "cacheRead": 126476544,
+          "input": 131936509,
+          "output": 236244,
+          "cacheRead": 128397056,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -588,8 +588,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 152.969872,
-        "pricingAsOf": "2026-07-16T02:16:28.196Z"
+        "usd": 154.747678,
+        "pricingAsOf": "2026-07-16T02:18:19.872Z"
       }
     },
     "merges": [
