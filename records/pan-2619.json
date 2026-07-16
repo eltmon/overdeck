@@ -162,9 +162,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T21:36:33.476Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T21:38Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-07-16T21:38:09.806Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-07-16T21:38:09Z",
+      "markdownBody": "# Test failure\n\nCode change itself verified correct: npm run typecheck (root, PASS), npx tsc --noEmit (frontend, PASS), npm run lint (PASS, exit 0), and the vBRIEF's own scoped verify_commands — cd src/dashboard/frontend && npx vitest run src/components/XTerminal.test.tsx — PASS (25/25). Diff is exactly the planned CSS/className fix (XTerminal.tsx padding moved off measured host onto .xterm via .xterm-host CSS rule) plus its regression test. FAILED because: (1) the broader configured 'test' quality gate (OVERDECK_VERIFICATION=1 npx vitest run --changed <merge-base>, root+frontend) fails in the frontend leg on src/App.test.tsx (31 tests) with 'No selectPendingInputSubjects export is defined on the ./lib/store mock' — confirmed byte-identical file content between this branch and main, and reproducible running App.test.tsx standalone; root-caused to unrelated main commit 2f4648e673 'header decisions badge with click-through popover' (landed 2026-07-16 15:28, before main tip a081a9ce59), inherited via routine merge-main-into-feature-branch, not touched by this branch's diff (git diff main...HEAD --stat only shows XTerminal.tsx/XTerminal.test.tsx/index.css/FLYWHEEL-STATE.md). (2) Required browser UAT — the ACs explicitly call for getBoundingClientRect measurements 'in an isolated Playwright browser' and tmux pane-size checks — could not be completed: the workspace's own isolated container stack (overdeck-feature-pan-2619-server-1/frontend-1, per roles/test.md host-process-boundary contract; host dashboard was never touched) rejects every /ws/terminal WebSocket upgrade from the frontend's Traefik/Vite-proxied browser path with HTTP 403 (Origin header not preserved through that proxy hop) even though OVERDECK_TRUSTED_ORIGINS is correctly set and a direct curl to the api- domain with a proper HTTP/1.1 upgrade succeeds; on the one occasion a connection did get through to real PTY spawn, the server process segfaulted (exit 139) — the devcontainer Dockerfile is FROM node:22-alpine (musl) but the pinned @lydell/node-pty-linux-x64 native binary is glibc-only (ldd shows symbol-relocation failures under musl), reproduced twice. Both blockers are pre-existing environment/infra defects unrelated to this diff and outside test-role boundaries to fix; per roles/test.md ('if the isolated stack cannot support verification, report TESTS FAILED; do not substitute the primary host dashboard'), no fallback to the host dashboard was used. Notified flywheel-orchestrator via pan tell before reporting. Cleanup: restarted the workspace server container back to a healthy idle state (0 agents) and removed the throwaway diagnostic tmux sessions (uat-pan-2619, uat-small) created inside that container for this test; no host-level services were touched.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-2619`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -181,7 +194,7 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:37:34.044Z",
+  "updated": "2026-07-16T21:38:10.683Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "pending",
@@ -330,8 +343,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 4,
     "claims": {},
