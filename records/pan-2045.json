@@ -30,15 +30,7 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T19:15:00Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2045\n\n# Review Synthesis — PAN-2045 — 2026-07-16T19:13:00Z\n\n## Verdict: CHANGES REQUESTED — happy-dom leaves Mission Control tests false-green while live localhost requests fail during teardown\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/context.json\n- Branch: feature/pan-2045\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045\n- HEAD reviewed: 3f52315f859661f6cc4484a0c09c5e4383e7dc83\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] Mission Control tests are false-green while happy-dom performs live localhost requests — `src/dashboard/frontend/vitest.config.ts:90`\nThe PR changes the frontend environment from jsdom to happy-dom. Under the committed configuration, `IssueMissionControl.test.tsx` passes while emitting repeated `connect ECONNREFUSED 127.0.0.1:3000` failures and teardown `AbortError` exceptions. The same selected tests run cleanly under jsdom, and other focused happy-dom test files are clean, isolating the escaped request lifecycle to the Mission Control test tree. `queryClient.clear()` aborts outstanding work after it has reached the network, so the suite can report success while asynchronous component work is failing and can consume arbitrary responses from a local process on port 3000. Make the test own every request-producing query or child, fail on unexpected requests, and await or cancel all work before teardown without adding a permissive global fetch fallback.\n\n### [requirements] Phase-color assertion no longer proves the icon is colored — `src/dashboard/frontend/src/components/CommandDeck/WorkspaceStatusCard.test.tsx:70`\nThe explicit in-PR requirement forbids weakening assertions during the happy-dom migration. The replacement assertion spies on the global `CSSStyleDeclaration.prototype.color` setter and checks only that the warning color was assigned somewhere. `WorkspaceStatusCard.tsx` assigns the same color to both the icon and the phase label, so removing the icon's color would leave the test green. Tie the assertion to `workspace-status-phase-icon`'s own style or prove that the matching setter invocation belongs to that element.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2045 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
@@ -167,22 +159,44 @@
     "recordedAt": "2026-07-16T19:46:37.938Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T19:46:57.732Z",
+  "updated": "2026-07-16T19:47:07.087Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:46:57.640Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-07-16T19:47:06.998Z",
+    "reviewNotes": "[correctness] The happy-dom suite is false-green while Mission Control performs live localhost requests — `src/dashboard/frontend/vitest.config.ts:90`",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
     "reviewRequestedAt": "2026-07-16T19:46:57.222Z",
-    "reviewSpawnedAt": "2026-07-16T19:07:13.354Z",
+    "reviewSpawnedAt": "2026-07-16T19:47:06.609Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/security.md",
+        "atCommit": "de813b2c3a337d844b86e762c8d56674755c67c4"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/correctness.md",
+        "atCommit": "de813b2c3a337d844b86e762c8d56674755c67c4"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/performance.md",
+        "atCommit": "de813b2c3a337d844b86e762c8d56674755c67c4"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-3f52315f/requirements.md",
+        "atCommit": "de813b2c3a337d844b86e762c8d56674755c67c4"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -254,9 +268,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3781312,
-            "output": 151457,
-            "cacheRead": 59175424,
+            "input": 3783846,
+            "output": 152561,
+            "cacheRead": 59854336,
             "cacheWrite": 0
           }
         }
@@ -275,9 +289,9 @@
           "cacheWrite": 165070
         },
         "openai/gpt-5.6-sol": {
-          "input": 6536168,
-          "output": 209509,
-          "cacheRead": 70770176,
+          "input": 6538702,
+          "output": 210613,
+          "cacheRead": 71449088,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -288,8 +302,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 82.443262,
-        "pricingAsOf": "2026-07-16T19:46:57.684Z"
+        "usd": 82.828508,
+        "pricingAsOf": "2026-07-16T19:47:07.074Z"
       }
     },
     "merges": [
