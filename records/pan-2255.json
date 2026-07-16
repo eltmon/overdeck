@@ -133,15 +133,7 @@
       "timestamp": "2026-07-16T07:50:44.759Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T07:50:44Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2255\n\n# Review Synthesis — PAN-2255 — 2026-07-16T08:20:00Z\n\n## Verdict: CHANGES REQUESTED — performance reviewer session ended without a usable report\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-29b621ed/context.json\n- Branch: feature/pan-2255\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255\n- HEAD reviewed: 29b621edab524e0b9fb5ba1671ab7141ad552b62\n- Cycle number: 4\n- Prior cycle SHA: e4676f8795187c8be389295476e3e87d8cbdd8bc\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-29b621ed/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-29b621ed/correctness.md | 0 |\n| performance | failed: reviewer session ended before writing a report | — | infrastructure failure |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-29b621ed/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Reviewer session ended before writing a report\nThe performance sub-role failed without producing a readable report. Review policy forbids approval when any reviewer fails or times out, so performance coverage is incomplete for this cycle.\n\n## Non-blocking Findings\n\n### Security\n\n- Close-out comments disclose absolute host filesystem paths — `src/lib/close-out.ts:36`. This advisory can be resolved by rendering `.pan/feedback/<basename>` in external tracker comments while retaining the absolute path only for local transitions.\n\n### Correctness\n\n- [demoted: previously reviewed] Delayed escalation never examines stopped or completed work agents — `src/lib/cloister/agent-mailbox-escalation.ts:19`. The cited production code did not change after the prior synthesis, so this finding is not promotable in cycle 4.\n- [demoted: previously reviewed] Mailbox state-write failures make successful spawn or resume calls fail after the agent is already live — `src/lib/agents/spawn.ts:789` and `src/lib/agents/resume.ts:489`. Neither cited production path changed after the prior synthesis, so this finding is not promotable in cycle 4.\n\n### Requirements\n\nNone.\n\n## Scope Note\nThe cycle diff after e4676f8795187c8be389295476e3e87d8cbdd8bc changes only `docs/FLYWHEEL-STATE.md`, outside this feature's implementation. The correctness findings remain material PR concerns, but their cited production lines were already present in the prior cycle and must be demoted as previously reviewed, not promotable.\n\n## Clean Sub-roles\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-29b621ed/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2255 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/dashboard-types-baseline.txt",
@@ -222,24 +214,24 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T08:04:02.054Z",
+  "updated": "2026-07-16T08:04:05.560Z",
   "pipeline": {
     "issueId": "PAN-2255",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T08:04:01.982Z",
+    "updatedAt": "2026-07-16T08:04:05.422Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: confirm mailbox delivery only after successful transport, isolate live-delivery persistence failures, and publish close-out warnings through GitHub or Linear tracker adapters",
     "verificationNotes": "Verification FAILED at test (219801ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255\u001b[39m\n\nNo test files found, exiting with code 0\n\n \u001b[31m❯\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/review-verdict-feedback.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     \u001b[31m×\u001b[31m leaves review feedback pending when no live work agent exists\u001b[39m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\u001b[33m (retry x1)\u001b[39m\n\u001b[90mstdout\u001b[2m | tests/lib/cloister/auto-resume-gating.test.ts\u001b[2m > \u001b[22m\u001b[2mauto-resume gates\u001b[2m > \u001b[22m\u001b[2mresumes scheduler-yielded agents first, within the slot budget\n\u001b[22m\u001b[39m[deacon] Auto-resumed 1 work agent(s): agent-pan-2001-yielded\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mbases Channels MCP override eligibility on work role and claude-code harness\n\u001b[22m\u001b[39m[agent-pan-channels] channels:ineligible:not-a-work-agent\n[agent-pan-channels] channels:ineligible:harness-pi\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mblocks spawnAgent from cached stack health before side effects\n\u001b[22m\u001b[39m[agents] Workspace stack for PAN-1140 unhealthy (overdeck-feature-pan-1140-init-1 init exited non-zero (1)) — rebuilding before spawn (attempt 1/3)\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mblocks spawnAgent before side effects when the workspace stack is unhealthy\n\u001b[22m\u001b[39m[agents] Workspace stack for PAN-1140 unhealthy (overdeck-feature-pan-1140-init init exited non-zero (1)) — rebuilding before spawn (attempt 1/3)\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \n…(284017 chars elided)…\nm✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/non-restartable-reason.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/project-specialist-status.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-start-args.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/workspaces/__tests__/merge-ops-dirty-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/planning/__tests__/spawn-planning-session-harness.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cli/commands/compliance.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[\n...(truncated)",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
     "lastVerifiedCommit": "29b621edab524e0b9fb5ba1671ab7141ad552b62",
     "reviewRequestedAt": "2026-07-16T08:04:01.645Z",
-    "reviewSpawnedAt": "2026-07-16T07:48:07.228Z"
+    "reviewSpawnedAt": "2026-07-16T08:04:05.421Z"
   },
   "closeOut": {
     "usage": {
@@ -303,7 +295,7 @@
       },
       "costAtCloseOut": {
         "usd": 47.829786,
-        "pricingAsOf": "2026-07-16T08:04:02.013Z"
+        "pricingAsOf": "2026-07-16T08:04:05.520Z"
       }
     },
     "merges": [
