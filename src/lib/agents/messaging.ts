@@ -348,30 +348,28 @@ export async function messageAgent(
   }
 
   const expectedHarness = agentState?.harness ?? 'claude-code';
-  if (expectedHarness === 'codex') {
-    let appServerState: string | undefined;
-    try {
-      appServerState = (await getCodexAppServerStatus(normalizedId)).state;
-    } catch {
-      // A missing/unresponsive app-server may still be a legacy Codex TUI.
-      // Continue through the tmux liveness path for that transport.
-    }
-    if (appServerState && appServerState !== 'closed' && appServerState !== 'error') {
-      const promptReady = claimCodexIdleTurn(normalizedId);
-      if (!promptReady) {
-        queueAgentMail(normalizedId, message, true);
-        logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
-        console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
-        await appendTellInterventionForUserSource(normalizedId, caller);
-        return;
-      }
-
-      const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
-      await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
-      queueAgentMail(normalizedId, message);
+  let appServerState: string | undefined;
+  try {
+    appServerState = (await getCodexAppServerStatus(normalizedId)).state;
+  } catch {
+    // A missing/unresponsive app-server means this target uses another
+    // transport. Continue through the legacy tmux liveness path.
+  }
+  if (appServerState && appServerState !== 'closed' && appServerState !== 'error') {
+    const promptReady = claimCodexIdleTurn(normalizedId);
+    if (!promptReady) {
+      queueAgentMail(normalizedId, message, true);
+      logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
+      console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
       await appendTellInterventionForUserSource(normalizedId, caller);
       return;
     }
+
+    const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
+    await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
+    queueAgentMail(normalizedId, message);
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    return;
   }
 
   if (!(await Effect.runPromise(sessionExists(normalizedId)))) {

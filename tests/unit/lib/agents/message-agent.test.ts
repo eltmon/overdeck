@@ -120,6 +120,7 @@ describe('messageAgent', () => {
   afterEach(() => {
     rmSync('/tmp/agent-pan-2262', { recursive: true, force: true });
     rmSync('/tmp/agent-pan-2701', { recursive: true, force: true });
+    rmSync('/tmp/conv-20260716-1234', { recursive: true, force: true });
   });
 
   it('delivers to a troubled agent when its tmux session is live', async () => {
@@ -211,5 +212,23 @@ describe('messageAgent', () => {
       .filter((file) => file.endsWith('.pending.md'));
     expect(pending).toHaveLength(1);
     expect(readFileSync(`/tmp/agent-pan-2701/mail/${pending[0]}`, 'utf-8')).toContain('second message');
+  });
+
+  it('detects a codex conversation through app-server without agent state', async () => {
+    mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getCodexAppServerStatus.mockResolvedValue({ state: 'ready' });
+    mocks.sessionExists.mockReturnValue(Effect.succeed(false));
+    mkdirSync('/tmp/conv-20260716-1234', { recursive: true });
+    writeFileSync('/tmp/conv-20260716-1234/turn-completed', new Date().toISOString());
+
+    await messageAgent('conv-20260716-1234', 'operator message', 'pan-tell');
+
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'conv-20260716-1234',
+      'operator message',
+      'messageAgent:pan-tell',
+      undefined,
+    );
+    expect(mocks.sessionExists).not.toHaveBeenCalled();
   });
 });
