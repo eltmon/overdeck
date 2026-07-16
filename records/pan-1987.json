@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T17:53:41.201Z",
+  "updated": "2026-07-16T18:04:08.472Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -46,16 +46,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "api-rename-route": {
-        "writerId": "agent-pan-1987",
-        "agentId": "agent-pan-1987",
-        "pid": 2753376,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:53:41.201Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1987",
@@ -67,6 +59,16 @@
         "outcome": "completed",
         "reason": "Added renameProjectSync with validation, no-op behavior, write-door persistence, and isolated unit coverage",
         "releasedAt": "2026-07-16T17:53:10.097Z"
+      },
+      {
+        "writerId": "agent-pan-1987",
+        "agentId": "agent-pan-1987",
+        "pid": 2753376,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T17:53:41.201Z",
+        "itemId": "api-rename-route",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:04:08.471Z"
       }
     ],
     "statusReasons": {
@@ -82,6 +84,10 @@
     "lib-rename-project.lib-rename-project.ac2": "completed",
     "lib-rename-project.lib-rename-project.ac3": "completed",
     "lib-rename-project.lib-rename-project.ac4": "completed",
-    "api-rename-route": "running"
+    "api-rename-route": "completed",
+    "api-rename-route.api-rename-route.ac1": "completed",
+    "api-rename-route.api-rename-route.ac2": "completed",
+    "api-rename-route.api-rename-route.ac3": "completed",
+    "api-rename-route.api-rename-route.ac4": "completed"
   }
 }
