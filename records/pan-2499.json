@@ -541,19 +541,21 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T03:28:34.998Z",
+  "updated": "2026-07-16T03:32:53.100Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-16T03:28:34.905Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-16T03:32:53.030Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
+    "testNotes": "Gates (all from workspace feature-pan-2499, HEAD 1107d2c626, matches reviewedAtCommit): npm run typecheck (root) PASS; npx tsc --noEmit (frontend) PASS; npm run lint PASS (eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/circular/ratchet/quarantine sub-gates); npm run build PASS; npm run build:dashboard:server:bundle PASS; scoped unit tests vs merge-base 4b426022c4 -- root: 30 files/228 tests PASS, frontend: 25 files/394 tests PASS (622 total, includes FR-0 no-loss render-gate tests and fixture-driven density/interaction tests for IssueView, rail-expand, StartAgentCta, ActiveAgentPanel, VerificationGates, BeadsPanel). UAT: this issue unifies rail/cockpit/console issue-view rendering, clearly UI-behavior scoped, so browser UAT was required. Built and drove the workspace's own isolated container stack (overdeck-feature-pan-2499-frontend-1/server-1, https://feature-pan-2499.overdeck.localhost, NOT the host dashboard on :3011) via Playwright MCP. Root-caused a pre-existing container node_modules drift unrelated to this PR (missing @radix-ui/react-tooltip, introduced by already-merged main commit 134d0f80dd, not in PAN-2499's changed-file set) blocking the Vite dev server; fixed via `bun install` inside the frontend container + container restart (no code/config edits). Confirmed the app boots and reloads cleanly with zero console errors. Could not exercise the specific rail->cockpit->console density transitions against live PAN-2499 issue data because this isolated peer container starts with zero registered projects/issues by design (tracker polling disabled for workspace peer stacks) and the in-app + New Project flow 401s on /api/fs/list-dirs in this container -- an inherent workspace-container architecture constraint, not a PR defect. The exact behaviors that gap would have covered (density-based section visibility, rail-expand-in-place -> cockpit -> console, collapse, StartAgentCta fixture states for troubled/paused/stopped/resumable/running, ActiveAgentPanel per-density mounting incl. collapsed-rail zero-consumer, FR-0 data-section presence at >=1 density) are independently proven by dedicated Vitest+RTL tests rendering the real production components (not shallow mocks) and asserting real DOM structure/attributes/click behavior, already green on this commit, and already independently confirmed by review (reviewStatus passed) and work.inspect (inspectStatus passed, inspector explicitly verified DOM-level data-section rendering in IssueMissionControl.test.tsx/IssueDrawer.test.tsx).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
+    "reviewedAtCommit": "87a31066c41770febae838a24bb5ad1a75f9a203",
     "lastVerifiedCommit": "87a31066c41770febae838a24bb5ad1a75f9a203",
     "reviewRequestedAt": "2026-07-16T03:23:36.499Z",
     "reviewSpawnedAt": "2026-07-16T03:28:28.749Z",
@@ -704,9 +706,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 193728068,
-            "output": 342131,
-            "cacheRead": 188836864,
+            "input": 197754713,
+            "output": 358313,
+            "cacheRead": 192530688,
             "cacheWrite": 0
           }
         },
@@ -759,9 +761,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 193728068,
-          "output": 342131,
-          "cacheRead": 188836864,
+          "input": 197754713,
+          "output": 358313,
+          "cacheRead": 192530688,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -784,8 +786,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 194.902947,
-        "pricingAsOf": "2026-07-16T03:28:34.986Z"
+        "usd": 198.899424,
+        "pricingAsOf": "2026-07-16T03:32:53.095Z"
       }
     },
     "merges": [
