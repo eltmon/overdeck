@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:15:25.282Z",
+  "updated": "2026-07-16T18:18:47.492Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -74,18 +74,32 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "fix-imc-open-handle": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2045",
         "agentId": "agent-pan-2045",
         "pid": 3635360,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:15:07.955Z"
+        "claimedAt": "2026-07-16T18:15:07.955Z",
+        "itemId": "fix-imc-open-handle",
+        "outcome": "completed",
+        "reason": "Added deterministic Testing Library cleanup and QueryClient.clear() teardown; configured query gcTime=0/retry=false. Solo run exits 0 in 4.44s with 9 passed, 0 failed, 0 skipped.",
+        "releasedAt": "2026-07-16T18:18:47.492Z"
+      }
+    ],
+    "statusReasons": {
+      "fix-imc-open-handle": {
+        "reason": "Added deterministic Testing Library cleanup and QueryClient.clear() teardown; configured query gcTime=0/retry=false. Solo run exits 0 in 4.44s with 9 passed, 0 failed, 0 skipped.",
+        "updatedAt": "2026-07-16T18:18:47.492Z"
       }
     }
   },
   "statusOverrides": {
-    "fix-imc-open-handle": "running"
+    "fix-imc-open-handle": "completed",
+    "fix-imc-open-handle.fix-imc-open-handle.ac1": "completed",
+    "fix-imc-open-handle.fix-imc-open-handle.ac2": "completed",
+    "fix-imc-open-handle.fix-imc-open-handle.ac3": "completed"
   }
 }
