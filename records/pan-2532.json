@@ -98,16 +98,16 @@
     "recordedAt": "2026-07-16T06:53:38.538Z"
   },
   "created": "2026-07-16T05:46:43.959Z",
-  "updated": "2026-07-16T07:35:48.847Z",
+  "updated": "2026-07-16T08:47:45.339Z",
   "pipeline": {
     "issueId": "PAN-2532",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-16T07:35:48.794Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T08:47:45.286Z",
     "testNotes": "Gates run in workspace (HEAD cc9a3a6a5f): npm run typecheck (pass, incl. dashboard-types guard), npm run lint (pass, exit 0), npm test (full suite: 1015 files/9374 tests passed, 3/50 skipped) and cd src/dashboard/frontend && npx vitest run src/components/CommandDeck/__tests__/ProjectOverview.test.tsx (24/24 passed). Matches Cloister's own verification-latest.json (typecheck/frontend-typecheck/lint/build/server-bundle/test all passed at lastVerifiedCommit=cc9a3a6a5f). Diff of PipelineRow.tsx verified line-by-line against vBRIEF item widen-title-grid: gridTemplateColumns is exactly '78px 1fr 74px 34px' with the old 200px status column removed (ac1); title stays a full-width truncating span (ac2); metadata line is one flex row (mt-[3px] flex min-w-0 items-center gap-1.5 overflow-hidden) holding the shrink-0 status chip plus a single truncate span rendering [sublineFor(entry), whoLineFor(entry)].filter(Boolean).join(' · ') (ac3); .filter(Boolean) guards the null whoLineFor case so no dangling separator, cost/session column and avatar column untouched (ac4). UAT: built and ran the dashboard from this workspace (docker compose stack overdeck-feature-pan-2532-{frontend,server,dev}, Vite HMR on the bind-mounted workspace source) at https://feature-pan-2532.overdeck.localhost, confirmed by traefik router API since the checked-in docker-compose.devcontainer.yml host-rule comments are stale. Found and fixed an unrelated container-hygiene gap (container's shared node_modules volume was missing posthog-js, added to package.json in a prior commit already on this branch, before this container's last install) via bun install + frontend container restart -- this only touched the throwaway workspace container, not code/config/tests. App then loaded cleanly with no PAN-2532-related console errors. Could not populate a live PipelineRow with real long-title data in this isolated container: it starts with zero registered projects/agents by design (no Deacon, no host state mount), and adding a project hit a pre-existing, unrelated origin-mismatch bug in this workspace's docker-compose.devcontainer.yml (OVERDECK_TRUSTED_ORIGINS/labels still say feature-pan-2532.pan.localhost while traefik's live rule is feature-pan-2532.overdeck.localhost, so authenticated API calls 401/403) -- fixing that requires editing configuration, which is outside this test role's boundaries and unrelated to the PAN-2532 diff. No acceptance criteria, issue body, or vBRIEF verify_commands call for browser UAT; the vBRIEF's own required checks (typecheck, lint, ProjectOverview.test.tsx) are exactly what ran and passed. Verdict: PASSED on gate results plus verified spec-conformant diff; recommend filing the docker-compose origin-mismatch as a separate follow-up issue since it will block future UAT-required workspace tests.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2782",
     "reviewedAtCommit": "2cc83ac13cc6637f35d3b0257ff2a2f5b304fc96",
@@ -136,9 +136,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 12280235,
-            "output": 27302,
-            "cacheRead": 11660288,
+            "input": 12713263,
+            "output": 28942,
+            "cacheRead": 12077056,
             "cacheWrite": 0
           }
         },
@@ -167,9 +167,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 12280235,
-          "output": 27302,
-          "cacheRead": 11660288,
+          "input": 12713263,
+          "output": 28942,
+          "cacheRead": 12077056,
           "cacheWrite": 0
         },
         "anthropic/claude-opus-4-8": {
@@ -186,8 +186,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 14.352069,
-        "pricingAsOf": "2026-07-16T07:35:48.842Z"
+        "usd": 14.690953,
+        "pricingAsOf": "2026-07-16T08:47:45.330Z"
       }
     },
     "merges": [
