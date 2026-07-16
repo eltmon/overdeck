@@ -424,15 +424,7 @@
       "timestamp": "2026-07-16T15:39:22.671Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T15:39:22Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1966\n\n# Review Synthesis — PAN-1966 — 2026-07-16T15:45:00-04:00\n\n## Verdict: CHANGES REQUESTED — expired in-flight promise caches can launch duplicate GitHub gathers\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-99252ef0/context.json`\n- Branch: `feature/pan-1966`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966`\n- HEAD reviewed: `99252ef028b6463d113170b67133ae9a79b3dfa9`\n- Cycle number: 8\n- Prior cycle SHA: `665c07a9d117b01f2fb5f617288cb11717f3cb7c`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-99252ef0/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-99252ef0/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-99252ef0/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-99252ef0/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [performance] Expired in-flight promise caches launch duplicate GitHub gathers — `src/dashboard/server/services/pipeline-membership.ts:20`\n\nThe new membership and open-PR promise caches use a start-time expiry for both pending and settled entries. If slow external work outlives the 30-second TTL, another caller replaces the pending promise and launches duplicate GitHub and git work. Pending and settled states must be distinct, with pending promises always coalesced and freshness starting only after successful settlement; fake-timer tests should cover operations pending beyond the TTL.\n\n### [requirements] Closed zombie PRs are excluded from missing-label drift detection — `src/lib/pipeline-membership.ts:104`\n\nThe changed resolver requires both an open issue and an open PR for `stale_absent`. The requirements reviewer interprets FR-4 and the changed documentation as requiring every open PR without a phase label, including `zombie_pr`, to report `stale_absent`. Update the resolver and regression expectation so the canonical read door exposes that drift.\n\n## Non-blocking Findings\n\n### Correctness\n\n- Merged PR detection compares GitHub owner and repository identity case-sensitively at `src/lib/pipeline-membership-gather.ts:115`; normalize both configured and returned values.\n\n## Clean Sub-roles\n\n- Security found no findings.\n- Correctness found no blocking findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-99252ef0/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1966 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
@@ -521,23 +513,23 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T15:54:55.575Z",
+  "updated": "2026-07-16T15:54:56.257Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T15:54:55.528Z",
+    "updatedAt": "2026-07-16T15:54:56.118Z",
     "reviewNotes": "Agent re-review request (5/25): Fixed review issues",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "lastVerifiedCommit": "41b0474d6d027e7840b29ea391995d0e52f6ee62",
     "reviewRequestedAt": "2026-07-16T14:24:05.694Z",
-    "reviewSpawnedAt": "2026-07-16T15:36:58.432Z"
+    "reviewSpawnedAt": "2026-07-16T15:54:56.117Z"
   },
   "closeOut": {
     "usage": {
@@ -601,7 +593,7 @@
       },
       "costAtCloseOut": {
         "usd": 130.061331,
-        "pricingAsOf": "2026-07-16T15:54:55.567Z"
+        "pricingAsOf": "2026-07-16T15:54:56.196Z"
       }
     },
     "merges": [
