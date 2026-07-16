@@ -51,6 +51,7 @@ import {
   assertWorkspaceStackHealthyForSpawn,
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
+import { confirmWorkMailboxDeliveryBestEffort, prepareWorkMailbox, type MailboxItem } from '../cloister/agent-mailbox.js';
 
 /**
  * Resume a suspended agent (PAN-80)
@@ -386,7 +387,16 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       });
       return { success: false, error: resumeMessage.error };
     }
-    const effectiveMessage = resumeMessage.message ?? defaultResumeMessage;
+    let effectiveMessage = resumeMessage.message ?? defaultResumeMessage;
+    let preparedMailboxItems: MailboxItem[] = [];
+    if (agentState.role === 'work' || agentState.role === 'strike') {
+      const prepared = await prepareWorkMailbox(effectiveMessage, {
+        issueId,
+        workspacePath: agentState.workspace,
+      });
+      effectiveMessage = prepared.message;
+      preparedMailboxItems = prepared.items;
+    }
 
     const { launcherContent, providerEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
@@ -474,6 +484,10 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
       }
+    }
+
+    if (messageDelivered && preparedMailboxItems.length > 0) {
+      await confirmWorkMailboxDeliveryBestEffort(preparedMailboxItems, `${normalizedId}/${agentState.issueId}`);
     }
 
     const resumedAt = new Date().toISOString();
