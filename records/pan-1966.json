@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T05:07:00.317Z",
+  "updated": "2026-07-16T05:07:19.453Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -50,6 +50,6 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-fable-5"
+  "harness": "codex",
+  "model": "gpt-5.6-sol"
 }
