@@ -235,13 +235,18 @@ external dependencies. `apps/desktop/package.json` installs the staged runtime
 with this electron-builder resource mapping:
 
 ```json
-{ "from": "cli", "to": "dist", "filter": ["**/*", "!**/*.map"] }
+[
+  { "from": "cli", "to": "dist", "filter": ["**/*", "!**/*.map"] },
+  { "from": "cli/package.json", "to": "package.json" }
+]
 ```
 
 The dashboard's `panCliInvocation` helper resolves the entry from
 `packageRoot/dist/cli/index.js`. In a packaged app, `packageRoot` is Electron's
 `resources/` directory, so the normal resolver reaches the packaged runtime
-without a desktop-specific code path. The preparation script also copies the
+without a desktop-specific code path. The second resource mapping places the
+generated CLI manifest at `resources/package.json`, where the shared version
+resolver expects the package-root manifest. The preparation script also copies the
 complete `sync-sources/` tree because commands such as `pan sync` need the
 skills, rules, agents, development skills, and hooks payload.
 

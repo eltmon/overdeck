@@ -83,6 +83,7 @@ describe("package.json", () => {
           to: "dist",
           filter: expect.arrayContaining(["**/*", "!**/*.map"]),
         }),
+        expect.objectContaining({ from: "cli/package.json", to: "package.json" }),
         expect.objectContaining({ from: "server", to: "server" }),
         expect.objectContaining({ from: "resources", to: "resources" }),
       ]),

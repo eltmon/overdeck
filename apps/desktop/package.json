@@ -86,6 +86,10 @@
         ]
       },
       {
+        "from": "cli/package.json",
+        "to": "package.json"
+      },
+      {
         "from": "server",
         "to": "server",
         "filter": [
