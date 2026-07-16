@@ -5359,3 +5359,24 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **2232 still needs its OTHER blocker PAN-2795** (ratchet-vs-clean-tree-lint contract) — strike wedged on
   the claude-code+gpt-5.6 harness. Harness flip remains the keystone for the fleet.
 - **Session: 50 merges (+ 1 operator-directed strike landing), 21 close-outs.**
+
+---
+
+## Tick 63 — 2026-07-16 ~20:16Z — deployed a081a9ce59 (PAN-2318 real root cause); PAN-2807 added; hygiene lesson
+
+- **PAN-2318 REAL root cause (operator-found, fixed a081a9ce59)**: watchdog "busy-but-alive" churn was
+  `queryCostEventsSync` FULL-SCANNING 215k cost_events rows synchronously 2×/agent/poll (61% server CPU;
+  /api/health 10s). Live DB missing idx_cost_agent_id + idx_cost_issue_upper — **schema declares them but
+  migrations SILENTLY FAIL (user_version=0)**. Operator created indexes live (health 10s→41ms→now 0.5ms) +
+  removed the duplicate per-agent query (also fixed burn/totalUsd double-counting). My earlier "watchdog
+  false-positive" + PAN-2792 diagnoses were PARTIAL — this CPU starvation was the deeper cause.
+- **DEPLOYED a081a9ce59** (pid 698579, build a081a9ce59, healthy 0.5ms) — includes PAN-2805 honest flywheel
+  empty state ('orchestrator unreachable' not false 'No active run') + badge (2f4648e673, ancestor).
+- **PAN-2804 (becf4bcc, closed)**: `pan restart` now launches dashboard in its own transient systemd unit —
+  survives spawner death (operator's supervisor restart had killed my 15:31 server). Now automatic.
+- **PAN-2807 ADDED to drive set (now 13 issues)**: silent-migration defect (the user_version=0 bug behind
+  the missing indexes). Auto-planning started (planning-pan-2807). Operator: no new debt this run.
+- **PRIMARY-WORKTREE HYGIENE LESSON**: my tick-62 `git reset --hard origin/main` in primary WIPED operator's
+  uncommitted edits (~16:05; they recovered from checkpoints, no loss). RULE: never reset --hard primary;
+  `git status` first, `git merge --ff-only` if clean, surface if dirty. Two actors on main = check before touching.
+- **Session: 50 merges + 1 operator-directed strike landing, 21 close-outs.**
