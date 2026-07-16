@@ -144,6 +144,7 @@ async function routeInspectToStandingSupervisorIfEnabled(
     inspectNotes: `Inspecting item ${context.itemId}`,
     inspectStartedAt: new Date().toISOString(),
     inspectBeadId: context.itemId,
+    inspectOwnerSession: agentId,
   });
 
   const sha = await Effect.runPromise(getCurrentHead(context.workspace));
@@ -207,6 +208,7 @@ async function spawnInspectAgentPromise(
       inspectNotes: `Inspecting item ${context.itemId}`,
       inspectStartedAt: new Date().toISOString(),
       inspectBeadId: context.itemId,
+      inspectOwnerSession: tmuxSession,
     });
 
     // Resolve model via the role primitive: work.<inspect|inspect-deep>.

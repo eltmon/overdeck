@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   mkdirSync: vi.fn(),
   readFileSync: vi.fn(),
   readWorkspacePlanSync: vi.fn(),
+  setReviewStatusSync: vi.fn(),
   saveAgentRuntimeState: vi.fn(),
   saveAgentState: vi.fn(),
   sessionExists: vi.fn(),
@@ -53,7 +54,7 @@ vi.mock('../inspect-checkpoints.js', () => ({
 }));
 
 vi.mock('../../review-status.js', () => ({
-  setReviewStatusSync: vi.fn(),
+  setReviewStatusSync: mocks.setReviewStatusSync,
 }));
 
 vi.mock('../../bd-mutex.js', () => ({
@@ -172,6 +173,11 @@ describe('spawnInspectAgent', () => {
       expect.stringContaining('launcher.sh'),
       expect.any(Object),
     );
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-1613', expect.objectContaining({
+      inspectStatus: 'inspecting',
+      inspectBeadId: 'workspace-b95lw',
+      inspectOwnerSession: 'inspect-pan-1613-workspace-b95lw',
+    }));
   });
 
   it('writes a minimal state.json so the inspect agent is enumerable', async () => {
@@ -227,6 +233,11 @@ describe('spawnInspectAgent', () => {
       sha: 'fedcba9876543210',
       itemId: 'workspace-b95lw',
       prdMarkdown: '# PRD',
+    }));
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-1613', expect.objectContaining({
+      inspectStatus: 'inspecting',
+      inspectBeadId: 'workspace-b95lw',
+      inspectOwnerSession: 'agent-pan-1613-review-supervisor',
     }));
     expect(mocks.createSession).not.toHaveBeenCalled();
   });

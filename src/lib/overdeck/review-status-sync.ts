@@ -37,6 +37,7 @@ interface DbRow {
   inspect_notes: string | null;
   inspect_started_at: number | null;
   inspect_bead_id: string | null;
+  inspect_owner_session: string | null;
   verification_status: string | null;
   verification_notes: string | null;
   verification_cycle_count: number | null;
@@ -87,6 +88,7 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     inspectNotes: row.inspect_notes ?? undefined,
     inspectStartedAt: msToIso(row.inspect_started_at),
     inspectBeadId: row.inspect_bead_id ?? undefined,
+    inspectOwnerSession: row.inspect_owner_session ?? undefined,
     verificationStatus:
       (row.verification_status as ReviewStatus['verificationStatus']) ?? undefined,
     verificationNotes: row.verification_notes ?? undefined,
@@ -174,7 +176,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       INSERT INTO review_status (
         issue_id, review_status, test_status, merge_status,
         inspect_status, inspect_notes, inspect_started_at, inspect_bead_id,
-        verification_status, verification_notes,
+        inspect_owner_session, verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
         review_notes, test_notes, merge_notes, release_status, release_notes,
         updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
@@ -187,7 +189,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_ready_head, strike_ready_at, strike_landing_state,
         strike_recovery_count, strike_landing_attempts
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -197,6 +199,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         inspect_notes = excluded.inspect_notes,
         inspect_started_at = excluded.inspect_started_at,
         inspect_bead_id = excluded.inspect_bead_id,
+        inspect_owner_session = excluded.inspect_owner_session,
         verification_status = excluded.verification_status,
         verification_notes = excluded.verification_notes,
         verification_cycle_count = excluded.verification_cycle_count,
@@ -244,6 +247,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       null, // inspect_notes — PAN-1988: feedback text lives in the journal, not the DB cache
       isoToMs(s.inspectStartedAt),
       s.inspectBeadId ?? null,
+      s.inspectOwnerSession ?? null,
       s.verificationStatus ?? null,
       null, // verification_notes — PAN-1988: feedback text lives in the journal, not the DB cache
       s.verificationCycleCount ?? null,
