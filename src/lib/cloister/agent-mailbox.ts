@@ -4,7 +4,7 @@
  */
 
 import { readFile, readdir, rename, stat, writeFile } from 'fs/promises';
-import { isAbsolute, join } from 'path';
+import { dirname, isAbsolute, join } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { getReadableWorkspacePanPaths, getWorkspacePanPaths } from '../pan-dir/index.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -314,6 +314,8 @@ async function transitionMailboxItem(
     const temporaryPath = `${absolutePath}.${process.pid}.${Date.now()}.tmp`;
     await writeFile(temporaryPath, rendered, 'utf8');
     await rename(temporaryPath, absolutePath);
+    mailboxReadCache.delete(absolutePath);
+    mailboxDirectoryCache.delete(dirname(absolutePath));
   }
   return item;
   } finally {
