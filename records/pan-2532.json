@@ -13,6 +13,26 @@
       "timestamp": "2026-07-16T06:53:41.103Z",
       "reason": "end",
       "note": "Deviation: removed a stale planning-era .pan/records/pan-2532.json artifact from the code branch because the migrated-state push guard correctly rejected it. Test addition waived per the approved vBRIEF because existing coverage at faffae87a4820e393df079e855bbd8cf184971ad exercises the preserved row content. No skipped work or remaining hazards. Delivered the four-column PipelineRow title-first layout with inline status metadata; typecheck, lint, focused tests, and full suite pass.\n\nTest gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.243Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.254Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.284Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T06:57:11.296Z"
     }
   ],
   "feedback": [],
@@ -28,7 +48,7 @@
     "recordedAt": "2026-07-16T06:53:38.538Z"
   },
   "created": "2026-07-16T05:46:43.959Z",
-  "updated": "2026-07-16T06:57:09.206Z",
+  "updated": "2026-07-16T06:57:11.296Z",
   "pipeline": {
     "issueId": "PAN-2532",
     "reviewStatus": "passed",
