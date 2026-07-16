@@ -10,6 +10,7 @@ import {
   PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS,
   summarizePipelineMembership,
 } from '../../../src/dashboard/server/services/pipeline-membership.js';
+import { PIPELINE_PROJECT_CONCURRENCY } from '../../../src/lib/pipeline-membership-gather.js';
 
 describe('pipeline membership service', () => {
   beforeEach(() => vi.useFakeTimers());
@@ -128,5 +129,39 @@ describe('pipeline membership service', () => {
     await getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership);
 
     expect(getMembership).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['issue snapshots', (projects, getMembership) => {
+      getPipelineMembershipSnapshotsForProjects(projects, getMembership);
+      return Promise.resolve();
+    }],
+    ['resource snapshots', (projects, getMembership) =>
+      getPipelineMembershipSnapshotsForResourceDiscovery(projects, getMembership).then(() => undefined)],
+  ] as const)('bounds concurrent multi-project refreshes for %s', async (_name, refresh) => {
+    const projects = Array.from({ length: 7 }, (_, index) => ({
+      name: `bounded-${_name}-${index}`,
+      path: `/bounded-${_name}-${index}`,
+      github_repo: `owner/repo-${index}`,
+    }));
+    let active = 0;
+    let maxActive = 0;
+    const releases: Array<() => void> = [];
+    const getMembership = vi.fn(() => new Promise<[]>(resolve => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      releases.push(() => { active--; resolve([]); });
+    }));
+
+    const result = refresh(projects, getMembership);
+    await vi.waitFor(() => expect(getMembership).toHaveBeenCalledTimes(PIPELINE_PROJECT_CONCURRENCY));
+    while (getMembership.mock.calls.length < projects.length) {
+      releases.shift()!();
+      await vi.waitFor(() => expect(getMembership.mock.calls.length).toBeGreaterThan(active));
+    }
+    while (releases.length > 0) releases.shift()!();
+    await result;
+
+    expect(maxActive).toBe(PIPELINE_PROJECT_CONCURRENCY);
   });
 });

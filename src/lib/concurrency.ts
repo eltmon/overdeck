@@ -60,6 +60,25 @@ export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => num
   };
 }
 
+/** Schedule promise work through one limiter shared by every caller of the returned function. */
+export function createPromiseConcurrencyLimiter(max: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const drain = () => {
+    while (active < max && queue.length > 0) queue.shift()!();
+  };
+  return <T>(task: () => Promise<T>): Promise<T> => new Promise<T>((resolve, reject) => {
+    queue.push(() => {
+      active++;
+      task().then(resolve, reject).finally(() => {
+        active--;
+        drain();
+      });
+    });
+    drain();
+  });
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**

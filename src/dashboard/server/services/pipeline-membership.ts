@@ -1,7 +1,7 @@
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { IssuePipelineMembership } from '@overdeck/contracts';
-import { createSettledTtlPromiseCache } from '../../../lib/concurrency.js';
-import { gatherProjectLensSignals, mapPipelineProjects } from '../../../lib/pipeline-membership-gather.js';
+import { createPromiseConcurrencyLimiter, createSettledTtlPromiseCache } from '../../../lib/concurrency.js';
+import { gatherProjectLensSignals, mapPipelineProjects, PIPELINE_PROJECT_CONCURRENCY } from '../../../lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership, type IssueLensSignals, type PipelineMembership } from '../../../lib/pipeline-membership.js';
 
 export const PIPELINE_MEMBERSHIP_TTL_MS = 30_000;
@@ -59,6 +59,7 @@ interface MembershipSnapshot {
 }
 
 const membershipSnapshots = new Map<string, MembershipSnapshot>();
+const scheduleMembershipRefresh = createPromiseConcurrencyLimiter(PIPELINE_PROJECT_CONCURRENCY);
 
 function refreshMembershipSnapshot(
   project: ProjectConfig,
@@ -67,7 +68,7 @@ function refreshMembershipSnapshot(
   now: () => number,
 ): Promise<void> {
   if (snapshot.refresh) return snapshot.refresh;
-  snapshot.refresh = getMembership(project).then((value) => {
+  snapshot.refresh = scheduleMembershipRefresh(() => getMembership(project)).then((value) => {
     snapshot.value = value;
     snapshot.refreshedAt = now();
   }).catch(() => {
