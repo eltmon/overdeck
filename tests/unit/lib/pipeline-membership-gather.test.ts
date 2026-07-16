@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   gatherProjectLensSignals,
+  PIPELINE_ISSUE_STATE_CONCURRENCY,
   type PipelineMembershipGatherDeps,
 } from '../../../src/lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership } from '../../../src/lib/pipeline-membership.js';
@@ -34,13 +35,15 @@ async function collectRelativeImportGraph(entry: string, visited = new Set<strin
 function deps(): PipelineMembershipGatherDeps {
   return {
     listOpenIssues: vi.fn().mockResolvedValue([{ number: 1, labels: ['in-review'] }]),
+    listPullRequests: vi.fn().mockResolvedValue([
+      { headRefName: 'feature/pan-2', mergedAt: null, state: 'open' },
+      { headRefName: 'feature/pan-1', mergedAt: '2026-01-01', state: 'closed' },
+    ]),
     getIssueState: vi.fn().mockImplementation(async (_owner, _repo, number) => ({
       state: number === 4 ? 'open' : 'closed',
     })),
     listSpecIssueIds: vi.fn().mockResolvedValue(['PAN-4']),
     run: vi.fn().mockImplementation(async (command, args) => {
-      if (command === 'gh' && args.includes('open')) return JSON.stringify([{ headRefName: 'feature/pan-2' }]);
-      if (command === 'gh' && args.includes('merged')) return JSON.stringify([{ headRefName: 'feature/pan-1', mergedAt: '2026-01-01' }]);
       if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-1\norigin/feature/pan-3\n';
       if (command === 'git') return 'feature/pan-1\norigin/feature/pan-3\n';
       throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
@@ -60,12 +63,45 @@ describe('gatherProjectLensSignals', () => {
     ]);
   });
 
-  it('lists merged PRs exactly once regardless of candidate count', async () => {
+  it('lists all PRs through one paginated dependency regardless of candidate count', async () => {
     const mocked = deps();
     await gatherProjectLensSignals(project, mocked);
-    const mergedCalls = vi.mocked(mocked.run).mock.calls.filter(([command, args]) =>
-      command === 'gh' && args.includes('merged'));
-    expect(mergedCalls).toHaveLength(1);
+    expect(mocked.listPullRequests).toHaveBeenCalledOnce();
+    expect(mocked.listPullRequests).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(mocked.run).not.toHaveBeenCalledWith('gh', expect.anything(), expect.anything());
+  });
+
+  it('returns no membership for a non-GitHub project without probing GitHub or git', async () => {
+    const mocked = deps();
+    const mixedTrackerProject = { ...project, github_repo: undefined };
+
+    await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([]);
+    expect(mocked.listOpenIssues).not.toHaveBeenCalled();
+    expect(mocked.listPullRequests).not.toHaveBeenCalled();
+    expect(mocked.run).not.toHaveBeenCalled();
+  });
+
+  it('bounds issue-state lookups for large candidate sets', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue(
+      Array.from({ length: 40 }, (_, index) => `PAN-${index + 1}`),
+    );
+    let active = 0;
+    let maximumActive = 0;
+    mocked.getIssueState = vi.fn().mockImplementation(async () => {
+      active += 1;
+      maximumActive = Math.max(maximumActive, active);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      active -= 1;
+      return { state: 'closed' };
+    });
+
+    await gatherProjectLensSignals(project, mocked);
+
+    expect(maximumActive).toBeGreaterThan(1);
+    expect(maximumActive).toBeLessThanOrEqual(PIPELINE_ISSUE_STATE_CONCURRENCY);
   });
 
   it('lets the resolver correct squash lineage using the merged-PR oracle', async () => {

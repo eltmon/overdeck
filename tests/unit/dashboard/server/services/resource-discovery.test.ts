@@ -4,7 +4,7 @@ import { Effect } from 'effect';
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   findSpecByIssue: vi.fn(),
-  gatherProjectLensSignals: vi.fn(),
+  getPipelineMembershipForProjects: vi.fn(),
   getAgentRuntimeState: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
@@ -25,8 +25,8 @@ vi.mock('node:child_process', () => ({
   execFile: mocks.execFile,
 }));
 
-vi.mock('../../../../../src/lib/pipeline-membership-gather.js', () => ({
-  gatherProjectLensSignals: mocks.gatherProjectLensSignals,
+vi.mock('../../../../../src/dashboard/server/services/pipeline-membership.js', () => ({
+  getPipelineMembershipForProjects: mocks.getPipelineMembershipForProjects,
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -80,6 +80,17 @@ import {
   sanitizeResourceAllocatedIssues,
 } from '../../../../../src/dashboard/server/services/resource-discovery.js';
 
+function membership(issueId: string, bucket = 'in_flight') {
+  return {
+    issueId,
+    inPipeline: true,
+    bucket,
+    reasons: ['test resolver verdict'],
+    labelDrift: null,
+    lenses: { L1_openPr: false, L2_unmergedBranch: true, L3_issueOpen: true, L4_phaseLabel: null },
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetResourceAllocatedIssuesCacheForTests();
@@ -99,7 +110,7 @@ beforeEach(() => {
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
-  mocks.gatherProjectLensSignals.mockResolvedValue([]);
+  mocks.getPipelineMembershipForProjects.mockResolvedValue([]);
   mocks.resolveAgentGitInfo.mockResolvedValue({
     actualBranch: null,
     branchDrifted: false,
@@ -320,13 +331,7 @@ describe('resource-discovery terminal issue filtering', () => {
     ]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-2054']));
 
-    await expect(discoverResourceAllocatedIssues()).resolves.toEqual([
-      expect.objectContaining({
-        issueId: 'PAN-2054',
-        pipelineBucket: 'clean_terminal',
-        resourceDrift: true,
-      }),
-    ]);
+    await expect(discoverResourceAllocatedIssues()).resolves.toEqual([]);
 
     resetResourceAllocatedIssuesCacheForTests();
     mocks.getGitHubConfig.mockReturnValue({ repos: [{ owner: 'eltmon', repo: 'overdeck' }] });
@@ -341,15 +346,13 @@ describe('resource-discovery terminal issue filtering', () => {
         baseRefName: 'main',
       },
     ];
-    mocks.gatherProjectLensSignals.mockResolvedValue([{
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
       issueId: 'PAN-2054',
-      issueOpen: false,
-      hasOpenPr: true,
-      hasMergedPr: false,
-      hasConventionBranch: false,
-      branchUnmerged: false,
-      phaseLabel: null,
-      hasVbriefSpec: false,
+      inPipeline: true,
+      bucket: 'zombie_pr',
+      reasons: ['open PR'],
+      labelDrift: null,
+      lenses: { L1_openPr: true, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: null },
     }]);
 
     const withOpenPr = await discoverResourceAllocatedIssues();
@@ -364,7 +367,34 @@ describe('resource-discovery terminal issue filtering', () => {
     expect(withOpenPr.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
     expect(withOpenPr[0]?.resourceSources).toContain('pr');
     expect(withOpenPr[0]?.pipelineBucket).toBe('zombie_pr');
-    expect(withOpenPr[0]?.resourceDrift).toBe(false);
+  });
+});
+
+describe('resource-discovery mixed tracker projects', () => {
+  it('uses the cached membership service and tolerates projects without GitHub repositories', async () => {
+    mocks.listProjectsSync.mockReturnValue([
+      { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } },
+      { key: 'mind-your-now', config: { name: 'mind-your-now', path: '/tmp/myn', issue_prefix: 'MIN' } },
+    ]);
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-1966', title: 'GitHub work', state: 'open', rawTrackerState: 'OPEN' },
+      { identifier: 'MIN-1', title: 'Linear work', state: 'open', rawTrackerState: 'Started' },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1966', 'agent-min-1']));
+    mocks.getPipelineMembershipForProjects.mockImplementation(async (configs: Array<{ github_repo?: string }>) =>
+      configs.some((config) => config.github_repo) ? [{
+        issueId: 'PAN-1966', inPipeline: true, bucket: 'in_flight', reasons: ['open issue'], labelDrift: null,
+        lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
+      }] : []);
+
+    const discovered = await discoverResourceAllocatedIssues();
+
+    expect(discovered.map((issue) => issue.issueId)).toEqual(['PAN-1966']);
+    expect(mocks.getPipelineMembershipForProjects).toHaveBeenCalledOnce();
+    expect(mocks.getPipelineMembershipForProjects).toHaveBeenCalledWith(expect.arrayContaining([
+      expect.objectContaining({ name: 'overdeck' }),
+      expect.objectContaining({ name: 'mind-your-now' }),
+    ]));
   });
 });
 
@@ -393,6 +423,7 @@ describe('resource-discovery review-status batching', () => {
   });
 
   it('loads ready-for-merge status for a terminal issue that still has an open PR', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-2054', 'zombie_pr')]);
     mocks.issueService.getIssues.mockReturnValue([
       {
         identifier: 'PAN-2054',
@@ -476,6 +507,7 @@ describe('resource-discovery branch-ahead signal', () => {
   });
 
   it('records branchAheadOfMain true for a bypass branch with unmerged work', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-9002')]);
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-9002', title: 'Bypass', state: 'in_progress', rawTrackerState: 'In Progress' },
     ]);
@@ -490,6 +522,7 @@ describe('resource-discovery branch-ahead signal', () => {
   });
 
   it('records branchAheadOfMain false for a feature branch fully merged into main', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-9001')]);
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-9001', title: 'Merged', state: 'in_progress', rawTrackerState: 'In Progress' },
     ]);
@@ -503,6 +536,7 @@ describe('resource-discovery branch-ahead signal', () => {
   });
 
   it('admits an inactive issue when a branch is ahead of main (PAN-2602)', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-9003')]);
     resetResourceAllocatedIssuesCacheForTests();
     // Re-use the branch mock but give the issue a non-active tracker state.
     mocks.issueService.getIssues.mockReturnValue([
@@ -559,6 +593,7 @@ describe('resource-discovery conversation signal', () => {
   }
 
   it('tags a non-archived conversation with an issueId as a conversation resource source', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([membership('PAN-9003')]);
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-9003', title: 'Conv issue', state: 'in_progress', rawTrackerState: 'In Progress' },
     ]);
@@ -581,7 +616,7 @@ describe('resource-discovery conversation signal', () => {
     expect(discovered.map((entry) => entry.issueId)).toEqual([]);
   });
 
-  it('admits an inactive issue when it has a linked conversation (PAN-2602)', async () => {
+  it('does not let a linked conversation override a clean resolver verdict', async () => {
     mocks.issueService.getIssues.mockReturnValue([
       { identifier: 'PAN-9003', title: 'Conv issue inactive', state: 'open', rawTrackerState: 'OPEN' },
     ]);
@@ -589,8 +624,7 @@ describe('resource-discovery conversation signal', () => {
 
     const discovered = await discoverResourceAllocatedIssues();
 
-    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9003']);
-    expect(discovered[0]?.resourceSources).toContain('conversation');
+    expect(discovered).toEqual([]);
   });
 });
 
@@ -604,6 +638,10 @@ describe('resource-discovery vbrief recency signal', () => {
   });
 
   it('admits an inactive issue when its vBRIEF spec was touched recently', async () => {
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
+      issueId: 'PAN-9005', inPipeline: true, bucket: 'planned', reasons: ['vBRIEF spec'], labelDrift: null,
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
+    }]);
     mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
       if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
         return [{ name: 'feature-pan-9005', isDirectory: () => true }];
@@ -618,7 +656,7 @@ describe('resource-discovery vbrief recency signal', () => {
     expect(discovered[0]?.resourceSources).toContain('vbrief');
   });
 
-  it('preserves a stale vBRIEF resource as orphan-resource drift', async () => {
+  it('excludes stale vBRIEF residue when the resolver reports no pipeline membership', async () => {
     mocks.readdir.mockImplementation(async (path: string, options?: { withFileTypes?: boolean }) => {
       if (typeof path === 'string' && path.endsWith('/workspaces') && options?.withFileTypes) {
         return [{ name: 'feature-pan-9005', isDirectory: () => true }];
@@ -629,9 +667,7 @@ describe('resource-discovery vbrief recency signal', () => {
 
     const discovered = await discoverResourceAllocatedIssues();
 
-    expect(discovered).toEqual([
-      expect.objectContaining({ issueId: 'PAN-9005', pipelineBucket: 'clean_terminal', resourceDrift: true }),
-    ]);
+    expect(discovered).toEqual([]);
   });
 });
 

@@ -15,6 +15,7 @@ export function createPipelineMembershipService(
 ) {
   const cache = new Map<string, { expiresAt: number; value: Promise<PipelineMembership[]> }>();
   return async (project: ProjectConfig): Promise<PipelineMembership[]> => {
+    if (!project.github_repo) return [];
     const key = project.path;
     const cached = cache.get(key);
     if (cached && cached.expiresAt > deps.now()) return cached.value;
@@ -28,6 +29,13 @@ export function createPipelineMembershipService(
 }
 
 export const getProjectPipelineMembership = createPipelineMembershipService();
+
+export async function getPipelineMembershipForProjects(
+  projects: ProjectConfig[],
+  getMembership = getProjectPipelineMembership,
+): Promise<PipelineMembership[]> {
+  return (await Promise.all(projects.map((project) => getMembership(project)))).flat();
+}
 
 export function summarizePipelineMembership(membership: PipelineMembership): IssuePipelineMembership {
   return {

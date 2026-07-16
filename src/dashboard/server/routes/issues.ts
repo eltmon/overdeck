@@ -68,7 +68,7 @@ import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { getProjectPipelineMembership, summarizePipelineMembership } from '../services/pipeline-membership.js';
+import { getPipelineMembershipForProjects, getProjectPipelineMembership, summarizePipelineMembership } from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -232,10 +232,8 @@ const getIssuesRoute = HttpRouter.add(
       if (project) projects.set(resolved.projectKey, project);
     }
     const membershipByIssue = new Map<string, IssuePipelineMembership>();
-    const memberships = yield* Effect.promise(() => Promise.all(
-      [...projects.values()].map((project) => getProjectPipelineMembership(project)),
-    ));
-    for (const membership of memberships.flat()) {
+    const memberships = yield* Effect.promise(() => getPipelineMembershipForProjects([...projects.values()]));
+    for (const membership of memberships) {
       membershipByIssue.set(membership.issueId.toUpperCase(), summarizePipelineMembership(membership));
     }
     return jsonResponse(issues.map((issue) => ({

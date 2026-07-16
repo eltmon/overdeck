@@ -15,13 +15,13 @@ import {
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
-import { gatherProjectLensSignals } from '../../../lib/pipeline-membership-gather.js';
-import { resolvePipelineMembership, type PipelineBucket, type PipelineMembership } from '../../../lib/pipeline-membership.js';
+import type { PipelineBucket, PipelineMembership } from '../../../lib/pipeline-membership.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
 import { getGitHubConfig } from './tracker-config.js';
 import { resolveAgentGitInfo } from './git-info.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
+import { getPipelineMembershipForProjects } from './pipeline-membership.js';
 
 const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
@@ -99,7 +99,6 @@ export interface ResourceAllocatedIssue {
   resourceDetails: ResourceDetails;
   taskTotals: TaskTotals | null;
   pipelineBucket?: PipelineBucket;
-  resourceDrift?: boolean;
 }
 
 interface InternalResourceDetails {
@@ -262,10 +261,6 @@ function isLiveResource(issue: MutableResourceIssue): boolean {
     || issue.resourceDetails.tmuxSessions.length > 0
     || issue.resourceDetails.dockerContainers.length > 0
     || hasOpenPr(issue);
-}
-
-function hasNonTrackerResource(issue: MutableResourceIssue): boolean {
-  return [...issue.resourceSources].some((source) => source !== 'tracker');
 }
 
 function isActiveTrackerState(state: string | null): boolean {
@@ -750,44 +745,17 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   const memberships = new Map<string, PipelineMembership>();
-  const projectSignals = await Promise.all(projects.map((project) => gatherProjectLensSignals(project.config)));
-  for (const signal of projectSignals.flat()) {
-    ensureIssue(signal.issueId);
-    memberships.set(signal.issueId, resolvePipelineMembership(signal));
-  }
-  for (const issue of issueMap.values()) {
-    if (!memberships.has(issue.issueId)) {
-      memberships.set(issue.issueId, resolvePipelineMembership({
-        issueId: issue.issueId,
-        issueOpen: false,
-        hasOpenPr: false,
-        hasMergedPr: false,
-        hasConventionBranch: false,
-        branchUnmerged: false,
-        phaseLabel: null,
-        hasVbriefSpec: false,
-      }));
-    }
+  const projectMemberships = await getPipelineMembershipForProjects(projects.map((project) => project.config));
+  for (const membership of projectMemberships) {
+    ensureIssue(membership.issueId);
+    memberships.set(membership.issueId, membership);
   }
 
-  // PRD acceptance (PAN-862): the tree shows ONLY issues with real in-flight work.
-  // PAN-1966 (durable-signal membership): an active tracker LABEL is NOT sufficient
-  // on its own — labels drift (an issue can stay `in-progress`/`in-review` after its
-  // work landed, or carry a stale planning vBRIEF with no implementation). So a
-  // tracker-active state only qualifies when it is backed by a real implementation
-  // artifact (a feature branch); otherwise inclusion requires ready-for-merge or a
-  // live runtime resource (tmux / docker / open PR / remote agent). A branch or
-  // workspace dir alone (no active label, no live resource) is merged-issue debris
-  // and stays excluded.
-  // PAN-2054: a CLOSED/done/canceled issue is terminal — the operator (or close-out)
-  // has declared it finished. Any workspace, feature branch, or *paused* work-agent
-  // tmux session left behind is stale close-out residue, not active pipeline work.
-  // PAN-2602 (pipeline-signal-union): non-terminal issues also qualify when they have
-  // a branch ahead of main, an active linked conversation, recently-active partial
-  // task completion, tasks currently in progress, or a recently-touched vBRIEF spec.
+  // The canonical resolver owns pipeline inclusion. Resource residue remains
+  // discoverable internally for diagnostics, but it cannot create a pipeline row.
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
-    .filter((issue) => memberships.get(issue.issueId)?.inPipeline || hasNonTrackerResource(issue))
+    .filter((issue) => memberships.get(issue.issueId)?.inPipeline === true)
     .map((issue) => {
         const membership = memberships.get(issue.issueId)!;
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
@@ -823,7 +791,6 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
           resourceDetails: issue.resourceDetails,
           taskTotals: issue.taskTotals,
           pipelineBucket: membership.bucket,
-          resourceDrift: !membership.inPipeline && hasNonTrackerResource(issue),
         } satisfies InternalDiscoveredIssue;
       });
 
