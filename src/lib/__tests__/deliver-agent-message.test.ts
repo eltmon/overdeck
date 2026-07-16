@@ -337,9 +337,9 @@ describe('initial kickoff transcript confirmation', () => {
   });
 
   it.each([
-    'spawnAgent:initial-prompt',
-    'deacon:redeliver-undelivered-kickoff',
-  ])('routes a Codex kickoff through auto delivery for %s when state selected the PTY supervisor', async (caller) => {
+    ['spawnAgent:initial-prompt', undefined],
+    ['deacon:redeliver-undelivered-kickoff', 'supervisor' as const],
+  ])('routes a Codex kickoff through auto delivery for %s', async (caller, deliveryMethod) => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-appserver-kickoff-'));
     const deliver = vi.fn(async () => ({ ok: true, path: 'app-server' as const }));
 
@@ -348,7 +348,7 @@ describe('initial kickoff transcript confirmation', () => {
         baseState.id,
         'Full work instructions for PAN-2771',
         caller,
-        'supervisor',
+        deliveryMethod,
         {
           ...baseOptions,
           getState: vi.fn(async () => ({ ...baseState, harness: 'codex', role: 'work', workspace })),
@@ -414,7 +414,7 @@ describe('initial kickoff transcript confirmation', () => {
         baseState.id,
         'Codex kickoff',
         'spawnAgent:initial-prompt',
-        'supervisor',
+        undefined,
         {
           ...baseOptions,
           getState: vi.fn(async () => null),

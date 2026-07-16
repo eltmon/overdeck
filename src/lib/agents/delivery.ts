@@ -543,7 +543,7 @@ export async function deliverInitialPromptWithRetry(
         `appserver-${normalizedId}.sock`,
       ));
       const kickoffDeliveryMethod = state?.harness === 'codex' || appServerSocketExists
-        ? resilientDeliveryMethod(deliveryMethod)
+        ? 'auto'
         : deliveryMethod;
       const result = await deliver(agentId, deliveredPrompt, caller, kickoffDeliveryMethod);
       if (result.ok) {
