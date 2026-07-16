@@ -51,11 +51,24 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T08:45:44.278Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T08:47Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T08:47:47.943Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T08:47:47Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2168\n\n# Review Synthesis — PAN-2168 — 2026-07-16T04:47:18-04:00\n\n## Verdict: CHANGES REQUESTED — cross-page reveal scroll is lost before the status anchor renders\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-161791f3/context.json`\n- Branch: `feature/pan-2168`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168`\n- HEAD reviewed: `161791f389b81992a9808a7aba8fd356d35fc642`\n- Cycle number: 2\n- Prior cycle SHA: `f78263ef7ac3a220851c06e84b0d8547a4ee7522`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-161791f3/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-161791f3/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-161791f3/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-161791f3/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Cross-page reveal scroll is lost before the status anchor renders — `src/dashboard/frontend/src/pages/FlywheelPage.tsx:398`\nOn a cold Flywheel-page mount, `consumePendingReveal()` immediately schedules one animation-frame lookup for `#flywheel-open-questions`, but the status snapshot that causes `FlywheelStatusDetails` to render may arrive later. The null lookup then discards the one-shot reveal, so the indicator can navigate to the correct page and tab without scrolling to Open Questions. The test preloads status before executing the animation-frame callback and does not cover this production ordering. The reveal intent must remain pending until the Status tab and anchor are rendered, with a regression test where the first frame runs before status arrives. This code is introduced by the PR, so the finding survives the PR scope gate; cycle 2 does not apply the cycle-3 convergence demotion.\n\n## Non-blocking Findings\n\n### [performance] Always-mounted indicator adds redundant steady polling — `src/dashboard/frontend/src/components/OpenQuestionsIndicator.tsx:36`\nThe indicator makes 12 status requests per minute per open tab while also receiving pushed status; opening the Flywheel page doubles that rate for the same resource. Request overlap and cleanup are now bounded, so this is advisory rather than blocking. Prefer relying on the existing subscription after initial hydration, sharing a deduplicated source, or documenting a longer recovery-poll interval if polling is required.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2168/.pan/review/agent-pan-2168-review-161791f3/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2168 -m \"Fixed review issues\"`"
+    }
+  ],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T08:45:47.792Z",
+  "updated": "2026-07-16T08:47:47.943Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "reviewing",
