@@ -418,18 +418,19 @@
     "recordedAt": "2026-07-16T12:07:29.315Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T12:41:46.814Z",
+  "updated": "2026-07-16T12:50:51.316Z",
   "pipeline": {
     "issueId": "PAN-1491",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T12:41:46.750Z",
+    "updatedAt": "2026-07-16T12:50:51.198Z",
     "reviewNotes": "[correctness] Operator-filed bugs are no longer always on top — `src/lib/overdeck/substrate-bug-weights-service.ts:79`",
+    "verificationNotes": "Verification FAILED at test (389233ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx \u001b[2m(\u001b[22m\u001b[2m13 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 558\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/vbrief/VBriefViewer.test.tsx \u001b[2m(\u001b[22m\u001b[2m27 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 434\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/issue-view/StartAgentCta.test.tsx \u001b[2m(\u001b[22m\u001b[2m13 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 895\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/chat/__tests__/ChatMarkdown.test.tsx \u001b[2m(\u001b[22m\u001b[2m8 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 638\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders bare assistant file paths as MarkdownFileLink chips once existence is confirmed \u001b[33m 351\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/SessionDetail.test.tsx \u001b[2m(\u001b[22m\u001b[2m22 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1124\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m calls onClose when close button is clicked \u001b[33m 348\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/chat/__tests__/MarkdownFileLink.test.tsx \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 981\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/ConversationsPage.test.tsx \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1316\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m forces keyword feed search when managed-archived is selected from semantic mode \u001b[33m 502\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/pages/__tests__/FlywheelPage.test.tsx \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1239\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandPalette.test.tsx \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1174\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m shows /pan-flywheel action when searching for flywheel and navigates to the Flywheel page \u001b[33m 418\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/sessions-\n…(387989 chars elided)…\n2m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-spawn-dirty-workspace.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/doctor-main-divergence.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/normalize-harness.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-start-args.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/events.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/remote/__tests__/remote-state-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b\n...(truncated)",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "lastVerifiedCommit": "782a127e82f29cfa7ca44ba9eef0fcbe1321a18f",
@@ -488,9 +489,9 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2792515,
-            "output": 6982,
-            "cacheRead": 2200064,
+            "input": 3488035,
+            "output": 7601,
+            "cacheRead": 2882176,
             "cacheWrite": 0
           },
           "openai/gpt-5.5": {
@@ -500,9 +501,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 32797493,
-            "output": 53999,
-            "cacheRead": 31721216,
+            "input": 33888878,
+            "output": 56586,
+            "cacheRead": 32792064,
             "cacheWrite": 0
           }
         },
@@ -585,9 +586,9 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2792515,
-          "output": 6982,
-          "cacheRead": 2200064,
+          "input": 3488035,
+          "output": 7601,
+          "cacheRead": 2882176,
           "cacheWrite": 0
         },
         "openai/gpt-5.5": {
@@ -597,9 +598,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 32797493,
-          "output": 53999,
-          "cacheRead": 31721216,
+          "input": 33888878,
+          "output": 56586,
+          "cacheRead": 32792064,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -664,8 +665,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 173.185371,
-        "pricingAsOf": "2026-07-16T12:41:46.807Z"
+        "usd": 173.90109,
+        "pricingAsOf": "2026-07-16T12:50:51.269Z"
       }
     },
     "merges": [
