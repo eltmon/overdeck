@@ -5389,3 +5389,19 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Pending fresh reviews not yet synthesized: 1966 (verdict none), 1897, 1491. UNSTABLE (fixing): 2773, 2619. CHANGES REQUESTED (driving): 2760, 2045.
 - Resources healthy: mem 32G avail, 15 devnets (<31 limit).
 - Close-out for 1987/2772 pending main CI green (2772 run in_progress at report time).
+
+## Tick 64b — PAN-2619 test disposition + infra follow-ups filed
+- PAN-2619 **test** role reported TESTS FAILED, but all three failures are pre-existing/environmental — NOT defects in the XTerminal padding fix (typecheck/lint/targeted XTerminal.test.tsx pass). Verified each:
+  - Container live-terminal UAT unrunnable: node-pty (`@lydell/node-pty` 1.2.0-beta.14, glibc prebuilt) segfaults (139) on musl devcontainer base (`node:22-alpine`/`node:20-alpine`); + Vite/Traefik WS proxy drops Origin → `/ws/terminal` 403. → filed **PAN-2809**.
+  - Workspace `vitest --changed` fails on `App.test.tsx` (selectPendingInputSubjects mock, from 2f4648e673) while **GitHub CI `test` on main is GREEN** — workspace-vs-CI harness divergence, NOT red-main. → filed **PAN-2810**.
+- 2619 itself is mid-fix: work agent alive (17:30, codex), head e3568752 past stale review run 2f507575 → review will re-run. No override now.
+- **DECISION RULE for 2619 close-out:** its AC-mandated browser UAT is un-runnable in-container (PAN-2809). When 2619's review APPROVES + code CI green, close with an HONEST `pan close --accept-<uat/verification>` citing PAN-2809 as the reason — do NOT block 2619 indefinitely on infra that affects all containerized workspaces. Only ever accept AFTER review approves the code.
+- Both PAN-2809/2810 filed as backstop-as-symptom, NOT driven (DRAIN in force outside authorized set).
+
+## Tick 65 — 2026-07-16 ~17:46 — HARNESS REVERSED to claude-code (CORRECTS tick 64)
+- **Operator REVERSED the codex flip.** `providers.openai.harness` is back to **claude-code** (config line 6 verified). Codex was only an emergency stopgap; operator says codex has serious problems right now and set claude-code deliberately.
+- **Real root cause of the afternoon review-synthesis wedge was PAN-2318 event-loop starvation (fixed ~17:00), NOT the harness.** claude-code agents depend on server-mediated delivery so they looked wedged; codex agents don't, which is why only claude-code appeared stuck. Do NOT re-attribute to PAN-1865/harness. Do NOT re-flip to codex.
+- Evidence backing reversal: live gpt-5.6-sol/claude-code conv passed git/read/test/write cleanly; direct 170k-token gpt-5.6-sol CLIProxy request 200 in 3s; PAN-2441 CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000 present in agent+conv launchers.
+- **Posture now:** let IN-FLIGHT codex reviews finish (don't kill working convoys); NEW spawns = claude-code+CLIProxy. WATCH the first claude-code review convoy — if synthesis stalls with server HEALTHY, capture pane+transcript+cliproxy.log window immediately and report (that's NEW evidence, not the old wedge).
+- Merges landed earlier this session on the (now-reverted) codex path remain valid: PAN-1987 (1e1efdb358), PAN-2772 (7b24be7f82) — both fresh APPROVED against exact head, CI green.
+- **Merge queue:** PAN-2760 PR#2797 FRESH APPROVED (run 42df3363==head), all checks green EXCEPT `test` still PENDING → hold until test passes, then merge. Do NOT --admin over pending test.

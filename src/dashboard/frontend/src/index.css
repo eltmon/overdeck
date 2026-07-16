@@ -199,6 +199,11 @@ body::after {
   line-height: 1.5;
 }
 
+/* FitAddon measures the parent box but subtracts padding from .xterm only. */
+.xterm-host .xterm {
+  padding: 8px;
+}
+
 /* ─── Semantic badge/status backgrounds (opacity variants via color-mix) ─── */
 /* These provide theme-aware opacity backgrounds for status badges and pills. */
 @layer utilities {

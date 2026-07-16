@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import type { Harness, SettingsConfig } from '../types';
 import {
@@ -26,7 +25,7 @@ function HarnessSelect({ model, value, settings, onChange, label = 'Harness' }: 
   </select></label>;
 }
 
-export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onChange, onRemove }: {
+export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onChange, onRequestRemove }: {
   crew: Crew;
   owned: string[];
   ownedKinds: string[];
@@ -34,9 +33,8 @@ export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onC
   open: boolean;
   onToggle: () => void;
   onChange: (crew: Crew) => void;
-  onRemove: () => void;
+  onRequestRemove: () => void;
 }) {
-  const [removeError, setRemoveError] = useState<string | null>(null);
   const entries = crew.distribution;
   const total = entries?.reduce((sum, entry) => sum + entry.weight, 0) ?? 100;
   const mismatch = (entry: Pick<CrewEntry, 'model' | 'harness'>) => entry.harness !== providerDefaultHarness(entry.model, settings);
@@ -49,11 +47,25 @@ export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onC
   };
 
   return <details open={open} className="rounded-lg border border-border/70">
-    <summary onClick={(event) => { event.preventDefault(); onToggle(); }} className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 focus-visible:ring-2 focus-visible:ring-primary">
-      <span aria-hidden>{open ? '▾' : '▸'}</span><span className="font-medium text-foreground">{crewLabel(crew)}</span>
+    <summary onClick={(event) => { event.preventDefault(); onToggle(); }} className="group flex cursor-pointer list-none items-center gap-2 px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary focus-within:bg-muted/40">
+      <span aria-hidden>{open ? '▾' : '▸'}</span>
+      <span className="text-[10px] text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-within:opacity-100">edit</span>
+      <span className="font-medium text-foreground">{crewLabel(crew)}</span>
       {warning && <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-700 dark:text-amber-300">⚠ harness overrides provider default — PAN-1865</span>}
       <span className="ml-auto text-[11px] text-muted-foreground">{owned.length || ownedKinds.length ? `handles ${[...owned, ...ownedKinds.map((kind) => `${kind} override`)].join(' · ')}` : 'handles nothing — assign it on the board or remove it'}</span>
       <span className="text-[11px] font-medium text-cyan-600 dark:text-cyan-400">{cost == null ? '—' : `≈ $${cost.toFixed(1)}/1M`}</span>
+      {!open && <button
+        type="button"
+        aria-label={`Remove crew ${crewLabel(crew)}`}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onRequestRemove();
+        }}
+        className="rounded px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        × remove
+      </button>}
     </summary>
     <div className="space-y-3 border-t border-border/70 px-4 py-3">
       {!entries ? <div className="grid gap-3 @xl:grid-cols-2">
@@ -72,13 +84,8 @@ export function CrewRow({ crew, owned, ownedKinds, settings, open, onToggle, onC
       </>}
       <div className="flex justify-between gap-2">
         <button type="button" onClick={() => entries ? onChange({ ...crew, distribution: undefined }) : onChange({ ...crew, distribution: [{ model: crew.model, harness: crew.harness, weight: 100 }] })} className="rounded-md border border-border px-2.5 py-1.5 text-xs">{entries ? 'Use one model' : 'Use a weighted mix'}</button>
-        <button type="button" onClick={() => {
-          if (owned.length) setRemoveError('Assign these difficulties to another crew before removing it.');
-          else if (ownedKinds.length) setRemoveError('Move or remove these kind overrides before removing this crew.');
-          else onRemove();
-        }} className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground">Remove crew</button>
+        <button type="button" onClick={onRequestRemove} className="rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground">Remove crew</button>
       </div>
-      {removeError && <p className="text-xs text-destructive">{removeError}</p>}
     </div>
   </details>;
 }
