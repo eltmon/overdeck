@@ -17,6 +17,11 @@
       "timestamp": "2026-07-16T18:48:48.339Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:48:52.953Z"
     }
   ],
   "feedback": [],
@@ -64,7 +69,7 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:48:54.386Z",
+  "updated": "2026-07-16T18:48:55.747Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "reviewing",
@@ -224,7 +229,7 @@
       },
       "costAtCloseOut": {
         "usd": 68.113843,
-        "pricingAsOf": "2026-07-16T18:48:54.371Z"
+        "pricingAsOf": "2026-07-16T18:48:53.865Z"
       }
     },
     "merges": [
