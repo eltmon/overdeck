@@ -182,6 +182,27 @@ describe('PipelineView', () => {
     expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
   });
 
+  it('falls back to tracker state when membership is unavailable', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({
+          identifier: 'PAN-15', title: 'Open while unavailable', state: 'in_progress',
+          pipelineMembership: { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null },
+        }),
+        issue({
+          identifier: 'PAN-16', title: 'Closed while unavailable', state: 'completed',
+          pipelineMembership: { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null },
+        }),
+      ],
+      reviewStatusByIssueId: {}, agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.getByText('Open while unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Closed while unavailable')).not.toBeInTheDocument();
+  });
+
   it('renders an explicitly ready issue admitted by canonical membership in the Ready lane', () => {
     useDashboardStore.setState({
       issuesRaw: [issue({

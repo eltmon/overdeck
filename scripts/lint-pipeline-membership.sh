@@ -52,7 +52,7 @@ if [[ $# -gt 0 ]]; then
   exit 2
 fi
 
-require_reference src/dashboard/server/services/resource-discovery.ts 'getPipelineMembershipForProjects' 'resource discovery'
+require_reference src/dashboard/server/services/resource-discovery.ts 'getPipelineMembershipResultsForProjects' 'resource discovery'
 require_reference src/dashboard/frontend/src/lib/pipeline-state.ts 'pipelineMembership' 'frontend pipeline state'
 require_reference src/cli/commands/pending.ts 'resolvePipelineMembership' 'pan pending'
 require_reference src/lib/reconstruct/enumerate-in-flight.ts 'resolvePipelineMembership' 'in-flight reconstruction'

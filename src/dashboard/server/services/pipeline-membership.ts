@@ -57,6 +57,41 @@ export async function getPipelineMembershipResultsForProjects(
   });
 }
 
+interface MembershipSnapshot {
+  value: PipelineMembership[];
+  refreshedAt: number;
+  refresh?: Promise<void>;
+}
+
+const membershipSnapshots = new Map<string, MembershipSnapshot>();
+
+/** Return the latest successful snapshot immediately and refresh stale/missing projects in the background. */
+export function getPipelineMembershipSnapshotsForProjects(
+  projects: ProjectConfig[],
+  getMembership = getProjectPipelineMembership,
+  now = Date.now,
+): ProjectPipelineMembershipResult[] {
+  return projects.map((project) => {
+    if (!project.github_repo) return { project, error: new Error('Pipeline membership unavailable: missing github_repo') };
+    const snapshot = membershipSnapshots.get(project.path);
+    if (!snapshot?.refresh && (!snapshot || now() - snapshot.refreshedAt >= PIPELINE_MEMBERSHIP_TTL_MS)) {
+      const current = snapshot ?? { value: [], refreshedAt: 0 };
+      current.refresh = getMembership(project).then((value) => {
+        current.value = value;
+        current.refreshedAt = now();
+      }).catch(() => {
+        // Keep the last successful snapshot; a cold caller remains unavailable.
+      }).finally(() => {
+        current.refresh = undefined;
+      });
+      membershipSnapshots.set(project.path, current);
+    }
+    return snapshot?.refreshedAt
+      ? { project, memberships: snapshot.value }
+      : { project, error: new Error('Pipeline membership snapshot is loading') };
+  });
+}
+
 export function summarizePipelineMembership(membership: PipelineMembership): IssuePipelineMembership {
   return {
     available: true,

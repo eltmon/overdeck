@@ -39,7 +39,9 @@ function deps(): PipelineMembershipGatherDeps {
   return {
     listOpenIssues: vi.fn().mockResolvedValue([{ number: 1, labels: ['in-review'] }]),
     listPhaseLabeledIssues: vi.fn().mockResolvedValue([]),
-    listOpenPullRequests: vi.fn().mockResolvedValue([{ headRefName: 'feature/pan-2' }]),
+    listOpenPullRequests: vi.fn().mockResolvedValue([{
+      headRefName: 'feature/pan-2', headRepoFullName: 'eltmon/overdeck',
+    }]),
     listMergedPullRequestHeads: vi.fn().mockResolvedValue(['feature/pan-1']),
     listIssueStates: vi.fn().mockImplementation(async (_owner, _repo, numbers: number[]) =>
       numbers.map((number) => ({ number, state: number === 4 ? 'open' as const : 'closed' as const }))),
@@ -114,6 +116,25 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listOpenPullRequests).not.toHaveBeenCalled();
     expect(mocked.listMergedPullRequestHeads).not.toHaveBeenCalled();
     expect(mocked.run).not.toHaveBeenCalled();
+  });
+
+  it('rejects GitHub projects without an issue prefix', async () => {
+    await expect(gatherProjectLensSignals({ ...project, issue_prefix: undefined }, deps()))
+      .rejects.toThrow('Missing issue_prefix');
+  });
+
+  it('ignores foreign refs, specs, and fork pull requests', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([
+      { headRefName: 'feature/pan-2', headRepoFullName: 'someone/overdeck' },
+      { headRefName: 'feature/krux-3', headRepoFullName: 'eltmon/overdeck' },
+    ]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['KRUX-4']);
+    mocked.run = vi.fn().mockResolvedValue('feature/krux-5\n');
+
+    await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
   });
 
   it('resolves issue states with one bulk dependency call', async () => {
@@ -259,6 +280,17 @@ describe('gatherProjectLensSignals', () => {
     )).rejects.toThrow('Incomplete merged-PR GraphQL response');
     await expect(listIssueStatesBatched('eltmon', 'overdeck', [1], partial))
       .rejects.toThrow('Incomplete issue-state GraphQL response');
+  });
+
+  it('accepts an explicit null issue alias but rejects an omitted alias', async () => {
+    const explicitNull = vi.fn().mockResolvedValue(JSON.stringify({
+      data: { repository: { i0: null } },
+    }));
+    const omitted = vi.fn().mockResolvedValue(JSON.stringify({ data: { repository: {} } }));
+
+    await expect(listIssueStatesBatched('eltmon', 'overdeck', [404], explicitNull)).resolves.toEqual([]);
+    await expect(listIssueStatesBatched('eltmon', 'overdeck', [404], omitted))
+      .rejects.toThrow('Missing issue-state alias i0');
   });
 
   it('lets the resolver correct squash lineage using the merged-PR oracle', async () => {

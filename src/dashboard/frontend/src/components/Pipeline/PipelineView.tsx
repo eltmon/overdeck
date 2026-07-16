@@ -77,7 +77,7 @@ function isClosedIssue(issue: Issue) {
 }
 
 function isOutsidePipeline(issue: Issue) {
-  return issue.pipelineMembership
+  return issue.pipelineMembership?.available !== false && issue.pipelineMembership
     ? issue.pipelineMembership.inPipeline !== true
     : isClosedIssue(issue);
 }

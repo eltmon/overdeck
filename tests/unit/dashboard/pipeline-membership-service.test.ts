@@ -4,6 +4,7 @@ import {
   createPipelineMembershipService,
   getPipelineMembershipForProjects,
   getPipelineMembershipResultsForProjects,
+  getPipelineMembershipSnapshotsForProjects,
   PIPELINE_MEMBERSHIP_TTL_MS,
   summarizePipelineMembership,
 } from '../../../src/dashboard/server/services/pipeline-membership.js';
@@ -83,5 +84,18 @@ describe('pipeline membership service', () => {
 
     expect(results[0]).toMatchObject({ project: projects[0], memberships: [{ issueId: 'PAN-1' }] });
     expect(results[1]).toMatchObject({ project: projects[1], error: failure });
+  });
+
+  it('returns unavailable on a cold read, then serves the successful snapshot while refreshing', async () => {
+    const project = { name: 'snapshot-test', path: '/snapshot-test', github_repo: 'owner/repo' };
+    const getMembership = vi.fn().mockResolvedValue([{ issueId: 'PAN-1' }]);
+
+    expect(getPipelineMembershipSnapshotsForProjects([project], getMembership)[0]?.error).toBeInstanceOf(Error);
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+    expect(getPipelineMembershipSnapshotsForProjects([project], getMembership)[0]?.memberships).toEqual([{ issueId: 'PAN-1' }]);
+
+    await vi.advanceTimersByTimeAsync(PIPELINE_MEMBERSHIP_TTL_MS + 1);
+    expect(getPipelineMembershipSnapshotsForProjects([project], getMembership)[0]?.memberships).toEqual([{ issueId: 'PAN-1' }]);
   });
 });

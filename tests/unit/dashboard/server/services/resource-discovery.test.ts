@@ -27,6 +27,14 @@ vi.mock('node:child_process', () => ({
 
 vi.mock('../../../../../src/dashboard/server/services/pipeline-membership.js', () => ({
   getPipelineMembershipForProjects: mocks.getPipelineMembershipForProjects,
+  getPipelineMembershipResultsForProjects: async (configs: Array<{ name: string; path: string }>) => [{
+    project: configs[0],
+    memberships: await mocks.getPipelineMembershipForProjects(configs),
+  }],
+}));
+
+vi.mock('../../../../../src/lib/pipeline-membership-gather.js', () => ({
+  listOpenPullRequestsSnapshot: vi.fn(async () => mocks.openPullRequests),
 }));
 
 vi.mock('node:fs/promises', () => ({
@@ -102,7 +110,7 @@ beforeEach(() => {
   mocks.getGitHubConfig.mockReturnValue({ repos: [] });
   mocks.loadReadyForMergeFlags.mockReturnValue(new Map());
   mocks.listProjectsSync.mockReturnValue([
-    { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN' } },
+    { key: 'overdeck', config: { name: 'overdeck', path: '/tmp/overdeck', issue_prefix: 'PAN', github_repo: 'eltmon/overdeck' } },
   ]);
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
   mocks.listConversations.mockReturnValue([]);
@@ -365,13 +373,6 @@ describe('resource-discovery terminal issue filtering', () => {
 
     const withOpenPr = await discoverResourceAllocatedIssues();
 
-    expect(mocks.getGitHubConfig).toHaveBeenCalled();
-    expect(mocks.execFile).toHaveBeenCalledWith(
-      'gh',
-      expect.arrayContaining(['pr', 'list']),
-      expect.any(Object),
-      expect.any(Function),
-    );
     expect(withOpenPr.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
     expect(withOpenPr[0]?.resourceSources).toContain('pr');
     expect(withOpenPr[0]?.pipelineBucket).toBe('zombie_pr');

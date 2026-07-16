@@ -68,7 +68,7 @@ import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { getPipelineMembershipResultsForProjects, getProjectPipelineMembership, summarizePipelineMembership, unavailablePipelineMembership } from '../services/pipeline-membership.js';
+import { getPipelineMembershipResultsForProjects, getPipelineMembershipSnapshotsForProjects, getProjectPipelineMembership, summarizePipelineMembership, unavailablePipelineMembership } from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -236,7 +236,7 @@ const getIssuesRoute = HttpRouter.add(
       }
     }
     const membershipByIssue = new Map<string, IssuePipelineMembership>();
-    const results = yield* Effect.promise(() => getPipelineMembershipResultsForProjects([...projects.values()]));
+    const results = getPipelineMembershipSnapshotsForProjects([...projects.values()]);
     const successfulPaths = new Set<string>();
     const failedPaths = new Set<string>();
     for (const result of results) {

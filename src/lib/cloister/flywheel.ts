@@ -176,11 +176,12 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
             if (issuesWithSpecs.has(id)) return true;
             return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
           };
+          const membershipAvailable = Boolean(projectConfig?.github_repo);
           const memberships = projectConfig?.github_repo
             ? (await gatherProjectLensSignals(projectConfig)).map(resolvePipelineMembership)
             : [];
           const isInPipeline = (issueId: string): boolean =>
-            !projectConfig?.github_repo || isIssueInResolvedPipeline(issueId, memberships);
+            membershipAvailable ? isIssueInResolvedPipeline(issueId, memberships) : true;
 
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
@@ -188,7 +189,10 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true, autoPickupBacklog: options.autoPickupBacklog, predictedConflictSignals });
           let nextLine: string;
           let pickInstruction: string;
-          if (!nextPick) {
+          if (!membershipAvailable) {
+            nextLine = 'MEMBERSHIP UNAVAILABLE: project has no GitHub repository; auto-pickup is disabled';
+            pickInstruction = '\n\nIMPORTANT: Canonical pipeline membership is unavailable for this project. Do NOT auto-start backlog work; surface the missing github_repo configuration to the operator.';
+          } else if (!nextPick) {
             nextLine = 'No eligible issue found in sequence — fall back to normal priority';
             pickInstruction = '';
           } else if (nextPick.planning === 'interactive') {

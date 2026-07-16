@@ -17,6 +17,7 @@ import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
+import { withConcurrencyLimitPromise } from './concurrency.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -628,13 +629,15 @@ export async function listIssuesWithAnyLabelPromise(
   labels: readonly string[],
 ): Promise<GitHubIssueLabels[]> {
   const byNumber = new Map<number, GitHubIssueLabels>();
-  for (const label of labels) {
-    const issues = await githubApiAllPages<{
+  const issueGroups = await withConcurrencyLimitPromise(labels.map((label) => async () =>
+    githubApiAllPages<{
       number: number;
       state: 'open' | 'closed';
       pull_request?: unknown;
       labels?: Array<string | { name?: string | null }>;
-    }>(`/repos/${owner}/${repo}/issues?state=all&labels=${encodeURIComponent(label)}`);
+    }>(`/repos/${owner}/${repo}/issues?state=all&labels=${encodeURIComponent(label)}`)
+  ), 3);
+  for (const issues of issueGroups) {
     for (const issue of issues) {
       if (issue.pull_request != null) continue;
       byNumber.set(issue.number, {

@@ -16,12 +16,12 @@ import {
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
 import type { PipelineBucket, PipelineMembership } from '../../../lib/pipeline-membership.js';
+import { listOpenPullRequestsSnapshot } from '../../../lib/pipeline-membership-gather.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
-import { getGitHubConfig } from './tracker-config.js';
 import { resolveAgentGitInfo } from './git-info.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
-import { getPipelineMembershipForProjects } from './pipeline-membership.js';
+import { getPipelineMembershipResultsForProjects } from './pipeline-membership.js';
 
 const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
@@ -342,26 +342,21 @@ async function loadDockerContainers(): Promise<string[]> {
   }
 }
 
-async function loadOpenPullRequests(): Promise<Map<string, GhPullRequest[]>> {
+async function loadOpenPullRequests(projects: ProjectRef[]): Promise<Map<string, GhPullRequest[]>> {
   const pullRequests = new Map<string, GhPullRequest[]>();
-  const githubConfig = getGitHubConfig();
-  const repos = githubConfig?.repos ?? [];
-
-  await Promise.all(repos.map(async (repo) => {
+  await Promise.all(projects.map(async (project) => {
+    if (!project.config.github_repo) return;
+    const [owner, repo] = project.config.github_repo.split('/');
+    if (!owner || !repo) return;
     try {
-      const { stdout } = await execFileAsync(
-        'gh',
-        [
-          'pr', 'list',
-          '--repo', `${repo.owner}/${repo.repo}`,
-          '--state', 'open',
-          '--limit', '200',
-          '--json', 'number,title,url,state,isDraft,headRefName,baseRefName',
-        ],
-        { encoding: 'utf-8', timeout: 15000, maxBuffer: 4 * 1024 * 1024 },
-      );
-      const prs = JSON.parse(stdout) as GhPullRequest[];
-      for (const pr of prs) {
+      const prs = await listOpenPullRequestsSnapshot(owner, repo);
+      for (const row of prs) {
+        if (row.number === undefined || row.title === undefined || row.url === undefined
+          || row.state === undefined || row.isDraft === undefined || row.baseRefName === undefined) continue;
+        const pr: GhPullRequest = {
+          number: row.number, title: row.title, url: row.url, state: row.state,
+          isDraft: row.isDraft, headRefName: row.headRefName, baseRefName: row.baseRefName,
+        };
         const issueId = parseIssueIdFromTextSync(pr.headRefName);
         if (!issueId) continue;
         const existing = pullRequests.get(issueId) ?? [];
@@ -499,7 +494,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     loadTrackerIssues(),
     loadTmuxSessions(),
     loadDockerContainers(),
-    loadOpenPullRequests(),
+    loadOpenPullRequests(projects),
   ]);
 
   const issueMap = new Map<string, MutableResourceIssue>();
@@ -747,10 +742,12 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   const memberships = new Map<string, PipelineMembership>();
-  const projectMemberships = await getPipelineMembershipForProjects(projects.map((project) => project.config));
-  for (const membership of projectMemberships) {
-    ensureIssue(membership.issueId);
-    memberships.set(membership.issueId, membership);
+  const projectMemberships = await getPipelineMembershipResultsForProjects(projects.map((project) => project.config));
+  for (const result of projectMemberships) {
+    for (const membership of result.memberships ?? []) {
+      ensureIssue(membership.issueId);
+      memberships.set(membership.issueId, membership);
+    }
   }
 
   // The canonical resolver owns pipeline inclusion. Resource residue remains
