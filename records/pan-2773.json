@@ -119,17 +119,17 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T19:58:00.112Z",
+  "updated": "2026-07-16T19:59:27.979Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:57:59.933Z",
+    "updatedAt": "2026-07-16T19:59:27.830Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2773-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "Verification FAILED at test (64575ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/Stage/PaneBar.test.tsx \u001b[2m(\u001b[22m\u001b[2m10 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 597\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders a tab per pane in order, HOME first with a ⌘1 hint \u001b[33m 328\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/chat/__tests__/ComposerPromptEditor.test.tsx \u001b[2m(\u001b[22m\u001b[2m22 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1312\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/chat/__tests__/ComposerFooter.test.tsx \u001b[2m(\u001b[22m\u001b[2m26 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1188\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/SessionDetail.test.tsx \u001b[2m(\u001b[22m\u001b[2m22 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1445\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m calls onClose when close button is clicked \u001b[33m 397\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/ConversationsPage.test.tsx \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1474\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m defaults to all sources and renders feed rows in backend order \u001b[33m 372\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m forces keyword feed search when managed-archived is selected from semantic mode \u001b[33m 526\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/Settings/__tests__/RolesPanel.test.tsx \u001b[2m(\u001b[22m\u001b[2m10 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 2851\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders role cards in order with workhorse, specific model, and flywheel choices \u001b[33m 984\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m expands work and review cards to show configured sub-role defaults \u001b[33m 319\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m round-trips nested role edits through PUT /api/settings \u001b[33m 371\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/sessions-page-no-loss.test.tsx \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33\n…(29570 chars elided)…\n✓\u001b[22m\u001b[39m 404: returns httpStatus=404 when workspace does not exist \u001b[33m 2442\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | src/dashboard/server/services/__tests__/auto-merge-executor.test.ts\u001b[2m > \u001b[22m\u001b[2mauto-merge executor\u001b[2m > \u001b[22m\u001b[2mmarks due entries blocked when fire-time eligibility fails\n\u001b[22m\u001b[39m[auto-merge] lost block race for PAN-1486 (#1), skipping\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/services/__tests__/auto-merge-executor.test.ts \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 22\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/approve-push.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 12\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/uat-stack-actions-auth.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 19\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/no-op-rebase.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[2\n...(truncated)",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
@@ -137,7 +137,7 @@
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
     "lastVerifiedCommit": "021ccdb83471a6cb7779d7c53f131b056964bc8c",
     "reviewRequestedAt": "2026-07-16T19:33:54.654Z",
-    "reviewSpawnedAt": "2026-07-16T19:34:04.385Z",
+    "reviewSpawnedAt": "2026-07-16T19:59:27.829Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -252,9 +252,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3472747,
-            "output": 280292,
-            "cacheRead": 72594432,
+            "input": 3512027,
+            "output": 282898,
+            "cacheRead": 73775104,
             "cacheWrite": 0
           }
         }
@@ -267,9 +267,9 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 12534995,
-          "output": 420197,
-          "cacheRead": 97116672,
+          "input": 12574275,
+          "output": 422803,
+          "cacheRead": 98297344,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -280,8 +280,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 139.40793,
-        "pricingAsOf": "2026-07-16T19:58:00.034Z"
+        "usd": 140.272846,
+        "pricingAsOf": "2026-07-16T19:59:27.930Z"
       }
     },
     "merges": [
