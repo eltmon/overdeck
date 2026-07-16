@@ -136,9 +136,11 @@ function PolicyRow({ label, help, overridden, reset, note, children }: PolicyRow
       <span className={`flex items-center gap-1.5 pt-1 text-[12px] font-medium ${overridden ? 'text-foreground' : 'text-muted-foreground'}`}>
         <span className={`h-[5px] w-[5px] shrink-0 rounded-full bg-primary ${overridden ? 'opacity-100' : 'opacity-0'}`} />
         {label}
+        {/* Opens vertically so the row's own control, which shares this line, stays readable.
+            A horizontal side would cover it: the trigger sits in the label column. */}
         <HelpTooltip
           label={label}
-          side="left"
+          side="top"
           content={<TooltipBody title={help.title} body={help.body} options={help.options} />}
         />
       </span>
