@@ -25,6 +25,14 @@ function readDevcontainerTemplate(): DevcontainerCompose {
 }
 
 describe('devcontainer init command', () => {
+  it('skips package lifecycle scripts on both dependency install attempts', () => {
+    const compose = readDevcontainerTemplate();
+    const command = compose.services?.init?.command;
+
+    expect(command).toEqual(expect.any(String));
+    expect(command?.match(/bun install --ignore-scripts/g)).toHaveLength(2);
+  });
+
   it('keeps the better-sqlite3 rebuild non-fatal', () => {
     const compose = readDevcontainerTemplate();
     const command = compose.services?.init?.command;
