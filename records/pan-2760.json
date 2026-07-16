@@ -647,16 +647,16 @@
     "recordedAt": "2026-07-16T21:42:09.171Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T21:50:14.321Z",
+  "updated": "2026-07-16T21:56:44.434Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "reviewing",
     "testStatus": "testing",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:48:50.250Z",
+    "updatedAt": "2026-07-16T21:56:44.307Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2760-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "reviewedAtCommit": "42df3363046d97d9319bda1aa8ab9ac30a87ac17",
@@ -721,42 +721,42 @@
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 644386,
-            "output": 41783,
-            "cacheRead": 6233600,
+            "input": 1086110,
+            "output": 68217,
+            "cacheRead": 11388928,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 269428,
-            "output": 8151,
-            "cacheRead": 2041856,
+            "input": 554685,
+            "output": 24484,
+            "cacheRead": 4505600,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 339976,
-            "output": 54966,
-            "cacheRead": 4193280,
+            "input": 1084066,
+            "output": 105700,
+            "cacheRead": 7184384,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 222795,
-            "output": 8345,
-            "cacheRead": 1885184,
+            "input": 519730,
+            "output": 18816,
+            "cacheRead": 3743232,
             "cacheWrite": 0
           }
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1329,
-            "output": 35259,
-            "cacheRead": 10047426,
-            "cacheWrite": 405332
+            "input": 1339,
+            "output": 36669,
+            "cacheRead": 10884906,
+            "cacheWrite": 413102
           }
         },
         "work": {
@@ -776,9 +776,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 25719912,
-          "output": 452650,
-          "cacheRead": 74541824,
+          "input": 27487918,
+          "output": 556622,
+          "cacheRead": 87010048,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -788,15 +788,15 @@
           "cacheWrite": 520882
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1329,
-          "output": 35259,
-          "cacheRead": 10047426,
-          "cacheWrite": 405332
+          "input": 1339,
+          "output": 36669,
+          "cacheRead": 10884906,
+          "cacheWrite": 413102
         }
       },
       "costAtCloseOut": {
-        "usd": 94.41335600000001,
-        "pricingAsOf": "2026-07-16T21:48:50.393Z"
+        "usd": 112.807698,
+        "pricingAsOf": "2026-07-16T21:56:44.408Z"
       }
     },
     "merges": [
@@ -804,7 +804,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
