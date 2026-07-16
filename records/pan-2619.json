@@ -66,42 +66,20 @@
     "recordedAt": "2026-07-16T21:13:53.247Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:14:12.129Z",
+  "updated": "2026-07-16T21:14:16.847Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:14:09.654Z",
+    "updatedAt": "2026-07-16T21:14:16.821Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "reviewRequestedAt": "2026-07-16T21:14:06.888Z",
     "reviewSpawnedAt": "2026-07-16T21:14:08.103Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/security.md",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/correctness.md",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/performance.md",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/requirements.md",
-        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -200,7 +178,7 @@
       },
       "costAtCloseOut": {
         "usd": 75.3182,
-        "pricingAsOf": "2026-07-16T21:14:09.666Z"
+        "pricingAsOf": "2026-07-16T21:14:16.829Z"
       }
     },
     "merges": [
