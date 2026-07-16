@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
     Promise.resolve({ networkRemoved: true, steps: ['Stopped Docker stack'] }),
   ),
   findWorkspacePath: vi.fn(),
+  listMailboxItems: vi.fn(async () => []),
 }));
 
 vi.mock('child_process', async (importOriginal) => {
@@ -54,6 +55,10 @@ vi.mock('../workspace-manager.js', () => ({
 
 vi.mock('../lifecycle/archive-planning.js', () => ({
   findWorkspacePath: mocks.findWorkspacePath,
+}));
+
+vi.mock('../cloister/agent-mailbox.js', () => ({
+  listMailboxItems: mocks.listMailboxItems,
 }));
 
 import { executeCloseOut } from '../close-out.js';
@@ -199,6 +204,26 @@ describe('executeCloseOut workspace resolution (PAN-2510)', () => {
     expect(mocks.teardownWorkspaceDockerByNamePromise).toHaveBeenCalledWith(issueId.toLowerCase());
     const dockerStep = result.steps.find((step) => step.name === 'Docker stack removed');
     expect(dockerStep?.status).toBe('passed');
+  });
+
+  it('comments pending mailbox items before removing the workspace', async () => {
+    const issueId = 'PAN-2510';
+    const workspacePath = join(projectPath, 'workspaces', 'feature-pan-2510');
+    mkdirSync(workspacePath, { recursive: true });
+    mocks.findWorkspacePath.mockReturnValue(workspacePath);
+    mocks.listMailboxItems.mockResolvedValue([
+      { issueId, role: 'work', source: 'review-agent', summary: 'Fix review', actionRequired: true, state: 'pending', createdAt: '2026-07-16T12:00:00Z', filePath: `${workspacePath}/.pan/feedback/001-review.md`, legacy: false, markdownBody: '' },
+      { issueId, role: 'work', source: 'test-agent', summary: 'Fix tests', actionRequired: true, state: 'pending', createdAt: '2026-07-16T12:01:00Z', filePath: `${workspacePath}/.pan/feedback/002-test.md`, legacy: false, markdownBody: '' },
+    ]);
+
+    await Effect.runPromise(executeCloseOut({ issueId, projectPath, isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 2510 }));
+    const commands = mocks.exec.mock.calls.map(call => String(call[0]));
+    const commentIndex = commands.findIndex(command => command.startsWith('gh issue comment 2510'));
+    const removalIndex = commands.findIndex(command => command.startsWith('git worktree remove'));
+    expect(commentIndex).toBeGreaterThanOrEqual(0);
+    expect(commentIndex).toBeLessThan(removalIndex);
+    expect(commands[commentIndex]).toContain('During close-out the system identified 2 undelivered message(s)');
+    expect(commands[commentIndex]).toContain('treat them as likely stale');
   });
 
   it('records a warning but does not abort when network removal cannot be verified', async () => {

@@ -26,8 +26,15 @@ import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-is
 import { findWorkspacePath } from './lifecycle/archive-planning.js';
 import { teardownWorkspaceDockerByNamePromise } from './workspace-manager/docker.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
+import { listMailboxItems, type MailboxItem } from './cloister/agent-mailbox.js';
 
 const execAsync = promisify(exec);
+
+export function buildPendingMailboxCloseOutComment(items: MailboxItem[]): string {
+  const details = items.map(item =>
+    `- ${item.source}: ${item.summary} (${item.createdAt}) — ${item.filePath}`).join('\n');
+  return `During close-out the system identified ${items.length} undelivered message(s):\n\n${details}\n\nThese were never delivered to a working agent. If this issue is reopened: treat them as likely stale — but consider whether an uncaught message contributed to a premature closure. Do not treat them as current instructions.`;
+}
 
 // Planning/pipeline artifact paths ignored when deciding whether a branch
 // still holds unmerged CODE. `.pan/` is the current artifact home (PAN-967);
@@ -335,6 +342,16 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
     const workspacePath = findWorkspacePath(ctx.projectPath, issueLower);
     const agentSession = `agent-${issueLower}`;
     let cleaned = false;
+
+    if (workspacePath && existsSync(workspacePath)) {
+      const pendingMail = (await listMailboxItems({ issueId: ctx.issueId, role: 'work', workspacePath }))
+        .filter(item => item.state === 'pending');
+      if (pendingMail.length > 0) {
+        const comment = buildPendingMailboxCloseOutComment(pendingMail);
+        await execAsync(`gh issue comment ${ctx.number} --repo ${ctx.owner}/${ctx.repo} --body ${JSON.stringify(comment)}`, { cwd: ctx.projectPath });
+        steps.push({ name: 'Comment pending mailbox', status: 'passed', message: `Commented ${pendingMail.length} undelivered message(s)` });
+      }
+    }
 
     // Kill tmux sessions for this issue
     const exactPatterns = [agentSession, `test-${issueLower}`, `merge-${issueLower}`];
