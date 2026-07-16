@@ -16,6 +16,19 @@ import { shouldRestartForPostMerge } from './merge-agent-step0.js';
 
 const execAsync = promisify(exec);
 
+const SYNC_GIT_FETCH_TIMEOUT_MS = 60_000;
+const SYNC_GIT_MERGE_TIMEOUT_MS = 120_000;
+const SYNC_GIT_COMMIT_TIMEOUT_MS = 60_000;
+const SYNC_GIT_STATUS_TIMEOUT_MS = 30_000;
+
+function describeGitTimeout(error: unknown, label: string, budgetMs: number): string | null {
+  return (error as { killed?: boolean } | null)?.killed === true
+    ? `${label} timed out after ${budgetMs / 1_000}s`
+    : null;
+}
+
+export const __syncMainTestInternals = { describeGitTimeout };
+
 /**
  * Paths that must never enter a pipeline auto-commit, regardless of gitignore
  * state. These are workspace-local or machine-local state files and sync-target
@@ -90,65 +103,50 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     for (const operationHead of ['MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD']) {
       try {
         await execAsync(`git rev-parse -q --verify ${operationHead}`, {
-          cwd: projectPath,
-          encoding: 'utf-8',
+          cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS,
         });
-        return {
-          success: false,
-          committed: false,
-          reason: `Refusing to auto-commit while ${operationHead} exists; finish or abort the in-progress Git operation first`,
-        };
+        return { success: false, committed: false, reason: `Refusing to auto-commit while ${operationHead} exists; finish or abort the in-progress Git operation first` };
       } catch { /* ref absent — continue */ }
     }
 
     try {
       const { stdout: conflictMarkers } = await execAsync(
         "git grep -n -I -E '^(<<<<<<<( |$)|=======$|>>>>>>>( |$))' -- .",
-        { cwd: projectPath, encoding: 'utf-8' },
+        { cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS },
       );
       if (conflictMarkers.trim()) {
         const files = [...new Set(conflictMarkers.trim().split('\n').map((line) => line.split(':', 1)[0]))];
-        return {
-          success: false,
-          committed: false,
-          reason: `Refusing to auto-commit conflict markers in: ${files.join(', ')}`,
-        };
+        return { success: false, committed: false, reason: `Refusing to auto-commit conflict markers in: ${files.join(', ')}` };
       }
     } catch (error: any) {
       // git grep exits 1 when it finds no matches. Any other failure means the
       // safety scan itself was inconclusive, so fail closed.
       if (error?.code !== 1) {
-        return {
-          success: false,
-          committed: false,
-          reason: `Failed to scan for conflict markers: ${error.message}`,
-        };
+        return { success: false, committed: false, reason: `Failed to scan for conflict markers: ${error.message}` };
       }
     }
 
     const { stdout: statusOut } = await execAsync('git status --porcelain', {
-      cwd: projectPath,
-      encoding: 'utf-8',
+      cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS,
     });
     if (!statusOut.trim()) {
       return { success: true, committed: false, reason: 'no uncommitted changes' };
     }
 
     // PAN-1819: plain `git add -A` respects .gitignore; never use -f.
-    await execAsync('git add -A', { cwd: projectPath, encoding: 'utf-8' });
+    await execAsync('git add -A', {
+      cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS,
+    });
 
     // Belt-and-suspenders: unstage excluded paths regardless of ignore state.
-    const resetPaths = AUTO_COMMIT_EXCLUDED_PATHS.map((p) =>
-      p.endsWith('/') ? p.slice(0, -1) : p
-    ).join(' ');
+    const resetPaths = AUTO_COMMIT_EXCLUDED_PATHS
+      .map((p) => p.endsWith('/') ? p.slice(0, -1) : p).join(' ');
     await execAsync(`git reset HEAD -- ${resetPaths}`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
+      cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS,
     });
 
     const { stdout: diffStat } = await execAsync('git diff --cached --stat', {
-      cwd: projectPath,
-      encoding: 'utf-8',
+      cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS,
     });
     if (!diffStat.trim()) {
       return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
@@ -157,10 +155,15 @@ export async function autoCommitWorkspaceChangesBeforeSync(
     const commitMessage = issueId
       ? `chore: auto-commit before sync with main (${issueId})`
       : 'chore: auto-commit before sync with main';
-    await execAsync(`git commit -m "${commitMessage}"`, {
-      cwd: projectPath,
-      encoding: 'utf-8',
-    });
+    try {
+      await execAsync(`git commit -m "${commitMessage}"`, {
+        cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_COMMIT_TIMEOUT_MS,
+      });
+    } catch (error) {
+      const timeoutReason = describeGitTimeout(error, 'Auto-commit git commit', SYNC_GIT_COMMIT_TIMEOUT_MS);
+      if (timeoutReason) return { success: false, committed: false, reason: timeoutReason };
+      throw error;
+    }
     return { success: true, committed: true };
   } catch (error: any) {
     return { success: false, committed: false, reason: `Failed to auto-commit: ${error.message}` };
@@ -1246,6 +1249,20 @@ export async function scanForConflictMarkers(projectPath: string): Promise<strin
   }
 }
 
+async function collectSyncMergeStats(projectPath: string): Promise<Pick<SyncMainResult, 'commitCount' | 'changedFiles'>> {
+  let changedFiles: string[] = [];
+  let commitCount = 0;
+  try {
+    const { stdout } = await execAsync('git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD', { cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS });
+    changedFiles = stdout.trim().split('\n').filter(Boolean);
+  } catch { /* non-fatal */ }
+  try {
+    const { stdout } = await execAsync('git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""', { cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS });
+    commitCount = stdout.trim().split('\n').filter(Boolean).length;
+  } catch { /* non-fatal */ }
+  return { changedFiles, commitCount };
+}
+
 /**
  * Sync the latest main branch into a workspace's feature branch.
  *
@@ -1280,8 +1297,7 @@ export async function syncMainIntoWorkspace(
   // Verify no non-excluded uncommitted changes remain.
   try {
     const { stdout: postCommitStatus } = await execAsync('git status --porcelain', {
-      cwd: projectPath,
-      encoding: 'utf-8',
+      cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS,
     });
     if (postCommitStatus.trim()) {
       const remainingNonExcluded = postCommitStatus
@@ -1322,18 +1338,30 @@ export async function syncMainIntoWorkspace(
   // Fetch latest main
   try {
     console.log(`[sync-main] Fetching origin/main...`);
-    await execAsync('git fetch origin main', { cwd: projectPath, encoding: 'utf-8' });
+    await execAsync('git fetch origin main', {
+      cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_FETCH_TIMEOUT_MS,
+    });
   } catch (error: any) {
-    return { success: false, reason: `Failed to fetch origin/main: ${error.message}` };
+    const timeoutReason = describeGitTimeout(error, 'git fetch origin main', SYNC_GIT_FETCH_TIMEOUT_MS);
+    return { success: false, reason: timeoutReason ?? `Failed to fetch origin/main: ${error.message}` };
   }
 
   // Attempt the merge
   let mergeOutput = '';
   let hasConflicts = false;
   try {
-    const result = await execAsync('git merge origin/main', { cwd: projectPath, encoding: 'utf-8' });
+    const result = await execAsync('git merge origin/main', {
+      cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_MERGE_TIMEOUT_MS,
+    });
     mergeOutput = (result.stdout || '') + (result.stderr || '');
   } catch (error: any) {
+    const timeoutReason = describeGitTimeout(error, 'git merge origin/main', SYNC_GIT_MERGE_TIMEOUT_MS);
+    if (timeoutReason) {
+      try {
+        await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8', timeout: SYNC_GIT_STATUS_TIMEOUT_MS });
+      } catch { /* best-effort cleanup */ }
+      return { success: false, reason: timeoutReason };
+    }
     mergeOutput = (error.stdout || '') + (error.stderr || '');
     hasConflicts = true;
   }
@@ -1350,24 +1378,7 @@ export async function syncMainIntoWorkspace(
     console.log(`[sync-main] Clean merge completed`);
     logActivity('sync_main_success', `Clean merge of main into ${issueId}`);
 
-    let changedFiles: string[] = [];
-    let commitCount = 0;
-    try {
-      const { stdout: diffFiles } = await execAsync(
-        'git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
-    } catch { /* non-fatal */ }
-    try {
-      const { stdout: logOut } = await execAsync(
-        'git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
-    } catch { /* non-fatal */ }
-
-    return { success: true, commitCount, changedFiles };
+    return { success: true, ...await collectSyncMergeStats(projectPath) };
   }
 
   // PAN-1531: sync-main conflict case — surface to operator instead of
@@ -1379,30 +1390,19 @@ export async function syncMainIntoWorkspace(
     console.log(`[sync-main] Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) with origin/main`);
     logActivity('sync_main_auto_resolved_conflicts', `Auto-resolved ${conflictFiles.length} pipeline-owned conflict(s) in ${issueId} with origin/main`);
 
-    let changedFiles: string[] = [];
-    let commitCount = 0;
-    try {
-      const { stdout: diffFiles } = await execAsync(
-        'git diff --name-only ORIG_HEAD HEAD 2>/dev/null || git diff --name-only HEAD~1 HEAD',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      changedFiles = diffFiles.trim().split('\n').filter(f => f.length > 0);
-    } catch { /* non-fatal */ }
-    try {
-      const { stdout: logOut } = await execAsync(
-        'git log ORIG_HEAD..HEAD --oneline 2>/dev/null || echo ""',
-        { cwd: projectPath, encoding: 'utf-8' },
-      );
-      commitCount = logOut.trim().split('\n').filter(l => l.length > 0).length;
-    } catch { /* non-fatal */ }
-
-    return { success: true, commitCount, changedFiles };
+    return { success: true, ...await collectSyncMergeStats(projectPath) };
   }
 
   console.log(`[sync-main] ${conflictFiles.length} conflict(s); aborting merge for manual resolution`);
   logActivity('sync_main_conflicts', `${conflictFiles.length} conflict(s) in ${issueId}: ${conflictFiles.join(', ')}`);
 
-  try { await execAsync('git merge --abort', { cwd: projectPath, encoding: 'utf-8' }); } catch { /* non-fatal */ }
+  try {
+    await execAsync('git merge --abort', {
+      cwd: projectPath,
+      encoding: 'utf-8',
+      timeout: SYNC_GIT_STATUS_TIMEOUT_MS,
+    });
+  } catch { /* non-fatal */ }
 
   return {
     success: false,
