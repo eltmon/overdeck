@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T06:26:05.737Z",
+  "updated": "2026-07-16T06:26:21.910Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -95,8 +95,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "wire-enumerate-in-flight": {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 2336342,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:26:21.910Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -180,6 +188,7 @@
     "membership-endpoint": "completed",
     "membership-endpoint.membership-endpoint.ac1": "completed",
     "membership-endpoint.membership-endpoint.ac2": "completed",
-    "membership-endpoint.membership-endpoint.ac3": "completed"
+    "membership-endpoint.membership-endpoint.ac3": "completed",
+    "wire-enumerate-in-flight": "running"
   }
 }
