@@ -361,20 +361,20 @@
     "recordedAt": "2026-07-16T21:54:06.876Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:54:10.314Z",
+  "updated": "2026-07-16T21:58:24.673Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:54:09.595Z",
+    "updatedAt": "2026-07-16T21:58:24.650Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
-    "lastVerifiedCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
+    "lastVerifiedCommit": "c9ec576763f8addd6fce1d12cd45a2ece4debd41",
     "reviewRequestedAt": "2026-07-16T21:54:07.726Z",
     "reviewSpawnedAt": "2026-07-16T21:54:08.748Z",
     "scopeDrift": {
@@ -451,41 +451,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6026390,
-            "output": 84505,
-            "cacheRead": 19160064,
+            "input": 6303368,
+            "output": 88877,
+            "cacheRead": 20306944,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 4158699,
-            "output": 102024,
-            "cacheRead": 17110528,
+            "input": 4859334,
+            "output": 136551,
+            "cacheRead": 20850688,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 2121029,
-            "output": 36501,
-            "cacheRead": 6187520,
+            "input": 2578167,
+            "output": 40082,
+            "cacheRead": 6477824,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 2652923,
-            "output": 82200,
-            "cacheRead": 8253952,
+            "input": 3845948,
+            "output": 107102,
+            "cacheRead": 10398208,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1984939,
-            "output": 30171,
-            "cacheRead": 4272128,
+            "input": 2448032,
+            "output": 33737,
+            "cacheRead": 4556288,
             "cacheWrite": 0
           }
         },
@@ -507,9 +507,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6560248,
-            "output": 414020,
-            "cacheRead": 117852160,
+            "input": 6570944,
+            "output": 416549,
+            "cacheRead": 118852096,
             "cacheWrite": 0
           }
         }
@@ -522,9 +522,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 28190917,
-          "output": 765955,
-          "cacheRead": 177122816,
+          "input": 31292482,
+          "output": 839432,
+          "cacheRead": 185728512,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -541,8 +541,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 248.550786,
-        "pricingAsOf": "2026-07-16T21:54:09.621Z"
+        "usd": 270.565769,
+        "pricingAsOf": "2026-07-16T21:58:24.659Z"
       }
     },
     "merges": [
