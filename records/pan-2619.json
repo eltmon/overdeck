@@ -181,18 +181,16 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:36:38.803Z",
+  "updated": "2026-07-16T21:37:24.443Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:36:37.882Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed test",
-    "testNotes": "See .pan/test/result.json for full evidence. Code fix verified correct (typecheck, lint, targeted XTerminal.test.tsx PASS). FAILED because broad --changed vitest gate fails on unrelated pre-existing App.test.tsx defect (commit 2f4648e673, untouched by this diff), and required browser UAT could not run: workspace container /ws/terminal rejects upgrades with 403 via frontend Traefik/Vite proxy path, and PTY spawn segfaults (node:22-alpine/musl vs glibc-only @lydell/node-pty-linux-x64). Both pre-existing env defects, out of test-role scope. No host dashboard fallback used. Flywheel notified via pan tell.",
+    "updatedAt": "2026-07-16T21:37:21.252Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "lastVerifiedCommit": "e3568752da539e8a69a62d6d2079775d86ca3c40",
     "reviewRequestedAt": "2026-07-16T21:16:57.434Z",
@@ -219,15 +217,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 631095,
-            "output": 2313,
-            "cacheRead": 490368,
+            "input": 659786,
+            "output": 2342,
+            "cacheRead": 516864,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 14740878,
-            "output": 33591,
-            "cacheRead": 14084352,
+            "input": 15980905,
+            "output": 35676,
+            "cacheRead": 15296512,
             "cacheWrite": 0
           }
         },
@@ -298,15 +296,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 631095,
-          "output": 2313,
-          "cacheRead": 490368,
+          "input": 659786,
+          "output": 2342,
+          "cacheRead": 516864,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20551427,
-          "output": 249552,
-          "cacheRead": 53634304,
+          "input": 21791454,
+          "output": 251637,
+          "cacheRead": 54846464,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -323,8 +321,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 90.552676,
-        "pricingAsOf": "2026-07-16T21:36:38.150Z"
+        "usd": 91.360641,
+        "pricingAsOf": "2026-07-16T21:37:21.464Z"
       }
     },
     "merges": [
