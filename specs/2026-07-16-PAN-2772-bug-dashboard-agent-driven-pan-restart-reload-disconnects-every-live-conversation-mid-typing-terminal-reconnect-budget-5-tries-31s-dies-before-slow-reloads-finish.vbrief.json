@@ -1,0 +1,669 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T05:12:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2772: bug(dashboard): agent-driven pan restart/reload disconnects every live conversation mid-typing; terminal reconnect budget (5 tries / ~31s) dies before slow reloads finish",
+    "updated": "2026-07-16T05:06:32.572Z"
+  },
+  "plan": {
+    "id": "pan-2772",
+    "title": "bug(dashboard): agent-driven pan restart/reload disconnects every live conversation mid-typing; terminal reconnect budget (5 tries / ~31s) dies before slow reloads finish",
+    "status": "proposed",
+    "uid": "bef7a2ec-b1bb-4f40-84da-f142beeefc84",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-16T05:12:00.000Z",
+    "updated": "2026-07-16T05:06:32.572Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2772",
+        "label": "PAN-2772",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "terminal",
+      "websocket",
+      "restart",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Every pan restart (~18-21s down) / pan reload (~46-62s down) severs all /ws/terminal and /ws/rpc WebSockets. The terminal panel's reconnect budget is 5 attempts with 1/2/4/8/16s backoff (~31s), failing fast while the backend is down, so a reload exhausts it and leaves a permanently dead panel with no retry affordance — operators abandon tmux+Claude sessions that are actually still alive. Agent-issued restarts also bypass the deploy patrol's ownership/deferral gates, so conversations restarted the server 8 times in one evening while the patrol correctly deferred.",
+      "Proposal": "Three layered fixes: (1) replace the attempt-counted terminal reconnect budget with a pure time-based patient policy (5-minute window, exponential 1/2/4s then flat 5s) plus a connection-status overlay whose exhausted state offers a manual Reconnect button; (2) broadcast WS close code 4503 'server-restarting' to all terminal clients from the graceful-shutdown handler so the panel shows a calm 'Dashboard restarting' message instead of a scary error; (3) gate agent-issued pan restart/pan reload (OVERDECK_AGENT_ID set) behind getDeployBlockReason() with a --force bypass and a flywheel self-exemption, so ad-hoc agent restarts respect the same deploy-window gates the deploy patrol does.",
+      "NonGoals": "- No restart control frame on /ws/rpc: EventRouter already reconnects indefinitely, re-bootstraps the snapshot, and offers a Retry overlay.\n- No gating of human operators: an unset OVERDECK_AGENT_ID never triggers the restart gate.\n- No live-attachment counting or attachment-aware refusal: the gate uses the existing deploy-window block reasons only, plus an unconditional disconnect notice.\n- No change to the 4404 session-not-found contract: after the server-side respawn wait it remains fatal with no retry.\n- No changes to the deploy patrol itself, the restart lock, or the merge debounce.\n- No new idle/timeout kill paths: the issue verified none exist in the conversation path and none are introduced."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Patient window is 5 minutes with flat 5s cadence after the initial 1/2/4s backoff.",
+        "rationale": "Worst observed reload downtime is 62s; 5 minutes covers slow builds with wide margin without retrying forever against a permanently dead server."
+      },
+      {
+        "summary": "No restart control frame on /ws/rpc; terminal channel only.",
+        "rationale": "EventRouter already reconnects indefinitely with snapshot re-bootstrap and a Retry overlay; extending the Effect RPC protocol for a cosmetic message is not worth the invasiveness. The reported dead-end pain is the terminal panel."
+      },
+      {
+        "summary": "Reconnect button appears only on window exhaustion, not on close code 4404.",
+        "rationale": "4404 is emitted after the server-side respawn-pending wait (ws-terminal.ts:269), meaning the tmux session truly no longer exists — reconnecting cannot help."
+      },
+      {
+        "summary": "Reuse pan restart's existing --force flag (extended help text) and add --force to pan reload, rather than introducing a new bypass flag.",
+        "rationale": "Fewer flags to learn; the wrapper skills are updated in the same commit and lint-skills enforces parity."
+      },
+      {
+        "summary": "Gate agent restarts on getDeployBlockReason() with a hard refusal (exit 1), exempting the flywheel from its own flywheel-ownership reason via injected DeployWindowDependencies.",
+        "rationale": "These are the mechanically owned gates the deploy patrol already respects; blocking the flywheel on its own run id would break the deploy path that owns deployment."
+      }
+    ],
+    "items": [
+      {
+        "id": "reconnect-policy",
+        "title": "Pure time-based terminal reconnect policy module with unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "xterminal-patient-reconnect",
+            "restart-close-code-ux"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
+            "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd src/dashboard/frontend && npx vitest run src/lib/__tests__/terminalReconnectPolicy.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "terminalReconnectPolicy.test.ts passes all tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts exporting: interface ReconnectPolicyState { attempt: number; windowStartedAt: number }, const PATIENT_WINDOW_MS = 5 * 60_000, const FLAT_DELAY_MS = 5_000, and function nextReconnectDelay(state: ReconnectPolicyState, now: number): number | null. Delay formula: Math.min(1000 * 2 ** state.attempt, FLAT_DELAY_MS) — yielding 1s, 2s, 4s, then flat 5s. Return null when now - state.windowStartedAt >= PATIENT_WINDOW_MS. The function is pure arithmetic: no Date.now() calls inside, no timers, callers pass now explicitly. Add unit tests in src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts covering the exponential phase, the flat phase, the exhaustion boundary (exactly at and just before PATIENT_WINDOW_MS), and attempt counts beyond 32 (no overflow from 2 ** attempt — clamp or use Math.min ordering that avoids Infinity issues). Repo rule restated: retry/delay tests must not use real timers; this module needs none because it is pure."
+        },
+        "items": [
+          {
+            "id": "reconnect-policy.ac1",
+            "title": "Given attempts 0,1,2 within the window, nextReconnectDelay returns 1000, 2000, 4000; for every attempt >= 3 it returns 5000",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconnect-policy.ac2",
+            "title": "Given now - windowStartedAt >= PATIENT_WINDOW_MS (5 minutes), nextReconnectDelay returns null; just below the boundary it still returns a delay",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconnect-policy.ac3",
+            "title": "Unit tests exercise exponential phase, flat phase, exhaustion boundary, and attempt=40 (no overflow) using pure arithmetic inputs — the test file contains no fake or real timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "xterminal-patient-reconnect",
+        "title": "Wire XTerminal to the time-based policy, replacing the 5-attempt budget",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/XTerminal.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without new errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/XTerminal.tsx: remove maxReconnectAttempts (line 141) and getReconnectDelay (lines 197-200). Hold a ReconnectPolicyState in a ref (e.g. reconnectPolicy = useRef<ReconnectPolicyState | null>(null)). In ws.onclose (line 686): keep the shouldReconnect early-return and the 4404 fatal branch unchanged; for other closes, initialize the policy ref on first failure ({ attempt: 0, windowStartedAt: Date.now() }), call nextReconnectDelay(state, Date.now()), and if non-null schedule connect() after that delay and increment attempt; if null, enter the exhausted state (item reconnect-affordance renders it). In the snapshot handler (near line 664) and queueLiveData (line 603), reset the policy ref to null where reconnectAttempts.current = 0 is reset today, so a later disconnect starts a fresh 5-minute window. HAZARD (from continue.json H1): the connect effect's dependency array (line 764) and the onDisconnectRef pattern (line 175) prevent reconnect loops — keep all policy state in refs, add no new effect dependencies, and preserve the cleanup that nulls ws.onclose (line 757) and clears reconnectTimer."
+        },
+        "items": [
+          {
+            "id": "xterminal-patient-reconnect.ac1",
+            "title": "Given an unexpected non-4404 close, the panel schedules retries per nextReconnectDelay and keeps retrying past 5 attempts and past 31 seconds, until the 5-minute window exhausts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-patient-reconnect.ac2",
+            "title": "When a snapshot arrives, the panel returns to connected state and a subsequent disconnect receives a fresh 5-minute retry window",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-patient-reconnect.ac3",
+            "title": "Close code 4404 still renders the session-ended message, calls onDisconnect, and never schedules a retry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "xterminal-patient-reconnect.ac4",
+            "title": "The connect effect dependency array (XTerminal.tsx:764) gains no new entries; policy state lives in refs and the diff preserves the ws.onclose = null cleanup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconnect-affordance",
+        "title": "Connection-status overlay with manual Reconnect button on exhaustion",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/XTerminal.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without new errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a connection-status React state to XTerminal: 'connected' | 'reconnecting' | 'restarting' | 'failed' (coarse status only — per-attempt details stay in refs per hazard H1). Replace the per-attempt ANSI writeln at XTerminal.tsx:710 and the dead-end writeln at line 716 with overlay rendering: 'reconnecting' shows a calm dimmed banner over the terminal ('Connection lost — reconnecting…'); 'failed' (policy window exhausted) shows a banner with a Reconnect button. Clicking Reconnect resets the policy ref to null, sets status to 'reconnecting', and invokes the connection path immediately (reuse the existing connect() closure via a ref, mirroring how onDisconnectRef avoids effect re-runs). On snapshot receipt set status 'connected' and clear the overlay. Follow the pan-style-guide: no green for running, no pill badges, muted colors; check an existing overlay (EventRouter's showOverlay usage or existing terminal chrome) for styling conventions before inventing new ones. The 'restarting' status value is introduced here but only assigned by item restart-close-code-ux."
+        },
+        "items": [
+          {
+            "id": "reconnect-affordance.ac1",
+            "title": "While retrying, the panel renders a calm reconnecting banner and writes no per-attempt ANSI lines into the scrollback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconnect-affordance.ac2",
+            "title": "When the 5-minute window exhausts, the panel renders a Reconnect button instead of the red 'Could not reconnect after N attempts' dead-end text (that string no longer appears in the diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconnect-affordance.ac3",
+            "title": "Clicking Reconnect resets the policy state, immediately attempts a connection, and on success clears the overlay and renders live terminal data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "server-restart-broadcast",
+        "title": "Broadcast close code 4503 'server-restarting' to all terminal clients on graceful shutdown",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/ws-terminal.ts",
+            "src/dashboard/server/main.ts",
+            "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ws-terminal-restart-broadcast.test.ts passes all tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/ws-terminal.ts, export broadcastServerRestarting(): number — iterate every PTY hub's clients (the module-local hub map used by setupTerminalWebSocket; each hub has a clients: Set<WebSocket>, see line 454) plus any pre-attach sockets that are tracked, call ws.close(4503, 'server-restarting') on each open socket, and return the count closed. Define const SERVER_RESTARTING_CLOSE_CODE = 4503 next to the existing 4404 usage so both close codes are named. In src/dashboard/server/main.ts handleShutdownSignal (line 544), immediately after the shuttingDown guard and the shutdown log line, call broadcastServerRestarting() and console.log the count (e.g. '[overdeck] notified N terminal client(s) of restart'). Wrap in try/catch — broadcast failure must never block shutdown (NFR-3: this is best-effort; SIGKILL paths never run it). Test: extract the per-hub close loop into a pure-ish helper if needed so a unit test can pass fake client sets with stubbed close(code, reason) and readyState, asserting each open client receives close(4503, 'server-restarting') and closed clients are skipped. If tests/unit/dashboard/ does not exist, create it (mirroring tests/unit/lib/ layout). Repo rules restated: no execSync anywhere server-reachable; async primitives only."
+        },
+        "items": [
+          {
+            "id": "server-restart-broadcast.ac1",
+            "title": "ws-terminal.ts exports broadcastServerRestarting() that closes every open /ws/terminal client with code 4503 and reason 'server-restarting' and returns the count closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-restart-broadcast.ac2",
+            "title": "handleShutdownSignal calls broadcastServerRestarting() before stopping services, logs the closed count, and a broadcast throw does not prevent shutdown from completing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-restart-broadcast.ac3",
+            "title": "Given a mix of open and non-open fake clients, broadcastServerRestarting() sends close(4503, 'server-restarting') only to open sockets and returns the count closed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "restart-close-code-ux",
+        "title": "Terminal panel treats close code 4503 as a planned restart",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/XTerminal.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint completes without new errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In XTerminal's ws.onclose handler, add a branch for event.code === 4503 (before the generic unexpected-close path): set the connection status to 'restarting' so the overlay from item reconnect-affordance shows 'Dashboard restarting — reconnecting automatically…' with the same calm (non-error) styling as 'reconnecting', and enter the identical patient retry cycle (initialize the policy ref and schedule via nextReconnectDelay). Functionally 4503 and a generic close retry the same way; only the message differs. Once reconnected (snapshot received) the status returns to 'connected' exactly like any other recovery."
+        },
+        "items": [
+          {
+            "id": "restart-close-code-ux.ac1",
+            "title": "Given a WebSocket close with code 4503, the panel renders 'Dashboard restarting — reconnecting automatically…' with non-error styling and schedules patient retries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restart-close-code-ux.ac2",
+            "title": "A 4503 close never renders the red connection-lost error styling, and a subsequent successful snapshot clears the restarting banner",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-gate-helper",
+        "title": "agent-restart-gate helper: block agent restarts on deploy-window reasons",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/deploy/agent-restart-gate.ts",
+            "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/deploy/agent-restart-gate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "agent-restart-gate.test.ts passes all tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/deploy/agent-restart-gate.ts exporting: interface AgentRestartGateInput { initiator: string | undefined; force: boolean } and async function agentRestartBlockReason(input: AgentRestartGateInput, deps?: Partial<DeployWindowDependencies>): Promise<string | null>. Behavior: return null immediately when input.initiator is undefined/empty or input.force is true (do not call getDeployBlockReason at all). Otherwise call getDeployBlockReason from src/lib/deploy/deploy-window.ts:41, passing through deps but overriding getFlywheelActiveRunId to () => null when input.initiator === 'flywheel-orchestrator' (hazard H2: the flywheel owns deployment and must not be blocked by its own run id; DeployWindowDependencies already supports injection). When a block reason is returned, wrap it in an operator-facing message that (a) quotes the block reason, (b) states in a complete sentence that this restart was refused because the agent-issued restart would disconnect live sessions while that gate is active, and (c) states that rerunning with --force bypasses the gate (explain-fully-no-jargon rule: no bare jargon, complete sentences). Unit tests in tests/unit/lib/deploy/agent-restart-gate.test.ts with fully injected DeployWindowDependencies (no real tmux/fs access): no-initiator passthrough, force passthrough, blocked agent, flywheel self-exemption, flywheel still blocked by a non-flywheel reason (e.g. verification in flight)."
+        },
+        "items": [
+          {
+            "id": "agent-gate-helper.ac1",
+            "title": "agentRestartBlockReason returns null without consulting getDeployBlockReason when initiator is undefined or force is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-helper.ac2",
+            "title": "With an initiator set and a block reason active, it returns a message quoting the block reason and stating that --force bypasses the gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-helper.ac3",
+            "title": "With initiator 'flywheel-orchestrator' and only the flywheel-ownership reason active, it returns null; with a verification-in-flight reason active it still returns the refusal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-helper.ac4",
+            "title": "Unit tests exercise the no-initiator, force, blocked-agent, flywheel-exemption, and non-flywheel-reason branches with injected DeployWindowDependencies, and each case returns the expected value with no real tmux, filesystem, or timer access",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-gate-restart",
+        "title": "Wire the agent gate into pan restart and its wrapper skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/restart.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-restart/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including lint-skills flag parity) completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/restart.ts restartCommand (line 209): after the dev-supervisor refusal block (lines 226-236) and BEFORE acquiring the restart lock (line 242 — hazard H5: the gate must run before this command holds the lock, or its own lock could contribute a block reason), when scope is 'dashboard' or 'full' AND process.env.OVERDECK_RESTART_LOCK_HELD !== '1' (hazard H6: pan reload re-invokes restart internally with that env set; gate only the outer entry), call agentRestartBlockReason({ initiator: process.env.OVERDECK_AGENT_ID, force: options.force === true }). If it returns a message, console.error it and set process.exitCode = 1 and return. When the gate passes but OVERDECK_AGENT_ID is set, print a one-line notice that this restart will disconnect every live conversation and terminal until clients reconnect. In src/cli/index.ts extend the --force option help text (line 1300) to also state: 'For dashboard scope: bypass the agent deploy-window gate (agent-initiated restarts are otherwise refused while deploy-window block reasons are active)'. Update sync-sources/skills/pan-restart/SKILL.md to document the gate and both --force meanings — same commit, scripts/lint-skills.sh enforces flag parity with pan restart --help."
+        },
+        "items": [
+          {
+            "id": "agent-gate-restart.ac1",
+            "title": "With OVERDECK_AGENT_ID set and a block reason active, pan restart (dashboard/full scope) prints the refusal and exits with code 1 before acquiring the restart lock; with --force it proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-restart.ac2",
+            "title": "With OVERDECK_RESTART_LOCK_HELD=1 (inner invocation from pan reload) or with OVERDECK_AGENT_ID unset, pan restart prints no refusal and proceeds without consulting the gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-restart.ac3",
+            "title": "An agent-initiated dashboard restart that proceeds prints a notice that live conversations and terminals will be disconnected until clients reconnect",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-restart.ac4",
+            "title": "sync-sources/skills/pan-restart/SKILL.md documents the gate and extended --force meaning, and npm run lint (lint-skills parity) passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-gate-reload",
+        "title": "Wire the agent gate into pan reload (new --force flag) and its wrapper skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/reload.ts",
+            "src/cli/index.ts",
+            "sync-sources/skills/pan-reload/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint (including lint-skills flag parity) completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add force?: boolean to ReloadOptions (src/cli/commands/reload.ts:12) and register .option('--force', ...) on the reload command in src/cli/index.ts (registration block at lines 1283-1288) with help text: 'Bypass the agent deploy-window gate (agent-initiated reloads are otherwise refused while deploy-window block reasons are active)'. In reloadCommand (line 182), before acquiring the restart lock (line 193 — hazards H5/H6 apply identically), call agentRestartBlockReason({ initiator: process.env.OVERDECK_AGENT_ID, force: options.force === true }); on a message, console.error it, set process.exitCode = 1, and return before any build work starts. When the gate passes but OVERDECK_AGENT_ID is set, print the same disconnect notice as pan restart. Update sync-sources/skills/pan-reload/SKILL.md to document the gate and the new --force flag in the same commit (lint-skills parity)."
+        },
+        "items": [
+          {
+            "id": "agent-gate-reload.ac1",
+            "title": "pan reload accepts a --force option registered in src/cli/index.ts and documented in pan reload --help",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-reload.ac2",
+            "title": "With OVERDECK_AGENT_ID set and a block reason active, pan reload prints the refusal and exits with code 1 before building; with --force or with no OVERDECK_AGENT_ID it proceeds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-gate-reload.ac3",
+            "title": "An agent-initiated reload that proceeds prints the disconnect notice, and sync-sources/skills/pan-reload/SKILL.md documents the gate (npm run lint passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-terminal-reconnect",
+        "title": "Document patient reconnect and restart close codes in CLAUDE.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-16T05:12:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-2772",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In the repo-root CLAUDE.md 'Terminal architecture' bullets (section 'Dashboard Server Architecture' → terminal bullets mentioning 'exponential backoff reconnection'), replace the client reconnection description with the shipped behavior: time-based patient reconnect (5-minute window, 1/2/4s then flat 5s via terminalReconnectPolicy.ts), the connection-status overlay with a manual Reconnect action on exhaustion, and the two named close codes — 4404 session-not-found (fatal after the server-side respawn wait) and 4503 server-restarting (calm 'Dashboard restarting' message, patient reconnect, broadcast from handleShutdownSignal on graceful shutdown)."
+        },
+        "items": [
+          {
+            "id": "docs-terminal-reconnect.ac1",
+            "title": "CLAUDE.md's terminal-architecture section contains the 5-minute patient reconnect window and the manual Reconnect affordance, and no longer contains the old 'exponential backoff reconnection' description",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-terminal-reconnect.ac2",
+            "title": "CLAUDE.md contains close-code documentation for 4404 (session gone, fatal) and 4503 (server restarting, patient reconnect with calm messaging)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "reconnect-policy",
+        "to": "xterminal-patient-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "xterminal-patient-reconnect",
+        "to": "reconnect-affordance",
+        "type": "blocks"
+      },
+      {
+        "from": "xterminal-patient-reconnect",
+        "to": "restart-close-code-ux",
+        "type": "blocks"
+      },
+      {
+        "from": "reconnect-affordance",
+        "to": "restart-close-code-ux",
+        "type": "blocks"
+      },
+      {
+        "from": "server-restart-broadcast",
+        "to": "restart-close-code-ux",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-gate-helper",
+        "to": "agent-gate-restart",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-gate-helper",
+        "to": "agent-gate-reload",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-gate-restart",
+        "to": "agent-gate-reload",
+        "type": "blocks"
+      },
+      {
+        "from": "restart-close-code-ux",
+        "to": "docs-terminal-reconnect",
+        "type": "blocks"
+      },
+      {
+        "from": "reconnect-affordance",
+        "to": "docs-terminal-reconnect",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2772-bug-dashboard-agent-driven-pan-restart-reload-disconnects-every-live-conversation-mid-typing-terminal-reconnect-budget-5-tries-31s-dies-before-slow-reloads-finish.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
