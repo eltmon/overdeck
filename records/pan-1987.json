@@ -3,18 +3,18 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T18:04:33.015Z",
+  "updated": "2026-07-16T18:05:04.747Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:04:32.946Z",
-    "inspectNotes": "Inspecting item api-rename-route",
+    "updatedAt": "2026-07-16T18:05:04.059Z",
+    "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -28,11 +28,19 @@
             "cacheWrite": 175114
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 4,
+            "output": 1307,
+            "cacheRead": 144760,
+            "cacheWrite": 95105
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 932344,
-            "output": 44823,
-            "cacheRead": 11517440,
+            "input": 947380,
+            "output": 46887,
+            "cacheRead": 12958720,
             "cacheWrite": 0
           }
         }
@@ -44,16 +52,22 @@
           "cacheRead": 8013701,
           "cacheWrite": 175114
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 4,
+          "output": 1307,
+          "cacheRead": 144760,
+          "cacheWrite": 95105
+        },
         "openai/gpt-5.6-sol": {
-          "input": 932344,
-          "output": 44823,
-          "cacheRead": 11517440,
+          "input": 947380,
+          "output": 46887,
+          "cacheRead": 12958720,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 24.307149,
-        "pricingAsOf": "2026-07-16T18:04:32.996Z"
+        "usd": 25.444682,
+        "pricingAsOf": "2026-07-16T18:05:04.308Z"
       }
     },
     "merges": [],
