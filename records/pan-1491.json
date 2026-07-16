@@ -387,6 +387,8 @@
       "drizzle/overdeck/0000_overdeck_init.sql",
       "scripts/file-size-baseline.txt",
       "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
       "src/dashboard/server/services/substrate-bug-poller.ts",
       "src/lib/database/__tests__/flywheel-substrate-bugs-db.test.ts",
       "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
@@ -432,6 +434,8 @@
       "src/dashboard/server/routes/__tests__/flywheel.test.ts",
       "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
       "src/dashboard/server/routes/flywheel.ts",
+      "src/dashboard/server/services/dashboard-db-task.ts",
+      "src/dashboard/server/services/dashboard-db-worker.ts",
       "src/dashboard/server/services/substrate-bug-poller.ts",
       "src/lib/database/__tests__/flywheel-substrate-bugs-db.test.ts",
       "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
@@ -450,10 +454,10 @@
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
       "vision.mdx"
     ],
-    "recordedAt": "2026-07-16T12:07:29.315Z"
+    "recordedAt": "2026-07-16T13:05:33.565Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T13:05:27.103Z",
+  "updated": "2026-07-16T13:05:33.566Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
