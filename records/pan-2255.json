@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T06:48:19.504Z",
+  "updated": "2026-07-16T06:50:44.193Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
@@ -87,16 +87,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "delayed-escalation": {
-        "writerId": "agent-pan-2255",
-        "agentId": "agent-pan-2255",
-        "pid": 2558946,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:48:19.504Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2255",
@@ -130,6 +122,17 @@
         "outcome": "completed",
         "reason": "Prepended pending mailbox feedback to work/strike spawn and resume prompts with idempotent delivered/acknowledged transitions; Deacon auto-resume inherits the shared path",
         "releasedAt": "2026-07-16T06:48:07.173Z"
+      },
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2558946,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:48:19.504Z",
+        "itemId": "delayed-escalation",
+        "outcome": "completed",
+        "reason": "Added one-patrol mailbox escalation policy with resurrection-first targeting, exactly-once operator fallback, and fake-timer coverage",
+        "releasedAt": "2026-07-16T06:50:44.193Z"
       }
     ],
     "statusReasons": {
@@ -144,6 +147,10 @@
       "drain-spawn-resume": {
         "reason": "Prepended pending mailbox feedback to work/strike spawn and resume prompts with idempotent delivered/acknowledged transitions; Deacon auto-resume inherits the shared path",
         "updatedAt": "2026-07-16T06:48:07.173Z"
+      },
+      "delayed-escalation": {
+        "reason": "Added one-patrol mailbox escalation policy with resurrection-first targeting, exactly-once operator fallback, and fake-timer coverage",
+        "updatedAt": "2026-07-16T06:50:44.193Z"
       }
     }
   },
@@ -163,6 +170,10 @@
     "drain-spawn-resume.drain-spawn-resume.ac2": "completed",
     "drain-spawn-resume.drain-spawn-resume.ac3": "completed",
     "drain-spawn-resume.drain-spawn-resume.ac4": "completed",
-    "delayed-escalation": "running"
+    "delayed-escalation": "completed",
+    "delayed-escalation.delayed-escalation.ac1": "completed",
+    "delayed-escalation.delayed-escalation.ac2": "completed",
+    "delayed-escalation.delayed-escalation.ac3": "completed",
+    "delayed-escalation.delayed-escalation.ac4": "completed"
   }
 }
