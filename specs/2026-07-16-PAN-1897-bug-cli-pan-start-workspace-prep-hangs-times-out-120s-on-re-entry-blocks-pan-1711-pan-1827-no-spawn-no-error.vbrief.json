@@ -1,0 +1,354 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T17:51:10Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1897: bug(cli): pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error)",
+    "updated": "2026-07-16T17:53:30.816Z"
+  },
+  "plan": {
+    "id": "pan-1897",
+    "title": "bug(cli): pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error)",
+    "status": "proposed",
+    "uid": "d76f6b6d-2adf-4bd5-ade5-2ee17963959c",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-16T17:51:10Z",
+    "updated": "2026-07-16T17:53:30.816Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1897",
+        "label": "PAN-1897",
+        "type": "issue"
+      },
+      {
+        "uri": "drafts/pan-1897.md",
+        "label": "PRD draft (overdeck-state)",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "cli",
+      "pan-start",
+      "workspace-prep",
+      "timeout",
+      "observability"
+    ],
+    "narratives": {
+      "Problem": "pan start on an existing workspace can exceed outer supervisor kill budgets (120-200s) during 'Preparing workspace...' with zero visible progress and no error. Root cause (verified): (1) ora 8 disables spinner.text rendering when stdout is not a TTY, so non-interactive callers see only the initial line — slow progress is indistinguishable from a hang; (2) several prep steps are unbounded — git fetch/merge and the husky-hooked auto-commit inside syncMainIntoWorkspace (src/lib/cloister/merge-agent.ts:1259) carry no execAsync timeout, tracker API calls have no explicit timeout, and spawnAgent can run a full inline docker rebuildWorkspaceStack; (3) RUN-35 host load made those steps genuinely slow (a 300s budget succeeded — contention, not deadlock).",
+      "Proposal": "Add a CLI prep-progress module (src/cli/commands/start-prep-progress.ts) that wraps each prep phase with a step budget, emits plain [prep] stdout lines for non-TTY callers plus a 15s still-running heartbeat, and rejects with an error naming the step and budget on exhaustion. Wire the four phases in start.ts (state-reconcile 60s fail-fast, sync-main 240s degrade, tracker-context 60s degrade, spawn 600s fail-fast). Independently, add explicit execAsync timeouts to every git operation inside syncMainIntoWorkspace/autoCommitWorkspaceChangesBeforeSync with timeout-aware failure reasons and a best-effort merge --abort on merge timeout. Document the budgets and heartbeat in the pan-start skill.",
+      "NonGoals": "- No parallelization or caching of prep steps (bun install caching, concurrent fetch) — follow-up optimization\n- No new CLI flags or config keys for budgets (constants only)\n- No changes to the remote/fly.io workspace path\n- No changes to the planning-session (start-planning) streaming path\n- No global whole-command watchdog — bounds are per-step\n- No changes to the flywheel's own outer command budgets (docs guidance only)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose heartbeat + per-step bounded prep over prep parallelization",
+        "rationale": "The issue's refinement comment establishes contention (not deadlock) and names the heartbeat-instrumented-timeout direction as the likely fix; parallelization is an optimization deferred to NonGoals."
+      },
+      {
+        "summary": "Budgets are module constants (state-reconcile 60s, sync-main 240s outer / fetch 60s / merge 120s / commit 60s / status 30s, tracker 60s, spawn 600s, heartbeat 15s) with no new flags",
+        "rationale": "No configurability was requested; constants keep the CLI/skill surface unchanged and satisfy fail-fast-with-clear-reason acceptance. Spawn gets 600s because inline docker rebuilds are legitimately slow."
+      },
+      {
+        "summary": "sync-main and tracker-context timeouts degrade (warn + continue); state-reconcile and spawn timeouts fail fast",
+        "rationale": "start.ts already continues on sync-main failure so the agent resolves conflicts (PAN-1872); tracker context already has non-fatal fallbacks. The migration gate and the spawn itself have no degraded mode."
+      },
+      {
+        "summary": "A timed-out git merge is classified as a timeout, not conflicts, and triggers best-effort git merge --abort",
+        "rationale": "The existing catch treats any merge throw as conflicts; letting a SIGTERM-killed merge enter the conflict path would mislabel the failure and skip cleanup."
+      }
+    ],
+    "items": [
+      {
+        "id": "prep-progress-module",
+        "title": "Add start-prep-progress module: step budgets, non-TTY [prep] lines, 15s heartbeat",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T17:51:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1897",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-prep-steps"
+          ],
+          "files_scope": [
+            "src/cli/commands/start-prep-progress.ts",
+            "tests/unit/cli/start-prep-progress.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/start-prep-progress.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/start-prep-progress.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/start-prep-progress.ts exporting createPrepProgress(spinner, opts?) -> { update(text), step(name, budgetMs, fn) } and PrepStepTimeoutError. update() always sets spinner.text and, when the output stream is not a TTY, also writes a plain '[prep] <text>' line to stdout. step() emits a start line, runs a 15s setInterval heartbeat ('[prep] still running: <name> (Ns elapsed)', non-TTY only), races fn() against setTimeout(budgetMs), clears timers on settle, emits a completion line with elapsed seconds, and rejects with PrepStepTimeoutError whose message names the step and budget (e.g. \"Prep step 'sync-main' exceeded its 240s budget\"). The raced fn() keeps running after timeout — callers decide fail-fast vs degrade. Unit tests use vi.useFakeTimers() + advanceTimersByTimeAsync exclusively (repo fake-timers rule; never real waits)."
+        },
+        "items": [
+          {
+            "id": "prep-progress-module.ac1",
+            "title": "Given a non-TTY stream, when update('Syncing latest main into workspace...') is called, the module writes a '[prep] Syncing latest main into workspace...' line to the stream and sets spinner.text to the same text",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prep-progress-module.ac2",
+            "title": "Given a TTY stream, when update() is called, the module sets spinner.text and emits no '[prep]' plain line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prep-progress-module.ac3",
+            "title": "Given a step whose fn is still pending after 15s (fake timers), the module emits a still-running heartbeat line naming the step and elapsed seconds, and repeats it every 15s until the step settles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prep-progress-module.ac4",
+            "title": "Given a step whose fn exceeds budgetMs (fake timers), step() rejects with PrepStepTimeoutError whose message names the step and the budget in seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prep-progress-module.ac5",
+            "title": "Given a step whose fn resolves within budget, step() returns fn's value, clears the heartbeat interval and timeout (no timer leaks under fake timers), and emits a completion line with elapsed duration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-prep-steps",
+        "title": "Wire the four pan start prep phases through prep.step() with budgets and fail-fast/degrade semantics",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T17:51:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1897",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "tests/unit/cli/start-prep-wiring.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/start-prep-wiring.test.ts",
+            "npx vitest run tests/cli/commands/start-conflicting-work.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "tests/unit/cli/start-prep-wiring.test.ts passes",
+            "existing start-conflicting-work suite still passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/start.ts, create const prep = createPrepProgress(spinner) right after the ora spinner at line 838, route the prep-flow spinner.text mutations through prep.update(), and wrap exactly four phases in prep.step(): (1) 'state-reconcile', 60_000ms, around requireAutomaticStateMigration + applyStartPolicyOptions (start.ts:845-848) — a PrepStepTimeoutError propagates to the outer catch (start.ts:1296-1298) which spinner.fail()s and exits 1; (2) 'sync-main', 240_000ms, around syncMainIntoWorkspace (start.ts:1042) — catch PrepStepTimeoutError alongside the existing syncErr catch (start.ts:1056-1058): spinner.warn naming the phase and budget, then continue to spawn (existing degraded semantics, PAN-1872); (3) 'tracker-context', 60_000ms, around getTrackerContext (start.ts:1210) — on timeout, spinner.warn and proceed with '' as trackerContext; (4) 'spawn', 600_000ms, around spawnAgent (start.ts:1222) — timeout propagates to the outer catch, failing fast with the step-naming message. Expose budget constants from start-prep-progress.ts or a small constants block; export any new pure helper through __testInternals for the wiring test. New test tests/unit/cli/start-prep-wiring.test.ts asserts the degrade-vs-fail-fast mapping using mocked step functions and fake timers."
+        },
+        "items": [
+          {
+            "id": "wire-prep-steps.ac1",
+            "title": "When pan start runs with non-TTY stdout, each of the four bounded phases (state-reconcile, sync-main, tracker-context, spawn) emits a '[prep]' step-start line before the phase executes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-prep-steps.ac2",
+            "title": "When the sync-main phase exceeds its 240s budget (fake timers), pan start emits a warning naming 'sync-main' and its budget and continues to the spawn phase instead of exiting",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-prep-steps.ac3",
+            "title": "When the tracker-context phase exceeds its 60s budget (fake timers), pan start warns naming the phase and builds the work-agent prompt with an empty tracker section, still reaching spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-prep-steps.ac4",
+            "title": "When the state-reconcile or spawn phase exceeds its budget (fake timers), pan start exits non-zero and the failure message names the phase and its budget in seconds",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bound-sync-main-git-ops",
+        "title": "Add execAsync timeouts + timeout-aware failure reasons to sync-main git operations",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T17:51:10Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1897",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/merge-agent.ts",
+            "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/cloister/sync-main-timeouts.test.ts",
+            "npx vitest run tests/cloister/sync-main.test.ts tests/unit/cli/sync-main.test.ts tests/unit/lib/cloister/auto-commit-excluded-paths.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new sync-main-timeouts suite passes",
+            "existing sync-main and auto-commit suites still pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/merge-agent.ts add constants SYNC_GIT_FETCH_TIMEOUT_MS=60_000, SYNC_GIT_MERGE_TIMEOUT_MS=120_000, SYNC_GIT_COMMIT_TIMEOUT_MS=60_000, SYNC_GIT_STATUS_TIMEOUT_MS=30_000 and pass timeout: options to the execAsync calls at: git fetch origin main (line 1325), git merge origin/main (line 1334), the auto-commit git commit (line 160), and the status/add/reset/diff calls in autoCommitWorkspaceChangesBeforeSync (lines 92-152) and syncMainIntoWorkspace (line 1282+). Add helper describeGitTimeout(error, label, budgetMs): string | null that returns e.g. 'git fetch origin main timed out after 60s' when error.killed === true (node exec timeout kill), else null; export it via a test-internals object. Use it so: fetch timeout returns { success:false, reason: <fetch timeout reason> }; merge timeout is detected BEFORE the conflict classification (the current catch sets hasConflicts=true for any throw), runs best-effort git merge --abort (with the status timeout), and returns { success:false, reason: <merge timeout reason> }; commit timeout makes autoCommitWorkspaceChangesBeforeSync return success:false with a reason naming the commit step (husky hooks stall). Keep the SyncMainResult shape unchanged (shared with src/dashboard/server/routes/workspaces/merge-ops.ts:273); async-only, no execSync. Tests mock the exec layer (vi.mock of child_process/execAsync) rather than spawning slow children; any timer use is fake timers."
+        },
+        "items": [
+          {
+            "id": "bound-sync-main-git-ops.ac1",
+            "title": "Given the mocked git fetch rejects with killed:true, syncMainIntoWorkspace returns success:false with a reason naming 'git fetch origin main' and the 60s budget instead of waiting indefinitely",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-sync-main-git-ops.ac2",
+            "title": "Given the mocked git merge rejects with killed:true, syncMainIntoWorkspace runs git merge --abort, does NOT take the conflict path, and returns success:false with a reason naming the merge step and its 120s budget",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-sync-main-git-ops.ac3",
+            "title": "Given the mocked git commit rejects with killed:true, autoCommitWorkspaceChangesBeforeSync returns success:false with a reason naming the auto-commit step (hook stall) and sync aborts with that reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bound-sync-main-git-ops.ac4",
+            "title": "Every execAsync git invocation inside syncMainIntoWorkspace and autoCommitWorkspaceChangesBeforeSync passes an explicit timeout option, and the SyncMainResult type is unchanged (existing sync-main and auto-commit suites pass unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pan-start-prep",
+        "title": "Document prep heartbeat, budgets, and fail-fast/degrade split in the pan-start skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T17:51:10Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1897",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-start/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "lint-skills passes with no flag/subcommand drift reported for pan-start"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ],
+          "acJustification": "Docs-only item: the two criteria fully pin the required content (phases/budgets table and heartbeat/semantics example); further ACs would restate them."
+        },
+        "narrative": {
+          "Action": "Add a 'Slow or hanging workspace prep' subsection to sync-sources/skills/pan-start/SKILL.md that: (a) lists the four bounded prep phases with their default budgets (state-reconcile 60s, sync-main 240s, tracker-context 60s, spawn 600s); (b) shows a sample '[prep] still running: sync-main (45s elapsed)' heartbeat line and explains these lines appear for non-interactive callers because ora spinner updates render only on a TTY; (c) states that sync-main and tracker-context timeouts degrade (warn + continue to spawn) while state-reconcile and spawn timeouts fail fast with the step named; (d) advises supervisors invoking pan start non-interactively to budget at least 300s under load (RUN-35 finding). Introduce no new flags so scripts/lint-skills.sh needs no changes."
+        },
+        "items": [
+          {
+            "id": "docs-pan-start-prep.ac1",
+            "title": "The pan-start SKILL.md troubleshooting section shows the four bounded prep phases with their default budgets and a sample '[prep]' heartbeat line, and states heartbeat lines appear for non-interactive callers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pan-start-prep.ac2",
+            "title": "The section shows which phase timeouts fail fast (state-reconcile, spawn) versus degrade-and-continue (sync-main, tracker-context) and contains the >=300s outer-budget guidance for non-interactive pan start under load",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "prep-progress-module",
+        "to": "wire-prep-steps",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-prep-steps",
+        "to": "docs-pan-start-prep",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-1897-bug-cli-pan-start-workspace-prep-hangs-times-out-120s-on-re-entry-blocks-pan-1711-pan-1827-no-spawn-no-error.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
