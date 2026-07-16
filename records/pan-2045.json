@@ -198,6 +198,11 @@
       "reason": "feedback",
       "note": "[2026-07-16T21:56Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-16T21:56:49.840Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T21:57Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T21:57:08.907Z"
     }
   ],
   "feedback": [
@@ -206,6 +211,13 @@
       "specialist": "review-agent",
       "outcome": "changes-requested",
       "timestamp": "2026-07-16T21:56:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2045\n\n# Review Synthesis — PAN-2045 — 2026-07-16T21:56:15.076018+00:00\n\n## Verdict: CHANGES REQUESTED — all four convoy reviewers exited before writing reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-81374816/context.json\n- Branch: feature/pan-2045\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045\n- HEAD reviewed: 81374816715d8ba0e03af6fb5c240be622619c98\n- Cycle number: 6\n- Prior cycle SHA: b5c142265493923f63fbabdc58a72160c96c2647\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed — session ended before writing a report | — | infrastructure failure |\n| correctness | failed — session ended before writing a report | — | infrastructure failure |\n| performance | failed — session ended before writing a report | — | infrastructure failure |\n| requirements | failed — session ended before writing a report | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer report unavailable\nThe security reviewer session ended before writing a report, so the security dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n### [correctness] Reviewer report unavailable\nThe correctness reviewer session ended before writing a report, so the correctness dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n### [performance] Reviewer report unavailable\nThe performance reviewer session ended before writing a report, so the performance dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n### [requirements] Reviewer report unavailable\nThe requirements reviewer session ended before writing a report, so the requirements and acceptance-criteria dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n## Non-blocking Findings\nNone. No reviewer produced a report from which findings could be synthesized.\n\n## Clean Sub-roles\nNone. All four sub-roles failed before producing reports.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-81374816/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2045 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T21:57:08Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-2045\n\n# Review Synthesis — PAN-2045 — 2026-07-16T21:56:15.076018+00:00\n\n## Verdict: CHANGES REQUESTED — all four convoy reviewers exited before writing reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-81374816/context.json\n- Branch: feature/pan-2045\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045\n- HEAD reviewed: 81374816715d8ba0e03af6fb5c240be622619c98\n- Cycle number: 6\n- Prior cycle SHA: b5c142265493923f63fbabdc58a72160c96c2647\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed — session ended before writing a report | — | infrastructure failure |\n| correctness | failed — session ended before writing a report | — | infrastructure failure |\n| performance | failed — session ended before writing a report | — | infrastructure failure |\n| requirements | failed — session ended before writing a report | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer report unavailable\nThe security reviewer session ended before writing a report, so the security dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n### [correctness] Reviewer report unavailable\nThe correctness reviewer session ended before writing a report, so the correctness dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n### [performance] Reviewer report unavailable\nThe performance reviewer session ended before writing a report, so the performance dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n### [requirements] Reviewer report unavailable\nThe requirements reviewer session ended before writing a report, so the requirements and acceptance-criteria dimension was not completed. Review policy forbids approval when any reviewer fails or times out.\n\n## Non-blocking Findings\nNone. No reviewer produced a report from which findings could be synthesized.\n\n## Clean Sub-roles\nNone. All four sub-roles failed before producing reports.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/.pan/review/agent-pan-2045-review-81374816/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2045 -m \"Fixed review issues\"`"
     }
   ],
@@ -344,7 +356,7 @@
     "recordedAt": "2026-07-16T21:48:55.460Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:57:08.204Z",
+  "updated": "2026-07-16T21:57:08.908Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "blocked",
