@@ -279,7 +279,7 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:07:49.280Z",
+  "updated": "2026-07-16T02:07:50.283Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -289,7 +289,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:07:49.168Z",
+    "updatedAt": "2026-07-16T02:07:50.200Z",
     "reviewNotes": "[correctness] “Expand issue full screen” does not expand the issue view — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx:1099`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "1107d2c62687708ca3a4f3fe37f85f34cdec422f",
@@ -523,7 +523,7 @@
       },
       "costAtCloseOut": {
         "usd": 146.54752,
-        "pricingAsOf": "2026-07-16T02:07:49.241Z"
+        "pricingAsOf": "2026-07-16T02:07:50.261Z"
       }
     },
     "merges": [
