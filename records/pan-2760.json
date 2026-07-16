@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T18:26:48.501Z",
+  "updated": "2026-07-16T18:26:57.728Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "pending",
@@ -145,5 +145,26 @@
     "docs-tiered-execution": "completed",
     "docs-tiered-execution.docs-tiered-execution.ac1": "completed",
     "docs-tiered-execution.docs-tiered-execution.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/TIERED-EXECUTION.md",
+      "docs/design/mockups/crew-create-delete-pan-2760.html",
+      "docs/design/mockups/tiered-execution-redesign-pan-2684.html",
+      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/TIERED-EXECUTION.md",
+      "docs/design/mockups/crew-create-delete-pan-2760.html",
+      "docs/design/mockups/tiered-execution-redesign-pan-2684.html",
+      "src/dashboard/frontend/src/components/Settings/sections/CrewRow.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx"
+    ],
+    "recordedAt": "2026-07-16T18:26:57.727Z"
   }
 }
