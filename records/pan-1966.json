@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:13:52.900Z",
+  "updated": "2026-07-16T12:13:55.058Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,8 +110,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "wire-pipeline-status-skill": {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1795863,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:13:55.058Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -251,6 +259,10 @@
       "wire-flywheel": {
         "reason": "Flywheel predicate and prompt use the authoritative membership read door.",
         "updatedAt": "2026-07-16T12:13:52.900Z"
+      },
+      "wire-pipeline-status-skill": {
+        "reason": "Implementation pushed in 82cac6601c",
+        "updatedAt": "2026-07-16T12:13:55.058Z"
       }
     }
   },
@@ -293,6 +305,7 @@
     "wire-pan-pending.wire-pan-pending.ac3": "completed",
     "wire-flywheel": "completed",
     "wire-flywheel.wire-flywheel.ac1": "completed",
-    "wire-flywheel.wire-flywheel.ac2": "completed"
+    "wire-flywheel.wire-flywheel.ac2": "completed",
+    "wire-pipeline-status-skill": "running"
   }
 }
