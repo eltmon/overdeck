@@ -8,8 +8,8 @@ interface OpenQuestionsIndicatorProps {
   onActivate: () => void;
 }
 
-async function fetchCurrentFlywheelStatus(): Promise<FlywheelStatus | null> {
-  const response = await fetch('/api/flywheel/current');
+async function fetchCurrentFlywheelStatus(signal: AbortSignal): Promise<FlywheelStatus | null> {
+  const response = await fetch('/api/flywheel/current', { signal });
   if (!response.ok) throw new Error(`Request failed (${response.status})`);
   return response.json() as Promise<FlywheelStatus | null>;
 }
@@ -19,10 +19,16 @@ export function OpenQuestionsIndicator({ onActivate }: OpenQuestionsIndicatorPro
 
   useEffect(() => {
     let cancelled = false;
+    let revision = 0;
+    let activeController: AbortController | null = null;
     const refreshCurrentStatus = async () => {
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+      const requestRevision = revision;
       try {
-        const current = await fetchCurrentFlywheelStatus();
-        if (!cancelled) setStatus(current);
+        const current = await fetchCurrentFlywheelStatus(controller.signal);
+        if (!cancelled && activeController === controller && revision === requestRevision) setStatus(current);
       } catch {
         // The RPC subscription remains authoritative while the dashboard restarts.
       }
@@ -31,9 +37,16 @@ export function OpenQuestionsIndicator({ onActivate }: OpenQuestionsIndicatorPro
     const interval = window.setInterval(() => {
       void refreshCurrentStatus();
     }, 5000);
-    const unsubscribe = subscribeFlywheelStatus(setStatus);
+    const unsubscribe = subscribeFlywheelStatus((next) => {
+      revision += 1;
+      activeController?.abort();
+      activeController = null;
+      setStatus(next);
+    });
     return () => {
       cancelled = true;
+      revision += 1;
+      activeController?.abort();
       window.clearInterval(interval);
       unsubscribe();
     };

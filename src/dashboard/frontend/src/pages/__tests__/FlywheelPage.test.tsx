@@ -429,6 +429,23 @@ describe('FlywheelPage', () => {
     expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
   });
 
+  it('does not replay a handled live reveal after remount', () => {
+    const first = renderFlywheelPage(<FlywheelPage />);
+    act(() => mocks.listener?.(status));
+    act(() => requestRevealOpenQuestions());
+    act(() => animationFrameCallback?.(0));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    scrollIntoView.mockClear();
+    animationFrameCallback = undefined;
+    renderFlywheelPage(<FlywheelPage />);
+    act(() => mocks.listener?.(status));
+
+    expect(animationFrameCallback).toBeUndefined();
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
+
   it('renders the Stats tab and switches back to existing panes without losing status data', () => {
     renderFlywheelPage(<FlywheelPage />);
 

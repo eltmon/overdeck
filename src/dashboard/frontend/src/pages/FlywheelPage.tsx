@@ -403,7 +403,10 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       });
     };
     if (consumePendingReveal()) revealOpenQuestions();
-    return subscribeRevealOpenQuestions(revealOpenQuestions);
+    return subscribeRevealOpenQuestions(() => {
+      consumePendingReveal();
+      revealOpenQuestions();
+    });
   }, []);
 
   const freshness = effectiveStatus ? getLastTickFreshness(effectiveStatus.lastTickAt, nowMs) : null;

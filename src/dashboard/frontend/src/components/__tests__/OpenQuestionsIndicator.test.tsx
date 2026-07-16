@@ -54,13 +54,14 @@ describe('OpenQuestionsIndicator', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 
   it('stays hidden without open questions and updates from live snapshots', async () => {
     render(<OpenQuestionsIndicator onActivate={vi.fn()} />);
 
-    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/flywheel/current'));
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/flywheel/current', { signal: expect.any(AbortSignal) }));
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
 
     act(() => mocks.listener?.(status(['First?', 'Second?'])));
@@ -79,5 +80,42 @@ describe('OpenQuestionsIndicator', () => {
     fireEvent.click(button);
     expect(mocks.requestRevealOpenQuestions).toHaveBeenCalledOnce();
     expect(onActivate).toHaveBeenCalledOnce();
+  });
+
+  it('aborts an unfinished refresh before starting the next one and on cleanup', async () => {
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => {
+      signals.push(init?.signal as AbortSignal);
+      return new Promise<Response>(() => undefined);
+    }));
+
+    const { unmount } = render(<OpenQuestionsIndicator onActivate={vi.fn()} />);
+    expect(signals).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(signals).toHaveLength(2);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(signals[1]?.aborted).toBe(false);
+
+    unmount();
+    expect(signals[1]?.aborted).toBe(true);
+  });
+
+  it('does not let an older HTTP response overwrite a newer pushed snapshot', async () => {
+    let resolveResponse: ((response: Response) => void) | undefined;
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => {
+      resolveResponse = resolve;
+    })));
+    render(<OpenQuestionsIndicator onActivate={vi.fn()} />);
+
+    act(() => mocks.listener?.(status(['Newest?', 'Still newest?'])));
+    expect(screen.getByRole('button')).toHaveTextContent('2');
+
+    await act(async () => {
+      resolveResponse?.(Response.json(status(['Old?'])));
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('button')).toHaveTextContent('2');
   });
 });
