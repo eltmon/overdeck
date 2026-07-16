@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:14:08.830Z",
+  "updated": "2026-07-16T12:14:10.899Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "docs-pipeline-membership": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 1802733,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:14:08.830Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -253,6 +245,17 @@
         "outcome": "completed",
         "reason": "Lint guard enforces six delegations, legacy predicate bans, and durable-only imports.",
         "releasedAt": "2026-07-16T12:14:06.493Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1802733,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:14:08.830Z",
+        "itemId": "docs-pipeline-membership",
+        "outcome": "completed",
+        "reason": "Canonical membership lenses, buckets, read doors, and guard are documented.",
+        "releasedAt": "2026-07-16T12:14:10.899Z"
       }
     ],
     "statusReasons": {
@@ -306,8 +309,8 @@
         "updatedAt": "2026-07-16T12:14:06.493Z"
       },
       "docs-pipeline-membership": {
-        "reason": "Implementation pushed in a032f04182",
-        "updatedAt": "2026-07-16T12:14:08.830Z"
+        "reason": "Canonical membership lenses, buckets, read doors, and guard are documented.",
+        "updatedAt": "2026-07-16T12:14:10.899Z"
       }
     }
   },
@@ -362,6 +365,8 @@
     "lint-guard-fr5.lint-guard-fr5.ac1": "completed",
     "lint-guard-fr5.lint-guard-fr5.ac2": "completed",
     "lint-guard-fr5.lint-guard-fr5.ac3": "completed",
-    "docs-pipeline-membership": "running"
+    "docs-pipeline-membership": "completed",
+    "docs-pipeline-membership.docs-pipeline-membership.ac1": "completed",
+    "docs-pipeline-membership.docs-pipeline-membership.ac2": "completed"
   }
 }
