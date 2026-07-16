@@ -141,17 +141,18 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:34:24.898Z",
+  "updated": "2026-07-16T12:34:26.890Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T12:34:24.712Z",
+    "updatedAt": "2026-07-16T12:34:26.737Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (387341ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mrenders terminal container with settings button\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mloads auto-copy setting from localStorage\n\u001b[22m\u001b[39mXTerminal: WebSocket opened\nXTerminal: Sending attach dimensions: \u001b[33m80\u001b[39m x \u001b[33m24\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mloads auto-copy setting from localStorage\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2muses default auto-copy value when localStorage is empty\n\u001b[22m\u001b[39mXTerminal: WebSocket opened\nXTerminal: Sending attach dimensions: \u001b[33m80\u001b[39m x \u001b[33m24\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2muses default auto-copy value when localStorage is empty\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mshows settings panel when settings button is clicked\n\u001b[22m\u001b[39mXTerminal: WebSocket opened\nXTerminal: Sending attach dimensions: \u001b[33m80\u001b[39m x \u001b[33m24\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mshows settings panel when settings button is clicked\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTermin\n…(526762 chars elided)…\n[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/verification-feedback.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/migrated-workspace-commit-gates.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/release-state-snapshot.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/flywheel-membership.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/operator-interventions.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/dashboard/settings-api-model-ids.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[2m\u001b[90m↓\u001b[39m\u001b[22m \u001b[30m\u001b[42m ro\n...(truncated)",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
@@ -219,7 +220,7 @@
       },
       "costAtCloseOut": {
         "usd": 37.478415,
-        "pricingAsOf": "2026-07-16T12:34:24.778Z"
+        "pricingAsOf": "2026-07-16T12:34:26.828Z"
       }
     },
     "merges": [
