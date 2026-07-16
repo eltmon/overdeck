@@ -394,7 +394,7 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:34:53.589Z",
+  "updated": "2026-07-16T02:35:18.367Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -404,12 +404,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:34:53.477Z",
+    "updatedAt": "2026-07-16T02:35:18.304Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at lint (57944ms):\n\nprompt-trailer\n> bash scripts/check-prompt-change-trailer.sh\n\nprompt-trailer: no roles/*.md or docs/flywheel-brief.md changes; ok\n\n> @overdeck/core@0.45.20 lint:file-size\n> bash scripts/lint-file-size.sh\n\n✓ file-size guard passed (no new god files; no baselined file grew)\n\n> @overdeck/core@0.45.20 lint:source-introspection\n> bash scripts/lint-source-introspection.sh\n\n✗ tests/unit/dashboard/frontend/issue-view-no-loss.test.ts has 2 source-introspection read(s) but is not baselined.\n\nsource-introspection guard failed. Rewrite the test to exercise runtime behavior, or use --regen only in an audited accept-new-offender commit.\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (73%)\n  - rolldown-plugin-dts:fake-js (20%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/agents.ts is dynamically imported by src/cli/commands/done.ts, src/cli/commands/reopen.ts, src/cli/commands/start.ts, src/lib/agents/messaging.ts, src/lib/cloister/merge-agent.ts, ... but also statically imported by src/cli/commands/admin/fpp-handler.ts, src/cli/commands/cv.ts, src/cli/commands/doctor.ts, src/cli/commands/done.ts, src/cli/commands/flywheel.ts, ..., dynamic import will not move module into another chunk.\n\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] Warning:\u001b[0m src/lib/memory/rollup.ts is dynamically imported by src/lib/memory/pending.ts but also statically imported by src/lib/memory/cli.ts, dynamic import will not move module into another chunk.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - tsdown:deps (72%)\n  - rolldown-plugin-dts:generate (21%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "c947d2aadf5011bc21c6293692c6edacb45fad8d",
-    "reviewRequestedAt": "2026-07-16T02:18:21.446Z",
+    "reviewRequestedAt": "2026-07-16T02:35:17.993Z",
     "reviewSpawnedAt": "2026-07-16T02:27:48.644Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -552,15 +552,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 14275117,
-            "output": 12330,
-            "cacheRead": 12563584,
+            "input": 14389695,
+            "output": 12401,
+            "cacheRead": 12677120,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 147731480,
-            "output": 277117,
-            "cacheRead": 143629568,
+            "input": 148864199,
+            "output": 277969,
+            "cacheRead": 144752128,
             "cacheWrite": 0
           }
         },
@@ -607,15 +607,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 14275117,
-          "output": 12330,
-          "cacheRead": 12563584,
+          "input": 14389695,
+          "output": 12401,
+          "cacheRead": 12677120,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 147731480,
-          "output": 277117,
-          "cacheRead": 143629568,
+          "input": 148864199,
+          "output": 277969,
+          "cacheRead": 144752128,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -638,8 +638,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 166.402419,
-        "pricingAsOf": "2026-07-16T02:34:53.542Z"
+        "usd": 167.040054,
+        "pricingAsOf": "2026-07-16T02:35:18.340Z"
       }
     },
     "merges": [
