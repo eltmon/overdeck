@@ -27,6 +27,7 @@ function deps(result: { success: boolean; mergeStatus?: string; error?: string }
     now: () => '2026-07-16T00:00:00.000Z',
     schedule: (key, work) => { scheduledKeys.add(key); scheduled.push(work().finally(() => scheduledKeys.delete(key))); },
     isScheduled: key => scheduledKeys.has(key),
+    isPersistentlyOwned: vi.fn().mockReturnValue(false),
     flush: () => Promise.all(scheduled).then(() => undefined),
   };
 }
@@ -57,6 +58,30 @@ describe('patrolStrikeLandings', () => {
     await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] reclaimed PAN-2702 at ${head}`]);
     await d.flush();
     expect(d.mergeIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not reclaim queued or active durable merge ownership', async () => {
+    const d = deps({ success: true, mergeStatus: 'queued' });
+    d.setState(ready({ strikeLandingState: 'landing' }));
+    const persistent = vi.mocked(d.isPersistentlyOwned);
+    persistent.mockReturnValue(true);
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([]);
+    expect(d.mergeIssue).not.toHaveBeenCalled();
+  });
+
+  it('does not duplicate a queued-to-dequeued merge while its promise is pending', async () => {
+    const d = deps({ success: true, mergeStatus: 'queued' });
+    await patrolStrikeLandings(d); await d.flush();
+    d.setState(ready({ strikeLandingState: 'landing' }));
+    vi.mocked(d.isPersistentlyOwned).mockReturnValue(true);
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([]);
+    vi.mocked(d.isPersistentlyOwned).mockReturnValue(false);
+    let release!: () => void;
+    vi.mocked(d.mergeIssue).mockReturnValue(new Promise(resolve => { release = () => resolve({ success: true, mergeStatus: 'merged' }); }));
+    await expect(patrolStrikeLandings(d)).resolves.toHaveLength(1);
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([]);
+    expect(d.mergeIssue).toHaveBeenCalledTimes(2);
+    release(); await d.flush();
   });
 
   it('routes unexpected supervised rejection through durable recovery', async () => {

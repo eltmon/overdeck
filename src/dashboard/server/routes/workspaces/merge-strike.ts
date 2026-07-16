@@ -11,6 +11,9 @@ export type TriggerMergeRequest = { kind: 'normal' } | StrikeMergeRequest;
 export function mergeCompletionStatus(request: TriggerMergeRequest): Pick<ReviewStatus, 'strikeLandingState' | 'strikeReadyHead' | 'strikeReadyAt'> | Record<string, never> {
   return request.kind === 'strike' ? { strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined } : {};
 }
+export function activeStrikeMerge(currentMerge: string | null, pendingOperation?: { type: string; status: string } | null): boolean {
+  return currentMerge !== null || (pendingOperation?.type === 'merge' && pendingOperation.status === 'running');
+}
 export interface MergeEligibilityResult {
   success: false; statusCode: number; error: string; reviewStatus?: string; testStatus?: string; mergeStatus?: string;
 }

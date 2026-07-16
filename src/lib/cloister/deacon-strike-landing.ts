@@ -17,8 +17,10 @@ export interface StrikeMergeRequest {
 export interface StrikeMergeResult { success: boolean; mergeStatus?: string; error?: string }
 type StrikeMergeTrigger = (issueId: string, request: StrikeMergeRequest) => Promise<StrikeMergeResult>;
 let strikeMergeTrigger: StrikeMergeTrigger | null = null;
+let strikeOwnershipProbe: ((issueId: string) => boolean) | null = null;
 
 export function registerStrikeMergeTrigger(trigger: StrikeMergeTrigger): void { strikeMergeTrigger = trigger; }
+export function registerStrikeOwnershipProbe(probe: (issueId: string) => boolean): void { strikeOwnershipProbe = probe; }
 
 export interface StrikeLandingDeps {
   loadStatuses: () => Record<string, ReviewStatus>;
@@ -33,6 +35,7 @@ export interface StrikeLandingDeps {
   now: () => string;
   schedule: (key: string, work: () => Promise<void>) => void;
   isScheduled: (key: string) => boolean;
+  isPersistentlyOwned: (issueId: string) => boolean;
 }
 
 export class StrikeLandingSupervisor {
@@ -71,6 +74,7 @@ function defaultDeps(): StrikeLandingDeps {
     now: () => new Date().toISOString(),
     schedule: (key, work) => strikeLandingSupervisor.enqueue(key, work),
     isScheduled: key => strikeLandingSupervisor.has(key),
+    isPersistentlyOwned: issueId => strikeOwnershipProbe?.(issueId) ?? false,
   };
 }
 
@@ -112,6 +116,7 @@ export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps>
     if (current?.strikeReadyHead !== head || (current.strikeLandingState !== 'ready' && current.strikeLandingState !== 'landing')) continue;
     const leaseKey = `${issueId}:${head}`;
     if (current.strikeLandingState === 'landing' && deps.isScheduled(leaseKey)) continue;
+    if (current.strikeLandingState === 'landing' && deps.isPersistentlyOwned(issueId)) continue;
     const claimed = current.strikeLandingState === 'ready' ? deps.setStatus(issueId, { strikeLandingState: 'landing' }) : current;
     if (claimed.strikeReadyHead !== head || claimed.strikeLandingState !== 'landing') continue;
 

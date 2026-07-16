@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
+import { activeStrikeMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
 import type { ReviewStatus } from '../../../../../src/lib/review-status.js';
 
 const markerHead = 'a'.repeat(40);
@@ -34,6 +34,12 @@ describe('strike merge-door eligibility', () => {
   it('clears a queued strike marker at canonical merge completion', () => {
     expect(mergeCompletionStatus(request)).toEqual({ strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
     expect(mergeCompletionStatus({ kind: 'normal' })).toEqual({});
+  });
+
+  it('rejects duplicate active strike pipelines at the merge door', () => {
+    expect(activeStrikeMerge('PAN-2702')).toBe(true);
+    expect(activeStrikeMerge(null, { type: 'merge', status: 'running' })).toBe(true);
+    expect(activeStrikeMerge(null, { type: 'merge', status: 'completed' })).toBe(false);
   });
   it('accepts the authenticated durable marker without normal review/test readiness', async () => {
     await expect(validateStrikeMergeRequest('PAN-2702', request, status(), { projectPath, git: git() })).resolves.toBeNull();

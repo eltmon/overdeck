@@ -20,7 +20,7 @@ import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { registerStrikeMergeTrigger } from '../../../../lib/cloister/deacon-strike-landing.js';
+import { registerStrikeMergeTrigger, registerStrikeOwnershipProbe } from '../../../../lib/cloister/deacon-strike-landing.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
@@ -40,7 +40,7 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
-import { ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
+import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -341,6 +341,7 @@ function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
 export async function triggerMerge(issueId: string, request: TriggerMergeRequest = { kind: 'normal' }): Promise<TriggerMergeResult> {
   const reviewStatus = getReviewStatusSync(issueId);
   if (request.kind === 'strike') {
+    if (activeStrikeMerge(getCurrentMerge((extractPrefixSync(issueId) ?? issueId.split('-')[0]).toLowerCase()) === issueId.toUpperCase() ? issueId.toUpperCase() : null, getPendingOperation(issueId))) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
     const projectPath = getProjectPath(undefined, extractPrefixSync(issueId) ?? issueId.split('-')[0]);
     const strikeError = await validateStrikeMergeRequest(issueId, request, reviewStatus, {
       projectPath,
@@ -402,6 +403,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   const projectKey = issuePrefix.toLowerCase();
   const normalizedId = issueId.toUpperCase();
   const currentlyMerging = getCurrentMerge(projectKey);
+  if (request.kind === 'strike' && currentlyMerging === normalizedId) return { success: true, statusCode: 200, message: 'Strike merge already in progress', mergeStatus: 'merging' };
   if (currentlyMerging && currentlyMerging !== normalizedId) {
     // Another merge is in progress — queue this one
     const position = enqueueMerge(projectKey, normalizedId);
@@ -1229,9 +1231,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   }
 }
 
-setMergeQueueTriggerHandler(triggerMerge);
-registerStrikeMergeTrigger(triggerMerge);
-
+setMergeQueueTriggerHandler(triggerMerge); registerStrikeMergeTrigger(triggerMerge); registerStrikeOwnershipProbe(issueId => (getPendingOperation(issueId)?.type === 'merge' && getPendingOperation(issueId)?.status === 'running') || getAllActiveQueues().some(queue => queue.current === issueId.toUpperCase() || queue.queue.includes(issueId.toUpperCase())));
 // ─── Route: POST /api/issues/:issueId/merge ───────────────────────────────
 const postWorkspaceMergeRoute = HttpRouter.add(
   'POST',
