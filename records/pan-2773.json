@@ -324,17 +324,17 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:27:31.189Z",
+  "updated": "2026-07-16T21:27:33.377Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:27:24.606Z",
+    "updatedAt": "2026-07-16T21:27:33.344Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "blockerReasons": [
       {
@@ -347,28 +347,6 @@
     "lastVerifiedCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
     "reviewRequestedAt": "2026-07-16T21:27:19.265Z",
     "reviewSpawnedAt": "2026-07-16T21:27:21.150Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/security.md",
-        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/correctness.md",
-        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/performance.md",
-        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/requirements.md",
-        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -454,9 +432,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5961231,
-            "output": 389572,
-            "cacheRead": 107009024,
+            "input": 5962957,
+            "output": 389886,
+            "cacheRead": 107210752,
             "cacheWrite": 0
           }
         }
@@ -469,9 +447,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 24866334,
-          "output": 670298,
-          "cacheRead": 156555008,
+          "input": 24868060,
+          "output": 670612,
+          "cacheRead": 156756736,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -488,8 +466,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 216.904423,
-        "pricingAsOf": "2026-07-16T21:27:24.646Z"
+        "usd": 217.023337,
+        "pricingAsOf": "2026-07-16T21:27:33.362Z"
       }
     },
     "merges": [
@@ -497,7 +475,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
