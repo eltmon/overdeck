@@ -31,19 +31,25 @@ export interface StrikeLandingDeps {
   writeFeedback: (issueId: string, workspacePath: string, markdownBody: string) => Promise<boolean>;
   needsYou: (issueId: string, reason: string, details: Record<string, unknown>) => Promise<void>;
   now: () => string;
-  schedule: (work: () => Promise<void>) => void;
+  schedule: (key: string, work: () => Promise<void>) => void;
+  isScheduled: (key: string) => boolean;
 }
 
 export class StrikeLandingSupervisor {
-  private readonly pending: Array<() => Promise<void>> = [];
+  private readonly pending: Array<{ key: string; work: () => Promise<void> }> = [];
+  private readonly owned = new Set<string>();
   private active = 0;
   constructor(private readonly concurrency = 2) {}
-  enqueue(work: () => Promise<void>): void { this.pending.push(work); this.drain(); }
+  has(key: string): boolean { return this.owned.has(key); }
+  enqueue(key: string, work: () => Promise<void>): void {
+    if (this.owned.has(key)) return;
+    this.owned.add(key); this.pending.push({ key, work }); this.drain();
+  }
   private drain(): void {
     while (this.active < this.concurrency && this.pending.length > 0) {
-      const work = this.pending.shift()!;
+      const { key, work } = this.pending.shift()!;
       this.active += 1;
-      void work().catch(error => console.error('[strike-landing] supervised work failed:', error)).finally(() => { this.active -= 1; this.drain(); });
+      void work().catch(error => console.error('[strike-landing] supervised work failed:', error)).finally(() => { this.active -= 1; this.owned.delete(key); this.drain(); });
     }
   }
 }
@@ -63,7 +69,8 @@ function defaultDeps(): StrikeLandingDeps {
     writeFeedback: async (issueId, workspacePath, markdownBody) => (await Effect.runPromise(writeFeedbackFile({ issueId, workspacePath, specialist: 'merge-agent', outcome: 'needs-you', summary: 'Strike landing needs operator attention', markdownBody }))).success,
     needsYou: surfaceIssueFeedbackNeedsYou,
     now: () => new Date().toISOString(),
-    schedule: work => strikeLandingSupervisor.enqueue(work),
+    schedule: (key, work) => strikeLandingSupervisor.enqueue(key, work),
+    isScheduled: key => strikeLandingSupervisor.has(key),
   };
 }
 
@@ -98,16 +105,29 @@ export async function patrolStrikeLandings(overrides: Partial<StrikeLandingDeps>
   for (const [key, candidate] of Object.entries(deps.loadStatuses())) {
     const issueId = (candidate.issueId || key).toUpperCase();
     const head = candidate.strikeReadyHead;
-    if (!head || candidate.strikeLandingState !== 'ready') continue;
+    if (!head || (candidate.strikeLandingState !== 'ready' && candidate.strikeLandingState !== 'landing')) continue;
     if (candidate.deaconIgnored || candidate.stuck || candidate.mergeStatus === 'merged') continue;
 
     const current = deps.getStatus(issueId);
-    if (current?.strikeReadyHead !== head || current.strikeLandingState !== 'ready') continue;
-    const claimed = deps.setStatus(issueId, { strikeLandingState: 'landing' });
+    if (current?.strikeReadyHead !== head || (current.strikeLandingState !== 'ready' && current.strikeLandingState !== 'landing')) continue;
+    const leaseKey = `${issueId}:${head}`;
+    if (current.strikeLandingState === 'landing' && deps.isScheduled(leaseKey)) continue;
+    const claimed = current.strikeLandingState === 'ready' ? deps.setStatus(issueId, { strikeLandingState: 'landing' }) : current;
     if (claimed.strikeReadyHead !== head || claimed.strikeLandingState !== 'landing') continue;
 
-    deps.schedule(async () => executeStrikeLanding(issueId, head, claimed, deps));
-    actions.push(`[strike-landing] claimed ${issueId} at ${head}`);
+    deps.schedule(leaseKey, async () => {
+      try { await executeStrikeLanding(issueId, head, claimed, deps); }
+      catch (error) {
+        const detail = `Unexpected supervised strike landing failure: ${error instanceof Error ? error.message : String(error)}`;
+        try {
+          const project = deps.resolveProject(issueId);
+          await handleFailure(issueId, head, detail, project?.projectPath ?? '', project ? join(project.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}-strike`) : '', deps.getStatus(issueId) ?? claimed, deps);
+        } catch (recoveryError) {
+          deps.setStatus(issueId, { strikeLandingState: 'needs_you', mergeNotes: `${detail}; durable recovery failed: ${recoveryError instanceof Error ? recoveryError.message : String(recoveryError)}` });
+        }
+      }
+    });
+    actions.push(`[strike-landing] ${candidate.strikeLandingState === 'landing' ? 'reclaimed' : 'claimed'} ${issueId} at ${head}`);
   }
   return actions;
 }

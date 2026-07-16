@@ -11,6 +11,7 @@ function ready(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
 function deps(result: { success: boolean; mergeStatus?: string; error?: string } = { success: true, mergeStatus: 'merged' }): StrikeLandingDeps & { readonly state: ReviewStatus; setState: (state: ReviewStatus) => void; flush: () => Promise<void> } {
   const container = { state: ready() };
   const scheduled: Promise<void>[] = [];
+  const scheduledKeys = new Set<string>();
   return {
     get state() { return container.state; },
     setState: (state) => { container.state = state; },
@@ -24,7 +25,8 @@ function deps(result: { success: boolean; mergeStatus?: string; error?: string }
     writeFeedback: vi.fn().mockResolvedValue(true),
     needsYou: vi.fn().mockResolvedValue(undefined),
     now: () => '2026-07-16T00:00:00.000Z',
-    schedule: work => { scheduled.push(work()); },
+    schedule: (key, work) => { scheduledKeys.add(key); scheduled.push(work().finally(() => scheduledKeys.delete(key))); },
+    isScheduled: key => scheduledKeys.has(key),
     flush: () => Promise.all(scheduled).then(() => undefined),
   };
 }
@@ -47,6 +49,23 @@ describe('patrolStrikeLandings', () => {
     await Promise.all([patrolStrikeLandings(d), patrolStrikeLandings(d)]);
     await d.flush();
     expect(d.mergeIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('reclaims a persisted landing after process-local supervision is lost', async () => {
+    const d = deps({ success: true, mergeStatus: 'queued' });
+    d.setState(ready({ strikeLandingState: 'landing' }));
+    await expect(patrolStrikeLandings(d)).resolves.toEqual([`[strike-landing] reclaimed PAN-2702 at ${head}`]);
+    await d.flush();
+    expect(d.mergeIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes unexpected supervised rejection through durable recovery', async () => {
+    const d = deps();
+    vi.mocked(d.mergeIssue).mockRejectedValue(new Error('worker crashed'));
+    await patrolStrikeLandings(d);
+    await d.flush();
+    expect(d.state).toMatchObject({ strikeLandingState: 'recovering', strikeRecoveryCount: 1 });
+    expect(d.state.mergeNotes).toContain('Unexpected supervised strike landing failure: worker crashed');
   });
 
   it('marks a terminal merge landed and clears readiness', async () => {
@@ -113,7 +132,7 @@ describe('patrolStrikeLandings', () => {
     const supervisor = new StrikeLandingSupervisor(2);
     const releases: Array<() => void> = [];
     const started: number[] = [];
-    for (let index = 0; index < 3; index += 1) supervisor.enqueue(async () => {
+    for (let index = 0; index < 3; index += 1) supervisor.enqueue(String(index), async () => {
       started.push(index);
       await new Promise<void>(resolve => releases.push(resolve));
     });
