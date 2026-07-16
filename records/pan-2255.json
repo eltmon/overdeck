@@ -3,20 +3,36 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T06:37:31.318Z",
+  "updated": "2026-07-16T06:37:38.488Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T05:46:13.517Z"
+    "updatedAt": "2026-07-16T06:37:38.444Z",
+    "inspectNotes": "Inspecting item mailbox-contract"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 294988,
+            "output": 912,
+            "cacheRead": 221568,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 5849450,
+            "output": 11537,
+            "cacheRead": 5703168,
+            "cacheWrite": 0
+          }
+        },
         "memory-extraction": {
           "cliproxy/gpt-5.4-mini": {
             "input": 24096,
@@ -27,6 +43,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 294988,
+          "output": 912,
+          "cacheRead": 221568,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 5849450,
+          "output": 11537,
+          "cacheRead": 5703168,
+          "cacheWrite": 0
+        },
         "cliproxy/gpt-5.4-mini": {
           "input": 24096,
           "output": 424,
@@ -35,15 +63,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-16T05:46:13.559Z"
+        "usd": 3.929104,
+        "pricingAsOf": "2026-07-16T06:37:38.478Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 2,
     "claims": {},
