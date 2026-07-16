@@ -4973,3 +4973,33 @@ now `ignore-scripts=1`. Batch `pan start` for 2168/2255/2532/1966/2768 running i
 ### Board: strikes live: 2599(PostHog), 2710, 2741, 2748?, 2749?, 2752?, 2753?, 2771 | PAN-2774 merged
 Kickoff-delivery (PAN-2771) still unfixed — watch the 5 batch starts for `kickoff not confirmed`; tell
 each agent per operator allowance if it recurs.
+
+---
+
+## Tick 45 — 2026-07-16 ~05:30Z — two strike verdicts (one BLOCKED on live disproof); board hygiene
+
+### ⚖️ Two "gates green — review and land" reports, OPPOSITE verdicts — verify EVERY one live
+- **PAN-2599/PostHog: APPROVED pending CI.** Real fix `c25e06a7cb` compacted captures to exactly the
+  1012 baseline; `213f39ac09` reverted an interim baseline bump; **net baseline diff vs main = 0**.
+  Monitor armed on #2776; merge + close PAN-2599 on green (operator directive).
+- **PAN-2777/bun-install: BLOCKED — fix empirically DISPROVEN.** Its gates were green because the test
+  only asserts the flag exists in YAML. I ran the exact command in the real init container:
+  `EPERM ... (copyfile)`, still 1618 failures. Error-class shift ENOENT→EPERM exposed the TRUE root:
+  **the `container-node-modules` named volume mounts ROOT-OWNED while init runs as uid 1000** —
+  `touch node_modules/.writetest` = Permission denied (proven in-container). Everything downstream
+  (bun link failures → unlinked husky → 127) was ownership. Verdict + fix direction (root-run chown
+  step ordered before install; heal EXISTING volumes; keep --ignore-scripts, drop copyfile) delivered
+  via pan tell and **delivery verified in its event stream** (4 userMessages). Related: #1198.
+  **Container fixes get container proof, not YAML assertions. Second green-gated fix disproven live tonight.**
+
+### Board hygiene
+- 4 finished strikes (2748/2752/2753/2770) idle 3-4h but their ISSUES are still OPEN (strike close-out
+  blocked by the DoD strike-branch gap found earlier) — left alive, not killed on a wrong premise.
+- `pan strike PAN-2710` retry #1 failed "exited before readiness" (transient); retry #2 running,
+  kickoff=True. Perf fixes (unbounded poller subprocesses + dedup leak + conclusions gap) still owed.
+- **Deploy gap:** PAN-2499 (Issue View unification) merged 04:25Z, AFTER the 03:39:52Z boot — NOT live.
+  Batching the deploy with PostHog once #2776 lands.
+- `pan strike` accepts NONEXISTENT issues (spawned strike-pan-2778 for an issue that doesn't exist —
+  my typo, killed) — no validation at dispatch. File when the drain quiets.
+
+Critical path unchanged: **2771** (frees 4 taskless agents) + **2777** (frees 3 docker-blocked issues).
