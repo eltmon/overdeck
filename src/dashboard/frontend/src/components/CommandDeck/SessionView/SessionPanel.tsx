@@ -8,6 +8,7 @@ import type { RoundMarker } from '../../chat/MessagesTimeline';
 import { ChatMarkdown } from '../../chat/ChatMarkdown';
 import { XTerminal } from '../../XTerminal';
 import { AwaitingInputIndicator } from '../../AwaitingInputIndicator';
+import { useAskUserQuestionUiStore } from '../../../lib/askUserQuestionUiStore';
 import { useDashboardStore, selectPendingPermissionAgentIds } from '../../../lib/store';
 import { RoundCard } from '../RoundCard';
 import type { RoundData, RoundVerdict } from '../RoundCard';
@@ -222,6 +223,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
   // the server-computed session.awaitingInput; merge via the shared selector.
   const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
   const hasPendingPermission = pendingPermissionAgentIds.has(session.sessionId);
+  const requestAskUserQuestionReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   const [view, setView] = useState<PanelView>(() => {
     const stored = readView(session.sessionId);
     // Default review sessions without JSONL to summary tab; with JSONL default
@@ -327,8 +329,12 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       {/* View toggle — slim tab bar (info already shown in ZoneB) */}
       <div className={styles.sessionPanelHeader}>
         {(session.awaitingInput || hasPendingPermission) && (
+          // Clicking re-opens the dialog for this session — the modal can be
+          // dismissed or lost, and the operator needs a way back to the
+          // question without hunting for it.
           <AwaitingInputIndicator
             kinds={hasPendingPermission ? ['permissionRequest'] : ['askUserQuestion']}
+            onClick={() => requestAskUserQuestionReopen(session.sessionId)}
           />
         )}
         <SessionPanelBranchChip sessionId={session.sessionId} />
