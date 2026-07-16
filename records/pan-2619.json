@@ -64,15 +64,7 @@
       "note": "No deviations. No skipped work or newly discovered hazards. Moved terminal padding from the measured host to the FitAddon-aware .xterm element, added the regression test, and verified the full suite, typecheck, and targeted XTerminal tests."
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T21:16:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2619\n\n# Review Synthesis — PAN-2619 — 2026-07-16T21:20:00-04:00\n\n## Verdict: CHANGES REQUESTED — correctness reviewer failed before producing a report\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-52760064/context.json\n- Branch: feature/pan-2619\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619\n- HEAD reviewed: 527600642793acab98d2c574fd40b91ead884c2b\n- Cycle number: 3\n- Prior cycle SHA: d2a4e5824040bfd2b2319469aaa540b4d1bb097b\n- PR diff: 5 commits from merge base fd517078d47e5ec57ddb8f5cabe0de3f12e68e3c to HEAD\n- Cycle diff: no changes to the three PAN-2619 files since the prior reviewed SHA\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-52760064/security.md | 0 |\n| correctness | failed — timed out waiting for Codex app-server readiness (`ECONNREFUSED`) | — | infrastructure failure |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-52760064/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-52760064/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Reviewer infrastructure failure\nThe correctness reviewer timed out waiting for its Codex app-server socket and produced no report. Review policy forbids approval when any reviewer fails or times out, so correctness remains unverified in this cycle even though the other three sub-roles are clean.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-52760064/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2619 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -89,7 +81,7 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:16:57.930Z",
+  "updated": "2026-07-16T21:16:59.692Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "pending",
