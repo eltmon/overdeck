@@ -4,17 +4,17 @@
     "created": "2026-07-16T03:41:40Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2768: Sync Now fails in packaged desktop (AppImage): panCliInvocation points at dist/cli/index.js, which extraResources never ships",
-    "updated": "2026-07-16T03:46:32.760Z"
+    "updated": "2026-07-16T07:27:40.060Z"
   },
   "plan": {
     "id": "pan-2768",
     "title": "Sync Now fails in packaged desktop (AppImage): panCliInvocation points at dist/cli/index.js, which extraResources never ships",
-    "status": "proposed",
+    "status": "approved",
     "uid": "4ab4c958-4f3f-4303-b31d-0535c51e2089",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-16T03:41:40Z",
-    "updated": "2026-07-16T03:46:32.760Z",
+    "updated": "2026-07-16T07:27:40.060Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2768",
@@ -463,5 +463,5 @@
       "canonicalFilename": "2026-07-16-PAN-2768-sync-now-fails-in-packaged-desktop-appimage-pancliinvocation-points-at-dist-cli-index-js-which-extraresources-never-ships.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
