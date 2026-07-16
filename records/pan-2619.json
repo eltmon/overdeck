@@ -121,16 +121,16 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:20:46.942Z",
+  "updated": "2026-07-16T21:23:06.253Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:20:46.548Z",
+    "updatedAt": "2026-07-16T21:23:06.223Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (28123ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619\n\n ❯ src/App.test.tsx (40 tests | 31 failed) 464ms\n     × defaults missing view state to conversation mode 66ms\n     × restores terminal view from the URL on initial render 13ms\n     × does not strip terminal view from a direct deep link on initial render 13ms\n     × updates the current conversation URL when the view mode changes 26ms\n     × restores a remembered terminal view when returning to a conversation 14ms\n     × renders HomePage at / 17ms\n     × opens a Home workspace card through the existing board drawer route 16ms\n     × renders PipelineView at /pipeline 23ms\n     × restores the selected project from a command deck project URL 15ms\n     × updates the URL when a command deck project is selected 11ms\n     × marks the parent surface when the drawer is open 10ms\n     × renders Board at /board 13ms\n     × renders ContextPage at /context 18ms\n     × opens the issue drawer on /issues/:id without rewriting the URL 11ms\n     × defaults /issues/:id to Pipeline when no last tab is stored 9ms\n     × restores the last surface on /issues/:id 9ms\n     × handles browser back/forward to /issues/:id 15ms\n     × redirects direct experimental routes to Home when experimental features are off 9ms\n     × keeps the sidebar open by default 9ms\n     × closes the sidebar from the toggle and persists the closed state 8ms\n     × restores the open sidebar from localStorage on mount 10ms\n     × closes from the in-sidebar close button and persists the closed state 16ms\n     × opens the issue drawer from kanban selection 11ms\n     × submits allow decisions for pending channel permission requests 9ms\n     × submits deny decisions for pending channel permission requests 7ms\n     × navigates to Pipeline with g p 9ms\n     × navigates to Board with g b 14ms\n     × navigates to Agents with g a 8ms\n     × navigates to Command Deck with g c 7ms\n     × does not trigger the chord when focus is inside an input 6ms\n     × cancels the chord on an unbound second key 8ms\n\n Test Files  1 failed | 30 passed (31)\n      Tests  31 failed | 458 passed (489)\n   Start at  17:20:35\n   Duration  9.73s (transform 37.64s, setup 9.27s, import 73.45s, tests 28.54s, environment 27.92s)\n\nNo test files found, exiting with code 0\n\n\n--- stderr ---\nError: [vitest] No \"selectPendingInputSubjects\" export is defined on the \"./lib/store\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\n    at VitestMocker.createError (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/node_modules/.bun/vitest@4.1.6/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17)\n    at Object.get (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/node_modules/.bun/vitest@4.1.6/node_modules/vitest/dist/chunks/startVitestModuleRunne\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
@@ -158,15 +158,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 281570,
-            "output": 1349,
-            "cacheRead": 195328,
+            "input": 317478,
+            "output": 1456,
+            "cacheRead": 223360,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 6203158,
-            "output": 18755,
-            "cacheRead": 5723136,
+            "input": 8029644,
+            "output": 23566,
+            "cacheRead": 7506688,
             "cacheWrite": 0
           }
         },
@@ -220,10 +220,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 68,
-            "output": 10787,
-            "cacheRead": 4991131,
-            "cacheWrite": 145764
+            "input": 1561,
+            "output": 19237,
+            "cacheRead": 6800866,
+            "cacheWrite": 161357
           }
         },
         "work": {
@@ -237,15 +237,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 281570,
-          "output": 1349,
-          "cacheRead": 195328,
+          "input": 317478,
+          "output": 1456,
+          "cacheRead": 223360,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 12013707,
-          "output": 234716,
-          "cacheRead": 45273088,
+          "input": 13840193,
+          "output": 239527,
+          "cacheRead": 47056640,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -255,15 +255,15 @@
           "cacheWrite": 327850
         },
         "anthropic/claude-sonnet-5": {
-          "input": 68,
-          "output": 10787,
-          "cacheRead": 4991131,
-          "cacheWrite": 145764
+          "input": 1561,
+          "output": 19237,
+          "cacheRead": 6800866,
+          "cacheWrite": 161357
         }
       },
       "costAtCloseOut": {
-        "usd": 81.089781,
-        "pricingAsOf": "2026-07-16T21:20:46.662Z"
+        "usd": 82.828972,
+        "pricingAsOf": "2026-07-16T21:23:06.240Z"
       }
     },
     "merges": [
