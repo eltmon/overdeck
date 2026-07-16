@@ -74,18 +74,18 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:54:39.483Z",
+  "updated": "2026-07-16T18:54:40.502Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:54:39.423Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-2773-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-16T18:54:40.407Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2773-review",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
@@ -235,7 +235,7 @@
       },
       "costAtCloseOut": {
         "usd": 88.096036,
-        "pricingAsOf": "2026-07-16T18:54:39.471Z"
+        "pricingAsOf": "2026-07-16T18:54:40.471Z"
       }
     },
     "merges": [
