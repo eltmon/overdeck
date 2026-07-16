@@ -2,7 +2,8 @@ import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { listSubstrateBugWeights } from '../../../lib/overdeck/substrate-bug-weights-service.js';
+import type { WeightedSubstrateBug } from '../../../lib/overdeck/substrate-bug-weights-service.js';
+import { runDashboardDbJob } from '../services/dashboard-db-task.js';
 
 const DEFAULT_WINDOW = '30d';
 const DEFAULT_LIMIT = 50;
@@ -40,7 +41,10 @@ export const getSubstrateBugWeightsRoute = HttpRouter.add(
     const window = parseWindow(params.get('window'));
     const limit = parseLimit(params.get('limit'));
     const offset = parseOffset(params.get('offset'));
-    const rows = yield* Effect.promise(() => listSubstrateBugWeights(window, { limit, offset }));
+    const rows = yield* Effect.promise(() => runDashboardDbJob<WeightedSubstrateBug[]>(
+      'listSubstrateBugWeights',
+      { window, limit, offset },
+    ));
     return jsonResponse(rows);
   })),
 );
