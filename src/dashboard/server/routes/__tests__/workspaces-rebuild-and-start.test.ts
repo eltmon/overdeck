@@ -33,8 +33,13 @@ vi.mock('../../../../lib/activity-logger.js', () => ({
 }));
 
 import { spawnPanCommand } from '../workspaces.js';
+import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 
 const CHAIN = { args: ['start', 'MIN-831'], phaseLabel: 'Stack rebuilt — starting agent for MIN-831' };
+const expectedSpawn = (args: string[]) => {
+  const invocation = panCliInvocation(args);
+  return { cmd: invocation.command, args: invocation.args };
+};
 
 describe('spawnPanCommand chainOnSuccess (rebuild-and-start)', () => {
   beforeEach(() => {
@@ -51,12 +56,12 @@ describe('spawnPanCommand chainOnSuccess (rebuild-and-start)', () => {
 
     // Phase 1 fired immediately; phase 2 has not.
     expect(harness.spawnCalls).toHaveLength(1);
-    expect(harness.spawnCalls[0]?.args.slice(-3)).toEqual(['workspace', 'rebuild', 'MIN-831']);
+    expect(harness.spawnCalls[0]).toEqual(expectedSpawn(['workspace', 'rebuild', 'MIN-831']));
 
     // Rebuild succeeds → start spawns.
     harness.children[0].emit('close', 0);
     expect(harness.spawnCalls).toHaveLength(2);
-    expect(harness.spawnCalls[1]?.args.slice(-2)).toEqual(['start', 'MIN-831']);
+    expect(harness.spawnCalls[1]).toEqual(expectedSpawn(['start', 'MIN-831']));
 
     // Start succeeds → no further spawns.
     harness.children[1].emit('close', 0);

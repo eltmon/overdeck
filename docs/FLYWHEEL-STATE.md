@@ -4692,3 +4692,106 @@ Preserves the auto-clobber protection. Blocked only on main going green.
 
 **Drain: 29 merged / 27 closed out.** Filed (14): +PAN-2757.
 Operator decisions still outstanding, NOT re-asked: PAN-2710 bypass; v0.45.20 (still blocked on red main).
+
+---
+
+## Tick 39 — 2026-07-16 ~01:45Z — 🟢 RED MAIN CLEARED (merged #2756); two more zombie classes found
+
+### ✅ PAN-2748 LANDED — `31754c5f52` — main red since 00:25Z is CLEARED
+All gates green on PR #2756 (`test=pass build (22)=pass lint=pass`), squash-merged **server-side**.
+**The landing path matters:** the pre-commit guard blocks me from *authoring a local commit*; it does
+NOT block a server-side PR merge — which is the normal way a strike lands anyway. No `--no-verify`,
+no local commit by me. Fix verified present on main (3× `expectedSpawn`). Main CI re-running on the
+merge: build/smoke/flake/trailer green, lint+test still in flight.
+**Seven commits had stacked on the red before it cleared.**
+
+### ✅ Did NOT build the dirty tree — the check that mattered
+`npm run build` builds the **working tree**. The primary worktree had **foreign uncommitted work**
+(8 live convs share it), so building would have deployed someone's unreviewed in-flight vBRIEF changes.
+Checked first; by merge time the owner had committed and the tree was clean (count: 0). **Deploy still
+owed** — live server booted 00:38 and main has taken 7 commits since, several with real runtime changes.
+Waiting on CI green rather than deploying onto an unverified main.
+
+### 🚨 PAN-2758 — provider capacity error SILENTLY ZOMBIES a spawned agent
+`strike-pan-2753`'s respawn lived **14 events / 5 seconds**:
+```json
+{"method":"error","params":{"error":{"message":"Selected model is at capacity. Please try a different model.",
+ "codexErrorInfo":"serverOverloaded"},"willRetry":false}}
+{"method":"turn/completed"}     ← NOT turn/failed. The turn carrying a hard error reports SUCCESS.
+```
+…and `state.json` 11 minutes later still says **`status: running, kickoffDelivered: true`**.
+`pan strike` printed `✔ Strike agent spawned` for an agent that **never ran a turn**. Slot consumed
+forever; no needs-you trip; discoverable only by hand-reading `appserver-events.jsonl`.
+**Distinct from PAN-2757:** 2757 = a LIVE agent misread as dead; 2758 = a DEAD agent recorded running.
+Same destination — state disagreeing with reality — from opposite directions. Filed **PAN-2758**.
+
+### ✅ CORRECTION I nearly got wrong: `lastActivity` is NOT stale
+I suspected `lastActivity` was a frozen write-only field (10m uptime, timestamp stuck at spawn+4s).
+**Measured it: DRIFT = 0s** against `appserver-events.jsonl` mtime, on all three strikes.
+The field is **accurate** — the agents are genuinely idle. `lastActivity` is the ONE honest field here;
+nothing consumes it to conclude "died on arrival." **Measure before accusing a field.**
+
+### PAN-2757 confirmed INTERMITTENT (as filed)
+`strike-pan-2753` respawn survived 10m+ — well past the 2m47s window that killed it — with
+`status=running, kickoff=true`. The reap is intermittent, which is why PAN-2757's repro demands
+several spawns, not one.
+
+### Strike board — all three IDLE, and I cannot message them
+- **2748** — merged ✓
+- **2752** — fix `9d0d488942` committed, correct (widens BOTH unions incl. `'ai-refined'`), unpushed.
+  `turn/completed` after 697s; idle awaiting the authorization I declined to give. **Main is now green,
+  which is what it actually needed.**
+- **2753** — DOA on PAN-2758 capacity; correct fix still UNCOMMITTED in its workspace.
+Doctrine forbids me `pan tell`/`kill`/`resume`; re-dispatch just re-hits capacity. **These need the
+operator.** Both hold correct work; neither is lost (verified on disk).
+
+**Drain: 30 merged / 27 closed out.** Filed (15): +PAN-2758.
+**Phase 2 UNBLOCKED pending CI** — v0.45.20 suggestion live again once main CI confirms green.
+Operator decisions still outstanding, NOT re-asked: PAN-2710 bypass; v0.45.20.
+
+---
+
+## Tick 40 — 2026-07-16 ~02:00Z — 🟢 MAIN GREEN + DEPLOYED. Phase 2 READY.
+
+### ✅ MAIN CI GREEN — `848cae5c84` (two independent monitors: `MAIN-CI 848cae5c84 => success`)
+First green main since 00:25Z. The 90-minute red is fully cleared.
+
+### ✅ DEPLOYED — DoD deploy row GREEN
+Built from a **clean** primary main (checked `git status --porcelain` = 0 first — `npm run build` builds
+the WORKING TREE, and this tree had foreign uncommitted work earlier; building it would have shipped
+someone's unreviewed vBRIEF changes). Build exit 0.
+`pan restart --dashboard --health-timeout 180000` (flag is **ms**) → verified:
+- new **pid 2780526** binds :3011, **parent = systemd**, cwd = primary
+- health **HTTP 200**; old pid 652717 **replaced**
+- **boot 01:56:37Z is 43s AFTER dist build 01:55:54Z** ⇒ live server provably contains the merge
+- Boot gates: `deacon=on resume=off (default)` — resume=off is the fail-safe boot default, by design.
+⚠️ `date -u -d "$(ps -o lstart=)"` **mislabels local time as Z** — same timezone trap as `find -newermt`.
+Convert deliberately; never trust the suffix.
+
+### 🚨 PAN-2761 — SECOND time a test assertion masqueraded as a red main and stalled a strike
+`strike-pan-2752` reported main red on `done.test.ts` (localhost vs 127.0.0.1) and refused to push.
+**I verified instead of acting. Main was GREEN.**
+- test passes **7/7 on main** AND **7/7 inside the strike's OWN workspace** (identical source)
+- fails **only** with the env var set — reproduced the strike's exact diff:
+  `- "http://localhost:3011/…"  + "http://127.0.0.1:3011/…"`
+- cause: `done.ts:73` reads `OVERDECK_DASHBOARD_URL || DASHBOARD_URL || 'http://localhost:3011'`;
+  production's default IS localhost (matches the test) — but **the test stubs NO env**, so it inherits
+  the agent shell's `127.0.0.1:3011` (the live default at `agent-runtime.ts:27`).
+**The strike's refusal was the right instinct on a bad signal.** Filed PAN-2761 + a sweep request:
+*any* test asserting an env-derived value without `vi.stubEnv` is green in CI and on a clean shell,
+red in every agent shell, and **an agent cannot tell it from a real red main.** (PAN-2748 was #1.)
+Told the strike: re-run with the var cleared and push; do NOT touch `done.test.ts` (scope creep).
+
+### Strike board — all 3 idle; work SAFE but unpushed; needs the operator
+- **2748** merged ✓ | **2752** `1bd3d4d967` correct, needs clean-env re-run | **2753** correct fix
+  UNCOMMITTED, DOA on PAN-2758 capacity.
+All report `status=running` while idle 52m/28m/23m. Doctrine bars me from `pan tell`/`kill`/`resume`;
+re-dispatch just re-hits capacity. Verified both diffs on disk — nothing lost.
+⚠️ **#2751 `feature/pan-2499` has gone CONFLICTING** as main moved (operator said don't touch — flagging only).
+
+### 🎯 PHASE 2 IS READY — main green, deployed, drained but for PAN-2710
+**Suggest `pan release stable --version 0.45.20`** (v0.45.19 + 60-odd commits, heavily pipeline
+reliability). **OPERATOR CUTS. I NEVER TAG.**
+
+**Drain: 30 merged / 27 closed out.** Filed (16): +PAN-2761.
+Outstanding operator decisions, NOT re-asked: (1) PAN-2710 bypass verdict; (2) v0.45.20.
