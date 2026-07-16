@@ -286,6 +286,11 @@
       "timestamp": "2026-07-16T12:07:30.129Z",
       "reason": "end",
       "note": "Deviation: the unsharded npm test command was terminated with SIGTERM 143 during Vitest, so the identical root suite was completed as two shards (9,404 passed, 50 skipped across 1,022 files) and the frontend suite passed 32/32. The required rebase introduced one duplicate no-loss matrix entry, which was removed, and the pre-rebase remote lineage was preserved with an ours-strategy merge to avoid force-pushing. Hazard: Bun reports a pre-existing duplicate @effect/vitest dependency warning. Delivered metric-aware flywheel substrate-bug prioritization with normalized criterion impact, persistence, API/CLI/UI surfaces, orchestration guidance, docs, migrations, and tests. Typecheck and lint pass."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T12:08:41.876Z"
     }
   ],
   "feedback": [],
@@ -360,7 +365,7 @@
     "recordedAt": "2026-07-16T12:07:29.315Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T12:08:40.746Z",
+  "updated": "2026-07-16T12:08:41.907Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "reviewing",
@@ -614,7 +619,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
     "b8-orchestrator-doc.ac1": "completed",
