@@ -364,17 +364,17 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:18:25.609Z",
+  "updated": "2026-07-16T02:24:34.157Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:18:24.736Z",
+    "updatedAt": "2026-07-16T02:24:34.073Z",
     "reviewNotes": "[correctness] Historical review/test sessions are treated as successful pipeline completion — `src/dashboard/frontend/src/components/issue-view/useIssueView.ts:331`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "82daafcb4a1389c9fe46822c4eae4748126fad09",
@@ -514,28 +514,6 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-16T02:07:47.991Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-82daafcb/security.md",
-        "atCommit": "82daafcb4a1389c9fe46822c4eae4748126fad09"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-82daafcb/correctness.md",
-        "atCommit": "82daafcb4a1389c9fe46822c4eae4748126fad09"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-82daafcb/performance.md",
-        "atCommit": "82daafcb4a1389c9fe46822c4eae4748126fad09"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-82daafcb/requirements.md",
-        "atCommit": "82daafcb4a1389c9fe46822c4eae4748126fad09"
-      }
     }
   },
   "closeOut": {
@@ -543,15 +521,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 13329936,
-            "output": 11737,
-            "cacheRead": 11644672,
+            "input": 13427361,
+            "output": 11816,
+            "cacheRead": 11734656,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 131936509,
-            "output": 236244,
-            "cacheRead": 128397056,
+            "input": 139589278,
+            "output": 260699,
+            "cacheRead": 135690496,
             "cacheWrite": 0
           }
         },
@@ -598,15 +576,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 13329936,
-          "output": 11737,
-          "cacheRead": 11644672,
+          "input": 13427361,
+          "output": 11816,
+          "cacheRead": 11734656,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 131936509,
-          "output": 236244,
-          "cacheRead": 128397056,
+          "input": 139589278,
+          "output": 260699,
+          "cacheRead": 135690496,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -629,8 +607,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 154.747678,
-        "pricingAsOf": "2026-07-16T02:18:24.779Z"
+        "usd": 160.924693,
+        "pricingAsOf": "2026-07-16T02:24:34.143Z"
       }
     },
     "merges": [
