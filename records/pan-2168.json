@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T07:29:13.290Z",
+  "updated": "2026-07-16T07:36:54.163Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "open-questions-anchor": {
-        "writerId": "agent-pan-2168",
-        "agentId": "agent-pan-2168",
-        "pid": 3119889,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:29:13.289Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2168",
@@ -91,6 +83,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2168 dead)",
         "releasedAt": "2026-07-16T06:35:42.214Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3119889,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:29:13.289Z",
+        "itemId": "open-questions-anchor",
+        "outcome": "completed",
+        "reason": "Added a stable DOM anchor to the Open Questions section and asserted the anchored section contains every question; full tests, typecheck, and lint pass.",
+        "releasedAt": "2026-07-16T07:36:54.163Z"
       }
     ],
     "statusReasons": {
@@ -99,8 +102,8 @@
         "updatedAt": "2026-07-16T06:33:16.102Z"
       },
       "open-questions-anchor": {
-        "reason": "stale claim released (agent-pan-2168 dead)",
-        "updatedAt": "2026-07-16T06:35:42.214Z"
+        "reason": "Added a stable DOM anchor to the Open Questions section and asserted the anchored section contains every question; full tests, typecheck, and lint pass.",
+        "updatedAt": "2026-07-16T07:36:54.163Z"
       }
     }
   },
@@ -109,7 +112,10 @@
     "reveal-signal-module.reveal-signal-module.ac1": "completed",
     "reveal-signal-module.reveal-signal-module.ac2": "completed",
     "reveal-signal-module.reveal-signal-module.ac3": "completed",
-    "open-questions-anchor": "running"
+    "open-questions-anchor": "completed",
+    "open-questions-anchor.open-questions-anchor.ac1": "completed",
+    "open-questions-anchor.open-questions-anchor.ac2": "completed",
+    "open-questions-anchor.open-questions-anchor.ac3": "completed"
   },
   "sessionHistory": [
     {
