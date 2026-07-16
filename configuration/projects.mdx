@@ -45,6 +45,19 @@ pan project list
 pan project remove myproject
 ```
 
+### Rename a project
+
+```bash
+pan project rename <key> <newName>
+
+# Example: keep the stable `myn` key and change its display name
+pan project rename myn "Mind Your Now"
+```
+
+The registration key is the stable identifier stored as the project's YAML map key. It is derived when the project is registered and cannot be renamed. The display name is the human-facing label shown throughout Overdeck; it can be renamed, but it cannot match another project's registration key or display name, ignoring letter case.
+
+In the dashboard, use the pencil beside the name on the project page, or right-click the project tree row and choose **Rename project**. Both controls open an inline editor for the display name while preserving the registration key.
+
 ## Project Configuration
 
 Projects are defined in `~/.overdeck/projects.yaml`:
