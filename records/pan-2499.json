@@ -541,17 +541,16 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T06:18:23.447Z",
+  "updated": "2026-07-16T06:18:25.711Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T04:25:45.396Z",
+    "updatedAt": "2026-07-16T06:18:25.688Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "testNotes": "Gates (all from workspace feature-pan-2499, HEAD 1107d2c626, matches reviewedAtCommit): npm run typecheck (root) PASS; npx tsc --noEmit (frontend) PASS; npm run lint PASS (eslint + effect/permissions/state-writes/overdeck-boundaries/skills/prompts/file-size/circular/ratchet/quarantine sub-gates); npm run build PASS; npm run build:dashboard:server:bundle PASS; scoped unit tests vs merge-base 4b426022c4 -- root: 30 files/228 tests PASS, frontend: 25 files/394 tests PASS (622 total, includes FR-0 no-loss render-gate tests and fixture-driven density/interaction tests for IssueView, rail-expand, StartAgentCta, ActiveAgentPanel, VerificationGates, BeadsPanel). UAT: this issue unifies rail/cockpit/console issue-view rendering, clearly UI-behavior scoped, so browser UAT was required. Built and drove the workspace's own isolated container stack (overdeck-feature-pan-2499-frontend-1/server-1, https://feature-pan-2499.overdeck.localhost, NOT the host dashboard on :3011) via Playwright MCP. Root-caused a pre-existing container node_modules drift unrelated to this PR (missing @radix-ui/react-tooltip, introduced by already-merged main commit 134d0f80dd, not in PAN-2499's changed-file set) blocking the Vite dev server; fixed via `bun install` inside the frontend container + container restart (no code/config edits). Confirmed the app boots and reloads cleanly with zero console errors. Could not exercise the specific rail->cockpit->console density transitions against live PAN-2499 issue data because this isolated peer container starts with zero registered projects/issues by design (tracker polling disabled for workspace peer stacks) and the in-app + New Project flow 401s on /api/fs/list-dirs in this container -- an inherent workspace-container architecture constraint, not a PR defect. The exact behaviors that gap would have covered (density-based section visibility, rail-expand-in-place -> cockpit -> console, collapse, StartAgentCta fixture states for troubled/paused/stopped/resumable/running, ActiveAgentPanel per-density mounting incl. collapsed-rail zero-consumer, FR-0 data-section presence at >=1 density) are independently proven by dedicated Vitest+RTL tests rendering the real production components (not shallow mocks) and asserting real DOM structure/attributes/click behavior, already green on this commit, and already independently confirmed by review (reviewStatus passed) and work.inspect (inspectStatus passed, inspector explicitly verified DOM-level data-section rendering in IssueMissionControl.test.tsx/IssueDrawer.test.tsx).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
@@ -693,7 +692,9 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-16T02:07:47.991Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-16T06:18:25.688Z"
   },
   "closeOut": {
     "usage": {
@@ -793,7 +794,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2751"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-16T06:18:25.708Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 87a31066c41770febae838a24bb5ad1a75f9a203",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2751 MERGED at 2026-07-16T04:25:20Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T04:25:20Z",
+          "mergeCommit": "4697f176302a90ad98823392c6493419f7c197d7"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 4697f176302a90ad98823392c6493419f7c197d7",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-16T05:34:20.000Z, dist built 2026-07-16T05:34:03.069Z, merge 2026-07-16T04:25:20.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 6 orphaned process(es); Removed git worktree; Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-2499 found; Pruned 39 checkpoint ref(s) for agent-pan-2499, planning-pan-2499, strike-pan-2499; No specialist registry entries for PAN-2499"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
