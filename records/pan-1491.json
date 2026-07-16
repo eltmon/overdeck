@@ -323,19 +323,17 @@
     "recordedAt": "2026-07-11T10:51:47.612Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T07:24:43.099Z",
+  "updated": "2026-07-16T07:24:46.311Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-13T06:15:15.100Z",
-    "reviewNotes": "[correctness] Existing `overdeck.db` files never get the new `affected_criteria` column — `src/lib/overdeck/flywheel-substrate-bugs.ts:102`",
-    "verificationNotes": "Verification FAILED at test (304327ms):\n\nProjects/overdeck/workspaces/feature-pan-1491/src/dashboard/server/routes/__tests__/costs-experiments.test.ts:38:21)\n    at file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/internal/effect.js:684:49\n    at ~effect/Utils/internal (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/node_modules/.bun/effect@4.0.0-beta.73/node_modules/effect/dist/Utils.js:79:12)\n\n\u001b[90mstderr\u001b[2m | tests/unit/lib/cloister/postmerge-release-isolation.test.ts\u001b[2m > \u001b[22m\u001b[2mtriggerPostMergeReleaseIfConfigured\u001b[2m > \u001b[22m\u001b[2mpersists releaseStatus failed and does not corrupt mergeStatus when runRelease throws\n\u001b[22m\u001b[39m[merge-agent] Post-merge release trigger failed for PAN-399: release engine blew up\n\n\n\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\u001b[1m\u001b[41m Failed Tests 1 \u001b[49m\u001b[22m\u001b[31m⎯⎯⎯⎯⎯⎯⎯\u001b[39m\n\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/overdeck/no-loss-matrix.test.ts\u001b[2m > \u001b[22mG3 no-loss matrix\u001b[2m > \u001b[22mmatrix has no duplicate surface entries\n\u001b[41m\u001b[1m FAIL \u001b[22m\u001b[49m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/overdeck/no-loss-matrix.test.ts\u001b[2m > \u001b[22mG3 no-loss matrix\u001b[2m > \u001b[22mmatrix has no duplicate surface entries\n\u001b[31m\u001b[1mAssertionError\u001b[22m: Duplicate surface keys found in NO_LOSS_MATRIX: expected [ Array(1) ] to deeply equal []\u001b[39m\n\n\u001b[32m- Expected\u001b[39m\n\u001b[31m+ Received\u001b[39m\n\n\u001b[32m- []\u001b[39m\n\u001b[31m+ [\u001b[39m\n\u001b[31m+   \"GET /api/projects/:projectKey/release-status\",\u001b[39m\n\u001b[31m+ ]\u001b[39m\n\n\u001b[36m \u001b[2m❯\u001b[22m tests/unit/lib/overdeck/no-loss-matrix.test.ts:\u001b[2m143:69\u001b[22m\u001b[39m\n    \u001b[90m141|\u001b[39m     }\n    \u001b[90m142|\u001b[39m     const dupes = [...seen.entries()].filter(([, n]) => n > 1).map(([s…\n    \u001b[90m143|\u001b[39m     expect(dupes, 'Duplicate surface keys found in NO_LOSS_MATRIX').to…\n    \u001b[90m   |\u001b[39m                                                                     \u001b[31m^\u001b[39m\n    \u001b[90m144|\u001b[39m   })\u001b[33m;\u001b[39m\n    \u001b[90m145|\u001b[39m })\u001b[33m;\u001b[39m\n\n\u001b[31m\u001b[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\u001b[22m\u001b[39m\n\n",
+    "updatedAt": "2026-07-16T07:24:46.167Z",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "lastVerifiedCommit": "c7e0b6386488f85dda6eeed49f5586db6b64a71c",
@@ -477,9 +475,9 @@
         },
         "work": {
           "custom/kimi-k2.7-code": {
-            "input": 2994981,
-            "output": 403954,
-            "cacheRead": 209435392,
+            "input": 2995337,
+            "output": 404018,
+            "cacheRead": 209648384,
             "cacheWrite": 0
           }
         }
@@ -552,15 +550,15 @@
           "cacheWrite": 256982
         },
         "custom/kimi-k2.7-code": {
-          "input": 2994981,
-          "output": 403954,
-          "cacheRead": 209435392,
+          "input": 2995337,
+          "output": 404018,
+          "cacheRead": 209648384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 145.194862,
-        "pricingAsOf": "2026-07-13T06:15:16.090Z"
+        "usd": 145.235924,
+        "pricingAsOf": "2026-07-16T07:24:46.268Z"
       }
     },
     "merges": [
