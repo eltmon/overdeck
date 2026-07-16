@@ -13,7 +13,7 @@ import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
 import { readRestartLockHolder, type RestartLockHolder } from '../restart-lock.js';
 import { sessionExists } from '../tmux.js';
 
-interface DeployWindowDependencies {
+export interface DeployWindowDependencies {
   readonly loadReviewStatuses: () => Record<string, ReviewStatus>;
   readonly getFlywheelActiveRunId: () => string | null;
   readonly isMergeAgentRunning: () => Promise<boolean>;
