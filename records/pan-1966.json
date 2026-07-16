@@ -439,15 +439,7 @@
       "timestamp": "2026-07-16T16:14:57.424Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T16:14:57Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1966\n\n# Review Synthesis — PAN-1966 — 2026-07-16T16:10:34Z\n\n## Verdict: CHANGES REQUESTED — closed zombie PR label drift regressed after the main merge, and correctness review coverage failed\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-41b0474d/context.json`\n- Branch: `feature/pan-1966`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966`\n- HEAD reviewed: `41b0474d6d027e7840b29ea391995d0e52f6ee62`\n- Cycle number: 9\n- Prior cycle SHA: `99252ef028b6463d113170b67133ae9a79b3dfa9`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-41b0474d/security.md` | 0 |\n| correctness | failed | — | infrastructure failure |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-41b0474d/performance.md` | 0 after convergence gate |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-41b0474d/requirements.md` | 1 after convergence gate |\n\n## Blocking Findings\n\n### [correctness] Reviewer session ended before writing a report\n\nThe correctness reviewer emitted `REVIEWER_FAILED correctness reviewer session ended before writing a report`. Review policy requires complete coverage from every sub-role, so this infrastructure failure blocks approval even though the other reports are readable.\n\n### [requirements] Closed zombie PRs are incorrectly classified as `stale_absent` — `src/lib/pipeline-membership.ts:104`\n\nFR-4 requires `stale_absent` only for an open issue with an open PR and no phase label. The cycle diff from `99252ef028b6463d113170b67133ae9a79b3dfa9` to the reviewed HEAD removed the `s.issueOpen` guard, so a closed issue with an open PR now alternates between `stale_absent` when unlabeled and `stale_present` after reconciliation adds the label. This regression is inside the cycle diff and remains blocking under the cycle-9 convergence gate.\n\n## Non-blocking Findings\n\n### Performance\n\n- [demoted: previously reviewed] Every 30-second resource refresh can trigger a full membership crawl. The cited resource-discovery, TTL, aggregation, and gatherer lines are outside the cycle diff, so cycle-9 convergence policy does not allow promotion to a new blocker. The report remains actionable follow-up evidence.\n\n### Requirements\n\n- [demoted: previously reviewed] The pipeline-status skill's Awaiting Merge summary does not intersect `/api/issues` annotations with memberships where `inPipeline === true`. The cited skill lines did not change since the prior synthesis.\n- [demoted: previously reviewed] The post-UAT flywheel prompt does not explicitly filter endpoint rows on `inPipeline === true`. The cited prompt did not change since the prior synthesis.\n\n## Clean Sub-roles\n\n- Security found no findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-41b0474d/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1966 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
@@ -536,7 +528,7 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T16:28:04.668Z",
+  "updated": "2026-07-16T16:28:04.968Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
