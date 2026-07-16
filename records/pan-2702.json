@@ -228,7 +228,7 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T13:58:56.522Z",
+  "updated": "2026-07-16T13:58:59.175Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "reviewing",
@@ -238,7 +238,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T13:58:51.974Z",
+    "updatedAt": "2026-07-16T13:58:58.972Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1 unmet: strike requests never reach triggerMerge(). Only dequeueNextMerge() (merge-ops.ts:322-336) builds a StrikeMergeRequest, but it's only invoked via advanceQueue() after another triggerMerge() call for the SAME project's queue completes, dequeuing entries populated solely by enqueueMerge() (called only at merge-ops.ts:406,418 inside triggerMerge itself). pan strike-ready (src/cli/commands/strike-ready.ts:70-80) only persists strikeReadyHead/strikeLandingState via setStatus -- it never calls enqueueMerge or triggerMerge. Every other triggerMerge call site (flywheel.ts:610, merge-ops.ts:1250 route handler, auto-merge-executor.ts:55/111 defaultMergeIssue, merge-queue-service.ts:25 resumeQueuedMerges) invokes triggerMerge(issueId) with no request arg, defaulting to {kind:'normal'}. Grepped repo-wide for strikeLandingState/strikeReadyHead outside merge-ops.ts/merge-strike.ts and found no patrol, route, or watcher that enqueues or triggers a merge for a freshly-ready strike marker. Result: a strike marked ready has no code path that ever constructs {kind:'strike',...} and calls triggerMerge -- the AC1 scenario (given a valid durable strike marker, the merge door resolves/gates/merges/invokes postMergeLifecycle) is unreachable dead code. Required fix: wire an actual trigger -- e.g. strikeReadyCommand or a server-side watcher on strikeLandingState==='ready' must enqueueMerge + call triggerMerge(issueId, strikeRequest), or add a dedicated endpoint/patrol that detects readiness and invokes the merge door. AC2 (stale-marker rejection, validateStrikeMergeRequest in merge-strike.ts:20-42) and AC3 (no-loss eligibility matrix, normalMergeEligibility + strike-merge.test.ts) verified correct in isolation; AC4 (main-push guard) unaffected by this diff. Minor non-blocking nit: 'Already merged' check now exists twice (merge-strike.ts:16 inside normalMergeEligibility, and unchanged original at merge-ops.ts ~391) -- harmless redundancy, not a functional loss.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2791",
@@ -251,15 +251,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 3131224,
-            "output": 8126,
-            "cacheRead": 2667008,
+            "input": 3261476,
+            "output": 8234,
+            "cacheRead": 2738944,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 72787240,
-            "output": 120701,
-            "cacheRead": 70526720,
+            "input": 73858454,
+            "output": 121185,
+            "cacheRead": 71593472,
             "cacheWrite": 0
           }
         },
@@ -274,15 +274,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 3131224,
-          "output": 8126,
-          "cacheRead": 2667008,
+          "input": 3261476,
+          "output": 8234,
+          "cacheRead": 2738944,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 72787240,
-          "output": 120701,
-          "cacheRead": 70526720,
+          "input": 73858454,
+          "output": 121185,
+          "cacheRead": 71593472,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -293,8 +293,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 51.115118,
-        "pricingAsOf": "2026-07-16T13:58:52.055Z"
+        "usd": 51.685324,
+        "pricingAsOf": "2026-07-16T13:58:59.084Z"
       }
     },
     "merges": [
