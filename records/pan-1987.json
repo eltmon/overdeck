@@ -147,6 +147,10 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
       "src/dashboard/server/routes/project-rename.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
@@ -173,10 +177,14 @@
       "scripts/file-size-baseline.txt",
       "src/cli/commands/project.ts",
       "src/cli/index.ts",
+      "src/dashboard/frontend/src/App.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
       "src/dashboard/server/routes/__tests__/projects-rename.test.ts",
       "src/dashboard/server/routes/project-rename.ts",
       "src/dashboard/server/routes/projects.ts",
@@ -185,10 +193,10 @@
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
       "tests/unit/lib/projects-rename.test.ts"
     ],
-    "recordedAt": "2026-07-16T19:14:41.281Z"
+    "recordedAt": "2026-07-16T20:57:38.756Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T20:57:31.249Z",
+  "updated": "2026-07-16T20:57:38.758Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "reviewing",
