@@ -1,0 +1,483 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T05:02:38Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2773: bug(command-deck): conversation create fails silently on unknown project slug — console-only error, no UI feedback",
+    "updated": "2026-07-16T05:06:22.081Z"
+  },
+  "plan": {
+    "id": "pan-2773",
+    "title": "bug(command-deck): conversation create fails silently on unknown project slug — console-only error, no UI feedback",
+    "status": "proposed",
+    "uid": "21acdc74-3f82-4579-ae52-c6baefdde0f4",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-16T05:02:38Z",
+    "updated": "2026-07-16T05:06:22.081Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2773",
+        "label": "PAN-2773",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2772",
+        "label": "PAN-2772 (found while investigating)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "command-deck",
+      "frontend",
+      "error-handling"
+    ],
+    "narratives": {
+      "Problem": "Navigating to /command-deck/<slug> with a slug that matches no registered project renders a normal-looking deck. The URL slug is taken verbatim (App/routes.ts:87 → App.tsx:147-148) with no validation, and CommandDeck renders <Stage> for any truthy selectedProject (CommandDeck/index.tsx:1438). Submitting the composer ('Ask Claude Code') POSTs /api/conversations with projectKey=<slug>; the server correctly rejects with 400 { error: 'Unknown project: <slug>' } (conversation-runtime.ts:753-755), but the frontend catch (CommandDeck/index.tsx:1099-1103) only console.errors and fires a transient toast, returning undefined. The composer keeps its text and open dropdown (Launcher.tsx:74-76 — open = query.length > 0, never cleared), shows no inline error, and every further Enter re-fires a failing POST.",
+      "Proposal": "Frontend-only, two-pronged fix. (1) Surface failures at the composer: change createConversationForProject/createDeckConversation to return { name } | { error }, give the Launcher presentational busy/errorText props, and have ProjectHome and IssueOverview own the async state — inline error with the server's message, submits suppressed while a create is in flight, typed text preserved. The existing toast + console.error stay for non-composer creation paths (sidebar + button, Stage '+ New conversation' menu). (2) Root cause: when the registered-projects and command-deck-projects queries have settled and selectedProject matches neither NO_PROJECT_KEY, a project name from the deck list, nor a registered project key/name, render a dedicated 'Unknown project' state in the content area (naming the slug, listing registered projects to switch to via onSelectProject) instead of a functional deck.",
+      "NonGoals": "- No server-side changes: /api/conversations already returns a precise 400; resolveProjectCwd is untouched.\n- No URL rewriting or redirect for unknown slugs: the address bar keeps what the user typed; recovery is via the offered project links.\n- No change to toast behavior for non-composer creation paths (sidebar + button, Stage + menu keep toast-only feedback).\n- No slug validation added to App/routes.ts parsing: validation lives in CommandDeck where the project data already loads.\n- No clearing of the composer's typed text on failure: retaining it for retry is intentional.\n- No changes to GeneralSection.tsx or the /api/general/conversations path (separate legacy surface, not part of this bug)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Frontend-only fix; server untouched.",
+        "rationale": "handleConversationCreate already returns 400 with the exact human-readable message the UI needs (conversation-runtime.ts:753-755); duplicating validation server-side or changing the contract adds risk without user-visible benefit."
+      },
+      {
+        "summary": "Error transport is a discriminated return type ({ name } | { error }) on createConversationForProject/createDeckConversation, not thrown exceptions.",
+        "rationale": "The function already catches internally to fire the shared toast; a result type lets typecheck force every consumer to handle failure explicitly, whereas rethrowing would require try/catch at ~5 call sites and risks unhandled rejections in fire-and-forget callers."
+      },
+      {
+        "summary": "Launcher receives busy/errorText as presentational props; async state lives in ProjectHome/IssueOverview.",
+        "rationale": "The Launcher is a shared dumb component with a sync onSelect contract used by multiple consumers; keeping state in the consumers that run the async create avoids changing the dispatchLauncherIntent contract for terminal/web intents that have no async failure mode."
+      },
+      {
+        "summary": "Unknown-slug handling renders a non-functional 'Unknown project' state inside the deck content area, only after project queries settle; no redirect.",
+        "rationale": "The issue asks not to render a functional-looking deck; an in-place state names the problem, offers registered projects (via the existing onSelectProject callback that already manages the URL), preserves the typed URL for correction, and gating on query settlement avoids false 'unknown' flashes on deep links (registeredProjects defaults to [] while loading)."
+      },
+      {
+        "summary": "The existing sonner toast in the catch is kept.",
+        "rationale": "It is the only feedback for creation paths without a composer (sidebar + button handleNewConversation, Stage '+ New conversation' menu); removing it would regress those paths (additive-refactor no-loss rule)."
+      }
+    ],
+    "items": [
+      {
+        "id": "create-result-type",
+        "title": "Return { name } | { error } from the CommandDeck conversation-create path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:02:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2773",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "projecthome-inline-error",
+            "issueoverview-inline-error"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/index.tsx",
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors across root and dashboard configs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Change createConversationForProject (CommandDeck/index.tsx:1067-1106) and createDeckConversation (index.tsx:1120-1128) to return Promise<{ name: string } | { error: string }> instead of Promise<string | undefined>. In the success path return { name: conv.name }; in the catch keep console.error + toast.error unchanged (NFR-1) and return { error: err instanceof Error ? err.message : 'Failed to create conversation' }. Update every consumer to the new shape: the onCreateConversation prop types in Stage/index.tsx:61, ProjectHome.tsx:31, IssueOverview.tsx:31; the Stage '+ New conversation' menu handler (Stage/index.tsx:333, narrow with 'name' in result before openOrFocusAgentPane); onAgentSelected in ProjectHome.tsx:94-98 and IssueOverview.tsx:69-73 (narrow the same way — inline error rendering is NOT this item; keep behavior otherwise identical); handleNewConversation/handleNewProjectConversation (index.tsx:1108-1115) need no logic change (void call). Do not change the request payload, toast, or any server code."
+        },
+        "items": [
+          {
+            "id": "create-result-type.ac1",
+            "title": "Given the POST /api/conversations response is non-ok with body { error: 'Unknown project: overdeck' }, createConversationForProject returns { error: 'Unknown project: overdeck' } and still emits the existing toast and console.error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-result-type.ac2",
+            "title": "Given a 201 response, createConversationForProject returns { name: <conversation name> } and the deck still opens/focuses the agent tab exactly as before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "create-result-type.ac3",
+            "title": "npm run typecheck exits 0 with every onCreateConversation consumer (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) compiled against the new { name } | { error } type — no remaining string|undefined usage of this contract",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "launcher-error-props",
+        "title": "Launcher accepts presentational busy and errorText props",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:02:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2773",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/stage.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Stage/HomePane/Launcher.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "Launcher.test.tsx passes including new busy-suppression and errorText-rendering cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add optional props busy?: boolean and errorText?: string to LauncherProps in Launcher.tsx. While busy is true, suppress submission on BOTH input paths: gate choose() and chooseIntent() (Launcher.tsx:79-86) so neither keyboard Enter (onKeyDown, :88-119) nor dropdown-row onMouseDown (:144-147) fires onSelect (hazard H4). When errorText is a non-empty string, render it below the launch bar inside the launcher container with role=\"alert\" and a module-css class using the existing error/danger color token from the dashboard style system (no new palette values, per the style guide's color-restraint rule). Do not clear or alter the query state — text retention on failure is intentional (D5). Extend Launcher.test.tsx with: busy=true Enter does not call onSelect; busy=true row mousedown does not call onSelect; errorText renders with role=alert; errorText absent renders no alert node."
+        },
+        "items": [
+          {
+            "id": "launcher-error-props.ac1",
+            "title": "Given busy=true and a non-empty query, pressing Enter or mousedown on a dropdown row does not invoke onSelect (zero calls asserted in Launcher.test.tsx)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-error-props.ac2",
+            "title": "Given errorText='Unknown project: overdeck', the Launcher renders that exact text below the launch bar in an element with role=\"alert\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-error-props.ac3",
+            "title": "Given busy=false and no errorText, the Launcher behaves exactly as today: Enter on the selected row invokes onSelect with the intent and query, and no alert element exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "launcher-error-props.ac4",
+            "title": "The typed query text is preserved (input value unchanged) when errorText appears — the component never clears query in response to props",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "projecthome-inline-error",
+        "title": "ProjectHome surfaces create failures inline at its Launcher",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:02:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2773",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+            "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Stage/HomePane/HomePane.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the ProjectHome launch-failure test passes (inline error rendered, single POST while busy)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In ProjectHome.tsx, add local state for the launch lifecycle: const [launchBusy, setLaunchBusy] = useState(false) and const [launchError, setLaunchError] = useState<string | null>(null). In onAgentSelected (ProjectHome.tsx:94-98): clear launchError, set launchBusy true, await onCreateConversation, then on { name } open the agent pane as today; on { error } set launchError to the returned message; finally set launchBusy false. Pass busy={launchBusy} and errorText={launchError ?? undefined} to both <Launcher> usages in this file (the sparse fallback and the cockpit-mode launcher render the same element — factor the props once). A new submission (next onAgentSelected call) clears the previous error. If ProjectHome has no direct test file, add the test to HomePane.test.tsx or create ProjectHome.test.tsx alongside, mocking onCreateConversation to resolve { error: 'Unknown project: overdeck' } and asserting the alert appears and that a second Enter during a pending create does not call onCreateConversation again."
+        },
+        "items": [
+          {
+            "id": "projecthome-inline-error.ac1",
+            "title": "Given onCreateConversation resolves { error: 'Unknown project: overdeck' }, ProjectHome renders that message in the Launcher's role=\"alert\" element and does not open an agent pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projecthome-inline-error.ac2",
+            "title": "While a create is pending (promise unresolved), a second submit from the Launcher produces no additional onCreateConversation call (exactly one call asserted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "projecthome-inline-error.ac3",
+            "title": "Given a failed create followed by a new submit, the previous error clears when the new attempt starts, and a subsequent { name } result opens the agent pane via api.openOrFocusAgentPane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issueoverview-inline-error",
+        "title": "IssueOverview surfaces create failures inline at its Launcher",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:02:38Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2773",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+            "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/Stage/IssueOverview.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the IssueOverview launch-failure test passes (inline error rendered, single POST while busy)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Mirror projecthome-inline-error in IssueOverview.tsx: launchBusy/launchError state around onAgentSelected (IssueOverview.tsx:69-73), busy/errorText passed to its <Launcher> (rendered at :89-101), error cleared on next submit, pane opened only on { name }. Create IssueOverview.test.tsx if absent (mirror the mocking approach used by the ProjectHome/HomePane test added in projecthome-inline-error), asserting the same three behaviors: inline alert with the server message, single in-flight call, error cleared on retry."
+        },
+        "items": [
+          {
+            "id": "issueoverview-inline-error.ac1",
+            "title": "Given onCreateConversation resolves { error: 'Unknown project: overdeck' }, IssueOverview renders that message in the Launcher's role=\"alert\" element and does not open an agent pane",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issueoverview-inline-error.ac2",
+            "title": "While a create is pending, a second submit from the Launcher produces no additional onCreateConversation call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issueoverview-inline-error.ac3",
+            "title": "Given a failed create followed by a new submit that resolves { name }, the error clears and api.openOrFocusAgentPane is called with the new conversation name",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "unknown-project-guard",
+        "title": "Render an 'Unknown project' state instead of a functional deck for unregistered slugs",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T05:02:38Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2773",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- src/components/CommandDeck/CommandDeck.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "CommandDeck.test.tsx passes including the new unknown-slug, known-by-key, known-by-name, and no-flash-while-loading cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In CommandDeck/index.tsx, derive a memoized known-project predicate once the two project queries have settled. Capture the isSuccess/isFetched flags of the 'command-deck-projects' query (index.tsx:246-250) and the 'registered-projects' query (index.tsx:258-263). known(selectedProject) is true when selectedProject === NO_PROJECT_KEY, or matches some projectsWithSessions[].name, or matches some registeredProjects rp.key or rp.name (hazard H1 — include BOTH key and name). In the content area render (index.tsx:1437-1487): if selectedProject is set, both queries settled, and known() is false, render a new unknown-project state instead of <Stage>: a centered panel in styles.contentEmpty style stating that '<slug>' is not a registered project, listing registered project names as buttons that call onSelectProject(rp.name ?? rp.key), and a 'Back to Command Deck' action calling onSelectProject(null). While either query is still loading, keep rendering exactly what renders today (no unknown-state flash, hazard H2). Add CommandDeck.test.tsx cases: unknown slug renders the unknown-project text and no Stage tab strip; a slug matching a registered key renders the deck; a slug matching a registered name renders the deck; with the registered-projects fetch unresolved the unknown-project text does not appear."
+        },
+        "items": [
+          {
+            "id": "unknown-project-guard.ac1",
+            "title": "Given /command-deck/overdeck where 'overdeck' matches no registered project key or name and queries have settled, the content area renders text naming 'overdeck' as unknown and renders no Stage (no composer, no tab strip)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unknown-project-guard.ac2",
+            "title": "Given a selectedProject equal to a registered project's key, and separately one equal to a registered project's name, the deck (Stage) renders as before — the guard produces no false positives for either addressing form",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unknown-project-guard.ac3",
+            "title": "Given the registered-projects query has not resolved, the content area renders the pre-change output (deck or empty state) and produces no 'Unknown project' text for any selectedProject — no flash on deep links",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "unknown-project-guard.ac4",
+            "title": "When the user clicks a listed registered project in the unknown-project state, the component emits onSelectProject with that project's deck key; when the user clicks 'Back to Command Deck', it emits onSelectProject(null)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-troubleshooting",
+        "title": "Document the unknown-project deck state in the troubleshooting guide",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T05:02:38Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-2773",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "reference/troubleshooting.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"Unknown project\" reference/troubleshooting.mdx"
+          ],
+          "expected_outputs": [
+            "grep prints at least one matching line from the new troubleshooting section"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a troubleshooting entry to reference/troubleshooting.mdx (match the page's existing section format) titled around the Command Deck showing 'Unknown project'. The entry states: the cause is a /command-deck/<slug> URL whose slug is not a registered project key or name; the deck now shows an unknown-project state instead of a working deck; conversation-create failures are shown inline at the composer; the remedy is to pick a registered project from the list shown (or open /command-deck) and that `pan projects` lists registered keys. Keep it to one concise section consistent with neighboring entries."
+        },
+        "items": [
+          {
+            "id": "docs-troubleshooting.ac1",
+            "title": "reference/troubleshooting.mdx contains a section that names the /command-deck/<slug> unregistered-slug cause and shows the 'Unknown project' state as the expected behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-troubleshooting.ac2",
+            "title": "The section shows the remedy: pick a registered project from the list the deck renders, and it contains a reference to `pan projects` for listing registered keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "create-result-type",
+        "to": "unknown-project-guard",
+        "type": "blocks"
+      },
+      {
+        "from": "create-result-type",
+        "to": "projecthome-inline-error",
+        "type": "blocks"
+      },
+      {
+        "from": "create-result-type",
+        "to": "issueoverview-inline-error",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-error-props",
+        "to": "projecthome-inline-error",
+        "type": "blocks"
+      },
+      {
+        "from": "launcher-error-props",
+        "to": "issueoverview-inline-error",
+        "type": "blocks"
+      },
+      {
+        "from": "unknown-project-guard",
+        "to": "docs-troubleshooting",
+        "type": "informs"
+      },
+      {
+        "from": "projecthome-inline-error",
+        "to": "docs-troubleshooting",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-2773-bug-command-deck-conversation-create-fails-silently-on-unknown-project-slug-console-only-error-no-ui-feedback.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
