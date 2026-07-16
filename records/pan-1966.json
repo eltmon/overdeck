@@ -52,17 +52,14 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T12:48:59.377Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T12:29:03Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1966\n\n# Review Synthesis — PAN-1966 — 2026-07-16T08:40:00-04:00\n\n## Verdict: CHANGES REQUESTED — mixed-tracker projects can break dashboard issue and resource discovery\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-138c09a6/context.json`\n- Branch: `feature/pan-1966`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966`\n- HEAD reviewed: `138c09a63b503a7c2c664783766c3bd88664cde7`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-138c09a6/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-138c09a6/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-138c09a6/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-138c09a6/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Mixed-tracker projects make dashboard issue and resource discovery requests fail — `src/dashboard/server/routes/issues.ts:235`\nThe new `/api/issues` path resolves membership for every represented project, while resource discovery gathers signals for every configured project. Both reach `gatherProjectLensSignals`, which throws when `github_repo` is absent. A valid Linear, Rally, or generic project can therefore reject the surrounding `Promise.all` and break dashboard issue loading and resource discovery for all projects. Membership gathering must be tracker-aware at the canonical service boundary, with mixed-project route and discovery coverage.\n\n### [performance] Unbounded per-candidate GitHub fan-out can exhaust sockets and rate limits — `src/lib/pipeline-membership-gather.ts:110`\nThe gatherer launches `getIssueState` for every candidate through one unbounded `Promise.all`. Candidate volume grows with feature refs, specs, and PR history, so cold HTTP requests, resource refreshes, reconstruction, CLI paths, and flywheel selection can create hundreds or thousands of simultaneous GitHub requests. The shared gatherer must apply bounded concurrency or fixed-size chunks so every caller inherits the limit.\n\n### [requirements] Resource discovery retains an independent resource-based membership gate — `src/dashboard/server/services/resource-discovery.ts:790`\nFR-2 and FR-5 require resolver membership to exclusively define the pipeline universe and leave resource state as annotation. The changed filter admits an issue when `membership.inPipeline` is false whenever `hasNonTrackerResource(issue)` is true, and the changed tests explicitly preserve that behavior for `clean_terminal` residue. Resource discovery must filter solely on resolver membership; orphan-resource drift belongs on a separate diagnostic or annotation surface.\n\n## Non-blocking Findings\n\n### [correctness] Fixed 500-PR window can misclassify older live or squash-merged work — `src/lib/pipeline-membership-gather.ts:65`\nBoth open and merged PR lenses use `gh pr list --limit 500`, so matching work beyond that window can be omitted and classified into the wrong bucket. Query candidate branches directly or paginate until candidates have definitive PR state.\n\n### [performance] Independent caches repeat the same expensive project scan — `src/dashboard/server/services/resource-discovery.ts:753`\nResource discovery calls the gatherer directly while HTTP membership routes use a separate cached service, allowing two full scans in the same 30-second interval. Share the cached project snapshot or move in-flight deduplication beneath the gatherer while keeping non-server freshness semantics explicit.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-138c09a6/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1966 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T12:50:07.040Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
@@ -151,21 +148,21 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:50:05.103Z",
+  "updated": "2026-07-16T12:50:07.041Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T12:50:05.016Z",
+    "updatedAt": "2026-07-16T12:50:05.692Z",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "lastVerifiedCommit": "272897c0082244749a763074e4be392c95246f01",
-    "reviewSpawnedAt": "2026-07-16T12:26:04.158Z"
+    "reviewSpawnedAt": "2026-07-16T12:50:05.691Z"
   },
   "closeOut": {
     "usage": {
@@ -229,7 +226,7 @@
       },
       "costAtCloseOut": {
         "usd": 42.684905,
-        "pricingAsOf": "2026-07-16T12:50:05.096Z"
+        "pricingAsOf": "2026-07-16T12:50:05.785Z"
       }
     },
     "merges": [
