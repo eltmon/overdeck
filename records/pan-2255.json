@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T06:43:29.430Z",
+  "updated": "2026-07-16T06:44:56.987Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
@@ -87,16 +87,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "feedback-producers": {
-        "writerId": "agent-pan-2255",
-        "agentId": "agent-pan-2255",
-        "pid": 2451085,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:38:37.038Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2255",
@@ -108,12 +100,27 @@
         "outcome": "completed",
         "reason": "Added issue-role YAML mailbox envelopes, legacy action-status fallback, idempotent delivery/acknowledgement transitions, and focused tests",
         "releasedAt": "2026-07-16T06:37:13.817Z"
+      },
+      {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2451085,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:38:37.038Z",
+        "itemId": "feedback-producers",
+        "outcome": "completed",
+        "reason": "Persisted issue-role feedback deliveries, resolved live agents at send time, marked mailbox delivery after successful sends, and deferred escalation when no target exists",
+        "releasedAt": "2026-07-16T06:44:56.987Z"
       }
     ],
     "statusReasons": {
       "mailbox-contract": {
         "reason": "Added issue-role YAML mailbox envelopes, legacy action-status fallback, idempotent delivery/acknowledgement transitions, and focused tests",
         "updatedAt": "2026-07-16T06:37:13.817Z"
+      },
+      "feedback-producers": {
+        "reason": "Persisted issue-role feedback deliveries, resolved live agents at send time, marked mailbox delivery after successful sends, and deferred escalation when no target exists",
+        "updatedAt": "2026-07-16T06:44:56.987Z"
       }
     }
   },
@@ -123,6 +130,10 @@
     "mailbox-contract.mailbox-contract.ac2": "completed",
     "mailbox-contract.mailbox-contract.ac3": "completed",
     "mailbox-contract.mailbox-contract.ac4": "completed",
-    "feedback-producers": "running"
+    "feedback-producers": "completed",
+    "feedback-producers.feedback-producers.ac1": "completed",
+    "feedback-producers.feedback-producers.ac2": "completed",
+    "feedback-producers.feedback-producers.ac3": "completed",
+    "feedback-producers.feedback-producers.ac4": "completed"
   }
 }
