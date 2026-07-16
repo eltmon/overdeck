@@ -617,20 +617,43 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T21:36:01.150Z",
+  "updated": "2026-07-16T21:38:39.507Z",
   "pipeline": {
     "issueId": "PAN-2760",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:36:01.088Z",
+    "updatedAt": "2026-07-16T21:38:39.151Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "reviewRequestedAt": "2026-07-16T21:24:56.928Z",
     "reviewSpawnedAt": "2026-07-16T21:35:46.751Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-3350fb04/security.md",
+        "atCommit": "e8648f7e6acd33fedbec51285248e3f6e3053840"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-3350fb04/correctness.md",
+        "atCommit": "e8648f7e6acd33fedbec51285248e3f6e3053840"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-3350fb04/performance.md",
+        "atCommit": "e8648f7e6acd33fedbec51285248e3f6e3053840"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-3350fb04/requirements.md",
+        "atCommit": "e8648f7e6acd33fedbec51285248e3f6e3053840"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -638,15 +661,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 445793,
-            "output": 1447,
-            "cacheRead": 330240,
+            "input": 494667,
+            "output": 1570,
+            "cacheRead": 378240,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 12101175,
-            "output": 25439,
-            "cacheRead": 11460608,
+            "input": 15528554,
+            "output": 32103,
+            "cacheRead": 14786560,
             "cacheWrite": 0
           }
         },
@@ -700,10 +723,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1243,
-            "output": 21226,
-            "cacheRead": 4120542,
-            "cacheWrite": 148768
+            "input": 1245,
+            "output": 21458,
+            "cacheRead": 4299457,
+            "cacheWrite": 151726
           }
         },
         "work": {
@@ -717,15 +740,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 445793,
-          "output": 1447,
-          "cacheRead": 330240,
+          "input": 494667,
+          "output": 1570,
+          "cacheRead": 378240,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 16303470,
-          "output": 434254,
-          "cacheRead": 65488896,
+          "input": 19730849,
+          "output": 440918,
+          "cacheRead": 68814848,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -735,15 +758,15 @@
           "cacheWrite": 520882
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1243,
-          "output": 21226,
-          "cacheRead": 4120542,
-          "cacheWrite": 148768
+          "input": 1245,
+          "output": 21458,
+          "cacheRead": 4299457,
+          "cacheWrite": 151726
         }
       },
       "costAtCloseOut": {
-        "usd": 85.55015,
-        "pricingAsOf": "2026-07-16T21:36:01.121Z"
+        "usd": 87.965683,
+        "pricingAsOf": "2026-07-16T21:38:39.481Z"
       }
     },
     "merges": [
