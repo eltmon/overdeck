@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { parseRoleMcpServersSync, roleSystemPromptInjectionSync } from '../runtime-command.js';
+import { getCodexLauncherFields, parseRoleMcpServersSync, roleSystemPromptInjectionSync } from '../runtime-command.js';
 
 const ROLE = `---
 name: test
@@ -23,16 +23,21 @@ Test role body.
 describe('parseRoleMcpServersSync', () => {
   let tempDir: string;
   let previousOverdeckHome: string | undefined;
+  let previousHome: string | undefined;
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'role-mcp-parser-'));
     previousOverdeckHome = process.env.OVERDECK_HOME;
+    previousHome = process.env.HOME;
     process.env.OVERDECK_HOME = tempDir;
+    process.env.HOME = tempDir;
   });
 
   afterEach(() => {
     if (previousOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = previousOverdeckHome;
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
     rmSync(tempDir, { recursive: true, force: true });
   });
 
@@ -72,5 +77,22 @@ describe('parseRoleMcpServersSync', () => {
     expect(JSON.parse(readFileSync(mcpPath, 'utf8'))).toEqual({
       mcpServers: parseRoleMcpServersSync(rolePath),
     });
+  });
+
+  it('preserves role MCP servers across Codex home rewrites', () => {
+    const fields = getCodexLauncherFields('agent-test-mcp', 'gpt-5.6', tempDir, 'test');
+    getCodexLauncherFields('agent-test-mcp', 'gpt-5.6', tempDir, 'test');
+
+    const config = readFileSync(join(fields.codexHome, 'config.toml'), 'utf8');
+    expect(config).toContain('[mcp_servers.playwright]');
+    expect(config).toContain('command = "npx"');
+    expect(config).toContain('args = ["-y", "@playwright/mcp@latest"]');
+  });
+
+  it('writes no MCP section for a role without declared servers', () => {
+    const fields = getCodexLauncherFields('agent-work-no-mcp', 'gpt-5.6', tempDir, 'work');
+    const config = readFileSync(join(fields.codexHome, 'config.toml'), 'utf8');
+
+    expect(config).not.toContain('[mcp_servers');
   });
 });

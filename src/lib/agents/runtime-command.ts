@@ -212,7 +212,7 @@ export async function getOhmypiLauncherFields(agentId: string, model: string): P
   };
 }
 
-export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
+export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
   codexHome: string;
@@ -240,6 +240,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
+    mcpServers: role ? parseRoleMcpServersSync(roleAgentDefinitionPath(role)) : undefined,
   });
   return {
     harness: 'codex',
