@@ -346,7 +346,7 @@
     "recordedAt": "2026-07-16T21:48:55.460Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T22:00:25.204Z",
+  "updated": "2026-07-16T22:00:30.821Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "reviewing",
@@ -356,7 +356,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T22:00:24.290Z",
+    "updatedAt": "2026-07-16T22:00:30.702Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed production-only test accommodation; retrying after reviewer infrastructure and transport failures",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
@@ -631,7 +631,7 @@
       },
       "costAtCloseOut": {
         "usd": 226.189585,
-        "pricingAsOf": "2026-07-16T22:00:24.382Z"
+        "pricingAsOf": "2026-07-16T22:00:30.777Z"
       }
     },
     "merges": [
@@ -639,7 +639,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
