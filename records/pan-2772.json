@@ -72,17 +72,18 @@
     "recordedAt": "2026-07-16T19:18:10.850Z"
   },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T20:21:05.934Z",
+  "updated": "2026-07-16T20:22:04.096Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:21:05.901Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-16T20:22:03.994Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "testNotes": "Reconciled from green GitHub Actions CI on 37b94ab2: build (22) (https://github.com/eltmon/overdeck/actions/runs/29527465635/job/87719350705)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2801",
     "lastVerifiedCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b",
     "reviewRequestedAt": "2026-07-16T20:20:47.752Z",
@@ -132,28 +133,6 @@
         "tests/unit/lib/deploy/agent-restart-gate.test.ts"
       ],
       "recordedAt": "2026-07-16T19:18:10.850Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/security.md",
-        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/correctness.md",
-        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/performance.md",
-        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/requirements.md",
-        "atCommit": "37b94ab2a22801e712e23ca364f23fb28c37223b"
-      }
     },
     "strikeRecoveryCount": 0
   },
@@ -210,9 +189,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2990244,
-            "output": 270950,
-            "cacheRead": 63806464,
+            "input": 2993530,
+            "output": 271234,
+            "cacheRead": 64177152,
             "cacheWrite": 0
           }
         }
@@ -225,15 +204,15 @@
           "cacheWrite": 167646
         },
         "openai/gpt-5.6-sol": {
-          "input": 11505889,
-          "output": 470484,
-          "cacheRead": 89491968,
+          "input": 11509175,
+          "output": 470768,
+          "cacheRead": 89862656,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 124.478628,
-        "pricingAsOf": "2026-07-16T20:21:05.913Z"
+        "usd": 124.688922,
+        "pricingAsOf": "2026-07-16T20:22:04.028Z"
       }
     },
     "merges": [
