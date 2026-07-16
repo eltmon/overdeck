@@ -4748,3 +4748,50 @@ operator.** Both hold correct work; neither is lost (verified on disk).
 **Drain: 30 merged / 27 closed out.** Filed (15): +PAN-2758.
 **Phase 2 UNBLOCKED pending CI** — v0.45.20 suggestion live again once main CI confirms green.
 Operator decisions still outstanding, NOT re-asked: PAN-2710 bypass; v0.45.20.
+
+---
+
+## Tick 40 — 2026-07-16 ~02:00Z — 🟢 MAIN GREEN + DEPLOYED. Phase 2 READY.
+
+### ✅ MAIN CI GREEN — `848cae5c84` (two independent monitors: `MAIN-CI 848cae5c84 => success`)
+First green main since 00:25Z. The 90-minute red is fully cleared.
+
+### ✅ DEPLOYED — DoD deploy row GREEN
+Built from a **clean** primary main (checked `git status --porcelain` = 0 first — `npm run build` builds
+the WORKING TREE, and this tree had foreign uncommitted work earlier; building it would have shipped
+someone's unreviewed vBRIEF changes). Build exit 0.
+`pan restart --dashboard --health-timeout 180000` (flag is **ms**) → verified:
+- new **pid 2780526** binds :3011, **parent = systemd**, cwd = primary
+- health **HTTP 200**; old pid 652717 **replaced**
+- **boot 01:56:37Z is 43s AFTER dist build 01:55:54Z** ⇒ live server provably contains the merge
+- Boot gates: `deacon=on resume=off (default)` — resume=off is the fail-safe boot default, by design.
+⚠️ `date -u -d "$(ps -o lstart=)"` **mislabels local time as Z** — same timezone trap as `find -newermt`.
+Convert deliberately; never trust the suffix.
+
+### 🚨 PAN-2761 — SECOND time a test assertion masqueraded as a red main and stalled a strike
+`strike-pan-2752` reported main red on `done.test.ts` (localhost vs 127.0.0.1) and refused to push.
+**I verified instead of acting. Main was GREEN.**
+- test passes **7/7 on main** AND **7/7 inside the strike's OWN workspace** (identical source)
+- fails **only** with the env var set — reproduced the strike's exact diff:
+  `- "http://localhost:3011/…"  + "http://127.0.0.1:3011/…"`
+- cause: `done.ts:73` reads `OVERDECK_DASHBOARD_URL || DASHBOARD_URL || 'http://localhost:3011'`;
+  production's default IS localhost (matches the test) — but **the test stubs NO env**, so it inherits
+  the agent shell's `127.0.0.1:3011` (the live default at `agent-runtime.ts:27`).
+**The strike's refusal was the right instinct on a bad signal.** Filed PAN-2761 + a sweep request:
+*any* test asserting an env-derived value without `vi.stubEnv` is green in CI and on a clean shell,
+red in every agent shell, and **an agent cannot tell it from a real red main.** (PAN-2748 was #1.)
+Told the strike: re-run with the var cleared and push; do NOT touch `done.test.ts` (scope creep).
+
+### Strike board — all 3 idle; work SAFE but unpushed; needs the operator
+- **2748** merged ✓ | **2752** `1bd3d4d967` correct, needs clean-env re-run | **2753** correct fix
+  UNCOMMITTED, DOA on PAN-2758 capacity.
+All report `status=running` while idle 52m/28m/23m. Doctrine bars me from `pan tell`/`kill`/`resume`;
+re-dispatch just re-hits capacity. Verified both diffs on disk — nothing lost.
+⚠️ **#2751 `feature/pan-2499` has gone CONFLICTING** as main moved (operator said don't touch — flagging only).
+
+### 🎯 PHASE 2 IS READY — main green, deployed, drained but for PAN-2710
+**Suggest `pan release stable --version 0.45.20`** (v0.45.19 + 60-odd commits, heavily pipeline
+reliability). **OPERATOR CUTS. I NEVER TAG.**
+
+**Drain: 30 merged / 27 closed out.** Filed (16): +PAN-2761.
+Outstanding operator decisions, NOT re-asked: (1) PAN-2710 bypass verdict; (2) v0.45.20.
