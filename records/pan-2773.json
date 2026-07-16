@@ -119,17 +119,17 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T19:17:48.200Z",
+  "updated": "2026-07-16T19:33:52.101Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:17:38.166Z",
+    "updatedAt": "2026-07-16T19:33:52.009Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
@@ -251,9 +251,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2166470,
-            "output": 148543,
-            "cacheRead": 52538368,
+            "input": 2509340,
+            "output": 222069,
+            "cacheRead": 62122496,
             "cacheWrite": 0
           }
         }
@@ -266,9 +266,9 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 11228718,
-          "output": 288448,
-          "cacheRead": 77060608,
+          "input": 11571588,
+          "output": 361974,
+          "cacheRead": 86644736,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -279,8 +279,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 118.896043,
-        "pricingAsOf": "2026-07-16T19:17:41.593Z"
+        "usd": 127.608237,
+        "pricingAsOf": "2026-07-16T19:33:52.075Z"
       }
     },
     "merges": [
