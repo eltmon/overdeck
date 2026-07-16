@@ -132,7 +132,7 @@ export function CrewStage({ sessions, onSelectSession }: {
   const liveListeners = tiers.filter((member) => member.state === 'working' || member.state === 'listening').length
 
   return (
-    <div className="rounded-[14px] border border-border bg-card p-4" data-testid="crew-stage">
+    <div className="rounded-[14px] border border-border bg-card p-4" data-testid="crew-stage" data-section="CrewStage">
       <div className="mb-3 flex items-baseline justify-between">
         <div className="font-['Space_Grotesk'] text-[13.5px] font-semibold text-foreground">The crew</div>
         <div className="text-[11px] text-muted-foreground">glow = actively spending · teal ring = reading the stream · faded = finished</div>

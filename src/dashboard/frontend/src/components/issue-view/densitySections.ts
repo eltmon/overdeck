@@ -1,12 +1,9 @@
-import { ISSUE_VIEW_INVENTORY, type IssueViewDensity } from './inventory';
+import type { IssueViewDensity } from './inventory';
 
 export const DENSITY_SECTIONS: Readonly<Record<IssueViewDensity, readonly string[]>> = {
-  rail: ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === 'rail').map((entry) => entry.section),
-  cockpit: ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === 'cockpit').map((entry) => entry.section),
-  console: [
-    ...ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === 'console').map((entry) => entry.section),
-    'ReviewPolicyControl',
-  ],
+  console: ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'DrawerReviewSpecialists', 'DrawerBeadsList', 'DrawerPlanPanel / VBriefViewer', 'DrawerArtifactsPanel', 'DrawerActivityRail / DrawerActivityPanel', 'DrawerAgentSession', 'ReviewPolicyControl'],
+  cockpit: ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'StackDrawer', 'Detail Tabs', 'CrewStage', 'HappenedFeed', 'PlanMapCard', 'IssueBlockerSpotlight', 'Code tab', 'PRD / Timeline / Discussion tabs', 'Costs / Artifacts / Ship tabs', 'Conversation / Files / Terminal tabs', 'BeadsRail / BeadsTab', 'Awareness rail', 'ReviewPolicyControl'],
+  rail: ['Filter bar', 'Feature (issue) row', 'Badges', 'MergeButton', 'Pipeline pips', 'ResourceStrip', 'SessionNode', 'SessionNode context menu', 'ReviewGroup', 'ShipDoorTreeRow', 'StackDrawer / UatStackTreeGroup', 'ResourcesGroup', 'ModelResolutionCard'],
 };
 
 export function sectionsForDensity(density: IssueViewDensity): readonly string[] {

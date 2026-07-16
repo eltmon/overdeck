@@ -17,79 +17,11 @@ import { VerificationGates } from '../issue-view/VerificationGates';
 import { ActiveAgentPanel } from '../issue-view/ActiveAgentPanel';
 import PhaseTimeline from './PhaseTimeline';
 import { PickupGateControls } from '../backlog/PickupGateControls';
-import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
-import { VBriefViewer } from '../vbrief/VBriefViewer';
-import type { VBriefDocument } from '../vbrief/types';
+import { useDrawerData } from './useDrawerData';
+import { DrawerActivityPanel, DrawerPlanPanel } from './DrawerSecondaryPanels';
 import { PanOpenInPicker } from '../PanOpenInPicker';
 import type { WorkspaceInfo } from '../../lib/workspace-types';
 import { IssueView } from '../issue-view/IssueView';
-
-const ACTIVITY_PHASE_DOT_CLASSES = {
-  work: 'bg-primary',
-  review: 'bg-signal-review',
-  ship: 'bg-warning',
-  done: 'bg-success',
-  info: 'bg-info',
-} satisfies Record<DrawerActivityPhase, string>;
-
-function formatActivityWhen(value: string) {
-  if (!value) return 'just now';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-}
-
-function DrawerActivityPanel() {
-  const { activityFull } = useDrawerData();
-  return (
-    <div data-testid="drawer-tab-panel-activity">
-      {activityFull.length === 0 ? (
-        <div className="rounded-[12px] border border-dashed border-border px-[12px] py-[18px] text-center text-[12px] text-muted-foreground">
-          No activity yet.
-        </div>
-      ) : (
-        <div className="space-y-[12px]">
-          {activityFull.map((item) => (
-            <div key={item.id} className="grid grid-cols-[14px_1fr] gap-[10px]" data-phase={item.phase}>
-              <span
-                aria-hidden="true"
-                className={cn('mt-[4px] h-[8px] w-[8px] rounded-full', ACTIVITY_PHASE_DOT_CLASSES[item.phase])}
-              />
-              <div className="min-w-0">
-                <div className="text-[12px] leading-[18px] text-foreground">{item.message}</div>
-                <div className="mt-[2px] font-mono text-[10px] leading-none text-muted-foreground">{formatActivityWhen(item.when)}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DrawerPlanPanel({ issueId }: { issueId: string }) {
-  const { data, isLoading, isError } = useQuery<VBriefDocument | null>({
-    queryKey: ['drawer-vbrief-plan', issueId],
-    queryFn: async () => {
-      const res = await fetch(`/api/workspaces/${issueId}/plan`);
-      if (!res.ok) return null;
-      return res.json() as Promise<VBriefDocument>;
-    },
-    retry: false,
-  });
-
-  return (
-    <div data-testid="drawer-tab-panel-plan">
-      {isLoading ? (
-        <div className="text-[12px] text-muted-foreground">Loading plan…</div>
-      ) : isError ? (
-        <div className="text-[12px] text-muted-foreground">Failed to load plan</div>
-      ) : (
-        <VBriefViewer doc={data ?? null} />
-      )}
-    </div>
-  );
-}
 
 // PAN-2059: the backlog pickup controls (Plan → Release, AI objection, Ready /
 // Park / Blocks-main, planning, pickup gate) on the issue overlay — the same
@@ -239,7 +171,7 @@ export function IssueDrawer() {
         onClick={(event) => event.stopPropagation()}
       >
         <IssueView issueId={drawer.issueId} density="console" className="contents">
-        <header className="flex h-[52px] items-center gap-[12px] border-b border-border px-[22px]">
+        <header data-section="Header bar" className="flex h-[52px] items-center gap-[12px] border-b border-border px-[22px]">
           <div className="min-w-0 flex-1">
             <div className="truncate font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
               {drawer.issueId}
@@ -273,8 +205,8 @@ export function IssueDrawer() {
             ×
           </button>
         </header>
-        <DrawerPausedBanner agents={agents} />
-        <DrawerTabs />
+        <div data-section="DrawerPausedBanner"><DrawerPausedBanner agents={agents} /></div>
+        <div data-section="DrawerTabs"><DrawerTabs /></div>
         <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_320px]">
           <div
             className={cn(
@@ -286,45 +218,45 @@ export function IssueDrawer() {
           >
             {drawer.tab === 'overview' ? (
               <div data-testid="drawer-tab-panel-overview" className="space-y-[14px]">
-                <PhaseTimeline />
-                <DrawerPickupSection issueId={drawer.issueId} />
-                <DrawerWorkspaceSection issueId={drawer.issueId} />
-                <ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" />
-                <VerificationGates issueId={drawer.issueId} />
-                <BeadsPanel issueId={drawer.issueId} items={beads} />
-                <DrawerReviewSpecialists />
+                <div data-section="PhaseTimeline"><PhaseTimeline /></div>
+                <div data-section="DrawerPickupSection / PickupGateControls"><DrawerPickupSection issueId={drawer.issueId} /></div>
+                <div data-section="DrawerWorkspaceSection"><DrawerWorkspaceSection issueId={drawer.issueId} /></div>
+                <div data-section="DrawerActiveAgent"><ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" /></div>
+                <div data-section="DrawerVerificationGates"><VerificationGates issueId={drawer.issueId} /></div>
+                <div data-section="DrawerBeadsList"><BeadsPanel issueId={drawer.issueId} items={beads} /></div>
+                <div data-section="DrawerReviewSpecialists"><DrawerReviewSpecialists /></div>
               </div>
             ) : drawer.tab === 'beads' ? (
-              <div data-testid="drawer-tab-panel-beads">
+              <div data-testid="drawer-tab-panel-beads" data-section="DrawerBeadsList">
                 <BeadsPanel issueId={drawer.issueId} items={beads} />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
-              <DrawerPlanPanel issueId={drawer.issueId} />
+              <div data-section="DrawerPlanPanel / VBriefViewer"><DrawerPlanPanel issueId={drawer.issueId} /></div>
             ) : drawer.tab === 'activity' ? (
-              <DrawerActivityPanel />
+              <div data-section="DrawerActivityRail / DrawerActivityPanel"><DrawerActivityPanel /></div>
             ) : drawer.tab === 'artifacts' ? (
-              <DrawerArtifactsPanel issueId={drawer.issueId} />
+              <div data-section="DrawerArtifactsPanel"><DrawerArtifactsPanel issueId={drawer.issueId} /></div>
             ) : drawer.tab === 'conversation' ? (
-              <DrawerAgentSession
+              <div data-section="DrawerAgentSession"><DrawerAgentSession
                 view="conversation"
                 agents={agents}
                 agentId={effectiveAgentId}
                 onSelectAgent={setSelectedAgentId}
-              />
+              /></div>
             ) : drawer.tab === 'terminal' ? (
-              <DrawerAgentSession
+              <div data-section="DrawerAgentSession"><DrawerAgentSession
                 view="terminal"
                 agents={agents}
                 agentId={effectiveAgentId}
                 onSelectAgent={setSelectedAgentId}
-              />
+              /></div>
             ) : (
               <DrawerTabPlaceholder tab={drawer.tab} />
             )}
           </div>
-          <DrawerActivityRail />
+          <div data-section="DrawerActivityRail / DrawerActivityPanel"><DrawerActivityRail /></div>
         </div>
-        <DrawerActionBar />
+        <div data-section="DrawerActionBar"><DrawerActionBar /></div>
         </IssueView>
       </aside>
     </div>

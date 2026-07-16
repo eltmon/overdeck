@@ -119,7 +119,7 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
       mutations: { retry: false },
     },
   })
-  render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <IssueMissionControl
         issueId="PAN-1661"
@@ -133,10 +133,16 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
       />
     </QueryClientProvider>,
   )
-  return { onOpenPane }
+  return { onOpenPane, ...view }
 }
 
 describe('IssueMissionControl', () => {
+  it('renders cockpit inventory markers on the real overview shell', () => {
+    const { container } = renderMissionControl();
+    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'BeadsRail / BeadsTab', 'Awareness rail', 'ReviewPolicyControl']) {
+      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+    }
+  });
   it('renders the mission header, issue tree, and persistent top tabs', () => {
     renderMissionControl()
 

@@ -1,16 +1,14 @@
-import type { ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
 import { ReviewPolicyControl } from '../ReviewPolicyControl';
 import { ShipProgress } from './ShipProgress';
 import { deriveShip } from './derivations';
 import { useReviewStatusQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { sectionsForDensity } from './densitySections';
 import type { IssueViewDensity } from './inventory';
 
-interface IssueViewProps {
+interface IssueViewProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'> {
   issueId: string;
   density: IssueViewDensity;
   children: ReactNode;
-  className?: string;
 }
 
 /**
@@ -18,12 +16,9 @@ interface IssueViewProps {
  * Shells retain routing and interaction glue; this component owns density
  * membership and the cross-density policy controls.
  */
-export function IssueView({ issueId, density, children, className }: IssueViewProps) {
+export function IssueView({ issueId, density, children, ...rootProps }: IssueViewProps) {
   return (
-    <div className={className} data-component="issue-view" data-density={density}>
-      {sectionsForDensity(density).map((section) => (
-        <span key={section} hidden data-section={section} />
-      ))}
+    <div {...rootProps} data-component={rootProps['data-component'] ?? 'issue-view'} data-density={density}>
       {(density === 'cockpit' || density === 'console') && (
         <div data-section="ReviewPolicyControl">
           <ReviewPolicyControl issueId={issueId} />

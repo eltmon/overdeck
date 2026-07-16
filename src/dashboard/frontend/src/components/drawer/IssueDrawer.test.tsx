@@ -886,6 +886,14 @@ describe('IssueDrawer', () => {
     expect(screen.getByText('No active agent.')).toHaveClass('text-muted-foreground');
   });
 
+  it('renders console inventory markers on the real overview shell', () => {
+    useDashboardStore.getState().openIssue('PAN-1');
+    const { container } = renderDrawer();
+    for (const section of ['DrawerActionBar', 'PhaseTimeline', 'DrawerTabs', 'DrawerPickupSection / PickupGateControls', 'DrawerWorkspaceSection', 'DrawerActiveAgent', 'DrawerPausedBanner', 'DrawerVerificationGates', 'DrawerReviewSpecialists', 'DrawerBeadsList', 'DrawerActivityRail / DrawerActivityPanel', 'ReviewPolicyControl']) {
+      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+    }
+  });
+
   it('renders drawer beads list from drawer data with done and current states', () => {
     useDashboardStore.getState().openIssue('PAN-1');
 

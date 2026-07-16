@@ -855,7 +855,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
 
   return (
     <IssueView issueId={issueId} density="cockpit" className={styles.missionWrap}>
-      <header className="rounded-[22px] border border-border bg-card p-4">
+      <header data-section="Header bar" className="rounded-[22px] border border-border bg-card p-4">
         <div className={styles.headerTop}>
           <div className={styles.headerTitle}>
             <div className="text-[11px] text-muted-foreground/70">
@@ -890,7 +890,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             </div>
           </div>
         </div>
-        <div className="mt-4 border-t border-border pt-4">
+        <div data-section="StatusNarrative" className="mt-4 border-t border-border pt-4">
           <StatusNarrative
             issueId={issueId}
             hasPlan={headerActions.state.hasPlan}
@@ -902,7 +902,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       </header>
 
       <div className={styles.missionBody}>
-        <IssueTreeLane
+        <div data-section="AgentsLane"><IssueTreeLane
           issueId={issueId}
           title={title}
           projectName={projectName}
@@ -910,9 +910,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           onSelectSession={selectSessionFromTree}
           onSessionsChange={recordTreeSessions}
           onOpenVerification={() => selectTab('overview')}
-        />
+        /></div>
         <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
-          <nav className="flex flex-wrap gap-1 border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
+          <nav data-section="Detail Tabs" className="flex flex-wrap gap-1 border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
             {TABS.map((tab) => {
               const badge = tabBadge(tab.id, checks.data)
               return (
@@ -949,16 +949,16 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 onOpenAgent={openAgentByType}
               />
             )}
-            {activeTab === 'overview' && <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} />}
+            {activeTab === 'overview' && <div data-section="Awareness rail"><OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} /></div>}
             {activeTab === 'code' && (
-              <div className="space-y-3.5">
+              <div data-section="Code tab" className="space-y-3.5">
                 <GitHubCiPanel issueId={issueId} />
                 <ChangedFilesView issueId={issueId} />
               </div>
             )}
-            {activeTab === 'plan' && <PlanMissionTab issueId={issueId} />}
+            {activeTab === 'plan' && <div data-section="PRD / Timeline / Discussion tabs"><PlanMissionTab issueId={issueId} /></div>}
             {activeTab === 'timeline' && (
-              <div className="space-y-4">
+              <div data-section="PRD / Timeline / Discussion tabs" className="space-y-4">
                 <div>
                   <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Status history</h3>
                   <StatusHistoryTab issueId={issueId} />
@@ -969,17 +969,17 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 </div>
               </div>
             )}
-            {activeTab === 'discussion' && <DiscussionsTab issueId={issueId} />}
-            {activeTab === 'costs' && <CostsTab issueId={issueId} />}
-            {activeTab === 'artifacts' && <DrawerArtifactsPanel issueId={issueId} />}
-            {activeTab === 'ship' && <ShipTab issueId={issueId} />}
-            {activeTab === 'conversation' && <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />}
-            {activeTab === 'files' && <OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} />}
-            {activeTab === 'terminal' && <OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} />}
-            {activeTab === 'beads' && <BeadsTab issueId={issueId} />}
+            {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
+            {activeTab === 'costs' && <div data-section="Costs / Artifacts / Ship tabs"><CostsTab issueId={issueId} /></div>}
+            {activeTab === 'artifacts' && <div data-section="Costs / Artifacts / Ship tabs"><DrawerArtifactsPanel issueId={issueId} /></div>}
+            {activeTab === 'ship' && <div data-section="Costs / Artifacts / Ship tabs"><ShipTab issueId={issueId} /></div>}
+            {activeTab === 'conversation' && <div data-section="Conversation / Files / Terminal tabs"><MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} /></div>}
+            {activeTab === 'files' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} /></div>}
+            {activeTab === 'terminal' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} /></div>}
+            {activeTab === 'beads' && <div data-section="BeadsRail / BeadsTab"><BeadsTab issueId={issueId} /></div>}
           </div>
         </main>
-        <BeadsPanel issueId={issueId} onOpenFull={() => selectTab('beads')} />
+        <div data-section="BeadsRail / BeadsTab"><BeadsPanel issueId={issueId} onOpenFull={() => selectTab('beads')} /></div>
       </div>
     </IssueView>
   )

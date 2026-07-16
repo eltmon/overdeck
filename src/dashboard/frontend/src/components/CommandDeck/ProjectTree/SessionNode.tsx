@@ -81,7 +81,7 @@ export function SessionNode({
   };
 
   return (
-    <AgentStepRow
+    <div data-section="SessionNode"><div data-section="SessionNode context menu"><div data-section="ModelResolutionCard"><AgentStepRow
       session={session}
       issueId={issueId}
       density="rail"
@@ -92,7 +92,7 @@ export function SessionNode({
       onToggleExpand={onToggleExpand}
       onClick={onClick}
       onAction={handleAction}
-    />
+    /></div></div></div>
   );
 }
 

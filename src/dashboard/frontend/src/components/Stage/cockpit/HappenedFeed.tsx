@@ -88,7 +88,7 @@ export function HappenedFeed({ issueId }: { issueId: string }) {
   if (recent.length === 0) return null
 
   return (
-    <div className="rounded-[14px] border border-border bg-card p-4" data-testid="happened-feed">
+    <div className="rounded-[14px] border border-border bg-card p-4" data-testid="happened-feed" data-section="HappenedFeed">
       <div className="mb-2 flex items-baseline justify-between">
         <div className="font-['Space_Grotesk'] text-[13.5px] font-semibold text-foreground">What just happened</div>
         {progressBadge && (

@@ -13,14 +13,22 @@ vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 }));
 
 describe('IssueView', () => {
-  it.each(['rail', 'cockpit', 'console'] as const)('renders the %s density from the declarative map', (density) => {
+  it.each(['rail', 'cockpit', 'console'] as const)('renders the %s density boundary', (density) => {
     const { container } = render(<IssueView issueId="PAN-2499" density={density}><span>body</span></IssueView>);
     expect(container.querySelector('[data-component="issue-view"]')).toHaveAttribute('data-density', density);
-    const sections = new Set(Array.from(container.querySelectorAll('[data-section]'), (node) => node.getAttribute('data-section')));
-    expect(DENSITY_SECTIONS[density].filter((section) => !sections.has(section))).toEqual([]);
+    expect(container.querySelectorAll('span[hidden][data-section]')).toHaveLength(0);
   });
 
-  it('renders every no-loss inventory section at one or more densities', () => {
+  it('forwards shell DOM attributes and handlers to the real boundary element', () => {
+    const onClick = vi.fn();
+    const { container } = render(<IssueView issueId="PAN-2499" density="rail" data-component="feature-item" data-issue-id="PAN-2499" onClick={onClick}><span>body</span></IssueView>);
+    const root = container.querySelector('[data-component="feature-item"]');
+    expect(root).toHaveAttribute('data-issue-id', 'PAN-2499');
+    root?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it('declares every no-loss inventory section at one or more densities', () => {
     const densities: IssueViewDensity[] = ['rail', 'cockpit', 'console'];
     const rendered = new Set(densities.flatMap((density) => DENSITY_SECTIONS[density]));
     expect(ISSUE_VIEW_INVENTORY.filter((entry) => !rendered.has(entry.section))).toEqual([]);

@@ -148,7 +148,7 @@ function StackDrawer({ issueId, feature, branch }: { issueId: string; feature?: 
     .filter((v): v is IssueActionView => !!v && v.enabled)
 
   return (
-    <div className={styles.resources}>
+    <div className={styles.resources} data-section="StackDrawer">
       <button type="button" className={styles.resToggle} onClick={() => setOpen((v) => !v)}>
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         Stack
@@ -265,7 +265,7 @@ export function AgentsLane({
   const count = [plan, ...works, ...knowledges, reviewParent, testSession, ...ships].filter(Boolean).length + 1 + (testSession ? 0 : 1)
 
   return (
-    <div>
+    <div data-section="AgentsLane">
       <div className={styles.header}>Agents &amp; steps <span className="n">{count}</span></div>
 
       {plan && (

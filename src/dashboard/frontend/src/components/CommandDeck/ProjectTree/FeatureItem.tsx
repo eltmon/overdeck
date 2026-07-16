@@ -801,7 +801,7 @@ function ReviewGroup({
       }`;
 
   return (
-    <div>
+    <div data-section="ReviewGroup">
       <SessionNode
         session={parent}
         subtitle={summary}
@@ -1082,7 +1082,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
         data-component="feature-item"
         data-issue-id={feature.issueId}
       >
-        <div className={styles.featureItemRow}>
+        <div data-section="Filter bar"><div data-section="Feature (issue) row" className={styles.featureItemRow}>
           {hasExpandableChildren ? (
             <button
               className={styles.featureItemCaret}
@@ -1118,7 +1118,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           </span>
           <span className={styles.featureMetaLine}>
           {!feature.isRally && aggregateBadges.length > 0 && (
-            <span className={styles.featureBadgeGroup}>
+            <span data-section="Badges" className={styles.featureBadgeGroup}>
               {aggregateBadges.map((badge) => (
                 <span
                   key={badge.key}
@@ -1196,12 +1196,12 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             </span>
           )}
           {feature.readyForMerge && (
-            <MergeButton
+            <span data-section="MergeButton"><MergeButton
               issueId={feature.issueId}
               variant="card"
               reviewStatus={{ readyForMerge: true }}
               onClick={(e) => e.stopPropagation()}
-            />
+            /></span>
           )}
           {trainInfo && (
             <span
@@ -1221,7 +1221,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
               {uatStackSummary.active ? 'UAT starting' : 'UAT healthy'}
             </span>
           )}
-          <span className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
+          <span data-section="Pipeline pips" className={styles.featurePipe} data-testid="feature-pipe" title="plan · work · review · test · ship">
             {pipeline.map((seg, i) => (
               <i key={PIPE_ORDER[i]} className={PIPE_CLASS[seg] ? styles[PIPE_CLASS[seg] as keyof typeof styles] as string : undefined} />
             ))}
@@ -1229,14 +1229,14 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           </span>
         </button>
       </ContextMenuTrigger>
-      </div>
-      <ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} />
+      </div></div>
+      <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
       {feature.resourceDetails?.hasBeads && (
         <BeadsPanel issueId={feature.issueId} compact onOpenFull={() => onSelect?.()} />
       )}
 
       {expanded && (
-        <RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} />
+        <div data-section="ShipDoorTreeRow"><RailShipProgress issueId={feature.issueId} onClick={() => onSelect?.()} /></div>
       )}
       {expanded && hasExpandableChildren && (
         <div className={styles.sessionList}>
@@ -1312,17 +1312,17 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       )}
 
       {shouldShowUatStack && uatStackSummary && (
-        <UatStackTreeGroup
+        <div data-section="StackDrawer / UatStackTreeGroup"><UatStackTreeGroup
           summary={uatStackSummary}
           workspace={workspace}
           pending={Boolean(stackPending)}
           storageKey={`${getExpandedKey(feature.issueId)}:uat`}
           onActionSelect={createUatActionHandler({ issueId: feature.issueId, workspace, queryClient })}
-        />
+        /></div>
       )}
 
       {expanded && hasResources && detailIdentifiers && (
-        <ResourcesGroup
+        <div data-section="ResourcesGroup"><ResourcesGroup
           issueId={feature.issueId}
           defaultExpanded={aggregateSessions.length > 0 && activityState !== 'stopped'}
           containers={(detailIdentifiers.dockerContainerNames ?? []).map((name) => {
@@ -1346,7 +1346,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             state: pr.state,
             isDraft: pr.isDraft,
           }))}
-        />
+        /></div>
       )}
     </IssueView>
     <FeatureContextMenu

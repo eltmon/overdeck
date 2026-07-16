@@ -195,7 +195,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageCl
   const model = deriveNarrative({ hasPlan, rs: review.data, ci: ci.data, plan: counts, workRunning })
 
   return (
-    <div data-testid="status-narrative">
+    <div data-testid="status-narrative" data-section="StatusNarrative">
       {model.needsYou && (
         <div className="mb-3 rounded-[10px] border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-[12.5px] text-foreground">
           ⚠ <span className="font-semibold">Waiting on you:</span> {model.next}
@@ -214,7 +214,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, cost, onStageCl
           </div>
         )}
       </div>
-      <div className="mt-3.5 flex" data-testid="journey-strip">
+      <div className="mt-3.5 flex" data-testid="journey-strip" data-section="Pipeline Band">
         {model.stages.map((stage) => (
           <button
             key={stage.key}
