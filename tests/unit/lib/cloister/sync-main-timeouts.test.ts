@@ -260,6 +260,85 @@ describe('sync-main git timeouts', () => {
     killSpy.mockRestore();
   });
 
+  it('gives stale-lock probes a fresh bounded cleanup signal', async () => {
+    vi.useFakeTimers();
+    try {
+      let cleanupOptions: {
+        signal?: AbortSignal;
+        processProbeTimeoutMs?: number;
+      } | undefined;
+      let finishCleanup!: () => void;
+      cleanupStaleLocksMock.mockImplementation((
+        _projectPath: string,
+        options: typeof cleanupOptions,
+      ) => {
+        cleanupOptions = options;
+        return Effect.promise(() => new Promise((resolve) => {
+          finishCleanup = () => resolve({
+            found: [`${PROJECT_PATH}/.git/index.lock`],
+            removed: [],
+            errors: [{ file: 'N/A', error: 'process probe cancelled' }],
+          });
+          options?.signal?.addEventListener('abort', finishCleanup, { once: true });
+        }));
+      });
+
+      const cleanupPromise = ensureSyncGitQuiescent(PROJECT_PATH, false, 1_000);
+      const rejection = expect(cleanupPromise).rejects.toMatchObject({
+        name: 'UnsafeSyncMainStateError',
+        message: expect.stringContaining('Could not establish Git quiescence'),
+      });
+      await Promise.resolve();
+
+      expect(cleanupOptions?.signal?.aborted).toBe(false);
+      expect(cleanupOptions?.processProbeTimeoutMs).toBe(1_000);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await rejection;
+
+      expect(cleanupOptions?.signal?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shares one cleanup deadline across lock and operation probes', async () => {
+    vi.useFakeTimers();
+    try {
+      cleanupStaleLocksMock.mockReturnValue(Effect.promise(() => new Promise((resolve) => {
+        setTimeout(() => resolve({ found: [], removed: [], errors: [] }), 700);
+      })));
+      operationHeads.add('MERGE_HEAD');
+      let finishAbort!: (value: { stdout: string; stderr: string }) => void;
+      execMock.mockImplementation(() => new Promise((resolve) => {
+        finishAbort = resolve;
+      }));
+      let settled = false;
+      const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true);
+      const cleanupPromise = ensureSyncGitQuiescent(PROJECT_PATH, true, 1_000);
+      const rejection = expect(cleanupPromise).rejects.toBeInstanceOf(UnsafeSyncMainStateError);
+      void cleanupPromise.then(() => { settled = true; }, () => { settled = true; });
+
+      await vi.advanceTimersByTimeAsync(700);
+      const abortCall = execMock.mock.calls.find(([command]) =>
+        command === 'git merge --abort');
+      expect(abortCall?.[1]?.timeout).toBe(300);
+
+      await vi.advanceTimersByTimeAsync(300);
+      expect(killSpy).toHaveBeenCalledWith(-4242, 'SIGKILL');
+      expect(settled).toBe(false);
+
+      finishAbort({ stdout: '', stderr: '' });
+      await rejection;
+      expect(settled).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+      killSpy.mockRestore();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('fails fast when cleanup cannot positively establish quiescence', async () => {
     operationHeads.add('MERGE_HEAD');
 

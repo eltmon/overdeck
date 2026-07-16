@@ -1271,24 +1271,23 @@ export async function syncMainIntoWorkspace(
     }
 
     try {
-      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath));
-      if (lockCleanup.found.length > 0) {
-        console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
-        if (lockCleanup.removed.length > 0) {
-          console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`);
-          logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
-        }
-        if (lockCleanup.errors.some((e: { error: string }) => e.error.includes('Git processes are running'))) {
-          const message = 'Git processes are still running — cannot safely start sync';
-          console.error(`[sync-main] ${message}`);
-          logActivity('sync_main_blocked', message);
-          return { success: false, reason: message };
-        }
+      const lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath, { signal, processProbeTimeoutMs: SYNC_GIT_STATUS_TIMEOUT_MS }));
+      if (lockCleanup.found.length > 0) console.log(`[sync-main] Found ${lockCleanup.found.length} lock file(s)`);
+      if (lockCleanup.removed.length > 0) {
+        console.log(`[sync-main] Cleaned up ${lockCleanup.removed.length} stale lock file(s)`); logActivity('git_lock_cleanup', `Removed ${lockCleanup.removed.length} stale lock file(s)`);
       }
-    } catch (lockErr: any) {
-      console.warn(`[sync-main] Lock cleanup warning: ${lockErr.message} (continuing)`);
+      if (lockCleanup.errors.length > 0) {
+        const details = lockCleanup.errors.map(({ file, error }) => `${file}: ${error}`).join('; ');
+        const message = `Cannot safely start sync: ${details}`;
+        console.error(`[sync-main] ${message}`); logActivity('sync_main_blocked', message);
+        return { success: false, reason: message };
+      }
+    } catch (lockError) {
+      const cause = lockError instanceof Error ? lockError.message : String(lockError);
+      const message = `Cannot verify Git lock state: ${cause}`;
+      console.error(`[sync-main] ${message}`); logActivity('sync_main_blocked', message);
+      return { success: false, reason: message };
     }
-
     console.log(`[sync-main] Fetching origin/main...`);
     try {
       await run('git fetch origin main', SYNC_GIT_FETCH_TIMEOUT_MS);

@@ -141,31 +141,112 @@ export async function ensureSyncGitQuiescent(
   abortMerge: boolean,
   timeoutMs = 30_000,
 ): Promise<void> {
-  let lockCleanup: { found: string[]; removed: string[]; errors: Array<{ file: string; error: string }> };
-  try {
-    lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath));
-  } catch (error) {
-    throw new UnsafeSyncMainStateError(`Could not verify Git lock state after cancellation: ${error instanceof Error ? error.message : String(error)}`);
-  }
-  if (lockCleanup.errors.length > 0) {
-    throw new UnsafeSyncMainStateError(`Could not establish Git quiescence: ${lockCleanup.errors.map(({ file, error }) => `${file}: ${error}`).join('; ')}`);
-  }
-
-  const before = await probeGitOperationHeads(projectPath, timeoutMs);
-  if (!before.success) throw new UnsafeSyncMainStateError(`Could not verify Git operation state: ${before.reason}`);
-  const nonMergeHeads = before.present.filter((head) => head !== 'MERGE_HEAD');
-  if (nonMergeHeads.length > 0 || (before.present.includes('MERGE_HEAD') && !abortMerge)) {
-    throw new UnsafeSyncMainStateError(`Git operation remains active after cancellation: ${before.present.join(', ')}`);
-  }
-  if (before.present.includes('MERGE_HEAD')) {
-    try {
-      await runSyncGitCommand('git merge --abort', { cwd: projectPath, timeout: timeoutMs });
-    } catch (error) {
-      throw new UnsafeSyncMainStateError(`Could not abort timed-out sync merge: ${error instanceof Error ? error.message : String(error)}`);
+  const controller = new AbortController();
+  const deadline = Date.now() + timeoutMs;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const remaining = (stage: string): number => {
+    const budget = deadline - Date.now();
+    if (controller.signal.aborted || budget <= 0) {
+      throw new UnsafeSyncMainStateError(
+        `Git cleanup timed out after ${timeoutMs / 1_000}s while ${stage}`,
+      );
     }
-  }
+    return budget;
+  };
 
-  const after = await probeGitOperationHeads(projectPath, timeoutMs);
-  if (!after.success) throw new UnsafeSyncMainStateError(`Could not verify Git operation state after cleanup: ${after.reason}`);
-  if (after.present.length > 0) throw new UnsafeSyncMainStateError(`Git operation remains active after cleanup: ${after.present.join(', ')}`);
+  try {
+    let lockCleanup: {
+      found: string[];
+      removed: string[];
+      errors: Array<{ file: string; error: string }>;
+    };
+    try {
+      lockCleanup = await Effect.runPromise(cleanupStaleLocks(projectPath, {
+        signal: controller.signal,
+        processProbeTimeoutMs: remaining('checking Git lock owners'),
+      }));
+    } catch (error) {
+      throw new UnsafeSyncMainStateError(
+        `Could not verify Git lock state after cancellation: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    if (lockCleanup.errors.length > 0) {
+      throw new UnsafeSyncMainStateError(
+        `Could not establish Git quiescence: ${lockCleanup.errors
+          .map(({ file, error }) => `${file}: ${error}`)
+          .join('; ')}`,
+      );
+    }
+
+    let before: OperationHeadProbeResult;
+    try {
+      before = await probeGitOperationHeads(
+        projectPath,
+        remaining('checking Git operation state'),
+        controller.signal,
+      );
+    } catch (error) {
+      throw new UnsafeSyncMainStateError(
+        `Could not verify Git operation state: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    if (!before.success) {
+      throw new UnsafeSyncMainStateError(
+        `Could not verify Git operation state: ${before.reason}`,
+      );
+    }
+    const nonMergeHeads = before.present.filter((head) => head !== 'MERGE_HEAD');
+    if (nonMergeHeads.length > 0
+      || (before.present.includes('MERGE_HEAD') && !abortMerge)) {
+      throw new UnsafeSyncMainStateError(
+        `Git operation remains active after cancellation: ${before.present.join(', ')}`,
+      );
+    }
+    if (before.present.includes('MERGE_HEAD')) {
+      try {
+        await runSyncGitCommand('git merge --abort', {
+          cwd: projectPath,
+          timeout: remaining('aborting the timed-out merge'),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        throw new UnsafeSyncMainStateError(
+          `Could not abort timed-out sync merge: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    }
+
+    let after: OperationHeadProbeResult;
+    try {
+      after = await probeGitOperationHeads(
+        projectPath,
+        remaining('verifying Git cleanup'),
+        controller.signal,
+      );
+    } catch (error) {
+      throw new UnsafeSyncMainStateError(
+        `Could not verify Git operation state after cleanup: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+    if (!after.success) {
+      throw new UnsafeSyncMainStateError(
+        `Could not verify Git operation state after cleanup: ${after.reason}`,
+      );
+    }
+    if (after.present.length > 0) {
+      throw new UnsafeSyncMainStateError(
+        `Git operation remains active after cleanup: ${after.present.join(', ')}`,
+      );
+    }
+  } finally {
+    clearTimeout(timeout);
+  }
 }

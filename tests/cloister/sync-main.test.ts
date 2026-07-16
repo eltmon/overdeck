@@ -451,7 +451,7 @@ describe('syncMainIntoWorkspace', () => {
       const result = await syncMainIntoWorkspace(PROJECT_PATH, ISSUE_ID);
 
       expect(result.success).toBe(false);
-      expect(result.reason).toMatch(/git processes are still running/i);
+      expect(result.reason).toMatch(/git processes are running/i);
     });
   });
 });
