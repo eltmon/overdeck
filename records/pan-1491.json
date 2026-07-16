@@ -391,9 +391,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T16:19:34.479Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T16:27Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T16:27:51.238Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T16:27:51.375Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T16:27:51Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1491\n\n# Review Synthesis — PAN-1491 — 2026-07-16T16:27:19Z\n\n## Verdict: CHANGES REQUESTED — security reviewer session ended before writing a report\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-ae0b48d3/context.json`\n- Branch: `feature/pan-1491`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491`\n- HEAD reviewed: `ae0b48d390c89f7cbaebc3c34aa5f93a9c58a11e`\n- Cycle number: 12\n- Prior cycle SHA: `9b20eeb68ff06eb40e13b4d6cc533ca9d76ae85c`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-ae0b48d3/correctness.md` | 0 after convergence gate |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-ae0b48d3/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-ae0b48d3/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [security] Reviewer failed before producing a report\nThe security reviewer emitted `REVIEWER_FAILED security reviewer session ended before writing a report`, and no `security.md` output exists. The review policy requires changes whenever any reviewer fails or times out, so security coverage is incomplete and this cycle cannot approve the branch.\n\n## Non-blocking Findings\n\n### [correctness] Dashboard priority sorting can move agent-filed bugs above operator-filed bugs — `src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx:122`\n**[demoted: previously reviewed]** The reviewer found that priority is compared before `filedBy`, which can conflict with the manifest's operator-always-on-top non-goal. The cited UI code was already present at the prior cycle SHA and did not change between `9b20eeb68ff06eb40e13b4d6cc533ca9d76ae85c` and the reviewed HEAD. Because this is cycle 12, the convergence gate prevents promoting previously reviewed, unchanged code to a blocker. The requirements reviewer also interprets FR-9 as priority-preserving with operator precedence inside equal-priority groups, so the requirement wording should be reconciled if this behavior is changed in a later cycle.\n\n### [correctness] Existing version-61 legacy databases skip the new column migration — `src/lib/database/schema.ts:1743`\nThe legacy migration returns early for databases already stamped at schema version 61, while those databases may lack `affected_criteria`. The correctness reviewer classified this as advisory because repository tracing found only test imports for the legacy accessor and the production Overdeck path has an idempotent runtime column top-up.\n\n### [performance] Pagination and request coalescing do not bound the expensive weighting computation — `src/lib/overdeck/substrate-bug-weights-service.ts:52`\nEach page and Flywheel tick still derives complete telemetry, reads the substrate-bug window, scores and sorts all rows, and paginates only afterward. The performance reviewer classified this as advisory because the current 30-day default and expected substrate-bug volume keep the cost operationally bounded, but recommended a shared window-scoped snapshot if volume grows.\n\n## Clean Sub-roles\n\n- Requirements: all ten traced vBRIEF items and seven explicit non-goals were covered with changed-code evidence; no missing or partial in-scope requirement was found.\n- Performance: no blocking regression was found; synchronous SQLite work remains off the HTTP event loop and response size is capped.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-ae0b48d3/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1491 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -469,7 +487,7 @@
     "recordedAt": "2026-07-16T13:05:33.565Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T16:27:50.570Z",
+  "updated": "2026-07-16T16:27:51.389Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "blocked",
@@ -783,7 +801,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
