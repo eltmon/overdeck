@@ -29,7 +29,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
 import { TroubledBadges } from './TroubledBadges';
 import { BeadsPanel } from '../../issue-view/BeadsPanel';
-import { IssueView, RailShipProgress } from '../../issue-view/IssueView';
+import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
 import styles from '../styles/command-deck.module.css';
 
@@ -932,7 +932,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     const persisted = readExpanded(feature.issueId);
     return persisted ?? defaultExpandedFromState(feature.stateLabel);
   });
-
+  const [fullScreen, setFullScreen] = useState(false);
   const [detailIdentifiers, setDetailIdentifiers] = useState<ProjectFeatureResourceIdentifiers | null>(null);
 
   useEffect(() => {
@@ -967,8 +967,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     Boolean(feature.resourceDetails.remoteAgent)
   );
 
-  // Derive best session once per data change instead of on every click (PAN-821 review)
-  // Respect the tree filter so auto-select picks a visible session.
   const visibleSessions = useMemo(
     () => feature.sessions?.filter((session) => sessionMatchesFilter(session, filter)) ?? [],
     [feature.sessions, filter],
@@ -1050,7 +1048,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     stackHealth: workspace?.stackHealth,
     pending: stackPending,
   });
-  // Live flash when dominant status or visible session count changes (blocker-8)
   const flashKey = `${feature.issueId}:${dominantStatus ?? 'none'}:${visibleSessions.length}:${activityState}`;
   const flashClass = useLiveFlash(flashKey, 'anim-row-flash', 600);
 
@@ -1058,6 +1055,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     e.stopPropagation();
     const next = !expanded;
     setExpanded(next);
+    if (!next) setFullScreen(false);
     writeExpanded(feature.issueId, next);
   }, [expanded, feature.issueId]);
 
@@ -1077,7 +1075,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
     <ContextMenuRoot>
       <IssueView
         issueId={feature.issueId}
-        density="rail"
+        density={fullScreen ? 'console' : expanded ? 'cockpit' : 'rail'}
         className={`${styles.featureItemWrapper} ${edgeClass} ${isSelected ? styles.featureItemWrapperSelected : ''} ${flashClass}`}
         data-component="feature-item"
         data-issue-id={feature.issueId}
@@ -1095,6 +1093,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
           ) : (
             <span className={styles.featureItemCaretPlaceholder} />
           )}
+          {expanded && <IssueViewFullscreenButton className={styles.featureItemCaret} onClick={() => setFullScreen(true)} />}
           <ContextMenuTrigger asChild>
             <button
               className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}

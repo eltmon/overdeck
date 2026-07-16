@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { useState } from 'react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ISSUE_VIEW_INVENTORY, type IssueViewDensity } from './inventory';
 import { DENSITY_SECTIONS } from './densitySections';
@@ -13,6 +14,21 @@ vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 }));
 
 describe('IssueView', () => {
+  it('keeps one view instance while rail expands through cockpit and console', () => {
+    function Harness() {
+      const [density, setDensity] = useState<IssueViewDensity>('rail');
+      return <IssueView issueId="PAN-2499" density={density}><button onClick={() => setDensity('cockpit')}>expand</button><button onClick={() => setDensity('console')}>full screen</button><button onClick={() => setDensity('rail')}>collapse</button></IssueView>;
+    }
+    const { container } = render(<Harness />);
+    const root = container.querySelector('[data-component="issue-view"]');
+    expect(root).toHaveAttribute('data-density', 'rail');
+    fireEvent.click(screen.getByRole('button', { name: 'expand' }));
+    expect(root).toHaveAttribute('data-density', 'cockpit');
+    fireEvent.click(screen.getByRole('button', { name: 'full screen' }));
+    expect(root).toHaveAttribute('data-density', 'console');
+    fireEvent.click(screen.getByRole('button', { name: 'collapse' }));
+    expect(root).toHaveAttribute('data-density', 'rail');
+  });
   it.each(['rail', 'cockpit', 'console'] as const)('renders the %s density boundary', (density) => {
     const { container } = render(<IssueView issueId="PAN-2499" density={density}><span>body</span></IssueView>);
     expect(container.querySelector('[data-component="issue-view"]')).toHaveAttribute('data-density', density);

@@ -757,6 +757,30 @@ describe('FeatureItem', () => {
     expect(localStorage.getItem('mc-feature-expanded:PAN-821')).toBeNull();
   });
 
+  it('grows the same issue view rail to cockpit and console without opening a tab', () => {
+    const onSelect = vi.fn();
+    const { container } = renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession()], stateLabel: 'Done' })}
+        isSelected={false}
+        onSelect={onSelect}
+      />,
+    );
+    const issueView = () => container.querySelector('[data-component="feature-item"]');
+    expect(issueView()).toHaveAttribute('data-density', 'rail');
+
+    fireEvent.click(screen.getByTestId('chevron-right'));
+    expect(issueView()).toHaveAttribute('data-density', 'cockpit');
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand issue full screen' }));
+    expect(issueView()).toHaveAttribute('data-density', 'console');
+    expect(onSelect).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId('chevron-down'));
+    expect(issueView()).toHaveAttribute('data-density', 'rail');
+  });
+
   it('restores expansion state from localStorage on mount', () => {
     localStorage.setItem('mc-feature-expanded:PAN-821', 'true');
     renderFeature(
