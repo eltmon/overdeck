@@ -126,21 +126,20 @@ describe('gatherProjectLensSignals', () => {
     );
   });
 
-  it('resolves every merged PR head in one project-scoped GraphQL call', async () => {
+  it('resolves merged PR heads in fixed-size project-scoped GraphQL chunks', async () => {
     const heads = Array.from({ length: 120 }, (_, index) => `feature/pan-${index + 1}`);
     const runGraphql = vi.fn().mockResolvedValue(JSON.stringify({
       data: { repository: {
         h0: { nodes: [{ headRepository: { name: 'overdeck', owner: { login: 'eltmon' } } }] },
-        h50: { nodes: [{ headRepository: { name: 'overdeck', owner: { login: 'eltmon' } } }] },
-        h100: { nodes: [{ headRepository: { name: 'overdeck', owner: { login: 'eltmon' } } }] },
       } },
     }));
 
     const merged = await listMergedPullRequestHeadsBatched('eltmon', 'overdeck', heads, runGraphql);
 
-    expect(runGraphql).toHaveBeenCalledOnce();
     expect(merged).toEqual(['feature/pan-1', 'feature/pan-51', 'feature/pan-101']);
-    expect(runGraphql.mock.calls[0]![0].match(/pullRequests\(/g)).toHaveLength(120);
+    expect(runGraphql).toHaveBeenCalledTimes(3);
+    expect(runGraphql.mock.calls.map(([query]) => query.match(/pullRequests\(/g)?.length))
+      .toEqual([50, 50, 20]);
   });
 
   it('does not attribute a fork PR with a colliding head name to the project', async () => {
@@ -165,6 +164,18 @@ describe('gatherProjectLensSignals', () => {
       { number: 11, state: 'closed' },
     ]);
     expect(runGraphql).toHaveBeenCalledOnce();
+  });
+
+  it('resolves issue states in fixed-size project-scoped GraphQL chunks', async () => {
+    const numbers = Array.from({ length: 101 }, (_, index) => index + 1);
+    const runGraphql = vi.fn().mockResolvedValue(JSON.stringify({ data: { repository: {} } }));
+
+    const states = await listIssueStatesBatched('eltmon', 'overdeck', numbers, runGraphql);
+
+    expect(states).toHaveLength(101);
+    expect(runGraphql).toHaveBeenCalledTimes(3);
+    expect(runGraphql.mock.calls.map(([query]) => query.match(/issue\(/g)?.length))
+      .toEqual([50, 50, 1]);
   });
 
   it('preserves the explicit ready label as a durable membership lens', async () => {

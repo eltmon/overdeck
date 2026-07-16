@@ -13,6 +13,15 @@ import type { ProjectConfig } from './projects.js';
 import { parseIssueIdFromTextSync } from './resource-utils.js';
 
 const execFileAsync = promisify(execFile);
+const GRAPHQL_ALIAS_CHUNK_SIZE = 50;
+
+function chunksOf<T>(values: T[]): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += GRAPHQL_ALIAS_CHUNK_SIZE) {
+    chunks.push(values.slice(index, index + GRAPHQL_ALIAS_CHUNK_SIZE));
+  }
+  return chunks;
+}
 
 interface PullRequestRow {
   headRefName: string;
@@ -46,13 +55,17 @@ export async function listMergedPullRequestHeadsBatched(
   runGraphql: (query: string) => Promise<string> = runGitHubGraphql,
 ): Promise<string[]> {
   if (heads.length === 0) return [];
-  const fields = heads.map((head, index) =>
-    `h${index}: pullRequests(states: MERGED, headRefName: ${JSON.stringify(head)}, first: 10) { nodes { headRepository { name owner { login } } } }`);
-  const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
-  const response = JSON.parse(await runGraphql(query)) as MergedHeadGraphqlResponse;
-  const repository = response.data?.repository ?? {};
-  return heads.filter((_head, index) => repository[`h${index}`]?.nodes?.some((pr) =>
-    pr.headRepository?.name === repo && pr.headRepository.owner?.login === owner));
+  const mergedHeads: string[] = [];
+  for (const headChunk of chunksOf(heads)) {
+    const fields = headChunk.map((head, index) =>
+      `h${index}: pullRequests(states: MERGED, headRefName: ${JSON.stringify(head)}, first: 10) { nodes { headRepository { name owner { login } } } }`);
+    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
+    const response = JSON.parse(await runGraphql(query)) as MergedHeadGraphqlResponse;
+    const repository = response.data?.repository ?? {};
+    mergedHeads.push(...headChunk.filter((_head, index) => repository[`h${index}`]?.nodes?.some((pr) =>
+      pr.headRepository?.name === repo && pr.headRepository.owner?.login === owner)));
+  }
+  return mergedHeads;
 }
 
 interface IssueStateGraphqlResponse {
@@ -66,14 +79,18 @@ export async function listIssueStatesBatched(
   runGraphql: (query: string) => Promise<string> = runGitHubGraphql,
 ): Promise<Array<{ number: number; state: 'open' | 'closed' }>> {
   if (numbers.length === 0) return [];
-  const fields = numbers.map((number, index) => `i${index}: issue(number: ${number}) { state }`);
-  const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
-  const response = JSON.parse(await runGraphql(query)) as IssueStateGraphqlResponse;
-  const repository = response.data?.repository ?? {};
-  return numbers.map((number, index) => ({
-    number,
-    state: repository[`i${index}`]?.state === 'OPEN' ? 'open' : 'closed',
-  }));
+  const states: Array<{ number: number; state: 'open' | 'closed' }> = [];
+  for (const numberChunk of chunksOf(numbers)) {
+    const fields = numberChunk.map((number, index) => `i${index}: issue(number: ${number}) { state }`);
+    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
+    const response = JSON.parse(await runGraphql(query)) as IssueStateGraphqlResponse;
+    const repository = response.data?.repository ?? {};
+    states.push(...numberChunk.map((number, index) => ({
+      number,
+      state: repository[`i${index}`]?.state === 'OPEN' ? 'open' as const : 'closed' as const,
+    })));
+  }
+  return states;
 }
 
 export interface PipelineMembershipGatherDeps {
