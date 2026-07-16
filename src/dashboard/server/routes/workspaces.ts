@@ -231,22 +231,14 @@ async function deliverQueuedFeedback(
   message: string,
 ): Promise<void> {
   await enqueuePendingFeedbackDelivery({
-    issueId,
-    role: 'work',
-    kind,
-    filePath,
-    message,
+    issueId, role: 'work', kind, filePath, message,
     createdAt: new Date().toISOString(),
   });
   const target = await resolveIssueFeedbackTarget(issueId);
   if (!('agentId' in target)) return;
-  try {
-    await messageAgent(target.agentId, message);
-    await markMailboxItemDelivered({ issueId, role: 'work', filePath });
-    await markPendingFeedbackDelivered(issueId, kind);
-  } catch {
-    // The durable issue-role mailbox remains pending for spawn/resume drain.
-  }
+  try { await messageAgent(target.agentId, message); } catch { return; }
+  await markMailboxItemDelivered({ issueId, role: 'work', filePath });
+  await markPendingFeedbackDelivered(issueId, kind);
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────

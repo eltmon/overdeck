@@ -799,14 +799,9 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     if ('agentId' in target) {
       const { messageAgent } = await import('./agents.js');
       await messageAgent(target.agentId, message, 'internal', { owesRework: true });
-      if (feedbackPath) {
-        const { markMailboxItemDelivered } = await import('./cloister/agent-mailbox.js');
-        await markMailboxItemDelivered({ issueId, role: 'work', filePath: feedbackPath });
-      }
+      const { markMailboxItemDelivered } = await import('./cloister/agent-mailbox.js'); if (feedbackPath) await markMailboxItemDelivered({ issueId, role: 'work', filePath: feedbackPath });
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
-    } else {
-      console.warn(`[review-status] ${target.reason}; issue-role mailbox remains pending`);
-    }
+    } else console.warn(`[review-status] ${target.reason}; issue-role mailbox remains pending`);
   } catch (err) {
     console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
   }
