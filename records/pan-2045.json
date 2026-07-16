@@ -17,16 +17,18 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:23:12.548Z",
+  "updated": "2026-07-16T18:23:21.278Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:13:03.463Z",
+    "updatedAt": "2026-07-16T18:23:21.131Z",
+    "inspectNotes": "Inspecting item switch-happy-dom",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -47,6 +49,14 @@
             "cacheRead": 3646094,
             "cacheWrite": 165070
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 767731,
+            "output": 21369,
+            "cacheRead": 10413056,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -61,18 +71,24 @@
           "output": 42924,
           "cacheRead": 3646094,
           "cacheWrite": 165070
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 767731,
+          "output": 21369,
+          "cacheRead": 10413056,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.8575230000000005,
-        "pricingAsOf": "2026-07-16T18:13:03.590Z"
+        "usd": 17.543776,
+        "pricingAsOf": "2026-07-16T18:23:21.245Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 6,
     "claims": {},
