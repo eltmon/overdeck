@@ -25,12 +25,12 @@ function readDevcontainerTemplate(): DevcontainerCompose {
 }
 
 describe('devcontainer init command', () => {
-  it('skips package lifecycle scripts on both dependency install attempts', () => {
+  it('copies cached packages across mounts and skips lifecycle scripts on both install attempts', () => {
     const compose = readDevcontainerTemplate();
     const command = compose.services?.init?.command;
 
     expect(command).toEqual(expect.any(String));
-    expect(command?.match(/bun install --ignore-scripts/g)).toHaveLength(2);
+    expect(command?.match(/bun install --backend=copyfile --ignore-scripts/g)).toHaveLength(2);
   });
 
   it('keeps the better-sqlite3 rebuild non-fatal', () => {

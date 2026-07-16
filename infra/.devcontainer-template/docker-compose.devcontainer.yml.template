@@ -37,9 +37,11 @@ services:
         # PAN-1169: --filter leaves top-level node_modules un-hoisted on this named volume.
         # PAN-1764: retry once — install scripts fetch native prebuilds over the network
         # on a cold cache, and a transient DNS blip (EAI_AGAIN) must not hard-fail init.
+        # PAN-2777: cache and node_modules are separate mounts, so Bun's default
+        # hardlink backend cannot link packages between them. Copy files instead.
         # Package lifecycle scripts are unnecessary here: init explicitly builds the
         # required artifacts below, and running prepare can fail on an unlinked husky binary.
-        { bun install --ignore-scripts || { echo 'bun install failed — retrying once in 5s...'; sleep 5; bun install --ignore-scripts; }; } &&
+        { bun install --backend=copyfile --ignore-scripts || { echo 'bun install failed — retrying once in 5s...'; sleep 5; bun install --backend=copyfile --ignore-scripts; }; } &&
         echo 'Rebuilding native Node.js addons...' &&
         { npm rebuild better-sqlite3 2>&1 || { echo 'WARN: better-sqlite3 rebuild failed (dev-only transitive dep via evalite; runtime uses bundled node:sqlite/bun:sqlite) — continuing init (PAN-2312).'; }; } &&
         echo 'Building contracts...' &&
