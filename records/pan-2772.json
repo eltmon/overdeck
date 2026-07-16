@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T17:39:05.441Z",
+  "updated": "2026-07-16T17:41:00.575Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,18 +54,32 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "reconnect-policy": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2772",
         "agentId": "agent-pan-2772",
         "pid": 2223299,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:39:05.441Z"
+        "claimedAt": "2026-07-16T17:39:05.441Z",
+        "itemId": "reconnect-policy",
+        "outcome": "completed",
+        "reason": "Added a pure five-minute patient reconnect policy with exponential-to-flat delays and boundary/large-attempt unit coverage.",
+        "releasedAt": "2026-07-16T17:41:00.574Z"
+      }
+    ],
+    "statusReasons": {
+      "reconnect-policy": {
+        "reason": "Added a pure five-minute patient reconnect policy with exponential-to-flat delays and boundary/large-attempt unit coverage.",
+        "updatedAt": "2026-07-16T17:41:00.574Z"
       }
     }
   },
   "statusOverrides": {
-    "reconnect-policy": "running"
+    "reconnect-policy": "completed",
+    "reconnect-policy.reconnect-policy.ac1": "completed",
+    "reconnect-policy.reconnect-policy.ac2": "completed",
+    "reconnect-policy.reconnect-policy.ac3": "completed"
   }
 }
