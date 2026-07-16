@@ -97,16 +97,16 @@ rmSync(drizzleDest, { recursive: true, force: true });
 cpSync(join(repoRoot, "drizzle"), drizzleDest, { recursive: true });
 console.log("[prepare-server] Copied migration SQL → drizzle/");
 
-// ─── Stage the Claude Code hook bundle (PAN-2595) ─────────────────────────────
-// Desktop installs never run `pan install`, so the dashboard server provisions
-// the hooks at boot (src/lib/claude-hooks-provision.ts). It resolves them from
-// SYNC_SOURCES.hooks = <packageRoot>/sync-sources/hooks — resources/ in the
-// packaged app (extraResources maps sync-sources → sync-sources), the package
-// root in the npx flavor (`files` includes sync-sources).
+// ─── Stage sync sources (PAN-2595, PAN-2768) ──────────────────────────────────
+// Desktop installs never run `pan install`, so the dashboard provisions hooks
+// at boot and `pan sync` reads skills, rules, agents, dev skills, and hooks from
+// <packageRoot>/sync-sources. packageRoot is resources/ in the packaged app
+// (extraResources maps sync-sources → sync-sources), so Sync Now needs the full
+// tree rather than only the hook bundle.
 const hooksStageDir = join(desktopDir, "sync-sources");
 rmSync(hooksStageDir, { recursive: true, force: true });
-cpSync(join(repoRoot, "sync-sources", "hooks"), join(hooksStageDir, "hooks"), { recursive: true });
-console.log("[prepare-server] Staged Claude hook bundle → sync-sources/hooks/");
+cpSync(join(repoRoot, "sync-sources"), hooksStageDir, { recursive: true });
+console.log("[prepare-server] Staged sync payload → sync-sources/");
 
 // ─── Bare-specifier scan helpers (shared by supervisor + server staging) ──────
 
