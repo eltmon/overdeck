@@ -314,6 +314,7 @@
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
       "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.test.tsx",
       "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
     ],
@@ -341,6 +342,7 @@
       "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/components/Sidebar.test.tsx",
       "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
       "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
       "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
@@ -351,10 +353,10 @@
       "src/dashboard/frontend/src/components/Stage/stage.module.css",
       "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
     ],
-    "recordedAt": "2026-07-16T21:44:39.479Z"
+    "recordedAt": "2026-07-16T21:54:06.876Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:53:58.883Z",
+  "updated": "2026-07-16T21:54:06.879Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "reviewing",
