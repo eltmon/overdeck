@@ -288,23 +288,24 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T15:36:00.836Z",
+  "updated": "2026-07-16T16:59:09.154Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T15:36:00.708Z",
+    "updatedAt": "2026-07-16T16:59:09.130Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "AC1 unmet: strike requests never reach triggerMerge(). Only dequeueNextMerge() (merge-ops.ts:322-336) builds a StrikeMergeRequest, but it's only invoked via advanceQueue() after another triggerMerge() call for the SAME project's queue completes, dequeuing entries populated solely by enqueueMerge() (called only at merge-ops.ts:406,418 inside triggerMerge itself). pan strike-ready (src/cli/commands/strike-ready.ts:70-80) only persists strikeReadyHead/strikeLandingState via setStatus -- it never calls enqueueMerge or triggerMerge. Every other triggerMerge call site (flywheel.ts:610, merge-ops.ts:1250 route handler, auto-merge-executor.ts:55/111 defaultMergeIssue, merge-queue-service.ts:25 resumeQueuedMerges) invokes triggerMerge(issueId) with no request arg, defaulting to {kind:'normal'}. Grepped repo-wide for strikeLandingState/strikeReadyHead outside merge-ops.ts/merge-strike.ts and found no patrol, route, or watcher that enqueues or triggers a merge for a freshly-ready strike marker. Result: a strike marked ready has no code path that ever constructs {kind:'strike',...} and calls triggerMerge -- the AC1 scenario (given a valid durable strike marker, the merge door resolves/gates/merges/invokes postMergeLifecycle) is unreachable dead code. Required fix: wire an actual trigger -- e.g. strikeReadyCommand or a server-side watcher on strikeLandingState==='ready' must enqueueMerge + call triggerMerge(issueId, strikeRequest), or add a dedicated endpoint/patrol that detects readiness and invokes the merge door. AC2 (stale-marker rejection, validateStrikeMergeRequest in merge-strike.ts:20-42) and AC3 (no-loss eligibility matrix, normalMergeEligibility + strike-merge.test.ts) verified correct in isolation; AC4 (main-push guard) unaffected by this diff. Minor non-blocking nit: 'Already merged' check now exists twice (merge-strike.ts:16 inside normalMergeEligibility, and unchanged original at merge-ops.ts ~391) -- harmless redundancy, not a functional loss.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2791",
     "lastVerifiedCommit": "cc8ce1a0d4c18e40c099ce9f56bbcce63320213f",
     "reviewRequestedAt": "2026-07-16T13:43:07.481Z",
-    "reviewSpawnedAt": "2026-07-16T14:20:32.115Z"
+    "reviewSpawnedAt": "2026-07-16T14:20:32.115Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-16T16:59:09.130Z"
   },
   "closeOut": {
     "usage": {
@@ -360,7 +361,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2791"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-16T16:59:09.150Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at cc8ce1a0d4c18e40c099ce9f56bbcce63320213f",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2791 MERGED at 2026-07-16T15:35:56Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T15:35:56Z",
+          "mergeCommit": "1f21e257accf745bc00b522ac27f6e3009dc5508"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 1f21e257accf745bc00b522ac27f6e3009dc5508",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-16T16:57:35.000Z, dist built 2026-07-16T16:25:15.759Z, merge 2026-07-16T15:35:56.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-2702 found; Pruned 8 checkpoint ref(s) for agent-pan-2702, planning-pan-2702, strike-pan-2702; No specialist registry entries for PAN-2702"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
