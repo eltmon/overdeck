@@ -42,6 +42,11 @@
       "timestamp": "2026-07-16T21:13:56.163Z",
       "reason": "end",
       "note": "No deviations. No skipped work or newly discovered hazards. Moved terminal padding from the measured host to the FitAddon-aware .xterm element, added the regression test, and verified the full suite, typecheck, and targeted XTerminal tests."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T21:14:09.864Z"
     }
   ],
   "feedback": [],
@@ -61,19 +66,42 @@
     "recordedAt": "2026-07-16T21:13:53.247Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:14:08.309Z",
+  "updated": "2026-07-16T21:14:09.864Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:14:08.104Z",
+    "updatedAt": "2026-07-16T21:14:09.654Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "reviewRequestedAt": "2026-07-16T21:14:06.888Z",
     "reviewSpawnedAt": "2026-07-16T21:14:08.103Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/security.md",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/correctness.md",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/performance.md",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/.pan/review/agent-pan-2619-review-d2a4e582/requirements.md",
+        "atCommit": "527600642793acab98d2c574fd40b91ead884c2b"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -172,7 +200,7 @@
       },
       "costAtCloseOut": {
         "usd": 75.3182,
-        "pricingAsOf": "2026-07-16T21:14:08.242Z"
+        "pricingAsOf": "2026-07-16T21:14:09.666Z"
       }
     },
     "merges": [
