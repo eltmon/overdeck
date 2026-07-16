@@ -188,6 +188,11 @@
       "timestamp": "2026-07-16T21:48:56.615Z",
       "reason": "end",
       "note": "No code changes required: repeated test feedback was stale at 434eea49. Current pushed b5c1422654 passes 215 files and 2,031 tests; stale specialists were cancelled and review restarted at current HEAD."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T21:49:13.871Z"
     }
   ],
   "feedback": [],
@@ -326,7 +331,7 @@
     "recordedAt": "2026-07-16T21:48:55.460Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:49:11.307Z",
+  "updated": "2026-07-16T21:49:14.483Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "reviewing",
@@ -618,7 +623,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
