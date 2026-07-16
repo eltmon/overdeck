@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T06:44:41.884Z",
+  "updated": "2026-07-16T06:52:20.533Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "stage-cli-runtime": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2768",
         "agentId": "agent-pan-2768",
         "pid": 2495837,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:44:41.884Z"
+        "claimedAt": "2026-07-16T06:44:41.884Z",
+        "itemId": "stage-cli-runtime",
+        "outcome": "completed",
+        "reason": "Staged the full CLI import closure and assets, pinned and installed external dependencies, stripped source maps, and verified an isolated temp-directory smoke run.",
+        "releasedAt": "2026-07-16T06:52:20.533Z"
+      }
+    ],
+    "statusReasons": {
+      "stage-cli-runtime": {
+        "reason": "Staged the full CLI import closure and assets, pinned and installed external dependencies, stripped source maps, and verified an isolated temp-directory smoke run.",
+        "updatedAt": "2026-07-16T06:52:20.533Z"
       }
     }
   },
   "statusOverrides": {
-    "stage-cli-runtime": "running"
+    "stage-cli-runtime": "completed",
+    "stage-cli-runtime.stage-cli-runtime.ac1": "completed",
+    "stage-cli-runtime.stage-cli-runtime.ac2": "completed",
+    "stage-cli-runtime.stage-cli-runtime.ac3": "completed",
+    "stage-cli-runtime.stage-cli-runtime.ac4": "completed"
   }
 }
