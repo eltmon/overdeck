@@ -120,16 +120,16 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T19:05:32.649Z",
+  "updated": "2026-07-16T19:05:48.335Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:05:32.569Z",
+    "updatedAt": "2026-07-16T19:05:48.251Z",
     "reviewNotes": "[correctness] A new crew collapses into an existing Haiku crew on rerender — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:183`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "lastVerifiedCommit": "e3c779b26b100897fcd2ec305abb031afa605cd5",
@@ -182,9 +182,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2039905,
-            "output": 280395,
-            "cacheRead": 36606464,
+            "input": 2047214,
+            "output": 282540,
+            "cacheRead": 37145600,
             "cacheWrite": 0
           }
         }
@@ -197,15 +197,15 @@
           "cacheWrite": 520882
         },
         "openai/gpt-5.6-sol": {
-          "input": 3516490,
-          "output": 393640,
-          "cacheRead": 50960384,
+          "input": 3523799,
+          "output": 395785,
+          "cacheRead": 51499520,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 69.024839,
-        "pricingAsOf": "2026-07-16T19:05:32.639Z"
+        "usd": 69.395302,
+        "pricingAsOf": "2026-07-16T19:05:48.316Z"
       }
     },
     "merges": [
