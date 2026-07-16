@@ -309,6 +309,11 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `WsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 
+**Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
+`docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
+components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
+marker so the no-loss gate proves that no existing surface disappeared.
+
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.
 - Do NOT pre-resize tmux windows. Let the PTY spawn handle sizing via client dimensions.
