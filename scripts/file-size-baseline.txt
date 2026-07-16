@@ -21,7 +21,7 @@
 1470 src/lib/cloister/merge-agent.ts
 1749 src/lib/cloister/specialists.ts
 1194 src/lib/conversations/smart-compaction.ts
-1750 src/lib/database/schema.ts
+1749 src/lib/database/schema.ts
 1364 src/lib/model-capabilities.ts
 1113 src/lib/overdeck/agents.ts
 1540 src/lib/overdeck/conversations.ts
