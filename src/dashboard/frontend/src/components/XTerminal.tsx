@@ -6,6 +6,10 @@ import '@xterm/xterm/css/xterm.css';
 import { Sun, Moon, SunMoon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../hooks/useTheme';
+import {
+  nextReconnectDelay,
+  type ReconnectPolicyState,
+} from '../lib/terminalReconnectPolicy';
 
 // Terminal background, exported so embedders can match the surrounding chrome.
 // Must match TERMINAL_BG in src/lib/ui-theme.ts — new tmux sessions stamp
@@ -133,12 +137,11 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectAttempts = useRef(0);
+  const reconnectPolicy = useRef<ReconnectPolicyState | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const remoteSize = useRef<{ cols: number; rows: number } | null>(null);
   const requestedSize = useRef<{ cols: number; rows: number } | null>(null);
   const readyForLiveData = useRef(false);
-  const maxReconnectAttempts = 5;
   const [shouldReconnect, setShouldReconnect] = useState(true);
 
   // Auto-copy state from localStorage or prop
@@ -193,11 +196,6 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       console.error('Failed to save Ctrl+V paste setting:', err);
     }
   }, [ctrlVPaste]);
-
-  // Calculate exponential backoff delay: 1s, 2s, 4s, 8s, max 30s
-  const getReconnectDelay = (attempt: number): number => {
-    return Math.min(1000 * Math.pow(2, attempt), 30000);
-  };
 
   const getMeasuredSize = useCallback((): { cols: number; rows: number } | null => {
     const term = terminalInstance.current;
@@ -600,7 +598,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // xterm.js parsed the current batch, producing an ever-larger next batch
     // that blocked the main thread and caused multi-second typing lag.
     const queueLiveData = (data: string) => {
-      reconnectAttempts.current = 0;
+      reconnectPolicy.current = null;
       if (!term) return;
       if (DEBUG_TERMINAL) {
         console.log(`XTerminal-debug: WRITE len=${data.length}`);
@@ -661,7 +659,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
             readyForLiveData.current = true;
             sendResizeIfNeeded();
           });
-          reconnectAttempts.current = 0;
+          reconnectPolicy.current = null;
           ws.send(JSON.stringify({ type: 'ready' }));
           profMark(sessionName, tProf, 'ready sent');
           return;
@@ -703,17 +701,21 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // For normal close (1000) or unexpected close, attempt reconnection.
       // The server sends 1000 when the PTY exits, which can happen if the
       // tmux session is killed and recreated during workspace setup retries.
-      if (reconnectAttempts.current < maxReconnectAttempts) {
-        const delay = getReconnectDelay(reconnectAttempts.current);
-        reconnectAttempts.current += 1;
+      const now = Date.now();
+      const policy = reconnectPolicy.current ?? { attempt: 0, windowStartedAt: now };
+      reconnectPolicy.current = policy;
+      const delay = nextReconnectDelay(policy, now);
 
-        term!.writeln(`\r\n\x1b[33m● Connection lost — reconnecting to \x1b[1m${sessionName}\x1b[0m\x1b[33m in ${delay / 1000}s (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})...\x1b[0m`);
+      if (delay !== null) {
+        policy.attempt += 1;
+
+        term!.writeln(`\r\n\x1b[33m● Connection lost — reconnecting to \x1b[1m${sessionName}\x1b[0m\x1b[33m in ${delay / 1000}s (attempt ${policy.attempt})...\x1b[0m`);
 
         reconnectTimer.current = setTimeout(() => {
           connect();
         }, delay);
       } else {
-        term!.writeln(`\r\n\x1b[31m● Could not reconnect to \x1b[1m${sessionName}\x1b[0m\x1b[31m after ${maxReconnectAttempts} attempts.\x1b[0m`);
+        term!.writeln(`\r\n\x1b[31m● Could not reconnect to \x1b[1m${sessionName}\x1b[0m\x1b[31m after 5 minutes.\x1b[0m`);
         onDisconnectRef.current?.();
       }
     };

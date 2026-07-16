@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { PATIENT_WINDOW_MS } from '../lib/terminalReconnectPolicy';
 import { XTerminal } from './XTerminal';
 
 // Mock xterm.js — it performs real DOM/media-query operations that break in jsdom.
@@ -76,7 +77,7 @@ class MockWebSocket {
   readyState = 1;
   binaryType = 'blob';
   onopen: (() => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: { code: number; reason: string }) => void) | null = null;
   onmessage: ((event: unknown) => void) | null = null;
   onerror: (() => void) | null = null;
   send = vi.fn();
@@ -602,6 +603,93 @@ describe('XTerminal - WebSocket', () => {
     await waitFor(() => {
       expect(screen.getByTitle('Terminal settings')).toBeInTheDocument();
     });
+  });
+});
+
+describe('XTerminal - patient reconnect', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    MockWebSocket.instances = [];
+    (Terminal as unknown as { instances: unknown[] }).instances = [];
+    (FitAddon as unknown as { instances: unknown[] }).instances = [];
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      value: 800,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('keeps reconnecting past five attempts and 31 seconds', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    const delays = [1_000, 2_000, 4_000, 5_000, 5_000, 5_000, 5_000, 5_000];
+    for (const delay of delays) {
+      const socket = MockWebSocket.instances.at(-1)!;
+      act(() => socket.onclose?.({ code: 1006, reason: 'restart' }));
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+    }
+
+    expect(MockWebSocket.instances).toHaveLength(9);
+  });
+
+  it('stops reconnecting when the five-minute window expires without healthy data', async () => {
+    const onDisconnect = vi.fn();
+    render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENT_WINDOW_MS - 1_000));
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 1006, reason: 'still down' }));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(onDisconnect).toHaveBeenCalledOnce();
+  });
+
+  it('starts a fresh reconnect window after a snapshot proves the connection healthy', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENT_WINDOW_MS));
+
+    const reconnected = MockWebSocket.instances[1];
+    act(() => reconnected.onmessage?.({
+      data: `\u0000${JSON.stringify({ type: 'snapshot', cols: 100, rows: 30, data: 'healthy' })}`,
+    }));
+    act(() => reconnected.onclose?.({ code: 1006, reason: 'another restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
+  it('treats close code 4404 as fatal without scheduling a retry', async () => {
+    const onDisconnect = vi.fn();
+    render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ writeln: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    expect(term.writeln).toHaveBeenCalledWith(expect.stringContaining('has ended'));
+    expect(onDisconnect).toHaveBeenCalledOnce();
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 });
 
