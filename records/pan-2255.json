@@ -233,15 +233,7 @@
       "timestamp": "2026-07-16T08:31:54.596Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T08:31:54Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2255\n\n# Review Synthesis — PAN-2255 — 2026-07-16T04:31:27-04:00\n\n## Verdict: CHANGES REQUESTED — retired workspaces remain permanently retained in the mailbox content cache\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-55297478/context.json\n- Branch: feature/pan-2255\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255\n- HEAD reviewed: 55297478250c6843c1cc52e485f4d67b1191a3aa\n- Cycle number: 7\n- Prior cycle SHA: 77aa2726424bd85960715163c243852c33f7c568\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-55297478/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-55297478/correctness.md | 0 after convergence gate |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-55297478/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-55297478/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Removed workspaces remain permanently retained in the mailbox content cache — `src/lib/cloister/agent-mailbox.ts:61`\nThe current cycle introduces a process-wide `mailboxReadCache` that retains each observed feedback file's complete content and parsed representation. Entries are deleted only while rescanning their original feedback directory, so after a workspace is removed that directory is never scanned again and its cache entries remain for the lifetime of the Deacon process. Heap usage therefore grows with cumulative retired-workspace and feedback-file churn rather than current active mailbox size. This finding is inside both the PR diff and the cycle-7 diff from `77aa2726424bd85960715163c243852c33f7c568`; it requires a cache lifecycle bound such as size-bounded LRU/TTL eviction or explicit workspace eviction, with a focused retirement test.\n\n## Non-blocking Findings\n\n### Correctness\n\n- [demoted: previously reviewed] Deacon deletes pending mailbox files that delayed escalation is meant to retain — `src/lib/cloister/deacon.ts:2756`. The existing `cleanupAbandonedFeedback()` later in the patrol deletes numbered feedback files for workspaces without a live agent, including pending mailbox items before or after escalation. The cited Deacon patrol line did not change in the cycle-7 diff, so the mandatory convergence gate makes this finding not promotable despite the material durability risk.\n- Successful dashboard feedback delivery remains queued when the mailbox transition fails — `src/dashboard/server/routes/workspaces.ts:239`. A mailbox persistence failure after transport leaves replay state queued and can duplicate delivery after restart.\n- Mailbox metadata failure is reported as verification-feedback delivery failure — `src/lib/cloister/verification-runner.ts:198`. A transition failure after successful transport rejects the helper and can cause misleading failure reporting and later duplicate delivery.\n\n### Performance\n\n- The patrol stats every numbered feedback file every minute — `src/lib/cloister/agent-mailbox.ts:161`. The cache avoids content reads and parsing but leaves patrol metadata I/O proportional to total retained feedback history in active workspaces.\n\n### Security\n\nNone.\n\n### Requirements\n\nNone.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-55297478/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2255 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/dashboard-types-baseline.txt",
@@ -322,24 +314,24 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T08:50:04.243Z",
+  "updated": "2026-07-16T08:50:08.093Z",
   "pipeline": {
     "issueId": "PAN-2255",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T08:50:04.069Z",
+    "updatedAt": "2026-07-16T08:50:08.010Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues: stopped-agent escalation, cached bounded mailbox reads, and relative close-out paths",
     "verificationNotes": "Verification FAILED at test (203831ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2255\u001b[39m\n\nNo test files found, exiting with code 0\n\n \u001b[31m❯\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agent-mailbox-drain.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[32m 32\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     \u001b[31m×\u001b[31m prepends paths and instructions on spawn, then acknowledges the same item on resume\u001b[39m\u001b[32m 25\u001b[2mms\u001b[22m\u001b[39m\u001b[33m (retry x1)\u001b[39m\n     \u001b[32m✓\u001b[39m leaves pending mail unchanged when prepared delivery is not confirmed\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m serializes concurrent transitions without regressing acknowledged state\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mbases Channels MCP override eligibility on work role and claude-code harness\n\u001b[22m\u001b[39m[agent-pan-channels] channels:ineligible:not-a-work-agent\n[agent-pan-channels] channels:ineligible:harness-pi\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mblocks spawnAgent from cached stack health before side effects\n\u001b[22m\u001b[39m[agents] Workspace stack for PAN-1140 unhealthy (overdeck-feature-pan-1140-init-1 init exited non-zero (1)) — rebuilding before spawn (attempt 1/3)\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mblocks spawnAgent before side effects when the workspace stack is unhealthy\n\u001b[22m\u001b[39m[agents] Workspace stack for PAN-1140 unhealthy (overdeck-feature-pan-1140-init init exited non-zero (1)) — rebuilding before spawn (attempt 1/3)\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mallow\n…(284323 chars elided)…\n \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/backlog/__tests__/lookups-no-loss.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/workspaces/__tests__/merge-ops-dirty-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 11\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/resolve-spawn-model.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/non-restartable-reason.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/deacon-review-status-completed.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/deacon-mailbox-cleanup.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[\n...(truncated)",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
     "lastVerifiedCommit": "55297478250c6843c1cc52e485f4d67b1191a3aa",
     "reviewRequestedAt": "2026-07-16T08:50:03.655Z",
-    "reviewSpawnedAt": "2026-07-16T08:29:25.183Z"
+    "reviewSpawnedAt": "2026-07-16T08:50:08.009Z"
   },
   "closeOut": {
     "usage": {
@@ -403,7 +395,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.215027,
-        "pricingAsOf": "2026-07-16T08:50:04.174Z"
+        "pricingAsOf": "2026-07-16T08:50:08.062Z"
       }
     },
     "merges": [
