@@ -17,6 +17,7 @@ import type { WorkspaceData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { DifficultyBadge, TrackerShadowBadges } from '../badges';
 import { avatarGradient, cardAvatarInitials, formatCost, formatRuntime, getCostColor } from '../kanban-utils';
 import type { ComplexityLevel, IssueCost, PlanningState } from '../types';
+import { StartAgentCta } from '../../issue-view';
 
 const DIFFICULTY_LEVELS: ComplexityLevel[] = ['trivial', 'simple', 'medium', 'complex', 'expert'];
 
@@ -712,6 +713,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
             <span className="font-mono text-[10px] text-muted-foreground">{issue.identifier}</span>
           )}
           <span className="ml-auto flex items-center gap-1.5">
+            <StartAgentCta issueId={issue.identifier} density="rail" surface="chip" />
             {troubledAgent && (
               <span
                 data-testid={`card-troubled-${issue.identifier}`}

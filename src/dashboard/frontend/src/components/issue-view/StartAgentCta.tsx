@@ -13,7 +13,9 @@ async function errorMessage(response: Response, fallback: string) {
   return body.error ?? body.message ?? fallback;
 }
 
-export function StartAgentCta({ issueId, density }: { issueId: string; density: IssueViewDensity }) {
+type StartAgentCtaSurface = 'issue-view' | 'chip' | 'inline';
+
+export function StartAgentCta({ issueId, density, surface = 'issue-view' }: { issueId: string; density: IssueViewDensity; surface?: StartAgentCtaSurface }) {
   const queryClient = useQueryClient();
   const actions = useIssueActions(issueId);
   const modelView = useIssueView(issueId);
@@ -42,11 +44,12 @@ export function StartAgentCta({ issueId, density }: { issueId: string; density: 
     onSuccess: () => refreshDashboardState(queryClient),
   });
   if (!mode) return null;
-  const compact = density === 'rail';
+  const compact = density === 'rail' || surface !== 'issue-view';
+  const label = mode === 'resume' ? (surface === 'chip' ? '▶ Resume' : surface === 'inline' ? 'Resume' : 'Resume session') : surface === 'chip' ? '▶ Start' : surface === 'inline' ? 'Start' : 'Start work agent';
   const confirmCopy = gate === 'troubled' ? 'This agent was marked troubled after repeated failed resumes. Clear the troubled flag and start a fresh work agent?' : 'This agent is paused and needs your attention. Clear the paused gate and start a fresh work agent?';
-  return <div data-section="StartAgentCta" className={compact ? 'inline-flex items-center gap-2' : 'w-full space-y-2'}>
+  return <div data-section="StartAgentCta" className={compact ? 'inline-flex items-center gap-2' : 'w-full space-y-2'} onClick={(event) => event.stopPropagation()}>
     {confirming && <div role="dialog" className="rounded-[var(--radius-sm)] border border-warning/50 bg-warning/10 p-3 text-[12px]"><p>{confirmCopy}</p><div className="mt-2 flex gap-2"><button type="button" className="rounded bg-primary px-2 py-1 text-primary-foreground" onClick={() => mutation.mutate('start')}>Clear gate and start</button><button type="button" className="rounded border border-border px-2 py-1" onClick={() => setConfirming(false)}>Cancel</button></div></div>}
-    {!confirming && <button type="button" disabled={mutation.isPending} className="rounded-[var(--radius-sm)] bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50" onClick={() => clearAndStart ? setConfirming(true) : mutation.mutate(mode)}>{mode === 'resume' ? 'Resume session' : 'Start work agent'}</button>}
+    {!confirming && <button type="button" disabled={mutation.isPending} className="rounded-[var(--radius-sm)] bg-primary px-2.5 py-1.5 text-[12px] font-medium text-primary-foreground disabled:opacity-50" onClick={() => clearAndStart ? setConfirming(true) : mutation.mutate(mode)}>{label}</button>}
     {!compact && mode === 'start' && <><button type="button" className="inline-flex items-center gap-1 rounded border border-border px-2 py-1 text-[11px]" aria-expanded={overrideOpen} onClick={() => setOverrideOpen((open) => !open)}><Settings2 className="h-3 w-3" />Overrides<ChevronDown className="h-3 w-3" /></button>{overrideOpen && <div className="rounded border border-border p-2"><label className="flex items-center gap-2 text-[12px]"><input type="checkbox" checked={overrideEnabled} onChange={(event) => setOverrideEnabled(event.target.checked)} />Override default harness and model</label>{overrideEnabled && <ModelHarnessPicker model={model} harness={harness} onModelChange={setModel} onHarnessChange={setHarness} groups={groups} harnessPolicy={harnessPolicy} modelLabel="Agent model" />}</div>}</>}
     {mutation.error && <p role="alert" className="text-[12px] text-destructive">{mutation.error.message}</p>}
   </div>;

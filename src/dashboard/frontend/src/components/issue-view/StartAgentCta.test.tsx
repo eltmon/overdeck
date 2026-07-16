@@ -104,4 +104,15 @@ describe('StartAgentCta', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Override default harness and model' }));
     expect(screen.getByText('model picker')).toBeInTheDocument();
   });
+
+  it.each([
+    ['chip', '▶ Start'],
+    ['inline', 'Start'],
+  ] as const)('renders the %s adoption without the override panel', (surface, label) => {
+    setState({ start: true });
+    const queryClient = new QueryClient();
+    render(<QueryClientProvider client={queryClient}><StartAgentCta issueId="PAN-2499" density="rail" surface={surface} /></QueryClientProvider>);
+    expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Overrides' })).not.toBeInTheDocument();
+  });
 });
