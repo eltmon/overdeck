@@ -1063,9 +1063,9 @@ export function CommandDeck({
 
   // Create a conversation (optionally scoped to a project) and open it as an
   // agent tab in the current project's deck. Returns the new conversation's
-  // name so the deck's launch components can focus the tab.
+  // name or the creation error so launch components can render the outcome.
   const createConversationForProject = useCallback(
-    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
+    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       try {
         const payload: Record<string, unknown> = {
           model: sidebarModel,
@@ -1095,11 +1095,11 @@ export function CommandDeck({
           prevSelectedRef.current = conv.name;
         }
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        return conv.name;
+        return { name: conv.name };
       } catch (err) {
         console.error('[CommandDeck] Failed to create conversation:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
-        return undefined;
+        return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
     [sidebarModel, sidebarHarness, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn],
@@ -1115,10 +1115,10 @@ export function CommandDeck({
   }, [createConversationForProject]);
 
   // Launch-component conversation creator (ProjectHome / IssueOverview): create
-  // a project conversation for the chosen agent and return its name so the deck
-  // can open/focus an agent tab on it.
+  // a project conversation for the chosen agent and return its result so the
+  // caller can open the tab or surface the creation error.
   const createDeckConversation = useCallback(
-    (agentId: string, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
+    (agentId: string, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;

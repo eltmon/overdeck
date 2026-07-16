@@ -26,9 +26,8 @@ export interface IssueOverviewProps {
   agentId?: string
   /** All conversations; filtered to this issue. */
   conversations?: Conversation[]
-  /** Create a conversation for this issue, returning the new conversation's
-   * name so the deck can open an agent tab on it. */
-  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<string | undefined>
+  /** Create a conversation for this issue, returning its name or creation error. */
+  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<{ name: string } | { error: string }>
   api: StageApi
 }
 
@@ -68,8 +67,8 @@ export function IssueOverview({
 
   const onAgentSelected = async (id: string, message?: string) => {
     writeLastUsedAgent(issueId, id)
-    const conversationName = await onCreateConversation?.(id, message, 'terminal')
-    if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
+    const result = await onCreateConversation?.(id, message, 'terminal')
+    if (result && 'name' in result) api.openOrFocusAgentPane(result.name, 'Agent')
   }
   // PAN-1561: terminal actions open the drawer stacked below, not a tab.
   const openTerminal = () => api.toggleTerminal()

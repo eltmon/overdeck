@@ -26,9 +26,8 @@ export interface ProjectHomeProps {
   branch?: string
   /** Conversations already scoped to this project. */
   conversations?: Conversation[]
-  /** Create a conversation for this project, returning the new conversation's
-   * name so the deck can open an agent tab on it. */
-  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<string | undefined>
+  /** Create a conversation for this project, returning its name or creation error. */
+  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<{ name: string } | { error: string }>
   /** Project issues/features — when present, the project cockpit (hero metrics,
    * stuck callout, pipeline swimlanes, cost cards) renders as the primary body
    * (S4). Absent during load / for the no-project deck → sparse fallback. */
@@ -93,8 +92,8 @@ export function ProjectHome({
 
   const onAgentSelected = async (id: string, message?: string) => {
     writeLastUsedAgent(api.deckKey, id)
-    const conversationName = await onCreateConversation?.(id, message, 'terminal')
-    if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
+    const result = await onCreateConversation?.(id, message, 'terminal')
+    if (result && 'name' in result) api.openOrFocusAgentPane(result.name, 'Agent')
   }
 
   const launcher = (

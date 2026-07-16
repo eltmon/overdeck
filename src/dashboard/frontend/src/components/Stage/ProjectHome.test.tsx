@@ -18,7 +18,7 @@ function api(overrides: Partial<StageApi> = {}): StageApi {
 describe('ProjectHome', () => {
   it('passes the launcher query into the created agent conversation', async () => {
     const openOrFocusAgentPane = vi.fn()
-    const onCreateConversation = vi.fn().mockResolvedValue('conv-123')
+    const onCreateConversation = vi.fn().mockResolvedValue({ name: 'conv-123' })
 
     render(
       <ProjectHome

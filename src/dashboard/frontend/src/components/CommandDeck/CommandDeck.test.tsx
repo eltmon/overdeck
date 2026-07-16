@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { CommandDeck } from './index';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { usePanesStore } from '../../lib/panesStore';
@@ -47,8 +48,25 @@ vi.mock('./SessionView/IssueHeader', () => ({
   ),
 }));
 
+let latestStageProps: any;
+let conversationCreateResponse: { ok: boolean; body: unknown } = {
+  ok: true,
+  body: { id: 3, name: 'created-conv', title: 'Agent' },
+};
+
+vi.mock('sonner', () => ({
+  toast: {
+    error: vi.fn(),
+    info: vi.fn(),
+    success: vi.fn(),
+  },
+}));
+
 vi.mock('../Stage', () => ({
-  Stage: (props: any) => <div data-testid="stage" data-deck={props.deckKey} />,
+  Stage: (props: any) => {
+    latestStageProps = props;
+    return <div data-testid="stage" data-deck={props.deckKey} />;
+  },
 }));
 
 // CommandDeck calls useConfirm() at render; the test doesn't mount a DialogProvider,
@@ -197,7 +215,13 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
   // Provide minimal fetch mocks for the hooks
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) => {
+    vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/conversations' && init?.method === 'POST') {
+        return {
+          ok: conversationCreateResponse.ok,
+          json: async () => conversationCreateResponse.body,
+        };
+      }
       if (url === '/api/issues/resource-allocated') {
         return {
           ok: true,
@@ -374,6 +398,11 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
 describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    latestStageProps = undefined;
+    conversationCreateResponse = {
+      ok: true,
+      body: { id: 3, name: 'created-conv', title: 'Agent' },
+    };
     useCommandDeckSelection.getState().clearAll();
     usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
     localStorage.clear();
@@ -406,6 +435,44 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
       'data-project-key',
       'other-project',
     );
+  });
+
+  it('returns the created conversation name and opens its agent pane', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+    await screen.findByTestId('stage');
+
+    let result: unknown;
+    await act(async () => {
+      result = await latestStageProps.onCreateConversation('claude-code');
+    });
+
+    expect(result).toEqual({ name: 'created-conv' });
+    expect(panes('test-project')).toEqual(expect.arrayContaining([
+      expect.objectContaining({ paneType: 'agent', conversationId: 'created-conv' }),
+    ]));
+  });
+
+  it('returns the server error while preserving the existing error signals', async () => {
+    conversationCreateResponse = {
+      ok: false,
+      body: { error: 'Unknown project: overdeck' },
+    };
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    renderCommandDeck({ selectedProject: 'overdeck' });
+    await screen.findByTestId('stage');
+
+    let result: unknown;
+    await act(async () => {
+      result = await latestStageProps.onCreateConversation('claude-code');
+    });
+
+    expect(result).toEqual({ error: 'Unknown project: overdeck' });
+    expect(toast.error).toHaveBeenCalledWith('Unknown project: overdeck');
+    expect(consoleError).toHaveBeenCalledWith(
+      '[CommandDeck] Failed to create conversation:',
+      expect.objectContaining({ message: 'Unknown project: overdeck' }),
+    );
+    consoleError.mockRestore();
   });
 
   it('opens an issue tab in the deck when a tree issue is selected', async () => {
