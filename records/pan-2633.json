@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-13T21:55:21.886Z",
+  "updated": "2026-07-16T17:41:22.711Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -91,7 +91,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "kimi-k2.7-code",
+  "model": "gpt-5.6-sol",
   "statusOverrides": {
     "reducer-liveness-gate": "completed",
     "reducer-liveness-gate.reducer-liveness-gate.ac1": "completed",
