@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:32:17.534Z",
+  "updated": "2026-07-16T00:34:36.292Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -182,7 +182,9 @@
     "cta-kanban-fleet": "completed",
     "cta-kanban-fleet.cta-kanban-fleet.ac1": "completed",
     "cta-kanban-fleet.cta-kanban-fleet.ac2": "completed",
-    "docs-issue-view": "running"
+    "docs-issue-view": "completed",
+    "docs-issue-view.docs-issue-view.ac1": "completed",
+    "docs-issue-view.docs-issue-view.ac2": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -208,16 +210,8 @@
     }
   },
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "docs-issue-view": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 603386,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T00:32:17.534Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -359,6 +353,16 @@
         "itemId": "cta-kanban-fleet",
         "outcome": "completed",
         "releasedAt": "2026-07-16T00:31:55.044Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 603386,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T00:32:17.534Z",
+        "itemId": "docs-issue-view",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T00:34:36.291Z"
       }
     ],
     "statusReasons": {
