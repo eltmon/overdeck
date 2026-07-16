@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Route } from 'lucide-react';
 import { type Harness, type SettingsConfig, type TieredExecutionConfig } from '../types';
 import type { SaveStatus } from '../hooks/useAutosavePipeline';
@@ -122,6 +122,8 @@ export function TieredExecutionSection({
   }
   const [openCrewId, setOpenCrewId] = useState<string | null>(null);
   const [addCrewPromptOpen, setAddCrewPromptOpen] = useState(false);
+  const [removePromptCrewId, setRemovePromptCrewId] = useState<string | null>(null);
+  const [removeError, setRemoveError] = useState<{ crewId: string; message: string } | null>(null);
   const [supervisorOpen, setSupervisorOpen] = useState(false);
   const [kindDraft, setKindDraft] = useState<typeof ITEM_KINDS[number]>('docs');
   const [crewDraft, setCrewDraft] = useState('');
@@ -203,6 +205,40 @@ export function TieredExecutionSection({
       return;
     }
     writeCrews(crews, { ...assign, [difficulty]: crewId });
+  };
+
+  const handleRequestRemove = (crewId: string) => {
+    const ownedKinds = Object.entries(byKind).filter(([, id]) => id === crewId).map(([kind]) => kind);
+    if (ownedKinds.length > 0) {
+      setRemovePromptCrewId(null);
+      setRemoveError({ crewId, message: 'Move or remove these kind overrides before removing this crew.' });
+      return;
+    }
+    if (crews.length === 1) {
+      setRemovePromptCrewId(null);
+      setRemoveError({ crewId, message: 'This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.' });
+      return;
+    }
+    const ownedDifficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crewId);
+    if (ownedDifficulties.length > 0) {
+      setRemoveError(null);
+      setRemovePromptCrewId(crewId);
+      return;
+    }
+    setRemoveError(null);
+    setRemovePromptCrewId(null);
+    writeCrews(crews.filter((crew) => crew.id !== crewId), assign);
+  };
+
+  const handleRemoveWithHeir = (crewId: string, heirId: string) => {
+    const nextAssign = { ...assign };
+    for (const difficulty of DIFFICULTIES) {
+      if (nextAssign[difficulty] === crewId) nextAssign[difficulty] = heirId;
+    }
+    setRemoveError(null);
+    setRemovePromptCrewId(null);
+    if (openCrewId === crewId) setOpenCrewId(null);
+    writeCrews(crews.filter((crew) => crew.id !== crewId), nextAssign);
   };
 
   const handleSupervisorPatch = (patch: Partial<NonNullable<TieredExecutionConfig['supervisor']>>) => {
@@ -427,19 +463,54 @@ export function TieredExecutionSection({
               </button>
             </div>
           )}
-          {crews.length > 0 ? crews.map((crew) => (
-            <CrewRow
-              key={crew.id}
-              crew={crew}
-              owned={DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id)}
-              ownedKinds={Object.entries(byKind).filter(([, crewId]) => crewId === crew.id).map(([kind]) => kind)}
-              settings={formData}
-              open={openCrewId === crew.id}
-              onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
-              onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
-              onRemove={() => writeCrews(crews.filter((entry) => entry.id !== crew.id), assign)}
-            />
-          )) : (
+          {crews.length > 0 ? crews.map((crew) => {
+            const ownedDifficulties = DIFFICULTIES.filter((difficulty) => assign[difficulty] === crew.id);
+            const otherCrews = crews.filter((entry) => entry.id !== crew.id);
+            return <Fragment key={crew.id}>
+              <CrewRow
+                crew={crew}
+                owned={ownedDifficulties}
+                ownedKinds={Object.entries(byKind).filter(([, crewId]) => crewId === crew.id).map(([kind]) => kind)}
+                settings={formData}
+                open={openCrewId === crew.id}
+                onToggle={() => setOpenCrewId(openCrewId === crew.id ? null : crew.id)}
+                onChange={(nextCrew) => writeCrews(crews.map((entry) => entry.id === crew.id ? nextCrew : entry), assign)}
+                onRequestRemove={() => handleRequestRemove(crew.id)}
+              />
+              {removeError?.crewId === crew.id && (
+                <p className="px-4 text-xs text-destructive">{removeError.message}</p>
+              )}
+              {removePromptCrewId === crew.id && (
+                <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
+                  <p className="text-xs font-medium text-foreground">
+                    Removing {crewLabel(crew)} — give {ownedDifficulties.join(', ')} to:
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {otherCrews.map((heir) => {
+                      const cost = blendedCost(heir);
+                      return <button
+                        key={heir.id}
+                        type="button"
+                        aria-label={`Give ${ownedDifficulties.join(', ')} to ${crewLabel(heir)}`}
+                        onClick={() => handleRemoveWithHeir(crew.id, heir.id)}
+                        className="rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span className="block font-medium">{crewLabel(heir)}</span>
+                        <span className="mt-0.5 block text-[11px] text-muted-foreground">{cost == null ? 'cost unknown' : `≈ $${cost.toFixed(1)}/1M`}</span>
+                      </button>;
+                    })}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setRemovePromptCrewId(null)}
+                    className="mt-3 text-xs text-muted-foreground hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </Fragment>;
+          }) : (
             <div className="rounded-lg border border-border/70 px-4 py-3">
               <p className="text-xs text-muted-foreground">No crews yet — every difficulty needs one before tiered execution can route work.</p>
               <button

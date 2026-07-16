@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { TieredExecutionSection } from '../TieredExecutionSection';
 import type { SettingsConfig } from '../../types';
 
@@ -246,26 +246,41 @@ describe('TieredExecutionSection', () => {
     expect(onSettingsChange.mock.calls.at(-1)?.[0].tiered_execution.tiers['trivial-simple-medium-complex-expert'].harness).toBe('ohmypi');
   });
 
-  it('blocks removal while a crew owns difficulties and surfaces invalid mix totals', () => {
+  it('hands a collapsed crew difficulties to an heir in one write without toggling the row', () => {
     const onSettingsChange = vi.fn();
     render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
       enabled: true,
-      tiers: { all: {
-        model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
-        distribution: [
-          { model: 'claude-sonnet-5', harness: 'claude-code', weight: 70 },
-          { model: 'gpt-5.6-terra', harness: 'codex', weight: 20 },
-        ],
-      } },
+      tiers: {
+        mixed: {
+          model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['trivial', 'simple'],
+          distribution: [
+            { model: 'claude-sonnet-5', harness: 'claude-code', weight: 70 },
+            { model: 'gpt-5.6-terra', harness: 'codex', weight: 20 },
+          ],
+        },
+        capable: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+      },
       supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
       by_kind: {}, replay_threshold: 0.5,
     } })} onSettingsChange={onSettingsChange} />);
 
     expect(screen.getByText(/Invalid — .*weights must total exactly 100/)).toBeTruthy();
-    fireEvent.click(screen.getAllByText('2-model mix').find((element) => element.closest('summary'))!.closest('summary')!);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove crew' }));
-    expect(screen.getByText('Assign these difficulties to another crew before removing it.')).toBeTruthy();
-    expect(onSettingsChange).not.toHaveBeenCalled();
+    const removeButton = screen.getByRole('button', { name: 'Remove crew 2-model mix' });
+    const row = removeButton.closest('details');
+    expect(row).not.toHaveAttribute('open');
+    fireEvent.click(removeButton);
+    expect(row).not.toHaveAttribute('open');
+    expect(screen.getByText('Removing 2-model mix — give trivial, simple to:')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Give trivial, simple to Claude Haiku 4.5' }));
+
+    expect(onSettingsChange).toHaveBeenCalledTimes(1);
+    const next = onSettingsChange.mock.calls[0][0] as SettingsConfig;
+    expect(next.tiered_execution?.tiers['trivial-simple-medium-complex-expert']).toMatchObject({
+      model: 'claude-haiku-4-5',
+      difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+    });
+    expect(Object.values(next.tiered_execution?.tiers ?? {}).some((tier) => tier.distribution)).toBe(false);
+    expect(screen.queryByText('Assign these difficulties to another crew before removing it.')).toBeNull();
   });
 
   it('blocks reassigning the final difficulty from a kind-routed crew', () => {
@@ -293,10 +308,57 @@ describe('TieredExecutionSection', () => {
       by_kind: { docs: 'legacy' }, replay_threshold: 0.5,
     } })} onSettingsChange={onSettingsChange} />);
 
-    fireEvent.click(screen.getAllByText('Claude Haiku 4.5').find((element) => element.closest('summary'))!.closest('summary')!);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove crew' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5' }));
     expect(screen.getByText('Move or remove these kind overrides before removing this crew.')).toBeTruthy();
     expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it('blocks removing the last crew because every difficulty needs an owner', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: { all: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      by_kind: {}, replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5' }));
+    expect(screen.getByText('This is the only crew, and every difficulty needs one. Add another crew first — or turn tiered execution off.')).toBeTruthy();
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it('routes the expanded Remove crew button through the heir prompt', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        capable: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+      },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      by_kind: {}, replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    const summary = screen.getAllByText('Claude Haiku 4.5').find((element) => element.closest('summary'))!.closest('summary')!;
+    const row = summary.closest('details')!;
+    fireEvent.click(summary);
+    fireEvent.click(within(row).getByRole('button', { name: 'Remove crew' }));
+    expect(screen.getByText('Removing Claude Haiku 4.5 — give trivial, simple to:')).toBeTruthy();
+    expect(screen.queryByText('Assign these difficulties to another crew before removing it.')).toBeNull();
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
+  it('shows the collapsed-row edit cue through hover and focus classes', () => {
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: { all: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'] } },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      by_kind: {}, replay_threshold: 0.5,
+    } })} onSettingsChange={vi.fn()} />);
+
+    const summary = screen.getByText('edit').closest('summary');
+    expect(summary).toHaveClass('hover:bg-muted/40', 'focus-visible:bg-muted/40', 'focus-within:bg-muted/40');
+    expect(screen.getByText('edit')).toHaveClass('opacity-0', 'group-hover:opacity-100', 'group-focus-visible:opacity-100', 'group-focus-within:opacity-100');
   });
 
   it('edits supervisor fields through onSettingsChange', () => {
@@ -578,6 +640,8 @@ describe('no-loss inventory', () => {
     expect(screen.getByText('Total: 100%')).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /Use (one model|a weighted mix)/ })).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Remove crew' })).toHaveLength(2);
+    expect(screen.getAllByRole('button', { name: /^Remove crew .+/ })).toHaveLength(2);
+    expect(screen.getAllByText('edit')).toHaveLength(2);
     expect(screen.getByRole('button', { name: 'Add model' })).toBeTruthy();
     expect(screen.getAllByRole('button', { name: /^Remove model/ })).toHaveLength(2);
 
