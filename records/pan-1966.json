@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T06:26:21.910Z",
+  "updated": "2026-07-16T06:28:25.867Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "wire-enumerate-in-flight": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 2336342,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:26:21.910Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -149,6 +141,17 @@
         "outcome": "completed",
         "reason": "Added 30-second stampede-safe membership service, GET /api/pipeline/membership project route, and fake-timer cache/classification coverage; focused test and typecheck pass",
         "releasedAt": "2026-07-16T06:26:05.737Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 2336342,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:26:21.910Z",
+        "itemId": "wire-enumerate-in-flight",
+        "outcome": "completed",
+        "reason": "Replaced open-issue/workspace intersection with gathered authoritative membership, preserving reconstruction's issue-id contract and adding post-merge-limbo coverage; 19 reconstruct tests and typecheck pass",
+        "releasedAt": "2026-07-16T06:28:25.867Z"
       }
     ],
     "statusReasons": {
@@ -167,6 +170,10 @@
       "membership-endpoint": {
         "reason": "Added 30-second stampede-safe membership service, GET /api/pipeline/membership project route, and fake-timer cache/classification coverage; focused test and typecheck pass",
         "updatedAt": "2026-07-16T06:26:05.737Z"
+      },
+      "wire-enumerate-in-flight": {
+        "reason": "Replaced open-issue/workspace intersection with gathered authoritative membership, preserving reconstruction's issue-id contract and adding post-merge-limbo coverage; 19 reconstruct tests and typecheck pass",
+        "updatedAt": "2026-07-16T06:28:25.867Z"
       }
     }
   },
@@ -189,6 +196,9 @@
     "membership-endpoint.membership-endpoint.ac1": "completed",
     "membership-endpoint.membership-endpoint.ac2": "completed",
     "membership-endpoint.membership-endpoint.ac3": "completed",
-    "wire-enumerate-in-flight": "running"
+    "wire-enumerate-in-flight": "completed",
+    "wire-enumerate-in-flight.wire-enumerate-in-flight.ac1": "completed",
+    "wire-enumerate-in-flight.wire-enumerate-in-flight.ac2": "completed",
+    "wire-enumerate-in-flight.wire-enumerate-in-flight.ac3": "completed"
   }
 }
