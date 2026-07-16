@@ -112,9 +112,9 @@ The weight formula is intentionally simple:
 
 The result is a single number (`weight`) and a human-readable `weightReason` such as `Criterion 4 (MTTR) is red`. The orchestrator runs `pan flywheel weights --json` each tick, keeps operator-filed bugs first, and then orders each filing-source group by weight descending; equal weights use the oldest filing time first. Higher-weight bugs are surfaced first within their filing-source group, but weight **only re-orders within the tier** — it never overrides red-main/P0 work or filters or displaces operator-injected items.
 
-`pan flywheel weights [--window <dur>] [--issue <id>] [--json]` is the sandbox-safe CLI surface for the same data the dashboard uses. Without `--json` it prints a table; with `--json` it emits the full weighted rows. The dashboard renders the weight as a badge on each substrate-bug suggestion in the Status panel, alongside the `weightReason`, and sorts by priority, operator precedence, then weight.
+`pan flywheel weights [--window <dur>] [--issue <id>] [--json]` is the sandbox-safe CLI surface for the same data the dashboard uses. Without `--json` it prints a table; with `--json` it emits the full weighted rows. The dashboard renders the weight as a badge on each substrate-bug suggestion in the Status panel, alongside the `weightReason`, and sorts by operator precedence, then priority, then weight.
 
-The dashboard HTTP endpoint `GET /api/flywheel/substrate-bug-weights` accepts the same `?window=<dur>` duration grammar as the CLI and passes all shared-parser-valid durations through to the service. Omitted, malformed, or non-positive values fall back to `30d`. The service caps the effective window at **365 days** to keep request-path work bounded.
+The dashboard HTTP endpoint `GET /api/flywheel/substrate-bug-weights` requires dashboard authentication and accepts the same `?window=<dur>` duration grammar as the CLI. Omitted, malformed, or non-positive values fall back to `30d`; valid values longer than **365 days** are canonicalized to `365d` before entering the shared database-worker queue, while shorter values retain their normalized duration. The service independently enforces the same 365-day cap as defense in depth.
 
 ## Lifecycle
 

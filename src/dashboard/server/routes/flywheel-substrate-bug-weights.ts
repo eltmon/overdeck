@@ -2,20 +2,25 @@ import { Effect, Option } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
+import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
 import type { WeightedSubstrateBug } from '../../../lib/overdeck/substrate-bug-weights-service.js';
 import { runDashboardDbJob } from '../services/dashboard-db-task.js';
+import { parseFlywheelStatsWindow } from '../services/flywheel-telemetry.js';
 
 const DEFAULT_WINDOW = '30d';
+const MAX_WINDOW = '365d';
+const MAX_WINDOW_MS = 365 * 24 * 60 * 60 * 1000;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 
 function parseWindow(value: string | null | undefined): string {
   if (!value) return DEFAULT_WINDOW;
-  const match = /^(\d+)(ms|s|m|h|d)$/.exec(value);
-  if (!match) return DEFAULT_WINDOW;
-  const amount = Number(match[1]);
-  if (!Number.isSafeInteger(amount) || amount <= 0) return DEFAULT_WINDOW;
-  return value;
+  try {
+    const parsed = parseFlywheelStatsWindow(value);
+    return parsed.ms > MAX_WINDOW_MS ? MAX_WINDOW : parsed.input;
+  } catch {
+    return DEFAULT_WINDOW;
+  }
 }
 
 function parseLimit(value: string | null | undefined): number {
@@ -34,6 +39,8 @@ export const getSubstrateBugWeightsRoute = HttpRouter.add(
   '/api/flywheel/substrate-bug-weights',
   httpHandler(Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
     const params = HttpServerRequest.toURL(request).pipe(Option.match({
       onNone: () => ({} as URLSearchParams),
       onSome: (url) => url.searchParams,

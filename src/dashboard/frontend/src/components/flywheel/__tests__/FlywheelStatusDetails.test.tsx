@@ -175,12 +175,12 @@ describe('FlywheelStatusDetails', () => {
     expect(within(rows[2]).getByRole('button', { name: 'PAN-1' })).toBeInTheDocument();
   });
 
-  it('keeps operator-filed suggestions ahead of higher-weight agent suggestions at the same priority', () => {
+  it('keeps operator-filed suggestions ahead of higher-priority, higher-weight agent suggestions', () => {
     render(<FlywheelStatusDetails status={{
       ...status,
       suggestions: [
-        { priority: 'high', action: 'start', issueId: 'PAN-AGENT', rationale: 'Higher weight', filedBy: 'agent', weight: 5 },
-        { priority: 'high', action: 'start', issueId: 'PAN-OPERATOR', rationale: 'Operator requested', filedBy: 'operator', weight: 1 },
+        { priority: 'urgent', action: 'start', issueId: 'PAN-AGENT', rationale: 'Higher weight', filedBy: 'agent', weight: 5 },
+        { priority: 'low', action: 'start', issueId: 'PAN-OPERATOR', rationale: 'Operator requested', filedBy: 'operator', weight: 1 },
       ],
     }} />);
 
