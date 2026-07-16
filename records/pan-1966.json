@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:13:50.677Z",
+  "updated": "2026-07-16T12:13:52.900Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "wire-flywheel": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 1795346,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:13:50.677Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -209,6 +201,17 @@
         "outcome": "completed",
         "reason": "Pending command uses durable membership and preserves ready/blocked annotations.",
         "releasedAt": "2026-07-16T12:13:48.508Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1795346,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:13:50.677Z",
+        "itemId": "wire-flywheel",
+        "outcome": "completed",
+        "reason": "Flywheel predicate and prompt use the authoritative membership read door.",
+        "releasedAt": "2026-07-16T12:13:52.900Z"
       }
     ],
     "statusReasons": {
@@ -246,8 +249,8 @@
         "updatedAt": "2026-07-16T12:13:48.508Z"
       },
       "wire-flywheel": {
-        "reason": "Implementation pushed in b4809e0c7b",
-        "updatedAt": "2026-07-16T12:13:50.677Z"
+        "reason": "Flywheel predicate and prompt use the authoritative membership read door.",
+        "updatedAt": "2026-07-16T12:13:52.900Z"
       }
     }
   },
@@ -288,6 +291,8 @@
     "wire-pan-pending.wire-pan-pending.ac1": "completed",
     "wire-pan-pending.wire-pan-pending.ac2": "completed",
     "wire-pan-pending.wire-pan-pending.ac3": "completed",
-    "wire-flywheel": "running"
+    "wire-flywheel": "completed",
+    "wire-flywheel.wire-flywheel.ac1": "completed",
+    "wire-flywheel.wire-flywheel.ac2": "completed"
   }
 }
