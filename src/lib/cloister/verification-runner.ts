@@ -27,7 +27,8 @@ import type {
 } from './verification-types.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
-import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
+import { resolveIssueFeedbackTarget } from './feedback-target.js';
+import { markMailboxItemDelivered } from './agent-mailbox.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { getVBriefACStatusSync } from '../vbrief/acceptance-criteria.js';
@@ -193,14 +194,18 @@ async function deliverVerificationFeedback(
     // PAN-2668: verification feedback owes rework — a stopped-by-user agent
     // with a completed handoff is re-driven, not silently queued mail.
     await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+    if (typeof details.feedbackPath === 'string') {
+      try {
+        await markMailboxItemDelivered({ issueId, role: 'work', filePath: details.feedbackPath });
+      } catch (error) {
+        console.warn(`[${logPrefix}] Verification feedback reached ${target.agentId}, but mailbox state update failed for ${issueId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
     return;
   }
 
-  await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-    specialist: 'verification-gate',
-    ...details,
-  });
+  console.warn(`[${logPrefix}] ${target.reason}; issue-role mailbox remains pending`);
 }
 
 async function resolveGitDirs(

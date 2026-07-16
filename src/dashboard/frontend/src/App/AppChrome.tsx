@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, History, RefreshCw, Search, StopCircle } f
 import { BootReconciliationModal } from '../components/BootReconciliationModal';
 import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { LowCostModePill } from '../components/LowCostModePill';
+import { OpenQuestionsIndicator } from '../components/OpenQuestionsIndicator';
 import { SystemMenu } from '../components/SystemMenu';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
 import { OrphanTestAgentsSurface } from '../components/OrphanTestAgentsSurface';
@@ -35,6 +36,7 @@ interface AppChromeProps {
   isSessionFeedSidebarOpen: boolean;
   onSearchOpen: () => void;
   onOpenSettings: () => void;
+  onNavigateOpenQuestions: () => void;
   onDismissTrackerBanner: () => void;
   onRestartBackend: () => void;
   onRestartCliproxy: () => void;
@@ -56,6 +58,7 @@ export function AppChrome({
   isSessionFeedSidebarOpen,
   onSearchOpen,
   onOpenSettings,
+  onNavigateOpenQuestions,
   onDismissTrackerBanner,
   onRestartBackend,
   onRestartCliproxy,
@@ -219,6 +222,7 @@ export function AppChrome({
           <LowCostModePill onOpenSettings={onOpenSettings} />
           <StaleBuildChip />
           <SystemHealthPill />
+          <OpenQuestionsIndicator onActivate={onNavigateOpenQuestions} />
           <SystemMenu onOpenSettings={onOpenSettings} />
           {/* The Command Deck has the always-on Awareness rail, so the global
               feed toggle only appears on other pages (PAN-1591). */}

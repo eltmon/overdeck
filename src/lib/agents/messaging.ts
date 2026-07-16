@@ -251,7 +251,7 @@ export async function messageAgent(
       ? await getOhmypiLauncherFields(normalizedId, resumeModel)
       : {};
     const fallbackCodexFields = fallbackHarness === 'codex'
-      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace)
+      ? getCodexLauncherFields(normalizedId, resumeModel, agentState.workspace, resumeRole)
       : {};
     const fallbackSupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, agentState, resumeModel, fallbackHarness);
     const fallbackContent = generateLauncherScriptSync({

@@ -205,7 +205,7 @@ describe('FlywheelStatusDetails', () => {
   });
 
   it('renders system metrics and open questions', () => {
-    render(<FlywheelStatusDetails status={status} />);
+    const { container } = render(<FlywheelStatusDetails status={status} />);
 
     const system = screen.getByText('System').closest('section');
     expect(system).not.toBeNull();
@@ -214,8 +214,10 @@ describe('FlywheelStatusDetails', () => {
     expect(within(system!).getByText('3 / 8 active')).toBeInTheDocument();
     expect(within(system!).getByText('cafebab')).toBeInTheDocument();
 
-    expect(screen.getByText('Should PAN-9 be split before review?')).toBeInTheDocument();
-    expect(screen.getByText('Is UAT allowed to run overnight?')).toBeInTheDocument();
+    const openQuestions = container.querySelector('#flywheel-open-questions');
+    expect(openQuestions).not.toBeNull();
+    expect(openQuestions).toHaveTextContent('Should PAN-9 be split before review?');
+    expect(openQuestions).toHaveTextContent('Is UAT allowed to run overnight?');
   });
 
   it('collapses empty collections gracefully', () => {

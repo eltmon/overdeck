@@ -18,6 +18,7 @@ const mockResetAgentFailureCount = vi.fn();
 const mockMarkAgentRunningState = vi.fn();
 const mockSessionExists = vi.fn();
 const mockSessionExistsSync = vi.fn();
+const mockQuerySessionSync = vi.fn();
 const mockKillSession = vi.fn();
 const mockListPaneValues = vi.fn();
 const mockGetReviewStatusSync = vi.fn();
@@ -73,6 +74,7 @@ vi.mock('../../../lib/agents.js', () => ({
 vi.mock('../../../lib/tmux.js', () => ({
   sessionExists: (...args: unknown[]) => Effect.succeed(mockSessionExists(...args)),
   sessionExistsSync: (...args: unknown[]) => mockSessionExistsSync(...args),
+  querySessionSync: (...args: unknown[]) => mockQuerySessionSync(...args),
   killSession: (...args: unknown[]) => Effect.succeed(mockKillSession(...args)),
   killSessionSync: (...args: unknown[]) => mockKillSession(...args),
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
@@ -154,6 +156,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
     mockMarkAgentRunningState.mockImplementation((s: any) => { s.status = 'running'; });
     mockSessionExists.mockResolvedValue(false);
     mockSessionExistsSync.mockReturnValue(false);
+    mockQuerySessionSync.mockReturnValue({ status: 'missing', detail: 'exit=1 stderr=can\'t find session: agent' });
     mockKillSession.mockResolvedValue(undefined);
     mockListPaneValues.mockResolvedValue(['0']);
     mockGetReviewStatusSync.mockReturnValue(undefined);
@@ -302,6 +305,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
     it('marks a running work agent stopped and records failure', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
 
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions.length).toBeGreaterThan(0);
@@ -318,6 +322,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
     it('accumulates (does not reset) failures for a pre-kickoff work-agent launch crash', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: false }));
 
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions.length).toBeGreaterThan(0);
@@ -331,6 +336,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
     it('resets failures for a normal work-agent orphan that already delivered its kickoff', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running', kickoffDelivered: true }));
 
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions.length).toBeGreaterThan(0);
@@ -352,6 +358,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
         reviewSynthesisAgentId: 'agent-pan-1908-review',
       }));
 
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908-review-security', 'patrol')).toEqual([]);
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908-review-security');
 
       expect(actions.length).toBeGreaterThan(0);
@@ -377,6 +384,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
         reviewRunId,
       }));
 
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908-review', 'patrol')).toEqual([]);
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908-review');
 
       expect(actions.length).toBeGreaterThan(0);
@@ -399,10 +407,20 @@ describe('PAN-1908 reactive liveness handlers', () => {
     it('skips running agents with a live tmux session', async () => {
       mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
       mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
 
       const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
 
       expect(actions).toEqual([]);
+      expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
+    it('does not reap on a tmux query error or a single confirmed miss', async () => {
+      mockGetAgentStateSync.mockReturnValue(makeState({ status: 'running' }));
+      mockQuerySessionSync.mockReturnValueOnce({ status: 'error', detail: 'exit=unknown code=ETIMEDOUT' });
+
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
+      expect(await handleAgentHeartbeatDeadEvent('agent-pan-1908', 'patrol')).toEqual([]);
       expect(mockSaveAgentState).not.toHaveBeenCalled();
     });
   });

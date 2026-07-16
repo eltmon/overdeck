@@ -17,7 +17,9 @@ mcpServers:
       command: npx
       args:
         - "-y"
-        - "@playwright/mcp@latest"
+        # Exact version; npm verifies the registry's published sha512 integrity:
+        # XLTUeA6mEN9sQ+hJ4dfG8EIkDbxS0K3Trc2RBkUJuf02TgE2FQRNTMtq/aJfhyRMINsRl/Ybc4sxcWLtFn4/TQ==
+        - "@playwright/mcp@0.0.78"
 hooks:
   PreToolUse:
     - matcher: ".*"

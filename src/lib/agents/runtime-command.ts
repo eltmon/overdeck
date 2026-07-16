@@ -33,6 +33,43 @@ import { CLI_PROXY_MODEL_ALIASES } from './provider-env.js';
 const execAsync = promisify(exec);
 const missingRoleDefinitionWarnings = new Set<string>();
 
+export interface RoleMcpServerDef {
+  type?: string;
+  command?: string;
+  args?: string[];
+  env?: Record<string, string>;
+}
+
+/** Parse and flatten a role definition's mcpServers frontmatter. */
+export function parseRoleMcpServersSync(definitionPath: string): Record<string, RoleMcpServerDef> {
+  const abs = resolve(definitionPath);
+  if (!existsSync(abs)) return {};
+
+  const raw = readFileSync(abs, 'utf8');
+  const fm = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!fm) return {};
+
+  try {
+    const frontmatter = parseYaml(fm[1]);
+    if (!frontmatter || typeof frontmatter !== 'object') return {};
+    const entries = (frontmatter as Record<string, unknown>).mcpServers;
+    if (!Array.isArray(entries)) return {};
+
+    const servers: Record<string, RoleMcpServerDef> = {};
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      for (const [name, definition] of Object.entries(entry as Record<string, unknown>)) {
+        if (definition && typeof definition === 'object') {
+          servers[name] = definition as RoleMcpServerDef;
+        }
+      }
+    }
+    return servers;
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Write an agent launcher script atomically. Every agent shares a fixed
  * `launcher.sh` path inside its agent dir, and spawn/resume/restart paths can
@@ -175,7 +212,7 @@ export async function getOhmypiLauncherFields(agentId: string, model: string): P
   };
 }
 
-export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string): {
+export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
   codexHome: string;
@@ -203,6 +240,7 @@ export function getCodexLauncherFields(agentId: string, model: string, workspace
     approvalPolicy,
     sandboxMode,
     approvalsReviewer,
+    mcpServers: role ? parseRoleMcpServersSync(roleAgentDefinitionPath(role)) : undefined,
   });
   return {
     harness: 'codex',
@@ -739,22 +777,12 @@ export function roleSystemPromptInjectionSync(definitionPath: string, explicitEf
   // into one { mcpServers: { name: def } } config loaded via --mcp-config. It is
   // additive (the launcher's channels --mcp-config still applies; no
   // --strict-mcp-config), so the role keeps any project/global MCP servers too.
-  const mcpNames: string[] = [];
-  if (Array.isArray(frontmatter.mcpServers) && frontmatter.mcpServers.length > 0) {
-    const servers: Record<string, unknown> = {};
-    for (const entry of frontmatter.mcpServers) {
-      if (entry && typeof entry === 'object') {
-        for (const [name, def] of Object.entries(entry as Record<string, unknown>)) {
-          servers[name] = def;
-          mcpNames.push(name);
-        }
-      }
-    }
-    if (Object.keys(servers).length > 0) {
-      const mcpPath = join(dir, `${stem}.mcp.json`);
-      writeFileSync(mcpPath, JSON.stringify({ mcpServers: servers }, null, 2));
-      flags.push(` --mcp-config '${mcpPath}'`);
-    }
+  const servers = parseRoleMcpServersSync(definitionPath);
+  const mcpNames = Object.keys(servers);
+  if (mcpNames.length > 0) {
+    const mcpPath = join(dir, `${stem}.mcp.json`);
+    writeFileSync(mcpPath, JSON.stringify({ mcpServers: servers }, null, 2));
+    flags.push(` --mcp-config '${mcpPath}'`);
   }
 
   // tools: allow-list → --allowedTools (comma-joined single arg so the variadic
@@ -784,6 +812,10 @@ export async function getRoleRuntimeBaseCommand(
   const quotedModel = shellQuoteModelIdSync(validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
+    const mcpNames = Object.keys(parseRoleMcpServersSync(roleAgentDefinitionPath(role)));
+    if (mcpNames.length > 0) {
+      console.warn(`[spawn] role '${role}' declares MCP servers (${mcpNames.join(', ')}) but harness 'ohmypi' does not provision MCP — those tools will be unavailable`);
+    }
     return `omp --mode rpc --model ${quotedModel}`;
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {

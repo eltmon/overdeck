@@ -14,9 +14,11 @@
 import { execFile } from 'node:child_process';
 import { join } from 'node:path';
 import { Effect } from 'effect';
-import { getAgentStateSync, messageAgent } from '../agents.js';
+import { messageAgent } from '../agents.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { writeFeedbackFile } from './feedback-writer.js';
+import { resolveIssueFeedbackTarget } from './feedback-target.js';
+import { markMailboxItemDelivered } from './agent-mailbox.js';
 
 function execFilePromise(
   file: string,
@@ -63,10 +65,6 @@ const lastNotifiedSha = new Map<string, string>();
 /** Reset internal debounce state — for tests only. */
 export function resetCiFailureFeedbackStateForTests(): void {
   lastNotifiedSha.clear();
-}
-
-function agentIdForIssue(issueId: string): string {
-  return `agent-${issueId.toLowerCase()}`;
 }
 
 function parseRepo(repo: string): { owner: string; repo: string } {
@@ -203,14 +201,6 @@ async function relayCiFailureFeedbackPromise(
 ): Promise<CiFailureFeedbackResult> {
   const issueId = opts.issueId.toUpperCase();
 
-  // Only relay for work agents. The feedback file/message would not be useful
-  // for plan/review/test/ship/strike roles.
-  const agentId = agentIdForIssue(issueId);
-  const agentState = getAgentStateSync(agentId);
-  if (!agentState || agentState.role !== 'work') {
-    return { agentMessageSent: false };
-  }
-
   // Debounce per head SHA so duplicate webhook deliveries / retries do not spam.
   const lastSha = lastNotifiedSha.get(issueId);
   if (lastSha === opts.headSha) {
@@ -273,11 +263,21 @@ async function relayCiFailureFeedbackPromise(
     `MUST READ: ${fileResult.filePath}\n\n` +
     'Use your Read tool to open this file, read every line, then fix ALL failing checks. Do NOT stop at the prompt.';
   try {
-    await messageAgent(agentId, message);
-    agentMessageSent = true;
+    const target = await resolveIssueFeedbackTarget(issueId);
+    if ('agentId' in target) {
+      await messageAgent(target.agentId, message);
+      agentMessageSent = true;
+      try {
+        await markMailboxItemDelivered({ issueId, role: 'work', filePath: fileResult.filePath });
+      } catch (err) {
+        console.warn(
+          `[ci-failure-feedback] Live message sent but mailbox state update failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
   } catch (err) {
     console.warn(
-      `[ci-failure-feedback] Could not message ${agentId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`,
+      `[ci-failure-feedback] Live delivery failed; issue-role mailbox remains pending: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 

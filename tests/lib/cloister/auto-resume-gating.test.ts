@@ -257,6 +257,7 @@ describe('auto-resume gates', () => {
       listPaneValues: vi.fn().mockReturnValue([]),
       listPaneValuesAsync: vi.fn().mockResolvedValue([]),
       listSessionNamesAsync: vi.fn().mockResolvedValue([]),
+      querySessionSync: vi.fn().mockReturnValue({ status: 'missing', detail: "exit=1 stderr=can't find session: test" }),
       sessionExists: vi.fn(() => Effect.succeed(false)),
       sessionExistsSync: vi.fn().mockReturnValue(false),
       sessionExistsAsync: vi.fn().mockResolvedValue(false),
@@ -493,6 +494,7 @@ describe('auto-resume gates', () => {
       startedAt: BASE_TIME.toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('startup')).toEqual([]);
     await Promise.all([
       recoverOrphanedAgents('startup'),
       recoverOrphanedAgents('patrol'),
@@ -554,6 +556,7 @@ describe('auto-resume gates', () => {
       startedAt: BASE_TIME.toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     const actions = await recoverOrphanedAgents('patrol');
 
     expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
@@ -589,6 +592,7 @@ describe('auto-resume gates', () => {
       pausedAt: BASE_TIME.toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     const actions = await recoverOrphanedAgents('patrol');
 
     const state = agents.getAgentStateSync(agentId);
@@ -618,6 +622,7 @@ describe('auto-resume gates', () => {
       lastFailureNextRetryAt: new Date(BASE_TIME.getTime() - 90_000).toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     const actions = await recoverOrphanedAgents('patrol');
 
     expect(actions).toEqual([`Recovered orphaned agent ${agentId} (running→stopped)`]);
@@ -648,6 +653,7 @@ describe('auto-resume gates', () => {
       lastFailureNextRetryAt: new Date(BASE_TIME.getTime() - 4 * 60_000).toISOString(),
     });
 
+    expect(await recoverOrphanedAgents('patrol')).toEqual([]);
     await recoverOrphanedAgents('patrol');
 
     const state = agents.getAgentStateSync(agentId);
@@ -803,6 +809,7 @@ describe('auto-resume gates', () => {
     });
 
     const resumed = await autoResumeStoppedWorkAgents();
+    expect(await recoverOrphanedAgents('test')).toEqual([]);
     const recovered = await recoverOrphanedAgents('test');
 
     expect(resumed).toEqual([]);
