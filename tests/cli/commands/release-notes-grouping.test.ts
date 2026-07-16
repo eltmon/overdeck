@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { groupCommitSubjects, buildReleaseNotesMarkdown } from '../../../src/cli/commands/release.js';
+import { groupCommitSubjects, buildReleaseNotesMarkdown, resolveReleaseManifestPaths } from '../../../src/cli/commands/release.js';
 
 describe('groupCommitSubjects', () => {
   it('drops pipeline bookkeeping commits entirely', () => {
@@ -68,5 +68,15 @@ describe('buildReleaseNotesMarkdown install command', () => {
     // version is pinned, so a release's notes install THAT release under THAT package — even
     // across the project's historical renames (panopticon-cli -> @panctl/cli -> @overdeck/core).
     expect(md).toContain('npm install -g @panctl/cli@1.2.3');
+  });
+});
+
+describe('resolveReleaseManifestPaths', () => {
+  it('targets the checkout being released rather than the installed CLI package', () => {
+    expect(resolveReleaseManifestPaths('/tmp/release-checkout')).toEqual({
+      core: '/tmp/release-checkout/package.json',
+      desktop: '/tmp/release-checkout/apps/desktop/package.json',
+      contracts: '/tmp/release-checkout/packages/contracts/package.json',
+    });
   });
 });

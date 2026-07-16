@@ -2,8 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { execFileSync, execSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 
 type ReleaseChannel = 'stable' | 'canary';
 
@@ -23,11 +22,13 @@ type ReleaseNotesOptions = {
   write?: string;
 };
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const packageJsonPath = join(__dirname, '..', '..', 'package.json');
-const desktopPackageJsonPath = join(__dirname, '..', '..', 'apps', 'desktop', 'package.json');
-const contractsPackageJsonPath = join(__dirname, '..', '..', 'packages', 'contracts', 'package.json');
+export function resolveReleaseManifestPaths(repoRoot: string) {
+  return {
+    core: join(repoRoot, 'package.json'),
+    desktop: join(repoRoot, 'apps', 'desktop', 'package.json'),
+    contracts: join(repoRoot, 'packages', 'contracts', 'package.json'),
+  };
+}
 
 export function registerReleaseCommands(program: Command): void {
   const release = program
@@ -66,32 +67,32 @@ export function registerReleaseCommands(program: Command): void {
     );
 }
 
-function readPackageJson(): PackageJson {
-  return JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as PackageJson;
+function readPackageJson(repoRoot: string): PackageJson {
+  return JSON.parse(readFileSync(resolveReleaseManifestPaths(repoRoot).core, 'utf-8')) as PackageJson;
 }
 
-function writePackageJson(pkg: PackageJson): void {
-  writeFileSync(packageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+function writePackageJson(repoRoot: string, pkg: PackageJson): void {
+  writeFileSync(resolveReleaseManifestPaths(repoRoot).core, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-function readDesktopPackageJson(): PackageJson {
-  return JSON.parse(readFileSync(desktopPackageJsonPath, 'utf-8')) as PackageJson;
+function readDesktopPackageJson(repoRoot: string): PackageJson {
+  return JSON.parse(readFileSync(resolveReleaseManifestPaths(repoRoot).desktop, 'utf-8')) as PackageJson;
 }
 
-function writeDesktopPackageJson(pkg: PackageJson): void {
-  writeFileSync(desktopPackageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+function writeDesktopPackageJson(repoRoot: string, pkg: PackageJson): void {
+  writeFileSync(resolveReleaseManifestPaths(repoRoot).desktop, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-function readContractsPackageJson(): PackageJson {
-  return JSON.parse(readFileSync(contractsPackageJsonPath, 'utf-8')) as PackageJson;
+function readContractsPackageJson(repoRoot: string): PackageJson {
+  return JSON.parse(readFileSync(resolveReleaseManifestPaths(repoRoot).contracts, 'utf-8')) as PackageJson;
 }
 
-function writeContractsPackageJson(pkg: PackageJson): void {
-  writeFileSync(contractsPackageJsonPath, `${JSON.stringify(pkg, null, 2)}\n`);
+function writeContractsPackageJson(repoRoot: string, pkg: PackageJson): void {
+  writeFileSync(resolveReleaseManifestPaths(repoRoot).contracts, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
-function getCurrentVersion(): string {
-  return readPackageJson().version;
+function getCurrentVersion(repoRoot: string): string {
+  return readPackageJson(repoRoot).version;
 }
 
 function run(command: string, cwd: string): string {
@@ -422,7 +423,7 @@ function runPreflight(repoRoot: string, opts: { skipTests?: boolean } = {}): Pre
 
 async function releaseCheckCommand(): Promise<void> {
   const repoRoot = getRepoRoot();
-  const currentVersion = getCurrentVersion();
+  const currentVersion = getCurrentVersion(repoRoot);
   const latestTag = getLatestTag(repoRoot);
 
   console.log(chalk.bold('Overdeck Release Check\n'));
@@ -449,10 +450,10 @@ async function releaseCreateCommand(
   opts: { skipTests?: boolean } = {}
 ): Promise<void> {
   const repoRoot = getRepoRoot();
-  const currentVersion = getCurrentVersion();
+  const currentVersion = getCurrentVersion(repoRoot);
   const previousTag = getLatestTag(repoRoot);
   const resolvedVersion = version ?? inferNextVersion(channel, currentVersion);
-  const pkg = readPackageJson();
+  const pkg = readPackageJson(repoRoot);
   const tagName = `v${resolvedVersion}`;
   const releaseNotesPath = join(repoRoot, '.release', `${tagName}.md`);
 
@@ -481,15 +482,15 @@ async function releaseCreateCommand(
   }
 
   pkg.version = resolvedVersion;
-  writePackageJson(pkg);
+  writePackageJson(repoRoot, pkg);
 
-  const desktopPkg = readDesktopPackageJson();
+  const desktopPkg = readDesktopPackageJson(repoRoot);
   desktopPkg.version = resolvedVersion;
-  writeDesktopPackageJson(desktopPkg);
+  writeDesktopPackageJson(repoRoot, desktopPkg);
 
-  const contractsPkg = readContractsPackageJson();
+  const contractsPkg = readContractsPackageJson(repoRoot);
   contractsPkg.version = resolvedVersion;
-  writeContractsPackageJson(contractsPkg);
+  writeContractsPackageJson(repoRoot, contractsPkg);
 
   const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
   const releaseNotes = buildReleaseNotesMarkdown({
@@ -561,7 +562,7 @@ async function releaseNotesCommand(
     from: resolvedFrom,
     to: resolvedTo,
     entries,
-    packageName: readPackageJson().name ?? '@overdeck/core',
+    packageName: readPackageJson(repoRoot).name ?? '@overdeck/core',
   });
 
   if (options.write) {
