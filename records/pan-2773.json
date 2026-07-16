@@ -74,21 +74,22 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:49:05.030Z",
+  "updated": "2026-07-16T18:54:39.483Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:49:01.305Z",
+    "updatedAt": "2026-07-16T18:54:39.423Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2773-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
+    "lastVerifiedCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973",
     "reviewRequestedAt": "2026-07-16T18:48:48.435Z",
     "reviewSpawnedAt": "2026-07-16T18:48:52.164Z",
     "scopeDrift": {
@@ -149,41 +150,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 419166,
-            "output": 9042,
-            "cacheRead": 2908672,
+            "input": 693148,
+            "output": 13204,
+            "cacheRead": 5587456,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 1272568,
-            "output": 22672,
-            "cacheRead": 4110336,
+            "input": 2498059,
+            "output": 38455,
+            "cacheRead": 7267840,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 423291,
-            "output": 4233,
-            "cacheRead": 436736,
+            "input": 914596,
+            "output": 8284,
+            "cacheRead": 1510912,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 732763,
-            "output": 15820,
-            "cacheRead": 950784,
+            "input": 962645,
+            "output": 18029,
+            "cacheRead": 1965056,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 475724,
-            "output": 6110,
-            "cacheRead": 458752,
+            "input": 880898,
+            "output": 9419,
+            "cacheRead": 1512960,
             "cacheWrite": 0
           }
         },
@@ -197,17 +198,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 28,
-            "output": 4862,
-            "cacheRead": 1938679,
-            "cacheWrite": 136369
+            "input": 40,
+            "output": 6584,
+            "cacheRead": 2951714,
+            "cacheWrite": 145805
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1880072,
-            "output": 120114,
-            "cacheRead": 42030592,
+            "input": 1897727,
+            "output": 122509,
+            "cacheRead": 43779584,
             "cacheWrite": 0
           }
         }
@@ -220,21 +221,21 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 5203584,
-          "output": 177991,
-          "cacheRead": 50895872,
+          "input": 7847073,
+          "output": 209900,
+          "cacheRead": 61623808,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 38,
-          "output": 7864,
-          "cacheRead": 2444035,
-          "cacheWrite": 268105
+          "input": 50,
+          "output": 9586,
+          "cacheRead": 3457070,
+          "cacheWrite": 277541
         }
       },
       "costAtCloseOut": {
-        "usd": 68.313911,
-        "pricingAsOf": "2026-07-16T18:49:01.853Z"
+        "usd": 88.096036,
+        "pricingAsOf": "2026-07-16T18:54:39.471Z"
       }
     },
     "merges": [
