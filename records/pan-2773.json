@@ -67,6 +67,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T19:15:04.440Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T19:17:48.200Z"
     }
   ],
   "feedback": [],
@@ -114,24 +119,24 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T19:17:37.550Z",
+  "updated": "2026-07-16T19:17:48.200Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:17:29.935Z",
+    "updatedAt": "2026-07-16T19:17:38.166Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
     "lastVerifiedCommit": "021ccdb83471a6cb7779d7c53f131b056964bc8c",
     "reviewRequestedAt": "2026-07-16T19:04:12.863Z",
-    "reviewSpawnedAt": "2026-07-16T19:12:06.270Z",
+    "reviewSpawnedAt": "2026-07-16T19:17:38.165Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -190,9 +195,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3587830,
-            "output": 49554,
-            "cacheRead": 10113024,
+            "input": 3760081,
+            "output": 51603,
+            "cacheRead": 10182144,
             "cacheWrite": 0
           }
         },
@@ -261,9 +266,9 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 11056467,
-          "output": 286399,
-          "cacheRead": 76991488,
+          "input": 11228718,
+          "output": 288448,
+          "cacheRead": 77060608,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -274,8 +279,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 117.93875799999999,
-        "pricingAsOf": "2026-07-16T19:17:31.278Z"
+        "usd": 118.896043,
+        "pricingAsOf": "2026-07-16T19:17:41.593Z"
       }
     },
     "merges": [
