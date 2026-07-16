@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T06:11:13.627Z",
+  "updated": "2026-07-16T06:11:27.564Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "resolver-label-drift": {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 2234685,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:11:27.564Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -79,6 +87,7 @@
     "resolver-planned-lens": "completed",
     "resolver-planned-lens.resolver-planned-lens.ac1": "completed",
     "resolver-planned-lens.resolver-planned-lens.ac2": "completed",
-    "resolver-planned-lens.resolver-planned-lens.ac3": "completed"
+    "resolver-planned-lens.resolver-planned-lens.ac3": "completed",
+    "resolver-label-drift": "running"
   }
 }
