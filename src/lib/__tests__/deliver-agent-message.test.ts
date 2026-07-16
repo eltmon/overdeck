@@ -400,6 +400,41 @@ describe('initial kickoff transcript confirmation', () => {
     );
   });
 
+  it('uses the live app-server socket when spawn-time agent state is unavailable', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'pan-codex-live-socket-'));
+    const socketDir = join(home, 'sockets');
+    const previousHome = process.env.OVERDECK_HOME;
+    mkdirSync(socketDir, { recursive: true });
+    writeFileSync(join(socketDir, `appserver-${baseState.id}.sock`), 'ready');
+    process.env.OVERDECK_HOME = home;
+    const deliver = vi.fn(async () => ({ ok: true, path: 'app-server' as const }));
+
+    try {
+      await expect(deliverInitialPromptWithRetry(
+        baseState.id,
+        'Codex kickoff',
+        'spawnAgent:initial-prompt',
+        'supervisor',
+        {
+          ...baseOptions,
+          getState: vi.fn(async () => null),
+          deliver,
+          snapshot: vi.fn(),
+        },
+      )).resolves.toMatchObject({ ok: true, path: 'app-server' });
+      expect(deliver).toHaveBeenCalledWith(
+        baseState.id,
+        'Codex kickoff',
+        'spawnAgent:initial-prompt',
+        'auto',
+      );
+    } finally {
+      if (previousHome === undefined) delete process.env.OVERDECK_HOME;
+      else process.env.OVERDECK_HOME = previousHome;
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
   it('does not overwrite a work kickoff when delivering a codex role prompt in the same workspace', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-role-kickoff-'));
     const existingWorkPrompt = 'Full work instructions for PAN-2318';

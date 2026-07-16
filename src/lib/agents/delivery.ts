@@ -534,7 +534,15 @@ export async function deliverInitialPromptWithRetry(
       // `supervisor` method, so initial kickoff and Deacon redelivery must use
       // auto routing for Codex: app-server first, then the PTY path used by
       // Codex TUI. Claude Code keeps its strict supervisor contract.
-      const kickoffDeliveryMethod = state?.harness === 'codex'
+      // The canonical state read can briefly return null during spawn while
+      // the app-server socket is already ready, so use the live transport as
+      // the fallback signal instead of regressing to strict PTY delivery.
+      const appServerSocketExists = existsSync(join(
+        overdeckHomeForSockets(),
+        'sockets',
+        `appserver-${normalizedId}.sock`,
+      ));
+      const kickoffDeliveryMethod = state?.harness === 'codex' || appServerSocketExists
         ? resilientDeliveryMethod(deliveryMethod)
         : deliveryMethod;
       const result = await deliver(agentId, deliveredPrompt, caller, kickoffDeliveryMethod);
