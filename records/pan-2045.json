@@ -147,21 +147,40 @@
     "recordedAt": "2026-07-16T19:06:28.490Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T19:09:23.460Z",
+  "updated": "2026-07-16T19:15:00.063Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:07:13.357Z",
+    "updatedAt": "2026-07-16T19:14:59.892Z",
+    "reviewNotes": "happy-dom leaves Mission Control tests false-green while live localhost requests fail during teardown",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
     "reviewRequestedAt": "2026-07-16T19:07:11.780Z",
     "reviewSpawnedAt": "2026-07-16T19:07:13.354Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "3f52315f859661f6cc4484a0c09c5e4383e7dc83"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "3f52315f859661f6cc4484a0c09c5e4383e7dc83"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "3f52315f859661f6cc4484a0c09c5e4383e7dc83"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "3f52315f859661f6cc4484a0c09c5e4383e7dc83"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -183,6 +202,46 @@
             "cacheWrite": 165070
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 217794,
+            "output": 10176,
+            "cacheRead": 3912192,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 919086,
+            "output": 18973,
+            "cacheRead": 3503104,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 343612,
+            "output": 3800,
+            "cacheRead": 759808,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 758575,
+            "output": 19032,
+            "cacheRead": 1727488,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 511905,
+            "output": 5793,
+            "cacheRead": 1480192,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 2,
@@ -193,9 +252,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2277125,
-            "output": 112388,
-            "cacheRead": 44370944,
+            "input": 2687754,
+            "output": 116189,
+            "cacheRead": 44696576,
             "cacheWrite": 0
           }
         }
@@ -213,22 +272,22 @@
           "cacheRead": 3646094,
           "cacheWrite": 165070
         },
+        "openai/gpt-5.6-sol": {
+          "input": 5438726,
+          "output": 173963,
+          "cacheRead": 56079360,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 2,
           "output": 147,
           "cacheRead": 28449,
           "cacheWrite": 90951
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 2277125,
-          "output": 112388,
-          "cacheRead": 44370944,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 45.034801,
-        "pricingAsOf": "2026-07-16T19:07:13.618Z"
+        "usd": 68.544264,
+        "pricingAsOf": "2026-07-16T19:15:00.037Z"
       }
     },
     "merges": [
