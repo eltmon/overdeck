@@ -143,7 +143,7 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T13:10:03.048Z",
+  "updated": "2026-07-16T13:10:24.539Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -153,12 +153,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T13:10:02.992Z",
+    "updatedAt": "2026-07-16T13:10:24.440Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2702-review",
     "inspectNotes": "AC1 unmet: strike requests never reach triggerMerge(). Only dequeueNextMerge() (merge-ops.ts:322-336) builds a StrikeMergeRequest, but it's only invoked via advanceQueue() after another triggerMerge() call for the SAME project's queue completes, dequeuing entries populated solely by enqueueMerge() (called only at merge-ops.ts:406,418 inside triggerMerge itself). pan strike-ready (src/cli/commands/strike-ready.ts:70-80) only persists strikeReadyHead/strikeLandingState via setStatus -- it never calls enqueueMerge or triggerMerge. Every other triggerMerge call site (flywheel.ts:610, merge-ops.ts:1250 route handler, auto-merge-executor.ts:55/111 defaultMergeIssue, merge-queue-service.ts:25 resumeQueuedMerges) invokes triggerMerge(issueId) with no request arg, defaulting to {kind:'normal'}. Grepped repo-wide for strikeLandingState/strikeReadyHead outside merge-ops.ts/merge-strike.ts and found no patrol, route, or watcher that enqueues or triggers a merge for a freshly-ready strike marker. Result: a strike marked ready has no code path that ever constructs {kind:'strike',...} and calls triggerMerge -- the AC1 scenario (given a valid durable strike marker, the merge door resolves/gates/merges/invokes postMergeLifecycle) is unreachable dead code. Required fix: wire an actual trigger -- e.g. strikeReadyCommand or a server-side watcher on strikeLandingState==='ready' must enqueueMerge + call triggerMerge(issueId, strikeRequest), or add a dedicated endpoint/patrol that detects readiness and invokes the merge door. AC2 (stale-marker rejection, validateStrikeMergeRequest in merge-strike.ts:20-42) and AC3 (no-loss eligibility matrix, normalMergeEligibility + strike-merge.test.ts) verified correct in isolation; AC4 (main-push guard) unaffected by this diff. Minor non-blocking nit: 'Already merged' check now exists twice (merge-strike.ts:16 inside normalMergeEligibility, and unchanged original at merge-ops.ts ~391) -- harmless redundancy, not a functional loss.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2791",
     "lastVerifiedCommit": "901c5a97634225143beb5fd5a8136ec25d07d11a",
-    "reviewRequestedAt": "2026-07-16T13:05:20.978Z",
+    "reviewRequestedAt": "2026-07-16T13:10:24.053Z",
     "reviewSpawnedAt": "2026-07-16T13:05:24.396Z"
   },
   "closeOut": {
@@ -209,7 +209,7 @@
       },
       "costAtCloseOut": {
         "usd": 37.848035,
-        "pricingAsOf": "2026-07-16T13:10:03.041Z"
+        "pricingAsOf": "2026-07-16T13:10:24.487Z"
       }
     },
     "merges": [
