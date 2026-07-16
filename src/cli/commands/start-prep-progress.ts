@@ -81,3 +81,33 @@ export function createPrepProgress(
 
   return { update, step };
 }
+
+export const START_PREP_STEP_POLICIES = {
+  'state-reconcile': { budgetMs: 60_000, timeout: 'fail-fast' },
+  'sync-main': { budgetMs: 240_000, timeout: 'degrade' },
+  'tracker-context': { budgetMs: 60_000, timeout: 'degrade' },
+  spawn: { budgetMs: 600_000, timeout: 'fail-fast' },
+} as const;
+
+export type StartPrepStepName = keyof typeof START_PREP_STEP_POLICIES;
+
+type PrepProgress = ReturnType<typeof createPrepProgress>;
+
+export async function runStartPrepStep<T>(
+  prep: PrepProgress,
+  spinner: Pick<Ora, 'warn'>,
+  name: StartPrepStepName,
+  fn: () => Promise<T> | T,
+  timeoutFallback?: T,
+): Promise<T> {
+  const policy = START_PREP_STEP_POLICIES[name];
+  try {
+    return await prep.step(name, policy.budgetMs, fn);
+  } catch (error) {
+    if (error instanceof PrepStepTimeoutError && policy.timeout === 'degrade') {
+      spinner.warn(error.message);
+      return timeoutFallback as T;
+    }
+    throw error;
+  }
+}

@@ -31,10 +31,7 @@ import {
   printPlanningConnectionError,
   streamPlanningSession,
 } from './planning-stream.js';
-import {
-  createPrepProgress,
-  PrepStepTimeoutError,
-} from './start-prep-progress.js';
+import { createPrepProgress, runStartPrepStep } from './start-prep-progress.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -729,35 +726,6 @@ export function resolveSpawnModel(
   return explicitModel || (fresh ? undefined : recordedModel);
 }
 
-const START_PREP_STEP_POLICIES = {
-  'state-reconcile': { budgetMs: 60_000, timeout: 'fail-fast' },
-  'sync-main': { budgetMs: 240_000, timeout: 'degrade' },
-  'tracker-context': { budgetMs: 60_000, timeout: 'degrade' },
-  spawn: { budgetMs: 600_000, timeout: 'fail-fast' },
-} as const;
-
-type StartPrepStepName = keyof typeof START_PREP_STEP_POLICIES;
-type PrepProgress = ReturnType<typeof createPrepProgress>;
-
-async function runStartPrepStep<T>(
-  prep: PrepProgress,
-  spinner: Pick<Ora, 'warn'>,
-  name: StartPrepStepName,
-  fn: () => Promise<T> | T,
-  timeoutFallback?: T,
-): Promise<T> {
-  const policy = START_PREP_STEP_POLICIES[name];
-  try {
-    return await prep.step(name, policy.budgetMs, fn);
-  } catch (error) {
-    if (error instanceof PrepStepTimeoutError && policy.timeout === 'degrade') {
-      spinner.warn(error.message);
-      return timeoutFallback as T;
-    }
-    throw error;
-  }
-}
-
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   try {
     const model = normalizeModelOverrideSync(options.model);
@@ -878,8 +846,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       prep.update(`Resolved project: ${resolved.projectName} (${resolved.projectPath})`);
       await runStartPrepStep(prep, spinner, 'state-reconcile', async () => {
         prep.update(`Reconciling permanent state for ${resolved.projectName}...`);
-        await requireAutomaticStateMigration(resolved);
-        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true);
+        await requireAutomaticStateMigration(resolved); await applyStartPolicyOptions(resolved, id, options, options.dryRun === true);
       });
     }
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
@@ -1078,16 +1045,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         await runStartPrepStep(prep, spinner, 'sync-main', async () => {
           const syncResult = await syncMainIntoWorkspace(workspace, id);
           if (syncResult.success) {
-            if (syncResult.alreadyUpToDate) {
-              prep.update('Workspace already up to date with main');
-            } else {
-              prep.update(`Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`);
-            }
+            prep.update(syncResult.alreadyUpToDate ? 'Workspace already up to date with main' : `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`);
           } else {
             syncConflictFiles = syncResult.conflictFiles;
-            const conflictHint = syncConflictFiles?.length
-              ? ` Conflicts: ${syncConflictFiles.join(', ')}.`
-              : '';
+            const conflictHint = syncConflictFiles?.length ? ` Conflicts: ${syncConflictFiles.join(', ')}.` : '';
             spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
           }
         });
@@ -1245,15 +1206,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     prep.update('Building agent prompt with planning context...');
-    const trackerContext = await runStartPrepStep(
-      prep,
-      spinner,
-      'tracker-context',
-      () => getTrackerContext(id, workspace),
-      '',
-    );
+    const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', () => getTrackerContext(id, workspace), '');
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
-
     prep.update('Spawning agent...');
 
     // `pan start --host --yes` does not attach to the work-agent tmux session.
@@ -1348,5 +1302,4 @@ export const __testInternals = {
   repairMainBranchWorkspace,
   resolveExplicitHarnessFlag,
   runStartPrepStep,
-  START_PREP_STEP_POLICIES,
 };

@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __testInternals } from '../../../src/cli/commands/start.js';
-import { PrepStepTimeoutError } from '../../../src/cli/commands/start-prep-progress.js';
+import {
+  PrepStepTimeoutError,
+  START_PREP_STEP_POLICIES,
+} from '../../../src/cli/commands/start-prep-progress.js';
 
-const { runStartPrepStep, START_PREP_STEP_POLICIES } = __testInternals;
+const { runStartPrepStep } = __testInternals;
 type PrepProgress = Parameters<typeof runStartPrepStep>[0];
 type PrepStepName = keyof typeof START_PREP_STEP_POLICIES;
 
