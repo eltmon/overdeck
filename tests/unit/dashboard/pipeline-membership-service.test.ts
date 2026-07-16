@@ -25,7 +25,7 @@ describe('pipeline membership service', () => {
   it('caches classified membership within the TTL and refreshes after expiry', async () => {
     const gather = vi.fn().mockResolvedValue([{
       issueId: 'PAN-1', issueOpen: true, hasOpenPr: true, hasMergedPr: false,
-      hasConventionBranch: true, branchUnmerged: true, phaseLabel: 'in-review', hasVbriefSpec: true,
+      hasConventionBranch: true, branchUnmerged: true, phaseLabel: 'in-review', hasVbriefSpec: true, explicitlyReady: false,
     }]);
     const getMembership = createPipelineMembershipService({ gather, now: Date.now });
     const project = { name: 'overdeck', path: '/project', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN' };

@@ -37,6 +37,7 @@ function signal(issueId: string, overrides: Partial<Awaited<ReturnType<typeof ga
     branchUnmerged: true,
     phaseLabel: 'in-review',
     hasVbriefSpec: true,
+    explicitlyReady: false,
     ...overrides,
   };
 }

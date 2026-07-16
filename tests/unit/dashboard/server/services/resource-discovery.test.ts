@@ -320,7 +320,7 @@ describe('resource-discovery sanitization', () => {
 });
 
 describe('resource-discovery terminal issue filtering', () => {
-  it('excludes closed close-out residue unless the issue still has an open PR', async () => {
+  it('preserves live close-out residue as annotation-only resource drift', async () => {
     mocks.issueService.getIssues.mockReturnValue([
       {
         identifier: 'PAN-2054',
@@ -330,8 +330,16 @@ describe('resource-discovery terminal issue filtering', () => {
       },
     ]);
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-2054']));
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
+      issueId: 'PAN-2054', inPipeline: false, bucket: 'clean_terminal', reasons: ['closed'], labelDrift: null,
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: null },
+    }]);
 
-    await expect(discoverResourceAllocatedIssues()).resolves.toEqual([]);
+    await expect(discoverResourceAllocatedIssues()).resolves.toEqual([
+      expect.objectContaining({
+        issueId: 'PAN-2054', pipelineBucket: 'clean_terminal', resourceDrift: true,
+      }),
+    ]);
 
     resetResourceAllocatedIssuesCacheForTests();
     mocks.getGitHubConfig.mockReturnValue({ repos: [{ owner: 'eltmon', repo: 'overdeck' }] });

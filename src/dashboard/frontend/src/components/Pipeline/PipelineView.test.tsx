@@ -168,6 +168,23 @@ describe('PipelineView', () => {
     expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
   });
 
+  it('renders an explicitly ready issue admitted by canonical membership in the Ready lane', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-12',
+        title: 'Explicitly ready work',
+        labels: ['ready'],
+        pipelineMembership: { inPipeline: true, bucket: 'planned_backlog', labelDrift: null },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const readyPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="ready"]') as HTMLElement;
+    expect(within(readyPhase).getByText('Explicitly ready work')).toBeInTheDocument();
+  });
+
   it('sorts rows within each phase by priority rank then updatedAt descending', () => {
     const { container } = renderPipelineView();
     const workPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="work"]') as HTMLElement;

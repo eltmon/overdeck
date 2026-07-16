@@ -1,14 +1,20 @@
+import { spawnSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { resolvePipelineMembership, type IssueLensSignals } from '../../../src/lib/pipeline-membership.js';
 
+const root = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const CONSUMERS = [
-  'resource-discovery',
-  'frontend-pipeline-state',
-  'pan-pending',
-  'enumerate-in-flight',
-  'flywheel',
-  'pipeline-status-skill',
+  { name: 'resource-discovery', file: 'src/dashboard/server/services/resource-discovery.ts', delegates: /getPipelineMembershipForProjects/, legacy: /filter\(\(issue\) => !isTerminalTrackerState/ },
+  { name: 'frontend-pipeline-state', file: 'src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx', delegates: /pipelineMembership\?\.inPipeline/, legacy: /stateType.*in_progress.*in_review/ },
+  { name: 'pan-pending', file: 'src/cli/commands/pending.ts', delegates: /resolvePipelineMembership/, legacy: /const memberIds = new Set\(Object\.values\(allStatuses\)/ },
+  { name: 'enumerate-in-flight', file: 'src/lib/reconstruct/enumerate-in-flight.ts', delegates: /resolvePipelineMembership/, legacy: /openIssueIds|FEATURE_DIR_RE/ },
+  { name: 'flywheel', file: 'src/lib/cloister/flywheel.ts', delegates: /resolvePipelineMembership/, legacy: /workspacesDir.*feature-/ },
+  { name: 'pipeline-status-skill', file: 'sync-sources/skills/pipeline-status/SKILL.md', delegates: /\/api\/pipeline\/membership/, legacy: /in_progress','in_review/ },
 ] as const;
 
 function signals(overrides: Partial<IssueLensSignals>): IssueLensSignals {
@@ -21,21 +27,28 @@ function signals(overrides: Partial<IssueLensSignals>): IssueLensSignals {
     branchUnmerged: false,
     phaseLabel: null,
     hasVbriefSpec: false,
+    explicitlyReady: false,
     ...overrides,
   };
 }
 
 describe('pipeline membership no-loss audit', () => {
-  it('accounts for all six legacy membership consumers', () => {
-    expect(CONSUMERS).toEqual([
-      'resource-discovery',
-      'frontend-pipeline-state',
-      'pan-pending',
-      'enumerate-in-flight',
-      'flywheel',
-      'pipeline-status-skill',
-    ]);
-    expect(new Set(CONSUMERS).size).toBe(6);
+  it('reads all six consumers and mechanically enforces delegation with no legacy predicate', async () => {
+    expect(new Set(CONSUMERS.map((consumer) => consumer.name)).size).toBe(6);
+    for (const consumer of CONSUMERS) {
+      const source = await readFile(resolve(root, consumer.file), 'utf-8');
+      expect(source, `${consumer.name} must delegate through membership`).toMatch(consumer.delegates);
+      expect(source, `${consumer.name} must not restore legacy membership math`).not.toMatch(consumer.legacy);
+    }
+  });
+
+  it('proves the lint guard rejects seeded violations', () => {
+    const result = spawnSync('bash', ['scripts/lint-pipeline-membership.sh', '--self-test'], {
+      cwd: root,
+      encoding: 'utf-8',
+    });
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain('caught seeded consumer and durable-boundary violations');
   });
 
   it.each([

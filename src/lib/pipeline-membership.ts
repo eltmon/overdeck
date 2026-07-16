@@ -51,6 +51,8 @@ export interface IssueLensSignals {
   phaseLabel: string | null;
   /** L6-spec — a durable vBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
   hasVbriefSpec: boolean;
+  /** Durable Definition-of-Ready signal from the issue's `ready` label. */
+  explicitlyReady: boolean;
 }
 
 export interface PipelineMembership {
@@ -145,6 +147,9 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
       'planned_backlog',
       'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
     );
+  }
+  if (s.explicitlyReady) {
+    return result('planned_backlog', 'open issue carries the explicit ready label — ready to start');
   }
   return result('clean_terminal', 'open issue with no branch and no PR — backlog, never started');
 }

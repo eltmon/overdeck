@@ -4,7 +4,6 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import {
-  getIssueStatePromise,
   listOpenIssuesWithLabelsPromise,
 } from './github-app.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
@@ -23,12 +22,11 @@ interface GitHubPullRequestRow {
   head: { ref: string };
 }
 
-export const PIPELINE_ISSUE_STATE_CONCURRENCY = 8;
-export const PIPELINE_PR_HEAD_BATCH_SIZE = 50;
-
 interface MergedHeadGraphqlResponse {
   data?: {
-    repository?: Record<string, { totalCount?: number }>;
+    repository?: Record<string, {
+      nodes?: Array<{ headRepository?: { name?: string; owner?: { login?: string } } | null }>;
+    }>;
   };
 }
 
@@ -47,26 +45,42 @@ export async function listMergedPullRequestHeadsBatched(
   heads: string[],
   runGraphql: (query: string) => Promise<string> = runGitHubGraphql,
 ): Promise<string[]> {
-  const mergedHeads: string[] = [];
-  for (let start = 0; start < heads.length; start += PIPELINE_PR_HEAD_BATCH_SIZE) {
-    const chunk = heads.slice(start, start + PIPELINE_PR_HEAD_BATCH_SIZE);
-    const fields = chunk.map((head, index) =>
-      `h${index}: pullRequests(states: MERGED, headRefName: ${JSON.stringify(head)}, first: 1) { totalCount }`);
-    const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
-    const response = JSON.parse(await runGraphql(query)) as MergedHeadGraphqlResponse;
-    const repository = response.data?.repository ?? {};
-    for (let index = 0; index < chunk.length; index += 1) {
-      if ((repository[`h${index}`]?.totalCount ?? 0) > 0) mergedHeads.push(chunk[index]!);
-    }
-  }
-  return mergedHeads;
+  if (heads.length === 0) return [];
+  const fields = heads.map((head, index) =>
+    `h${index}: pullRequests(states: MERGED, headRefName: ${JSON.stringify(head)}, first: 10) { nodes { headRepository { name owner { login } } } }`);
+  const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
+  const response = JSON.parse(await runGraphql(query)) as MergedHeadGraphqlResponse;
+  const repository = response.data?.repository ?? {};
+  return heads.filter((_head, index) => repository[`h${index}`]?.nodes?.some((pr) =>
+    pr.headRepository?.name === repo && pr.headRepository.owner?.login === owner));
+}
+
+interface IssueStateGraphqlResponse {
+  data?: { repository?: Record<string, { state?: 'OPEN' | 'CLOSED' } | null> };
+}
+
+export async function listIssueStatesBatched(
+  owner: string,
+  repo: string,
+  numbers: number[],
+  runGraphql: (query: string) => Promise<string> = runGitHubGraphql,
+): Promise<Array<{ number: number; state: 'open' | 'closed' }>> {
+  if (numbers.length === 0) return [];
+  const fields = numbers.map((number, index) => `i${index}: issue(number: ${number}) { state }`);
+  const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
+  const response = JSON.parse(await runGraphql(query)) as IssueStateGraphqlResponse;
+  const repository = response.data?.repository ?? {};
+  return numbers.map((number, index) => ({
+    number,
+    state: repository[`i${index}`]?.state === 'OPEN' ? 'open' : 'closed',
+  }));
 }
 
 export interface PipelineMembershipGatherDeps {
   listOpenIssues(owner: string, repo: string): Promise<Array<{ number: number; labels: string[] }>>;
   listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
   listMergedPullRequestHeads(owner: string, repo: string, heads: string[]): Promise<string[]>;
-  getIssueState(owner: string, repo: string, number: number): Promise<{ state: 'open' | 'closed' }>;
+  listIssueStates(owner: string, repo: string, numbers: number[]): Promise<Array<{ number: number; state: 'open' | 'closed' }>>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
   run(command: string, args: string[], cwd?: string): Promise<string>;
 }
@@ -89,7 +103,7 @@ const defaultDeps: PipelineMembershipGatherDeps = {
     }));
   },
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
-  getIssueState: getIssueStatePromise,
+  listIssueStates: listIssueStatesBatched,
   listSpecIssueIds: async (projectPath) =>
     (await Effect.runPromise(listSpecs(projectPath))).map((entry) => entry.issueId),
   run: async (command, args, cwd) => {
@@ -112,23 +126,6 @@ function issueNumber(issueId: string): number {
 function issueIdFromRef(ref: string): string | null {
   if (!/(?:^|\/)feature\//.test(ref)) return null;
   return parseIssueIdFromTextSync(ref);
-}
-
-async function mapWithConcurrency<T, R>(
-  items: T[],
-  concurrency: number,
-  map: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let nextIndex = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex++;
-      results[index] = await map(items[index]!);
-    }
-  });
-  await Promise.all(workers);
-  return results;
 }
 
 /** Gather all durable pipeline lenses for one GitHub-backed project in batches. */
@@ -194,17 +191,13 @@ export async function gatherProjectLensSignals(
     if (!headRefsByIssue.has(id) && mergedHeads.has(`feature/${id.toLowerCase()}`)) mergedPrIssues.add(id);
   }
 
-  const candidateStates = await mapWithConcurrency(
-    [...candidates],
-    PIPELINE_ISSUE_STATE_CONCURRENCY,
-    async (id) => {
-      return [
-        id,
-        labelsByIssue.has(id) || (await deps.getIssueState(owner, repo, issueNumber(id))).state === 'open',
-      ] as const;
-    },
-  );
-  const issueOpen = new Map(candidateStates);
+  const unknownIssueIds = [...candidates].filter((id) => !labelsByIssue.has(id));
+  const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
+  const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
+  const issueOpen = new Map([...candidates].map((id) => [
+    id,
+    labelsByIssue.has(id) || stateByNumber.get(issueNumber(id)) === 'open',
+  ]));
 
   return [...candidates].sort().map((id) => ({
     issueId: id,
@@ -215,5 +208,6 @@ export async function gatherProjectLensSignals(
     branchUnmerged: unmergedBranchIssues.has(id),
     phaseLabel: STALE_PIPELINE_LABELS.find((label) => labelsByIssue.get(id)?.includes(label)) ?? null,
     hasVbriefSpec: specIssues.has(id),
+    explicitlyReady: labelsByIssue.get(id)?.includes('ready') ?? false,
   }));
 }

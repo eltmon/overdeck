@@ -21,19 +21,30 @@ ban_pattern() {
   fi
 }
 
+ban_disposable_imports() {
+  local file="$1"
+  if rg -n "from ['\"][^'\"]*(database|review-status|agents|agent-state|tmux)" "$file"; then
+    echo "✗ pipeline-membership boundary: disposable-state import in $file"
+    fail=1
+  fi
+}
+
 if [[ "${1:-}" == "--self-test" ]]; then
-  consumer='const isInPipeline = existsSync(join(workspacesDir, `feature-${issueId}`));'
-  boundary="import { getAllReviewStatusesFromDb } from './review-status-sync.js';"
-  if [[ "$consumer" != *"existsSync"* || "$consumer" != *"workspacesDir"* ]]; then
-    echo "✗ pipeline-membership self-test: seeded legacy workspace predicate was not detected"
-    exit 1
+  fixture_dir="$(mktemp -d)"
+  trap 'rm -rf "$fixture_dir"' EXIT
+  printf '%s\n' 'const isInPipeline = existsSync(join(workspacesDir, `feature-${issueId}`));' > "$fixture_dir/consumer.ts"
+  printf '%s\n' "import { getAllReviewStatusesFromDb } from './review-status-sync.js';" > "$fixture_dir/gatherer.ts"
+
+  fail=0
+  require_reference "$fixture_dir/consumer.ts" 'resolvePipelineMembership' 'seeded consumer'
+  ban_pattern "$fixture_dir/consumer.ts" 'existsSync.*workspacesDir' 'seeded consumer'
+  ban_disposable_imports "$fixture_dir/gatherer.ts"
+  if (( fail == 0 )); then
+    echo "pipeline-membership self-test failed to reject seeded violations" >&2
+    exit 2
   fi
-  if [[ ! "$boundary" =~ review-status|database|agents|tmux ]]; then
-    echo "✗ pipeline-membership self-test: seeded disposable-state import was not detected"
-    exit 1
-  fi
-  echo "✓ pipeline-membership self-test caught seeded consumer and durable-boundary violations"
-  exit 0
+  echo "pipeline-membership self-test caught seeded consumer and durable-boundary violations"
+  exit 1
 fi
 
 if [[ $# -gt 0 ]]; then
@@ -59,10 +70,7 @@ ban_pattern sync-sources/skills/pipeline-status/SKILL.md "in_progress','in_revie
 # The resolver and gatherer are durable-lens code. Disposable L5 state may not
 # enter through DB, review-status, agent-state, or tmux imports.
 for file in src/lib/pipeline-membership.ts src/lib/pipeline-membership-gather.ts; do
-  if rg -n "from ['\"][^'\"]*(database|review-status|agents|agent-state|tmux)" "$file"; then
-    echo "✗ pipeline-membership boundary: disposable-state import in $file"
-    fail=1
-  fi
+  ban_disposable_imports "$file"
 done
 
 if (( fail )); then

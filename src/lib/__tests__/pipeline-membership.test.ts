@@ -11,6 +11,7 @@ const sig = (over: Partial<IssueLensSignals>): IssueLensSignals => ({
   branchUnmerged: false,
   phaseLabel: null,
   hasVbriefSpec: false,
+  explicitlyReady: false,
   ...over,
 });
 
@@ -53,6 +54,12 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
 
   it('planned_backlog: open issue with a vBRIEF spec but no branch or PR', () => {
     const r = resolvePipelineMembership(sig({ issueOpen: true, hasVbriefSpec: true }));
+    expect(r.bucket).toBe('planned_backlog');
+    expect(r.inPipeline).toBe(true);
+  });
+
+  it('planned_backlog: open issue with only the explicit ready label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, explicitlyReady: true }));
     expect(r.bucket).toBe('planned_backlog');
     expect(r.inPipeline).toBe(true);
   });

@@ -99,6 +99,8 @@ export interface ResourceAllocatedIssue {
   resourceDetails: ResourceDetails;
   taskTotals: TaskTotals | null;
   pipelineBucket?: PipelineBucket;
+  /** Live resource residue attached to a resolver-rejected terminal issue. */
+  resourceDrift?: boolean;
 }
 
 interface InternalResourceDetails {
@@ -755,7 +757,11 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   // discoverable internally for diagnostics, but it cannot create a pipeline row.
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
-    .filter((issue) => memberships.get(issue.issueId)?.inPipeline === true)
+    .filter((issue) => {
+      const membership = memberships.get(issue.issueId);
+      return membership?.inPipeline === true
+        || (membership?.bucket === 'clean_terminal' && isLiveResource(issue));
+    })
     .map((issue) => {
         const membership = memberships.get(issue.issueId)!;
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
@@ -791,6 +797,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
           resourceDetails: issue.resourceDetails,
           taskTotals: issue.taskTotals,
           pipelineBucket: membership.bucket,
+          resourceDrift: !membership.inPipeline,
         } satisfies InternalDiscoveredIssue;
       });
 
