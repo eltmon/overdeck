@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:43.959Z",
-  "updated": "2026-07-16T06:53:33.346Z",
+  "updated": "2026-07-16T06:53:38.538Z",
   "pipeline": {
     "issueId": "PAN-2532",
     "reviewStatus": "pending",
@@ -81,5 +81,16 @@
       "summary": "Test gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass.",
       "recordedAt": "2026-07-16T06:53:33.346Z"
     }
-  ]
+  ],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+    ],
+    "recordedAt": "2026-07-16T06:53:38.538Z"
+  }
 }
