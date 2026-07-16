@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-16T18:22:52.592Z",
+  "updated": "2026-07-16T18:25:06.292Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -84,7 +84,7 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
+    "sequence": 3,
     "claims": {},
     "claimHistory": [
       {
@@ -97,12 +97,19 @@
         "outcome": "completed",
         "releasedAt": "2026-07-16T18:08:20.709Z"
       }
-    ]
+    ],
+    "statusReasons": {
+      "wi-2-registry": {
+        "reason": "Blocked by failed mandatory inspection for wi-1-spawn: lint ratchet baseline is intentionally deferred to wi-7, but the inspector requires the clean intermediate commit to pass npm run lint. Resolve the inspection/spec conflict and obtain a passed wi-1 verdict before advancing.",
+        "updatedAt": "2026-07-16T18:25:06.292Z"
+      }
+    }
   },
   "statusOverrides": {
     "wi-1-spawn": "completed",
     "wi-1-spawn.wi-1-spawn.ac1": "completed",
     "wi-1-spawn.wi-1-spawn.ac2": "completed",
-    "wi-1-spawn.wi-1-spawn.ac3": "completed"
+    "wi-1-spawn.wi-1-spawn.ac3": "completed",
+    "wi-2-registry": "blocked"
   }
 }
