@@ -87,7 +87,7 @@ export default defineConfig({
   server: { watch: null },
   test: {
     globals: true,
-    environment: 'jsdom',
+    environment: 'happy-dom',
     // canvas-setup.ts must load first — it stubs canvas before test-setup.ts
     // imports @xterm/xterm (which probes canvas on import). See PAN-1989.
     setupFiles: [
