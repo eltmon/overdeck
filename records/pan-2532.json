@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:43.959Z",
-  "updated": "2026-07-16T06:53:31.647Z",
+  "updated": "2026-07-16T06:53:33.346Z",
   "pipeline": {
     "issueId": "PAN-2532",
     "reviewStatus": "pending",
@@ -74,5 +74,12 @@
     "widen-title-grid.widen-title-grid.ac3": "completed",
     "widen-title-grid.widen-title-grid.ac4": "completed",
     "widen-title-grid.widen-title-grid.ac5": "completed"
-  }
+  },
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass.",
+      "recordedAt": "2026-07-16T06:53:33.346Z"
+    }
+  ]
 }
