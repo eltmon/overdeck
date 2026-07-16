@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:14:47.057Z",
+  "updated": "2026-07-16T00:19:40.513Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -169,7 +169,10 @@
     "issue-view-wrapper.issue-view-wrapper.ac3": "completed",
     "issue-view-wrapper.issue-view-wrapper.ac4": "completed",
     "issue-view-wrapper.issue-view-wrapper.ac5": "completed",
-    "rail-expand": "running"
+    "rail-expand": "completed",
+    "rail-expand.rail-expand.ac1": "completed",
+    "rail-expand.rail-expand.ac2": "completed",
+    "rail-expand.rail-expand.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -195,16 +198,8 @@
     }
   },
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "rail-expand": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 472635,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T00:14:47.057Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -315,6 +310,17 @@
         "outcome": "completed",
         "reason": "Shared IssueView now owns the rail, cockpit, and console density boundary via DENSITY_SECTIONS; all three shells adopt it, policy control is shared, no-loss shell tests pass, and FeatureItem ratchet fell to 1366 lines. Commit 08c17dd04c is pushed.",
         "releasedAt": "2026-07-16T00:01:52.195Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 472635,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T00:14:47.057Z",
+        "itemId": "rail-expand",
+        "outcome": "completed",
+        "reason": "The existing rail caret now promotes the same IssueView instance to cockpit density without selecting a tab, the shared full-screen control promotes to console, collapse returns to rail, row-click tab selection remains intact, and FeatureItem ratchet dropped to 1365. Commit d6e758ea00 is pushed.",
+        "releasedAt": "2026-07-16T00:19:40.513Z"
       }
     ],
     "statusReasons": {
@@ -353,6 +359,10 @@
       "issue-view-wrapper": {
         "reason": "Shared IssueView now owns the rail, cockpit, and console density boundary via DENSITY_SECTIONS; all three shells adopt it, policy control is shared, no-loss shell tests pass, and FeatureItem ratchet fell to 1366 lines. Commit 08c17dd04c is pushed.",
         "updatedAt": "2026-07-16T00:01:52.195Z"
+      },
+      "rail-expand": {
+        "reason": "The existing rail caret now promotes the same IssueView instance to cockpit density without selecting a tab, the shared full-screen control promotes to console, collapse returns to rail, row-click tab selection remains intact, and FeatureItem ratchet dropped to 1365. Commit d6e758ea00 is pushed.",
+        "updatedAt": "2026-07-16T00:19:40.513Z"
       }
     }
   },
