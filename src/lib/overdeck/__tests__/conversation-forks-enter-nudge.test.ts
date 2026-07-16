@@ -22,7 +22,11 @@ vi.mock('../../agents.js', async (importOriginal) => ({
 }));
 
 import type { LegacyConversation as Conversation } from '../conversations.js';
-import { createConversation, getConversationByName } from '../conversations.js';
+import {
+  createConversation,
+  getConversationByName,
+  recordConversationHandoff,
+} from '../conversations.js';
 import { sessionFilePath } from '../../paths.js';
 import * as forks from '../conversation-forks.js';
 
@@ -175,8 +179,8 @@ describe('runForkPipeline stranded status', () => {
       tmuxSession: 'status-fork-session',
       cwd: parentCwd,
       harness: 'codex',
-      handoffDocPath,
     });
+    recordConversationHandoff('status-parent', 'status-fork', handoffDocPath);
     vi.spyOn(forks, 'ensureForkSessionReady').mockResolvedValue(undefined);
     vi.spyOn(forks, 'injectForkSummary').mockResolvedValue(result);
 
