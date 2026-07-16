@@ -192,23 +192,24 @@
     "recordedAt": "2026-07-16T07:45:53.765Z"
   },
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T10:01:16.343Z",
+  "updated": "2026-07-16T12:02:23.034Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "error",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T10:01:16.306Z",
+    "updatedAt": "2026-07-16T12:02:23.004Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Inspection error for bead codex-config-mcp-servers: tmux session inspect-pan-2698-codex-config-mcp-servers exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2785",
     "lastVerifiedCommit": "5d854d7d791798fae62289b955f422b2d1e8bda5",
     "reviewRequestedAt": "2026-07-16T08:55:04.547Z",
-    "reviewSpawnedAt": "2026-07-16T09:10:18.873Z"
+    "reviewSpawnedAt": "2026-07-16T09:10:18.873Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-16T12:02:23.004Z"
   },
   "closeOut": {
     "usage": {
@@ -278,7 +279,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2785"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-16T12:02:23.030Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 5d854d7d791798fae62289b955f422b2d1e8bda5",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2785 MERGED at 2026-07-16T10:01:15Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T10:01:15Z",
+          "mergeCommit": "e4a4a6b214ed64e5c8531e672a05d3d168c9f4ec"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on e4a4a6b214ed64e5c8531e672a05d3d168c9f4ec",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-16T12:01:13.000Z, dist built 2026-07-16T11:43:20.890Z, merge 2026-07-16T10:01:15.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 3 orphaned process(es); Removed git worktree; Removed 7 agent state directories; No strike branch strike/pan-2698 found; Pruned 25 checkpoint ref(s) for agent-pan-2698, planning-pan-2698, strike-pan-2698; No specialist registry entries for PAN-2698"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",

@@ -85,21 +85,22 @@
   ],
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T10:01:17.174Z",
+  "updated": "2026-07-16T12:00:53.703Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T10:01:17.086Z",
+    "updatedAt": "2026-07-16T12:00:53.655Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2786",
     "lastVerifiedCommit": "efdf6bf28798d0779a04402341824a44c2962842",
     "reviewRequestedAt": "2026-07-16T08:35:05.583Z",
-    "reviewSpawnedAt": "2026-07-16T08:58:31.395Z"
+    "reviewSpawnedAt": "2026-07-16T08:58:31.395Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-16T12:00:53.655Z"
   },
   "closeOut": {
     "usage": {
@@ -169,7 +170,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2786"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-16T12:00:53.675Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at efdf6bf28798d0779a04402341824a44c2962842",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2786 MERGED at 2026-07-16T10:01:12Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T10:01:12Z",
+          "mergeCommit": "69e9e9ac533714e76929e4888da062d0c1760ef2"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: in_review; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 69e9e9ac533714e76929e4888da062d0c1760ef2",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-16T11:59:53.000Z, dist built 2026-07-16T11:43:20.890Z, merge 2026-07-16T10:01:12.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; Killed 6 orphaned process(es); Removed git worktree; No agent state directories found; Preserved local branch strike/pan-2168 — not merged to main; Preserved remote branch strike/pan-2168 — not merged to main; Pruned 0 checkpoint ref(s) for agent-pan-2168, planning-pan-2168, strike-pan-2168; No specialist registry entries for PAN-2168"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
