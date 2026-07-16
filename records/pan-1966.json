@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:14:04.228Z",
+  "updated": "2026-07-16T12:14:06.493Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "lint-guard-fr5": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 1801593,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:14:04.228Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -242,6 +234,17 @@
         "outcome": "completed",
         "reason": "Runtime drift table and six-consumer inventory are pinned without violating the source-introspection guard.",
         "releasedAt": "2026-07-16T12:14:01.822Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1801593,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:14:04.228Z",
+        "itemId": "lint-guard-fr5",
+        "outcome": "completed",
+        "reason": "Lint guard enforces six delegations, legacy predicate bans, and durable-only imports.",
+        "releasedAt": "2026-07-16T12:14:06.493Z"
       }
     ],
     "statusReasons": {
@@ -291,8 +294,8 @@
         "updatedAt": "2026-07-16T12:14:01.822Z"
       },
       "lint-guard-fr5": {
-        "reason": "Implementation pushed in 124117eab7",
-        "updatedAt": "2026-07-16T12:14:04.228Z"
+        "reason": "Lint guard enforces six delegations, legacy predicate bans, and durable-only imports.",
+        "updatedAt": "2026-07-16T12:14:06.493Z"
       }
     }
   },
@@ -343,6 +346,9 @@
     "no-loss-audit-test.no-loss-audit-test.ac1": "completed",
     "no-loss-audit-test.no-loss-audit-test.ac2": "completed",
     "no-loss-audit-test.no-loss-audit-test.ac3": "completed",
-    "lint-guard-fr5": "running"
+    "lint-guard-fr5": "completed",
+    "lint-guard-fr5.lint-guard-fr5.ac1": "completed",
+    "lint-guard-fr5.lint-guard-fr5.ac2": "completed",
+    "lint-guard-fr5.lint-guard-fr5.ac3": "completed"
   }
 }
