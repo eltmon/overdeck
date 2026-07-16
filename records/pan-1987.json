@@ -171,17 +171,17 @@
     "recordedAt": "2026-07-16T19:14:41.281Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T20:36:30.487Z",
+  "updated": "2026-07-16T20:37:31.274Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:36:29.619Z",
+    "updatedAt": "2026-07-16T20:37:31.236Z",
     "reviewNotes": "[correctness] Tree rename can target a different project — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx:232`",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
@@ -230,28 +230,6 @@
         "tests/unit/lib/projects-rename.test.ts"
       ],
       "recordedAt": "2026-07-16T19:14:41.281Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/security.md",
-        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/correctness.md",
-        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
-      },
-      "performance": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/performance.md",
-        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/requirements.md",
-        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
-      }
     },
     "strikeRecoveryCount": 0
   },
@@ -316,9 +294,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4443811,
-            "output": 217018,
-            "cacheRead": 64142336,
+            "input": 4484189,
+            "output": 223188,
+            "cacheRead": 66350080,
             "cacheWrite": 0
           }
         }
@@ -331,9 +309,9 @@
           "cacheWrite": 175114
         },
         "openai/gpt-5.6-sol": {
-          "input": 9164955,
-          "output": 339256,
-          "cacheRead": 84914176,
+          "input": 9205333,
+          "output": 345426,
+          "cacheRead": 87121920,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -344,8 +322,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 111.31169,
-        "pricingAsOf": "2026-07-16T20:36:29.631Z"
+        "usd": 112.802552,
+        "pricingAsOf": "2026-07-16T20:37:31.260Z"
       }
     },
     "merges": [
