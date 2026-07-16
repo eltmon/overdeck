@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   writeFeedbackFile: vi.fn(),
   messageAgent: vi.fn(),
   resolveIssueFeedbackTarget: vi.fn(),
-  markWorkspaceStuck: vi.fn(),
 }));
 
 vi.mock('../../projects.js', () => ({
@@ -16,7 +15,6 @@ vi.mock('../../projects.js', () => ({
 
 vi.mock('../../review-status.js', () => ({
   getReviewStatusSync: mocks.getReviewStatusSync,
-  markWorkspaceStuck: mocks.markWorkspaceStuck,
 }));
 
 vi.mock('../feedback-writer.js', () => ({
@@ -25,12 +23,6 @@ vi.mock('../feedback-writer.js', () => ({
 
 vi.mock('../feedback-target.js', () => ({
   resolveIssueFeedbackTarget: mocks.resolveIssueFeedbackTarget,
-  surfaceIssueFeedbackNeedsYou: (issueId: string, reason: string, details: Record<string, unknown> = {}) => {
-    mocks.markWorkspaceStuck(issueId, 'feedback_delivery_needs_you', {
-      reason,
-      ...details,
-    });
-  },
 }));
 
 vi.mock('../../agents.js', () => ({
@@ -53,7 +45,6 @@ describe('deliverReviewVerdictFeedback', () => {
       needsYou: true,
       reason: 'No live feedback target for PAN-1917',
     });
-    mocks.markWorkspaceStuck.mockReturnValue(undefined);
     mocks.messageAgent.mockResolvedValue(undefined);
   });
 
@@ -69,6 +60,5 @@ describe('deliverReviewVerdictFeedback', () => {
       feedbackPath: '/tmp/overdeck/workspaces/feature-pan-1917/.pan/feedback/001-review-agent-blocked.md',
       agentMessageSent: false,
     }));
-    expect(mocks.markWorkspaceStuck).not.toHaveBeenCalled();
   });
 });
