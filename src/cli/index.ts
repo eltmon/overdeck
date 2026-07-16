@@ -1278,11 +1278,11 @@ program
 
     console.log('');
   });
-
 program
   .command('reload')
   .description('Build Overdeck, then restart the dashboard only after the build succeeds')
   .option('--skip-build', 'Skip npm run build and restart the existing bundle')
+  .option('--force', 'Bypass the agent deploy-window gate (agent-initiated reloads are otherwise refused while deploy-window block reasons are active)')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 30000)')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start after reload')
   .action(reloadCommand);
