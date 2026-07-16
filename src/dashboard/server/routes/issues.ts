@@ -38,7 +38,7 @@ import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 import { Duration, Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
 
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { extractTeamPrefix, findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
 import { isPlanningComplete, readPlanSync } from '../../../lib/vbrief/io.js';
@@ -67,6 +67,7 @@ import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
+import { getProjectPipelineMembership } from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -867,6 +868,19 @@ const getResourceAllocatedIssuesRoute = HttpRouter.add(
   })),
 );
 
+const getPipelineMembershipRoute = HttpRouter.add(
+  'GET',
+  '/api/pipeline/membership',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project');
+    if (!projectKey) return jsonResponse({ error: 'project query parameter is required' }, { status: 400 });
+    const project = getProjectSync(projectKey);
+    if (!project) return jsonResponse({ error: `Project not found: ${projectKey}` }, { status: 404 });
+    return jsonResponse(yield* Effect.promise(() => getProjectPipelineMembership(project)));
+  })),
+);
+
 const getIssueResourceDetailsRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/resource-details',
@@ -906,6 +920,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
   getResourceAllocatedIssuesRoute,
+  getPipelineMembershipRoute,
   getIssueResourceDetailsRoute,
   getIssuePrRoute,
   getIssuePrDiffRoute,
