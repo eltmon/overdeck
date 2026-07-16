@@ -119,24 +119,24 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T19:33:55.089Z",
+  "updated": "2026-07-16T19:34:03.656Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:33:54.999Z",
+    "updatedAt": "2026-07-16T19:34:03.550Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
     "lastVerifiedCommit": "021ccdb83471a6cb7779d7c53f131b056964bc8c",
     "reviewRequestedAt": "2026-07-16T19:33:54.654Z",
-    "reviewSpawnedAt": "2026-07-16T19:17:38.165Z",
+    "reviewSpawnedAt": "2026-07-16T19:34:03.549Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -280,7 +280,7 @@
       },
       "costAtCloseOut": {
         "usd": 127.608237,
-        "pricingAsOf": "2026-07-16T19:33:55.050Z"
+        "pricingAsOf": "2026-07-16T19:34:03.636Z"
       }
     },
     "merges": [
