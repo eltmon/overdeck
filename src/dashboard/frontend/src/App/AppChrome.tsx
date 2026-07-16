@@ -2,6 +2,7 @@ import { AlertTriangle, CheckCircle2, History, RefreshCw, Search, StopCircle } f
 import { BootReconciliationModal } from '../components/BootReconciliationModal';
 import { DeaconPauseToggle } from '../components/DeaconPauseToggle';
 import { LowCostModePill } from '../components/LowCostModePill';
+import { DecisionsIndicator } from '../components/DecisionsIndicator';
 import { OpenQuestionsIndicator } from '../components/OpenQuestionsIndicator';
 import { SystemMenu } from '../components/SystemMenu';
 import { StoppedAgentsBanner } from '../components/StoppedAgentsBanner';
@@ -222,6 +223,7 @@ export function AppChrome({
           <LowCostModePill onOpenSettings={onOpenSettings} />
           <StaleBuildChip />
           <SystemHealthPill />
+          <DecisionsIndicator />
           <OpenQuestionsIndicator onActivate={onNavigateOpenQuestions} />
           <SystemMenu onOpenSettings={onOpenSettings} />
           {/* The Command Deck has the always-on Awareness rail, so the global
