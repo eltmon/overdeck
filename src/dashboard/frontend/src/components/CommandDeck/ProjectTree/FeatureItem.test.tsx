@@ -1118,7 +1118,8 @@ describe('FeatureItem', () => {
       };
     });
     vi.stubGlobal('fetch', fetchMock);
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const confirmSpy = vi.fn(() => true);
+    vi.stubGlobal('confirm', confirmSpy);
 
     renderReadyForMergeFeature();
 
