@@ -177,9 +177,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T14:08:42.205Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T14:10Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T14:10:39.547Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T14:10:39Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2702\n\n# Review Synthesis — PAN-2702 — 2026-07-16T14:09:12Z\n\n## Verdict: CHANGES REQUESTED — landing reclamation can launch a concurrent duplicate strike merge\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-1341cbac/context.json`\n- Branch: `feature/pan-2702`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702`\n- HEAD reviewed: `1341cbacece74d018de993a0bcedf41ee0cebdb0`\n- Cycle number: 3\n- Prior cycle SHA: `c393bc360db0ae190358a0b3ac62fb8d5cb3445c`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-1341cbac/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-1341cbac/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-1341cbac/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-1341cbac/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Landing reclamation can launch a concurrent duplicate strike merge — `src/lib/cloister/deacon-strike-landing.ts:114`\nThe cycle-3 orphan-recovery fix treats absence from the process-local supervisor as proof that a persisted `landing` marker is unowned. After an initial strike request returns `queued`, the supervisor releases its key while the canonical persistent merge queue still owns the strike. Later patrols can reclaim it repeatedly; once dequeue starts the long-running strike merge outside the supervisor, reclamation can invoke a second pipeline concurrently because strike requests bypass the normal active-operation guard. This can duplicate recovery instructions and race pending-operation state, queue advancement, forge merge, and post-merge lifecycle. Reclaim only when neither process-local supervision nor the persistent queue/pending operation owns the issue, reject duplicate active strike merges at the canonical merge door, and add a queued-to-dequeued lifecycle test that patrols while the merge promise is pending.\n\nThis finding is promotable under the cycle-3 convergence gate because the cited `landing` reclamation and keyed supervisor logic changed after the cycle-2 SHA. It could not have been raised in cycle 1: the original implementation awaited merge work inline and had neither background supervision nor orphan reclamation.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-1341cbac/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2702 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -258,7 +271,7 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T14:08:44.642Z",
+  "updated": "2026-07-16T14:10:39.547Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "reviewing",
