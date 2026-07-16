@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:25:00.720Z",
+  "updated": "2026-07-16T07:27:42.877Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "extract-role-mcp-parser": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2698",
         "agentId": "agent-pan-2698",
         "pid": 3083840,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:25:00.720Z"
+        "claimedAt": "2026-07-16T07:25:00.720Z",
+        "itemId": "extract-role-mcp-parser",
+        "outcome": "completed",
+        "reason": "Extracted parseRoleMcpServersSync, preserved Claude MCP flags, and added parser regression coverage",
+        "releasedAt": "2026-07-16T07:27:42.877Z"
+      }
+    ],
+    "statusReasons": {
+      "extract-role-mcp-parser": {
+        "reason": "Extracted parseRoleMcpServersSync, preserved Claude MCP flags, and added parser regression coverage",
+        "updatedAt": "2026-07-16T07:27:42.877Z"
       }
     }
   },
   "statusOverrides": {
-    "extract-role-mcp-parser": "running"
+    "extract-role-mcp-parser": "completed",
+    "extract-role-mcp-parser.extract-role-mcp-parser.ac1": "completed",
+    "extract-role-mcp-parser.extract-role-mcp-parser.ac2": "completed",
+    "extract-role-mcp-parser.extract-role-mcp-parser.ac3": "completed"
   }
 }
