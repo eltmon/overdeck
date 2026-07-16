@@ -18,7 +18,6 @@ import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, 
 import { needsReviewDispatch } from './review-dispatch-decision.js';
 import type { ScopeDriftRecord } from './vbrief/continue-state.js';
 import { registerMailboxStatusReader } from './cloister/mailbox-status-source.js';
-
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
     notifyPipelineSync({ type, issueId });
@@ -194,7 +193,6 @@ export function mergeGateEligibility(
 // warm-idle advancing classification (see cloister/review-status-source.ts).
 registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
 registerMailboxStatusReader(issueId => getReviewStatusSync(issueId));
-
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
 export function loadReviewStatuses(filePath = DEFAULT_STATUS_FILE): Record<string, ReviewStatus> {
