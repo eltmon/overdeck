@@ -35,10 +35,9 @@ async function collectRelativeImportGraph(entry: string, visited = new Set<strin
 function deps(): PipelineMembershipGatherDeps {
   return {
     listOpenIssues: vi.fn().mockResolvedValue([{ number: 1, labels: ['in-review'] }]),
-    listPullRequests: vi.fn().mockResolvedValue([
-      { headRefName: 'feature/pan-2', mergedAt: null, state: 'open' },
-      { headRefName: 'feature/pan-1', mergedAt: '2026-01-01', state: 'closed' },
-    ]),
+    listOpenPullRequests: vi.fn().mockResolvedValue([{ headRefName: 'feature/pan-2' }]),
+    hasMergedPullRequestForHead: vi.fn().mockImplementation(async (_owner, _repo, head) =>
+      head === 'feature/pan-1'),
     getIssueState: vi.fn().mockImplementation(async (_owner, _repo, number) => ({
       state: number === 4 ? 'open' : 'closed',
     })),
@@ -66,8 +65,9 @@ describe('gatherProjectLensSignals', () => {
   it('lists all PRs through one paginated dependency regardless of candidate count', async () => {
     const mocked = deps();
     await gatherProjectLensSignals(project, mocked);
-    expect(mocked.listPullRequests).toHaveBeenCalledOnce();
-    expect(mocked.listPullRequests).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(mocked.listOpenPullRequests).toHaveBeenCalledOnce();
+    expect(mocked.listOpenPullRequests).toHaveBeenCalledWith('eltmon', 'overdeck');
+    expect(mocked.hasMergedPullRequestForHead).toHaveBeenCalledWith('eltmon', 'overdeck', 'feature/pan-1');
     expect(mocked.run).not.toHaveBeenCalledWith('gh', expect.anything(), expect.anything());
   });
 
@@ -77,14 +77,16 @@ describe('gatherProjectLensSignals', () => {
 
     await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([]);
     expect(mocked.listOpenIssues).not.toHaveBeenCalled();
-    expect(mocked.listPullRequests).not.toHaveBeenCalled();
+    expect(mocked.listOpenPullRequests).not.toHaveBeenCalled();
+    expect(mocked.hasMergedPullRequestForHead).not.toHaveBeenCalled();
     expect(mocked.run).not.toHaveBeenCalled();
   });
 
   it('bounds issue-state lookups for large candidate sets', async () => {
     const mocked = deps();
     mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
-    mocked.listPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.hasMergedPullRequestForHead = vi.fn().mockResolvedValue(false);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(
       Array.from({ length: 40 }, (_, index) => `PAN-${index + 1}`),
     );
@@ -102,6 +104,22 @@ describe('gatherProjectLensSignals', () => {
 
     expect(maximumActive).toBeGreaterThan(1);
     expect(maximumActive).toBeLessThanOrEqual(PIPELINE_ISSUE_STATE_CONCURRENCY);
+    expect(mocked.hasMergedPullRequestForHead).toHaveBeenCalledTimes(40);
+  });
+
+  it('checks merged PR history only for active candidate heads', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['PAN-10', 'PAN-11']);
+    mocked.run = vi.fn().mockResolvedValue('');
+    mocked.hasMergedPullRequestForHead = vi.fn().mockResolvedValue(false);
+
+    await gatherProjectLensSignals(project, mocked);
+
+    expect(mocked.hasMergedPullRequestForHead).toHaveBeenCalledTimes(2);
+    expect(mocked.hasMergedPullRequestForHead).toHaveBeenCalledWith('eltmon', 'overdeck', 'feature/pan-10');
+    expect(mocked.hasMergedPullRequestForHead).toHaveBeenCalledWith('eltmon', 'overdeck', 'feature/pan-11');
   });
 
   it('lets the resolver correct squash lineage using the merged-PR oracle', async () => {

@@ -144,11 +144,6 @@ function filterMatchesShipModifier(filter: PipelineFilterState, reviewStatus?: R
   return true;
 }
 
-function isClosedIssue(issue: Issue) {
-  const state = issue.state ?? issue.status;
-  return issue.stateType === 'completed' || issue.stateType === 'canceled' || state === 'done' || state === 'canceled' || state === 'Canceled' || state === 'Closed' || state === 'Completed';
-}
-
 function isRunningAgent(agent: Agent) {
   return isAgentRunningStatus(agent.status);
 }
@@ -314,7 +309,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
     };
 
     for (const issue of issues) {
-      if (isClosedIssue(issue) && issue.pipelineMembership?.inPipeline !== true) continue;
+      if (issue.pipelineMembership?.inPipeline === false) continue;
 
       const projectOption = projectOptionForIssue(issue);
       if (filter.projects.length > 0 && (!projectOption || !filter.projects.includes(projectOption.id))) {
@@ -413,7 +408,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
 
   const metricTiles = useMemo(() => {
     const activeIssues = issues.filter((issue) => {
-      if (isClosedIssue(issue) && issue.pipelineMembership?.inPipeline !== true) return false;
+      if (issue.pipelineMembership?.inPipeline === false) return false;
       // Active issues = the pipeline set (the rendered lanes), NOT all open
       // issues — raw backlog ('todo') is excluded so the header matches the
       // Definition-of-Ready lanes below (PAN-1966).

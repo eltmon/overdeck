@@ -3,7 +3,11 @@ import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
 
-import { getIssueStatePromise, listOpenIssuesWithLabelsPromise } from './github-app.js';
+import {
+  getIssueStatePromise,
+  listOpenIssuesWithLabelsPromise,
+  listPullRequestsForHeadPromise,
+} from './github-app.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { listSpecs } from './pan-dir/specs.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
@@ -14,21 +18,18 @@ const execFileAsync = promisify(execFile);
 
 interface PullRequestRow {
   headRefName: string;
-  mergedAt?: string | null;
-  state: 'open' | 'closed';
 }
 
 interface GitHubPullRequestRow {
   head: { ref: string };
-  merged_at?: string | null;
-  state: 'open' | 'closed';
 }
 
 export const PIPELINE_ISSUE_STATE_CONCURRENCY = 8;
 
 export interface PipelineMembershipGatherDeps {
   listOpenIssues(owner: string, repo: string): Promise<Array<{ number: number; labels: string[] }>>;
-  listPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
+  listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
+  hasMergedPullRequestForHead(owner: string, repo: string, head: string): Promise<boolean>;
   getIssueState(owner: string, repo: string, number: number): Promise<{ state: 'open' | 'closed' }>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
   run(command: string, args: string[], cwd?: string): Promise<string>;
@@ -36,12 +37,12 @@ export interface PipelineMembershipGatherDeps {
 
 const defaultDeps: PipelineMembershipGatherDeps = {
   listOpenIssues: listOpenIssuesWithLabelsPromise,
-  listPullRequests: async (owner, repo) => {
+  listOpenPullRequests: async (owner, repo) => {
     const { stdout } = await execFileAsync('gh', [
       'api',
       '--paginate',
       '--slurp',
-      `repos/${owner}/${repo}/pulls?state=all&per_page=100`,
+      `repos/${owner}/${repo}/pulls?state=open&per_page=100`,
     ], {
       encoding: 'utf-8',
       timeout: 30_000,
@@ -49,10 +50,10 @@ const defaultDeps: PipelineMembershipGatherDeps = {
     });
     return (JSON.parse(stdout) as GitHubPullRequestRow[][]).flat().map((pr) => ({
       headRefName: pr.head.ref,
-      mergedAt: pr.merged_at,
-      state: pr.state,
     }));
   },
+  hasMergedPullRequestForHead: async (owner, repo, head) =>
+    (await listPullRequestsForHeadPromise(owner, repo, head, 'all')).some((pr) => pr.merged),
   getIssueState: getIssueStatePromise,
   listSpecIssueIds: async (projectPath) =>
     (await Effect.runPromise(listSpecs(projectPath))).map((entry) => entry.issueId),
@@ -104,22 +105,21 @@ export async function gatherProjectLensSignals(
   const [owner, repo] = project.github_repo.split('/');
   if (!owner || !repo) throw new Error(`Invalid github_repo for ${project.name}: ${project.github_repo}`);
 
-  const [openIssues, pullRequests, branchRefs, unmergedRefs, specIssueIds] = await Promise.all([
+  const [openIssues, openPrs, branchRefs, unmergedRefs, specIssueIds] = await Promise.all([
     deps.listOpenIssues(owner, repo),
-    deps.listPullRequests(owner, repo),
+    deps.listOpenPullRequests(owner, repo),
     deps.run('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
     deps.run('git', ['for-each-ref', '--no-merged=main', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
     deps.listSpecIssueIds(project.path),
   ]);
 
-  const openPrs = pullRequests.filter((pr) => pr.state === 'open');
-  const mergedPrs = pullRequests.filter((pr) => pr.mergedAt);
   const refs = branchRefs.split('\n').map((ref) => ref.trim()).filter(Boolean);
   const unmerged = new Set(unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
   const candidates = new Set<string>();
   const labelsByIssue = new Map<string, string[]>();
   const openPrIssues = new Set<string>();
   const mergedPrIssues = new Set<string>();
+  const headRefsByIssue = new Map<string, Set<string>>();
   const branchIssues = new Set<string>();
   const unmergedBranchIssues = new Set<string>();
   const specIssues = new Set(specIssueIds.map((id) => id.toUpperCase()));
@@ -134,33 +134,39 @@ export async function gatherProjectLensSignals(
     if (id) {
       candidates.add(id);
       openPrIssues.add(id);
+      headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), pr.headRefName]));
     }
-  }
-  for (const pr of mergedPrs) {
-    const id = issueIdFromRef(pr.headRefName);
-    if (id) mergedPrIssues.add(id);
   }
   for (const ref of refs) {
     const id = issueIdFromRef(ref);
     if (id) {
       candidates.add(id);
       branchIssues.add(id);
+      const headRef = ref.replace(/^origin\//, '');
+      headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), headRef]));
       if (unmerged.has(ref)) unmergedBranchIssues.add(id);
     }
   }
   for (const id of specIssues) candidates.add(id);
 
-  const issueOpen = new Map([...labelsByIssue.keys()].map((id) => [id, true]));
-  const unknownCandidates = [...candidates].filter((id) => !issueOpen.has(id));
-  const issueOpenEntries = await mapWithConcurrency(
-    unknownCandidates,
+  const candidateStates = await mapWithConcurrency(
+    [...candidates],
     PIPELINE_ISSUE_STATE_CONCURRENCY,
-    async (id) => [
-      id,
-      (await deps.getIssueState(owner, repo, issueNumber(id))).state === 'open',
-    ] as const,
+    async (id) => {
+      const heads = headRefsByIssue.get(id) ?? new Set([`feature/${id.toLowerCase()}`]);
+      for (const head of heads) {
+        if (await deps.hasMergedPullRequestForHead(owner, repo, head)) {
+          mergedPrIssues.add(id);
+          break;
+        }
+      }
+      return [
+        id,
+        labelsByIssue.has(id) || (await deps.getIssueState(owner, repo, issueNumber(id))).state === 'open',
+      ] as const;
+    },
   );
-  for (const entry of issueOpenEntries) issueOpen.set(...entry);
+  const issueOpen = new Map(candidateStates);
 
   return [...candidates].sort().map((id) => ({
     issueId: id,

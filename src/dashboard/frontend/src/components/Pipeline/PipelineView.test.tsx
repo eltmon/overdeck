@@ -132,11 +132,12 @@ describe('PipelineView', () => {
     expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(6);
   });
 
-  it('renders post-merge limbo from server membership without review-status residue', () => {
+  it('keeps phase derivation unchanged when server membership is attached', () => {
     useDashboardStore.setState({
       issuesRaw: [issue({
         identifier: 'PAN-10',
         title: 'Merged but still open',
+        state: 'in_review',
         pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
       })],
       reviewStatusByIssueId: {},
@@ -144,8 +145,27 @@ describe('PipelineView', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const { container } = renderPipelineView();
-    const readyPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="ready"]') as HTMLElement;
-    expect(within(readyPhase).getByText('Merged but still open')).toBeInTheDocument();
+    const reviewPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="review"]') as HTMLElement;
+    expect(within(reviewPhase).getByText('Merged but still open')).toBeInTheDocument();
+  });
+
+  it('excludes open clean-terminal issues before lane derivation and metric counting', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-11',
+        title: 'Stale open work',
+        state: 'in_progress',
+        pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.queryByText('Stale open work')).not.toBeInTheDocument();
+    const activeTile = screen.getByText('Active issues').closest('[data-component="metric-tile"]') as HTMLElement;
+    expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
   });
 
   it('sorts rows within each phase by priority rank then updatedAt descending', () => {

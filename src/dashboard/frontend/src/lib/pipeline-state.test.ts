@@ -35,15 +35,21 @@ describe('Definition of Ready (PAN-1966)', () => {
     expect(getPipelineIssuePhase(backlogIssue())).toBe('todo');
   });
 
-  it('uses server-computed membership when present and preserves legacy fallback when absent', () => {
-    expect(getPipelineIssuePhase(backlogIssue({
+  it('does not use server membership as a lane-assignment signal', () => {
+    const withoutMembership = backlogIssue();
+    const withMembership = backlogIssue({
       pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
-    }))).toBe('ready');
-    expect(getPipelineIssuePhase(backlogIssue({
+    });
+    expect(getPipelineIssuePhase(withMembership)).toBe(getPipelineIssuePhase(withoutMembership));
+    expect(getPipelineIssuePhase(withMembership)).toBe('todo');
+
+    const readyWithoutMembership = backlogIssue({ labels: ['ready'] });
+    const readyWithMembership = backlogIssue({
       labels: ['ready'],
       pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
-    }))).toBe('todo');
-    expect(getPipelineIssuePhase(backlogIssue({ labels: ['ready'] }))).toBe('ready');
+    });
+    expect(getPipelineIssuePhase(readyWithMembership)).toBe(getPipelineIssuePhase(readyWithoutMembership));
+    expect(getPipelineIssuePhase(readyWithMembership)).toBe('ready');
   });
 
   it('preserves in-flight lane assignment when membership is attached', () => {
