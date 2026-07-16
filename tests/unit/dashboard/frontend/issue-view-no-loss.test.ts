@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -127,5 +127,24 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
       .filter((entry) => !entry.home.startsWith('src/dashboard/frontend/src/components/'))
       .map((entry) => `${entry.section} → ${entry.home}`);
     expect(outOfTree, `home path(s) outside the frontend components tree: ${outOfTree.join(', ')}`).toEqual([]);
+  });
+
+  it('every inventory section has a real rendered JSX marker', () => {
+    const componentsRoot = path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components');
+    const sources = readdirSync(componentsRoot, { recursive: true, encoding: 'utf8' })
+      .filter((file) => file.endsWith('.tsx') && !file.endsWith('.test.tsx'))
+      .map((file) => readFileSync(path.join(componentsRoot, file), 'utf8'))
+      .join('\n');
+    const renderedSectionAttributes = [...sources.matchAll(/data-section=(?:"[^"]*"|\{[^}]*\})/gs)]
+      .map(([attribute]) => attribute)
+      .join('\n');
+    const missing = EXPECTED_SECTIONS.filter(
+      (section) => !renderedSectionAttributes.includes(`"${section}"`) &&
+        !renderedSectionAttributes.includes(`'${section}'`),
+    );
+    expect(
+      missing,
+      `section(s) declared but not rendered with a data-section marker under ${componentsRoot}: ${missing.join(', ')}`,
+    ).toEqual([]);
   });
 });

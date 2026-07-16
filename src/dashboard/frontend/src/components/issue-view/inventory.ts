@@ -103,8 +103,6 @@ export const VERIFICATION_GATES_SECTIONS = [
 
 export type VerificationGatesSection = (typeof VERIFICATION_GATES_SECTIONS)[number];
 
-export const BEADS_PANEL_SECTIONS = ['beads-panel', 'beads-panel-compact'] as const;
-
 export const ACTIVE_AGENT_PANEL_SECTIONS = [
   'active-agent-panel',
   'active-agent-panel-header',

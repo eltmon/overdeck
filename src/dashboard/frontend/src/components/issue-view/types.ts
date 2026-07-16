@@ -19,7 +19,6 @@ export interface IssueViewModel {
   agents: AgentRowModel[];
   verification: IssueVerificationModel;
   ship: IssueShipModel;
-  beads: IssueBeadsModel;
   activity: IssueActivityModel;
   resources: IssueResourcesModel;
   operator: IssueOperatorModel;
@@ -124,12 +123,6 @@ export interface IssueShipModel {
   mergeStep: string | null;
   blockerReason?: string;
   log?: ShipLogModel | null;
-}
-
-export interface IssueBeadsModel {
-  total: number;
-  completed: number;
-  percent: number;
 }
 
 export interface IssueActivityModel {

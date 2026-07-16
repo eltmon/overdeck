@@ -4,7 +4,7 @@ The issue view kit gives the dashboard one semantic issue surface at three densi
 
 ## Data model
 
-`IssueViewModel` is a derived, read-only view model with `header`, `narrative`, `pipeline`, `agents`, `verification`, `ship`, `beads`, `activity`, `resources`, and `operator` groups. `useIssueView` builds it by composing the existing review-status, cost, workspace, activity, and ship-log query hooks plus the dashboard store's agent selector. It must reuse those hooks and their query keys; it must not introduce another endpoint, polling loop, store, or direct canonical-state access. Writes continue through the domain's existing write door.
+`IssueViewModel` is a derived, read-only view model with `header`, `narrative`, `pipeline`, `agents`, `verification`, `ship`, `activity`, `resources`, and `operator` groups. `useIssueView` builds it by composing the existing review-status, cost, workspace, activity, and ship-log query hooks plus the dashboard store's agent selector. Tasks remain owned by the canonical `TasksPanel`, `TasksRail`, and `TasksTab` queries so the issue view does not fabricate a second task model. It must reuse those hooks and their query keys; it must not introduce another endpoint, polling loop, store, or direct canonical-state access. Writes continue through the domain's existing write door.
 
 ## Shared components
 

@@ -5,6 +5,7 @@ const mockAppendOperatorInterventionEvent = vi.hoisted(() => vi.fn(() => Promise
 const mockClearAgentPaused = vi.hoisted(() => vi.fn());
 const mockClearAgentTroubled = vi.hoisted(() => vi.fn());
 const mockGetAgentState = vi.hoisted(() => vi.fn());
+const mockSaveAgentState = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../../lib/operator-interventions.js', () => ({
   appendOperatorInterventionEvent: mockAppendOperatorInterventionEvent,
@@ -14,9 +15,10 @@ vi.mock('../../../../lib/agents.js', () => ({
   getAgentState: mockGetAgentState,
   clearAgentPaused: mockClearAgentPaused,
   clearAgentTroubled: mockClearAgentTroubled,
+  saveAgentState: mockSaveAgentState,
 }));
 
-import { resolveStartAgentGateForRoute } from '../agents/spawn.js';
+import { resolveStartAgentGateForRoute, spawnAfterClearingStartGates } from '../agents/spawn.js';
 import type { AgentState } from '../../../../lib/agents.js';
 
 function makeState(overrides: Partial<AgentState> & { id: string; issueId: string }): AgentState {
@@ -215,5 +217,35 @@ describe('resolveStartAgentGateForRoute', () => {
     );
 
     expect(result).toEqual(expect.objectContaining({ blocked: true, paused: true }));
+  });
+});
+
+describe('spawnAfterClearingStartGates', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockSaveAgentState.mockReturnValue(Effect.succeed(undefined));
+  });
+
+  it('restores the complete persistent state when the second gate clear fails', async () => {
+    const initialState = makeState({
+      id: 'agent-pan-1234',
+      issueId: 'PAN-1234',
+      paused: true,
+      troubled: true,
+      consecutiveFailures: 3,
+    });
+    mockClearAgentPaused.mockReturnValue(Effect.succeed({ ...initialState, paused: false }));
+    mockClearAgentTroubled.mockReturnValue(Effect.fail(new Error('state write failed')));
+    const spawn = vi.fn(() => Promise.resolve('activity-id'));
+
+    await expect(spawnAfterClearingStartGates({
+      agentSessionName: initialState.id,
+      gate: { blocked: true, paused: true, troubled: true, error: 'blocked' },
+      initialState,
+      spawn,
+    })).rejects.toThrow('state write failed');
+
+    expect(spawn).not.toHaveBeenCalled();
+    expect(mockSaveAgentState).toHaveBeenCalledWith(initialState);
   });
 });

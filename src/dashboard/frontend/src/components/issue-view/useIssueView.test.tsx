@@ -114,7 +114,6 @@ describe('buildIssueViewModel', () => {
     expect(model.agents).toBeDefined();
     expect(model.verification).toBeDefined();
     expect(model.ship).toBeDefined();
-    expect(model.beads).toBeDefined();
     expect(model.activity).toBeDefined();
     expect(model.resources).toBeDefined();
     expect(model.operator).toBeDefined();
@@ -399,6 +398,36 @@ describe('buildIssueViewModel', () => {
     expect(model.pipeline.work.active).toBe(true);
     expect(model.pipeline.review.status).toBe('pending');
     expect(model.pipeline.ship.status).toBe('pending');
+  });
+
+  it('does not treat historical review and test sessions as successful completion', () => {
+    const sessions = [
+      makeSession({ type: 'review', sessionId: 'review-old', status: 'stopped', presence: 'ended' }),
+      makeSession({ type: 'test', sessionId: 'test-old', status: 'stopped', presence: 'ended' }),
+    ];
+    const model = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined,
+      makeReviewStatus({ reviewStatus: 'failed', testStatus: 'dispatch_failed' }),
+      undefined, undefined, makeActivity(sessions), {},
+    );
+
+    expect(model.pipeline.review).toEqual({ status: 'failed', active: false, done: false });
+    expect(model.pipeline.test).toEqual({ status: 'dispatch_failed', active: false, done: false });
+  });
+
+  it('uses live sessions only to mark pending canonical stages active', () => {
+    const sessions = [
+      makeSession({ type: 'review', sessionId: 'review-live', status: 'running', presence: 'active' }),
+      makeSession({ type: 'test', sessionId: 'test-live', status: 'running', presence: 'active' }),
+    ];
+    const model = buildIssueViewModel(
+      'PAN-2499', undefined, undefined, undefined,
+      makeReviewStatus({ reviewStatus: 'pending', testStatus: 'pending' }),
+      undefined, undefined, makeActivity(sessions), {},
+    );
+
+    expect(model.pipeline.review).toEqual({ status: 'pending', active: true, done: false });
+    expect(model.pipeline.test).toEqual({ status: 'pending', active: true, done: false });
   });
 
   it('includes verification gates', () => {

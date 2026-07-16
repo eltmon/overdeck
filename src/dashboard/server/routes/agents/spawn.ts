@@ -11,6 +11,7 @@ import {
   saveAgentStateSync, saveAgentState, determineModel, getProviderAuthMode, getAgentState,
   clearAgentPaused, clearAgentTroubled,
 } from '../../../../lib/agents.js';
+import type { AgentState } from '../../../../lib/agents/agent-state.js';
 import { operatorInterventionEvent } from '../../../../lib/operator-interventions.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../../lib/child-env.js';
 import { checkCodexAuthStatus } from '../../../../lib/codex-auth.js';
@@ -149,6 +150,28 @@ export function resolveStartAgentGateForRoute(input: {
       return Effect.succeed(gate);
     }),
   );
+}
+
+/**
+ * Clear the persistent start gates immediately before spawning, restoring the
+ * complete original state if either clear or the spawn itself fails.
+ */
+export async function spawnAfterClearingStartGates<T>(input: {
+  agentSessionName: string;
+  gate: AgentStartGateDecision | null;
+  initialState: AgentState | null;
+  spawn: () => Promise<T>;
+}): Promise<T> {
+  try {
+    if (input.gate?.paused) await Effect.runPromise(clearAgentPaused(input.agentSessionName));
+    if (input.gate?.troubled) await Effect.runPromise(clearAgentTroubled(input.agentSessionName));
+    return await input.spawn();
+  } catch (error) {
+    if (input.gate && input.initialState) {
+      await Effect.runPromise(saveAgentState(input.initialState));
+    }
+    throw error;
+  }
 }
 
 // ─── Route: POST /api/agents (start agent) ───────────────────────────────────
@@ -675,17 +698,12 @@ export const postAgentsRoute = HttpRouter.add(
     // Spawn pan start command
     let gatesCommitted = false;
     const spawnPanCommand = async (args: string[], cwd?: string): Promise<string> => {
-      if (startGateBlock && !gatesCommitted) {
-        if (startGateBlock.paused) await Effect.runPromise(clearAgentPaused(agentSessionName));
-        if (startGateBlock.troubled) await Effect.runPromise(clearAgentTroubled(agentSessionName));
-      }
-      let activityId: string;
-      try {
-        activityId = await spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd });
-      } catch (error) {
-        if (startGateBlock && initialAgentState) await Effect.runPromise(saveAgentState(initialAgentState));
-        throw error;
-      }
+      const activityId = await spawnAfterClearingStartGates({
+        agentSessionName,
+        gate: gatesCommitted ? null : startGateBlock,
+        initialState: initialAgentState,
+        spawn: () => spawnPanCommandDetached({ agentSessionName, issueId, role, workspacePath, args, cwd }),
+      });
       if (startGateBlock && !gatesCommitted) {
         gatesCommitted = true;
         if (startGateBlock.paused) {

@@ -18,7 +18,6 @@ import { deriveShip, isAgentRunning, readyForMerge } from './derivations';
 import type {
   AgentRowModel,
   IssueActivityModel,
-  IssueBeadsModel,
   IssueHeaderModel,
   IssueNarrativeModel,
   IssueOperatorModel,
@@ -306,7 +305,7 @@ function stepState(
   active: boolean,
 ): { status: string; active: boolean; done: boolean } {
   const s = status ?? 'pending';
-  return { status: s, active, done: s === 'passed' || s === 'merged' || s === 'completed' };
+  return { status: s, active, done: s === 'passed' || s === 'skipped' || s === 'merged' || s === 'completed' };
 }
 
 function derivePipeline(
@@ -316,26 +315,25 @@ function derivePipeline(
   const merged = reviewStatus?.mergeStatus === 'merged';
   const hasPlanSession = sessions.some((s) => s.type === 'planning' || s.type === 'legacy');
   const hasWorkSession = sessions.some((s) => s.type === 'work' || s.type === 'strike');
-  const hasReviewSession = sessions.some((s) => s.type === 'review' || s.type === 'reviewer');
-  const hasTestSession = sessions.some((s) => s.type === 'test');
-
   const planActive = hasPlanSession && sessions.some((s) => (s.type === 'planning' || s.type === 'legacy') && isAgentRunning(s, undefined));
   const workActive = sessions.some((s) => (s.type === 'work' || s.type === 'strike') && isAgentRunning(s, undefined));
-  const reviewActive = reviewStatus?.reviewStatus === 'reviewing' || sessions.some((s) => (s.type === 'review' || s.type === 'reviewer') && isAgentRunning(s, undefined));
-  const testActive = reviewStatus?.testStatus === 'testing' || sessions.some((s) => s.type === 'test' && isAgentRunning(s, undefined));
+  const reviewSessionActive = sessions.some((s) => (s.type === 'review' || s.type === 'reviewer') && isAgentRunning(s, undefined));
+  const testSessionActive = sessions.some((s) => s.type === 'test' && isAgentRunning(s, undefined));
+  const reviewActive = reviewStatus?.reviewStatus === 'reviewing' ||
+    ((reviewStatus?.reviewStatus === undefined || reviewStatus.reviewStatus === 'pending') && reviewSessionActive);
+  const testActive = reviewStatus?.testStatus === 'testing' ||
+    ((reviewStatus?.testStatus === undefined || reviewStatus.testStatus === 'pending') && testSessionActive);
   const shipActive = reviewStatus?.mergeStatus === 'queued' || reviewStatus?.mergeStatus === 'merging' || reviewStatus?.mergeStatus === 'verifying';
 
   return {
     plan: stepState(hasPlanSession ? 'passed' : 'pending', planActive),
     work: stepState(hasWorkSession ? 'passed' : 'pending', workActive),
     review: stepState(
-      merged || reviewStatus?.reviewStatus === 'passed' || hasReviewSession ? 'passed' : 'pending',
+      merged ? 'passed' : reviewStatus?.reviewStatus,
       reviewActive,
     ),
     test: stepState(
-      merged || reviewStatus?.testStatus === 'passed' || reviewStatus?.testStatus === 'skipped' || hasTestSession
-        ? 'passed'
-        : 'pending',
+      merged ? 'passed' : reviewStatus?.testStatus,
       testActive,
     ),
     ship: stepState(merged ? 'merged' : readyForMerge(reviewStatus) ? 'ready' : reviewStatus?.mergeStatus ?? 'pending', shipActive),
@@ -412,11 +410,6 @@ function toShipLogModel(data: ShipLogData | undefined): import('./types').ShipLo
     step: data.log.step,
     lines: data.log.lines,
   };
-}
-
-function deriveBeads(): IssueBeadsModel {
-  // Placeholder: WI-4b will wire the real beads panel via the canonical beads resolver.
-  return { total: 0, completed: 0, percent: 0 };
 }
 
 function deriveActivity(activity: ActivityResponse | undefined): IssueActivityModel {
@@ -499,7 +492,6 @@ export function buildIssueViewModel(
     agents,
     verification: deriveVerification(reviewStatus, workspace),
     ship: deriveShip(reviewStatus, toShipLogModel(shipLog)),
-    beads: deriveBeads(),
     activity: deriveActivity(activity),
     resources: deriveResources(workspace),
     operator: deriveOperator(sessions, agentsById, reviewStatus),
