@@ -610,6 +610,7 @@ describe('XTerminal - patient reconnect', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
     MockWebSocket.instances = [];
     (Terminal as unknown as { instances: unknown[] }).instances = [];
     (FitAddon as unknown as { instances: unknown[] }).instances = [];
@@ -625,6 +626,20 @@ describe('XTerminal - patient reconnect', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('adds stable per-terminal jitter to reconnect attempts', async () => {
+    vi.mocked(Math.random).mockReturnValue(0.5);
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_249));
+    expect(MockWebSocket.instances).toHaveLength(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 
   it('keeps reconnecting past five attempts without writing retry messages to scrollback', async () => {
@@ -730,6 +745,26 @@ describe('XTerminal - patient reconnect', () => {
     await act(async () => vi.advanceTimersByTimeAsync(1_000));
 
     expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
+  it('closes the replacement socket on unmount without scheduling another retry', async () => {
+    const { unmount } = render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+    const replacement = MockWebSocket.instances[1];
+    const queuedCloseHandler = replacement.onclose;
+    unmount();
+
+    expect(replacement.close).toHaveBeenCalledOnce();
+    expect(replacement.onclose).toBeNull();
+
+    act(() => queuedCloseHandler?.({ code: 1006, reason: 'queued-after-unmount' }));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    expect(MockWebSocket.instances).toHaveLength(2);
   });
 
   it('treats close code 4404 as fatal without scheduling a retry', async () => {

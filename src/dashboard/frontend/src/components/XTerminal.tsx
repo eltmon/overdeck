@@ -7,6 +7,7 @@ import { Sun, Moon, SunMoon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../hooks/useTheme';
 import {
+  createReconnectJitter,
   nextReconnectDelay,
   type ReconnectPolicyState,
 } from '../lib/terminalReconnectPolicy';
@@ -141,13 +142,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
   const terminalInstance = useRef<Terminal | null>(null);
   const fitAddon = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const connectionCleanupRef = useRef<(() => void) | null>(null);
   const reconnectPolicy = useRef<ReconnectPolicyState | null>(null);
+  const [reconnectJitterMs] = useState(() => createReconnectJitter());
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectRef = useRef<(() => void) | null>(null);
+  const mountedRef = useRef(false);
   const remoteSize = useRef<{ cols: number; rows: number } | null>(null);
   const requestedSize = useRef<{ cols: number; rows: number } | null>(null);
   const readyForLiveData = useRef(false);
-  const [shouldReconnect, setShouldReconnect] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connected');
 
   // Auto-copy state from localStorage or prop
@@ -352,6 +355,30 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     return true;
   }, []);
 
+  const handleForcedSelectionMouseDown = useCallback((event: MouseEvent) => {
+    if (!event.isTrusted || event.button !== 0) return;
+    if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+    event.stopPropagation();
+    const synthetic = new MouseEvent('mousedown', {
+      bubbles: true, cancelable: true, composed: true, view: window,
+      button: event.button, buttons: event.buttons,
+      clientX: event.clientX, clientY: event.clientY,
+      screenX: event.screenX, screenY: event.screenY,
+      detail: event.detail,
+      shiftKey: true,
+    });
+    target.dispatchEvent(synthetic);
+  }, []);
+
+  const handleSelectionContextMouseDown = useCallback((event: MouseEvent) => {
+    if (event.button !== 2 || !terminalInstance.current?.hasSelection()) return;
+    // xterm clears its selection while processing a right-button mousedown.
+    // Keep that event away from xterm so the context menu can still offer Copy.
+    event.stopPropagation();
+  }, []);
+
   // Close context menu
   const closeContextMenu = useCallback(() => {
     setContextMenu(prev => ({ ...prev, visible: false }));
@@ -386,18 +413,24 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     const tProf = performance.now();
     profMark(sessionName, tProf, 'connect() entered');
 
-    // Clear any pending reconnect timer
+    // Clear any pending reconnect timer and dispose the previous connection.
+    // Each retry installs connection-scoped window/document listeners, so the
+    // replacement must tear those down instead of relying on the initial
+    // mount's cleanup closure.
     if (reconnectTimer.current) {
       clearTimeout(reconnectTimer.current);
       reconnectTimer.current = null;
     }
+    const previousConnectionCleanup = connectionCleanupRef.current;
+    connectionCleanupRef.current = null;
+    previousConnectionCleanup?.();
 
     // Ensure container has dimensions before creating terminal
     const container = terminalRef.current;
     if (container.clientWidth === 0 || container.clientHeight === 0) {
       console.warn('XTerminal: Container has no size, retrying in 100ms');
       profMark(sessionName, tProf, 'container 0x0, retry in 100ms');
-      setTimeout(() => connect(), 100);
+      reconnectTimer.current = setTimeout(() => connect(), 100);
       return;
     }
     profMark(sessionName, tProf, 'container sized', `${container.clientWidth}x${container.clientHeight}`);
@@ -407,37 +440,6 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // Create terminal instance if it doesn't exist, otherwise reuse
     let term = terminalInstance.current;
     let fit = fitAddon.current;
-    const handleForcedSelectionMouseDown = (event: MouseEvent) => {
-      if (!event.isTrusted) return;
-      if (event.button !== 0) return;
-      if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      event.stopPropagation();
-      const synthetic = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        composed: true,
-        view: window,
-        button: event.button,
-        buttons: event.buttons,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        screenX: event.screenX,
-        screenY: event.screenY,
-        detail: event.detail,
-        shiftKey: true,
-      });
-      target.dispatchEvent(synthetic);
-    };
-    const handleSelectionContextMouseDown = (event: MouseEvent) => {
-      if (event.button === 2 && term?.hasSelection()) {
-        // xterm clears its selection while processing a right-button mousedown.
-        // Keep that event away from xterm so the following contextmenu event can
-        // still offer Copy for the selected text.
-        event.stopPropagation();
-      }
-    };
 
     if (!term) {
       term = new Terminal({
@@ -692,11 +694,10 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     ws.onclose = (event) => {
       console.log('XTerminal: WebSocket closed', event.code, event.reason);
 
-      if (!shouldReconnect) {
-        term!.writeln('\r\n\x1b[33m● Session disconnected\x1b[0m');
-        onDisconnectRef.current?.();
-        return;
-      }
+      // A close callback may already be queued when React unmounts the
+      // component. Ignore it so the stale connection cannot schedule another
+      // socket or update disposed terminal state.
+      if (!mountedRef.current) return;
 
       // 4404 = session not found on the server (tmux session doesn't exist).
       // Do NOT retry — the session is gone. Retrying just hammers the server.
@@ -718,7 +719,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       const now = Date.now();
       const policy = reconnectPolicy.current ?? { attempt: 0, windowStartedAt: now };
       reconnectPolicy.current = policy;
-      const delay = nextReconnectDelay(policy, now);
+      const delay = nextReconnectDelay(policy, now, reconnectJitterMs);
 
       if (delay !== null) {
         policy.attempt += 1;
@@ -754,28 +755,21 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    return () => {
+    const cleanupConnection = () => {
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
-      terminalRef.current?.removeEventListener('mousedown', handleSelectionContextMouseDown, true);
-      terminalRef.current?.removeEventListener('contextmenu', handleContextMenu);
-      setShouldReconnect(false);
-      readyForLiveData.current = false;
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-      }
-      // Prevent the old ws.onclose handler (which closes over the stale
-      // shouldReconnect value) from scheduling an orphaned reconnect timer
-      // after the component has already remounted.
+      ws.onopen = null;
       ws.onclose = null;
+      ws.onmessage = null;
+      ws.onerror = null;
       ws.close();
-      wsRef.current = null;
-      term?.dispose();
-      terminalInstance.current = null;
-      fitAddon.current = null;
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+        readyForLiveData.current = false;
+      }
     };
-  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyEvent, handleContextMenu, handleTerminalWheel, getMeasuredSize, sendResizeIfNeeded]);
+    connectionCleanupRef.current = cleanupConnection;
+  }, [sessionName, token, autoCopyOnSelect, reconnectJitterMs, handleKeyEvent, handleContextMenu, handleTerminalWheel, handleForcedSelectionMouseDown, handleSelectionContextMouseDown, getMeasuredSize, sendResizeIfNeeded]);
   connectRef.current = connect;
 
   useEffect(() => {
@@ -793,16 +787,30 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // cold-path latency win; connect()'s own clientWidth/Height check still
     // covers the rare container-not-yet-sized case via its 100ms retry.
     let cancelled = false;
-    let cleanupFn: (() => void) | undefined;
+    mountedRef.current = true;
     const timer = setTimeout(() => {
-      if (!cancelled) cleanupFn = connect();
+      if (!cancelled) connect();
     }, 0);
     return () => {
       cancelled = true;
+      mountedRef.current = false;
       clearTimeout(timer);
-      cleanupFn?.();
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
+      const cleanupConnection = connectionCleanupRef.current;
+      connectionCleanupRef.current = null;
+      cleanupConnection?.();
+      terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
+      terminalRef.current?.removeEventListener('mousedown', handleSelectionContextMouseDown, true);
+      terminalRef.current?.removeEventListener('contextmenu', handleContextMenu);
+      readyForLiveData.current = false;
+      terminalInstance.current?.dispose();
+      terminalInstance.current = null;
+      fitAddon.current = null;
     };
-  }, [connect, sessionName]);
+  }, [connect, sessionName, handleContextMenu, handleForcedSelectionMouseDown, handleSelectionContextMouseDown]);
 
   useEffect(() => {
     const debouncedFit = debounce(() => {
