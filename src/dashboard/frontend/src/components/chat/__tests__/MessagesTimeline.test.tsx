@@ -141,9 +141,11 @@ describe('MessagesTimeline — search', () => {
     expect(highlighted).toHaveAttribute('data-conversation-search-highlight', 'true');
     expect(highlighted).toHaveClass('bg-amber-300/40');
     const highlightedRow = highlighted.closest('[data-search-row-id]') as HTMLElement;
-    expect(highlightedRow.style.outlineWidth).toBe('2px');
-    expect(highlightedRow.style.outlineStyle).toBe('solid');
-    expect(highlightedRow.style.outlineColor).toBe('var(--color-primary)');
+    const expectedOutline = document.createElement('div');
+    expectedOutline.style.outline = '2px solid var(--color-primary)';
+    expect(highlightedRow.style.outlineWidth).toBe(expectedOutline.style.outlineWidth);
+    expect(highlightedRow.style.outlineStyle).toBe(expectedOutline.style.outlineStyle);
+    expect(highlightedRow.style.outlineColor).toBe(expectedOutline.style.outlineColor);
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('textbox', { name: 'Search conversation' })).toBeNull();

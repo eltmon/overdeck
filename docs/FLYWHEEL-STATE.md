@@ -5359,3 +5359,41 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **2232 still needs its OTHER blocker PAN-2795** (ratchet-vs-clean-tree-lint contract) — strike wedged on
   the claude-code+gpt-5.6 harness. Harness flip remains the keystone for the fleet.
 - **Session: 50 merges (+ 1 operator-directed strike landing), 21 close-outs.**
+
+---
+
+## Tick 63 — 2026-07-16 ~20:16Z — deployed a081a9ce59 (PAN-2318 real root cause); PAN-2807 added; hygiene lesson
+
+- **PAN-2318 REAL root cause (operator-found, fixed a081a9ce59)**: watchdog "busy-but-alive" churn was
+  `queryCostEventsSync` FULL-SCANNING 215k cost_events rows synchronously 2×/agent/poll (61% server CPU;
+  /api/health 10s). Live DB missing idx_cost_agent_id + idx_cost_issue_upper — **schema declares them but
+  migrations SILENTLY FAIL (user_version=0)**. Operator created indexes live (health 10s→41ms→now 0.5ms) +
+  removed the duplicate per-agent query (also fixed burn/totalUsd double-counting). My earlier "watchdog
+  false-positive" + PAN-2792 diagnoses were PARTIAL — this CPU starvation was the deeper cause.
+- **DEPLOYED a081a9ce59** (pid 698579, build a081a9ce59, healthy 0.5ms) — includes PAN-2805 honest flywheel
+  empty state ('orchestrator unreachable' not false 'No active run') + badge (2f4648e673, ancestor).
+- **PAN-2804 (becf4bcc, closed)**: `pan restart` now launches dashboard in its own transient systemd unit —
+  survives spawner death (operator's supervisor restart had killed my 15:31 server). Now automatic.
+- **PAN-2807 ADDED to drive set (now 13 issues)**: silent-migration defect (the user_version=0 bug behind
+  the missing indexes). Auto-planning started (planning-pan-2807). Operator: no new debt this run.
+- **PRIMARY-WORKTREE HYGIENE LESSON**: my tick-62 `git reset --hard origin/main` in primary WIPED operator's
+  uncommitted edits (~16:05; they recovered from checkpoints, no loss). RULE: never reset --hard primary;
+  `git status` first, `git merge --ff-only` if clean, surface if dirty. Two actors on main = check before touching.
+- **Session: 50 merges + 1 operator-directed strike landing, 21 close-outs.**
+
+## Tick 64 — 2026-07-16 ~17:23 — codex path proven: TWO real merges
+- Harness flip to codex working end-to-end. First fleet merges post-flip:
+  - **PAN-1987 MERGED → 1e1efdb358** (fresh APPROVED run 8dbd15a7==head, all CI green, overdeck/review+test pass).
+  - **PAN-2772 MERGED → 7b24be7f82** (fresh APPROVED run 96ab92d9==head, CI green, mergeState CLEAN). Freshness invariant (review run suffix==PR headRefOid) satisfied for both — no PAN-2499 stale-verdict risk.
+- Fleet driving on codex: 2760 respawned FRESH on codex (was claude-code resumable; harness=codex model=gpt-5.6-sol confirmed) to address CHANGES REQUESTED; 2045 work agent alive (tmux 17:22); 2619/2773/1897/1966/1491 review convoys spinning on codex.
+- Pending fresh reviews not yet synthesized: 1966 (verdict none), 1897, 1491. UNSTABLE (fixing): 2773, 2619. CHANGES REQUESTED (driving): 2760, 2045.
+- Resources healthy: mem 32G avail, 15 devnets (<31 limit).
+- Close-out for 1987/2772 pending main CI green (2772 run in_progress at report time).
+
+## Tick 64b — PAN-2619 test disposition + infra follow-ups filed
+- PAN-2619 **test** role reported TESTS FAILED, but all three failures are pre-existing/environmental — NOT defects in the XTerminal padding fix (typecheck/lint/targeted XTerminal.test.tsx pass). Verified each:
+  - Container live-terminal UAT unrunnable: node-pty (`@lydell/node-pty` 1.2.0-beta.14, glibc prebuilt) segfaults (139) on musl devcontainer base (`node:22-alpine`/`node:20-alpine`); + Vite/Traefik WS proxy drops Origin → `/ws/terminal` 403. → filed **PAN-2809**.
+  - Workspace `vitest --changed` fails on `App.test.tsx` (selectPendingInputSubjects mock, from 2f4648e673) while **GitHub CI `test` on main is GREEN** — workspace-vs-CI harness divergence, NOT red-main. → filed **PAN-2810**.
+- 2619 itself is mid-fix: work agent alive (17:30, codex), head e3568752 past stale review run 2f507575 → review will re-run. No override now.
+- **DECISION RULE for 2619 close-out:** its AC-mandated browser UAT is un-runnable in-container (PAN-2809). When 2619's review APPROVES + code CI green, close with an HONEST `pan close --accept-<uat/verification>` citing PAN-2809 as the reason — do NOT block 2619 indefinitely on infra that affects all containerized workspaces. Only ever accept AFTER review approves the code.
+- Both PAN-2809/2810 filed as backstop-as-symptom, NOT driven (DRAIN in force outside authorized set).

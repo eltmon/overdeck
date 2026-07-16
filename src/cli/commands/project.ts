@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { existsSync, readFileSync } from 'fs';
 import { join, resolve } from 'path';
 import {
@@ -7,6 +8,7 @@ import {
   getProjectSync,
   initializeProjectsConfigSync,
   PROJECTS_CONFIG_FILE,
+  renameProjectSync,
   ProjectConfig,
   IssueRoutingRule,
   getIssuePrefix,
@@ -232,6 +234,21 @@ export async function projectListCommand(options: ListOptions = {}): Promise<voi
   console.log(chalk.dim(`Config: ${PROJECTS_CONFIG_FILE}`));
 }
 
+export async function projectRenameCommand(key: string, newName: string): Promise<void> {
+  try {
+    const project = getProjectSync(key);
+    if (!project) throw new Error(`Unknown project: ${key}`);
+
+    const oldName = project.name;
+    renameProjectSync(key, newName);
+    console.log(chalk.green(`✓ Renamed project: ${oldName} → ${newName.trim()}`));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(chalk.red(message));
+    process.exitCode = 1;
+  }
+}
+
 export async function projectRemoveCommand(nameOrPath: string): Promise<void> {
   // Try to find by key first, then by name, then by path
   const projects = listProjectsSync();
@@ -325,4 +342,41 @@ export async function projectShowCommand(keyOrName: string): Promise<void> {
   }
 
   console.log('');
+}
+
+export function registerProjectCommands(command: Command): void {
+  command
+    .command('add <path>')
+    .description('Register a project with Overdeck')
+    .option('--name <name>', 'Project name')
+    .option('--type <type>', 'Project type (standalone/monorepo)', 'standalone')
+    .option('--linear-team <team>', 'Linear team prefix (e.g., MIN, PAN)')
+    .option('--rally-project <oid>', 'Rally project OID (e.g., /project/822404704163)')
+    .action(projectAddCommand);
+
+  command
+    .command('list')
+    .description('List all registered projects')
+    .option('--json', 'Output as JSON')
+    .action(projectListCommand);
+
+  command
+    .command('show <key>')
+    .description('Show details for a specific project')
+    .action(projectShowCommand);
+
+  command
+    .command('rename <key> <newName>')
+    .description('Rename a project\'s display name (the registration key stays unchanged)')
+    .action(projectRenameCommand);
+
+  command
+    .command('remove <nameOrPath>')
+    .description('Remove a project from the registry')
+    .action(projectRemoveCommand);
+
+  command
+    .command('init')
+    .description('Initialize projects.yaml with example configuration')
+    .action(projectInitCommand);
 }

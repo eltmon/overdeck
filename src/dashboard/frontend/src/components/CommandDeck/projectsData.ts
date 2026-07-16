@@ -29,6 +29,7 @@ export function isUnscopedConversation(
 }
 
 export interface ProjectData {
+  key: string;
   name: string;
   path: string;
   features: ProjectFeature[];
@@ -45,6 +46,7 @@ export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
     }
 
     grouped.set(issue.projectName, {
+      key: issue.projectName,
       name: issue.projectName,
       path: issue.projectName,
       features: [issue],
@@ -73,12 +75,13 @@ export async function fetchProjects(): Promise<ProjectData[]> {
   // Start with projects that have qualifying issues
   const projectMap = new Map(groupProjects(issues).map(p => [p.name, p]));
 
-  // Add registered projects that have no qualifying issues (empty features list)
+  // Preserve stable keys when registered projects already have grouped issues.
   for (const proj of registered) {
     const name = proj.name ?? proj.key;
-    if (!projectMap.has(name)) {
-      projectMap.set(name, { name, path: proj.path, features: [] });
-    }
+    const existing = projectMap.get(name);
+    projectMap.set(name, existing
+      ? { ...existing, key: proj.key, path: proj.path }
+      : { key: proj.key, name, path: proj.path, features: [] });
   }
 
   return [...projectMap.values()].sort((a, b) => a.name.localeCompare(b.name));

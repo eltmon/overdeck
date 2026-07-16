@@ -11,6 +11,7 @@ Use this after code changes that should run in the local Overdeck dashboard.
 
 ```bash
 pan reload
+pan reload --force   # explicitly bypass the agent deploy-window gate
 ```
 
 `pan reload` runs `bun install` and then `npm run build` first. If either fails, it leaves the current dashboard running and exits non-zero. If both succeed, it restarts the dashboard and waits for `http://127.0.0.1:3011/api/health`.
@@ -20,6 +21,7 @@ pan reload
 ## Options
 
 - `--skip-build` — restart the current bundle without running `bun install` or `npm run build`.
+- `--force` — bypass the deploy-window gate for an agent-issued reload. Without it, active verification, merge, post-merge, flywheel, restart, or `pan dev` ownership refuses the reload because it would disconnect live conversations and terminals.
 - `--health-timeout <ms>` — set the dashboard health-check budget. The default is `30000`.
 - `--no-deacon` — restart without Cloister/Deacon auto-start.
 

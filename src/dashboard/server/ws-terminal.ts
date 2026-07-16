@@ -5,9 +5,10 @@
  * browser. This module restores the working raw WebSocket `/ws/terminal` endpoint
  * from pre-PAN-435 code.
  *
- * Exports a single function `setupTerminalWebSocket(server)` that installs a
- * `noServer` WebSocketServer on the given HTTP server's `upgrade` event for the
- * `/ws/terminal` path. Other upgrade paths (e.g., `/ws/rpc`) are left untouched.
+ * `setupTerminalWebSocket(server)` installs a `noServer` WebSocketServer on the
+ * given HTTP server's `upgrade` event for the `/ws/terminal` path. The shutdown
+ * path uses `broadcastServerRestarting()` to give every client a retryable close.
+ * Other upgrade paths (e.g., `/ws/rpc`) are left untouched.
  *
  * PAN-484: Multiple WebSocket clients (browser tabs) for the same tmux session
  * are handled via a shared PTY hub — one PTY process, many WebSocket clients.
@@ -41,6 +42,36 @@ const ATTACH_TIMEOUT_MS = 5000;
 const READY_TIMEOUT_MS = 10_000;
 const PRE_ATTACH_MAX_MESSAGES = 32;
 const PRE_ATTACH_MAX_BYTES = 64 * 1024;
+const SESSION_NOT_FOUND_CLOSE_CODE = 4404;
+export const SERVER_RESTARTING_CLOSE_CODE = 4503;
+const SERVER_RESTARTING_REASON = 'server-restarting';
+
+interface RestartableTerminalClient {
+  readyState: number;
+  close(code: number, reason?: string): void;
+}
+
+const preAttachTerminalClients = new Set<WebSocket>();
+
+function collectRestartableTerminalClients(): Set<RestartableTerminalClient> {
+  const clients = new Set<RestartableTerminalClient>(preAttachTerminalClients);
+  for (const hub of activePtyHubs.values()) {
+    for (const client of hub.clients) clients.add(client);
+  }
+  return clients;
+}
+
+export function broadcastServerRestarting(
+  clients: Iterable<RestartableTerminalClient> = collectRestartableTerminalClients(),
+): number {
+  let closedCount = 0;
+  for (const client of clients) {
+    if (client.readyState !== WebSocket.OPEN) continue;
+    client.close(SERVER_RESTARTING_CLOSE_CODE, SERVER_RESTARTING_REASON);
+    closedCount += 1;
+  }
+  return closedCount;
+}
 
 function parseControlMessage(message: string): ClientControlMessage | null {
   if (!message.startsWith('{')) return null;
@@ -190,6 +221,9 @@ export function setupTerminalWebSocket(server: http.Server): void {
   });
 
   wss.on('connection', (ws: WebSocket, req: http.IncomingMessage) => {
+    preAttachTerminalClients.add(ws);
+    ws.once('close', () => preAttachTerminalClients.delete(ws));
+
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const sessionName = url.searchParams.get('session');
 
@@ -269,11 +303,11 @@ export function setupTerminalWebSocket(server: http.Server): void {
           if (isRespawnPending(sessionName)) {
             const cameBack = await waitForSessionRespawn(sessionName, RESPAWN_WAIT_MS);
             if (!cameBack) {
-              ws.close(4404, 'session-not-found');
+              ws.close(SESSION_NOT_FOUND_CLOSE_CODE, 'session-not-found');
               return;
             }
           } else {
-            ws.close(4404, 'session-not-found');
+            ws.close(SESSION_NOT_FOUND_CLOSE_CODE, 'session-not-found');
             return;
           }
         }
@@ -342,6 +376,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
       if (existingHub) {
         console.log(`[ws-terminal] Joining existing PTY hub for ${sessionName} (${existingHub.clients.size} existing clients)`);
         addClientToHub(existingHub, ws, false);
+        preAttachTerminalClients.delete(ws);
         existingHub.inputClient = ws;
 
         const dimsMatchHub = existingHub.cols === requestedCols && existingHub.rows === requestedRows;
@@ -461,6 +496,7 @@ export function setupTerminalWebSocket(server: http.Server): void {
 
       activePtyHubs.set(sessionName, hub);
       addClientToHub(hub, ws, false);
+      preAttachTerminalClients.delete(ws);
 
       const startLocalPty = async () => {
         if (ptyStarted) return;
@@ -478,13 +514,13 @@ export function setupTerminalWebSocket(server: http.Server): void {
             // "session doesn't exist" from "normal disconnect". The client
             // should NOT retry on 4404 — the session is gone.
             activePtyHubs.delete(sessionName);
-            ws.close(4404, 'session-not-found');
+            ws.close(SESSION_NOT_FOUND_CLOSE_CODE, 'session-not-found');
             return;
           }
         } catch {
           console.log(`[ws-terminal] Session ${sessionName} does not exist — closing without PTY spawn`);
           activePtyHubs.delete(sessionName);
-          ws.close(4404, 'session-not-found');
+          ws.close(SESSION_NOT_FOUND_CLOSE_CODE, 'session-not-found');
           return;
         }
 

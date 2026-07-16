@@ -1,10 +1,5 @@
 import { jsonResponse } from "../http-helpers.js";
-/**
- * Projects route module — Effect HttpRouter.Layer (PAN-821)
- *
- * Implements:
- *   GET /api/projects/:projectKey/session-tree
- */
+/** Projects route module — Effect HttpRouter.Layer (PAN-821). */
 
 import { access, readFile, readdir, mkdir, stat, realpath } from 'node:fs/promises';
 import { join, isAbsolute, sep, resolve, normalize, dirname, relative } from 'node:path';
@@ -14,6 +9,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
+import { postProjectRenameRoute } from './project-rename.js';
 import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync } from '../../../lib/projects.js';
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
@@ -1038,6 +1034,7 @@ export const projectsRouteLayer = Layer.mergeAll(
   getProjectReleaseStatusRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
+  postProjectRenameRoute,
   getProjectSwarmPolicyRoute,
   postProjectSwarmPolicyRoute,
   getIssueSwarmPolicyRoute,

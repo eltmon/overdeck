@@ -136,6 +136,7 @@ vi.mock('./lib/store', () => ({
     state.agentsWithPendingAskUserQuestion ?? [],
   selectAgentsWithPendingProposedPlan: (state: { agentsById?: Record<string, unknown> }) =>
     Object.values(state.agentsById ?? {}).filter((a) => (a as { pendingProposedPlan?: unknown }).pendingProposedPlan != null),
+  selectPendingInputSubjects: () => [],
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,
