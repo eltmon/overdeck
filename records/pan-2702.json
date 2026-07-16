@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T12:27:17.050Z",
+  "updated": "2026-07-16T12:31:58.825Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "pending",
@@ -118,16 +118,8 @@
   },
   "reviewMode": "full",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "patrol-strike-landings": {
-        "writerId": "agent-pan-2702",
-        "agentId": "agent-pan-2702",
-        "pid": 2029451,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:27:17.049Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2702",
@@ -183,6 +175,16 @@
         "outcome": "completed",
         "reason": "Added discriminated strike merge requests, authenticated marker/branch validation, strike recovery targeting, persistent queue convergence, and normal-gate no-loss matrix",
         "releasedAt": "2026-07-16T12:20:02.282Z"
+      },
+      {
+        "writerId": "agent-pan-2702",
+        "agentId": "agent-pan-2702",
+        "pid": 2029451,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:27:17.049Z",
+        "itemId": "patrol-strike-landings",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T12:31:58.825Z"
       }
     ],
     "statusReasons": {
@@ -207,6 +209,9 @@
     "merge-strike-through-door.merge-strike-through-door.ac2": "completed",
     "merge-strike-through-door.merge-strike-through-door.ac3": "completed",
     "merge-strike-through-door.merge-strike-through-door.ac4": "completed",
-    "patrol-strike-landings": "running"
+    "patrol-strike-landings": "completed",
+    "patrol-strike-landings.patrol-strike-landings.ac1": "completed",
+    "patrol-strike-landings.patrol-strike-landings.ac2": "completed",
+    "patrol-strike-landings.patrol-strike-landings.ac3": "completed"
   }
 }
