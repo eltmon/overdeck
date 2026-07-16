@@ -324,18 +324,18 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:27:22.854Z",
+  "updated": "2026-07-16T21:27:25.934Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:27:21.151Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-07-16T21:27:24.606Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -347,6 +347,28 @@
     "lastVerifiedCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
     "reviewRequestedAt": "2026-07-16T21:27:19.265Z",
     "reviewSpawnedAt": "2026-07-16T21:27:21.150Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/security.md",
+        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/correctness.md",
+        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/performance.md",
+        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-c372139e/requirements.md",
+        "atCommit": "507cbb99feaab71ec07439a43f1039e301dbfdff"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -467,7 +489,7 @@
       },
       "costAtCloseOut": {
         "usd": 216.904423,
-        "pricingAsOf": "2026-07-16T21:27:21.292Z"
+        "pricingAsOf": "2026-07-16T21:27:24.646Z"
       }
     },
     "merges": [
@@ -475,8 +497,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "harness": "claude-code",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 12,
     "claims": {},
