@@ -39,7 +39,7 @@ export function OpenQuestionsIndicator({ onActivate }: OpenQuestionsIndicatorPro
     };
   }, []);
 
-  const count = status?.openQuestions.length ?? 0;
+  const count = status?.openQuestions?.length ?? 0;
   if (count === 0) return null;
 
   const label = `${count} open Flywheel question${count === 1 ? '' : 's'} — click to view`;

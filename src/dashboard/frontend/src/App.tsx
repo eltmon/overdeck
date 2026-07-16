@@ -777,6 +777,7 @@ export default function App() {
           isSessionFeedSidebarOpen={isSessionFeedSidebarOpen}
           onSearchOpen={() => setIsSearchOpen(true)}
           onOpenSettings={() => setActiveTab('settings')}
+          onNavigateOpenQuestions={() => setActiveTab('flywheel')}
           onDismissTrackerBanner={() => setTrackerBannerDismissed(true)}
           onRestartBackend={() => restartBackendMutation.mutate()}
           onRestartCliproxy={() => restartCliproxyMutation.mutate()}

@@ -313,6 +313,7 @@ async function newContext(): Promise<BrowserContext> {
       if (path === '/api/conversations/pending-input') return json([]);
       if (path === '/api/git-activity') return json([]);
       if (path === '/api/conversations/cost' || path === '/api/conversations/cost/by-workspace') return json({ totalCost: 0, entries: [] });
+      if (path === '/api/flywheel/current') return json(null);
       if (path === '/api/flywheel/runs') return json([]);
       return json(search ? { search } : {});
     };
