@@ -35,7 +35,7 @@
     "start": "bun run scripts/start-electron.mjs",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --configLoader runner --passWithNoTests",
-    "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never && node scripts/stamp-update-manifests.mjs",
+    "dist:linux": "node scripts/prepare-server-resources.mjs && electron-builder --linux AppImage --publish never && node scripts/smoke-appimage-cli.mjs && node scripts/stamp-update-manifests.mjs",
     "dist:mac": "node scripts/prepare-server-resources.mjs && electron-builder --mac dmg zip --arm64 --publish never && node scripts/stamp-update-manifests.mjs",
     "dist:win": "node scripts/prepare-server-resources.mjs && electron-builder --win nsis --publish never && node scripts/stamp-update-manifests.mjs",
     "postinstall": "electron-rebuild -f -w node-pty 2>/dev/null; exit 0"
