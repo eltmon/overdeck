@@ -394,17 +394,17 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:30:12.416Z",
+  "updated": "2026-07-16T02:33:12.146Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:27:54.866Z",
+    "updatedAt": "2026-07-16T02:33:12.087Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "c947d2aadf5011bc21c6293692c6edacb45fad8d",
@@ -551,15 +551,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 13824576,
-            "output": 12076,
-            "cacheRead": 12127360,
+            "input": 14048355,
+            "output": 12206,
+            "cacheRead": 12339072,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 141284528,
-            "output": 262056,
-            "cacheRead": 137373952,
+            "input": 146612207,
+            "output": 276380,
+            "cacheRead": 142516224,
             "cacheWrite": 0
           }
         },
@@ -606,15 +606,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 13824576,
-          "output": 12076,
-          "cacheRead": 12127360,
+          "input": 14048355,
+          "output": 12206,
+          "cacheRead": 12339072,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 141284528,
-          "output": 262056,
-          "cacheRead": 137373952,
+          "input": 146612207,
+          "output": 276380,
+          "cacheRead": 142516224,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -637,8 +637,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 161.86610100000001,
-        "pricingAsOf": "2026-07-16T02:27:55.105Z"
+        "usd": 165.793992,
+        "pricingAsOf": "2026-07-16T02:33:12.139Z"
       }
     },
     "merges": [
