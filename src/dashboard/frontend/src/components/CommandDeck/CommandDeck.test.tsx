@@ -23,6 +23,9 @@ vi.mock('./styles/command-deck.module.css', () => ({
     resizeHandle: 'resizeHandle',
     content: 'content',
     contentEmpty: 'contentEmpty',
+    unknownProject: 'unknownProject',
+    unknownProjectList: 'unknownProjectList',
+    unknownProjectBack: 'unknownProjectBack',
     featureHeader: 'featureHeader',
     featureTitle: 'featureTitle',
     featureId: 'featureId',
@@ -48,7 +51,27 @@ vi.mock('./SessionView/IssueHeader', () => ({
   ),
 }));
 
+interface RegisteredProjectFixture {
+  key: string;
+  name?: string;
+  path: string;
+}
+
+const defaultRegisteredProjects: RegisteredProjectFixture[] = [
+  { key: 'test-key', name: 'test-project', path: '/path/to/test-project' },
+  { key: 'other-project', name: 'Other Project', path: '/path/to/other-project' },
+];
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 let latestStageProps: any;
+let registeredProjectsResponse: RegisteredProjectFixture[] | Promise<RegisteredProjectFixture[]> = defaultRegisteredProjects;
 let conversationCreateResponse: { ok: boolean; body: unknown } = {
   ok: true,
   body: { id: 3, name: 'created-conv', title: 'Agent' },
@@ -258,10 +281,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
       if (url === '/api/registered-projects') {
         return {
           ok: true,
-          json: async () => [
-            { key: 'test-project', name: 'test-project', path: '/path/to/test-project' },
-            { key: 'other-project', name: 'Other Project', path: '/path/to/other-project' },
-          ],
+          json: async () => registeredProjectsResponse,
         };
       }
       if (url === '/api/conversations') {
@@ -399,6 +419,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     latestStageProps = undefined;
+    registeredProjectsResponse = defaultRegisteredProjects;
     conversationCreateResponse = {
       ok: true,
       body: { id: 3, name: 'created-conv', title: 'Agent' },
@@ -437,6 +458,54 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     );
   });
 
+  it('renders an unknown-project state instead of a deck for an unregistered slug', async () => {
+    renderCommandDeck({ selectedProject: 'missing-project' });
+
+    expect(await screen.findByRole('heading', { name: 'Unknown project' })).toBeInTheDocument();
+    expect(screen.getByText('missing-project')).toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+  });
+
+  it('accepts a selected project that matches a registered key', async () => {
+    renderCommandDeck({ selectedProject: 'test-key' });
+
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-key');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+  });
+
+  it('accepts a selected project that matches a registered name', async () => {
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-project');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+  });
+
+  it('does not flash the unknown-project state while project queries are unresolved', async () => {
+    const pendingProjects = deferred<RegisteredProjectFixture[]>();
+    registeredProjectsResponse = pendingProjects.promise;
+    renderCommandDeck({ selectedProject: 'missing-project' });
+
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      pendingProjects.resolve(defaultRegisteredProjects);
+      await pendingProjects.promise;
+    });
+    expect(await screen.findByRole('heading', { name: 'Unknown project' })).toBeInTheDocument();
+  });
+
+  it('navigates from the unknown-project state to a registered project or the deck root', async () => {
+    const onSelectProject = vi.fn();
+    renderCommandDeck({ selectedProject: 'missing-project', onSelectProject });
+    await screen.findByRole('heading', { name: 'Unknown project' });
+
+    fireEvent.click(screen.getByRole('button', { name: 'test-project' }));
+    expect(onSelectProject).toHaveBeenCalledWith('test-project');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Command Deck' }));
+    expect(onSelectProject).toHaveBeenCalledWith(null);
+  });
+
   it('returns the created conversation name and opens its agent pane', async () => {
     renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findByTestId('stage');
@@ -458,7 +527,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
       body: { error: 'Unknown project: overdeck' },
     };
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    renderCommandDeck({ selectedProject: 'overdeck' });
+    renderCommandDeck({ selectedProject: 'test-project' });
     await screen.findByTestId('stage');
 
     let result: unknown;

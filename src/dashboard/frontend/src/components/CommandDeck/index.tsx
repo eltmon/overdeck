@@ -59,7 +59,7 @@ async function fetchVersion(): Promise<{ version: string }> {
 
 interface RegisteredProject {
   key: string;
-  name: string;
+  name?: string;
   path: string;
 }
 
@@ -243,7 +243,7 @@ export function CommandDeck({
   const currentWidth = useRef(sidebarWidth);
   const queryClient = useQueryClient();
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: projects = [], isLoading, isFetched: projectsFetched } = useQuery({
     queryKey: ['command-deck-projects', projectQueryEpoch],
     queryFn: fetchProjects,
     refetchInterval: 30000,
@@ -255,7 +255,7 @@ export function CommandDeck({
     refetchInterval: 15000,
   });
 
-  const { data: registeredProjects = [] } = useQuery({
+  const { data: registeredProjects = [], isFetched: registeredProjectsFetched } = useQuery({
     queryKey: ['registered-projects'],
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
@@ -1221,6 +1221,25 @@ export function CommandDeck({
     return projectsWithSessions.find(p => p.name === selectedProject) ?? null;
   }, [projectsWithSessions, selectedProject]);
 
+  const selectedRegisteredProject = useMemo(
+    () => registeredProjects.find((project) =>
+      project.key === selectedProject || project.name === selectedProject,
+    ),
+    [registeredProjects, selectedProject],
+  );
+  const selectedProjectIsKnown = useMemo(() => {
+    if (!selectedProject) return false;
+    if (selectedProject === NO_PROJECT_KEY) return true;
+    return projectsWithSessions.some((project) => project.name === selectedProject)
+      || selectedRegisteredProject !== undefined;
+  }, [projectsWithSessions, selectedProject, selectedRegisteredProject]);
+  const showUnknownProject = Boolean(
+    selectedProject
+      && projectsFetched
+      && registeredProjectsFetched
+      && !selectedProjectIsKnown,
+  );
+
   // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
   // For a real project: its scoped conversations + issue ids. For the special
   // "No project" bucket: conversations not under any registered project.
@@ -1435,7 +1454,38 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {selectedProject ? (
+          {showUnknownProject ? (
+            <div className={styles.contentEmpty}>
+              <div className={styles.unknownProject}>
+                <Compass size={48} aria-hidden="true" />
+                <h2>Unknown project</h2>
+                <p><code>{selectedProject}</code> is not a registered project.</p>
+                {registeredProjects.length > 0 && (
+                  <div className={styles.unknownProjectList} aria-label="Registered projects">
+                    {registeredProjects.map((project) => {
+                      const projectName = project.name ?? project.key;
+                      return (
+                        <button
+                          key={project.key}
+                          type="button"
+                          onClick={() => onSelectProject?.(projectName)}
+                        >
+                          {projectName}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className={styles.unknownProjectBack}
+                  onClick={() => onSelectProject?.(null)}
+                >
+                  Back to Command Deck
+                </button>
+              </div>
+            </div>
+          ) : selectedProject ? (
             <Stage
               key={selectedProject}
               deckKey={selectedProject}
@@ -1444,12 +1494,12 @@ export function CommandDeck({
               onCreateConversation={createDeckConversation}
               onActiveConversationChange={setSelectedConversation}
               terminalCwd={
-                registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.path
+                selectedRegisteredProject?.path
               }
               renderHome={(api) => (
                 <ProjectHome
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
-                  projectKey={registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.key}
+                  projectKey={selectedRegisteredProject?.key}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
                   features={selectedProjectData?.features}
@@ -1489,7 +1539,7 @@ export function CommandDeck({
         {/* Awareness rail (PAN-1591) — the merged feed: one column with a
             Needs-you / Project / Global scope switcher, replacing the separate
             Project Activity + global Activity Feed columns. */}
-        {selectedProject && (
+        {selectedProject && !showUnknownProject && (
           awarenessCollapsed ? (
             <button
               type="button"
