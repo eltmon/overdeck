@@ -13,6 +13,7 @@ import type { AgentStatus } from '@overdeck/contracts';
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
+import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import {
   getAgentDir,
   getLatestSessionIdSync,
@@ -84,7 +85,8 @@ export async function spawnPanCommandDetached(input: {
   await mkdir(agentDir, { recursive: true });
   const spawnLogPath = join(agentDir, 'spawn.log');
   const spawnLogHandle = await open(spawnLogPath, 'a');
-  const child = spawn('pan', args, {
+  const invocation = panCliInvocation(args);
+  const child = spawn(invocation.command, invocation.args, {
     cwd,
     detached: true,
     stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],

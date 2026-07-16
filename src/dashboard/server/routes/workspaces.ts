@@ -1,6 +1,7 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
+import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
  *
@@ -526,7 +527,8 @@ export function spawnPanCommand(
     }
   };
 
-  const child = spawn('pan', args, {
+  const invocation = panCliInvocation(args);
+  const child = spawn(invocation.command, invocation.args, {
     cwd: cwd || process.cwd(),
     detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -544,7 +546,8 @@ export function spawnPanCommand(
         });
       }
       appendActivityOutput(activityId, `--- ${chain.phaseLabel} ---`);
-      const next = spawn('pan', chain.args, {
+      const nextInvocation = panCliInvocation(chain.args);
+      const next = spawn(nextInvocation.command, nextInvocation.args, {
         cwd: cwd || process.cwd(),
         detached: true,
         stdio: ['ignore', 'pipe', 'pipe'],

@@ -40,6 +40,7 @@ import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstab
 
 import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
+import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
 import { isPlanningComplete, readPlanSync } from '../../../lib/vbrief/io.js';
 import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
 import {
@@ -428,7 +429,8 @@ const postIssueResetToPlannedRoute = HttpRouter.add(
     const id = params['id'] ?? '';
     if (!parseIssueIdSync(id)) return jsonResponse({ error: 'Invalid issue ID' }, { status: 400 });
     try {
-      const { stdout } = yield* Effect.promise(() => execFileAsync('pan', ['reset-to-planned', id], { encoding: 'utf8' }));
+      const invocation = panCliInvocation(['reset-to-planned', id]);
+      const { stdout } = yield* Effect.promise(() => execFileAsync(invocation.command, invocation.args, { encoding: 'utf8' }));
       invalidateAgentsCache();
       return jsonResponse({ success: true, message: stdout.trim() });
     } catch (error) {
