@@ -381,6 +381,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T15:37:03.975Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T16:00:21.815Z"
     }
   ],
   "feedback": [],
@@ -459,7 +464,7 @@
     "recordedAt": "2026-07-16T13:05:33.565Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T16:00:20.644Z",
+  "updated": "2026-07-16T16:00:21.889Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "reviewing",
@@ -714,7 +719,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
