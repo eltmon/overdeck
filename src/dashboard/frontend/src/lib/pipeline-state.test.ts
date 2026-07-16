@@ -34,4 +34,22 @@ describe('Definition of Ready (PAN-1966)', () => {
   it('getPipelineIssuePhase: open backlog issue with no ready signal → todo (hidden from pipeline)', () => {
     expect(getPipelineIssuePhase(backlogIssue())).toBe('todo');
   });
+
+  it('uses server-computed membership when present and preserves legacy fallback when absent', () => {
+    expect(getPipelineIssuePhase(backlogIssue({
+      pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+    }))).toBe('ready');
+    expect(getPipelineIssuePhase(backlogIssue({
+      labels: ['ready'],
+      pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
+    }))).toBe('todo');
+    expect(getPipelineIssuePhase(backlogIssue({ labels: ['ready'] }))).toBe('ready');
+  });
+
+  it('preserves in-flight lane assignment when membership is attached', () => {
+    const membership = { inPipeline: true, bucket: 'in_flight' as const, labelDrift: null };
+    expect(getPipelineIssuePhase(backlogIssue({ state: 'in_progress', pipelineMembership: membership }))).toBe('work');
+    expect(getPipelineIssuePhase(backlogIssue({ state: 'in_review', pipelineMembership: membership }))).toBe('review');
+    expect(getPipelineIssuePhase(backlogIssue({ mergeStatus: 'queued', pipelineMembership: membership }))).toBe('ship');
+  });
 });

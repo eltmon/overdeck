@@ -132,6 +132,22 @@ describe('PipelineView', () => {
     expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(6);
   });
 
+  it('renders post-merge limbo from server membership without review-status residue', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-10',
+        title: 'Merged but still open',
+        pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const readyPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="ready"]') as HTMLElement;
+    expect(within(readyPhase).getByText('Merged but still open')).toBeInTheDocument();
+  });
+
   it('sorts rows within each phase by priority rank then updatedAt descending', () => {
     const { container } = renderPipelineView();
     const workPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="work"]') as HTMLElement;

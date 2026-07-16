@@ -3,11 +3,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createPipelineMembershipService,
   PIPELINE_MEMBERSHIP_TTL_MS,
+  summarizePipelineMembership,
 } from '../../../src/dashboard/server/services/pipeline-membership.js';
 
 describe('pipeline membership service', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
+
+  it('projects the authoritative result onto the issue DTO contract', () => {
+    expect(summarizePipelineMembership({
+      issueId: 'PAN-1966',
+      inPipeline: true,
+      bucket: 'post_merge_limbo',
+      reasons: ['merged but open'],
+      labelDrift: 'stale_absent',
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
+    })).toEqual({ inPipeline: true, bucket: 'post_merge_limbo', labelDrift: 'stale_absent' });
+  });
 
   it('caches classified membership within the TTL and refreshes after expiry', async () => {
     const gather = vi.fn().mockResolvedValue([{

@@ -1,4 +1,5 @@
 import type { ProjectConfig } from '../../../lib/projects.js';
+import type { IssuePipelineMembership } from '@overdeck/contracts';
 import { gatherProjectLensSignals } from '../../../lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership, type IssueLensSignals, type PipelineMembership } from '../../../lib/pipeline-membership.js';
 
@@ -27,3 +28,11 @@ export function createPipelineMembershipService(
 }
 
 export const getProjectPipelineMembership = createPipelineMembershipService();
+
+export function summarizePipelineMembership(membership: PipelineMembership): IssuePipelineMembership {
+  return {
+    inPipeline: membership.inPipeline,
+    bucket: membership.bucket,
+    labelDrift: membership.labelDrift,
+  };
+}

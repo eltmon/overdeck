@@ -120,12 +120,13 @@ export function isDeaconIgnored(status?: PipelineStateLike | null): boolean {
  * an explicit human act. Keeps backlog out of the pipeline view; only DoR-met,
  * not-yet-started issues land in the Ready lane. See docs/PIPELINE-READY-AND-DONE.md.
  */
-export function isPipelineReady(issue: Pick<Issue, 'labels' | 'stateType'>): boolean {
+export function isPipelineReady(issue: Pick<Issue, 'labels' | 'stateType' | 'pipelineMembership'>): boolean {
+  if (issue.pipelineMembership) return issue.pipelineMembership.inPipeline;
   return (issue.labels?.includes('ready') ?? false) || issue.stateType === 'unstarted';
 }
 
 export function getPipelineIssuePhase(
-  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels'>,
+  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels' | 'pipelineMembership'>,
   reviewStatus?: PipelineStateLike | null,
   agent?: Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null,
 ): PipelineIssuePhase {

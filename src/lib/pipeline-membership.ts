@@ -27,6 +27,10 @@
  */
 
 /** Durable lens signals for one issue. Gather these from GitHub + git, never L5. */
+import type { PipelineBucket } from '@overdeck/contracts';
+
+export type { PipelineBucket } from '@overdeck/contracts';
+
 export interface IssueLensSignals {
   issueId: string;
   /** L3 — the GitHub issue state is open. */
@@ -48,13 +52,6 @@ export interface IssueLensSignals {
   /** L6-spec — a durable vBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
   hasVbriefSpec: boolean;
 }
-
-export type PipelineBucket =
-  | 'in_flight'
-  | 'zombie_pr'
-  | 'post_merge_limbo'
-  | 'planned_backlog'
-  | 'clean_terminal';
 
 export interface PipelineMembership {
   issueId: string;

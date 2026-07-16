@@ -1,4 +1,4 @@
-import { jsonResponse, jsonStringResponse } from "../http-helpers.js";
+import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
 /**
  * Issues route module — Effect HttpRouter.Layer (PAN-428 B6)
@@ -37,6 +37,7 @@ import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 
 import { Duration, Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import type { IssuePipelineMembership } from '@overdeck/contracts';
 
 import { extractTeamPrefix, findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
@@ -67,7 +68,7 @@ import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { getProjectPipelineMembership } from '../services/pipeline-membership.js';
+import { getProjectPipelineMembership, summarizePipelineMembership } from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -222,7 +223,25 @@ const getIssuesRoute = HttpRouter.add(
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
 
     const issueDataService = getIssueDataService();
-    return jsonStringResponse(issueDataService.getIssuesJson({ cycle, includeCompleted }));
+    const issues = issueDataService.getIssues({ cycle, includeCompleted });
+    const projects = new Map<string, NonNullable<ReturnType<typeof getProjectSync>>>();
+    for (const issue of issues) {
+      const resolved = resolveProjectFromIssueSync(issue.identifier, issue.labels);
+      if (!resolved) continue;
+      const project = getProjectSync(resolved.projectKey);
+      if (project) projects.set(resolved.projectKey, project);
+    }
+    const membershipByIssue = new Map<string, IssuePipelineMembership>();
+    const memberships = yield* Effect.promise(() => Promise.all(
+      [...projects.values()].map((project) => getProjectPipelineMembership(project)),
+    ));
+    for (const membership of memberships.flat()) {
+      membershipByIssue.set(membership.issueId.toUpperCase(), summarizePipelineMembership(membership));
+    }
+    return jsonResponse(issues.map((issue) => ({
+      ...issue,
+      pipelineMembership: membershipByIssue.get(issue.identifier.toUpperCase()),
+    })));
   })),
 );
 
