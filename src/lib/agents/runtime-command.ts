@@ -812,6 +812,10 @@ export async function getRoleRuntimeBaseCommand(
   const quotedModel = shellQuoteModelIdSync(validatedModel);
   const behavior = getHarnessBehavior(harness);
   if (behavior.launchCommandKind === 'ohmypi-rpc') {
+    const mcpNames = Object.keys(parseRoleMcpServersSync(roleAgentDefinitionPath(role)));
+    if (mcpNames.length > 0) {
+      console.warn(`[spawn] role '${role}' declares MCP servers (${mcpNames.join(', ')}) but harness 'ohmypi' does not provision MCP — those tools will be unavailable`);
+    }
     return `omp --mode rpc --model ${quotedModel}`;
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {

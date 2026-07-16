@@ -1,8 +1,8 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { getCodexLauncherFields, parseRoleMcpServersSync, roleSystemPromptInjectionSync } from '../runtime-command.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getCodexLauncherFields, getRoleRuntimeBaseCommand, parseRoleMcpServersSync, roleSystemPromptInjectionSync } from '../runtime-command.js';
 
 const ROLE = `---
 name: test
@@ -94,5 +94,27 @@ describe('parseRoleMcpServersSync', () => {
     const config = readFileSync(join(fields.codexHome, 'config.toml'), 'utf8');
 
     expect(config).not.toContain('[mcp_servers');
+  });
+
+  it('warns when ohmypi cannot provision a role MCP server', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const command = await getRoleRuntimeBaseCommand('gpt-5.6', 'agent-test', 'test', 'ohmypi');
+
+    expect(command).toBe("omp --mode rpc --model 'gpt-5.6'");
+    expect(warn).toHaveBeenCalledWith(
+      "[spawn] role 'test' declares MCP servers (playwright) but harness 'ohmypi' does not provision MCP — those tools will be unavailable",
+    );
+    warn.mockRestore();
+  });
+
+  it('does not warn for roles without MCP or harnesses that provision it', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await getRoleRuntimeBaseCommand('gpt-5.6', 'agent-work', 'work', 'ohmypi');
+    await getRoleRuntimeBaseCommand('gpt-5.6', 'agent-test', 'test', 'codex');
+
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });
