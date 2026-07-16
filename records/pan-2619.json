@@ -31,18 +31,18 @@
     "recordedAt": "2026-07-16T18:10:23.028Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T18:35:47.524Z",
+  "updated": "2026-07-16T18:40:13.236Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:35:47.404Z",
+    "updatedAt": "2026-07-16T18:40:13.173Z",
     "reviewNotes": "Verification failed at empty-changeset",
-    "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/vBRIEF task state) changed vs origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
+    "lastVerifiedCommit": "d2a4e5824040bfd2b2319469aaa540b4d1bb097b",
     "reviewSpawnedAt": "2026-07-16T18:10:41.383Z",
     "strikeRecoveryCount": 0
   },
@@ -122,7 +122,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.584718,
-        "pricingAsOf": "2026-07-16T18:35:47.498Z"
+        "pricingAsOf": "2026-07-16T18:40:13.227Z"
       }
     },
     "merges": [],
