@@ -181,7 +181,7 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:36:33.477Z",
+  "updated": "2026-07-16T21:36:38.803Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "reviewing",
@@ -190,7 +190,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:36:27.294Z",
+    "updatedAt": "2026-07-16T21:36:37.882Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed test",
     "testNotes": "See .pan/test/result.json for full evidence. Code fix verified correct (typecheck, lint, targeted XTerminal.test.tsx PASS). FAILED because broad --changed vitest gate fails on unrelated pre-existing App.test.tsx defect (commit 2f4648e673, untouched by this diff), and required browser UAT could not run: workspace container /ws/terminal rejects upgrades with 403 via frontend Traefik/Vite proxy path, and PTY spawn segfaults (node:22-alpine/musl vs glibc-only @lydell/node-pty-linux-x64). Both pre-existing env defects, out of test-role scope. No host dashboard fallback used. Flywheel notified via pan tell.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
@@ -324,7 +324,7 @@
       },
       "costAtCloseOut": {
         "usd": 90.552676,
-        "pricingAsOf": "2026-07-16T21:36:27.663Z"
+        "pricingAsOf": "2026-07-16T21:36:38.150Z"
       }
     },
     "merges": [
