@@ -208,20 +208,21 @@
     "recordedAt": "2026-07-16T01:13:10.379Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T01:29:19.156Z",
+  "updated": "2026-07-16T01:32:37.581Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T01:29:19.088Z",
+    "updatedAt": "2026-07-16T01:32:37.410Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Both prior blockers are fixed. (1) IssueView.tsx now types IssueViewProps as Omit<HTMLAttributes<HTMLDivElement>,'children'> and spreads ...rootProps onto the root div (data-component defaults to 'issue-view' but is overridable) — FeatureItem's data-component/data-issue-id now actually reach the DOM, and a new render+dispatchEvent test in IssueView.test.tsx verifies both the attribute and an onClick handler forward correctly. (2) The FR-0 gate is now real: densitySections.ts is hand-authored per density instead of self-deriving from ISSUE_VIEW_INVENTORY, IssueView.tsx no longer emits hidden decoy spans, and dozens of real production elements (ReviewGroup, Badges, MergeButton, ResourceStrip, SessionNode, AgentsLane, CrewStage, HappenedFeed, StatusNarrative, IssueMissionControl tabs, IssueDrawer panels, etc.) now carry genuine data-section markers verified in source. New tests in IssueMissionControl.test.tsx and IssueDrawer.test.tsx render the real shells and assert data-section presence in the DOM, not just the static map against itself. AC5: verified directly — FeatureItem.tsx is 1366 lines matching its baseline exactly (no growth), and IssueDrawer.tsx (319 lines) / IssueMissionControl.tsx (986 lines) are both under the 1000-line ceiling in scripts/lint-file-size.sh and correctly absent from file-size-baseline.txt (no stale entries), so lint passes. Minor non-blocking nit for the review convoy: FeatureItem.tsx's 'Filter bar' data-section wraps the same DOM as 'Feature (issue) row' (no distinct filter-bar UI exists in that file) and SessionNode.tsx stacks three section markers (SessionNode / SessionNode context menu / ModelResolutionCard) on one identical wrapper — these satisfy AC2's literal text but are imprecise placements worth tightening, not a functional or gate-integrity violation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
-    "lastVerifiedCommit": "cc6b645b18a3a591bc449c4010622ee8bd9e1fdb",
+    "lastVerifiedCommit": "48aecad1ce5105f0cd0066c7bcf7b10369c580ab",
     "reviewRequestedAt": "2026-07-16T01:13:13.463Z",
     "reviewSpawnedAt": "2026-07-16T01:17:14.744Z",
     "scopeDrift": {
@@ -369,15 +370,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 10378557,
-            "output": 10675,
-            "cacheRead": 9022976,
+            "input": 10596437,
+            "output": 10761,
+            "cacheRead": 9237888,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 103502415,
-            "output": 162619,
-            "cacheRead": 101249536,
+            "input": 105598707,
+            "output": 163299,
+            "cacheRead": 103336960,
             "cacheWrite": 0
           }
         },
@@ -416,15 +417,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 10378557,
-          "output": 10675,
-          "cacheRead": 9022976,
+          "input": 10596437,
+          "output": 10761,
+          "cacheRead": 9237888,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 103502415,
-          "output": 162619,
-          "cacheRead": 101249536,
+          "input": 105598707,
+          "output": 163299,
+          "cacheRead": 103336960,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -447,8 +448,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 128.82990900000001,
-        "pricingAsOf": "2026-07-16T01:29:19.146Z"
+        "usd": 129.93836100000001,
+        "pricingAsOf": "2026-07-16T01:32:37.461Z"
       }
     },
     "merges": [
