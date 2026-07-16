@@ -108,6 +108,24 @@ describe('ActiveAgentPanel', () => {
     expect(screen.getByText('✗ lint failed')).toHaveClass('text-destructive-foreground');
   });
 
+  it('keeps errored agents visible with diagnostics and recovery controls', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-2499-slot-2': makeAgent({ id: 'agent-pan-2499-slot-2', status: 'error' }),
+      },
+      agentOutputById: {
+        'agent-pan-2499-slot-2': ['✗ worker exited'],
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPanel();
+
+    expect(screen.queryByText('No active agent.')).not.toBeInTheDocument();
+    expect(screen.getByText('✗ worker exited')).toBeInTheDocument();
+    expect(screen.getByText(/STUCK/)).toBeInTheDocument();
+    expect(screen.getByTestId('active-agent-panel-resume')).toBeInTheDocument();
+  });
+
   it('posts Tell input to /api/agents/:agentId/tell for a live agent', async () => {
     useDashboardStore.setState({
       agentsById: {

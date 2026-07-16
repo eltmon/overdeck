@@ -161,11 +161,16 @@ export async function spawnAfterClearingStartGates<T>(input: {
   gate: AgentStartGateDecision | null;
   initialState: AgentState | null;
   spawn: () => Promise<T>;
+  isSuccessful?: (result: T) => boolean;
 }): Promise<T> {
   try {
     if (input.gate?.paused) await Effect.runPromise(clearAgentPaused(input.agentSessionName));
     if (input.gate?.troubled) await Effect.runPromise(clearAgentTroubled(input.agentSessionName));
-    return await input.spawn();
+    const result = await input.spawn();
+    if (input.isSuccessful && !input.isSuccessful(result) && input.gate && input.initialState) {
+      await Effect.runPromise(saveAgentState(input.initialState));
+    }
+    return result;
   } catch (error) {
     if (input.gate && input.initialState) {
       await Effect.runPromise(saveAgentState(input.initialState));
@@ -616,7 +621,9 @@ export const postAgentsRoute = HttpRouter.add(
           spawnGuardrails,
           lifecycle,
         })),
+        isSuccessful: (remoteResponse) => remoteResponse.status >= 200 && remoteResponse.status < 300,
       }));
+      if (response.status < 200 || response.status >= 300) return response;
       yield* Effect.promise(commitClearedGates);
       return response;
     }

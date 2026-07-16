@@ -248,4 +248,21 @@ describe('spawnAfterClearingStartGates', () => {
     expect(spawn).not.toHaveBeenCalled();
     expect(mockSaveAgentState).toHaveBeenCalledWith(initialState);
   });
+
+  it('restores persistent gates when remote dispatch resolves with a preflight rejection', async () => {
+    const initialState = makeState({ id: 'agent-pan-1234', issueId: 'PAN-1234', paused: true });
+    mockClearAgentPaused.mockReturnValue(Effect.succeed({ ...initialState, paused: false }));
+    const rejected = new Response('spend cap exceeded', { status: 429 });
+
+    const result = await spawnAfterClearingStartGates({
+      agentSessionName: initialState.id,
+      gate: { blocked: true, paused: true, troubled: false, error: 'blocked' },
+      initialState,
+      spawn: () => Promise.resolve(rejected),
+      isSuccessful: (response) => response.ok,
+    });
+
+    expect(result.status).toBe(429);
+    expect(mockSaveAgentState).toHaveBeenCalledWith(initialState);
+  });
 });
