@@ -184,7 +184,7 @@
     "recordedAt": "2026-07-16T21:45:13.425Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T23:03:54.376Z",
+  "updated": "2026-07-16T23:04:00.840Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "passed",
@@ -193,7 +193,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T23:02:09.166Z",
+    "updatedAt": "2026-07-16T23:04:00.832Z",
     "testNotes": "Code change itself verified correct: npm run typecheck (root, PASS), npx tsc --noEmit (frontend, PASS), npm run lint (PASS, exit 0), and the vBRIEF's own scoped verify_commands — cd src/dashboard/frontend && npx vitest run src/components/XTerminal.test.tsx — PASS (25/25). Diff is exactly the planned CSS/className fix (XTerminal.tsx padding moved off measured host onto .xterm via .xterm-host CSS rule) plus its regression test. FAILED because: (1) the broader configured 'test' quality gate (OVERDECK_VERIFICATION=1 npx vitest run --changed <merge-base>, root+frontend) fails in the frontend leg on src/App.test.tsx (31 tests) with 'No selectPendingInputSubjects export is defined on the ./lib/store mock' — confirmed byte-identical file content between this branch and main, and reproducible running App.test.tsx standalone; root-caused to unrelated main commit 2f4648e673 'header decisions badge with click-through popover' (landed 2026-07-16 15:28, before main tip a081a9ce59), inherited via routine merge-main-into-feature-branch, not touched by this branch's diff (git diff main...HEAD --stat only shows XTerminal.tsx/XTerminal.test.tsx/index.css/FLYWHEEL-STATE.md). (2) Required browser UAT — the ACs explicitly call for getBoundingClientRect measurements 'in an isolated Playwright browser' and tmux pane-size checks — could not be completed: the workspace's own isolated container stack (overdeck-feature-pan-2619-server-1/frontend-1, per roles/test.md host-process-boundary contract; host dashboard was never touched) rejects every /ws/terminal WebSocket upgrade from the frontend's Traefik/Vite-proxied browser path with HTTP 403 (Origin header not preserved through that proxy hop) even though OVERDECK_TRUSTED_ORIGINS is correctly set and a direct curl to the api- domain with a proper HTTP/1.1 upgrade succeeds; on the one occasion a connection did get through to real PTY spawn, the server process segfaulted (exit 139) — the devcontainer Dockerfile is FROM node:22-alpine (musl) but the pinned @lydell/node-pty-linux-x64 native binary is glibc-only (ldd shows symbol-relocation failures under musl), reproduced twice. Both blockers are pre-existing environment/infra defects unrelated to this diff and outside test-role boundaries to fix; per roles/test.md ('if the isolated stack cannot support verification, report TESTS FAILED; do not substitute the primary host dashboard'), no fallback to the host dashboard was used. Notified flywheel-orchestrator via pan tell before reporting. Cleanup: restarted the workspace server container back to a healthy idle state (0 agents) and removed the throwaway diagnostic tmux sessions (uat-pan-2619, uat-small) created inside that container for this test; no host-level services were touched.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "reviewedAtCommit": "416d0cb20bb55b2c1d705641b54cb1285e78668d",
@@ -284,10 +284,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1787,
-            "output": 87821,
-            "cacheRead": 28899315,
-            "cacheWrite": 402311
+            "input": 1817,
+            "output": 92477,
+            "cacheRead": 30714672,
+            "cacheWrite": 513770
           }
         },
         "work": {
@@ -319,15 +319,15 @@
           "cacheWrite": 327850
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1787,
-          "output": 87821,
-          "cacheRead": 28899315,
-          "cacheWrite": 402311
+          "input": 1817,
+          "output": 92477,
+          "cacheRead": 30714672,
+          "cacheWrite": 513770
         }
       },
       "costAtCloseOut": {
-        "usd": 97.54124,
-        "pricingAsOf": "2026-07-16T23:02:09.172Z"
+        "usd": 98.229578,
+        "pricingAsOf": "2026-07-16T23:04:00.837Z"
       }
     },
     "merges": [
@@ -335,8 +335,8 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 4,
     "claims": {},
