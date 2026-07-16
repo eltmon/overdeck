@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T06:35:42.222Z",
+  "updated": "2026-07-16T07:23:26.028Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -102,5 +102,12 @@
     "reveal-signal-module.reveal-signal-module.ac2": "completed",
     "reveal-signal-module.reveal-signal-module.ac3": "completed",
     "open-questions-anchor": "pending"
-  }
+  },
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:23:26.027Z"
+    }
+  ]
 }
