@@ -89,6 +89,26 @@ For a Role with no Claude-specific frontmatter (the review convoy sub-roles), th
 
 **Source of truth. Never deleted. Lives in the repo.**
 
+### Role MCP servers
+
+Top-level role files declare MCP servers in `mcpServers`, a YAML list of single-key maps. For example, `roles/test.md` declares Playwright as:
+
+```yaml
+mcpServers:
+  - playwright:
+      type: stdio
+      command: npx
+      args:
+        - "-y"
+        - "@playwright/mcp@latest"
+```
+
+Overdeck renders this declaration for each harness:
+
+- **Claude Code** gets a generated `--mcp-config` JSON file and an `mcp__<name>` entry in `--allowedTools` (PAN-2090).
+- **Codex** gets `[mcp_servers.<name>]` entries in the agent's `codex-home/config.toml`. Overdeck rewrites the entries on spawn, resume, and recovery so relaunching a role preserves its tools (PAN-2698).
+- **ohmypi** cannot provision role MCP servers. Overdeck logs a spawn-time warning that names every unavailable server.
+
 ### 2. Overdeck pipeline agent — `agents/pan-*-agent.md`
 
 Claude Code subagent definitions used by Overdeck's pipeline. These are committed under `agents/` in the overdeck repo and synced to every devroot's `<devroot>/.claude/agents/` by `pan install` / `pan sync`. From there, `mergeSkillsIntoWorkspace()` copies them into each workspace's `.claude/agents/` so Claude Code can load them when a pipeline run uses the `--agent` flag.
