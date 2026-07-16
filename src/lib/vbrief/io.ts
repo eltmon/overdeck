@@ -2,9 +2,12 @@
  * vBRIEF File I/O Utilities
  *
  * Single-spec-on-main model (PAN-1124): the canonical vBRIEF spec lives at
- * `<projectRoot>/.pan/specs/<canonical>.vbrief.json` and is immutable after
- * planning writes it. The only legal spec mutation is `plan.status` via
- * `updateSpecStatus()` in `pan-dir/specs.ts`.
+ * `<projectRoot>/.pan/specs/<canonical>.vbrief.json`. Work and task operations
+ * cannot mutate its structure; they may only advance `plan.status` through
+ * `updateSpecStatus()` in `pan-dir/specs.ts`. A deliberate return to planning
+ * may replace the full document at the same canonical path through
+ * `writeSpecDocument()`, preserving stable item IDs so existing progress still
+ * applies.
  *
  * Runtime item/subItem status is tracked as a flat `statusOverrides` map in
  * the workspace continue file (`<workspace>/.pan/continue.json`).
