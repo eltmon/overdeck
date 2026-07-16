@@ -53,7 +53,7 @@
     "recordedAt": "2026-07-16T19:14:41.281Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T19:15:33.461Z",
+  "updated": "2026-07-16T19:17:07.485Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -63,10 +63,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:15:33.347Z",
+    "updatedAt": "2026-07-16T19:17:07.386Z",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
-    "reviewRequestedAt": "2026-07-16T19:15:30.505Z",
+    "reviewRequestedAt": "2026-07-16T19:17:07.001Z",
     "reviewSpawnedAt": "2026-07-16T19:14:50.508Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -124,6 +124,14 @@
             "cacheWrite": 175114
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 355464,
+            "output": 6826,
+            "cacheRead": 1599488,
+            "cacheWrite": 0
+          }
+        },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
             "input": 6,
@@ -148,22 +156,22 @@
           "cacheRead": 8013701,
           "cacheWrite": 175114
         },
+        "openai/gpt-5.6-sol": {
+          "input": 3348272,
+          "output": 155779,
+          "cacheRead": 49334784,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 6,
           "output": 1567,
           "cacheRead": 268314,
           "cacheWrite": 96313
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 2992808,
-          "output": 148953,
-          "cacheRead": 47735296,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 56.152425,
-        "pricingAsOf": "2026-07-16T19:15:33.420Z"
+        "usd": 58.934269,
+        "pricingAsOf": "2026-07-16T19:17:07.440Z"
       }
     },
     "merges": [
