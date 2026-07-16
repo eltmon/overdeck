@@ -12,9 +12,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T20:03:36.023Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T20:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T20:06:36.780Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T20:06:36Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2772\n\n# Review Synthesis — PAN-2772 — 2026-07-16\n\n## Verdict: CHANGES REQUESTED — reconnected terminal sockets escape component unmount cleanup\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/context.json\n- Branch: feature/pan-2772\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2772\n- HEAD reviewed: 37b94ab2a22801e712e23ca364f23fb28c37223b\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Reconnected terminal sockets escape component unmount cleanup — `src/dashboard/frontend/src/components/XTerminal.tsx:835`\nThe mount effect retains only the cleanup function returned by the initial `connect()` call (`XTerminal.tsx:795-804`). Both patient-policy retries (`XTerminal.tsx:727-729`) and the new manual Reconnect action (`XTerminal.tsx:835-839`) call `connect()` while discarding its returned cleanup. Each cleanup closes its captured `ws`, so unmounting after a successful retry closes the already-dead initial socket rather than the current live socket (`XTerminal.tsx:757-777`). The live replacement remains attached to the server and its PTY hub, continues delivering callbacks to a disposed terminal, and leaves its resize and visibility listeners installed; its stale `shouldReconnect=true` close handler can also schedule another connection after unmount. The new manual recovery path is directly inside the PR diff, and the five-minute retry policy amplifies the same lifecycle error across many reconnects. Centralize per-connection disposal in a ref or make unmount cleanup close `wsRef.current` and remove every replacement connection's listeners, then add a test that reconnects, unmounts, and proves the replacement WebSocket closes without scheduling another retry.\n\n## Non-blocking Findings\n\n### [performance] Add jitter to the patient reconnect schedule — `src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts:14`\nThe graceful restart broadcast closes all mounted terminal clients together, and the deterministic 1s, 2s, 4s, then 5s schedule keeps their retry attempts synchronized. Each accepted connection enumerates tmux sessions, so a large dashboard can launch a burst of WebSocket handshakes and tmux child processes while the replacement server is booting. Bounded per-client jitter would spread this recovery load without changing the five-minute patient window.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2772/.pan/review/agent-pan-2772-review-37b94ab2/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2772 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/__tests__/reload.test.ts",
@@ -62,7 +75,7 @@
     "recordedAt": "2026-07-16T19:18:10.850Z"
   },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T20:06:36.060Z",
+  "updated": "2026-07-16T20:06:36.781Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "blocked",
