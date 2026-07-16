@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T06:09:06.056Z",
+  "updated": "2026-07-16T06:11:13.627Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "resolver-planned-lens": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-1966",
         "agentId": "agent-pan-1966",
         "pid": 2219739,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T06:09:06.056Z"
+        "claimedAt": "2026-07-16T06:09:06.056Z",
+        "itemId": "resolver-planned-lens",
+        "outcome": "completed",
+        "reason": "Added durable hasVbriefSpec lens, planned-backlog classification, and open/closed unit coverage; focused suite and typecheck pass",
+        "releasedAt": "2026-07-16T06:11:13.626Z"
+      }
+    ],
+    "statusReasons": {
+      "resolver-planned-lens": {
+        "reason": "Added durable hasVbriefSpec lens, planned-backlog classification, and open/closed unit coverage; focused suite and typecheck pass",
+        "updatedAt": "2026-07-16T06:11:13.626Z"
       }
     }
   },
   "statusOverrides": {
-    "resolver-planned-lens": "running"
+    "resolver-planned-lens": "completed",
+    "resolver-planned-lens.resolver-planned-lens.ac1": "completed",
+    "resolver-planned-lens.resolver-planned-lens.ac2": "completed",
+    "resolver-planned-lens.resolver-planned-lens.ac3": "completed"
   }
 }
