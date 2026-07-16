@@ -547,6 +547,12 @@ export async function handleReviewDiscoveryReady(
   await Effect.runPromise(saveAgentState(parent));
 
   const { inScope, carried, scope } = await computeConvoyScope(normalized, workspace);
+  // The per-issue review-model override has to be re-read here: this path is entered from a
+  // signal, not from the parent's spawn opts, so nothing carries `model` in. Read the record
+  // rather than `parent.model` — that is the parent's *resolved* model, and forwarding it
+  // would override each sub-role's own configured model even with no override set.
+  const project = resolveProjectForIssue(normalized);
+  const issueReviewModel = project ? readIssueRecordSync(project, normalized)?.reviewModel : undefined;
   const results = await launchConvoyReviewersPromise({
     issueId: normalized,
     workspace,
@@ -556,6 +562,7 @@ export async function handleReviewDiscoveryReady(
     carried,
     scope,
     contextManifestPath: parent.reviewContextManifestPath,
+    ...(issueReviewModel ? { model: issueReviewModel } : {}),
     allowHost: parent.hostOverride ?? false,
     forkFromParent: true,
   });
