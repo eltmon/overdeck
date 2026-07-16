@@ -21,33 +21,33 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:04:16.859Z",
+  "updated": "2026-07-16T00:11:00.672Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T00:04:16.788Z",
-    "inspectNotes": "3 violations: (1) src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx:1077-1082 passes data-component='feature-item' and data-issue-id={feature.issueId} to <IssueView>, but IssueViewProps (issue-view/IssueView.tsx:9-13) declares only issueId/density/children/className with no rest-spread onto the root div — this fails typecheck and, even if it compiled, silently drops both DOM attributes from the rendered row. (2) AC2 FR-0 render gate is vacuous: densitySections.ts derives DENSITY_SECTIONS purely by filtering ISSUE_VIEW_INVENTORY on its own 'view' field, and IssueView.tsx:23-26 renders those names as unconditional hidden <span data-section> decoys regardless of what is actually in children. IssueView.test.tsx never renders real shell content (IssueDrawer/IssueMissionControl/FeatureItem) — its two FR-0-relevant tests only compare the static map against itself, so a real section could be deleted from a shell and this gate would still report a pass. This defeats the no-loss audit's purpose (project rule additive-refactor-no-loss.md: 'Is anything lost is answered by the audit, not by reasoning from memory'). (3) AC5 not met: scripts/file-size-baseline.txt only lowers FeatureItem.tsx (1374->1366, -8 lines); IssueDrawer.tsx and IssueMissionControl.tsx baselines are untouched and their diffs are net-additive (new import + wrapper tags + prop threading), not reductions. Required fix: forward real DOM attrs/handlers through IssueView (rest-spread or explicit prop), replace the FR-0 gate with an assertion against actual rendered shell output (e.g. render IssueDrawer/IssueMissionControl/FeatureItem at each density and diff data-section coverage against ISSUE_VIEW_INVENTORY), and shrink IssueDrawer/IssueMissionControl enough to move their baselines."
+    "updatedAt": "2026-07-16T00:11:00.630Z",
+    "inspectNotes": "Inspecting item issue-view-wrapper"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 2927871,
-            "output": 5398,
-            "cacheRead": 2634112,
+            "input": 2983290,
+            "output": 5487,
+            "cacheRead": 2687232,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 23286534,
-            "output": 42590,
-            "cacheRead": 22385664,
+            "input": 28247421,
+            "output": 54492,
+            "cacheRead": 27271680,
             "cacheWrite": 0
           }
         },
@@ -69,10 +69,10 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16847,
-            "output": 21515,
-            "cacheRead": 3422723,
-            "cacheWrite": 363995
+            "input": 16849,
+            "output": 22224,
+            "cacheRead": 3565779,
+            "cacheWrite": 364673
           }
         },
         "work": {
@@ -86,15 +86,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 2927871,
-          "output": 5398,
-          "cacheRead": 2634112,
+          "input": 2983290,
+          "output": 5487,
+          "cacheRead": 2687232,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23286534,
-          "output": 42590,
-          "cacheRead": 22385664,
+          "input": 28247421,
+          "output": 54492,
+          "cacheRead": 27271680,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -104,10 +104,10 @@
           "cacheWrite": 438365
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16847,
-          "output": 21515,
-          "cacheRead": 3422723,
-          "cacheWrite": 363995
+          "input": 16849,
+          "output": 22224,
+          "cacheRead": 3565779,
+          "cacheWrite": 364673
         },
         "custom/kimi-k2.7-code": {
           "input": 3398495,
@@ -117,8 +117,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 78.460142,
-        "pricingAsOf": "2026-07-16T00:04:16.843Z"
+        "usd": 81.671965,
+        "pricingAsOf": "2026-07-16T00:11:00.665Z"
       }
     },
     "merges": [],
