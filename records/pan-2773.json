@@ -302,17 +302,17 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:09:08.565Z",
+  "updated": "2026-07-16T21:17:59.240Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:07:59.100Z",
+    "updatedAt": "2026-07-16T21:17:59.200Z",
     "reviewNotes": "Correctness reviewer failed before writing a report; security, performance, and requirements passed.",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
@@ -363,24 +363,6 @@
       ],
       "recordedAt": "2026-07-16T18:48:47.449Z"
     },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "71db541b6a13d5e43561f146f1f835dcbb4774a3"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "71db541b6a13d5e43561f146f1f835dcbb4774a3"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "71db541b6a13d5e43561f146f1f835dcbb4774a3"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "71db541b6a13d5e43561f146f1f835dcbb4774a3"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -388,15 +370,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 25815,
-            "output": 138,
-            "cacheRead": 7552,
+            "input": 57434,
+            "output": 255,
+            "cacheRead": 33024,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 2038734,
-            "output": 9104,
-            "cacheRead": 1758464,
+            "input": 2250676,
+            "output": 9345,
+            "cacheRead": 1967616,
             "cacheWrite": 0
           }
         },
@@ -466,24 +448,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5637513,
-            "output": 366289,
-            "cacheRead": 99212288,
+            "input": 5830428,
+            "output": 374554,
+            "cacheRead": 102502400,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 25815,
-          "output": 138,
-          "cacheRead": 7552,
+          "input": 57434,
+          "output": 255,
+          "cacheRead": 33024,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21929347,
-          "output": 639598,
-          "cacheRead": 146240256,
+          "input": 22334204,
+          "output": 648104,
+          "cacheRead": 149739520,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -500,8 +482,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 208.731192,
-        "pricingAsOf": "2026-07-16T21:07:59.114Z"
+        "usd": 211.714529,
+        "pricingAsOf": "2026-07-16T21:17:59.226Z"
       }
     },
     "merges": [
@@ -509,7 +491,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
