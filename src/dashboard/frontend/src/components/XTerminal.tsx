@@ -889,7 +889,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       {/* Terminal container */}
       <div
         ref={terminalRef}
-        className="absolute inset-2"
+        className="absolute inset-0 xterm-host"
         onClick={handleClick}
         tabIndex={0}
         style={{
