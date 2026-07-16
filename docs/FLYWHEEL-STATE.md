@@ -5225,3 +5225,28 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **PAN-2255** still HELD — operator keep/revert authorization not yet given (issue's last comment is
   only the agent-completion bot msg).
 - **Session: 48 merges, 19 close-outs.**
+
+---
+
+## Tick 57 — 2026-07-16 ~17:00Z — OPERATOR-DIRECTED DEPLOY + fleet unfreeze; 2702/2768 CLOSED honestly
+
+- **Tick-56 diagnosis CORRECTED by operator**: the "watchdog churn" was NOT a trigger-happy watchdog —
+  it was MY OWN `pan close` orphan sweeps killing the dashboard + conversation PTYs via `lsof +D
+  <workspace>` matching Bun-hardlinked pty.node mmaps. Watchdog restart was the SYMPTOM (respawn after
+  my sweep killed it). Fixed on main **dce47042e4 / PAN-2792** (sweeps now select by `/proc/<pid>/cwd`).
+- **DEPLOYED per explicit operator directive**: `pan restart --dashboard --resume --health-timeout
+  120000` → new pid 1714664, build **fb1b422abd** (HEAD; also trims tmux.ts back to file-size baseline,
+  resolving the f7e36872df over-baseline push-blocker). **Boot gates: deacon=on resume=on source=flag** —
+  FIRST resume-ON boot this run. Every prior watchdog restart booted resume=off (PAN-1963 default) ⇒ the
+  operator's "wall of RESUME SESSION buttons." --resume lets the deacon recover the fleet.
+- **PAN-2702 CLOSED — 8/8 DoD rows, ZERO overrides** (honest deploy row: server 16:57Z build includes
+  merge 15:35Z). **teardown:orphaned-processes = None found ⇒ PAN-2792 PROVEN: sweep no longer kills the
+  dashboard** (server pid 1714664 survived both close-outs).
+- **PAN-2768 CLOSED — all rows pass** (desktop packaging; deploy row honest via build inclusion; user
+  delivery still needs release v0.45.21, operator-cut).
+- **Fleet sweep post-resume**: only in-flight active = **1491** (claude-code, actively resolving a rebase
+  conflict + verifying → will submit review; clean tree, 58% context) and **1966** (review convoy
+  re-triggered, advancing). **PAN-2633** stopped but **stoppedByUser=True** (operator-stopped — left).
+  2255 held on operator keep/revert. 2760/2772/2773 = dormant filed bugs, no agents (not in-flight).
+- **Pipeline genuinely drained to 1491 + 1966** (both working) + 2255 (operator decision).
+- **Session: 49 merges, 21 close-outs.**
