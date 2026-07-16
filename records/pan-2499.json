@@ -476,23 +476,23 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:57:30.439Z",
+  "updated": "2026-07-16T02:57:33.273Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:57:30.371Z",
+    "updatedAt": "2026-07-16T02:57:33.191Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed lint",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt\n  - src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx\n  - src/dashboard/frontend/src/components/CommandDeck/ProjectTree/SessionNode.tsx",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "ead3b32ecb03895eade031b3692cf578c40be44d",
     "reviewRequestedAt": "2026-07-16T02:57:30.004Z",
-    "reviewSpawnedAt": "2026-07-16T02:52:08.150Z",
+    "reviewSpawnedAt": "2026-07-16T02:57:33.191Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -721,7 +721,7 @@
       },
       "costAtCloseOut": {
         "usd": 188.225593,
-        "pricingAsOf": "2026-07-16T02:57:30.404Z"
+        "pricingAsOf": "2026-07-16T02:57:33.245Z"
       }
     },
     "merges": [
