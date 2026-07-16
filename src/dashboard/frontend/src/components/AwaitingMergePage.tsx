@@ -8,11 +8,11 @@
  * This is the only page the user needs to look at while `/pan-flywheel` runs.
  * See docs/flywheel-brief.md and docs/FLYWHEEL.md.
  */
-
 import { useMemo, useState } from 'react';
 import { useQueries, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { GitMerge, ExternalLink, Loader2, CheckCircle, AlertTriangle, ShieldAlert, XCircle, GitPullRequest, MessageSquare, FilePenLine, PenLine, ChevronDown, ChevronUp, ThumbsUp, TriangleAlert, Circle, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
+import posthog from 'posthog-js';
 import { useDashboardStore, selectAwaitingMerge, selectBlockedFromMerge, selectOpenMergeRequests, selectIssues } from '../lib/store';
 import { useConfirm } from './DialogProvider';
 import { AutoMergeToggle } from './AutoMergeToggle';
@@ -390,11 +390,11 @@ export function AwaitingMergeRow({
   const mergeMutation = useMutation({
     mutationFn: () => mergeIssue(issueId),
     onSuccess: () => {
-      toast.success(`Merge started for ${identifier}`);
+      posthog.capture('issue_merged', { issue_id: issueId, identifier }); toast.success(`Merge started for ${identifier}`);
       onMerged();
     },
     onError: (err: Error) => {
-      toast.error(`Merge failed for ${identifier}`, { description: err.message });
+      posthog.captureException(err, { issue_id: issueId, action: 'merge' }); toast.error(`Merge failed for ${identifier}`, { description: err.message });
     },
   });
 
@@ -894,10 +894,10 @@ function OpenMergeRequestRow({
   const mergeMutation = useMutation({
     mutationFn: () => forgeMerge(issueId),
     onSuccess: () => {
-      toast.success(`Force merge started for ${identifier}`);
+      posthog.capture('force_merge_triggered', { issue_id: issueId, identifier, forge: forgeName }); toast.success(`Force merge started for ${identifier}`);
     },
     onError: (err: Error) => {
-      toast.error(`Force merge failed for ${identifier}`, { description: err.message });
+      posthog.captureException(err, { issue_id: issueId, action: 'force_merge' }); toast.error(`Force merge failed for ${identifier}`, { description: err.message });
     },
   });
 
