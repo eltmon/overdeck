@@ -31,8 +31,8 @@ import { TroubledBadges } from './TroubledBadges';
 import { BeadsPanel } from '../../issue-view/BeadsPanel';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { ExpandableSessionNode } from './ExpandableSessionNode';
+import { SessionNode } from './SessionNode';
 import styles from '../styles/command-deck.module.css';
-
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
 
 interface FeatureItemProps {

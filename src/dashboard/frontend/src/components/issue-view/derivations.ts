@@ -34,7 +34,8 @@ export function mergeStep(reviewStatus: ReviewStatusData | undefined): string | 
 
 /** Human-readable reason the issue is stuck or blocked. */
 export function stuckReason(reviewStatus: ReviewStatusData | undefined): string {
-  if (reviewStatus?.stuckReason) return reviewStatus.stuckReason;
+  const explicitReason = (reviewStatus as (ReviewStatusData & { stuckReason?: string }) | undefined)?.stuckReason;
+  if (explicitReason) return explicitReason;
   if (reviewStatus?.blockerReasons?.[0]) return reviewStatus.blockerReasons[0].summary;
   if (reviewStatus?.reviewStatus === 'blocked') return 'Review blocked';
   if (reviewStatus?.reviewStatus === 'failed') return 'Review failed';

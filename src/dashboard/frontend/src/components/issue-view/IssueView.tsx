@@ -18,8 +18,9 @@ interface IssueViewProps extends Omit<HTMLAttributes<HTMLDivElement>, 'children'
  * membership and the cross-density policy controls.
  */
 export function IssueView({ issueId, density, children, ...rootProps }: IssueViewProps) {
+  const dataComponent = (rootProps as Record<string, unknown>)['data-component'];
   return (
-    <div {...rootProps} data-component={rootProps['data-component'] ?? 'issue-view'} data-density={density}>
+    <div {...rootProps} data-component={typeof dataComponent === 'string' ? dataComponent : 'issue-view'} data-density={density}>
       {(density === 'cockpit' || density === 'console') && (
         <div data-section="ReviewPolicyControl">
           <ReviewPolicyControl issueId={issueId} />

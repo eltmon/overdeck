@@ -4,7 +4,7 @@ import {
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
   CircleCheck, CircleX, Loader2, type LucideIcon,
 } from 'lucide-react'
-import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery, type ReviewStatusData } from '../../CommandDeck/ZoneCOverviewTabs/queries'
+import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
 import { UatStackStatus, getUatStackSummary } from '../../CommandDeck/UatStackStatus'
 import type { ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'

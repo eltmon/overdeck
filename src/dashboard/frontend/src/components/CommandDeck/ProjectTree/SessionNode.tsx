@@ -4,7 +4,7 @@ import { type Harness } from '../../shared/ModelPicker';
 import { AgentStepRow, type AgentStepActionKind } from '../../issue-view/AgentStepRow';
 import styles from '../styles/command-deck.module.css';
 
-interface SessionNodeProps {
+export interface SessionNodeProps {
   session: SessionNodeType;
   issueId?: string;
   isSelected?: boolean;

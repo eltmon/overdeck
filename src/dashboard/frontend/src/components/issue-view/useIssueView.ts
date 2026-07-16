@@ -24,7 +24,6 @@ import type {
   IssueOperatorModel,
   IssuePipelineModel,
   IssueResourcesModel,
-  IssueShipModel,
   IssueVerificationModel,
   IssueViewModel,
   OperatorNeedsYou,
@@ -91,7 +90,13 @@ function toSessionNode(section: ActivitySection): SessionNode {
     status: normalizeAgentStatus(section.status),
     presence: normalizePresence(section.status),
     role: section.role,
-    roundMetadata: section.roundMetadata,
+    roundMetadata: section.roundMetadata ? {
+      ...section.roundMetadata,
+      history: section.roundMetadata.history.map((round) => ({
+        ...round,
+        durationSec: round.durationSec ?? undefined,
+      })),
+    } : undefined,
   };
 }
 
@@ -441,10 +446,11 @@ function deriveOperator(
   for (const session of sessions) {
     const agent = findAgentForSession(session, agentsById);
     if (session.troubled || agent?.troubled) {
+      const agentTroubledReason = (agent as (AgentSnapshot & { troubledReason?: string }) | undefined)?.troubledReason;
       const needsYou: OperatorNeedsYou = {
         kind: 'troubled',
         sessionId: session.sessionId,
-        reason: session.troubledReason ?? agent?.troubledReason,
+        reason: session.troubledReason ?? agentTroubledReason,
       };
       return { needsYou };
     }

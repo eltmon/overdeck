@@ -31,7 +31,7 @@ import { useSharedTick } from '../../lib/useSharedTick';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
 import { useDashboardStore } from '../../lib/store';
 import { useResolvedModels, resolveWorkTypeKey } from '../../lib/useResolvedModels';
-import { useAvailableModels, type Harness, type HarnessPolicyDecisions, type ModelGroup } from '../shared/ModelPicker';
+import { useAvailableModels, type Harness, type ModelGroup } from '../shared/ModelPicker';
 import { StatusDot, type StatusDotStatus } from '../CommandDeck/StatusDot';
 import { toolNameToPhase, isSpinnerPhase, type WorkingPhase } from '../../lib/workingPhase';
 import { useIssueCostsQuery } from '../CommandDeck/ZoneCOverviewTabs/queries';
@@ -118,21 +118,6 @@ function TypeIcon({ type, role }: { type: SessionNodeType['type']; role?: string
     ? (REVIEWER_ROLE_ICON[role] ?? ShieldCheck)
     : (TYPE_ICON[type] ?? Code2);
   return <Icon size={13} />;
-}
-
-function typeIconForCockpit(session: SessionNodeType): LucideIcon {
-  switch (session.type) {
-    case 'work': return Code2;
-    case 'strike': return Zap;
-    case 'planning': return Compass;
-    case 'legacy': return Archive;
-    case 'review': return Eye;
-    case 'reviewer': return (session.role && REVIEWER_ROLE_ICON[session.role]) ?? ShieldCheck;
-    case 'test': return FlaskConical;
-    case 'ship':
-    case 'merge': return GitMerge;
-    default: return Code2;
-  }
 }
 
 function slotIndexFromSessionId(sessionId: string): number | null {
@@ -517,7 +502,6 @@ function RestartModelSubmenu({
   currentHarness,
   currentModel,
   groups,
-  harnessPolicy,
   label,
   onRestart,
   modelOrigin,
@@ -527,7 +511,6 @@ function RestartModelSubmenu({
   currentHarness?: string | null;
   currentModel?: string | null;
   groups: ModelGroup[];
-  harnessPolicy?: HarnessPolicyDecisions;
   label?: string;
   onRestart: (model?: string, harness?: Harness) => void;
   modelOrigin?: ModelOrigin;
@@ -582,7 +565,7 @@ export function AgentStepRow({
   onAction,
   showMenu = true,
 }: AgentStepRowProps): JSX.Element {
-  const { groups, harnessPolicy } = useAvailableModels();
+  const { groups } = useAvailableModels();
   const resolvedModels = useResolvedModels();
   const costOf = useSessionCost(issueId);
   const runtime = useDashboardStore((s) => s.agentRuntimeById[session.sessionId]);
@@ -719,7 +702,6 @@ export function AgentStepRow({
           currentHarness={session.harness ?? null}
           currentModel={session.model}
           groups={groups}
-          harnessPolicy={harnessPolicy}
           label={restartLabel}
           modelOrigin={session.modelOrigin}
           roleLabel={session.role ?? session.type}
