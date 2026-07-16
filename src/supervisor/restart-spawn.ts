@@ -29,6 +29,12 @@ export function buildSupervisorRestartArgs(): string[] {
   return [
     'restart',
     '--dashboard',
+    // A watchdog restart is autonomous recovery — it must preserve autonomous
+    // operation. Without --resume the boot lands on the conservative PAN-1963
+    // resume-off default and silently gates the whole fleet ("Boot --no-resume")
+    // until an operator notices (2026-07-16: three fleet freezes in one day).
+    // Operator-invoked `pan restart` keeps the conservative default.
+    '--resume',
     '--health-timeout',
     String(WATCHDOG_RESTART_HEALTH_TIMEOUT_MS),
   ];
