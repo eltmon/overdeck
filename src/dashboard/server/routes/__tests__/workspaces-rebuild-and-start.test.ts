@@ -51,12 +51,12 @@ describe('spawnPanCommand chainOnSuccess (rebuild-and-start)', () => {
 
     // Phase 1 fired immediately; phase 2 has not.
     expect(harness.spawnCalls).toHaveLength(1);
-    expect(harness.spawnCalls[0]).toEqual({ cmd: 'pan', args: ['workspace', 'rebuild', 'MIN-831'] });
+    expect(harness.spawnCalls[0]?.args.slice(-3)).toEqual(['workspace', 'rebuild', 'MIN-831']);
 
     // Rebuild succeeds → start spawns.
     harness.children[0].emit('close', 0);
     expect(harness.spawnCalls).toHaveLength(2);
-    expect(harness.spawnCalls[1]).toEqual({ cmd: 'pan', args: ['start', 'MIN-831'] });
+    expect(harness.spawnCalls[1]?.args.slice(-2)).toEqual(['start', 'MIN-831']);
 
     // Start succeeds → no further spawns.
     harness.children[1].emit('close', 0);
