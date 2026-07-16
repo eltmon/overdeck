@@ -753,11 +753,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
       console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
-        if (role === 'strike') {
-          await Effect.runPromise(stopAgent(agentId));
-          throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
-        }
-        return state;
+        await Effect.runPromise(stopAgent(agentId));
+        throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   } else if (prompt) {
@@ -775,11 +772,8 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
         await recordStartupSessionExit(state, options.issueId, role);
       }
       await recordKickoffDeliveryFailure(state, options.issueId, role);
-      if (role === 'strike') {
-        await Effect.runPromise(stopAgent(agentId));
-        throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
-      }
-      return state;
+      await Effect.runPromise(stopAgent(agentId));
+      throw new Error(`Agent ${agentId} kickoff delivery failed: ${delivery.failure ?? 'unknown error'}`);
     }
   }
 

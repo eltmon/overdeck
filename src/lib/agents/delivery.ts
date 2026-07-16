@@ -529,7 +529,15 @@ export async function deliverInitialPromptWithRetry(
     }
     try {
       const confirmationTarget = await resolveTranscriptConfirmationTarget(state);
-      const result = await deliver(agentId, deliveredPrompt, caller, deliveryMethod);
+      // Codex app-server agents do not have a PTY supervisor socket. Work-agent
+      // state can still project supervisorEnabled=true into the legacy strict
+      // `supervisor` method, so initial kickoff and Deacon redelivery must use
+      // auto routing for Codex: app-server first, then the PTY path used by
+      // Codex TUI. Claude Code keeps its strict supervisor contract.
+      const kickoffDeliveryMethod = state?.harness === 'codex'
+        ? resilientDeliveryMethod(deliveryMethod)
+        : deliveryMethod;
+      const result = await deliver(agentId, deliveredPrompt, caller, kickoffDeliveryMethod);
       if (result.ok) {
         if (!confirmationTarget) return result;
         const confirmed = await waitForTranscriptUserRecordLanding(

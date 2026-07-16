@@ -336,6 +336,70 @@ describe('initial kickoff transcript confirmation', () => {
     }
   });
 
+  it.each([
+    'spawnAgent:initial-prompt',
+    'deacon:redeliver-undelivered-kickoff',
+  ])('routes a Codex kickoff through auto delivery for %s when state selected the PTY supervisor', async (caller) => {
+    const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-appserver-kickoff-'));
+    const deliver = vi.fn(async () => ({ ok: true, path: 'app-server' as const }));
+
+    try {
+      await expect(deliverInitialPromptWithRetry(
+        baseState.id,
+        'Full work instructions for PAN-2771',
+        caller,
+        'supervisor',
+        {
+          ...baseOptions,
+          getState: vi.fn(async () => ({ ...baseState, harness: 'codex', role: 'work', workspace })),
+          deliver,
+          snapshot: vi.fn(),
+        },
+      )).resolves.toMatchObject({ ok: true, path: 'app-server' });
+
+      expect(deliver).toHaveBeenCalledWith(
+        baseState.id,
+        expect.stringContaining('Read that file in full now'),
+        caller,
+        'auto',
+      );
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps strict PTY supervisor delivery for Claude Code kickoffs', async () => {
+    const deliver = vi.fn(async () => ({ ok: true, path: 'supervisor' as const }));
+    let userRecordCount = 0;
+    const snapshot = vi.fn(async () => ({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: userRecordCount++,
+      fileSize: 100,
+      rangeStartByte: 0,
+      readOffset: 100,
+    }));
+
+    await expect(deliverInitialPromptWithRetry(
+      baseState.id,
+      'Claude Code kickoff',
+      'spawnAgent:initial-prompt',
+      'supervisor',
+      {
+        ...baseOptions,
+        getState: vi.fn(async () => baseState),
+        deliver,
+        snapshot,
+      },
+    )).resolves.toMatchObject({ ok: true, path: 'supervisor' });
+
+    expect(deliver).toHaveBeenCalledWith(
+      baseState.id,
+      'Claude Code kickoff',
+      'spawnAgent:initial-prompt',
+      'supervisor',
+    );
+  });
+
   it('does not overwrite a work kickoff when delivering a codex role prompt in the same workspace', async () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-codex-role-kickoff-'));
     const existingWorkPrompt = 'Full work instructions for PAN-2318';
