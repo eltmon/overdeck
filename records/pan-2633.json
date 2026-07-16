@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-16T17:42:17.232Z",
+  "updated": "2026-07-16T17:42:33.216Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -100,7 +100,9 @@
     "reducer-liveness-gate.reducer-liveness-gate.ac4": "completed",
     "emitter-liveness-threading": "running",
     "enrichment-convergence-reemit": "running",
-    "docs-pending-input-invariant": "running"
+    "docs-pending-input-invariant": "completed",
+    "docs-pending-input-invariant.docs-pending-input-invariant.ac1": "completed",
+    "docs-pending-input-invariant.docs-pending-input-invariant.ac2": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -118,14 +120,25 @@
     }
   },
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "docs-pending-input-invariant": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2633",
         "agentId": "agent-pan-2633",
         "pid": 2321557,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:42:17.232Z"
+        "claimedAt": "2026-07-16T17:42:17.232Z",
+        "itemId": "docs-pending-input-invariant",
+        "outcome": "completed",
+        "reason": "Existing commit 8442de99e4 documents the liveness-gated pending-input wipe and ~10s enrichment convergence invariant; ASKUSERQUESTION-DASHBOARD.md had no stop/status_changed payload-clearing description to update.",
+        "releasedAt": "2026-07-16T17:42:33.215Z"
+      }
+    ],
+    "statusReasons": {
+      "docs-pending-input-invariant": {
+        "reason": "Existing commit 8442de99e4 documents the liveness-gated pending-input wipe and ~10s enrichment convergence invariant; ASKUSERQUESTION-DASHBOARD.md had no stop/status_changed payload-clearing description to update.",
+        "updatedAt": "2026-07-16T17:42:33.215Z"
       }
     }
   }
