@@ -527,6 +527,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T21:03:03.986Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T21:04:16.890Z"
     }
   ],
   "feedback": [],
@@ -552,7 +557,7 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T21:04:15.659Z",
+  "updated": "2026-07-16T21:04:16.902Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "reviewing",
@@ -653,7 +658,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
