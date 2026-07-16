@@ -4,17 +4,17 @@
     "created": "2026-07-09T04:48:37.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2532: Pipeline rows — widen issue title to reclaim wasted horizontal space (keep compact height)",
-    "updated": "2026-07-16T07:29:10.772Z"
+    "updated": "2026-07-16T15:38:34.600Z"
   },
   "plan": {
     "id": "pan-2532",
     "title": "Pipeline rows: widen issue title to reclaim wasted horizontal space (keep compact height)",
-    "status": "running",
+    "status": "completed",
     "uid": "98a77f20-87f0-49dc-873c-a93ba8cc1a84",
     "author": "agent:claude-opus-4-8",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-09T04:48:37.000Z",
-    "updated": "2026-07-16T07:29:10.772Z",
+    "updated": "2026-07-16T15:38:34.600Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2532",
@@ -134,5 +134,5 @@
       "canonicalFilename": "2026-07-09-PAN-2532-pipeline-rows-widen-issue-title-to-reclaim-wasted-horizontal-space-keep-compact-height.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
