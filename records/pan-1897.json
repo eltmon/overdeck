@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T18:51:47.072Z",
+  "updated": "2026-07-16T18:53:13.498Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs-pan-start-prep": {
-        "writerId": "agent-pan-1897",
-        "agentId": "agent-pan-1897",
-        "pid": 1509246,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:51:47.072Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1897",
@@ -127,6 +119,17 @@
         "outcome": "completed",
         "reason": "Added explicit timeouts to sync-main git operations, timeout-specific fetch/merge/auto-commit failures, best-effort merge abort, and mocked regression coverage; typecheck and all required sync-main suites pass.",
         "releasedAt": "2026-07-16T18:51:38.721Z"
+      },
+      {
+        "writerId": "agent-pan-1897",
+        "agentId": "agent-pan-1897",
+        "pid": 1509246,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:51:47.072Z",
+        "itemId": "docs-pan-start-prep",
+        "outcome": "completed",
+        "reason": "Documented all four preparation phase budgets, non-interactive heartbeat output, fail-fast versus degrade behavior, and the 300-second supervisor guidance; skill lint passes.",
+        "releasedAt": "2026-07-16T18:53:13.497Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "bound-sync-main-git-ops": {
         "reason": "Added explicit timeouts to sync-main git operations, timeout-specific fetch/merge/auto-commit failures, best-effort merge abort, and mocked regression coverage; typecheck and all required sync-main suites pass.",
         "updatedAt": "2026-07-16T18:51:38.721Z"
+      },
+      "docs-pan-start-prep": {
+        "reason": "Documented all four preparation phase budgets, non-interactive heartbeat output, fail-fast versus degrade behavior, and the 300-second supervisor guidance; skill lint passes.",
+        "updatedAt": "2026-07-16T18:53:13.497Z"
       }
     }
   },
@@ -161,6 +168,8 @@
     "bound-sync-main-git-ops.bound-sync-main-git-ops.ac2": "completed",
     "bound-sync-main-git-ops.bound-sync-main-git-ops.ac3": "completed",
     "bound-sync-main-git-ops.bound-sync-main-git-ops.ac4": "completed",
-    "docs-pan-start-prep": "running"
+    "docs-pan-start-prep": "completed",
+    "docs-pan-start-prep.docs-pan-start-prep.ac1": "completed",
+    "docs-pan-start-prep.docs-pan-start-prep.ac2": "completed"
   }
 }
