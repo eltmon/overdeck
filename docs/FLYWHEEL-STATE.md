@@ -5147,3 +5147,18 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   (2770+2777), gate feedback (2741), review infra (2735+2743), reaper (2757). Fleet 8/8 self-driving;
   fleet PRs #2783/#2785/#2786 advancing on their own verdicts.
 - **Session tally: 43 merges, 12 close-outs tonight.**
+
+---
+
+## Tick 53 — 2026-07-16 ~09:50Z — REAPER FIX PROVEN LIVE (0 reaps + retention line fired); 2 fleet merges
+
+- **PAN-2757 positive proof in prod**: `strike-pan-2757 retained after first confirmed tmux miss` —
+  the designed retention behavior firing on a real first-miss; **0 reaps since the 09:27 deploy.**
+- **PAN-2168 + PAN-2698 MERGED** (fleet-produced, real verdicts). ⚠️ VERDICT-READING TRAP: my first
+  synthesis glob picked OLD run dirs showing CHANGES REQUESTED (incl. a security finding) while the
+  DB said passed — held the merges, then checked ALL runs by mtime: **newest = APPROVED both** (agents
+  iterated: 2168 3 rounds, 2698 fixed the security finding in round 2). **Always read the NEWEST
+  synthesis; the review dir accumulates rounds.** Close-outs run with --accept-deploy (merges post-boot).
+- Fleet remaining: PAN-2255 (#2783, agent stopped at 09:29 post-work — review advancing), 1966, 2768,
+  2702, 2532(merged earlier), 1491 working.
+- **Session: 45 merges, 14 close-outs.**
