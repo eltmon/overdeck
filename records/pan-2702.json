@@ -147,9 +147,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T13:58:56.522Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T14:00Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T14:00:48.786Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T14:00:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2702\n\n# Review Synthesis — PAN-2702 — 2026-07-16T13:59:29Z\n\n## Verdict: CHANGES REQUESTED — persisted landing claims can be orphaned when in-memory supervised work is lost\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/context.json`\n- Branch: `feature/pan-2702`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702`\n- HEAD reviewed: `c393bc360db0ae190358a0b3ac62fb8d5cb3445c`\n- Cycle number: 2\n- Prior cycle SHA: `901c5a97634225143beb5fd5a8136ec25d07d11a`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Persisted `landing` claims are not recoverable after supervised work is lost — `src/lib/cloister/deacon-strike-landing.ts:109`\nThe cycle-2 fix persists `strikeLandingState: 'landing'` before placing `executeStrikeLanding` in an in-memory supervisor queue. A process exit after the claim but before durable merge enqueue loses the work while later patrols skip every state except `ready`. Unexpected scheduled-work rejection has the same terminal effect because the supervisor only logs the error. The strike remains indefinitely in `landing`, with no retry, recovery delivery, or `needs_you` transition. Make claims restart-recoverable through a durable enqueue or a reclaimable persisted lease, route every unexpected scheduled failure through durable failure handling, and add restart/re-patrol and rejected-work tests.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2702 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -228,7 +241,7 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T13:58:59.175Z",
+  "updated": "2026-07-16T14:00:48.787Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "reviewing",
