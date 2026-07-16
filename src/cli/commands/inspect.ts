@@ -122,8 +122,8 @@ export async function inspectCommand(id: string, options: InspectOptions): Promi
     }
 
     console.log(chalk.green('✓ Inspect specialist spawned'));
-    console.log(chalk.dim(`  Session: ${result.tmuxSession}`));
-    console.log(chalk.dim(`  Run ID:  ${result.runId}`));
+    if (result.tmuxSession) console.log(chalk.dim(`  Session: ${result.tmuxSession}`));
+    if (result.runId) console.log(chalk.dim(`  Run ID:  ${result.runId}`));
     console.log('');
     console.log(chalk.yellow('The inspect specialist is reviewing your item.'));
     console.log(chalk.yellow('Wait for the result — it will be delivered to your session via pan tell.'));

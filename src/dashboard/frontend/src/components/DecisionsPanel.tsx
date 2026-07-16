@@ -19,7 +19,7 @@ import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { useNow } from '../hooks/useNow';
 import styles from './styles/decisions.module.css';
 
-function DecisionRow({ decision }: { decision: Decision }) {
+function DecisionRow({ decision, onOpenSubject }: { decision: Decision; onOpenSubject?: (d: Decision) => void }) {
   const requestReopen = useAskUserQuestionUiStore((s) => s.requestReopen);
   const now = useNow();
   const prompt =
@@ -46,6 +46,16 @@ function DecisionRow({ decision }: { decision: Decision }) {
           {decision.since && <span>· waiting {formatRelativeTime(decision.since, now)}</span>}
         </div>
       </div>
+      {onOpenSubject && (
+        <button
+          type="button"
+          className={styles.answer}
+          title={decision.source === 'conversation' ? 'Go to the conversation' : 'Open the issue'}
+          onClick={() => onOpenSubject(decision)}
+        >
+          Open
+        </button>
+      )}
       <button type="button" className={styles.answer} onClick={() => requestReopen(decision.id)}>
         Answer
       </button>
@@ -53,7 +63,7 @@ function DecisionRow({ decision }: { decision: Decision }) {
   );
 }
 
-function Group({ title, hint, decisions }: { title: string; hint: string; decisions: Decision[] }) {
+function Group({ title, hint, decisions, onOpenSubject }: { title: string; hint: string; decisions: Decision[]; onOpenSubject?: (d: Decision) => void }) {
   if (decisions.length === 0) return null;
   return (
     <section className={styles.group}>
@@ -63,13 +73,13 @@ function Group({ title, hint, decisions }: { title: string; hint: string; decisi
         <span className={styles.groupHint}>{hint}</span>
       </header>
       {decisions.map((d) => (
-        <DecisionRow key={`${d.source}:${d.id}`} decision={d} />
+        <DecisionRow key={`${d.source}:${d.id}`} decision={d} onOpenSubject={onOpenSubject} />
       ))}
     </section>
   );
 }
 
-export function DecisionsPanel() {
+export function DecisionsPanel({ onOpenSubject }: { onOpenSubject?: (d: Decision) => void } = {}) {
   const decisions = useDecisions();
   const blocking = decisions.filter((d) => d.blocking);
   const waiting = decisions.filter((d) => !d.blocking);
@@ -84,8 +94,8 @@ export function DecisionsPanel() {
 
   return (
     <div className={styles.panel} data-testid="decisions-panel">
-      <Group title="Blocking work" hint="An agent has stopped until you answer" decisions={blocking} />
-      <Group title="Waiting" hint="Work continues; these can wait" decisions={waiting} />
+      <Group title="Blocking work" hint="An agent has stopped until you answer" decisions={blocking} onOpenSubject={onOpenSubject} />
+      <Group title="Waiting" hint="Work continues; these can wait" decisions={waiting} onOpenSubject={onOpenSubject} />
     </div>
   );
 }

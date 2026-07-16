@@ -25,6 +25,10 @@ describe('supervisor restart spawner', () => {
     });
   });
 
+  it('watchdog restarts pass --resume so autonomous recovery never gates the fleet', () => {
+    expect(buildSupervisorRestartArgs()).toContain('--resume');
+  });
+
   it('spawns pan restart --dashboard with a 120s health timeout', async () => {
     const child = new FakeChild();
     const spawnFn = vi.fn(() => child as never);
@@ -49,6 +53,7 @@ describe('supervisor restart spawner', () => {
     expect(buildSupervisorRestartArgs()).toEqual([
       'restart',
       '--dashboard',
+      '--resume',
       '--health-timeout',
       '120000',
     ]);

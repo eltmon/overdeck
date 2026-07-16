@@ -30,6 +30,31 @@ function configYamlSingleChunkAssertion() {
   };
 }
 
+function strikeLandingSingleChunkAssertion() {
+  return {
+    name: 'strike-landing-single-chunk-assertion',
+    writeBundle(
+      _outputOptions: unknown,
+      bundle: Record<string, { type: string; fileName: string; modules?: Record<string, unknown> }>,
+    ) {
+      const chunks = Object.values(bundle).filter((output) => {
+        if (output.type !== 'chunk' || !output.modules) return false;
+        return Object.keys(output.modules).some((moduleId) => {
+          const normalized = moduleId.replaceAll('\\', '/');
+          return normalized.endsWith('/src/lib/cloister/deacon-strike-landing.ts');
+        });
+      });
+
+      if (chunks.length !== 1) {
+        const chunkList = chunks.map((chunk) => chunk.fileName).join(', ') || '(none)';
+        throw new Error(
+          `Expected src/lib/cloister/deacon-strike-landing.ts in exactly one dashboard chunk, found ${chunks.length}: ${chunkList}`,
+        );
+      }
+    },
+  };
+}
+
 export default defineConfig(async () => {
   const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: resolve(import.meta.dirname, '../../..'),
@@ -71,7 +96,7 @@ export default defineConfig(async () => {
         ],
       },
     },
-    plugins: [configYamlSingleChunkAssertion()],
+    plugins: [configYamlSingleChunkAssertion(), strikeLandingSingleChunkAssertion()],
     deps: {
       alwaysBundle: [/^@overdeck\//],
       neverBundle: [
