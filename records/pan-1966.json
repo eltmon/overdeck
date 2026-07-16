@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:12:59.278Z",
+  "updated": "2026-07-16T12:13:39.506Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "wire-resource-discovery": {
-        "writerId": "flywheel-orchestrator",
-        "agentId": "flywheel-orchestrator",
-        "pid": 2946617,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:14:28.596Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -175,6 +167,18 @@
         "outcome": "completed",
         "reason": "Replaced open-issue/workspace intersection with gathered authoritative membership, preserving reconstruction's issue-id contract and adding post-merge-limbo coverage; 19 reconstruct tests and typecheck pass",
         "releasedAt": "2026-07-16T06:28:25.867Z"
+      },
+      {
+        "writerId": "flywheel-orchestrator",
+        "agentId": "flywheel-orchestrator",
+        "pid": 2946617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:14:28.596Z",
+        "itemId": "wire-resource-discovery",
+        "outcome": "completed",
+        "reason": "Override stale flywheel-orchestrator claim: implementation is pushed in ce406f7c59 and focused tests/typecheck pass.",
+        "forced": true,
+        "releasedAt": "2026-07-16T12:13:39.505Z"
       }
     ],
     "statusReasons": {
@@ -197,6 +201,11 @@
       "wire-enumerate-in-flight": {
         "reason": "Replaced open-issue/workspace intersection with gathered authoritative membership, preserving reconstruction's issue-id contract and adding post-merge-limbo coverage; 19 reconstruct tests and typecheck pass",
         "updatedAt": "2026-07-16T06:28:25.867Z"
+      },
+      "wire-resource-discovery": {
+        "reason": "Override stale flywheel-orchestrator claim: implementation is pushed in ce406f7c59 and focused tests/typecheck pass.",
+        "updatedAt": "2026-07-16T12:13:39.505Z",
+        "forced": true
       }
     }
   },
@@ -223,6 +232,10 @@
     "wire-enumerate-in-flight.wire-enumerate-in-flight.ac1": "completed",
     "wire-enumerate-in-flight.wire-enumerate-in-flight.ac2": "completed",
     "wire-enumerate-in-flight.wire-enumerate-in-flight.ac3": "completed",
-    "wire-resource-discovery": "running"
+    "wire-resource-discovery": "completed",
+    "wire-resource-discovery.wire-resource-discovery.ac1": "completed",
+    "wire-resource-discovery.wire-resource-discovery.ac2": "completed",
+    "wire-resource-discovery.wire-resource-discovery.ac3": "completed",
+    "wire-resource-discovery.wire-resource-discovery.ac4": "completed"
   }
 }
