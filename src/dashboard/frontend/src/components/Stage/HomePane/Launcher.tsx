@@ -53,6 +53,10 @@ export interface LauncherProps {
   /** History / file-completion content shown below the rows; hidden in compact. */
   extras?: ReactNode
   placeholder?: string
+  /** Suppress submissions while an existing launch is in progress. */
+  busy?: boolean
+  /** Presentational launch error shown below the input without clearing its query. */
+  errorText?: string
   /** Id of the last-run agent in this workspace; floats it to position 1. */
   lastUsedAgentId?: string | null
 }
@@ -69,6 +73,8 @@ export function Launcher({
   compact = false,
   extras,
   placeholder = 'Ask, run, or search…',
+  busy = false,
+  errorText,
   lastUsedAgentId,
 }: LauncherProps) {
   const [query, setQuery] = useState('')
@@ -77,11 +83,13 @@ export function Launcher({
   const ordered = orderIntents({ intents, query, lastUsedAgentId })
 
   const choose = (index: number) => {
+    if (busy) return
     const intent = ordered[index]
     if (intent) onSelect?.(intent, query)
   }
 
   const chooseIntent = (intent: LauncherIntent | undefined) => {
+    if (busy) return
     if (intent) onSelect?.(intent, query)
   }
 
@@ -132,6 +140,7 @@ export function Launcher({
           onKeyDown={onKeyDown}
         />
       </div>
+      {errorText && <div className={styles.launchError} role="alert">{errorText}</div>}
       {open && (
         <div className={styles.dropdown} role="listbox" aria-label="Quick actions">
           {ordered.map((intent, index) => (

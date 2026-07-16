@@ -70,6 +70,39 @@ describe('Launcher', () => {
     expect(onSelect).toHaveBeenCalledWith(DEFAULT_INTENTS[0], 'go')
   })
 
+  it('suppresses Enter submissions while busy', () => {
+    const onSelect = vi.fn()
+    render(<Launcher onSelect={onSelect} busy />)
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'go' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('suppresses row submissions while busy', () => {
+    const onSelect = vi.fn()
+    render(<Launcher onSelect={onSelect} busy />)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'deploy' } })
+    fireEvent.mouseDown(screen.getAllByRole('option')[1])
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('renders error text as an alert without clearing the query', () => {
+    const { rerender } = render(<Launcher />)
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'keep this query' } })
+
+    rerender(<Launcher errorText="Unknown project: overdeck" />)
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Unknown project: overdeck')
+    expect(input).toHaveValue('keep this query')
+  })
+
+  it('renders no alert when error text is absent', () => {
+    render(<Launcher />)
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   it('hides extras in compact mode but shows them otherwise', () => {
     const extras = <div data-testid="history">recent</div>
     const { rerender } = render(<Launcher extras={extras} />)
