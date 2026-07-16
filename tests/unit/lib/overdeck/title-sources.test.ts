@@ -2,13 +2,16 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Schema } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  Conversation,
   canRefineTitle,
   canReplaceTitle,
   createConversation,
   getConversationByName,
+  updateConversationTitle,
   type LegacyConversation,
 } from '../../../../src/lib/overdeck/conversations.js';
 
@@ -80,13 +83,38 @@ describe('canRefineTitle', () => {
   });
 });
 
+describe('TitleSource schema', () => {
+  it.each(['ai-refined', 'ai-explicit'] as const)('decodes a conversation with title_source=%s', (titleSource) => {
+    const decodeConversation = Schema.decodeUnknownSync(Conversation);
+
+    expect(decodeConversation({
+      id: 'conversation-id',
+      name: 'schema-test',
+      cwd: '/tmp',
+      issueId: null,
+      harness: null,
+      model: null,
+      effort: null,
+      title: 'Generated title',
+      titleSource,
+      createdAt: new Date(),
+      archivedAt: null,
+      handoffDocPath: null,
+      handoffTargetConvId: null,
+      clearedToConvId: null,
+      files: [],
+    }).titleSource).toBe(titleSource);
+  });
+});
+
 describe('retitleConversation source', () => {
-  it('persists title_source as ai-explicit on successful AI summary', async () => {
+  it('overrides a manual title and protects the explicit result from auto/refine passes', async () => {
     const { retitleConversation } = await import('../../../../src/lib/overdeck/conversation-reads.js');
     const transcriptSummary = await import('../../../../src/lib/conversations/transcript-summary.js');
     vi.spyOn(transcriptSummary, 'summarizeTranscriptTitle').mockResolvedValue('OAuth login bug fix');
 
     createConversation({ name: 'retitle-ai', tmuxSession: 'conv-retitle-ai', cwd: '/tmp' });
+    updateConversationTitle('retitle-ai', 'My manual title', 'manual');
     const sessionFile = join(testHome, 'retitle-ai.jsonl');
     writeFileSync(sessionFile, JSON.stringify({ type: 'user', message: { content: 'Please help me fix the OAuth login bug' } }) + '\n');
 
@@ -94,10 +122,14 @@ describe('retitleConversation source', () => {
       resolveSessionFile: () => Promise.resolve(sessionFile),
     });
 
+    // An omitted status is serialized by the route as HTTP 200.
+    expect(result.status).toBeUndefined();
     expect(result.body).toEqual(expect.objectContaining({ title: 'OAuth login bug fix' }));
     const updated = getConversationByName('retitle-ai');
     expect(updated?.title).toBe('OAuth login bug fix');
     expect(updated?.titleSource).toBe('ai-explicit');
+    expect(canReplaceTitle(updated!)).toBe(false);
+    expect(canRefineTitle(updated!)).toBe(false);
   });
 
   it('persists title_source as ai-explicit when AI times out and deterministic fallback is used', async () => {
