@@ -141,6 +141,93 @@ describe('TieredExecutionSection', () => {
     expect(screen.getAllByLabelText('Model')[0].closest('details')).toHaveAttribute('open');
   });
 
+  it('creates and expands a Haiku crew from the roster difficulty prompt', () => {
+    const onSettingsChange = vi.fn();
+    const formData = baseSettings({
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          cheap: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+          capable: { model: 'gpt-5.6-terra', harness: 'codex', difficulties: ['medium', 'complex', 'expert'] },
+        },
+        by_kind: {},
+        supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+        replay_threshold: 0.5,
+      },
+    });
+    const { rerender } = render(
+      <TieredExecutionSection
+        formData={formData}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add crew' }));
+    expect(screen.getByText('The new crew starts on Haiku 4.5. Which difficulty does it take over?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Assign medium to new crew' }));
+
+    const next = onSettingsChange.mock.calls.at(-1)?.[0] as SettingsConfig;
+    expect(next.tiered_execution?.tiers.medium).toMatchObject({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      difficulties: ['medium'],
+    });
+    rerender(
+      <TieredExecutionSection
+        formData={next}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+    expect(screen.getAllByLabelText('Model').at(-1)?.closest('details')).toHaveAttribute('open');
+  });
+
+  it('creates the first crew from the empty roster without teaching the board shortcut in prose', () => {
+    const onSettingsChange = vi.fn();
+    render(
+      <TieredExecutionSection
+        formData={baseSettings({
+          tiered_execution: {
+            enabled: false,
+            tiers: {},
+            by_kind: {},
+            replay_threshold: 0.5,
+          },
+        })}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    expect(screen.queryByText('Choose “+ new crew…” on the board to create the first crew.')).toBeNull();
+    expect(screen.getByText('No crews yet — every difficulty needs one before tiered execution can route work.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add crew' }));
+
+    const next = onSettingsChange.mock.calls.at(-1)?.[0] as SettingsConfig;
+    expect(next.tiered_execution?.tiers['trivial-simple-medium-complex-expert']).toMatchObject({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+    });
+  });
+
+  it('disables a roster difficulty that would strand a kind override', () => {
+    const onSettingsChange = vi.fn();
+    render(<TieredExecutionSection formData={baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial'] },
+        standard: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['simple', 'medium', 'complex', 'expert'] },
+      },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      by_kind: { docs: 'cheap' }, replay_threshold: 0.5,
+    } })} onSettingsChange={onSettingsChange} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add crew' }));
+    const guardedDifficulty = screen.getByRole('button', { name: 'Assign trivial to new crew' });
+    expect(guardedDifficulty).toBeDisabled();
+    expect(screen.getByText("Move or remove docs kind overrides before reassigning this crew's final difficulty.")).toBeTruthy();
+    expect(onSettingsChange).not.toHaveBeenCalled();
+  });
+
   it('warns on a provider harness mismatch and auto writes the provider default', () => {
     const onSettingsChange = vi.fn();
     render(<TieredExecutionSection formData={baseSettings({
