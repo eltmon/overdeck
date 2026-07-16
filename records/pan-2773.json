@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:03:53.046Z",
+  "updated": "2026-07-16T18:07:21.978Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "projecthome-inline-error": {
-        "writerId": "agent-pan-2773",
-        "agentId": "agent-pan-2773",
-        "pid": 3198133,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:03:53.046Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2773",
@@ -116,6 +108,17 @@
         "outcome": "completed",
         "reason": "Added presentational busy and errorText launcher props, blocked keyboard and pointer submissions while busy, preserved the typed query, rendered accessible inline errors, and passed 11 focused tests plus npm run typecheck.",
         "releasedAt": "2026-07-16T18:03:29.451Z"
+      },
+      {
+        "writerId": "agent-pan-2773",
+        "agentId": "agent-pan-2773",
+        "pid": 3198133,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:03:53.046Z",
+        "itemId": "projecthome-inline-error",
+        "outcome": "completed",
+        "reason": "ProjectHome now tracks launch busy/error state, prevents duplicate in-flight submissions, renders server creation errors inline while retaining the query, clears errors on retry, and opens panes only after successful creation. Eight focused tests and typecheck passed.",
+        "releasedAt": "2026-07-16T18:07:21.978Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "launcher-error-props": {
         "reason": "Added presentational busy and errorText launcher props, blocked keyboard and pointer submissions while busy, preserved the typed query, rendered accessible inline errors, and passed 11 focused tests plus npm run typecheck.",
         "updatedAt": "2026-07-16T18:03:29.451Z"
+      },
+      "projecthome-inline-error": {
+        "reason": "ProjectHome now tracks launch busy/error state, prevents duplicate in-flight submissions, renders server creation errors inline while retaining the query, clears errors on retry, and opens panes only after successful creation. Eight focused tests and typecheck passed.",
+        "updatedAt": "2026-07-16T18:07:21.978Z"
       }
     }
   },
@@ -139,6 +146,9 @@
     "launcher-error-props.launcher-error-props.ac2": "completed",
     "launcher-error-props.launcher-error-props.ac3": "completed",
     "launcher-error-props.launcher-error-props.ac4": "completed",
-    "projecthome-inline-error": "running"
+    "projecthome-inline-error": "completed",
+    "projecthome-inline-error.projecthome-inline-error.ac1": "completed",
+    "projecthome-inline-error.projecthome-inline-error.ac2": "completed",
+    "projecthome-inline-error.projecthome-inline-error.ac3": "completed"
   }
 }
