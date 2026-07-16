@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T07:28:50.112Z",
+  "updated": "2026-07-16T07:30:38.150Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "package-structure-tests": {
-        "writerId": "agent-pan-2768",
-        "agentId": "agent-pan-2768",
-        "pid": 3115771,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:28:50.112Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2768",
@@ -117,6 +109,17 @@
         "outcome": "completed",
         "reason": "Mapped the staged cli tree to packaged resources/dist with source maps excluded while preserving the npm files list.",
         "releasedAt": "2026-07-16T07:24:50.469Z"
+      },
+      {
+        "writerId": "agent-pan-2768",
+        "agentId": "agent-pan-2768",
+        "pid": 3115771,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:28:50.112Z",
+        "itemId": "package-structure-tests",
+        "outcome": "completed",
+        "reason": "Added package contract tests for cli-to-dist resources, preserved resource mappings, isolated CLI smoke staging, and full sync-sources staging; targeted desktop suite passes 16 tests.",
+        "releasedAt": "2026-07-16T07:30:38.150Z"
       }
     ],
     "statusReasons": {
@@ -131,6 +134,10 @@
       "ship-cli-extraresources": {
         "reason": "Mapped the staged cli tree to packaged resources/dist with source maps excluded while preserving the npm files list.",
         "updatedAt": "2026-07-16T07:24:50.469Z"
+      },
+      "package-structure-tests": {
+        "reason": "Added package contract tests for cli-to-dist resources, preserved resource mappings, isolated CLI smoke staging, and full sync-sources staging; targeted desktop suite passes 16 tests.",
+        "updatedAt": "2026-07-16T07:30:38.150Z"
       }
     }
   },
@@ -146,6 +153,10 @@
     "ship-cli-extraresources": "completed",
     "ship-cli-extraresources.ship-cli-extraresources.ac1": "completed",
     "ship-cli-extraresources.ship-cli-extraresources.ac2": "completed",
-    "package-structure-tests": "running"
+    "package-structure-tests": "completed",
+    "package-structure-tests.package-structure-tests.ac1": "completed",
+    "package-structure-tests.package-structure-tests.ac2": "completed",
+    "package-structure-tests.package-structure-tests.ac3": "completed",
+    "package-structure-tests.package-structure-tests.ac4": "completed"
   }
 }
