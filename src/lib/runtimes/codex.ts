@@ -44,6 +44,17 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`
 }
 
+function escapeTomlBasicString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+}
+
+export interface CodexMcpServerDef {
+  type?: string
+  command?: string
+  args?: string[]
+  env?: Record<string, string>
+}
+
 function overdeckDir(): string {
   return join(homedir(), '.overdeck')
 }
@@ -275,6 +286,7 @@ export interface InitCodexHomeOpts {
   approvalPolicy?: string
   sandboxMode?: string
   approvalsReviewer?: string
+  mcpServers?: Record<string, CodexMcpServerDef>
 }
 
 /**
@@ -325,8 +337,28 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     if (opts.trustedDir) {
       // Pre-seed folder trust so the TUI skips its first-run autonomy wizard.
       // TOML basic-string key: escape backslashes and double-quotes in the path.
-      const escaped = opts.trustedDir.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+      const escaped = escapeTomlBasicString(opts.trustedDir)
       lines.push('', `[projects."${escaped}"]`, 'trust_level = "trusted"')
+    }
+    for (const [name, definition] of Object.entries(opts.mcpServers ?? {})) {
+      if (typeof definition.command !== 'string' || definition.command.length === 0) {
+        console.warn(`[codex] skipping MCP server "${name}" — only stdio command servers are provisioned into codex config`)
+        continue
+      }
+
+      const escapedName = escapeTomlBasicString(name)
+      const sectionKey = /^[A-Za-z0-9_-]+$/.test(name) ? name : `"${escapedName}"`
+      lines.push('', `[mcp_servers.${sectionKey}]`)
+      lines.push(`command = "${escapeTomlBasicString(definition.command)}"`)
+      const args = definition.args?.filter((arg): arg is string => typeof arg === 'string') ?? []
+      if (args.length > 0) {
+        lines.push(`args = [${args.map(arg => `"${escapeTomlBasicString(arg)}"`).join(', ')}]`)
+      }
+      const env = Object.entries(definition.env ?? {}).filter((entry): entry is [string, string] => typeof entry[1] === 'string')
+      if (env.length > 0) {
+        const values = env.map(([key, value]) => `"${escapeTomlBasicString(key)}" = "${escapeTomlBasicString(value)}"`)
+        lines.push(`env = { ${values.join(', ')} }`)
+      }
     }
     lines.push('')
     writeFileSync(configPath, lines.join('\n'), { mode: 0o600 })
