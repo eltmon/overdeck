@@ -5053,3 +5053,30 @@ alone is a FALSE NEGATIVE — code lives in hash chunks that import each other.
 ### PAN-2499 close-out teardown KILLED the host dashboard (orphan-killer swept wide; systemd respawned).
 Also killed 2 workspace CONTAINER peers myself on a wrong orphan-storm read — harmless, noted.
 **7 issues still dammed on kickoff (now PAN-2781). PAN-2710 strike still working. PAN-1491 unpause queued post-fix.**
+
+---
+
+## Tick 48 — 2026-07-16 ~07:35Z — 🎉 THE DAM IS BROKEN — all 7 issues working; kickoff chain COMPLETE
+
+### ✅ PAN-2781 landed `via #2784` + deployed — THE REAL residual root cause
+`resilientDeliveryMethod(undefined)` → undefined → deliverAgentMessage re-read the persisted strict
+'supervisor' method and aborted the cascade. Fix: resolve persisted method BEFORE wrapping
+(`deliveryMethod ?? state.deliveryMethod`). Strike was REAPED MID-WORK 15s after its last event
+(PAN-2757, 7th occurrence tonight) — work rescued from its workspace commit `a6c3fee207`, gates run
+by me (36/36, tc 0), PR #2784, merged, built (strict `&&` chain this time), deployed.
+
+### 🎯 LIVE PROOF PASSED, THEN THE FLEET
+`pan start PAN-2698` → `✔ Agent spawned, kickoffDelivered=True, userMessages=2` — **first successful
+codex work-agent kickoff of the night.** Then all six others via `--fresh` (plain start refused on
+resumable zombie sessions):
+**ALL SEVEN: status=running kickoff=True userMsgs=2** — 2698, 1966, 2768, 2702, 2168, 2255, 2532.
+The kickoff chain took THREE fixes to break: PAN-2771 (route codex→auto) + PAN-2781 (resolve persisted
+method) + stop-on-failure backstop. Two of the three "green gates" claims were disproven by live proof
+first. **The only acceptance test that counts is the running system.**
+
+### ✅ Closed out: PAN-2741, 2771, 2777, 2781 (deploy row honestly green post-deploy)
+### ✅ PAN-1491: unpaused + review cycles reset; kimi session auth DEAD (kimi-k2.7-code auth failed —
+operator: fix key in Settings if kimi matters). `--fresh` start issued; Cloister routes the model.
+
+**RUN-63 session totals: 39 merges. The drain: every parked issue now has a WORKING agent.**
+Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491, PAN-2633 (operator-stopped).
