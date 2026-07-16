@@ -46,6 +46,11 @@
       "reason": "feedback",
       "note": "[2026-07-16T20:13Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-16T20:13:29.266Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T20:16:19.615Z"
     }
   ],
   "feedback": [],
@@ -93,22 +98,22 @@
     "recordedAt": "2026-07-16T19:14:41.281Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T20:16:18.231Z",
+  "updated": "2026-07-16T20:16:19.615Z",
   "pipeline": {
     "issueId": "PAN-1987",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:16:17.674Z",
+    "updatedAt": "2026-07-16T20:16:18.250Z",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
     "lastVerifiedCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e",
     "reviewRequestedAt": "2026-07-16T19:59:43.649Z",
-    "reviewSpawnedAt": "2026-07-16T20:13:09.463Z",
+    "reviewSpawnedAt": "2026-07-16T20:16:18.249Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -244,7 +249,7 @@
       },
       "costAtCloseOut": {
         "usd": 104.068091,
-        "pricingAsOf": "2026-07-16T20:16:17.733Z"
+        "pricingAsOf": "2026-07-16T20:16:18.274Z"
       }
     },
     "merges": [
