@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:45:21.774Z",
+  "updated": "2026-07-16T07:45:29.487Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -199,5 +199,36 @@
     "docs-role-mcp-provisioning": "completed",
     "docs-role-mcp-provisioning.docs-role-mcp-provisioning.ac1": "completed",
     "docs-role-mcp-provisioning.docs-role-mcp-provisioning.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "configuration/harnesses.mdx",
+      "docs/ROLES.md",
+      "src/lib/agents/__tests__/role-mcp-parser.test.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/agents/recovery.ts",
+      "src/lib/agents/runtime-command.ts",
+      "src/lib/agents/spawn-prep.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/planning/spawn-planning-session.ts",
+      "src/lib/runtimes/__tests__/codex.test.ts",
+      "src/lib/runtimes/codex.ts"
+    ],
+    "actualChangedFiles": [
+      "configuration/harnesses.mdx",
+      "docs/ROLES.md",
+      "src/lib/agents/__tests__/role-mcp-parser.test.ts",
+      "src/lib/agents/messaging.ts",
+      "src/lib/agents/recovery.ts",
+      "src/lib/agents/runtime-command.ts",
+      "src/lib/agents/spawn-prep.ts",
+      "src/lib/agents/spawn.ts",
+      "src/lib/planning/spawn-planning-session.ts",
+      "src/lib/runtimes/__tests__/codex.test.ts",
+      "src/lib/runtimes/codex.ts"
+    ],
+    "recordedAt": "2026-07-16T07:45:29.487Z"
   }
 }
