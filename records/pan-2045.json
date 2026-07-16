@@ -242,7 +242,7 @@
     "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T20:48:16.789Z",
+  "updated": "2026-07-16T20:48:26.609Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "passed",
@@ -252,9 +252,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:48:16.423Z",
+    "updatedAt": "2026-07-16T20:48:26.557Z",
     "reviewNotes": "both prior blockers are repaired; the only new raw finding is demoted by the mandatory cycle-3 convergence gate",
-    "testNotes": "Ran the configured frontend test gate (`OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main`, which runs the full suite since this PR changed setup files) three times. Deterministically FAILED every run: 7 files / 73 tests failing in src/components/chat/__tests__/ConversationPanel.test.tsx (rename-flow, ~20 cases) and src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx (~13 cases) - both pre-existing files untouched by this PR. Every failure trips the new global fetch guard added in test-setup.ts:26 (expect(requests).toEqual([]) in afterEach) on real unmocked GET requests to /api/conversations/test-conv/diffs and /api/conversations/pending-input. This is the same class of issue the completed code review already flagged as a blocking correctness finding (happy-dom suite passing while real network work fails silently) - the guardedFetch fix now makes the full suite fail outright instead of silently passing, so the vBRIEF acceptance criterion green-full-suite-happy-dom.ac1 (zero failed test cases) is unmet. typecheck and lint both PASSED. UAT not required (pure test-infra/perf issue, no UI-facing ACs). Full evidence in .pan/test/result.json.",
+    "testNotes": "See .pan/test/result.json for full evidence. Frontend suite deterministically fails (73/2008) on unmocked network requests caught by new test-setup.ts fetch guard; typecheck/lint pass; UAT not required.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
@@ -459,10 +459,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 124,
-            "output": 30637,
-            "cacheRead": 10138847,
-            "cacheWrite": 205648
+            "input": 126,
+            "output": 31802,
+            "cacheRead": 10344495,
+            "cacheWrite": 206171
           }
         },
         "work": {
@@ -494,15 +494,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 126,
-          "output": 30784,
-          "cacheRead": 10167296,
-          "cacheWrite": 296599
+          "input": 128,
+          "output": 31949,
+          "cacheRead": 10372944,
+          "cacheWrite": 297122
         }
       },
       "costAtCloseOut": {
-        "usd": 149.704716,
-        "pricingAsOf": "2026-07-16T20:48:16.607Z"
+        "usd": 149.758807,
+        "pricingAsOf": "2026-07-16T20:48:26.586Z"
       }
     },
     "merges": [
