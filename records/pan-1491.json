@@ -469,7 +469,7 @@
     "recordedAt": "2026-07-16T13:05:33.565Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T16:19:38.306Z",
+  "updated": "2026-07-16T16:26:23.309Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "pending",
@@ -756,7 +756,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
