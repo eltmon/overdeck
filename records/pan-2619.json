@@ -56,22 +56,16 @@
     "recordedAt": "2026-07-16T18:10:23.028Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T18:42:56.346Z",
+  "updated": "2026-07-16T21:07:29.124Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-16T18:42:56.113Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
-    "reviewedAtCommit": "d2a4e5824040bfd2b2319469aaa540b4d1bb097b",
-    "lastVerifiedCommit": "d2a4e5824040bfd2b2319469aaa540b4d1bb097b",
-    "reviewSpawnedAt": "2026-07-16T18:40:14.117Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-16T21:07:29.100Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -87,9 +81,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1926166,
-            "output": 45056,
-            "cacheRead": 9083392,
+            "input": 1928906,
+            "output": 45242,
+            "cacheRead": 9295360,
             "cacheWrite": 0
           }
         },
@@ -142,21 +136,21 @@
           "cacheWrite": 327850
         },
         "openai/gpt-5.6-sol": {
-          "input": 5807809,
-          "output": 215775,
-          "cacheRead": 39337984,
+          "input": 5810549,
+          "output": 215961,
+          "cacheRead": 39549952,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 73.669546,
-        "pricingAsOf": "2026-07-16T18:42:56.288Z"
+        "usd": 73.79481,
+        "pricingAsOf": "2026-07-16T21:07:29.117Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 4,
