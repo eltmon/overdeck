@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T18:07:48.572Z",
+  "updated": "2026-07-16T18:20:56.419Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -76,16 +76,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "cli-rename-command": {
-        "writerId": "agent-pan-1987",
-        "agentId": "agent-pan-1987",
-        "pid": 3337082,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:07:48.572Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1987",
@@ -107,6 +99,16 @@
         "itemId": "api-rename-route",
         "outcome": "completed",
         "releasedAt": "2026-07-16T18:04:08.471Z"
+      },
+      {
+        "writerId": "agent-pan-1987",
+        "agentId": "agent-pan-1987",
+        "pid": 3337082,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:07:48.572Z",
+        "itemId": "cli-rename-command",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:20:56.419Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +129,9 @@
     "api-rename-route.api-rename-route.ac2": "completed",
     "api-rename-route.api-rename-route.ac3": "completed",
     "api-rename-route.api-rename-route.ac4": "completed",
-    "cli-rename-command": "running"
+    "cli-rename-command": "completed",
+    "cli-rename-command.cli-rename-command.ac1": "completed",
+    "cli-rename-command.cli-rename-command.ac2": "completed",
+    "cli-rename-command.cli-rename-command.ac3": "completed"
   }
 }
