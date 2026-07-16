@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T17:55:26.457Z",
+  "updated": "2026-07-16T18:05:56.483Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "reconnect-affordance": {
-        "writerId": "agent-pan-2772",
-        "agentId": "agent-pan-2772",
-        "pid": 2820488,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:55:26.456Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -86,6 +78,17 @@
         "outcome": "completed",
         "reason": "Replaced the five-attempt terminal retry cap with the shared five-minute policy, reset the window on healthy snapshot or live data, preserved fatal 4404 handling and cleanup, and added fake-timer integration coverage.",
         "releasedAt": "2026-07-16T17:55:06.896Z"
+      },
+      {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 2820488,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T17:55:26.456Z",
+        "itemId": "reconnect-affordance",
+        "outcome": "completed",
+        "reason": "Added a calm terminal reconnect status overlay, replaced retry/exhaustion scrollback messages with coarse React state, kept the terminal mounted on exhaustion, and added an immediate Reconnect action that clears after healthy snapshot data. Focused tests, typecheck, lint, and diff checks pass.",
+        "releasedAt": "2026-07-16T18:05:56.483Z"
       }
     ],
     "statusReasons": {
@@ -96,6 +99,10 @@
       "xterminal-patient-reconnect": {
         "reason": "Replaced the five-attempt terminal retry cap with the shared five-minute policy, reset the window on healthy snapshot or live data, preserved fatal 4404 handling and cleanup, and added fake-timer integration coverage.",
         "updatedAt": "2026-07-16T17:55:06.896Z"
+      },
+      "reconnect-affordance": {
+        "reason": "Added a calm terminal reconnect status overlay, replaced retry/exhaustion scrollback messages with coarse React state, kept the terminal mounted on exhaustion, and added an immediate Reconnect action that clears after healthy snapshot data. Focused tests, typecheck, lint, and diff checks pass.",
+        "updatedAt": "2026-07-16T18:05:56.483Z"
       }
     }
   },
@@ -109,6 +116,9 @@
     "xterminal-patient-reconnect.xterminal-patient-reconnect.ac2": "completed",
     "xterminal-patient-reconnect.xterminal-patient-reconnect.ac3": "completed",
     "xterminal-patient-reconnect.xterminal-patient-reconnect.ac4": "completed",
-    "reconnect-affordance": "running"
+    "reconnect-affordance": "completed",
+    "reconnect-affordance.reconnect-affordance.ac1": "completed",
+    "reconnect-affordance.reconnect-affordance.ac2": "completed",
+    "reconnect-affordance.reconnect-affordance.ac3": "completed"
   }
 }
