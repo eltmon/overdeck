@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlywheelStatus } from '@overdeck/contracts';
+import { consumePendingReveal, requestRevealOpenQuestions } from '../../lib/flywheelReveal';
 import { FlywheelPage } from '../FlywheelPage';
 
 const mocks = vi.hoisted(() => ({
@@ -22,7 +23,7 @@ vi.mock('../../lib/wsTransport', () => ({
 vi.mock('../../components/flywheel/FlywheelStatusDetails', () => ({
   FlywheelStatusDetails: (props: { status: FlywheelStatus; onNavigateAgent?: (agentId: string) => void; onNavigateIssue?: (issueId: string) => void }) => {
     mocks.statusDetails(props);
-    return <div data-testid="status-details">{props.status.runId}</div>;
+    return <div id="flywheel-open-questions" data-testid="status-details">{props.status.runId}</div>;
   },
 }));
 
@@ -97,8 +98,19 @@ const status: FlywheelStatus = {
 };
 
 describe('FlywheelPage', () => {
+  const scrollIntoView = vi.fn();
+  let animationFrameCallback: FrameRequestCallback | undefined;
+
   beforeEach(() => {
+    consumePendingReveal();
     vi.stubGlobal('fetch', vi.fn(async () => Response.json(null)));
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      animationFrameCallback = callback;
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    Element.prototype.scrollIntoView = scrollIntoView;
+    scrollIntoView.mockReset();
     mocks.listener = undefined;
     mocks.unsubscribe.mockReset();
     mocks.statusDetails.mockReset();
@@ -393,6 +405,51 @@ describe('FlywheelPage', () => {
     expect(statsTab).toHaveAttribute('aria-selected', 'false');
     expect(screen.getByTestId('state-pane')).toBeInTheDocument();
     expect(screen.queryByText(/No active run/)).not.toBeInTheDocument();
+  });
+
+  it('retains a pending reveal until status renders the questions anchor', () => {
+    requestRevealOpenQuestions();
+    renderFlywheelPage(<FlywheelPage />);
+
+    act(() => animationFrameCallback?.(0));
+    expect(scrollIntoView).not.toHaveBeenCalled();
+
+    animationFrameCallback = undefined;
+    act(() => mocks.listener?.(status));
+    expect(animationFrameCallback).toBeDefined();
+    act(() => animationFrameCallback?.(0));
+
+    expect(screen.getByRole('tab', { name: 'Status' })).toHaveAttribute('aria-selected', 'true');
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  });
+
+  it('reveals questions while already mounted', () => {
+    renderFlywheelPage(<FlywheelPage />);
+    act(() => mocks.listener?.(status));
+    fireEvent.click(screen.getByRole('tab', { name: 'State' }));
+
+    act(() => requestRevealOpenQuestions());
+    act(() => animationFrameCallback?.(0));
+
+    expect(screen.getByRole('tab', { name: 'Status' })).toHaveAttribute('aria-selected', 'true');
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+  });
+
+  it('does not replay a handled live reveal after remount', () => {
+    const first = renderFlywheelPage(<FlywheelPage />);
+    act(() => mocks.listener?.(status));
+    act(() => requestRevealOpenQuestions());
+    act(() => animationFrameCallback?.(0));
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    first.unmount();
+
+    scrollIntoView.mockClear();
+    animationFrameCallback = undefined;
+    renderFlywheelPage(<FlywheelPage />);
+    act(() => mocks.listener?.(status));
+
+    expect(animationFrameCallback).toBeUndefined();
+    expect(scrollIntoView).not.toHaveBeenCalled();
   });
 
   it('renders the Stats tab and switches back to existing panes without losing status data', () => {
