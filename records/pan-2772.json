@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T19:18:01.998Z",
+  "updated": "2026-07-16T19:18:10.851Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -219,5 +219,51 @@
     "docs-terminal-reconnect": "completed",
     "docs-terminal-reconnect.docs-terminal-reconnect.ac1": "completed",
     "docs-terminal-reconnect.docs-terminal-reconnect.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/reload.test.ts",
+      "src/cli/commands/__tests__/restart-agent-gate.test.ts",
+      "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+      "src/lib/deploy/deploy-window.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "src/cli/commands/reload.ts",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/XTerminal.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
+      "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/ws-terminal.ts",
+      "src/lib/deploy/agent-restart-gate.ts",
+      "sync-sources/skills/pan-reload/SKILL.md",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
+      "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "src/cli/commands/__tests__/reload.test.ts",
+      "src/cli/commands/__tests__/restart-agent-gate.test.ts",
+      "src/cli/commands/reload.ts",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/XTerminal.test.tsx",
+      "src/dashboard/frontend/src/components/XTerminal.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/terminalReconnectPolicy.test.ts",
+      "src/dashboard/frontend/src/lib/terminalReconnectPolicy.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/ws-terminal.ts",
+      "src/lib/deploy/agent-restart-gate.ts",
+      "src/lib/deploy/deploy-window.ts",
+      "sync-sources/skills/pan-reload/SKILL.md",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/dashboard/ws-terminal-restart-broadcast.test.ts",
+      "tests/unit/lib/deploy/agent-restart-gate.test.ts"
+    ],
+    "recordedAt": "2026-07-16T19:18:10.850Z"
   }
 }
