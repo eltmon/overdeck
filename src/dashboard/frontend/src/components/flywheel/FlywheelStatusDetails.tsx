@@ -110,9 +110,9 @@ function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): Flywhe
     .map(({ suggestion }) => suggestion);
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, children, id }: { title: string; children: ReactNode; id?: string }) {
   return (
-    <section className="rounded-lg border border-border bg-card/60 p-4">
+    <section id={id} className="rounded-lg border border-border bg-card/60 p-4">
       <h3 className="mb-3 text-sm font-semibold text-foreground">{title}</h3>
       {children}
     </section>
@@ -268,7 +268,7 @@ export function FlywheelStatusDetails({ status, onNavigateAgent, onNavigateIssue
           </dl>
         </Section>
 
-        <Section title="Open Questions for the Next Tick">
+        <Section title="Open Questions for the Next Tick" id="flywheel-open-questions">
           {status.openQuestions.length > 0 ? (
             <ul className="list-disc space-y-2 pl-5 text-sm text-foreground">
               {status.openQuestions.map((question) => <li key={question}>{question}</li>)}
