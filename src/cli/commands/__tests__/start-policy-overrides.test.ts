@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { updateIssueRecord } = vi.hoisted(() => ({
   updateIssueRecord: vi.fn(async (_project, _issueId, mutator) => {
@@ -13,6 +13,10 @@ vi.mock('../../../lib/pan-dir/record-update.js', () => ({ updateIssueRecord }));
 import { hasStartPolicyOverrides, parseStartPolicyOverrides, persistStartPolicyOverrides } from '../start-policy-overrides.js';
 
 describe('pan start policy overrides', () => {
+  beforeEach(() => {
+    updateIssueRecord.mockClear();
+  });
+
   it('parses all supported start-time policy flags', () => {
     expect(parseStartPolicyOverrides({ model: 'gpt-5.6-sol', swarm: 'off', reviewMode: 'full', reviewModel: 'gpt-5.5' })).toEqual({
       workModel: 'gpt-5.6-sol', swarmMode: 'off', reviewMode: 'full', reviewModel: 'gpt-5.5',
@@ -31,6 +35,36 @@ describe('pan start policy overrides', () => {
     expect(hasStartPolicyOverrides(overrides)).toBe(false);
     await persistStartPolicyOverrides({} as never, 'PAN-2704', overrides);
     expect(updateIssueRecord).not.toHaveBeenCalled();
+  });
+
+  it('does not enter the write door after reconciliation is cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort(new Error('state reconciliation timed out'));
+
+    await expect(persistStartPolicyOverrides({} as never, 'PAN-2704', {
+      reviewMode: 'full',
+    }, controller.signal)).rejects.toThrow('state reconciliation timed out');
+    expect(updateIssueRecord).not.toHaveBeenCalled();
+  });
+
+  it('awaits a write that already entered the canonical durability boundary', async () => {
+    const controller = new AbortController();
+    let finishWrite!: () => void;
+    updateIssueRecord.mockImplementationOnce(() => new Promise((resolve) => {
+      finishWrite = () => resolve({});
+    }));
+    let settled = false;
+    const persistence = persistStartPolicyOverrides({} as never, 'PAN-2704', {
+      reviewMode: 'full',
+    }, controller.signal);
+    void persistence.then(() => { settled = true; }, () => { settled = true; });
+    await vi.waitFor(() => expect(updateIssueRecord).toHaveBeenCalledOnce());
+
+    controller.abort(new Error('state reconciliation timed out'));
+
+    expect(settled).toBe(false);
+    finishWrite();
+    await expect(persistence).resolves.toBeUndefined();
   });
 
   it('creates or updates the issue record through the canonical writer', async () => {

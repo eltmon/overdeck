@@ -90,7 +90,7 @@ export function createPrepProgress(
 }
 
 export const START_PREP_STEP_POLICIES = {
-  'state-reconcile': { budgetMs: 60_000, timeout: 'fail-fast', awaitQuiescence: false },
+  'state-reconcile': { budgetMs: 60_000, timeout: 'fail-fast', awaitQuiescence: true },
   'sync-main': { budgetMs: 240_000, timeout: 'degrade', awaitQuiescence: true },
   'tracker-context': { budgetMs: 60_000, timeout: 'degrade', awaitQuiescence: true },
   spawn: { budgetMs: 600_000, timeout: 'fail-fast', awaitQuiescence: true },
@@ -119,9 +119,9 @@ export async function runStateReconcile(
   prep: PrepProgress,
   spinner: Pick<Ora, 'warn'>,
   remote: boolean,
-  reconcile: () => Promise<void> | void,
+  reconcile: (signal: AbortSignal) => Promise<void> | void,
 ): Promise<void> {
-  if (remote) await reconcile();
+  if (remote) await reconcile(new AbortController().signal);
   else await runStartPrepStep(prep, spinner, 'state-reconcile', reconcile);
 }
 

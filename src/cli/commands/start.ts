@@ -867,10 +867,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
     const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
     if (resolved) {
-      const reconcileState = async () => {
+      const reconcileState = async (signal: AbortSignal) => {
         spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
-        await requireAutomaticStateMigration(resolved);
-        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true);
+        await requireAutomaticStateMigration(resolved, signal);
+        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true, signal);
       };
       await runStateReconcile(prep, spinner, effectiveRemote, reconcileState);
     }

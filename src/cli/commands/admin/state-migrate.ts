@@ -1,8 +1,7 @@
-import { execFile } from 'node:child_process';
+import { execFile, type ChildProcess, type ExecFileException } from 'node:child_process';
 import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { promisify } from 'node:util';
 import { Command } from 'commander';
 import { Effect } from 'effect';
 
@@ -13,11 +12,73 @@ import { STATE_BRANCH_PATHS } from '../../../lib/state-plane.js';
 import { acquireStateMigrationLock } from '../../../lib/state-migration-lock.js';
 import { manifestEntry, verifyStateMigrationManifest, type StateMigrationManifestEntry } from '../../../lib/state-migration-manifest.js';
 
-const execFileAsync = promisify(execFile);
+const GIT_COMMAND_TIMEOUT_MS = 30_000;
 
-async function git(cwd: string, args: string[], env?: NodeJS.ProcessEnv): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, { cwd, env: { ...process.env, ...env }, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
-  return stdout.trim();
+const execFileDetached = execFile as unknown as (
+  file: string,
+  args: string[],
+  options: {
+    cwd: string;
+    env: NodeJS.ProcessEnv;
+    encoding: BufferEncoding;
+    maxBuffer: number;
+    detached: boolean;
+  },
+  callback: (error: ExecFileException | null, stdout: string, stderr: string) => void,
+) => ChildProcess;
+
+function killProcessTree(child: ChildProcess | undefined): void {
+  if (!child?.pid) return;
+  try {
+    if (process.platform === 'win32') child.kill('SIGKILL');
+    else process.kill(-child.pid, 'SIGKILL');
+  } catch {
+    try { child.kill('SIGKILL'); } catch { /* process already exited */ }
+  }
+}
+
+async function git(
+  cwd: string,
+  args: string[],
+  signal?: AbortSignal,
+  env?: NodeJS.ProcessEnv,
+): Promise<string> {
+  signal?.throwIfAborted();
+  const command = `git ${args.join(' ')}`;
+  return new Promise((resolve, reject) => {
+    let child: ChildProcess | undefined;
+    let termination: 'abort' | 'timeout' | undefined;
+    const terminate = (kind: 'abort' | 'timeout') => {
+      if (termination) return;
+      termination = kind;
+      killProcessTree(child);
+    };
+    const timeout = setTimeout(() => terminate('timeout'), GIT_COMMAND_TIMEOUT_MS);
+    const onAbort = () => terminate('abort');
+    signal?.addEventListener('abort', onAbort, { once: true });
+
+    child = execFileDetached('git', args, {
+      cwd,
+      env: { ...process.env, ...env },
+      encoding: 'utf8',
+      maxBuffer: 32 * 1024 * 1024,
+      detached: process.platform !== 'win32',
+    }, (error, stdout, stderr) => {
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', onAbort);
+      if (termination === 'abort') {
+        reject(signal?.reason ?? new DOMException(`${command} was cancelled`, 'AbortError'));
+      } else if (termination === 'timeout') {
+        reject(new Error(`${command} timed out after ${GIT_COMMAND_TIMEOUT_MS / 1_000}s`));
+      } else if (error) {
+        reject(Object.assign(error, { stdout, stderr }));
+      } else {
+        resolve(stdout.trim());
+      }
+    });
+
+    if (signal?.aborted) terminate('abort');
+  });
 }
 
 function destinationForTracked(path: string): string | null {
@@ -26,10 +87,16 @@ function destinationForTracked(path: string): string | null {
   return STATE_BRANCH_PATHS.some((prefix) => flat.startsWith(prefix)) ? flat : null;
 }
 
-async function trackedManifest(repo: string, sourceSha: string, stateRoot: string): Promise<StateMigrationManifestEntry[]> {
-  const paths = (await git(repo, ['ls-tree', '-r', '--name-only', sourceSha, '--', '.pan']))
+async function trackedManifest(
+  repo: string,
+  sourceSha: string,
+  stateRoot: string,
+  signal?: AbortSignal,
+): Promise<StateMigrationManifestEntry[]> {
+  const paths = (await git(repo, ['ls-tree', '-r', '--name-only', sourceSha, '--', '.pan'], signal))
     .split('\n').filter(Boolean);
   return paths.flatMap((path) => {
+    signal?.throwIfAborted();
     const destination = destinationForTracked(path);
     if (!destination) return [];
     const source = join(repo, path);
@@ -42,28 +109,39 @@ async function trackedManifest(repo: string, sourceSha: string, stateRoot: strin
   });
 }
 
-async function createOrphanStateCommit(repo: string, sourceSha: string): Promise<string> {
+async function createOrphanStateCommit(
+  repo: string,
+  sourceSha: string,
+  signal?: AbortSignal,
+): Promise<string> {
   const index = join(tmpdir(), `overdeck-state-index-${process.pid}-${Date.now()}`);
   const env = { GIT_INDEX_FILE: index };
   try {
-    await git(repo, ['read-tree', '--empty'], env);
-    const rows = (await git(repo, ['ls-tree', '-r', sourceSha, '--', '.pan'])).split('\n').filter(Boolean);
+    await git(repo, ['read-tree', '--empty'], signal, env);
+    const rows = (await git(repo, ['ls-tree', '-r', sourceSha, '--', '.pan'], signal)).split('\n').filter(Boolean);
     for (const row of rows) {
       const match = row.match(/^(\d+)\s+\w+\s+([0-9a-f]+)\t(.+)$/);
       if (!match) continue;
       const destination = destinationForTracked(match[3]);
-      if (destination) await git(repo, ['update-index', '--add', '--cacheinfo', `${match[1]},${match[2]},${destination}`], env);
+      if (destination) {
+        await git(repo, ['update-index', '--add', '--cacheinfo', `${match[1]},${match[2]},${destination}`], signal, env);
+      }
     }
-    const tree = await git(repo, ['write-tree'], env);
-    return await git(repo, ['commit-tree', tree, '-m', 'chore(state): seed overdeck-state']);
+    const tree = await git(repo, ['write-tree'], signal, env);
+    return await git(repo, ['commit-tree', tree, '-m', 'chore(state): seed overdeck-state'], signal, env);
   } finally {
     rmSync(index, { force: true });
   }
 }
 
-function copyLegacyState(sourceRoot: string, stateRoot: string): StateMigrationManifestEntry[] {
+function copyLegacyState(
+  sourceRoot: string,
+  stateRoot: string,
+  signal?: AbortSignal,
+): StateMigrationManifestEntry[] {
   const manifest: StateMigrationManifestEntry[] = [];
   for (const sourcePath of STATE_BRANCH_PATHS) {
+    signal?.throwIfAborted();
     const source = join(sourceRoot, '.pan', sourcePath);
     if (!existsSync(source)) continue;
     const destination = join(stateRoot, sourcePath);
@@ -73,6 +151,7 @@ function copyLegacyState(sourceRoot: string, stateRoot: string): StateMigrationM
     });
     const visit = (sourceDir: string, destinationDir: string): void => {
       for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
+        signal?.throwIfAborted();
         const sourceEntry = join(sourceDir, entry.name);
         const destinationEntry = join(destinationDir, entry.name);
         if (entry.isDirectory()) visit(sourceEntry, destinationEntry);
@@ -138,7 +217,7 @@ function rewriteGitignore(repo: string): void {
 
 export async function migrateProjectState(
   projectKey: string,
-  options: { dryRun?: boolean } = {},
+  options: { dryRun?: boolean; signal?: AbortSignal } = {},
   projectOverride?: ProjectConfig,
 ): Promise<void> {
   const project = projectOverride ?? getProjectSync(projectKey);
@@ -152,37 +231,53 @@ export async function migrateProjectState(
   console.log(`  ${legacyStateSource}/.pan/context -> ${legacyStateSource}/.overdeck/context`);
   if (options.dryRun) return;
 
+  options.signal?.throwIfAborted();
   const release = acquireStateMigrationLock(projectKey);
   try {
+    // A queued state commit is already inside the canonical durability boundary.
+    // Await it without interrupting the Effect, then honor cancellation before
+    // starting migration work so the timeout cannot detach a live commit/push.
     await Effect.runPromise(flushAutoCommits(repo));
-    if (hasNonStateDirtyState(await git(repo, ['status', '--porcelain']))) {
+    options.signal?.throwIfAborted();
+    if (hasNonStateDirtyState(await git(repo, ['status', '--porcelain'], options.signal))) {
       throw new Error('Primary checkout is dirty outside legacy state paths; migration refused before mutation');
     }
-    await git(repo, ['fetch', '--prune', 'origin']);
-    const sourceMainSha = await git(repo, ['rev-parse', 'main']);
-    const remoteMainSha = await git(repo, ['rev-parse', 'origin/main']);
+    await git(repo, ['fetch', '--prune', 'origin'], options.signal);
+    const sourceMainSha = await git(repo, ['rev-parse', 'main'], options.signal);
+    const remoteMainSha = await git(repo, ['rev-parse', 'origin/main'], options.signal);
     if (sourceMainSha !== remoteMainSha) throw new Error('main is not exactly at origin/main; migration refused');
 
-    const existingMarker = await git(repo, ['show', `origin/${STATE_BRANCH}:${MIGRATION_COMPLETE_MARKER}`]).catch(() => '');
+    const existingMarker = await git(repo, ['show', `origin/${STATE_BRANCH}:${MIGRATION_COMPLETE_MARKER}`], options.signal)
+      .catch(() => {
+        options.signal?.throwIfAborted();
+        return '';
+      });
     if (existingMarker) {
       console.log('State migration already complete on origin; nothing to do.');
       return;
     }
 
-    let stateSha = await git(repo, ['rev-parse', STATE_BRANCH]).catch(() => '');
-    const remoteStateSha = await git(repo, ['rev-parse', `origin/${STATE_BRANCH}`]).catch(() => '');
+    let stateSha = await git(repo, ['rev-parse', STATE_BRANCH], options.signal).catch(() => {
+      options.signal?.throwIfAborted();
+      return '';
+    });
+    const remoteStateSha = await git(repo, ['rev-parse', `origin/${STATE_BRANCH}`], options.signal).catch(() => {
+      options.signal?.throwIfAborted();
+      return '';
+    });
     if (stateSha && remoteStateSha && stateSha !== remoteStateSha) {
       throw new Error('Local and remote overdeck-state diverged; refusing non-fast-forward migration');
     }
     if (!stateSha) {
-      stateSha = remoteStateSha || await createOrphanStateCommit(repo, sourceMainSha);
-      await git(repo, ['update-ref', `refs/heads/${STATE_BRANCH}`, stateSha]);
+      stateSha = remoteStateSha || await createOrphanStateCommit(repo, sourceMainSha, options.signal);
+      await git(repo, ['update-ref', `refs/heads/${STATE_BRANCH}`, stateSha], options.signal);
     }
-    if (!remoteStateSha) await git(repo, ['push', 'origin', STATE_BRANCH]);
+    if (!remoteStateSha) await git(repo, ['push', 'origin', STATE_BRANCH], options.signal);
 
     if (!existsSync(stateRoot)) {
+      options.signal?.throwIfAborted();
       mkdirSync(dirname(stateRoot), { recursive: true });
-      await git(repo, ['worktree', 'add', stateRoot, STATE_BRANCH]);
+      await git(repo, ['worktree', 'add', stateRoot, STATE_BRANCH], options.signal);
     }
 
     // A pipeline may have produced state after the last code commit (the PUZ-1
@@ -192,19 +287,19 @@ export async function migrateProjectState(
     // hard block above. Legacy .beads data is intentionally left untouched.
     const manifest = sourceIsHostRepo
       ? dedupeManifest([
-          ...await trackedManifest(repo, sourceMainSha, stateRoot),
-          ...copyLegacyState(legacyStateSource, stateRoot),
+          ...await trackedManifest(repo, sourceMainSha, stateRoot, options.signal),
+          ...copyLegacyState(legacyStateSource, stateRoot, options.signal),
         ])
-      : copyLegacyState(legacyStateSource, stateRoot);
+      : copyLegacyState(legacyStateSource, stateRoot, options.signal);
     if (manifest.length > 0) {
-      await git(stateRoot, ['add', '--all']);
-      if (await git(stateRoot, ['diff', '--cached', '--name-only'])) {
-        await git(stateRoot, ['commit', '-m', 'chore(state): seed legacy project state']);
+      await git(stateRoot, ['add', '--all'], options.signal);
+      if (await git(stateRoot, ['diff', '--cached', '--name-only'], options.signal)) {
+        await git(stateRoot, ['commit', '-m', 'chore(state): seed legacy project state'], options.signal);
       }
-      await git(stateRoot, ['push', 'origin', STATE_BRANCH]);
+      await git(stateRoot, ['push', 'origin', STATE_BRANCH], options.signal);
     }
     const untracked = sourceIsHostRepo
-      ? (await git(repo, ['ls-files', '--others', '--', '.pan'])).split('\n')
+      ? (await git(repo, ['ls-files', '--others', '--', '.pan'], options.signal)).split('\n')
         .filter((path) => path.split('/').length === 2 && existsSync(join(repo, path)) && lstatSync(join(repo, path)).isFile())
       : existsSync(join(legacyStateSource, '.pan'))
         ? readdirSync(join(legacyStateSource, '.pan'), { withFileTypes: true })
@@ -212,6 +307,7 @@ export async function migrateProjectState(
           .map((entry) => `.pan/${entry.name}`)
         : [];
     for (const path of untracked) {
+      options.signal?.throwIfAborted();
       if (!existsSync(join(legacyStateSource, path))) continue;
       const destination = join(stateRoot, 'notes', path.slice('.pan/'.length));
       if (existsSync(destination)) {
@@ -228,17 +324,23 @@ export async function migrateProjectState(
       manifest.push(manifestEntry(join(legacyStateSource, path), destination));
     }
     if (untracked.length > 0) {
-      await git(stateRoot, ['add', 'notes']);
+      await git(stateRoot, ['add', 'notes'], options.signal);
       // Resume tolerance: a prior interrupted attempt may have already
       // committed these notes — git commit exits 1 on an empty index.
-      if (await git(stateRoot, ['diff', '--cached', '--name-only'])) {
-        await git(stateRoot, ['commit', '-m', 'chore(state): preserve untracked operator notes']);
+      if (await git(stateRoot, ['diff', '--cached', '--name-only'], options.signal)) {
+        await git(stateRoot, ['commit', '-m', 'chore(state): preserve untracked operator notes'], options.signal);
       }
-      await git(stateRoot, ['push', 'origin', STATE_BRANCH]);
+      await git(stateRoot, ['push', 'origin', STATE_BRANCH], options.signal);
     }
 
-    if (await git(repo, ['rev-parse', 'main']) !== sourceMainSha) throw new Error('main advanced during migration; refusing cleanup');
+    if (await git(repo, ['rev-parse', 'main'], options.signal) !== sourceMainSha) {
+      throw new Error('main advanced during migration; refusing cleanup');
+    }
+    options.signal?.throwIfAborted();
 
+    // From source cleanup through the atomic push, migration is one durability
+    // boundary. Cancellation must await this resumable sequence instead of
+    // leaving deleted legacy sources without a durable completion marker.
     if (sourceIsHostRepo) {
       await git(repo, ['rm', '-r', '--cached', '--ignore-unmatch', '.pan/records', '.pan/continues', '.pan/specs', '.pan/drafts', '.pan/review', '.pan/test', '.pan/feedback', '.pan/backlog', '.pan/notes']);
     }
@@ -289,6 +391,8 @@ export async function migrateProjectState(
     release();
   }
 }
+
+export const __testInternals = { git };
 
 export function registerStateMigrationCommand(admin: Command): void {
   admin.command('state')

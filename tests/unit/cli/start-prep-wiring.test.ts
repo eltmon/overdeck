@@ -51,7 +51,7 @@ describe('pan start prep step wiring', () => {
       });
     }
 
-    expect(prep.step).toHaveBeenNthCalledWith(1, 'state-reconcile', 60_000, expect.any(Function), { awaitQuiescence: false });
+    expect(prep.step).toHaveBeenNthCalledWith(1, 'state-reconcile', 60_000, expect.any(Function), { awaitQuiescence: true });
     expect(prep.step).toHaveBeenNthCalledWith(2, 'sync-main', 240_000, expect.any(Function), { awaitQuiescence: true });
     expect(prep.step).toHaveBeenNthCalledWith(3, 'tracker-context', 60_000, expect.any(Function), { awaitQuiescence: true });
     expect(prep.step).toHaveBeenNthCalledWith(4, 'spawn', 600_000, expect.any(Function), { awaitQuiescence: true });
@@ -68,25 +68,31 @@ describe('pan start prep step wiring', () => {
   });
 
   it('bounds local reconciliation but leaves remote reconciliation unbounded', async () => {
+    let localSignal: AbortSignal | undefined;
     const prep = {
       update: vi.fn(),
-      step: vi.fn(async (_name: string, _budgetMs: number, fn: () => Promise<void>) => fn()),
+      step: vi.fn(async (_name: string, _budgetMs: number, fn: (signal: AbortSignal) => Promise<void>) => {
+        localSignal = new AbortController().signal;
+        return fn(localSignal);
+      }),
     } as unknown as PrepProgress;
     const spinner = { warn: vi.fn() };
-    const reconcile = vi.fn().mockResolvedValue(undefined);
+    const receivedSignals: AbortSignal[] = [];
+    const reconcile = vi.fn(async (signal: AbortSignal) => { receivedSignals.push(signal); });
 
     await runStateReconcile(prep, spinner, false, reconcile);
     expect(prep.step).toHaveBeenCalledWith(
       'state-reconcile',
       60_000,
       reconcile,
-      { awaitQuiescence: false },
+      { awaitQuiescence: true },
     );
+    expect(receivedSignals[0]).toBe(localSignal);
 
     vi.mocked(prep.step).mockClear();
     await runStateReconcile(prep, spinner, true, reconcile);
     expect(prep.step).not.toHaveBeenCalled();
-    expect(reconcile).toHaveBeenCalledTimes(2);
+    expect(receivedSignals[1]?.aborted).toBe(false);
   });
 
   it('keeps planning stream updates on the Ora spinner', () => {
@@ -152,6 +158,33 @@ describe('pan start prep step wiring', () => {
 
     await rejection;
     expect(spinner.warn).not.toHaveBeenCalled();
+  });
+
+  it('aborts local reconciliation and waits for cleanup before returning its timeout', async () => {
+    const prep = createPrepProgress(
+      { text: '' },
+      { stream: { isTTY: false, write: vi.fn() } },
+    );
+    const spinner = { warn: vi.fn() };
+    let receivedSignal: AbortSignal | undefined;
+    let finishCleanup!: () => void;
+    let settled = false;
+    const resultPromise = runStateReconcile(prep, spinner, false, (signal) => {
+      receivedSignal = signal;
+      return new Promise<void>((resolve) => { finishCleanup = resolve; });
+    });
+    void resultPromise.then(() => { settled = true; }, () => { settled = true; });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect(receivedSignal?.aborted).toBe(true);
+    expect(settled).toBe(false);
+    finishCleanup();
+    await expect(resultPromise).rejects.toMatchObject({
+      name: 'PrepStepTimeoutError',
+      message: "Prep step 'state-reconcile' exceeded its 60s budget",
+    });
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('waits for spawn quiescence before returning its timeout', async () => {

@@ -33,7 +33,10 @@ describe('automatic state migration coordinator', () => {
       status: 'ready', projectKey: 'fixture-ready', worktree: 'healthy',
     });
     expect(deps.migrate).not.toHaveBeenCalled();
-    expect(deps.ensureWorktree).toHaveBeenCalledWith(project, { projectKey: 'fixture-ready' });
+    expect(deps.ensureWorktree).toHaveBeenCalledWith(project, {
+      projectKey: 'fixture-ready',
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('migrates an unmarked project and verifies the remote marker before returning ready', async () => {
@@ -42,7 +45,11 @@ describe('automatic state migration coordinator', () => {
       .mockResolvedValueOnce({ migrated: true, migrationInProgress: false, remoteTip: 'b'.repeat(40) });
     const deps = dependencies({ inspect });
     await expect(ensureAutomaticStateMigration('fixture-new', project, deps)).resolves.toMatchObject({ status: 'ready' });
-    expect(deps.migrate).toHaveBeenCalledWith('fixture-new', project);
+    expect(deps.migrate).toHaveBeenCalledWith(
+      'fixture-new',
+      project,
+      expect.any(AbortSignal),
+    );
     expect(deps.clearCache).toHaveBeenCalledOnce();
   });
 
@@ -59,6 +66,76 @@ describe('automatic state migration coordinator', () => {
     await vi.waitFor(() => expect(migrate).toHaveBeenCalledOnce());
     release();
     await expect(first).resolves.toMatchObject({ status: 'ready' });
+  });
+
+  it('aborts sole-owner migration and waits for its cleanup to settle', async () => {
+    const controller = new AbortController();
+    const timeout = new Error('state reconciliation timed out');
+    let migrationSignal: AbortSignal | undefined;
+    let finishCleanup!: () => void;
+    const migrate = vi.fn((_key: string, _project: Parameters<AutomaticStateMigrationDependencies['migrate']>[1], signal?: AbortSignal) => {
+      migrationSignal = signal;
+      return new Promise<void>((_resolve, reject) => {
+        finishCleanup = () => reject(signal?.reason);
+      });
+    });
+    const deps = dependencies({
+      inspect: vi.fn(async () => ({ migrated: false, migrationInProgress: false, remoteTip: null })),
+      migrate,
+    });
+    const migration = ensureAutomaticStateMigration(
+      'fixture-cancelled',
+      project,
+      deps,
+      controller.signal,
+    );
+    let settled = false;
+    void migration.then(() => { settled = true; }, () => { settled = true; });
+    await vi.waitFor(() => expect(migrate).toHaveBeenCalledOnce());
+
+    controller.abort(timeout);
+
+    expect(migrationSignal?.aborted).toBe(true);
+    expect(settled).toBe(false);
+    finishCleanup();
+    await expect(migration).rejects.toBe(timeout);
+  });
+
+  it('keeps shared migration alive while another cancellable caller still owns it', async () => {
+    const firstController = new AbortController();
+    const secondController = new AbortController();
+    const firstTimeout = new Error('first caller timed out');
+    let migrationSignal: AbortSignal | undefined;
+    let finishMigration!: () => void;
+    const migrate = vi.fn((_key: string, _project: Parameters<AutomaticStateMigrationDependencies['migrate']>[1], signal?: AbortSignal) => {
+      migrationSignal = signal;
+      return new Promise<void>((resolve) => { finishMigration = resolve; });
+    });
+    const inspect = vi.fn()
+      .mockResolvedValueOnce({ migrated: false, migrationInProgress: false, remoteTip: null })
+      .mockResolvedValue({ migrated: true, migrationInProgress: false, remoteTip: 'd'.repeat(40) });
+    const deps = dependencies({ inspect, migrate });
+    const first = ensureAutomaticStateMigration(
+      'fixture-shared-cancellation',
+      project,
+      deps,
+      firstController.signal,
+    );
+    const second = ensureAutomaticStateMigration(
+      'fixture-shared-cancellation',
+      project,
+      deps,
+      secondController.signal,
+    );
+    const firstRejection = expect(first).rejects.toBe(firstTimeout);
+    await vi.waitFor(() => expect(migrate).toHaveBeenCalledOnce());
+
+    firstController.abort(firstTimeout);
+
+    expect(migrationSignal?.aborted).toBe(false);
+    finishMigration();
+    await firstRejection;
+    await expect(second).resolves.toMatchObject({ status: 'ready' });
   });
 
   it('returns a standalone blocked result instead of permitting legacy writes', async () => {
