@@ -287,22 +287,22 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T20:56:31.549Z",
+  "updated": "2026-07-16T20:59:44.341Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:56:31.512Z",
-    "reviewNotes": "[correctness] Detached review requests can race and replace each other's pipeline work — `src/dashboard/server/routes/workspaces/review-pipeline.ts:699`",
+    "updatedAt": "2026-07-16T20:59:44.311Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
-    "lastVerifiedCommit": "5e1dd8fd05bc8404540af53e1c2c14273da1c231",
+    "lastVerifiedCommit": "71db541b6a13d5e43561f146f1f835dcbb4774a3",
     "reviewRequestedAt": "2026-07-16T19:33:54.654Z",
     "reviewSpawnedAt": "2026-07-16T20:56:01.919Z",
     "scopeDrift": {
@@ -419,9 +419,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5574282,
-            "output": 358196,
-            "cacheRead": 97063936,
+            "input": 5578046,
+            "output": 359884,
+            "cacheRead": 97590784,
             "cacheWrite": 0
           }
         }
@@ -434,9 +434,9 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 19624484,
-          "output": 617045,
-          "cacheRead": 141580800,
+          "input": 19628248,
+          "output": 618733,
+          "cacheRead": 142107648,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -447,8 +447,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 202.992879,
-        "pricingAsOf": "2026-07-16T20:56:31.536Z"
+        "usd": 203.325763,
+        "pricingAsOf": "2026-07-16T20:59:44.332Z"
       }
     },
     "merges": [
