@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { Route } from 'lucide-react';
 import { type Harness, type SettingsConfig, type TieredExecutionConfig } from '../types';
 import type { SaveStatus } from '../hooks/useAutosavePipeline';
@@ -6,7 +6,6 @@ import { MODELS_BY_PROVIDER } from '../modelCatalog';
 import {
   blendedCost,
   crewLabel,
-  deriveTierName,
   DIFFICULTIES,
   importCrews,
   providerDefaultHarness,
@@ -23,6 +22,14 @@ interface TieredExecutionSectionProps {
   saveErrorMessage?: string | null;
   saveStatus?: SaveStatus;
   onSettingsChange: (next: SettingsConfig, opts?: { debounce?: boolean }) => void;
+}
+
+interface EditableCrewState {
+  acceptedConfigKeys: readonly string[];
+  persistedCrewConfigKey: string;
+  crews: readonly Crew[];
+  assign: CrewAssignments;
+  rest: CrewRest;
 }
 
 const ITEM_KINDS = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
@@ -60,6 +67,14 @@ function normalizeTieredExecution(
     tiers: { ...(config?.tiers ?? {}) },
     by_kind: config?.by_kind ?? config?.byKind ?? {},
   };
+}
+
+function configKey(config: TieredExecutionConfig): string {
+  return JSON.stringify(config);
+}
+
+function persistedCrewConfigKey(config: TieredExecutionConfig): string {
+  return JSON.stringify({ tiers: config.tiers, by_kind: config.by_kind });
 }
 
 function csvToList(value: string): string[] {
@@ -113,7 +128,20 @@ export function TieredExecutionSection({
 }: TieredExecutionSectionProps) {
   const config = formData.tiered_execution;
   const normalizedConfig = normalizeTieredExecution(config);
-  const { crews, assign, rest } = importCrews(normalizedConfig);
+  const normalizedConfigKey = configKey(normalizedConfig);
+  const normalizedPersistedCrewConfigKey = persistedCrewConfigKey(normalizedConfig);
+  const importedCrewState = importCrews(normalizedConfig);
+  const editableCrewStateRef = useRef<EditableCrewState | null>(null);
+  const cachedCrewState = editableCrewStateRef.current;
+  const editableCrewState = cachedCrewState?.acceptedConfigKeys.includes(normalizedConfigKey)
+    ? cachedCrewState
+    : cachedCrewState?.persistedCrewConfigKey === normalizedPersistedCrewConfigKey
+      ? {
+          ...cachedCrewState,
+          rest: { ...importedCrewState.rest, by_kind: cachedCrewState.rest.by_kind },
+        }
+      : importedCrewState;
+  const { crews, assign, rest } = editableCrewState;
   let outgoingConfig: TieredExecutionConfig = normalizedConfig;
   try {
     outgoingConfig = serializeCrews(crews, assign, rest);
@@ -167,7 +195,16 @@ export function TieredExecutionSection({
   };
 
   const writeCrews = (nextCrews: readonly Crew[], nextAssign: CrewAssignments, nextRest: CrewRest = rest) => {
-    updateTieredExecution(serializeCrews(nextCrews, nextAssign, nextRest));
+    const nextConfig = serializeCrews(nextCrews, nextAssign, nextRest);
+    const normalizedNextConfig = normalizeTieredExecution(nextConfig);
+    editableCrewStateRef.current = {
+      acceptedConfigKeys: [normalizedConfigKey, configKey(normalizedNextConfig)],
+      persistedCrewConfigKey: persistedCrewConfigKey(normalizedNextConfig),
+      crews: [...nextCrews],
+      assign: { ...nextAssign },
+      rest: nextRest,
+    };
+    updateTieredExecution(nextConfig);
   };
 
   const finalDifficultyGuard = (difficulty: typeof DIFFICULTIES[number]): string | null => {
@@ -188,7 +225,7 @@ export function TieredExecutionSection({
       : { ...assign, [difficulty]: id };
     setAssignmentError(null);
     setAddCrewPromptOpen(false);
-    setOpenCrewId(deriveTierName(DIFFICULTIES.filter((entry) => nextAssign[entry] === id)));
+    setOpenCrewId(id);
     writeCrews([...crews, crew], nextAssign);
   };
 
@@ -231,6 +268,13 @@ export function TieredExecutionSection({
   };
 
   const handleRemoveWithHeir = (crewId: string, heirId: string) => {
+    const ownedKinds = Object.entries(byKind).filter(([, id]) => id === crewId).map(([kind]) => kind);
+    if (ownedKinds.length > 0) {
+      setRemovePromptCrewId(null);
+      setRemoveError({ crewId, message: 'Move or remove these kind overrides before removing this crew.' });
+      return;
+    }
+
     const nextAssign = { ...assign };
     for (const difficulty of DIFFICULTIES) {
       if (nextAssign[difficulty] === crewId) nextAssign[difficulty] = heirId;
@@ -447,7 +491,7 @@ export function TieredExecutionSection({
                         className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <span className="block font-medium capitalize">{difficulty}</span>
-                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{currentCrew ? crewLabel(currentCrew) : 'unassigned'}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{currentCrew ? `now ${crewLabel(currentCrew)}` : 'unassigned'}</span>
                       </button>
                       {guardMessage && <p className="text-[10px] leading-tight text-destructive">{guardMessage}</p>}
                     </div>
@@ -483,7 +527,7 @@ export function TieredExecutionSection({
               {removePromptCrewId === crew.id && (
                 <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3">
                   <p className="text-xs font-medium text-foreground">
-                    Removing {crewLabel(crew)} — give {ownedDifficulties.join(', ')} to:
+                    Removing {crewLabel(crew)} — give {ownedDifficulties.join(' · ')} to:
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {otherCrews.map((heir) => {
@@ -491,7 +535,7 @@ export function TieredExecutionSection({
                       return <button
                         key={heir.id}
                         type="button"
-                        aria-label={`Give ${ownedDifficulties.join(', ')} to ${crewLabel(heir)}`}
+                        aria-label={`Give ${ownedDifficulties.join(' · ')} to ${crewLabel(heir)}`}
                         onClick={() => handleRemoveWithHeir(crew.id, heir.id)}
                         className="rounded-md border border-border bg-background px-2.5 py-2 text-left text-xs text-foreground hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-primary"
                       >

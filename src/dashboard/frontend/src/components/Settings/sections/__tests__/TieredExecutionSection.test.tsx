@@ -181,6 +181,54 @@ describe('TieredExecutionSection', () => {
     expect(screen.getAllByLabelText('Model').at(-1)?.closest('details')).toHaveAttribute('open');
   });
 
+  it('keeps a new default Haiku crew distinct from an existing Haiku crew after rerender', () => {
+    const onSettingsChange = vi.fn();
+    const formData = baseSettings({
+      tiered_execution: {
+        enabled: true,
+        tiers: {
+          all: {
+            model: 'claude-haiku-4-5',
+            harness: 'claude-code',
+            difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
+          },
+        },
+        by_kind: {},
+        supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+        replay_threshold: 0.5,
+      },
+    });
+    const { rerender } = render(
+      <TieredExecutionSection
+        formData={formData}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '+ Add crew' }));
+    expect(screen.getAllByText('now Claude Haiku 4.5')).toHaveLength(5);
+    fireEvent.click(screen.getByRole('button', { name: 'Assign medium to new crew' }));
+
+    const next = onSettingsChange.mock.calls.at(-1)?.[0] as SettingsConfig;
+    expect(next.tiered_execution?.tiers.medium).toMatchObject({
+      model: 'claude-haiku-4-5',
+      harness: 'claude-code',
+      difficulties: ['medium'],
+    });
+    rerender(
+      <TieredExecutionSection
+        formData={next}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+
+    expect(screen.getAllByText('edit')).toHaveLength(2);
+    const trivialCrew = screen.getByLabelText('crew for trivial') as HTMLSelectElement;
+    const mediumCrew = screen.getByLabelText('crew for medium') as HTMLSelectElement;
+    expect(mediumCrew.value).not.toBe(trivialCrew.value);
+    expect(screen.getAllByText('edit')[1].closest('details')).toHaveAttribute('open');
+  });
+
   it('creates the first crew from the empty roster without teaching the board shortcut in prose', () => {
     const onSettingsChange = vi.fn();
     render(
@@ -270,8 +318,8 @@ describe('TieredExecutionSection', () => {
     expect(row).not.toHaveAttribute('open');
     fireEvent.click(removeButton);
     expect(row).not.toHaveAttribute('open');
-    expect(screen.getByText('Removing 2-model mix — give trivial, simple to:')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Give trivial, simple to Claude Haiku 4.5' }));
+    expect(screen.getByText('Removing 2-model mix — give trivial · simple to:')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Haiku 4.5' }));
 
     expect(onSettingsChange).toHaveBeenCalledTimes(1);
     const next = onSettingsChange.mock.calls[0][0] as SettingsConfig;
@@ -281,6 +329,44 @@ describe('TieredExecutionSection', () => {
     });
     expect(Object.values(next.tiered_execution?.tiers ?? {}).some((tier) => tier.distribution)).toBe(false);
     expect(screen.queryByText('Assign these difficulties to another crew before removing it.')).toBeNull();
+  });
+
+  it('revalidates kind overrides before confirming an open heir prompt', () => {
+    const onSettingsChange = vi.fn();
+    const formData = baseSettings({ tiered_execution: {
+      enabled: true,
+      tiers: {
+        cheap: { model: 'claude-haiku-4-5', harness: 'claude-code', difficulties: ['trivial', 'simple'] },
+        capable: { model: 'claude-sonnet-5', harness: 'claude-code', difficulties: ['medium', 'complex', 'expert'] },
+      },
+      supervisor: { model: 'claude-sonnet-5', harness: 'claude-code', subscribe: 'flagged' },
+      by_kind: {}, replay_threshold: 0.5,
+    } });
+    const { rerender } = render(
+      <TieredExecutionSection formData={formData} onSettingsChange={onSettingsChange} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove crew Claude Haiku 4.5' }));
+    expect(screen.getByText('Removing Claude Haiku 4.5 — give trivial · simple to:')).toBeTruthy();
+
+    rerender(
+      <TieredExecutionSection
+        formData={baseSettings({
+          ...formData,
+          tiered_execution: {
+            ...formData.tiered_execution!,
+            by_kind: { docs: 'cheap' },
+          },
+        })}
+        onSettingsChange={onSettingsChange}
+      />,
+    );
+    onSettingsChange.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Sonnet 5' }));
+    expect(screen.getByText('Move or remove these kind overrides before removing this crew.')).toBeTruthy();
+    expect(screen.queryByText('Removing Claude Haiku 4.5 — give trivial · simple to:')).toBeNull();
+    expect(onSettingsChange).not.toHaveBeenCalled();
   });
 
   it('blocks reassigning the final difficulty from a kind-routed crew', () => {
@@ -343,7 +429,7 @@ describe('TieredExecutionSection', () => {
     const row = summary.closest('details')!;
     fireEvent.click(summary);
     fireEvent.click(within(row).getByRole('button', { name: 'Remove crew' }));
-    expect(screen.getByText('Removing Claude Haiku 4.5 — give trivial, simple to:')).toBeTruthy();
+    expect(screen.getByText('Removing Claude Haiku 4.5 — give trivial · simple to:')).toBeTruthy();
     expect(screen.queryByText('Assign these difficulties to another crew before removing it.')).toBeNull();
     expect(onSettingsChange).not.toHaveBeenCalled();
   });
