@@ -43,6 +43,11 @@ describe('notifyFlywheelOfUatPromote', () => {
       expect.stringContaining('EXCLUDE the merged member(s): PAN-2260, PAN-2294'),
       'uat-promote-notify',
     );
+    expect(d.message).toHaveBeenCalledWith(
+      FLYWHEEL_ORCHESTRATOR_AGENT_ID,
+      expect.stringContaining('only the rows where inPipeline=true'),
+      'uat-promote-notify',
+    );
     expect(d.recordNudge).toHaveBeenCalledWith({
       patrol: 'uat-promote-notify',
       issueId: 'PAN-2260',

@@ -9,12 +9,12 @@ import { resolvePipelineMembership, type IssueLensSignals } from '../../../src/l
 
 const root = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const CONSUMERS = [
-  { name: 'resource-discovery', file: 'src/dashboard/server/services/resource-discovery.ts', delegates: /getPipelineMembershipResultsForProjects/, legacy: /filter\(\(issue\) => !isTerminalTrackerState/ },
+  { name: 'resource-discovery', file: 'src/dashboard/server/services/resource-discovery.ts', delegates: /getPipelineMembershipSnapshotsForResourceDiscovery/, legacy: /filter\(\(issue\) => !isTerminalTrackerState/ },
   { name: 'frontend-pipeline-state', file: 'src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx', delegates: /pipelineMembership(?:\?\.|\.)inPipeline/, legacy: /stateType.*in_progress.*in_review/ },
   { name: 'pan-pending', file: 'src/cli/commands/pending.ts', delegates: /resolvePipelineMembership/, legacy: /const memberIds = new Set\(Object\.values\(allStatuses\)/ },
   { name: 'enumerate-in-flight', file: 'src/lib/reconstruct/enumerate-in-flight.ts', delegates: /resolvePipelineMembership/, legacy: /openIssueIds|FEATURE_DIR_RE/ },
   { name: 'flywheel', file: 'src/lib/cloister/flywheel.ts', delegates: /resolvePipelineMembership/, legacy: /workspacesDir.*feature-/ },
-  { name: 'pipeline-status-skill', file: 'sync-sources/skills/pipeline-status/SKILL.md', delegates: /\/api\/pipeline\/membership/, legacy: /in_progress','in_review/ },
+  { name: 'pipeline-status-skill', file: 'sync-sources/skills/pipeline-status/SKILL.md', delegates: /member_ids = \{m\['issueId'\].*if m\.get\('inPipeline'\) is True\}/, legacy: /in_progress','in_review/ },
 ] as const;
 
 function signals(overrides: Partial<IssueLensSignals>): IssueLensSignals {

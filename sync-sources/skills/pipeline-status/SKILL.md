@@ -189,14 +189,19 @@ PY
 
 ### 2. Add an Awaiting Merge summary line
 
-After the main table, count and list anything with `readyForMerge=true`:
+After the main table, count and list canonical pipeline members with `readyForMerge=true`:
 
 ```bash
-curl -s http://localhost:3011/api/issues | python3 -c "
-import json, sys
-data = json.load(sys.stdin)
+python3 -c "
+import json, subprocess
+data = json.loads(subprocess.check_output(['curl','-s','http://localhost:3011/api/issues']))
+membership = json.loads(subprocess.check_output([
+    'curl','-s','http://localhost:3011/api/pipeline/membership?project=overdeck'
+]))
+member_ids = {m['issueId'].upper() for m in membership if m.get('inPipeline') is True}
 ready = [i for i in data
          if i.get('source')=='github' and i.get('sourceRepo')=='eltmon/overdeck'
+         and (i.get('identifier') or '').upper() in member_ids
          and i.get('readyForMerge') is True
          and (i.get('mergeStatus') or '').lower() != 'merged']
 print(f'\\nAwaiting Merge: {len(ready)} issue(s) ready for human approval')

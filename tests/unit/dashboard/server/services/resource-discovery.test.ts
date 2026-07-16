@@ -31,6 +31,10 @@ vi.mock('../../../../../src/dashboard/server/services/pipeline-membership.js', (
     project: configs[0],
     memberships: await mocks.getPipelineMembershipForProjects(configs),
   }],
+  getPipelineMembershipSnapshotsForResourceDiscovery: async (configs: Array<{ name: string; path: string }>) => [{
+    project: configs[0],
+    memberships: await mocks.getPipelineMembershipForProjects(configs),
+  }],
 }));
 
 vi.mock('../../../../../src/lib/pipeline-membership-gather.js', () => ({

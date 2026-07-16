@@ -21,7 +21,7 @@ import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
 import { resolveAgentGitInfo } from './git-info.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
-import { getPipelineMembershipResultsForProjects } from './pipeline-membership.js';
+import { getPipelineMembershipSnapshotsForResourceDiscovery } from './pipeline-membership.js';
 
 const execFileAsync = promisify(execFile);
 const RESOURCE_DISCOVERY_TTL_MS = 30_000;
@@ -742,7 +742,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   const memberships = new Map<string, PipelineMembership>();
-  const projectMemberships = await getPipelineMembershipResultsForProjects(projects.map((project) => project.config));
+  const projectMemberships = await getPipelineMembershipSnapshotsForResourceDiscovery(projects.map((project) => project.config));
   for (const result of projectMemberships) {
     for (const membership of result.memberships ?? []) {
       ensureIssue(membership.issueId);

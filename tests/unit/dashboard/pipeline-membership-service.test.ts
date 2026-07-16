@@ -5,7 +5,9 @@ import {
   getPipelineMembershipForProjects,
   getPipelineMembershipResultsForProjects,
   getPipelineMembershipSnapshotsForProjects,
+  getPipelineMembershipSnapshotsForResourceDiscovery,
   PIPELINE_MEMBERSHIP_TTL_MS,
+  PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS,
   summarizePipelineMembership,
 } from '../../../src/dashboard/server/services/pipeline-membership.js';
 
@@ -110,7 +112,21 @@ describe('pipeline membership service', () => {
     await Promise.resolve();
     expect(getPipelineMembershipSnapshotsForProjects([project], getMembership)[0]?.memberships).toEqual([{ issueId: 'PAN-1' }]);
 
-    await vi.advanceTimersByTimeAsync(PIPELINE_MEMBERSHIP_TTL_MS + 1);
+    await vi.advanceTimersByTimeAsync(PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS + 1);
     expect(getPipelineMembershipSnapshotsForProjects([project], getMembership)[0]?.memberships).toEqual([{ issueId: 'PAN-1' }]);
+  });
+
+  it('does not recrawl membership on repeated 30-second resource refreshes', async () => {
+    const project = { name: 'resources', path: '/resources', github_repo: 'owner/resources' };
+    const getMembership = vi.fn().mockResolvedValue([{ issueId: 'PAN-1' }]);
+
+    await expect(getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership))
+      .resolves.toEqual([{ project, memberships: [{ issueId: 'PAN-1' }] }]);
+    await vi.advanceTimersByTimeAsync(30_001);
+    await getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership);
+    await vi.advanceTimersByTimeAsync(30_001);
+    await getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership);
+
+    expect(getMembership).toHaveBeenCalledOnce();
   });
 });
