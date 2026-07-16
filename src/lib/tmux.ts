@@ -590,13 +590,36 @@ export function exactPaneTarget(name: string): string {
   return `=${name}:`;
 }
 
-export function sessionExistsSync(name: string): boolean {
+export type SessionQueryResult =
+  | { status: 'exists' }
+  | { status: 'missing'; detail: string }
+  | { status: 'error'; detail: string };
+
+function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { status: 'exists' }> {
+  const error = cause as NodeJS.ErrnoException & { stderr?: string | Buffer; status?: number };
+  const stderr = String(error.stderr ?? '').trim();
+  const detail = [
+    `exit=${error.status ?? 'unknown'}`,
+    error.code ? `code=${error.code}` : '',
+    stderr ? `stderr=${stderr}` : '',
+    error.message ? `message=${error.message}` : '',
+  ].filter(Boolean).join(' ');
+  return error.status === 1 && /can't find session:/i.test(stderr)
+    ? { status: 'missing', detail }
+    : { status: 'error', detail };
+}
+
+export function querySessionSync(name: string): SessionQueryResult {
   try {
-    tmuxExecSync(['has-session', '-t', exactSession(name)], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
+    tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
+    return { status: 'exists' };
+  } catch (cause) {
+    return sessionQueryFailure(cause);
   }
+}
+
+export function sessionExistsSync(name: string): boolean {
+  return querySessionSync(name).status === 'exists';
 }
 
 
@@ -1026,6 +1049,21 @@ export const sessionExists = (
       }
     },
     catch: (cause) => toTmuxError('session-exists', cause),
+  });
+
+export const querySession = (
+  name: string,
+): Effect.Effect<SessionQueryResult, TmuxError> =>
+  Effect.tryPromise({
+    try: async () => {
+      try {
+        await tmuxExecAsync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
+        return { status: 'exists' } as const;
+      } catch (cause) {
+        return sessionQueryFailure(cause);
+      }
+    },
+    catch: (cause) => toTmuxError('query-session', cause),
   });
 
 export const createSession = (
