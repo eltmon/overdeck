@@ -52,21 +52,21 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T20:47:37.505Z",
+  "updated": "2026-07-16T20:52:48.823Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:47:37.467Z",
+    "updatedAt": "2026-07-16T20:52:48.808Z",
     "reviewNotes": "Degraded sync-main timeout can spawn against a workspace still being mutated",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
+    "lastVerifiedCommit": "5c805146dafd9378c79a81eba4889b415f9e7eb4",
     "reviewRequestedAt": "2026-07-16T19:36:58.340Z",
     "reviewSpawnedAt": "2026-07-16T19:37:06.432Z",
     "strikeRecoveryCount": 0
@@ -140,9 +140,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3644179,
-            "output": 389004,
-            "cacheRead": 76574720,
+            "input": 3649639,
+            "output": 390214,
+            "cacheRead": 77287424,
             "cacheWrite": 0
           }
         }
@@ -161,9 +161,9 @@
           "cacheWrite": 165841
         },
         "openai/gpt-5.6-sol": {
-          "input": 5843899,
-          "output": 466280,
-          "cacheRead": 86888960,
+          "input": 5849359,
+          "output": 467490,
+          "cacheRead": 87601664,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -174,8 +174,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 94.844887,
-        "pricingAsOf": "2026-07-16T20:47:37.491Z"
+        "usd": 95.264839,
+        "pricingAsOf": "2026-07-16T20:52:48.814Z"
       }
     },
     "merges": [
