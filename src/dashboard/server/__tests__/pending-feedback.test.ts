@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import {
   enqueuePendingFeedbackDelivery,
   markPendingFeedbackDelivered,
+  markPendingFeedbackTransportDelivered,
   processPendingFeedbackDeliveries,
 } from '../pending-feedback.js';
 
@@ -194,6 +195,21 @@ describe('pending feedback recovery (PAN-585)', () => {
     const stored = JSON.parse(await readFile(queueFile, 'utf-8'));
     expect(stored.deliveries).toHaveLength(1);
     expect(stored.deliveries[0].issueId).toBe('PAN-586');
+  });
+
+  it('records immediate transport success before mailbox persistence completes', async () => {
+    queueFile = await setupQueueFile();
+    await enqueuePendingFeedbackDelivery({
+      issueId: 'PAN-585', role: 'work', kind: 'review-blocked', filePath: '/tmp/a.md',
+      message: 'first', createdAt: '2026-04-27T06:00:00Z',
+    }, { filePath: queueFile });
+
+    await markPendingFeedbackTransportDelivered('PAN-585', 'review-blocked', {
+      filePath: queueFile, at: '2026-04-27T06:01:00Z',
+    });
+
+    const stored = JSON.parse(await readFile(queueFile, 'utf8'));
+    expect(stored.deliveries[0].transportDeliveredAt).toBe('2026-04-27T06:01:00Z');
   });
 
   it('normalizes legacy queue entries without a role before replay', async () => {

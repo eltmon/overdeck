@@ -65,7 +65,29 @@ const mailboxReadCache = new Map<string, {
   content: string;
   parsed: ReturnType<typeof parseMailboxMarkdown>;
 }>();
+const mailboxDirectoryCache = new Map<string, { mtimeMs: number; filenames: string[] }>();
+const MAILBOX_READ_CACHE_MAX_ENTRIES = 512;
+const MAILBOX_DIRECTORY_CACHE_MAX_ENTRIES = 128;
 const MAILBOX_FILE_READ_CONCURRENCY = 8;
+
+function setBoundedCache<K, V>(cache: Map<K, V>, key: K, value: V, maxEntries: number): void {
+  cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > maxEntries) cache.delete(cache.keys().next().value!);
+}
+
+export function getMailboxCacheSizesForTests(): { files: number; directories: number } {
+  return { files: mailboxReadCache.size, directories: mailboxDirectoryCache.size };
+}
+
+export function resetMailboxCachesForTests(): void {
+  mailboxReadCache.clear();
+  mailboxDirectoryCache.clear();
+}
+
+export function hasActionableMailboxItems(items: Pick<MailboxItem, 'state' | 'actionRequired'>[]): boolean {
+  return items.some(item => item.state === 'pending' || (item.state === 'delivered' && item.actionRequired));
+}
 
 interface MailboxFeedbackFile {
   filename: string;
@@ -162,17 +184,42 @@ async function readMailboxFeedback(workspacePath: string): Promise<MailboxFeedba
   const feedbackDir = getReadableWorkspacePanPaths(workspacePath).feedbackDir;
   let filenames: string[];
   try {
-    filenames = (await readdir(feedbackDir, { withFileTypes: true }))
-      .filter(entry => entry.isFile() && NUMBERED_FEEDBACK.test(entry.name))
-      .map(entry => entry.name)
-      .sort();
+    const directoryStat = await stat(feedbackDir);
+    const cachedDirectory = mailboxDirectoryCache.get(feedbackDir);
+    if (cachedDirectory?.mtimeMs === directoryStat.mtimeMs) {
+      filenames = cachedDirectory.filenames;
+      setBoundedCache(mailboxDirectoryCache, feedbackDir, cachedDirectory, MAILBOX_DIRECTORY_CACHE_MAX_ENTRIES);
+    } else {
+      filenames = (await readdir(feedbackDir, { withFileTypes: true }))
+        .filter(entry => entry.isFile() && NUMBERED_FEEDBACK.test(entry.name))
+        .map(entry => entry.name)
+        .sort();
+      setBoundedCache(
+        mailboxDirectoryCache,
+        feedbackDir,
+        { mtimeMs: directoryStat.mtimeMs, filenames },
+        MAILBOX_DIRECTORY_CACHE_MAX_ENTRIES,
+      );
+    }
   } catch {
+    mailboxDirectoryCache.delete(feedbackDir);
     return [];
   }
 
   const livePaths = new Set(filenames.map(filename => join(feedbackDir, filename)));
   for (const path of mailboxReadCache.keys()) {
     if (path.startsWith(`${feedbackDir}/`) && !livePaths.has(path)) mailboxReadCache.delete(path);
+  }
+
+  const indexedResults = filenames.map(filename => {
+    const path = join(feedbackDir, filename);
+    const cached = mailboxReadCache.get(path);
+    if (!cached) return null;
+    setBoundedCache(mailboxReadCache, path, cached, MAILBOX_READ_CACHE_MAX_ENTRIES);
+    return { filename, path, content: cached.content, parsed: cached.parsed };
+  });
+  if (indexedResults.every((result): result is MailboxFeedbackFile => result !== null)) {
+    return indexedResults;
   }
 
   const results = new Array<MailboxFeedbackFile>(filenames.length);
@@ -187,7 +234,9 @@ async function readMailboxFeedback(workspacePath: string): Promise<MailboxFeedba
       if (!cached || cached.mtimeMs !== fileStat.mtimeMs || cached.size !== fileStat.size) {
         const content = await readFile(path, 'utf8');
         cached = { mtimeMs: fileStat.mtimeMs, size: fileStat.size, content, parsed: parseMailboxMarkdown(content) };
-        mailboxReadCache.set(path, cached);
+        setBoundedCache(mailboxReadCache, path, cached, MAILBOX_READ_CACHE_MAX_ENTRIES);
+      } else {
+        setBoundedCache(mailboxReadCache, path, cached, MAILBOX_READ_CACHE_MAX_ENTRIES);
       }
       results[index] = { filename, path, content: cached.content, parsed: cached.parsed };
     }

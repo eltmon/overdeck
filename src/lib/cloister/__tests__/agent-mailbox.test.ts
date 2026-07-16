@@ -11,11 +11,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('../../projects.js', () => ({ resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync }));
 import {
   createMailboxItem,
+  getMailboxCacheSizesForTests,
   listMailboxItems,
   markMailboxItemAcknowledged,
   markMailboxItemDelivered,
   parseMailboxMarkdown,
   renderMailboxItem,
+  resetMailboxCachesForTests,
 } from '../agent-mailbox.js';
 import { registerMailboxStatusReader } from '../mailbox-status-source.js';
 
@@ -26,6 +28,7 @@ describe('agent mailbox', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     registerMailboxStatusReader(issueId => mocks.getReviewStatusSync(issueId));
+    resetMailboxCachesForTests();
     workspacePath = await mkdtemp(join(tmpdir(), 'agent-mailbox-'));
     feedbackDir = join(workspacePath, '.pan', 'feedback');
     await mkdir(feedbackDir, { recursive: true });
@@ -99,5 +102,17 @@ describe('agent mailbox', () => {
       state: 'acknowledged', deliveredAt: '2026-07-16T12:01:00Z', acknowledgedAt: '2026-07-16T12:03:00Z',
     });
     expect(parsed.markdownBody).toContain('# Tests failed\n\nKeep this readable.');
+  });
+
+  it('bounds cache retention independently of retired workspace rescans', async () => {
+    for (let index = 0; index < 520; index += 1) {
+      const filePath = join(feedbackDir, `${String(index).padStart(3, '0')}-review-agent-changes-requested.md`);
+      await writeFile(filePath, '# Review blocked');
+    }
+    mocks.getReviewStatusSync.mockReturnValue({ reviewStatus: 'blocked' });
+
+    await listMailboxItems({ issueId: 'PAN-2255', role: 'work', workspacePath });
+
+    expect(getMailboxCacheSizesForTests()).toEqual({ files: 512, directories: 1 });
   });
 });

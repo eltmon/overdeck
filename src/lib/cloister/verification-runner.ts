@@ -195,7 +195,11 @@ async function deliverVerificationFeedback(
     // with a completed handoff is re-driven, not silently queued mail.
     await messageAgent(target.agentId, message, 'internal', { owesRework: true });
     if (typeof details.feedbackPath === 'string') {
-      await markMailboxItemDelivered({ issueId, role: 'work', filePath: details.feedbackPath });
+      try {
+        await markMailboxItemDelivered({ issueId, role: 'work', filePath: details.feedbackPath });
+      } catch (error) {
+        console.warn(`[${logPrefix}] Verification feedback reached ${target.agentId}, but mailbox state update failed for ${issueId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     console.log(`[${logPrefix}] Sent verification feedback for ${issueId} to ${target.agentId}`);
     return;

@@ -122,6 +122,19 @@ export async function markPendingFeedbackDelivered(
   await writeStore(filePath, { deliveries: next });
 }
 
+export async function markPendingFeedbackTransportDelivered(
+  issueId: string,
+  kind: FeedbackKind,
+  options?: { filePath?: string; at?: string },
+): Promise<void> {
+  const filePath = options?.filePath ?? PENDING_FEEDBACK_FILE;
+  const store = await readStore(filePath);
+  const delivery = store.deliveries.find(item => item.issueId === issueId && item.kind === kind);
+  if (!delivery || delivery.transportDeliveredAt) return;
+  delivery.transportDeliveredAt = options?.at ?? new Date().toISOString();
+  await writeStore(filePath, store);
+}
+
 export async function processPendingFeedbackDeliveries(options?: {
   filePath?: string;
   staleThresholdMs?: number;
