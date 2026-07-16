@@ -140,6 +140,15 @@ it('does not overlap interval ticks while an evaluation is pending', async () =>
   await vi.advanceTimersByTimeAsync(0);
 });
 
+it('stops future interval ticks', async () => {
+  startStaleCheckRetriggerService();
+  stopStaleCheckRetriggerService();
+
+  await vi.advanceTimersByTimeAsync(2 * 60_000);
+
+  expect(mocks.candidates).not.toHaveBeenCalled();
+});
+
 it('prunes issue throttles when candidates disappear', async () => {
   await __tickOnceForTests();
   mocks.candidates.mockReturnValue([]);
