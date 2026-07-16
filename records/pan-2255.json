@@ -102,17 +102,19 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T07:04:02.788Z",
+  "updated": "2026-07-16T07:05:29.561Z",
   "pipeline": {
     "issueId": "PAN-2255",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:00:09.637Z",
+    "updatedAt": "2026-07-16T07:05:29.509Z",
+    "reviewNotes": "Verification failed at test",
+    "verificationNotes": "Verification FAILED at test (211883ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255\n\nNo test files found, exiting with code 0\n\n ❯ |root| tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts (4 tests | 1 failed) 57ms\n     × surfaces needs-you instead of falling back silently when no target is resolved 3ms (retry x1)\nstdout | tests/unit/lib/cloister/ci-failure-feedback.test.ts > relayCiFailureFeedback > debounces duplicate feedback for the same head SHA\n[ci-failure-feedback] Skipping duplicate feedback for PAN-1801 @ abc123de\n\nstdout | tests/unit/lib/cloister/ci-failure-feedback.test.ts > relayCiFailureFeedback > debounces duplicate feedback for the same head SHA\n[ci-failure-feedback] Skipping duplicate feedback for PAN-1801 @ abc123de\n\n ❯ |root| tests/unit/lib/cloister/ci-failure-feedback.test.ts (8 tests | 6 failed) 28ms\n     × writes feedback and messages the work agent 17ms (retry x1)\n     × debounces duplicate feedback for the same head SHA 2ms (retry x1)\n     × skips feedback when no work agent exists 3ms (retry x1)\n     × skips feedback for non-work agent roles 2ms (retry x1)\n     × still messages the agent when gh log fetch fails 2ms (retry x1)\n     × includes a status source even when no failing run is found 1ms (retry x1)\n\n Test Files  2 failed | 371 passed | 2 skipped (375)\n      Tests  7 failed | 3435 passed | 20 skipped (3469)\n   Start at  03:03:45\n   Duration  103.90s (transform 1.41s, setup 5.56s, import 200.55s, tests 175.33s, environment 24ms)\n\n\n--- stderr ---\ninclude: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/src/dashboard/frontend/src/**/__tests__/**/*.test.{ts,tsx}, /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/src/dashboard/frontend/src/**/*.{test,spec}.{ts,tsx}\nexclude:  **/node_modules/**, **/dist/**, **/tests/**\n\nstderr | tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts > swarm verdict feedback routing > surfaces needs-you instead of falling back silently when no target is resolved\n[review-verdict-feedback] No live feedback target for PAN-2203 for item wi-c; issue-role mailbox remains pending\n\nstderr | tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts > swarm verdict feedback routing > surfaces needs-you instead of falling back silently when no target is resolved\n[review-verdict-feedback] No live feedback target for PAN-2203 for item wi-c; issue-role mailbox remains pending\n\nstderr | tests/unit/lib/cloister/ci-failure-feedback.test.ts > relayCiFailureFeedback > writes feedback and m\n…(15007 chars elided)…\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/14]⎯\n\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts > swarm verdict feedback routing > surfaces needs-you instead of falling back silently when no target is resolved\n FAIL  |root| tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts > swarm verdict feedback routing > surfaces needs-you instead of falling back silently \n...(truncated)",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
     "reviewRequestedAt": "2026-07-16T07:00:08.608Z",
@@ -129,9 +131,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 32464009,
-            "output": 37695,
-            "cacheRead": 32108544,
+            "input": 34471494,
+            "output": 48042,
+            "cacheRead": 33878784,
             "cacheWrite": 0
           }
         },
@@ -160,9 +162,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 32464009,
-          "output": 37695,
-          "cacheRead": 32108544,
+          "input": 34471494,
+          "output": 48042,
+          "cacheRead": 33878784,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -179,8 +181,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 19.626607,
-        "pricingAsOf": "2026-07-16T07:00:09.754Z"
+        "usd": 22.008362,
+        "pricingAsOf": "2026-07-16T07:05:29.553Z"
       }
     },
     "merges": [
