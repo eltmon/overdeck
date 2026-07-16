@@ -117,9 +117,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T13:43:12.861Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T13:45Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T13:45:43.567Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T13:45:43Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2702\n\n# Review Synthesis — PAN-2702 — 2026-07-16T13:45:00Z\n\n## Verdict: CHANGES REQUESTED — queued strike completion leaves durable state stale, and inline landing can stall the Deacon patrol\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-901c5a97/context.json`\n- Branch: `feature/pan-2702`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702`\n- HEAD reviewed: `901c5a97634225143beb5fd5a8136ec25d07d11a`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-901c5a97/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-901c5a97/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-901c5a97/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-901c5a97/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Queued strike success never consumes the durable marker — `src/lib/cloister/deacon-strike-landing.ts:103`\nThe patrol changes the strike lifecycle to `landing`, accepts a `queued` merge result as in progress, and returns. When the persistent merge queue later invokes `triggerMerge` and the strike merges successfully, that path does not set `strikeLandingState` to `landed` or clear `strikeReadyHead` and `strikeReadyAt`. Later patrols only select `ready` candidates and skip already-merged issues, so the durable marker remains permanently stale. Reconcile strike lifecycle state at the canonical merge-completion point and cover the queued-success path with a focused test.\n\n### [performance] Strike landing can block the entire Deacon patrol for 30 minutes — `src/lib/cloister/deacon.ts:3088`\n`runPatrol` awaits `patrolStrikeLandings`, which serially awaits the full merge workflow for each ready strike. A strike that needs rebasing enters the existing five-second polling loop for up to 30 minutes, delaying swarm coordination and all later patrol work; multiple ready strikes compound the delay. Keep patrol work bounded to claiming and enqueuing landing work, run the merge operation under independently supervised bounded concurrency, and persist completion or failure through the existing strike lifecycle.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-901c5a97/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2702 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -198,7 +211,7 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T13:43:12.862Z",
+  "updated": "2026-07-16T13:45:43.567Z",
   "pipeline": {
     "issueId": "PAN-2702",
     "reviewStatus": "reviewing",
