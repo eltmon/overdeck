@@ -17,18 +17,18 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:23:37.629Z",
+  "updated": "2026-07-16T18:24:01.266Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:23:37.512Z",
-    "inspectNotes": "Inspection error for bead switch-happy-dom: tmux session inspect-pan-2045-switch-happy-dom exited before producing a verdict. No verdict was produced.",
+    "updatedAt": "2026-07-16T18:24:01.070Z",
+    "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -52,9 +52,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 775653,
-            "output": 22025,
-            "cacheRead": 11042816,
+            "input": 789489,
+            "output": 23993,
+            "cacheRead": 11896832,
             "cacheWrite": 0
           }
         }
@@ -73,15 +73,15 @@
           "cacheWrite": 165070
         },
         "openai/gpt-5.6-sol": {
-          "input": 775653,
-          "output": 22025,
-          "cacheRead": 11042816,
+          "input": 789489,
+          "output": 23993,
+          "cacheRead": 11896832,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.917946,
-        "pricingAsOf": "2026-07-16T18:23:37.603Z"
+        "usd": 18.473174,
+        "pricingAsOf": "2026-07-16T18:24:01.217Z"
       }
     },
     "merges": [],
