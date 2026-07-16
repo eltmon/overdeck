@@ -478,7 +478,7 @@ export async function buildAgentLaunchConfig(opts: {
     ? await getOhmypiLauncherFields(opts.agentId, model)
     : {};
   const codexLauncherFields = behavior.usesCodexHome
-    ? getCodexLauncherFields(opts.agentId, model, opts.workspace)
+    ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {

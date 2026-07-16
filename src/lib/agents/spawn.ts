@@ -253,7 +253,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? await getOhmypiLauncherFields(agentId, selectedModel)
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
-    ? getCodexLauncherFields(agentId, selectedModel, workspace)
+    ? getCodexLauncherFields(agentId, selectedModel, workspace, role)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,

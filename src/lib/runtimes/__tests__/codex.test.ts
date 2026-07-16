@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -124,6 +124,7 @@ describe('initCodexHome', () => {
     // nudge that freezes an unattended pipeline agent's pane.
     expect(config).toContain('[notice]')
     expect(config).toContain('hide_rate_limit_model_nudge = true')
+    expect(config).not.toContain('[mcp_servers')
   })
 
   it('pre-seeds folder trust and autonomy so the TUI skips its first-run wizard', () => {
@@ -141,6 +142,57 @@ describe('initCodexHome', () => {
     // it suppresses the wizard on a fresh per-agent CODEX_HOME.
     expect(config).toContain('[projects."/home/eltmon/Projects/overdeck"]')
     expect(config).toContain('trust_level = "trusted"')
+  })
+
+  it('writes stdio MCP servers with escaped args, environment, and quoted names', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp')
+    initCodexHome(codexDir, {
+      mcpServers: {
+        playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@0.0.78'] },
+        'quoted.server': {
+          type: 'stdio',
+          command: 'path\\to"command',
+          args: ['arg\\with"quotes'],
+          env: { 'API"KEY': 'value\\path' },
+        },
+      },
+    })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).toContain('[mcp_servers.playwright]\ncommand = "npx"\nargs = ["-y", "@playwright/mcp@0.0.78"]')
+    expect(config).toContain('[mcp_servers."quoted.server"]')
+    expect(config).toContain('command = "path\\\\to\\"command"')
+    expect(config).toContain('args = ["arg\\\\with\\"quotes"]')
+    expect(config).toContain('env = { "API\\"KEY" = "value\\\\path" }')
+  })
+
+  it('omits unsupported MCP servers and warns with their name', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp-unsupported')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    initCodexHome(codexDir, { mcpServers: { remote: { type: 'http', command: 'proxy' } } })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).not.toContain('[mcp_servers')
+    expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "remote" — only stdio command servers are provisioned into codex config')
+    warn.mockRestore()
+  })
+
+  it('rejects mutable npx MCP package selectors', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp-mutable')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    initCodexHome(codexDir, {
+      mcpServers: { playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@latest'] } },
+    })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).not.toContain('[mcp_servers.playwright]')
+    expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "playwright" — npx MCP packages must use an exact immutable version')
+    warn.mockRestore()
   })
 
   it('symlinks auth.json to the global ~/.codex so all agents share one token family (PAN-2285)', () => {

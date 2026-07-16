@@ -66,6 +66,9 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
   (`src/lib/cost-parsers/codex-parser.ts`).
 - Native AGENTS.md and Claude-Code-compatible skills; `pan sync` distributes
   context layers and skills to it like any other harness.
+- Role-declared MCP servers, such as Playwright for the `test` role, are
+  provisioned as `[mcp_servers.<name>]` entries in the per-agent Codex config
+  so browser UAT can run on Codex.
 
 ## Installing oh-my-pi
 
