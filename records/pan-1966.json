@@ -221,20 +221,20 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T13:13:51.619Z",
+  "updated": "2026-07-16T13:19:04.174Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T13:13:51.566Z",
+    "updatedAt": "2026-07-16T13:19:04.130Z",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
-    "lastVerifiedCommit": "d1119d505551c0cc7d459e4e8fc741d325a35a19",
+    "lastVerifiedCommit": "734d83a23600637843861e355ed37feec021f755",
     "reviewSpawnedAt": "2026-07-16T13:13:06.051Z"
   },
   "closeOut": {
@@ -242,15 +242,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 6164623,
-            "output": 12869,
-            "cacheRead": 5502720,
+            "input": 6463176,
+            "output": 13290,
+            "cacheRead": 5781632,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 69016850,
-            "output": 125632,
-            "cacheRead": 67340032,
+            "input": 75258136,
+            "output": 141873,
+            "cacheRead": 73292544,
             "cacheWrite": 0
           }
         },
@@ -273,15 +273,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 6164623,
-          "output": 12869,
-          "cacheRead": 5502720,
+          "input": 6463176,
+          "output": 13290,
+          "cacheRead": 5781632,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 69016850,
-          "output": 125632,
-          "cacheRead": 67340032,
+          "input": 75258136,
+          "output": 141873,
+          "cacheRead": 73292544,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -298,8 +298,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 54.071873000000004,
-        "pricingAsOf": "2026-07-16T13:13:51.613Z"
+        "usd": 58.979229000000004,
+        "pricingAsOf": "2026-07-16T13:19:04.166Z"
       }
     },
     "merges": [
