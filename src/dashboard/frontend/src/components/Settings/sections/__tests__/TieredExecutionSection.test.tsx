@@ -255,6 +255,12 @@ describe('TieredExecutionSection', () => {
       harness: 'claude-code',
       difficulties: ['trivial', 'simple', 'medium', 'complex', 'expert'],
     });
+    expect(next.tiered_execution?.supervisor).toEqual({
+      model: 'claude-sonnet-5',
+      harness: 'claude-code',
+      subscribe: 'flagged',
+      owns_inspection: true,
+    });
   });
 
   it('disables a roster difficulty that would strand a kind override', () => {

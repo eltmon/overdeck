@@ -223,10 +223,19 @@ export function TieredExecutionSection({
     const nextAssign = difficulty === null || crews.length === 0
       ? Object.fromEntries(DIFFICULTIES.map((entry) => [entry, id])) as CrewAssignments
       : { ...assign, [difficulty]: id };
+    const nextRest: CrewRest = rest.supervisor ? rest : {
+      ...rest,
+      supervisor: {
+        model: DEFAULT_SUPERVISOR_MODEL,
+        harness: 'claude-code',
+        subscribe: 'flagged',
+        owns_inspection: true,
+      },
+    };
     setAssignmentError(null);
     setAddCrewPromptOpen(false);
     setOpenCrewId(id);
-    writeCrews([...crews, crew], nextAssign);
+    writeCrews([...crews, crew], nextAssign, nextRest);
   };
 
   const handleAssignment = (difficulty: typeof DIFFICULTIES[number], crewId: string) => {
