@@ -10,8 +10,36 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/cli/commands/start-prep-progress.ts",
+      "src/cli/commands/start.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "sync-sources/skills/pan-start/SKILL.md",
+      "tests/unit/cli/start-prep-progress.test.ts",
+      "tests/unit/cli/start-prep-wiring.test.ts",
+      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+    ],
+    "actualChangedFiles": [
+      "scripts/file-size-baseline.txt",
+      "src/cli/commands/start-prep-progress.ts",
+      "src/cli/commands/start.ts",
+      "src/lib/cloister/merge-agent.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "sync-sources/skills/pan-start/SKILL.md",
+      "tests/unit/cli/start-prep-progress.test.ts",
+      "tests/unit/cli/start-prep-wiring.test.ts",
+      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+    ],
+    "recordedAt": "2026-07-16T19:36:56.017Z"
+  },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T19:36:56.018Z",
+  "updated": "2026-07-16T19:36:59.450Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "pending",
@@ -21,8 +49,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:26:36.120Z",
+    "updatedAt": "2026-07-16T19:36:59.302Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -44,11 +73,19 @@
             "cacheWrite": 165841
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 93,
+            "cacheRead": 28449,
+            "cacheWrite": 90987
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 534193,
-            "output": 35482,
-            "cacheRead": 6123520,
+            "input": 1874932,
+            "output": 156772,
+            "cacheRead": 40151552,
             "cacheWrite": 0
           }
         }
@@ -66,23 +103,31 @@
           "cacheRead": 4109255,
           "cacheWrite": 165841
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 93,
+          "cacheRead": 28449,
+          "cacheWrite": 90987
+        },
         "openai/gpt-5.6-sol": {
-          "input": 534193,
-          "output": 35482,
-          "cacheRead": 6123520,
+          "input": 1874932,
+          "output": 156772,
+          "cacheRead": 40151552,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.755606,
-        "pricingAsOf": "2026-07-16T18:26:36.334Z"
+        "usd": 42.346108,
+        "pricingAsOf": "2026-07-16T19:36:59.416Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2803"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 8,
     "claims": {},
@@ -171,33 +216,5 @@
     "docs-pan-start-prep": "completed",
     "docs-pan-start-prep.docs-pan-start-prep.ac1": "completed",
     "docs-pan-start-prep.docs-pan-start-prep.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt",
-      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "src/cli/commands/start-prep-progress.ts",
-      "src/cli/commands/start.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "sync-sources/skills/pan-start/SKILL.md",
-      "tests/unit/cli/start-prep-progress.test.ts",
-      "tests/unit/cli/start-prep-wiring.test.ts",
-      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
-    ],
-    "actualChangedFiles": [
-      "scripts/file-size-baseline.txt",
-      "src/cli/commands/start-prep-progress.ts",
-      "src/cli/commands/start.ts",
-      "src/lib/cloister/merge-agent.ts",
-      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
-      "sync-sources/skills/pan-start/SKILL.md",
-      "tests/unit/cli/start-prep-progress.test.ts",
-      "tests/unit/cli/start-prep-wiring.test.ts",
-      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
-    ],
-    "recordedAt": "2026-07-16T19:36:56.017Z"
   }
 }
