@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:07:27.599Z",
+  "updated": "2026-07-16T18:10:17.438Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "issueoverview-inline-error": {
-        "writerId": "agent-pan-2773",
-        "agentId": "agent-pan-2773",
-        "pid": 3325557,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:07:27.599Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2773",
@@ -127,6 +119,17 @@
         "outcome": "completed",
         "reason": "ProjectHome now tracks launch busy/error state, prevents duplicate in-flight submissions, renders server creation errors inline while retaining the query, clears errors on retry, and opens panes only after successful creation. Eight focused tests and typecheck passed.",
         "releasedAt": "2026-07-16T18:07:21.978Z"
+      },
+      {
+        "writerId": "agent-pan-2773",
+        "agentId": "agent-pan-2773",
+        "pid": 3325557,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:07:27.599Z",
+        "itemId": "issueoverview-inline-error",
+        "outcome": "completed",
+        "reason": "IssueOverview now tracks launch busy/error state, suppresses duplicate in-flight submissions, renders server errors inline while retaining the query, clears errors on retry, and opens panes only for successful creation. Three focused tests and typecheck passed.",
+        "releasedAt": "2026-07-16T18:10:17.438Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "projecthome-inline-error": {
         "reason": "ProjectHome now tracks launch busy/error state, prevents duplicate in-flight submissions, renders server creation errors inline while retaining the query, clears errors on retry, and opens panes only after successful creation. Eight focused tests and typecheck passed.",
         "updatedAt": "2026-07-16T18:07:21.978Z"
+      },
+      "issueoverview-inline-error": {
+        "reason": "IssueOverview now tracks launch busy/error state, suppresses duplicate in-flight submissions, renders server errors inline while retaining the query, clears errors on retry, and opens panes only for successful creation. Three focused tests and typecheck passed.",
+        "updatedAt": "2026-07-16T18:10:17.438Z"
       }
     }
   },
@@ -158,6 +165,9 @@
     "projecthome-inline-error.projecthome-inline-error.ac1": "completed",
     "projecthome-inline-error.projecthome-inline-error.ac2": "completed",
     "projecthome-inline-error.projecthome-inline-error.ac3": "completed",
-    "issueoverview-inline-error": "running"
+    "issueoverview-inline-error": "completed",
+    "issueoverview-inline-error.issueoverview-inline-error.ac1": "completed",
+    "issueoverview-inline-error.issueoverview-inline-error.ac2": "completed",
+    "issueoverview-inline-error.issueoverview-inline-error.ac3": "completed"
   }
 }
