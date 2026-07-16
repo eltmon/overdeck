@@ -15,7 +15,7 @@ mcpServers:
       command: npx
       args:
         - "-y"
-        - "@playwright/mcp@latest"
+        - "@playwright/mcp@0.0.78"
 ---
 Test role body.
 `;
@@ -49,7 +49,7 @@ describe('parseRoleMcpServersSync', () => {
       playwright: {
         type: 'stdio',
         command: 'npx',
-        args: ['-y', '@playwright/mcp@latest'],
+        args: ['-y', '@playwright/mcp@0.0.78'],
       },
     });
   });
@@ -86,7 +86,7 @@ describe('parseRoleMcpServersSync', () => {
     const config = readFileSync(join(fields.codexHome, 'config.toml'), 'utf8');
     expect(config).toContain('[mcp_servers.playwright]');
     expect(config).toContain('command = "npx"');
-    expect(config).toContain('args = ["-y", "@playwright/mcp@latest"]');
+    expect(config).toContain('args = ["-y", "@playwright/mcp@0.0.78"]');
   });
 
   it('writes no MCP section for a role without declared servers', () => {

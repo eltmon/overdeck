@@ -148,7 +148,7 @@ describe('initCodexHome', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-mcp')
     initCodexHome(codexDir, {
       mcpServers: {
-        playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@latest'] },
+        playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@0.0.78'] },
         'quoted.server': {
           command: 'path\\to"command',
           args: ['arg\\with"quotes'],
@@ -159,7 +159,7 @@ describe('initCodexHome', () => {
 
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
-    expect(config).toContain('[mcp_servers.playwright]\ncommand = "npx"\nargs = ["-y", "@playwright/mcp@latest"]')
+    expect(config).toContain('[mcp_servers.playwright]\ncommand = "npx"\nargs = ["-y", "@playwright/mcp@0.0.78"]')
     expect(config).toContain('[mcp_servers."quoted.server"]')
     expect(config).toContain('command = "path\\\\to\\"command"')
     expect(config).toContain('args = ["arg\\\\with\\"quotes"]')
@@ -176,6 +176,21 @@ describe('initCodexHome', () => {
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
     expect(config).not.toContain('[mcp_servers')
     expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "remote" — only stdio command servers are provisioned into codex config')
+    warn.mockRestore()
+  })
+
+  it('rejects mutable npx MCP package selectors', () => {
+    const codexDir = join(ctx.codexHome, 'agent-init-mcp-mutable')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    initCodexHome(codexDir, {
+      mcpServers: { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest'] } },
+    })
+
+    const { readFileSync: readNode } = require('node:fs')
+    const config = readNode(join(codexDir, 'config.toml'), 'utf8')
+    expect(config).not.toContain('[mcp_servers.playwright]')
+    expect(warn).toHaveBeenCalledWith('[codex] skipping MCP server "playwright" — npx MCP packages must use an exact immutable version')
     warn.mockRestore()
   })
 

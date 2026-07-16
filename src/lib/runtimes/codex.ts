@@ -48,6 +48,12 @@ function escapeTomlBasicString(value: string): string {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
 }
 
+function hasImmutableNpxPackageSelector(args: string[] | undefined): boolean {
+  const selector = args?.find(arg => !arg.startsWith('-'))
+  if (!selector) return false
+  return /^(?:@[^/]+\/[^@]+|[^@/][^@]*)@\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(selector)
+}
+
 export interface CodexMcpServerDef {
   type?: string
   command?: string
@@ -343,6 +349,10 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
     for (const [name, definition] of Object.entries(opts.mcpServers ?? {})) {
       if (typeof definition.command !== 'string' || definition.command.length === 0) {
         console.warn(`[codex] skipping MCP server "${name}" — only stdio command servers are provisioned into codex config`)
+        continue
+      }
+      if (definition.command === 'npx' && !hasImmutableNpxPackageSelector(definition.args)) {
+        console.warn(`[codex] skipping MCP server "${name}" — npx MCP packages must use an exact immutable version`)
         continue
       }
 

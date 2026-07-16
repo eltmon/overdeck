@@ -100,8 +100,10 @@ mcpServers:
       command: npx
       args:
         - "-y"
-        - "@playwright/mcp@latest"
+        - "@playwright/mcp@0.0.78"
 ```
+
+Executable npm MCP declarations must use an exact version. npm checks the package's registry-published integrity digest, and Codex skips mutable tags, ranges, and unversioned `npx` selectors.
 
 Overdeck renders this declaration for each harness:
 
