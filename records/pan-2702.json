@@ -154,15 +154,7 @@
       "timestamp": "2026-07-16T14:00:48.786Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T14:00:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2702\n\n# Review Synthesis — PAN-2702 — 2026-07-16T13:59:29Z\n\n## Verdict: CHANGES REQUESTED — persisted landing claims can be orphaned when in-memory supervised work is lost\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/context.json`\n- Branch: `feature/pan-2702`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702`\n- HEAD reviewed: `c393bc360db0ae190358a0b3ac62fb8d5cb3445c`\n- Cycle number: 2\n- Prior cycle SHA: `901c5a97634225143beb5fd5a8136ec25d07d11a`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Persisted `landing` claims are not recoverable after supervised work is lost — `src/lib/cloister/deacon-strike-landing.ts:109`\nThe cycle-2 fix persists `strikeLandingState: 'landing'` before placing `executeStrikeLanding` in an in-memory supervisor queue. A process exit after the claim but before durable merge enqueue loses the work while later patrols skip every state except `ready`. Unexpected scheduled-work rejection has the same terminal effect because the supervisor only logs the error. The strike remains indefinitely in `landing`, with no retry, recovery delivery, or `needs_you` transition. Make claims restart-recoverable through a durable enqueue or a reclaimable persisted lease, route every unexpected scheduled failure through durable failure handling, and add restart/re-patrol and rejected-work tests.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2702/.pan/review/agent-pan-2702-review-c393bc36/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2702 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -241,23 +233,23 @@
     "recordedAt": "2026-07-16T13:04:38.427Z"
   },
   "created": "2026-07-15T12:52:17.786Z",
-  "updated": "2026-07-16T14:08:37.469Z",
+  "updated": "2026-07-16T14:08:38.516Z",
   "pipeline": {
     "issueId": "PAN-2702",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T14:08:37.198Z",
+    "updatedAt": "2026-07-16T14:08:38.356Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "AC1 unmet: strike requests never reach triggerMerge(). Only dequeueNextMerge() (merge-ops.ts:322-336) builds a StrikeMergeRequest, but it's only invoked via advanceQueue() after another triggerMerge() call for the SAME project's queue completes, dequeuing entries populated solely by enqueueMerge() (called only at merge-ops.ts:406,418 inside triggerMerge itself). pan strike-ready (src/cli/commands/strike-ready.ts:70-80) only persists strikeReadyHead/strikeLandingState via setStatus -- it never calls enqueueMerge or triggerMerge. Every other triggerMerge call site (flywheel.ts:610, merge-ops.ts:1250 route handler, auto-merge-executor.ts:55/111 defaultMergeIssue, merge-queue-service.ts:25 resumeQueuedMerges) invokes triggerMerge(issueId) with no request arg, defaulting to {kind:'normal'}. Grepped repo-wide for strikeLandingState/strikeReadyHead outside merge-ops.ts/merge-strike.ts and found no patrol, route, or watcher that enqueues or triggers a merge for a freshly-ready strike marker. Result: a strike marked ready has no code path that ever constructs {kind:'strike',...} and calls triggerMerge -- the AC1 scenario (given a valid durable strike marker, the merge door resolves/gates/merges/invokes postMergeLifecycle) is unreachable dead code. Required fix: wire an actual trigger -- e.g. strikeReadyCommand or a server-side watcher on strikeLandingState==='ready' must enqueueMerge + call triggerMerge(issueId, strikeRequest), or add a dedicated endpoint/patrol that detects readiness and invokes the merge door. AC2 (stale-marker rejection, validateStrikeMergeRequest in merge-strike.ts:20-42) and AC3 (no-loss eligibility matrix, normalMergeEligibility + strike-merge.test.ts) verified correct in isolation; AC4 (main-push guard) unaffected by this diff. Minor non-blocking nit: 'Already merged' check now exists twice (merge-strike.ts:16 inside normalMergeEligibility, and unchanged original at merge-ops.ts ~391) -- harmless redundancy, not a functional loss.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2791",
     "lastVerifiedCommit": "1341cbacece74d018de993a0bcedf41ee0cebdb0",
     "reviewRequestedAt": "2026-07-16T13:43:07.481Z",
-    "reviewSpawnedAt": "2026-07-16T13:58:51.973Z"
+    "reviewSpawnedAt": "2026-07-16T14:08:38.355Z"
   },
   "closeOut": {
     "usage": {
@@ -307,7 +299,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.244889,
-        "pricingAsOf": "2026-07-16T14:08:37.283Z"
+        "pricingAsOf": "2026-07-16T14:08:38.444Z"
       }
     },
     "merges": [
