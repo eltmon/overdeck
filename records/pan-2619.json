@@ -121,17 +121,18 @@
     "recordedAt": "2026-07-16T21:16:56.333Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T21:18:33.607Z",
+  "updated": "2026-07-16T21:20:46.486Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:18:28.993Z",
+    "updatedAt": "2026-07-16T21:20:46.397Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2619-review already running. Use 'pan tell' to message it.",
+    "verificationNotes": "Verification FAILED at test (28123ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2619\n\n ❯ src/App.test.tsx (40 tests | 31 failed) 464ms\n     × defaults missing view state to conversation mode 66ms\n     × restores terminal view from the URL on initial render 13ms\n     × does not strip terminal view from a direct deep link on initial render 13ms\n     × updates the current conversation URL when the view mode changes 26ms\n     × restores a remembered terminal view when returning to a conversation 14ms\n     × renders HomePage at / 17ms\n     × opens a Home workspace card through the existing board drawer route 16ms\n     × renders PipelineView at /pipeline 23ms\n     × restores the selected project from a command deck project URL 15ms\n     × updates the URL when a command deck project is selected 11ms\n     × marks the parent surface when the drawer is open 10ms\n     × renders Board at /board 13ms\n     × renders ContextPage at /context 18ms\n     × opens the issue drawer on /issues/:id without rewriting the URL 11ms\n     × defaults /issues/:id to Pipeline when no last tab is stored 9ms\n     × restores the last surface on /issues/:id 9ms\n     × handles browser back/forward to /issues/:id 15ms\n     × redirects direct experimental routes to Home when experimental features are off 9ms\n     × keeps the sidebar open by default 9ms\n     × closes the sidebar from the toggle and persists the closed state 8ms\n     × restores the open sidebar from localStorage on mount 10ms\n     × closes from the in-sidebar close button and persists the closed state 16ms\n     × opens the issue drawer from kanban selection 11ms\n     × submits allow decisions for pending channel permission requests 9ms\n     × submits deny decisions for pending channel permission requests 7ms\n     × navigates to Pipeline with g p 9ms\n     × navigates to Board with g b 14ms\n     × navigates to Agents with g a 8ms\n     × navigates to Command Deck with g c 7ms\n     × does not trigger the chord when focus is inside an input 6ms\n     × cancels the chord on an unbound second key 8ms\n\n Test Files  1 failed | 30 passed (31)\n      Tests  31 failed | 458 passed (489)\n   Start at  17:20:35\n   Duration  9.73s (transform 37.64s, setup 9.27s, import 73.45s, tests 28.54s, environment 27.92s)\n\nNo test files found, exiting with code 0\n\n\n--- stderr ---\nError: [vitest] No \"selectPendingInputSubjects\" export is defined on the \"./lib/store\" mock. Did you forget to return it from \"vi.mock\"?\nIf you need to partially mock a module, you can use \"importOriginal\" helper inside:\n\n    at VitestMocker.createError (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/node_modules/.bun/vitest@4.1.6/node_modules/vitest/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17)\n    at Object.get (file:///home/eltmon/Projects/overdeck/workspaces/feature-pan-2619/node_modules/.bun/vitest@4.1.6/node_modules/vitest/dist/chunks/startVitestModuleRunne\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2808",
     "reviewRequestedAt": "2026-07-16T21:16:57.434Z",
     "reviewSpawnedAt": "2026-07-16T21:18:28.992Z",
@@ -157,15 +158,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 225857,
-            "output": 1059,
-            "cacheRead": 160768,
+            "input": 281570,
+            "output": 1349,
+            "cacheRead": 195328,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 4449353,
-            "output": 12750,
-            "cacheRead": 4042496,
+            "input": 6203158,
+            "output": 18755,
+            "cacheRead": 5723136,
             "cacheWrite": 0
           }
         },
@@ -219,10 +220,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 48,
-            "output": 6147,
-            "cacheRead": 3300174,
-            "cacheWrite": 132939
+            "input": 68,
+            "output": 10787,
+            "cacheRead": 4991131,
+            "cacheWrite": 145764
           }
         },
         "work": {
@@ -236,15 +237,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 225857,
-          "output": 1059,
-          "cacheRead": 160768,
+          "input": 281570,
+          "output": 1349,
+          "cacheRead": 195328,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 10259902,
-          "output": 228711,
-          "cacheRead": 43592448,
+          "input": 12013707,
+          "output": 234716,
+          "cacheRead": 45273088,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -254,15 +255,15 @@
           "cacheWrite": 327850
         },
         "anthropic/claude-sonnet-5": {
-          "input": 48,
-          "output": 6147,
-          "cacheRead": 3300174,
-          "cacheWrite": 132939
+          "input": 68,
+          "output": 10787,
+          "cacheRead": 4991131,
+          "cacheWrite": 145764
         }
       },
       "costAtCloseOut": {
-        "usd": 79.286792,
-        "pricingAsOf": "2026-07-16T21:18:29.112Z"
+        "usd": 81.089781,
+        "pricingAsOf": "2026-07-16T21:20:46.430Z"
       }
     },
     "merges": [
