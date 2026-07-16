@@ -31,36 +31,19 @@
     "recordedAt": "2026-07-16T18:10:23.028Z"
   },
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T18:14:02.511Z",
+  "updated": "2026-07-16T18:15:36.514Z",
   "pipeline": {
     "issueId": "PAN-2619",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:14:02.376Z",
+    "updatedAt": "2026-07-16T18:15:36.386Z",
     "reviewNotes": "Branch has no terminal-padding implementation or promised regression test",
+    "verificationNotes": "Branch has no implementation — only pipeline artifacts (.pan/vBRIEF task state) changed vs origin/main. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).",
     "reviewSpawnedAt": "2026-07-16T18:10:41.383Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "d555aed0440cb7345376b72dac8ef5d6811f37f4"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "d555aed0440cb7345376b72dac8ef5d6811f37f4"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "d555aed0440cb7345376b72dac8ef5d6811f37f4"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "d555aed0440cb7345376b72dac8ef5d6811f37f4"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -76,9 +59,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 169100,
-            "output": 12548,
-            "cacheRead": 2312704,
+            "input": 174302,
+            "output": 12810,
+            "cacheRead": 2487808,
             "cacheWrite": 0
           }
         },
@@ -116,9 +99,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1981413,
-            "output": 125154,
-            "cacheRead": 21165568,
+            "input": 2343804,
+            "output": 137714,
+            "cacheRead": 23557120,
             "cacheWrite": 0
           }
         }
@@ -131,15 +114,15 @@
           "cacheWrite": 327850
         },
         "openai/gpt-5.6-sol": {
-          "input": 3439440,
-          "output": 154711,
-          "cacheRead": 24652800,
+          "input": 3807033,
+          "output": 167533,
+          "cacheRead": 27219456,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 52.653189,
-        "pricingAsOf": "2026-07-16T18:14:02.455Z"
+        "usd": 56.159142,
+        "pricingAsOf": "2026-07-16T18:15:36.445Z"
       }
     },
     "merges": [],
