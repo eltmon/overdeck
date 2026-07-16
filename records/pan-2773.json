@@ -57,7 +57,7 @@
     "recordedAt": "2026-07-16T18:38:15.942Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:47:04.673Z",
+  "updated": "2026-07-16T18:47:05.760Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "passed",
@@ -235,7 +235,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 12,
     "claims": {},
