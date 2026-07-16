@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:40:14.938Z",
+  "updated": "2026-07-16T07:41:31.047Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-role-mcp-provisioning": {
-        "writerId": "agent-pan-2698",
-        "agentId": "agent-pan-2698",
-        "pid": 3316134,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:40:14.938Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2698",
@@ -149,6 +141,17 @@
         "outcome": "completed",
         "reason": "Added a named spawn warning when ohmypi cannot provision role-declared MCP servers, with positive and negative regression coverage",
         "releasedAt": "2026-07-16T07:40:03.145Z"
+      },
+      {
+        "writerId": "agent-pan-2698",
+        "agentId": "agent-pan-2698",
+        "pid": 3316134,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:40:14.938Z",
+        "itemId": "docs-role-mcp-provisioning",
+        "outcome": "completed",
+        "reason": "Documented role MCP frontmatter and per-harness provisioning in developer and Codex harness docs",
+        "releasedAt": "2026-07-16T07:41:31.047Z"
       }
     ],
     "statusReasons": {
@@ -167,6 +170,10 @@
       "warn-ohmypi-mcp-drop": {
         "reason": "Added a named spawn warning when ohmypi cannot provision role-declared MCP servers, with positive and negative regression coverage",
         "updatedAt": "2026-07-16T07:40:03.145Z"
+      },
+      "docs-role-mcp-provisioning": {
+        "reason": "Documented role MCP frontmatter and per-harness provisioning in developer and Codex harness docs",
+        "updatedAt": "2026-07-16T07:41:31.047Z"
       }
     }
   },
@@ -189,6 +196,8 @@
     "warn-ohmypi-mcp-drop": "completed",
     "warn-ohmypi-mcp-drop.warn-ohmypi-mcp-drop.ac1": "completed",
     "warn-ohmypi-mcp-drop.warn-ohmypi-mcp-drop.ac2": "completed",
-    "docs-role-mcp-provisioning": "running"
+    "docs-role-mcp-provisioning": "completed",
+    "docs-role-mcp-provisioning.docs-role-mcp-provisioning.ac1": "completed",
+    "docs-role-mcp-provisioning.docs-role-mcp-provisioning.ac2": "completed"
   }
 }
