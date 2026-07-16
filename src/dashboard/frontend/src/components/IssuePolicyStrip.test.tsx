@@ -181,6 +181,54 @@ describe('IssuePolicyStrip', () => {
     expect(screen.queryByText('Overrides crew routing — every item on this issue runs this model.')).not.toBeInTheDocument();
   });
 
+  it('gives every policy row an inline hint and a help tooltip', async () => {
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    for (const hint of [
+      'How much AI review runs before merge.',
+      'Which reviewers run again after you push fixes.',
+      'Which model reviews this issue.',
+      'Pins the implementation model for this issue.',
+      'Run plan items in parallel across several agents.',
+      'Route each item to a model tier by difficulty.',
+    ]) expect(screen.getByText(hint)).toBeInTheDocument();
+
+    for (const label of ['Mode help', 'Re-review help', 'Model help', 'Swarm help', 'Standing crew help']) {
+      expect(screen.getAllByRole('button', { name: label }).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('reveals the fuller explanation when a help trigger is focused', async () => {
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    fireEvent.focus(screen.getByRole('button', { name: 'Swarm help' }));
+
+    const tip = await screen.findByRole('tooltip');
+    expect(tip).toHaveTextContent('Whether several work agents take independent plan items');
+    expect(tip).toHaveTextContent('at least two items are independently startable');
+  });
+
+  it('does not claim Always forces a swarm, because the resolver treats it exactly like Auto', async () => {
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    fireEvent.focus(screen.getByRole('button', { name: 'Swarm help' }));
+
+    const tip = await screen.findByRole('tooltip');
+    expect(tip).toHaveTextContent('Behaves the same as Auto today');
+    expect(tip).not.toHaveTextContent(/forces a swarm|requires swarm readiness/i);
+  });
+
+  it('keeps focus on the first real control rather than a help trigger', async () => {
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    expect(document.activeElement).not.toHaveAttribute('data-help-trigger');
+    expect(screen.getByLabelText('Review mode for this issue')).toContainElement(document.activeElement as HTMLElement);
+  });
+
   it('preserves every affordance from the five-select policy strip', async () => {
     fixtures.review.override = { reviewMode: 'full', reReviewScope: 'all', reviewModel: 'gpt-5.5' };
     fixtures.staffing.override.workModel = 'claude-sonnet-5';

@@ -36,6 +36,7 @@ function makeDoc(issueId: string): VBriefDocument {
       status: 'draft',
       metadata: {
         canonicalFilename: '../../outside.vbrief.json',
+        docsJustification: 'Promotion-mechanics fixture; documentation coverage is exercised in the quality-lint suite',
       } as Record<string, unknown>,
       items: [
         {
