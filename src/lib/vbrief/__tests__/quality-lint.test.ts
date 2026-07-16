@@ -195,6 +195,93 @@ describe('lintPlanQuality dispatch metadata', () => {
   });
 });
 
+describe('lintPlanQuality file-size ratchet ownership', () => {
+  function extractionItem(overrides: Partial<VBriefItem> = {}): VBriefItem {
+    return item({
+      id: 'extract-seam',
+      narrative: { Action: 'Extract functions from src/lib/cloister/specialists.ts into a focused module without behavior changes' },
+      metadata: {
+        files_scope: [
+          'src/lib/cloister/specialists.ts',
+          'src/lib/cloister/specialists-spawn.ts',
+        ],
+        verify_commands: ['npm run lint'],
+      },
+      ...overrides,
+    });
+  }
+
+  function reconciliationItem(): VBriefItem {
+    return item({
+      id: 'reconcile-ratchet',
+      narrative: { Action: 'Run the updater to lower scripts/file-size-baseline.txt for src/lib/cloister/specialists.ts after all extractions' },
+      metadata: {
+        files_scope: [
+          'scripts/file-size-baseline.txt',
+          'src/lib/cloister/specialists.ts',
+        ],
+        verify_commands: ['bash scripts/lint-file-size.sh'],
+      },
+    });
+  }
+
+  it('rejects lint when a baselined file is changed before deferred reconciliation', () => {
+    expect(lintPlanQuality(doc([
+      extractionItem(),
+      reconciliationItem(),
+    ]))).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        itemId: 'extract-seam',
+        rule: 'deferred-file-size-ratchet',
+        severity: 'error',
+        message: expect.stringContaining('reconcile-ratchet'),
+      }),
+    ]));
+  });
+
+  it('accepts item-local baseline reconciliation', () => {
+    const candidate = extractionItem({
+      metadata: {
+        files_scope: [
+          'scripts/file-size-baseline.txt',
+          'src/lib/cloister/specialists.ts',
+          'src/lib/cloister/specialists-spawn.ts',
+        ],
+        verify_commands: ['npm run lint'],
+      },
+    });
+
+    expect(lintPlanQuality(doc([candidate, reconciliationItem()])).map(issue => issue.rule))
+      .not.toContain('deferred-file-size-ratchet');
+  });
+
+  it.each([
+    'npm run typecheck',
+    'npm run lint:skills',
+  ])('accepts intermediate verification that excludes the file-size ratchet: %s', verifyCommand => {
+    const candidate = extractionItem({
+      metadata: {
+        files_scope: [
+          'src/lib/cloister/specialists.ts',
+          'src/lib/cloister/specialists-spawn.ts',
+        ],
+        verify_commands: [verifyCommand],
+      },
+    });
+
+    expect(lintPlanQuality(doc([candidate, reconciliationItem()])).map(issue => issue.rule))
+      .not.toContain('deferred-file-size-ratchet');
+  });
+
+  it('does not infer deferred reconciliation from a baseline audit alone', () => {
+    const audit = reconciliationItem();
+    audit.narrative = { Action: 'Audit scripts/file-size-baseline.txt against src/lib/cloister/specialists.ts without changing entries' };
+
+    expect(lintPlanQuality(doc([extractionItem(), audit])).map(issue => issue.rule))
+      .not.toContain('deferred-file-size-ratchet');
+  });
+});
+
 describe('lintPlanQuality overlap audit', () => {
   it('warns when two edge-unconnected items have overlapping files_scope entries', () => {
     const issues = lintPlanQuality(doc([
