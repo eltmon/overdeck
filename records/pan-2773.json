@@ -87,7 +87,7 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T19:04:08.012Z",
+  "updated": "2026-07-16T19:04:13.335Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
@@ -97,12 +97,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:04:07.910Z",
+    "updatedAt": "2026-07-16T19:04:13.234Z",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
     "lastVerifiedCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973",
-    "reviewRequestedAt": "2026-07-16T18:48:48.435Z",
+    "reviewRequestedAt": "2026-07-16T19:04:12.863Z",
     "reviewSpawnedAt": "2026-07-16T18:48:52.164Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -247,7 +247,7 @@
       },
       "costAtCloseOut": {
         "usd": 99.661771,
-        "pricingAsOf": "2026-07-16T19:04:08.005Z"
+        "pricingAsOf": "2026-07-16T19:04:13.294Z"
       }
     },
     "merges": [
