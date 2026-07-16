@@ -296,6 +296,11 @@
       "reason": "feedback",
       "note": "[2026-07-16T12:12Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-16T12:12:09.458Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.5",
+      "timestamp": "2026-07-16T12:13:02.458Z"
     }
   ],
   "feedback": [],
@@ -370,7 +375,7 @@
     "recordedAt": "2026-07-16T12:07:29.315Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T12:13:01.405Z",
+  "updated": "2026-07-16T12:13:02.494Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "reviewing",
@@ -626,7 +631,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.5",
   "statusOverrides": {
     "b8-orchestrator-doc": "completed",
     "b8-orchestrator-doc.ac1": "completed",
