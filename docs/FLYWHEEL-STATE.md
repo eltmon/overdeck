@@ -5130,3 +5130,20 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   runs fresh session now).
 - **Session tally: 41 merges.** Substrate chain COMPLETE: kickoff (2771+2781 proven live, 8/8 fleet
   working), docker init (2770+2777), gate output (2741), reaper (2757 — pending deploy).
+
+---
+
+## Tick 52 — 2026-07-16 ~09:30Z — REAPER FIX DEPLOYED; PAN-2710 SHIPPED on a real verdict; substrate chain COMPLETE
+
+- **PAN-2757 merged `9a8c033a3e` + DEPLOYED** (pid 537702, health 200, fix verified in `deacon-ByKaqSew.js`).
+  From this boot: tmux query errors never reap; misses need two consecutive confirmations. **The 11-victim
+  killer is dead.** Closed out.
+- **PAN-2710 merged via #2788 `8872bdf300`** — full feature + all 3 convoy findings fixed; real review verdict;
+  #2736 (bypass-tainted) closed as superseded. Content-equivalence verified (main vs feature/pan-2710 on the
+  feature's 8 files = 9 obsolete test lines only) → --accept-merged honest → CLOSED OUT.
+  Three wrong diffs before the right one: three-dot can't see squash-carried content; unrestricted tree diff
+  drowns in main's motion; **restrict the tree diff to the feature's own files.**
+- **EVERY substrate blocker of RUN-63 is now fixed AND deployed**: kickoff (2771+2781), docker init
+  (2770+2777), gate feedback (2741), review infra (2735+2743), reaper (2757). Fleet 8/8 self-driving;
+  fleet PRs #2783/#2785/#2786 advancing on their own verdicts.
+- **Session tally: 43 merges, 12 close-outs tonight.**
