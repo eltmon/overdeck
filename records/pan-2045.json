@@ -242,25 +242,19 @@
     "recordedAt": "2026-07-16T20:15:02.866Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:06:24.113Z",
+  "updated": "2026-07-16T21:06:50.522Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:06:24.069Z",
-    "reviewNotes": "both prior blockers are repaired; the only new raw finding is demoted by the mandatory cycle-3 convergence gate",
-    "testNotes": "See .pan/test/result.json for full evidence. Frontend suite deterministically fails (73/2008) on unmocked network requests caught by new test-setup.ts fetch guard; typecheck/lint pass; UAT not required.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-16T21:06:50.490Z",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
-    "reviewedAtCommit": "434eea498384e40a4efa4a7e8a0228931aa0f6d2",
-    "reviewRequestedAt": "2026-07-16T20:26:25.115Z",
-    "reviewSpawnedAt": "2026-07-16T20:27:56.877Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/App.test.tsx",
@@ -502,7 +496,7 @@
       },
       "costAtCloseOut": {
         "usd": 161.671017,
-        "pricingAsOf": "2026-07-16T21:06:24.090Z"
+        "pricingAsOf": "2026-07-16T21:06:50.515Z"
       }
     },
     "merges": [
@@ -510,7 +504,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
