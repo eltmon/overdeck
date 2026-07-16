@@ -4,8 +4,10 @@ import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
 import {
+  listIssuesWithAnyLabelPromise,
   listOpenIssuesWithLabelsPromise,
 } from './github-app.js';
+import { withConcurrencyLimitPromise } from './concurrency.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { listSpecs } from './pan-dir/specs.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
@@ -32,6 +34,7 @@ interface GitHubPullRequestRow {
 }
 
 interface MergedHeadGraphqlResponse {
+  errors?: unknown[];
   data?: {
     repository?: Record<string, {
       nodes?: Array<{ headRepository?: { name?: string; owner?: { login?: string } } | null }>;
@@ -61,7 +64,11 @@ export async function listMergedPullRequestHeadsBatched(
       `h${index}: pullRequests(states: MERGED, headRefName: ${JSON.stringify(head)}, first: 10) { nodes { headRepository { name owner { login } } } }`);
     const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
     const response = JSON.parse(await runGraphql(query)) as MergedHeadGraphqlResponse;
-    const repository = response.data?.repository ?? {};
+    const repository = response.data?.repository;
+    if (response.errors?.length || !repository) throw new Error('Incomplete merged-PR GraphQL response');
+    for (let index = 0; index < headChunk.length; index++) {
+      if (!Array.isArray(repository[`h${index}`]?.nodes)) throw new Error(`Missing merged-PR alias h${index}`);
+    }
     mergedHeads.push(...headChunk.filter((_head, index) => repository[`h${index}`]?.nodes?.some((pr) =>
       pr.headRepository?.name === repo && pr.headRepository.owner?.login === owner)));
   }
@@ -69,6 +76,7 @@ export async function listMergedPullRequestHeadsBatched(
 }
 
 interface IssueStateGraphqlResponse {
+  errors?: unknown[];
   data?: { repository?: Record<string, { state?: 'OPEN' | 'CLOSED' } | null> };
 }
 
@@ -84,7 +92,12 @@ export async function listIssueStatesBatched(
     const fields = numberChunk.map((number, index) => `i${index}: issue(number: ${number}) { state }`);
     const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
     const response = JSON.parse(await runGraphql(query)) as IssueStateGraphqlResponse;
-    const repository = response.data?.repository ?? {};
+    const repository = response.data?.repository;
+    if (response.errors?.length || !repository) throw new Error('Incomplete issue-state GraphQL response');
+    for (let index = 0; index < numberChunk.length; index++) {
+      const state = repository[`i${index}`]?.state;
+      if (state !== 'OPEN' && state !== 'CLOSED') throw new Error(`Missing issue-state alias i${index}`);
+    }
     states.push(...numberChunk.map((number, index) => ({
       number,
       state: repository[`i${index}`]?.state === 'OPEN' ? 'open' as const : 'closed' as const,
@@ -95,6 +108,7 @@ export async function listIssueStatesBatched(
 
 export interface PipelineMembershipGatherDeps {
   listOpenIssues(owner: string, repo: string): Promise<Array<{ number: number; labels: string[] }>>;
+  listPhaseLabeledIssues(owner: string, repo: string): Promise<Array<{ number: number; state: 'open' | 'closed'; labels: string[] }>>;
   listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
   listMergedPullRequestHeads(owner: string, repo: string, heads: string[]): Promise<string[]>;
   listIssueStates(owner: string, repo: string, numbers: number[]): Promise<Array<{ number: number; state: 'open' | 'closed' }>>;
@@ -104,6 +118,7 @@ export interface PipelineMembershipGatherDeps {
 
 const defaultDeps: PipelineMembershipGatherDeps = {
   listOpenIssues: listOpenIssuesWithLabelsPromise,
+  listPhaseLabeledIssues: (owner, repo) => listIssuesWithAnyLabelPromise(owner, repo, STALE_PIPELINE_LABELS),
   listOpenPullRequests: async (owner, repo) => {
     const { stdout } = await execFileAsync('gh', [
       'api',
@@ -154,8 +169,9 @@ export async function gatherProjectLensSignals(
   const [owner, repo] = project.github_repo.split('/');
   if (!owner || !repo) throw new Error(`Invalid github_repo for ${project.name}: ${project.github_repo}`);
 
-  const [openIssues, openPrs, branchRefs, unmergedRefs, specIssueIds] = await Promise.all([
+  const [openIssues, phaseLabeledIssues, openPrs, branchRefs, unmergedRefs, specIssueIds] = await Promise.all([
     deps.listOpenIssues(owner, repo),
+    deps.listPhaseLabeledIssues(owner, repo),
     deps.listOpenPullRequests(owner, repo),
     deps.run('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
     deps.run('git', ['for-each-ref', '--no-merged=main', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
@@ -166,6 +182,7 @@ export async function gatherProjectLensSignals(
   const unmerged = new Set(unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
   const candidates = new Set<string>();
   const labelsByIssue = new Map<string, string[]>();
+  const knownStateByIssue = new Map<string, 'open' | 'closed'>();
   const openPrIssues = new Set<string>();
   const mergedPrIssues = new Set<string>();
   const headRefsByIssue = new Map<string, Set<string>>();
@@ -177,6 +194,13 @@ export async function gatherProjectLensSignals(
     const id = `${project.issue_prefix?.toUpperCase() ?? ''}-${issue.number}`;
     candidates.add(id);
     labelsByIssue.set(id, issue.labels);
+    knownStateByIssue.set(id, 'open');
+  }
+  for (const issue of phaseLabeledIssues) {
+    const id = `${project.issue_prefix?.toUpperCase() ?? ''}-${issue.number}`;
+    candidates.add(id);
+    labelsByIssue.set(id, issue.labels);
+    knownStateByIssue.set(id, issue.state);
   }
   for (const pr of openPrs) {
     const id = issueIdFromRef(pr.headRefName);
@@ -208,12 +232,12 @@ export async function gatherProjectLensSignals(
     if (!headRefsByIssue.has(id) && mergedHeads.has(`feature/${id.toLowerCase()}`)) mergedPrIssues.add(id);
   }
 
-  const unknownIssueIds = [...candidates].filter((id) => !labelsByIssue.has(id));
+  const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
   const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
   const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
   const issueOpen = new Map([...candidates].map((id) => [
     id,
-    labelsByIssue.has(id) || stateByNumber.get(issueNumber(id)) === 'open',
+    knownStateByIssue.get(id) === 'open' || stateByNumber.get(issueNumber(id)) === 'open',
   ]));
 
   return [...candidates].sort().map((id) => ({
@@ -226,5 +250,29 @@ export async function gatherProjectLensSignals(
     phaseLabel: STALE_PIPELINE_LABELS.find((label) => labelsByIssue.get(id)?.includes(label)) ?? null,
     hasVbriefSpec: specIssues.has(id),
     explicitlyReady: labelsByIssue.get(id)?.includes('ready') ?? false,
+  }));
+}
+
+export const PIPELINE_PROJECT_CONCURRENCY = 3;
+
+export async function mapPipelineProjects<T>(
+  projects: ProjectConfig[],
+  operation: (project: ProjectConfig) => Promise<T>,
+): Promise<Array<{ project: ProjectConfig; value?: T; error?: unknown }>> {
+  return withConcurrencyLimitPromise(projects.map((project) => async () => {
+    try {
+      return { project, value: await operation(project) };
+    } catch (error) {
+      return { project, error };
+    }
+  }), PIPELINE_PROJECT_CONCURRENCY);
+}
+
+export async function gatherProjectLensSignalsForProjects(
+  projects: ProjectConfig[],
+  gather: (project: ProjectConfig) => Promise<IssueLensSignals[]> = gatherProjectLensSignals,
+): Promise<Array<{ project: ProjectConfig; signals?: IssueLensSignals[]; error?: unknown }>> {
+  return (await mapPipelineProjects(projects, gather)).map(({ project, value, error }) => ({
+    project, signals: value, error,
   }));
 }

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { pendingCommand } from '../../../src/cli/commands/pending.js';
 import { getAllReviewStatusesFromDb } from '../../../src/lib/overdeck/review-status-sync.js';
-import { gatherProjectLensSignals } from '../../../src/lib/pipeline-membership-gather.js';
+import { gatherProjectLensSignalsForProjects } from '../../../src/lib/pipeline-membership-gather.js';
 import type { ReviewStatus } from '../../../src/lib/review-status.js';
 
 vi.mock('../../../src/lib/overdeck/review-status-sync.js', () => ({
@@ -21,13 +21,13 @@ vi.mock('../../../src/lib/projects.js', () => ({
 }));
 
 vi.mock('../../../src/lib/pipeline-membership-gather.js', () => ({
-  gatherProjectLensSignals: vi.fn(),
+  gatherProjectLensSignalsForProjects: vi.fn(),
 }));
 
 const getStatuses = vi.mocked(getAllReviewStatusesFromDb);
-const gatherSignals = vi.mocked(gatherProjectLensSignals);
+const gatherProjects = vi.mocked(gatherProjectLensSignalsForProjects);
 
-function signal(issueId: string, overrides: Partial<Awaited<ReturnType<typeof gatherProjectLensSignals>>[number]> = {}) {
+function signal(issueId: string, overrides: Record<string, unknown> = {}) {
   return {
     issueId,
     issueOpen: true,
@@ -63,7 +63,10 @@ describe('pendingCommand', () => {
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     getStatuses.mockReturnValue({});
-    gatherSignals.mockResolvedValue([signal('PAN-1'), signal('PAN-2'), signal('PAN-3')]);
+    gatherProjects.mockResolvedValue([{
+      project: { name: 'overdeck', path: '/project' },
+      signals: [signal('PAN-1'), signal('PAN-2'), signal('PAN-3')],
+    }]);
   });
 
   afterEach(() => {
@@ -119,9 +122,10 @@ describe('pendingCommand', () => {
   });
 
   it('prints resolver membership and drift when review status is empty', async () => {
-    gatherSignals.mockResolvedValue([
-      signal('PAN-10', { hasOpenPr: false, hasMergedPr: true, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null }),
-    ]);
+    gatherProjects.mockResolvedValue([{
+      project: { name: 'overdeck', path: '/project' },
+      signals: [signal('PAN-10', { hasOpenPr: false, hasMergedPr: true, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null })],
+    }]);
 
     await pendingCommand();
 
@@ -132,7 +136,9 @@ describe('pendingCommand', () => {
   });
 
   it('keeps ready and blocked filters within the resolver membership set', async () => {
-    gatherSignals.mockResolvedValue([signal('PAN-1')]);
+    gatherProjects.mockResolvedValue([{
+      project: { name: 'overdeck', path: '/project' }, signals: [signal('PAN-1')],
+    }]);
     getStatuses.mockReturnValue({
       'PAN-1': status('PAN-1', { readyForMerge: true, testStatus: 'failed' }),
       'PAN-2': status('PAN-2', { readyForMerge: true, testStatus: 'failed' }),

@@ -168,6 +168,20 @@ describe('PipelineView', () => {
     expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
   });
 
+  it('excludes completed issues when membership is missing', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-14', title: 'Completed without residue', state: 'completed' })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.queryByText('Completed without residue')).not.toBeInTheDocument();
+    const activeTile = screen.getByText('Active issues').closest('[data-component="metric-tile"]') as HTMLElement;
+    expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
+  });
+
   it('renders an explicitly ready issue admitted by canonical membership in the Ready lane', () => {
     useDashboardStore.setState({
       issuesRaw: [issue({

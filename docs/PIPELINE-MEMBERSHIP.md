@@ -35,6 +35,6 @@ All consumers use one of these representations of the same verdict:
 
 - Library: `resolvePipelineMembership()` in `src/lib/pipeline-membership.ts`, with signals from `gatherProjectLensSignals()` in `src/lib/pipeline-membership-gather.ts`.
 - Dashboard API: `GET /api/pipeline/membership?project=<project-key>`, backed by the cached membership service.
-- Issue DTO: optional `pipelineMembership` with `inPipeline`, `bucket`, and `labelDrift`, used by the dashboard frontend.
+- Issue DTO: total `pipelineMembership` with `available`, `inPipeline`, `bucket`, and `labelDrift`, used by the dashboard frontend. `available: false` means durable membership could not be resolved; a successful lookup with no candidate is explicitly `clean_terminal`.
 
 No command, route, view, or skill may reconstruct membership from tracker state, workspaces, agents, tmux, or review rows. `scripts/lint-pipeline-membership.sh` enforces delegation for the six migrated consumers and rejects disposable-state imports in the resolver/gatherer boundary. Run `bash scripts/lint-pipeline-membership.sh --self-test` to verify that the guard detects seeded legacy and L5 violations.

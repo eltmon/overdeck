@@ -180,7 +180,7 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
             ? (await gatherProjectLensSignals(projectConfig)).map(resolvePipelineMembership)
             : [];
           const isInPipeline = (issueId: string): boolean =>
-            isIssueInResolvedPipeline(issueId, memberships);
+            !projectConfig?.github_repo || isIssueInResolvedPipeline(issueId, memberships);
 
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,

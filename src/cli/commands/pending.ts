@@ -1,6 +1,6 @@
 import chalk from 'chalk';
 import { listRunningAgentsSync } from '../../lib/agents.js';
-import { gatherProjectLensSignals } from '../../lib/pipeline-membership-gather.js';
+import { gatherProjectLensSignalsForProjects } from '../../lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership, type PipelineMembership } from '../../lib/pipeline-membership.js';
 import { getAllReviewStatusesFromDb } from '../../lib/overdeck/review-status-sync.js';
 import { listProjectsSync } from '../../lib/projects.js';
@@ -25,8 +25,11 @@ function blockerKind(status: ReviewStatus): string | null {
 
 async function loadPipelineMembership(): Promise<PipelineMembership[]> {
   const projects = listProjectsSync().filter(({ config }) => config.github_repo);
-  const signals = await Promise.all(projects.map(({ config }) => gatherProjectLensSignals(config)));
-  return signals.flat().map(resolvePipelineMembership).filter((membership) => membership.inPipeline);
+  const results = await gatherProjectLensSignalsForProjects(projects.map(({ config }) => config));
+  const failed = results.find((result) => result.error);
+  if (failed) throw failed.error;
+  return results.flatMap((result) => result.signals ?? [])
+    .map(resolvePipelineMembership).filter((membership) => membership.inPipeline);
 }
 
 export async function pendingCommand(options: { ready?: boolean; blocked?: boolean } = {}): Promise<void> {

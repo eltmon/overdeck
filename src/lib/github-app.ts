@@ -91,6 +91,10 @@ export interface GitHubOpenIssueLabels {
   labels: string[];
 }
 
+export interface GitHubIssueLabels extends GitHubOpenIssueLabels {
+  state: 'open' | 'closed';
+}
+
 export type GitHubCiCheckRunsVerdict = 'green' | 'pending' | 'red';
 
 export interface GitHubCiCheckRunSummary {
@@ -616,6 +620,33 @@ export async function listOpenIssuesWithLabelsPromise(
         .map((label) => typeof label === 'string' ? label : label.name)
         .filter((name): name is string => typeof name === 'string' && name.length > 0),
     }));
+}
+
+export async function listIssuesWithAnyLabelPromise(
+  owner: string,
+  repo: string,
+  labels: readonly string[],
+): Promise<GitHubIssueLabels[]> {
+  const byNumber = new Map<number, GitHubIssueLabels>();
+  for (const label of labels) {
+    const issues = await githubApiAllPages<{
+      number: number;
+      state: 'open' | 'closed';
+      pull_request?: unknown;
+      labels?: Array<string | { name?: string | null }>;
+    }>(`/repos/${owner}/${repo}/issues?state=all&labels=${encodeURIComponent(label)}`);
+    for (const issue of issues) {
+      if (issue.pull_request != null) continue;
+      byNumber.set(issue.number, {
+        number: issue.number,
+        state: issue.state,
+        labels: (issue.labels ?? [])
+          .map((value) => typeof value === 'string' ? value : value.name)
+          .filter((name): name is string => typeof name === 'string' && name.length > 0),
+      });
+    }
+  }
+  return [...byNumber.values()];
 }
 
 async function mergePullRequestWithAppPromise(

@@ -14,6 +14,7 @@ export type PipelineBucket =
 
 /** Server-computed pipeline membership attached to dashboard issue DTOs. */
 export interface IssuePipelineMembership {
+  available?: boolean
   inPipeline: boolean
   bucket: PipelineBucket
   labelDrift: "stale_present" | "stale_absent" | null

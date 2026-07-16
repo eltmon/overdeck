@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createPipelineMembershipService,
   getPipelineMembershipForProjects,
+  getPipelineMembershipResultsForProjects,
   PIPELINE_MEMBERSHIP_TTL_MS,
   summarizePipelineMembership,
 } from '../../../src/dashboard/server/services/pipeline-membership.js';
@@ -19,7 +20,7 @@ describe('pipeline membership service', () => {
       reasons: ['merged but open'],
       labelDrift: 'stale_absent',
       lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
-    })).toEqual({ inPipeline: true, bucket: 'post_merge_limbo', labelDrift: 'stale_absent' });
+    })).toEqual({ available: true, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: 'stale_absent' });
   });
 
   it('caches classified membership within the TTL and refreshes after expiry', async () => {
@@ -65,5 +66,22 @@ describe('pipeline membership service', () => {
       { issueId: 'PAN-1966' },
     ]);
     expect(getMembership).toHaveBeenCalledTimes(2);
+  });
+
+  it('isolates one project failure in explicit result metadata', async () => {
+    const projects = [
+      { name: 'healthy', path: '/healthy', github_repo: 'owner/healthy' },
+      { name: 'failed', path: '/failed', github_repo: 'owner/failed' },
+    ];
+    const failure = new Error('GitHub unavailable');
+    const getMembership = vi.fn().mockImplementation(async (project: { path: string }) => {
+      if (project.path === '/failed') throw failure;
+      return [{ issueId: 'PAN-1' }];
+    });
+
+    const results = await getPipelineMembershipResultsForProjects(projects, getMembership);
+
+    expect(results[0]).toMatchObject({ project: projects[0], memberships: [{ issueId: 'PAN-1' }] });
+    expect(results[1]).toMatchObject({ project: projects[1], error: failure });
   });
 });

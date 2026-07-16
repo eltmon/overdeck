@@ -10,7 +10,7 @@ import { resolvePipelineMembership, type IssueLensSignals } from '../../../src/l
 const root = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const CONSUMERS = [
   { name: 'resource-discovery', file: 'src/dashboard/server/services/resource-discovery.ts', delegates: /getPipelineMembershipForProjects/, legacy: /filter\(\(issue\) => !isTerminalTrackerState/ },
-  { name: 'frontend-pipeline-state', file: 'src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx', delegates: /pipelineMembership\?\.inPipeline/, legacy: /stateType.*in_progress.*in_review/ },
+  { name: 'frontend-pipeline-state', file: 'src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx', delegates: /pipelineMembership(?:\?\.|\.)inPipeline/, legacy: /stateType.*in_progress.*in_review/ },
   { name: 'pan-pending', file: 'src/cli/commands/pending.ts', delegates: /resolvePipelineMembership/, legacy: /const memberIds = new Set\(Object\.values\(allStatuses\)/ },
   { name: 'enumerate-in-flight', file: 'src/lib/reconstruct/enumerate-in-flight.ts', delegates: /resolvePipelineMembership/, legacy: /openIssueIds|FEATURE_DIR_RE/ },
   { name: 'flywheel', file: 'src/lib/cloister/flywheel.ts', delegates: /resolvePipelineMembership/, legacy: /workspacesDir.*feature-/ },

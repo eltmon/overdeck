@@ -1,6 +1,6 @@
 import type { ProjectConfig } from '../../../lib/projects.js';
 import type { IssuePipelineMembership } from '@overdeck/contracts';
-import { gatherProjectLensSignals } from '../../../lib/pipeline-membership-gather.js';
+import { gatherProjectLensSignals, mapPipelineProjects } from '../../../lib/pipeline-membership-gather.js';
 import { resolvePipelineMembership, type IssueLensSignals, type PipelineMembership } from '../../../lib/pipeline-membership.js';
 
 export const PIPELINE_MEMBERSHIP_TTL_MS = 30_000;
@@ -34,13 +34,38 @@ export async function getPipelineMembershipForProjects(
   projects: ProjectConfig[],
   getMembership = getProjectPipelineMembership,
 ): Promise<PipelineMembership[]> {
-  return (await Promise.all(projects.map((project) => getMembership(project)))).flat();
+  const results = await getPipelineMembershipResultsForProjects(projects, getMembership);
+  const failed = results.find((result) => result.error);
+  if (failed) throw failed.error;
+  return results.flatMap((result) => result.memberships ?? []);
+}
+
+export interface ProjectPipelineMembershipResult {
+  project: ProjectConfig;
+  memberships?: PipelineMembership[];
+  error?: unknown;
+}
+
+export async function getPipelineMembershipResultsForProjects(
+  projects: ProjectConfig[],
+  getMembership = getProjectPipelineMembership,
+): Promise<ProjectPipelineMembershipResult[]> {
+  const gathered = await mapPipelineProjects(projects, getMembership);
+  return gathered.map(({ project, value, error }) => {
+    if (error) return { project, error };
+    return { project, memberships: value ?? [] };
+  });
 }
 
 export function summarizePipelineMembership(membership: PipelineMembership): IssuePipelineMembership {
   return {
+    available: true,
     inPipeline: membership.inPipeline,
     bucket: membership.bucket,
     labelDrift: membership.labelDrift,
   };
+}
+
+export function unavailablePipelineMembership(): IssuePipelineMembership {
+  return { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null };
 }

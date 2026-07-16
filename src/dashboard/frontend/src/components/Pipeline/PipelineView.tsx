@@ -69,6 +69,19 @@ function comparePipelineIssues(a: Issue, b: Issue) {
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 
+function isClosedIssue(issue: Issue) {
+  const state = issue.state ?? issue.status;
+  return issue.stateType === 'completed' || issue.stateType === 'canceled'
+    || state === 'done' || state === 'canceled' || state === 'Canceled'
+    || state === 'Closed' || state === 'Completed' || state === 'completed';
+}
+
+function isOutsidePipeline(issue: Issue) {
+  return issue.pipelineMembership
+    ? issue.pipelineMembership.inPipeline !== true
+    : isClosedIssue(issue);
+}
+
 function readFilterState(): PipelineFilterState {
   if (typeof window === 'undefined') {
     return { phase: 'all', projects: [], blocked: false, noPr: false };
@@ -309,7 +322,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
     };
 
     for (const issue of issues) {
-      if (issue.pipelineMembership?.inPipeline === false) continue;
+      if (isOutsidePipeline(issue)) continue;
 
       const projectOption = projectOptionForIssue(issue);
       if (filter.projects.length > 0 && (!projectOption || !filter.projects.includes(projectOption.id))) {
@@ -408,7 +421,7 @@ export function PipelineView({ onSearchOpen, onTabChange, keyboardShortcutsDisab
 
   const metricTiles = useMemo(() => {
     const activeIssues = issues.filter((issue) => {
-      if (issue.pipelineMembership?.inPipeline === false) return false;
+      if (isOutsidePipeline(issue)) return false;
       // Active issues = the pipeline set (the rendered lanes), NOT all open
       // issues — raw backlog ('todo') is excluded so the header matches the
       // Definition-of-Ready lanes below (PAN-1966).
