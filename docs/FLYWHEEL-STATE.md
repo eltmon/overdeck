@@ -5080,3 +5080,15 @@ operator: fix key in Settings if kimi matters). `--fresh` start issued; Cloister
 
 **RUN-63 session totals: 39 merges. The drain: every parked issue now has a WORKING agent.**
 Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491, PAN-2633 (operator-stopped).
+
+---
+
+## Tick 49 — 2026-07-16 ~07:50Z — reaper struck at last; fleet mostly healthy
+
+- **7 of 8 work agents running** post-dam-break; agent-pan-2168 was REAPED by PAN-2757 (74s after
+  item/completed — 8th victim tonight) with work safely committed (`d7452b18d9`); resumed.
+- **STRUCK PAN-2757 itself** — the last systemic killer. Posted tonight's 8-victim kill tally +
+  minimal scope: query-failure ≠ session-absence, two-miss rule across patrol cycles, attributable
+  reap logs. NOT a per-transport redesign (that's PAN-2775 follow-up).
+- 2710 strike was a 122m zombie (nudge dead-lettered — idle codex, no next turn) → killed + re-struck.
+- Main CI green on `94742d9678`.
