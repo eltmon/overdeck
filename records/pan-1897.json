@@ -104,21 +104,20 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T21:35:20.494Z",
+  "updated": "2026-07-16T21:43:52.275Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:35:20.426Z",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
+    "updatedAt": "2026-07-16T21:43:52.228Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
-    "lastVerifiedCommit": "5c805146dafd9378c79a81eba4889b415f9e7eb4",
+    "lastVerifiedCommit": "92c04241357a54fa6dbf2eb617c957aafe2f57b3",
     "reviewRequestedAt": "2026-07-16T21:27:19.265Z",
     "reviewSpawnedAt": "2026-07-16T21:27:22.961Z",
     "strikeRecoveryCount": 0
@@ -206,9 +205,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6058856,
-            "output": 440617,
-            "cacheRead": 93104640,
+            "input": 6082394,
+            "output": 443687,
+            "cacheRead": 95754752,
             "cacheWrite": 0
           }
         }
@@ -221,9 +220,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 10813928,
-          "output": 536796,
-          "cacheRead": 107648768,
+          "input": 10837466,
+          "output": 539866,
+          "cacheRead": 110298880,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -246,8 +245,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 121.818576,
-        "pricingAsOf": "2026-07-16T21:35:20.464Z"
+        "usd": 123.353422,
+        "pricingAsOf": "2026-07-16T21:43:52.256Z"
       }
     },
     "merges": [
