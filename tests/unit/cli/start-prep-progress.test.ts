@@ -97,6 +97,42 @@ describe('start prep progress', () => {
     expect(new PrepStepTimeoutError('test-step', 1_000)).toBeInstanceOf(Error);
   });
 
+  it('aborts degradable work and waits for cancellation cleanup to settle', async () => {
+    const progress = createPrepProgress(createSpinner(), { stream: createStream(false).stream });
+    let receivedSignal: AbortSignal | undefined;
+    let finishCleanup!: () => void;
+    let settled = false;
+    const resultPromise = progress.step('sync-main', 240_000, (signal) => {
+      receivedSignal = signal;
+      return new Promise<void>((resolve) => {
+        finishCleanup = resolve;
+      });
+    }, { awaitQuiescence: true });
+    void resultPromise.then(() => { settled = true; }, () => { settled = true; });
+
+    await vi.advanceTimersByTimeAsync(240_000);
+
+    expect(receivedSignal?.aborted).toBe(true);
+    expect(settled).toBe(false);
+    finishCleanup();
+    await expect(resultPromise).rejects.toBeInstanceOf(PrepStepTimeoutError);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('propagates a cleanup failure instead of degrading after timeout', async () => {
+    const progress = createPrepProgress(createSpinner(), { stream: createStream(false).stream });
+    const unsafeCleanup = new Error('Git quiescence could not be established');
+    const resultPromise = progress.step('sync-main', 240_000, (signal) => new Promise<never>((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(unsafeCleanup), { once: true });
+    }), { awaitQuiescence: true });
+    const rejection = expect(resultPromise).rejects.toBe(unsafeCleanup);
+
+    await vi.advanceTimersByTimeAsync(240_000);
+
+    await rejection;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('returns the step value, clears timers, and emits elapsed completion progress', async () => {
     const spinner = createSpinner();
     const { chunks, stream } = createStream(false);

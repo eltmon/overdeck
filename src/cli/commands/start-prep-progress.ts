@@ -1,4 +1,5 @@
 import type { Ora } from 'ora';
+import { UnsafeSyncMainStateError } from '../../lib/cloister/sync-main-git.js';
 
 const HEARTBEAT_INTERVAL_MS = 15_000;
 
@@ -48,9 +49,11 @@ export function createPrepProgress(
   async function step<T>(
     name: string,
     budgetMs: number,
-    fn: () => Promise<T> | T,
+    fn: (signal: AbortSignal) => Promise<T> | T,
+    options: { awaitQuiescence?: boolean } = {},
   ): Promise<T> {
     const startedAt = Date.now();
+    const controller = new AbortController();
     update(name);
 
     const heartbeat = setInterval(() => {
@@ -58,18 +61,22 @@ export function createPrepProgress(
       writeLine(`still running: ${name} (${elapsedSeconds}s elapsed)`);
     }, HEARTBEAT_INTERVAL_MS);
 
+    const operation = Promise.resolve().then(() => fn(controller.signal));
     let timeout: ReturnType<typeof setTimeout> | undefined;
-    const timeoutPromise = new Promise<never>((_resolve, reject) => {
-      timeout = setTimeout(() => {
-        reject(new PrepStepTimeoutError(name, budgetMs));
-      }, budgetMs);
+    const timedOut = Symbol('timed-out');
+    const timeoutPromise = new Promise<typeof timedOut>((resolve) => {
+      timeout = setTimeout(() => resolve(timedOut), budgetMs);
     });
 
     try {
-      const value = await Promise.race([
-        Promise.resolve().then(fn),
-        timeoutPromise,
-      ]);
+      const value = await Promise.race([operation, timeoutPromise]);
+      if (value === timedOut) {
+        const error = new PrepStepTimeoutError(name, budgetMs);
+        controller.abort(error);
+        if (options.awaitQuiescence) await operation;
+        else void operation.catch(() => undefined);
+        throw error;
+      }
       const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1_000);
       update(`completed: ${name} (${elapsedSeconds}s elapsed)`);
       return value;
@@ -93,16 +100,43 @@ export type StartPrepStepName = keyof typeof START_PREP_STEP_POLICIES;
 
 type PrepProgress = ReturnType<typeof createPrepProgress>;
 
+export function createPlanningProgress(
+  spinner: Pick<Ora, 'text'>,
+  onComplete: (name: string) => void,
+) {
+  return {
+    setSpinnerText: (text: string) => { spinner.text = text; },
+    onComplete,
+  };
+}
+
+export function warnSyncMainFailure(spinner: Pick<Ora, 'warn'>, error: unknown): void {
+  if (error instanceof UnsafeSyncMainStateError) throw error;
+  spinner.warn(`Sync main failed: ${error instanceof Error ? error.message : String(error)}`);
+}
+
+export async function runStateReconcile(
+  prep: PrepProgress,
+  spinner: Pick<Ora, 'warn'>,
+  remote: boolean,
+  reconcile: () => Promise<void> | void,
+): Promise<void> {
+  if (remote) await reconcile();
+  else await runStartPrepStep(prep, spinner, 'state-reconcile', reconcile);
+}
+
 export async function runStartPrepStep<T>(
   prep: PrepProgress,
   spinner: Pick<Ora, 'warn'>,
   name: StartPrepStepName,
-  fn: () => Promise<T> | T,
+  fn: (signal: AbortSignal) => Promise<T> | T,
   timeoutFallback?: T,
 ): Promise<T> {
   const policy = START_PREP_STEP_POLICIES[name];
   try {
-    return await prep.step(name, policy.budgetMs, fn);
+    return await prep.step(name, policy.budgetMs, fn, {
+      awaitQuiescence: policy.timeout === 'degrade',
+    });
   } catch (error) {
     if (error instanceof PrepStepTimeoutError && policy.timeout === 'degrade') {
       spinner.warn(error.message);

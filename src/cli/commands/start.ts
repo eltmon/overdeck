@@ -31,7 +31,7 @@ import {
   printPlanningConnectionError,
   streamPlanningSession,
 } from './planning-stream.js';
-import { createPrepProgress, runStartPrepStep } from './start-prep-progress.js';
+import { createPlanningProgress, createPrepProgress, runStartPrepStep, runStateReconcile, warnSyncMainFailure } from './start-prep-progress.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -842,13 +842,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     const locationPreference = determineWorkspaceLocation(options);
     // Log project resolution info
     const resolved = resolveProjectFromIssueSync(id);
-    if (resolved) {
-      prep.update(`Resolved project: ${resolved.projectName} (${resolved.projectPath})`);
-      await runStartPrepStep(prep, spinner, 'state-reconcile', async () => {
-        prep.update(`Reconciling permanent state for ${resolved.projectName}...`);
-        await requireAutomaticStateMigration(resolved); await applyStartPolicyOptions(resolved, id, options, options.dryRun === true);
-      });
-    }
+    if (resolved) spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
     // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
@@ -872,6 +866,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
     const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
+    if (resolved) {
+      const reconcileState = async () => {
+        spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
+        await requireAutomaticStateMigration(resolved);
+        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true);
+      };
+      await runStateReconcile(prep, spinner, effectiveRemote, reconcileState);
+    }
 
     // PAN-2407: route unplanned issues to the start-planning endpoint before
     // any workspace creation or remote provisioning.
@@ -887,7 +889,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           return;
         }
 
-        prep.update(`Starting ${resolvedPlanningMode} planning session for ${id}...`);
+        spinner.text = `Starting ${resolvedPlanningMode} planning session for ${id}...`;
         let sessionName = '';
         try {
           const response = await fetch(
@@ -921,8 +923,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
           await streamPlanningSession(response, {
             issueId: id,
-            setSpinnerText: (text) => { prep.update(text); },
-            onComplete: (name) => { sessionName = name; },
+            ...createPlanningProgress(spinner, (name) => { sessionName = name; }),
           });
 
           spinner.succeed(
@@ -1042,8 +1043,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       prep.update('Syncing latest main into workspace...');
       let syncConflictFiles: string[] | undefined;
       try {
-        await runStartPrepStep(prep, spinner, 'sync-main', async () => {
-          const syncResult = await syncMainIntoWorkspace(workspace, id);
+        await runStartPrepStep(prep, spinner, 'sync-main', async (signal) => {
+          const syncResult = await syncMainIntoWorkspace(workspace, id, signal);
           if (syncResult.success) {
             prep.update(syncResult.alreadyUpToDate ? 'Workspace already up to date with main' : `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`);
           } else {
@@ -1052,8 +1053,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
             spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
           }
         });
-      } catch (syncErr: any) {
-        spinner.warn(`Sync main failed: ${syncErr.message}`);
+      } catch (syncErr: unknown) {
+        warnSyncMainFailure(spinner, syncErr);
       }
 
       // PAN-1872: a sync-main conflict must not strand the issue. Continue
@@ -1206,7 +1207,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     prep.update('Building agent prompt with planning context...');
-    const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', () => getTrackerContext(id, workspace), '');
+    const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', (signal) => getTrackerContext(id, workspace, signal), '');
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
     prep.update('Spawning agent...');
 
@@ -1297,9 +1298,4 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   }
 }
 
-export const __testInternals = {
-  failPostCreateValidation,
-  repairMainBranchWorkspace,
-  resolveExplicitHarnessFlag,
-  runStartPrepStep,
-};
+export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep };

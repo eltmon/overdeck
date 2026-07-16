@@ -210,7 +210,8 @@ const TOTAL_CONTEXT_LIMIT = 2000;
  */
 export async function getTrackerContext(
   issueId: string,
-  workspacePath: string
+  workspacePath: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   let stateMtime: Date | null = null;
 
@@ -246,8 +247,8 @@ export async function getTrackerContext(
 
       // Fetch issue and comments in parallel
       const [issue, allComments] = await Promise.all([
-        Effect.runPromise(tracker.getIssue(issueId)),
-        Effect.runPromise(tracker.getComments(issueId)).catch((err: unknown) => {
+        Effect.runPromise(tracker.getIssue(issueId), { signal }),
+        Effect.runPromise(tracker.getComments(issueId), { signal }).catch((err: unknown) => {
           // GitLab throws NotImplementedError; treat as no comments
           if (err instanceof NotImplementedError) return [];
           throw err;
@@ -329,6 +330,7 @@ export async function getTrackerContext(
       }
       return result;
     } catch (err: unknown) {
+      if (signal?.aborted) return '';
       // Issue not found in this tracker — try next
       const message = err instanceof Error ? err.message : String(err);
       if (

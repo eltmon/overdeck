@@ -58,17 +58,20 @@ const execMock = vi.hoisted(() =>
     .mockResolvedValue({ stdout: '', stderr: '' })
 );
 
-const isOperationHeadCheck = (cmd: string) =>
-  /git rev-parse -q --verify (?:MERGE_HEAD|REBASE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD)/.test(cmd);
+const operationHeads = vi.hoisted(() => new Set<string>());
+const operationHeadFromCommand = (cmd: string) =>
+  cmd.match(/git rev-parse -q --verify (MERGE_HEAD|REBASE_HEAD|CHERRY_PICK_HEAD|REVERT_HEAD)/)?.[1];
 
 vi.mock('child_process', () => {
   const kCustom = Symbol.for('nodejs.util.promisify.custom');
 
   function exec(cmd: string, optionsOrCb: any, maybeCallback?: any) {
     const callback = typeof optionsOrCb === 'function' ? optionsOrCb : maybeCallback;
-    if (isOperationHeadCheck(cmd)) {
-      callback(new Error('ref not found'), '', '');
-      return;
+    const operationHead = operationHeadFromCommand(cmd);
+    if (operationHead) {
+      if (operationHeads.has(operationHead)) callback(null, 'deadbeef\n', '');
+      else callback(Object.assign(new Error('ref not found'), { code: 1 }), '', '');
+      return { pid: 4242, kill: vi.fn() };
     }
     execMock(cmd, typeof optionsOrCb === 'object' ? optionsOrCb : undefined)
       .then(({ stdout }) => callback(null, stdout, ''))
@@ -89,7 +92,12 @@ vi.mock('child_process', () => {
   }
 
   (exec as any)[kCustom] = (cmd: string, opts?: any) => {
-    if (isOperationHeadCheck(cmd)) return Promise.reject(new Error('ref not found'));
+    const operationHead = operationHeadFromCommand(cmd);
+    if (operationHead) {
+      return operationHeads.has(operationHead)
+        ? Promise.resolve({ stdout: 'deadbeef\n', stderr: '' })
+        : Promise.reject(Object.assign(new Error('ref not found'), { code: 1 }));
+    }
     return execMock(cmd, opts);
   };
   // execFile's promisified form is called as (file, args, opts). Translate
@@ -98,7 +106,12 @@ vi.mock('child_process', () => {
   // async tmux helpers in src/lib/tmux.ts.
   (execFile as any)[kCustom] = (file: string, args?: string[], opts?: any) => {
     const cmd = Array.isArray(args) && args.length > 0 ? `${file} ${args.join(' ')}` : file;
-    if (isOperationHeadCheck(cmd)) return Promise.reject(new Error('ref not found'));
+    const operationHead = operationHeadFromCommand(cmd);
+    if (operationHead) {
+      return operationHeads.has(operationHead)
+        ? Promise.resolve({ stdout: 'deadbeef\n', stderr: '' })
+        : Promise.reject(Object.assign(new Error('ref not found'), { code: 1 }));
+    }
     return execMock(cmd, opts);
   };
 
@@ -214,6 +227,7 @@ describe('syncMainIntoWorkspace', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    operationHeads.clear();
     (cleanupStaleLocks as any).mockReturnValue(Effect.succeed({ found: [], removed: [], errors: [] }));
   });
 
@@ -394,6 +408,7 @@ describe('syncMainIntoWorkspace', () => {
         if (cmd.includes('git status --porcelain')) return { stdout: '', stderr: '' };
         if (cmd.includes('git fetch origin main')) return { stdout: '', stderr: '' };
         if (cmd.includes('git merge origin/main')) {
+          operationHeads.add('MERGE_HEAD');
           const err: any = new Error('CONFLICT (content): Merge conflict in src/foo.ts');
           err.stdout = 'Auto-merging src/foo.ts\nCONFLICT (content): Merge conflict in src/foo.ts\n';
           err.stderr = '';
@@ -401,7 +416,11 @@ describe('syncMainIntoWorkspace', () => {
         }
         if (cmd.includes('git diff --name-only --diff-filter=U')) return { stdout: 'src/foo.ts\n', stderr: '' };
         if (cmd.includes('git branch --show-current')) return { stdout: 'feature/pan-242\n', stderr: '' };
-        if (cmd.includes('git merge --abort')) { mergeAbortCalled = true; return { stdout: '', stderr: '' }; }
+        if (cmd.includes('git merge --abort')) {
+          operationHeads.delete('MERGE_HEAD');
+          mergeAbortCalled = true;
+          return { stdout: '', stderr: '' };
+        }
         return { stdout: '', stderr: '' };
       });
 

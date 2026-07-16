@@ -1,9 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { __testInternals } from '../../../src/cli/commands/start.js';
 import {
+  createPlanningProgress,
   PrepStepTimeoutError,
+  runStateReconcile,
   START_PREP_STEP_POLICIES,
+  warnSyncMainFailure,
 } from '../../../src/cli/commands/start-prep-progress.js';
+import { UnsafeSyncMainStateError } from '../../../src/lib/cloister/sync-main-git.js';
 
 const { runStartPrepStep } = __testInternals;
 type PrepProgress = Parameters<typeof runStartPrepStep>[0];
@@ -46,10 +50,10 @@ describe('pan start prep step wiring', () => {
       });
     }
 
-    expect(prep.step).toHaveBeenNthCalledWith(1, 'state-reconcile', 60_000, expect.any(Function));
-    expect(prep.step).toHaveBeenNthCalledWith(2, 'sync-main', 240_000, expect.any(Function));
-    expect(prep.step).toHaveBeenNthCalledWith(3, 'tracker-context', 60_000, expect.any(Function));
-    expect(prep.step).toHaveBeenNthCalledWith(4, 'spawn', 600_000, expect.any(Function));
+    expect(prep.step).toHaveBeenNthCalledWith(1, 'state-reconcile', 60_000, expect.any(Function), { awaitQuiescence: false });
+    expect(prep.step).toHaveBeenNthCalledWith(2, 'sync-main', 240_000, expect.any(Function), { awaitQuiescence: true });
+    expect(prep.step).toHaveBeenNthCalledWith(3, 'tracker-context', 60_000, expect.any(Function), { awaitQuiescence: true });
+    expect(prep.step).toHaveBeenNthCalledWith(4, 'spawn', 600_000, expect.any(Function), { awaitQuiescence: false });
     expect(events).toEqual([
       'step:state-reconcile',
       'fn:state-reconcile',
@@ -60,6 +64,51 @@ describe('pan start prep step wiring', () => {
       'step:spawn',
       'fn:spawn',
     ]);
+  });
+
+  it('bounds local reconciliation but leaves remote reconciliation unbounded', async () => {
+    const prep = {
+      update: vi.fn(),
+      step: vi.fn(async (_name: string, _budgetMs: number, fn: () => Promise<void>) => fn()),
+    } as unknown as PrepProgress;
+    const spinner = { warn: vi.fn() };
+    const reconcile = vi.fn().mockResolvedValue(undefined);
+
+    await runStateReconcile(prep, spinner, false, reconcile);
+    expect(prep.step).toHaveBeenCalledWith(
+      'state-reconcile',
+      60_000,
+      reconcile,
+      { awaitQuiescence: false },
+    );
+
+    vi.mocked(prep.step).mockClear();
+    await runStateReconcile(prep, spinner, true, reconcile);
+    expect(prep.step).not.toHaveBeenCalled();
+    expect(reconcile).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps planning stream updates on the Ora spinner', () => {
+    const spinner = { text: '' };
+    const onComplete = vi.fn();
+    const progress = createPlanningProgress(spinner, onComplete);
+
+    progress.setSpinnerText('Planning: inspecting repository');
+    progress.onComplete('planning-pan-1897');
+
+    expect(spinner.text).toBe('Planning: inspecting repository');
+    expect(onComplete).toHaveBeenCalledWith('planning-pan-1897');
+  });
+
+  it('fails start on unsafe sync state but warns for ordinary sync failures', () => {
+    const spinner = { warn: vi.fn() };
+    const unsafe = new UnsafeSyncMainStateError('Git quiescence could not be established');
+
+    expect(() => warnSyncMainFailure(spinner, unsafe)).toThrow(unsafe);
+    expect(spinner.warn).not.toHaveBeenCalled();
+
+    warnSyncMainFailure(spinner, new Error('fetch failed'));
+    expect(spinner.warn).toHaveBeenCalledWith('Sync main failed: fetch failed');
   });
 
   it.each([
