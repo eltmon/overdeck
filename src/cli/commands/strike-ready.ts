@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { resolve } from 'node:path';
 import type { Command } from 'commander';
 
-import { getReviewStatusSync, setReviewStatusSync, type ReviewStatus } from '../../lib/review-status.js';
+import { clearWorkspaceStuck, getReviewStatusSync, setReviewStatusSync, type ReviewStatus } from '../../lib/review-status.js';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 
 const execFileAsync = promisify(execFile);
@@ -14,6 +14,7 @@ export interface StrikeReadyDependencies {
   resolveProject: typeof resolveProjectFromIssueSync;
   getStatus: typeof getReviewStatusSync;
   setStatus: typeof setReviewStatusSync;
+  clearStuck: typeof clearWorkspaceStuck;
   git: (args: string[], cwd: string) => Promise<string>;
 }
 
@@ -23,6 +24,7 @@ const defaultDependencies: StrikeReadyDependencies = {
   resolveProject: resolveProjectFromIssueSync,
   getStatus: getReviewStatusSync,
   setStatus: setReviewStatusSync,
+  clearStuck: clearWorkspaceStuck,
   git: async (args, cwd) => (await execFileAsync('git', args, { cwd })).stdout.trim(),
 };
 
@@ -68,7 +70,15 @@ export async function strikeReadyCommand(
   }
 
   const previous = deps.getStatus(issueId);
-  if (previous?.strikeReadyHead === remoteHead) return previous;
+  if (previous?.strikeReadyHead === remoteHead) {
+    if (previous.strikeLandingState !== 'needs_you') return previous;
+    deps.clearStuck(issueId);
+    return deps.setStatus(issueId, {
+      strikeLandingState: 'ready',
+      strikeRecoveryCount: 0,
+      strikeLandingAttempts: previous.strikeLandingAttempts ?? [],
+    });
+  }
 
   const readyAt = deps.now();
   return deps.setStatus(issueId, {
