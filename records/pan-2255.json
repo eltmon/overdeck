@@ -86,9 +86,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T07:33:49.573Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T07:37Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-16T07:37:13.046Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T07:37:13.103Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T07:37:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2255\n\n# Review Synthesis — PAN-2255 — 2026-07-16T08:10:00Z\n\n## Verdict: CHANGES REQUESTED — security review failed, and Deacon now serially rereads retained workspaces' feedback on every patrol\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-e4676f87/context.json\n- Branch: feature/pan-2255\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255\n- HEAD reviewed: e4676f8795187c8be389295476e3e87d8cbdd8bc\n- Cycle number: 3\n- Prior cycle SHA: ed65a258299886a34e9d2f738f44fc460c69be2a\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed: reviewer session ended before writing a report | — | infrastructure failure |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-e4676f87/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-e4676f87/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-e4676f87/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Reviewer session ended before writing a report\nThe security sub-role failed without producing a usable report. Review policy forbids approval when any reviewer fails or times out, so security coverage is incomplete for this cycle.\n\n### [performance] Deacon patrol serially rereads every feedback file for every retained work agent — `src/lib/cloister/agent-mailbox-escalation.ts:41`\nThe cycle diff expanded patrol candidates to include `starting`, `running`, and `stopped` work agents. Each candidate is processed sequentially, and its mailbox listing reads every feedback file sequentially before later Deacon recovery checks run. The cost therefore grows with retained workspace history and feedback volume, which can delay stuck-agent remediation and other patrol duties. Use a bounded candidate set or metadata-first filtering, bounded concurrency, and avoid scanning stopped agents without pending actionable mail; cover the behavior with a scale test.\n\n## Non-blocking Findings\n\n### Correctness\n\n- [demoted: previously reviewed] Discovered mailbox items retain a stale serialized path — `src/lib/cloister/agent-mailbox.ts:160`. The defect can break mailbox delivery after workspace relocation, but the cited production code was unchanged from cycle 2 to cycle 3 and is not promotable under the cycle-3 convergence gate.\n- Restart replay can duplicate a message when transport succeeds but only the mailbox transition fails — `src/dashboard/server/pending-feedback.ts:180`. The reviewer classified this as non-blocking; transport success and mailbox-state retry should be tracked separately to avoid duplicate replay.\n\n### Requirements\n\n- [demoted: previously reviewed] Review-verdict feedback bypasses the one-patrol escalation window — `src/lib/cloister/review-verdict-feedback.ts:158`. This is an in-PR-scope gap against `feedback-producers.ac3` and `delayed-escalation.ac1`, but the cited production branch was unchanged from cycle 2 to cycle 3 and is not promotable under the convergence gate. The cycle changed its test to assert the immediate escalation, so the behavior remains visible for follow-up.\n\n### Performance\n\nNone beyond the blocking finding.\n\n## Scope Note\nCycle 3 re-litigates only changes after ed65a258299886a34e9d2f738f44fc460c69be2a. The stale-path correctness defect and immediate-escalation requirements gap remain material concerns in the PR, but their cited production lines were already present in the prior cycle and were therefore demoted as previously reviewed, not promotable.\n\n## Clean Sub-roles\nNone. Correctness and requirements have no promotable blockers but retain non-blocking findings; performance is blocked, and security did not complete.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2255/.pan/review/agent-pan-2255-review-e4676f87/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2255 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/dashboard-types-baseline.txt",
@@ -169,7 +187,7 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T07:33:49.573Z",
+  "updated": "2026-07-16T07:37:13.103Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "reviewing",
