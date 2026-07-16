@@ -52,17 +52,17 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T20:53:22.344Z",
+  "updated": "2026-07-16T20:58:25.182Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:53:22.314Z",
+    "updatedAt": "2026-07-16T20:58:25.160Z",
     "reviewNotes": "Degraded sync-main timeout can spawn against a workspace still being mutated",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
@@ -175,7 +175,7 @@
       },
       "costAtCloseOut": {
         "usd": 96.044057,
-        "pricingAsOf": "2026-07-16T20:53:22.332Z"
+        "pricingAsOf": "2026-07-16T20:58:25.168Z"
       }
     },
     "merges": [
