@@ -18,6 +18,7 @@ import { emitActivityEntrySync } from '../../lib/activity-logger.js';
 
 const PENDING_FEEDBACK_FILE = join(getOverdeckHome(), 'pending-feedback-deliveries.json');
 const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000;
+const storeMutationQueues = new Map<string, Promise<void>>();
 
 type FeedbackKind = 'review-blocked' | 'review-failed' | 'test-failed';
 
@@ -35,6 +36,21 @@ export interface PendingFeedbackDelivery {
 
 interface PendingFeedbackStore {
   deliveries: PendingFeedbackDelivery[];
+}
+
+async function withStoreMutation<T>(filePath: string, mutate: () => Promise<T>): Promise<T> {
+  const previous = storeMutationQueues.get(filePath) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>(resolve => { release = resolve; });
+  const queued = previous.then(() => current);
+  storeMutationQueues.set(filePath, queued);
+  await previous;
+  try {
+    return await mutate();
+  } finally {
+    release();
+    if (storeMutationQueues.get(filePath) === queued) storeMutationQueues.delete(filePath);
+  }
 }
 
 function normalizeDelivery(value: unknown): PendingFeedbackDelivery | null {
@@ -91,12 +107,14 @@ export async function enqueuePendingFeedbackDelivery(
   options?: { filePath?: string }
 ): Promise<void> {
   const filePath = options?.filePath ?? PENDING_FEEDBACK_FILE;
-  const store = await readStore(filePath);
-  store.deliveries = store.deliveries.filter(
-    (existing) => !(existing.issueId === delivery.issueId && existing.kind === delivery.kind)
-  );
-  store.deliveries.push(delivery);
-  await writeStore(filePath, store);
+  await withStoreMutation(filePath, async () => {
+    const store = await readStore(filePath);
+    store.deliveries = store.deliveries.filter(
+      (existing) => !(existing.issueId === delivery.issueId && existing.kind === delivery.kind)
+    );
+    store.deliveries.push(delivery);
+    await writeStore(filePath, store);
+  });
 }
 
 export async function markPendingFeedbackDelivered(
@@ -105,21 +123,21 @@ export async function markPendingFeedbackDelivered(
   options?: { filePath?: string }
 ): Promise<void> {
   const filePath = options?.filePath ?? PENDING_FEEDBACK_FILE;
-  const store = await readStore(filePath);
-  const next = store.deliveries.filter(
-    (delivery) => !(delivery.issueId === issueId && delivery.kind === kind)
-  );
+  await withStoreMutation(filePath, async () => {
+    const store = await readStore(filePath);
+    const next = store.deliveries.filter(
+      (delivery) => !(delivery.issueId === issueId && delivery.kind === kind)
+    );
 
-  if (next.length === store.deliveries.length) return;
+    if (next.length === store.deliveries.length) return;
 
-  if (next.length === 0) {
-    if (existsSync(filePath)) {
-      await unlink(filePath).catch(() => {});
+    if (next.length === 0) {
+      if (existsSync(filePath)) await unlink(filePath).catch(() => {});
+      return;
     }
-    return;
-  }
 
-  await writeStore(filePath, { deliveries: next });
+    await writeStore(filePath, { deliveries: next });
+  });
 }
 
 export async function markPendingFeedbackTransportDelivered(
@@ -128,11 +146,13 @@ export async function markPendingFeedbackTransportDelivered(
   options?: { filePath?: string; at?: string },
 ): Promise<void> {
   const filePath = options?.filePath ?? PENDING_FEEDBACK_FILE;
-  const store = await readStore(filePath);
-  const delivery = store.deliveries.find(item => item.issueId === issueId && item.kind === kind);
-  if (!delivery || delivery.transportDeliveredAt) return;
-  delivery.transportDeliveredAt = options?.at ?? new Date().toISOString();
-  await writeStore(filePath, store);
+  await withStoreMutation(filePath, async () => {
+    const store = await readStore(filePath);
+    const delivery = store.deliveries.find(item => item.issueId === issueId && item.kind === kind);
+    if (!delivery || delivery.transportDeliveredAt) return;
+    delivery.transportDeliveredAt = options?.at ?? new Date().toISOString();
+    await writeStore(filePath, store);
+  });
 }
 
 export async function processPendingFeedbackDeliveries(options?: {
@@ -146,6 +166,13 @@ export async function processPendingFeedbackDeliveries(options?: {
   _getStatus?: typeof getReviewStatusSync;
 }): Promise<void> {
   const filePath = options?.filePath ?? PENDING_FEEDBACK_FILE;
+  await withStoreMutation(filePath, () => processPendingFeedbackDeliveriesLocked(filePath, options));
+}
+
+async function processPendingFeedbackDeliveriesLocked(
+  filePath: string,
+  options?: Parameters<typeof processPendingFeedbackDeliveries>[0],
+): Promise<void> {
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;

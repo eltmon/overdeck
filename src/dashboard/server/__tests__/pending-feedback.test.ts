@@ -69,6 +69,22 @@ describe('pending feedback recovery (PAN-585)', () => {
     await expect(readFile(queueFile, 'utf-8')).rejects.toThrow();
   });
 
+  it('serializes concurrent journal updates without losing unrelated deliveries', async () => {
+    queueFile = await setupQueueFile();
+    const delivery = (issueId: string): Parameters<typeof enqueuePendingFeedbackDelivery>[0] => ({
+      issueId, role: 'work', kind: 'review-blocked', filePath: `/tmp/${issueId}.md`,
+      message: `${issueId} feedback`, createdAt: '2026-04-27T06:00:00Z',
+    });
+
+    await Promise.all([
+      enqueuePendingFeedbackDelivery(delivery('PAN-585'), { filePath: queueFile }),
+      enqueuePendingFeedbackDelivery(delivery('PAN-586'), { filePath: queueFile }),
+    ]);
+
+    const stored = JSON.parse(await readFile(queueFile, 'utf8'));
+    expect(stored.deliveries.map((item: { issueId: string }) => item.issueId).sort()).toEqual(['PAN-585', 'PAN-586']);
+  });
+
   it('keeps queued feedback when delivery still fails on startup', async () => {
     queueFile = await setupQueueFile();
 
