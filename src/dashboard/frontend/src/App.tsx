@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
+import posthog from 'posthog-js';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
 import { ChannelPermissionDialog } from './components/ChannelPermissionDialog';
@@ -370,6 +371,7 @@ export default function App() {
     const denyExperimental = experimentalFeaturesKnown && !experimentalFeaturesEnabled;
     const nextTab = denyExperimental && isExperimentalTab(tab) ? 'home' : tab;
     setActiveTabState(nextTab);
+    posthog.capture('dashboard_tab_viewed', { tab: nextTab });
     const path = TAB_PATHS[nextTab];
     if (window.location.pathname !== path) {
       window.history.pushState({ tab: nextTab }, '', path);

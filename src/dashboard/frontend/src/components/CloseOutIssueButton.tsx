@@ -1,6 +1,7 @@
 import type { MouseEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCheck, Loader2 } from 'lucide-react';
+import posthog from 'posthog-js';
 import { useConfirm } from './DialogProvider';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
@@ -41,6 +42,7 @@ export function CloseOutIssueButton({ issueId, variant = 'card', stopPropagation
       return data;
     },
     onSuccess: async () => {
+      posthog.capture('issue_closed_out', { issue_id: issueId, variant });
       await refreshDashboardState(queryClient);
     },
   });
