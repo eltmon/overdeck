@@ -346,21 +346,21 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:18:24.004Z",
+  "updated": "2026-07-16T02:18:24.549Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:18:21.827Z",
+    "updatedAt": "2026-07-16T02:18:24.117Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "82daafcb4a1389c9fe46822c4eae4748126fad09",
     "reviewRequestedAt": "2026-07-16T02:18:21.446Z",
-    "reviewSpawnedAt": "2026-07-16T02:16:18.160Z",
+    "reviewSpawnedAt": "2026-07-16T02:18:24.115Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/FLYWHEEL-STATE.md",
@@ -589,7 +589,7 @@
       },
       "costAtCloseOut": {
         "usd": 154.747678,
-        "pricingAsOf": "2026-07-16T02:18:21.898Z"
+        "pricingAsOf": "2026-07-16T02:18:24.339Z"
       }
     },
     "merges": [
