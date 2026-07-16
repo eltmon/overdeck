@@ -1683,6 +1683,7 @@ describe('CompactChildCard', () => {
     const child = createMockChild();
     render(<CompactChildCard issue={child} agents={[]} onSelect={onSelect} />);
     const link = screen.getByText('US100');
+    link.addEventListener('click', (event) => event.preventDefault(), { once: true });
     fireEvent.click(link);
     expect(onSelect).not.toHaveBeenCalled();
   });

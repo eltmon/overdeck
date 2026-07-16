@@ -1,10 +1,42 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MachineRoom } from './MachineRoom';
+import { installStrictFetchMock } from '../../test-utils/strictFetchMock';
 import type { ResourceStack, ResourcesSnapshot } from '../../types';
 
-afterEach(() => {
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+beforeEach(() => {
+  fetchControl = installStrictFetchMock(({ method, url }) => {
+    if (method === 'GET' && url === '/api/resources/history/24h') {
+      return Response.json({ startedAt: '2026-07-07T00:00:00.000Z', cpu: [], mem: [], annotations: [] });
+    }
+    if (method === 'GET' && url === '/api/resources/stacks/PAN-2464/teardown-estimate') {
+      return Response.json({
+        issueId: 'PAN-2464',
+        composeProject: 'feature-pan-2464',
+        ramBytes: 3 * 1024 ** 3,
+        diskBytes: 2 * 1024 ** 3,
+        confirmToken: 'confirm-1',
+      });
+    }
+    if (method === 'POST' && [
+      '/api/resources/docker/container/c-api/stop',
+      '/api/resources/docker/container/c-api/unpause',
+      '/api/resources/stacks/PAN-2464/stop',
+      '/api/resources/stacks/PAN-2464/teardown',
+    ].includes(url)) {
+      return Response.json({ ok: true });
+    }
+    return undefined;
+  });
+});
+
+afterEach(async () => {
+  cleanup();
+  await fetchControl.assertNoUnexpectedRequests();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe('MachineRoom shell', () => {
@@ -56,7 +88,6 @@ describe('MachineRoom shell', () => {
   });
 
   it('wires service and stack stop buttons to their resource endpoints', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response('{}', { status: 200 }));
     render(<MachineRoom snapshot={fixtureSnapshot({ stacks: [stack('PAN-2464')] })} />);
 
     expandStack('PAN-2464');
@@ -64,26 +95,14 @@ describe('MachineRoom shell', () => {
     fireEvent.click(within(serviceRow).getByText('Stop'));
     fireEvent.click(screen.getAllByText('Stop')[0]!);
 
-    await waitFor(() => expect(destructiveCalls(fetchMock)).toHaveLength(2));
-    expect(destructiveCalls(fetchMock)).toEqual([
+    await waitFor(() => expect(destructiveCalls(fetchControl.fetchMock)).toHaveLength(2));
+    expect(destructiveCalls(fetchControl.fetchMock)).toEqual([
       ['/api/resources/docker/container/c-api/stop', { method: 'POST' }],
       ['/api/resources/stacks/PAN-2464/stop', { method: 'POST' }],
     ]);
   });
 
   it('keeps teardown confirm disabled until typed text matches and posts the estimate token', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (String(input).endsWith('/teardown-estimate')) {
-        return new Response(JSON.stringify({
-          issueId: 'PAN-2464',
-          composeProject: 'feature-pan-2464',
-          ramBytes: 3 * 1024 ** 3,
-          diskBytes: 2 * 1024 ** 3,
-          confirmToken: 'confirm-1',
-        }), { status: 200 });
-      }
-      return new Response(JSON.stringify({ ok: true }), { status: 200 });
-    });
     render(<MachineRoom snapshot={fixtureSnapshot({ stacks: [stack('PAN-2464')] })} />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Tear down' }));
@@ -98,7 +117,7 @@ describe('MachineRoom shell', () => {
     expect(confirm).not.toBeDisabled();
     fireEvent.click(confirm);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/resources/stacks/PAN-2464/teardown', {
+    await waitFor(() => expect(fetchControl.fetchMock).toHaveBeenCalledWith('/api/resources/stacks/PAN-2464/teardown', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ confirmToken: 'confirm-1', typedText: 'feature-pan-2464' }),
@@ -106,31 +125,23 @@ describe('MachineRoom shell', () => {
   });
 
   it('does not send destructive requests when rendering cards or opening the teardown modal', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(JSON.stringify({
-      issueId: 'PAN-2464',
-      composeProject: 'feature-pan-2464',
-      ramBytes: 1,
-      diskBytes: 2,
-      confirmToken: 'confirm-1',
-    }), { status: 200 }));
     render(<MachineRoom snapshot={fixtureSnapshot({ stacks: [stack('PAN-2464')] })} />);
 
-    expect(destructiveCalls(fetchMock)).toHaveLength(0);
+    expect(destructiveCalls(fetchControl.fetchMock)).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Tear down' }));
     await screen.findByLabelText('Type feature-pan-2464');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/resources/stacks/PAN-2464/teardown-estimate');
-    expect(destructiveCalls(fetchMock)).toHaveLength(0);
+    expect(fetchControl.fetchMock).toHaveBeenCalledWith('/api/resources/stacks/PAN-2464/teardown-estimate');
+    expect(destructiveCalls(fetchControl.fetchMock)).toHaveLength(0);
   });
 
   it('renders Unpause for a paused service and posts unpause on click', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 200 }));
     render(<MachineRoom snapshot={fixtureSnapshot({ stacks: [stack('PAN-2464', { services: [service('c-api', 'feature-pan-2464-api', 'paused')] })] })} />);
 
     expandStack('PAN-2464');
     fireEvent.click(screen.getByText('Unpause'));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/resources/docker/container/c-api/unpause', { method: 'POST' }));
+    await waitFor(() => expect(fetchControl.fetchMock).toHaveBeenCalledWith('/api/resources/docker/container/c-api/unpause', { method: 'POST' }));
   });
 });
 

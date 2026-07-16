@@ -1,9 +1,10 @@
-import { act, render } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardSnapshot, DomainEvent } from '@overdeck/contracts'
 import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts'
 import { EventRouter, eventRouterReconnectDelayMs } from './EventRouter'
 import { useDashboardStore } from '../lib/store'
+import { installStrictFetchMock } from '../test-utils/strictFetchMock'
 
 const wsTransport = vi.hoisted(() => {
   const state = {
@@ -92,8 +93,14 @@ function systemHeartbeatEvent(): DomainEvent {
 }
 
 describe('EventRouter memory updates', () => {
+  let fetchControl: ReturnType<typeof installStrictFetchMock>
+
   beforeEach(() => {
     vi.useFakeTimers()
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/activity') return Response.json([])
+      return undefined
+    })
     request.mockReset()
     request.mockResolvedValue(snapshot)
     subscribe.mockClear()
@@ -105,7 +112,10 @@ describe('EventRouter memory updates', () => {
     resetDashboardStore()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    cleanup()
+    await fetchControl.assertNoUnexpectedRequests()
+    vi.unstubAllGlobals()
     vi.useRealTimers()
   })
 

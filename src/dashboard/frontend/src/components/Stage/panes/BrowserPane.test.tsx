@@ -15,8 +15,10 @@ const pane = (over: Partial<WorkspacePane> = {}): WorkspacePane => ({
 
 describe('BrowserPane', () => {
   it('renders an iframe to the pane browserInitialUrl', () => {
+    const host = document.createElement('div')
     const { container } = render(
       <BrowserPane pane={pane({ browserInitialUrl: 'https://example.com/x' })} ctx={ctx} />,
+      { container: host },
     )
     const iframe = container.querySelector('iframe')
     expect(iframe).not.toBeNull()

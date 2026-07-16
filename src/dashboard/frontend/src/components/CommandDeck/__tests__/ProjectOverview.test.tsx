@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReviewStatusSnapshot } from '@overdeck/contracts';
@@ -6,6 +6,9 @@ import { bucketFeaturePhase, ProjectOverview } from '../ProjectOverview';
 import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
 // ProjectOverview now fetches recent spend via react-query (PAN-1597), so every
 // render must sit under a QueryClientProvider. Shadow render() with a wrapper so
@@ -158,7 +161,18 @@ describe('bucketFeaturePhase', () => {
 
 describe('ProjectOverview', () => {
   beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/costs/summary?project=PAN') {
+        return Response.json({ totalCost: 0 });
+      }
+      return undefined;
+    });
     useDashboardStore.setState({ reviewStatusByIssueId: {} });
+  });
+
+  afterEach(async () => {
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
   });
 
   it('renders a project-scoped five-tile hero billboard that updates with feature state', () => {

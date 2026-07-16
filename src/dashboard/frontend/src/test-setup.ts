@@ -1,5 +1,30 @@
 import '@testing-library/jest-dom';
+import { afterEach, beforeEach, expect, vi } from 'vitest';
 import { Terminal } from '@xterm/xterm';
+
+const environmentFetch = globalThis.fetch;
+let unexpectedRequests: string[] = [];
+let guardedFetch: typeof fetch | undefined;
+
+beforeEach(() => {
+  unexpectedRequests = [];
+  if (globalThis.fetch !== environmentFetch) return;
+
+  guardedFetch = vi.fn<typeof fetch>(async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
+    unexpectedRequests.push(`${method} ${url}`);
+    throw new Error(`Unexpected network request: ${method} ${url}`);
+  });
+  globalThis.fetch = guardedFetch;
+});
+
+afterEach(() => {
+  const requests = unexpectedRequests;
+  if (globalThis.fetch === guardedFetch) globalThis.fetch = environmentFetch;
+  guardedFetch = undefined;
+  expect(requests).toEqual([]);
+});
 
 // Install DOM API fallbacks only when the test environment does not provide them.
 if (typeof Element.prototype.scrollIntoView !== 'function') {

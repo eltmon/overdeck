@@ -9,6 +9,7 @@ import type { ProjectFeature, ProjectFeatureResourceIdentifiers } from './Projec
 import { resolveUatActions } from '../uat-actions';
 import { refreshDashboardState } from '../../../lib/refresh-dashboard-state';
 import { useDashboardStore } from '../../../lib/store';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -1255,6 +1256,26 @@ describe('FeatureItem', () => {
  * planning question went unseen.
  */
 describe('FeatureItem needs-attention shading', () => {
+  let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+  beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method !== 'GET') return undefined;
+      if (url === '/api/settings/available-models') return Response.json({ models: [] });
+      if (url === '/api/flywheel/uat-generations') return Response.json([]);
+      if (url === '/api/workspaces/PAN-821') return Response.json({});
+      if (url.startsWith('/api/review/PAN-821/') || url.startsWith('/api/issues/PAN-821/')) {
+        return Response.json({});
+      }
+      return undefined;
+    });
+  });
+
+  afterEach(async () => {
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
+  });
+
   it('shades the issue row when a descendant session awaits input', () => {
     const { container } = renderFeature(
       <FeatureItem
