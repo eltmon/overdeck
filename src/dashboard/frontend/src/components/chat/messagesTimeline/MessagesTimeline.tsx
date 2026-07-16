@@ -439,7 +439,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
                     width: '100%',
                     transform: `translateY(${virtualItem.start}px)`,
                     background: 'var(--background)',
-                    outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                    ...(currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id
+                      ? { outlineWidth: '2px', outlineStyle: 'solid', outlineColor: 'var(--color-primary)' }
+                      : {}),
                     outlineOffset: '-2px',
                     borderRadius: 8,
                   }}
@@ -476,7 +478,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
               key={row.id}
               data-search-row-id={row.id}
               style={{
-                outline: currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id ? '2px solid var(--color-primary)' : undefined,
+                ...(currentMatch?.row.id === row.id || targetMessageRow?.row.id === row.id
+                  ? { outlineWidth: '2px', outlineStyle: 'solid', outlineColor: 'var(--color-primary)' }
+                  : {}),
                 outlineOffset: '-2px',
                 borderRadius: 8,
               }}

@@ -140,8 +140,10 @@ describe('MessagesTimeline — search', () => {
     const highlighted = screen.getByText('needle');
     expect(highlighted).toHaveAttribute('data-conversation-search-highlight', 'true');
     expect(highlighted).toHaveClass('bg-amber-300/40');
-    expect(highlighted.closest('[data-search-row-id]'))
-      .toHaveStyle({ outline: '2px solid var(--color-primary)' });
+    const highlightedRow = highlighted.closest('[data-search-row-id]') as HTMLElement;
+    expect(highlightedRow.style.outlineWidth).toBe('2px');
+    expect(highlightedRow.style.outlineStyle).toBe('solid');
+    expect(highlightedRow.style.outlineColor).toBe('var(--color-primary)');
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(screen.queryByRole('textbox', { name: 'Search conversation' })).toBeNull();
