@@ -60,7 +60,7 @@
     "recordedAt": "2026-07-16T07:45:53.765Z"
   },
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:51:00.681Z",
+  "updated": "2026-07-16T07:51:12.377Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -70,12 +70,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:51:00.599Z",
+    "updatedAt": "2026-07-16T07:51:12.279Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2698-review",
     "inspectNotes": "Inspection error for bead codex-config-mcp-servers: tmux session inspect-pan-2698-codex-config-mcp-servers exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2785",
     "lastVerifiedCommit": "59fa03e557f815a35bf441b508df07eeb95010ab",
-    "reviewRequestedAt": "2026-07-16T07:46:21.800Z",
+    "reviewRequestedAt": "2026-07-16T07:51:11.867Z",
     "reviewSpawnedAt": "2026-07-16T07:46:23.763Z"
   },
   "closeOut": {
@@ -140,7 +140,7 @@
       },
       "costAtCloseOut": {
         "usd": 23.455231,
-        "pricingAsOf": "2026-07-16T07:51:00.671Z"
+        "pricingAsOf": "2026-07-16T07:51:12.324Z"
       }
     },
     "merges": [
