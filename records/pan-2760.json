@@ -120,17 +120,17 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T19:11:25.153Z",
+  "updated": "2026-07-16T19:11:29.879Z",
   "pipeline": {
     "issueId": "PAN-2760",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:11:24.967Z",
-    "reviewNotes": "[correctness] A new crew collapses into an existing Haiku crew on rerender — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:183`",
+    "updatedAt": "2026-07-16T19:11:25.399Z",
+    "reviewNotes": "Agent re-review request (1/25): probe-only-no-state-change",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "lastVerifiedCommit": "e3c779b26b100897fcd2ec305abb031afa605cd5",
     "reviewRequestedAt": "2026-07-16T18:36:33.187Z",
@@ -205,7 +205,7 @@
       },
       "costAtCloseOut": {
         "usd": 69.981814,
-        "pricingAsOf": "2026-07-16T19:11:25.133Z"
+        "pricingAsOf": "2026-07-16T19:11:27.869Z"
       }
     },
     "merges": [
