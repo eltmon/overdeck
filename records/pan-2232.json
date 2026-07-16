@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-16T18:10:33.667Z",
+  "updated": "2026-07-16T18:22:52.592Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:10:33.553Z",
-    "inspectNotes": "Inspection error for bead wi-1-spawn: tmux session inspect-pan-2232-wi-1-spawn exited before producing a verdict. No verdict was produced.",
+    "updatedAt": "2026-07-16T18:22:52.225Z",
+    "inspectNotes": "AC1/AC2 satisfied (7 functions moved verbatim, 2 exported ones re-exported, only specialists.ts+specialists-spawn.ts touched, typecheck/build/full vitest all green). AC3 fails: npm run lint exits 1 — scripts/file-size-baseline.txt:22 still says '1749 src/lib/cloister/specialists.ts' but the file is now 1581 lines post-extraction, tripping the stale-baseline guard in scripts/lint-file-size.sh. Fix: run 'bash scripts/lint-file-size.sh --update' and commit the updated scripts/file-size-baseline.txt alongside this seam.",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -38,17 +38,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 20,
-            "output": 7240,
-            "cacheRead": 1210318,
-            "cacheWrite": 108736
+            "input": 40,
+            "output": 9740,
+            "cacheRead": 2628721,
+            "cacheWrite": 118307
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 921780,
-            "output": 45485,
-            "cacheRead": 12482048,
+            "input": 1346566,
+            "output": 63135,
+            "cacheRead": 17352192,
             "cacheWrite": 0
           }
         }
@@ -61,21 +61,21 @@
           "cacheWrite": 152114
         },
         "anthropic/claude-sonnet-5": {
-          "input": 20,
-          "output": 7240,
-          "cacheRead": 1210318,
-          "cacheWrite": 108736
+          "input": 40,
+          "output": 9740,
+          "cacheRead": 2628721,
+          "cacheWrite": 118307
         },
         "openai/gpt-5.6-sol": {
-          "input": 921780,
-          "output": 45485,
-          "cacheRead": 12482048,
+          "input": 1346566,
+          "output": 63135,
+          "cacheRead": 17352192,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 21.528266,
-        "pricingAsOf": "2026-07-16T18:10:33.634Z"
+        "usd": 26.949416,
+        "pricingAsOf": "2026-07-16T18:22:52.362Z"
       }
     },
     "merges": [],
