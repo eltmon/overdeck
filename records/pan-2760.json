@@ -87,20 +87,43 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T18:51:03.254Z",
+  "updated": "2026-07-16T18:52:04.117Z",
   "pipeline": {
     "issueId": "PAN-2760",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:51:01.939Z",
+    "updatedAt": "2026-07-16T18:52:03.993Z",
+    "reviewNotes": "[correctness] A new crew collapses into an existing Haiku crew on rerender — `src/dashboard/frontend/src/components/Settings/sections/TieredExecutionSection.tsx:183`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "lastVerifiedCommit": "78b732233cb0e03b42239f35698a1843ccd25937",
     "reviewRequestedAt": "2026-07-16T18:36:33.187Z",
     "reviewSpawnedAt": "2026-07-16T18:51:01.938Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/security.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/correctness.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/performance.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2760/.pan/review/agent-pan-2760-review-78b73223/requirements.md",
+        "atCommit": "78b732233cb0e03b42239f35698a1843ccd25937"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -171,7 +194,7 @@
       },
       "costAtCloseOut": {
         "usd": 66.496728,
-        "pricingAsOf": "2026-07-16T18:51:02.029Z"
+        "pricingAsOf": "2026-07-16T18:52:04.091Z"
       }
     },
     "merges": [
