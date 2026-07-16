@@ -66,7 +66,7 @@ All Overdeck orchestration state lives under `.pan/` — a single dot-directory 
 
 ```
 .pan/
-  specs/                    ← immutable vBRIEF specs (one per issue)
+  specs/                    ← canonical vBRIEF specs (one stable filename per issue)
   continues/                ← durable continue subset (decisions/hazards/feedback)
   pan-1908.json             ← per-issue permanent record: continue + pipeline + closeOut + owner
   pan-1909.json
@@ -89,7 +89,8 @@ PRDs and vBRIEFs are distinct artifacts that flow through the same pipeline:
 1. **PRD drafted** — human or planning agent writes a markdown PRD to `drafts/` on `overdeck-state`
 2. **Planning completes** — planning agent converts the PRD into a machine-readable vBRIEF spec in `specs/` on `overdeck-state` with `status: "proposed"`
 3. **Work starts** — `pan start` updates the spec's `status` field to `"active"` through the state write door; work agents read it via `findPlan()` and track item progress in workspace `.overdeck/continue.json` `statusOverrides`
-4. **Work completes** — after merge, `status` is updated to `"completed"` on `overdeck-state`
+4. **Active plan repair** — if an item's declared scope and verification are mechanically incompatible, stop its running work session and return the issue to planning. Preserve stable item IDs, repair the ownership or verification in the planning draft, and re-finalize it. Planning quality-lints the replacement and `writeSpecDocument()` rewrites the same canonical filename through the state write door; matching status overrides continue to apply. Work, task, and inspection surfaces never edit the canonical document directly.
+5. **Work completes** — after merge, `status` is updated to `"completed"` on `overdeck-state`
 
 ### Status Transitions (field-based)
 
@@ -127,13 +128,13 @@ If `slugify()` receives an empty or all-special-character title, it returns `'pl
 
 ### Workspace Spec (PAN-1124: single-spec-on-main)
 
-There is no workspace-local copy of the spec. Work agents read the canonical spec directly from `specs/` on `overdeck-state` via `findPlan()`. Item/subItem status updates are tracked in the workspace `continue.json`'s `statusOverrides` flat map. `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so callers see a complete document with up-to-date statuses.
+There is no workspace-local copy of the spec during work execution. Work agents read the canonical spec directly from `specs/` on `overdeck-state` via `findPlan()`. Item/subItem status updates are tracked in the workspace `continue.json`'s `statusOverrides` flat map. `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so callers see a complete document with up-to-date statuses. Planning may write a workspace draft; finalization validates that draft, replaces the canonical document through `writeSpecDocument()`, and leaves the draft non-canonical.
 
 ### Concurrency Model
 
 | Resource | Writer | Readers | Contention |
 |----------|--------|---------|------------|
-| `specs/<file>` on `overdeck-state` | Pipeline only | Dashboard, agents (via `findPlan()`) | None — single writer, immutable after planning |
+| `specs/<file>` on `overdeck-state` | Planning and lifecycle writers only | Dashboard, agents (via `findPlan()`) | None — structure is immutable during work; explicit re-planning may replace the document at the same canonical filename |
 | `.overdeck/continue.json` in a workspace | Pipeline + `updateItemStatus()` | Agent (injected into prompt at session start) | None — one agent per workspace |
 | `.overdeck/sessions.jsonl` in a workspace | Pipeline appends | Dashboard, post-mortems | Minimal — append-only |
 | `.overdeck/feedback/*.md` in a workspace | Pipeline only | Agent (injected into prompt) | None — single writer |
