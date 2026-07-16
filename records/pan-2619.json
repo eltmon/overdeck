@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T04:37:43.405Z",
-  "updated": "2026-07-16T17:40:59.231Z",
+  "updated": "2026-07-16T18:08:30.088Z",
   "pipeline": {
     "issueId": "PAN-2619",
     "reviewStatus": "pending",
@@ -54,18 +54,27 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "move-xterm-padding": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2619",
         "agentId": "agent-pan-2619",
         "pid": 2264439,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:40:59.231Z"
+        "claimedAt": "2026-07-16T17:40:59.231Z",
+        "itemId": "move-xterm-padding",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:08:30.088Z"
       }
-    }
+    ]
   },
   "statusOverrides": {
-    "move-xterm-padding": "running"
+    "move-xterm-padding": "completed",
+    "move-xterm-padding.move-xterm-padding.ac1": "completed",
+    "move-xterm-padding.move-xterm-padding.ac2": "completed",
+    "move-xterm-padding.move-xterm-padding.ac3": "completed",
+    "move-xterm-padding.move-xterm-padding.ac4": "completed",
+    "move-xterm-padding.move-xterm-padding.ac5": "completed"
   }
 }
