@@ -392,9 +392,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T03:23:39.348Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T03:25Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T03:25:15.508Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T03:25:15Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2499\n\n# Review Synthesis — PAN-2499 — 2026-07-15T23:30:00-04:00\n\n## Verdict: CHANGES REQUESTED — security, performance, and requirements reviewers ended without reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-d53cfd7a/context.json\n- Branch: feature/pan-2499\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499\n- HEAD reviewed: d53cfd7a1a8dd1c32a2c88980abf34c08c76a7e3\n- Cycle number: 12\n- Prior cycle SHA: 517bc968c0970aca58a1dc87cf9d344252458622\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-d53cfd7a/correctness.md | 0 |\n| performance | failed | — | infrastructure failure |\n| requirements | failed | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer session ended before writing a report\nSecurity coverage is missing. Review policy forbids approval when a reviewer fails or its report is unavailable.\n\n### [performance] Reviewer session ended before writing a report\nPerformance coverage is missing. Review policy forbids approval when a reviewer fails or its report is unavailable.\n\n### [requirements] Reviewer session ended before writing a report\nRequirements and acceptance-criteria coverage is missing. Review policy forbids approval when a reviewer fails or its report is unavailable.\n\n## Non-blocking Findings\n\nNone from the completed correctness review.\n\n## Clean Sub-roles\n- correctness\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-d53cfd7a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2499 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/FLYWHEEL-STATE.md",
@@ -531,7 +544,7 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T03:25:14.915Z",
+  "updated": "2026-07-16T03:25:15.509Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "blocked",
