@@ -5250,3 +5250,27 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   2255 held on operator keep/revert. 2760/2772/2773 = dormant filed bugs, no agents (not in-flight).
 - **Pipeline genuinely drained to 1491 + 1966** (both working) + 2255 (operator decision).
 - **Session: 49 merges, 21 close-outs.**
+
+---
+
+## Tick 58 — 2026-07-16 ~17:35Z — pipeline drained to 2 issues, BOTH wedged on codex review-path deaths (PAN-2775)
+
+- After the resume-on deploy, the drain is down to **PAN-1491 + PAN-1966**, and BOTH are blocked by the
+  same unsolved substrate bug — codex hosts dying in the REVIEW path:
+  - **1966**: 3/4 convoy reviewers PASS (performance/requirements/security), but the **correctness
+    reviewer died at 17:03Z** (stopped, pane gone) right after starting, producing no correctness.md ⇒
+    the synthesis parent waits forever ⇒ no APPROVED verdict ⇒ no merge. Convoy has re-run rounds
+    (4d7202ba→3580c137); correctness dies each round. CI green, PR #2790 CLEAN. `pan review request
+    PAN-1966` HANGS (2min timeout, no new convoy spawned) — the re-trigger path itself wedges.
+  - **1491**: work agent (claude-code after --fresh) reached pan done and a review convoy ran, but the
+    convoy also died mid-flight — review run e26572ba has ONLY correctness.md, no synthesis, and NO open
+    PR. Work agent now sits "⏸ manual mode on", delivered nudges land in the composer but don't submit.
+    3 fresh/nudge cycles this session; fix commit ae0b48d390 safe on branch.
+- **This is PAN-2775 (codex host death) as the FINAL drain blocker.** Not a code problem in either issue
+  — the substrate kills reviewers/agents mid-turn. Re-driving cannot fix a substrate bug. Both PARKED
+  pending the operator's PAN-2775 substrate fix. Evidence already on PAN-2775 (resume-lies + silent death
+  + no exit instrumentation). New this tick: the death also hits (a) convoy sub-reviewers ⇒ synthesis
+  wedge, and (b) `pan review request` itself hangs.
+- Server pid 1714664 stable (PAN-2792 holding — no dashboard kills). 2702/2768 closed. 2255 held on
+  operator. Loop cadence slowed to heartbeat — nothing advances until the substrate is fixed.
+- **Session: 49 merges, 21 close-outs. Pipeline at rest: 2 substrate-blocked, 1 operator-decision.**
