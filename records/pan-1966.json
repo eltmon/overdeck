@@ -11,20 +11,36 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T06:16:43.012Z",
+  "updated": "2026-07-16T06:16:50.233Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T04:36:20.427Z"
+    "updatedAt": "2026-07-16T06:16:50.192Z",
+    "inspectNotes": "Inspecting item lens-gatherer"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 618049,
+            "output": 1824,
+            "cacheRead": 520064,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 2766117,
+            "output": 10303,
+            "cacheRead": 2639104,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 3080,
@@ -35,6 +51,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 618049,
+          "output": 1824,
+          "cacheRead": 520064,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 2766117,
+          "output": 10303,
+          "cacheRead": 2639104,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 3080,
           "output": 54509,
@@ -43,15 +71,15 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 7.30641,
-        "pricingAsOf": "2026-07-16T04:36:20.478Z"
+        "usd": 9.570117,
+        "pricingAsOf": "2026-07-16T06:16:50.225Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "harness": "codex",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 6,
     "claims": {},
