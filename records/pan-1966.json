@@ -286,59 +286,37 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T13:41:08.936Z",
+  "updated": "2026-07-16T13:43:44.036Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T13:41:05.810Z",
-    "reviewNotes": "[correctness] Explicitly ready GitHub issues are filtered out before lane assignment — `src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx:312`",
+    "updatedAt": "2026-07-16T13:43:43.985Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
-    "lastVerifiedCommit": "734d83a23600637843861e355ed37feec021f755",
-    "reviewSpawnedAt": "2026-07-16T13:41:02.470Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/security.md",
-        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/correctness.md",
-        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
-      },
-      "performance": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/performance.md",
-        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-734d83a2/requirements.md",
-        "atCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60"
-      }
-    }
+    "lastVerifiedCommit": "b4cc86becbec6992e84a3d596a82fe5ea7b6eb60",
+    "reviewSpawnedAt": "2026-07-16T13:41:02.470Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 7076323,
-            "output": 14462,
-            "cacheRead": 6316416,
+            "input": 7206589,
+            "output": 14723,
+            "cacheRead": 6443008,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 92555206,
-            "output": 170593,
-            "cacheRead": 90365952,
+            "input": 94228960,
+            "output": 172244,
+            "cacheRead": 91975936,
             "cacheWrite": 0
           }
         },
@@ -361,15 +339,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 7076323,
-          "output": 14462,
-          "cacheRead": 6316416,
+          "input": 7206589,
+          "output": 14723,
+          "cacheRead": 6443008,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 92555206,
-          "output": 170593,
-          "cacheRead": 90365952,
+          "input": 94228960,
+          "output": 172244,
+          "cacheRead": 91975936,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -386,8 +364,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 69.495843,
-        "pricingAsOf": "2026-07-16T13:41:05.845Z"
+        "usd": 70.669215,
+        "pricingAsOf": "2026-07-16T13:43:44.030Z"
       }
     },
     "merges": [
