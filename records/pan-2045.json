@@ -326,22 +326,22 @@
     "recordedAt": "2026-07-16T21:48:55.460Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:49:03.127Z",
+  "updated": "2026-07-16T21:49:11.307Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:48:57.922Z",
+    "updatedAt": "2026-07-16T21:49:03.573Z",
     "reviewNotes": "Production MessagesTimeline CSS was changed solely for happy-dom assertions, violating an explicit must-not requirement.",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
     "reviewRequestedAt": "2026-07-16T21:48:56.640Z",
-    "reviewSpawnedAt": "2026-07-16T21:48:17.822Z",
+    "reviewSpawnedAt": "2026-07-16T21:49:03.164Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/App.test.tsx",
@@ -529,9 +529,9 @@
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 493633,
-            "output": 4517,
-            "cacheRead": 819712,
+            "input": 528800,
+            "output": 11252,
+            "cacheRead": 1589248,
             "cacheWrite": 0
           }
         },
@@ -584,9 +584,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 55220294,
-          "output": 487538,
-          "cacheRead": 167906048,
+          "input": 55255461,
+          "output": 494273,
+          "cacheRead": 168675584,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -609,8 +609,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 191.01817,
-        "pricingAsOf": "2026-07-16T21:48:59.577Z"
+        "usd": 191.780823,
+        "pricingAsOf": "2026-07-16T21:49:05.377Z"
       }
     },
     "merges": [
