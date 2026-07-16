@@ -1006,9 +1006,7 @@ export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Prom
   const actions: string[] = [];
   const agents = listAllAgents();
 
-  // Query every nominally live agent; the handler requires two confirmed misses before reaping.
   const orphanCandidates = agents.filter((agent) => agent.status === 'running' || agent.status === 'starting').map((agent) => agent.id);
-
   for (const agentId of orphanCandidates) {
     const result = await handleAgentHeartbeatDeadEvent(agentId, 'reconcile', deps);
     actions.push(...result);
