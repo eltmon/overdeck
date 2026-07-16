@@ -242,9 +242,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T21:04:22.026Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-16T21:07Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-16T21:07:59.813Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-16T21:07:59Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2773\n\n# Review Synthesis — PAN-2773 — 2026-07-16T21:20:00Z\n\n## Verdict: CHANGES REQUESTED — correctness reviewer failed before writing a report\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-71db541b/context.json`\n- Branch: `feature/pan-2773`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773`\n- HEAD reviewed: `71db541b6a13d5e43561f146f1f835dcbb4774a3`\n- Cycle number: 6\n- Prior cycle SHA: `5e1dd8fd05bc8404540af53e1c2c14273da1c231`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-71db541b/security.md` | 0 |\n| correctness | failed | — | 1 infrastructure failure |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-71db541b/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-71db541b/requirements.md` | 0 |\n\n## Blocking Findings\n\n### [correctness] Reviewer failed before producing a usable report\nThe correctness reviewer session ended before writing its report. Review policy forbids approval when any reviewer fails or times out, so correctness coverage is incomplete even though the other three sub-roles are clean.\n\n## Non-blocking Findings\n\n### [requirements] Malformed registered-project payload is treated as an empty registry — `src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx:15`\nThe fetch helper returns an empty array when a successful response is not an array, which could label a valid slug unknown under a malformed API response. This is advisory hardening because malformed-payload behavior is not part of the stated acceptance criteria.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2773/.pan/review/agent-pan-2773-review-71db541b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2773 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -289,7 +302,7 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:07:59.123Z",
+  "updated": "2026-07-16T21:07:59.813Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "blocked",
