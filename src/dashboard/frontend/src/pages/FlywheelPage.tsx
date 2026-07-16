@@ -9,6 +9,7 @@ import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDeta
 import { MergeQueueCard } from '../components/flywheel/MergeQueueCard';
 import { RailCard } from '../components/flywheel/RailCard';
 import { MergePolicySection } from '../components/MergePolicySection';
+import { consumePendingReveal, subscribeRevealOpenQuestions } from '../lib/flywheelReveal';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
 
 interface FlywheelPageProps {
@@ -292,6 +293,7 @@ function PendingAutoMergesBanner({ onNavigateIssue }: { onNavigateIssue?: (issue
 export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue }: FlywheelPageProps) {
   const [status, setStatus] = useState<FlywheelStatus | null>(null);
   const [activeTab, setActiveTab] = useState<FlywheelLeftTab>('status');
+  const [openQuestionsRevealPending, setOpenQuestionsRevealPending] = useState(false);
   const [leftWidth, setLeftWidth] = useState<number>(getStoredSplitWidth);
   const [nowMs, setNowMs] = useState(() => Date.now());
   const leftWidthRef = useRef(leftWidth);
@@ -393,6 +395,29 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const revealOpenQuestions = () => {
+      setActiveTab('status');
+      setOpenQuestionsRevealPending(true);
+    };
+    if (consumePendingReveal()) revealOpenQuestions();
+    return subscribeRevealOpenQuestions(() => {
+      consumePendingReveal();
+      revealOpenQuestions();
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!openQuestionsRevealPending || activeTab !== 'status') return;
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById('flywheel-open-questions');
+      if (!target) return;
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setOpenQuestionsRevealPending(false);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab, effectiveStatus, openQuestionsRevealPending]);
 
   const freshness = effectiveStatus ? getLastTickFreshness(effectiveStatus.lastTickAt, nowMs) : null;
 

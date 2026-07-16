@@ -353,7 +353,7 @@ export async function recoverAgent(
   }
 
   const recoveryCodexFields = recoveryHarness === 'codex'
-    ? getCodexLauncherFields(normalizedId, state.model, state.workspace)
+    ? getCodexLauncherFields(normalizedId, state.model, state.workspace, recoveryRole)
     : {};
   const recoveryLauncherContent = generateLauncherScriptSync({
     role: recoveryRole,
