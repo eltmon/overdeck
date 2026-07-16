@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T17:41:12.026Z",
+  "updated": "2026-07-16T17:55:06.897Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "xterminal-patient-reconnect": {
-        "writerId": "agent-pan-2772",
-        "agentId": "agent-pan-2772",
-        "pid": 2269282,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T17:41:12.025Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -75,12 +67,27 @@
         "outcome": "completed",
         "reason": "Added a pure five-minute patient reconnect policy with exponential-to-flat delays and boundary/large-attempt unit coverage.",
         "releasedAt": "2026-07-16T17:41:00.574Z"
+      },
+      {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 2269282,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T17:41:12.025Z",
+        "itemId": "xterminal-patient-reconnect",
+        "outcome": "completed",
+        "reason": "Replaced the five-attempt terminal retry cap with the shared five-minute policy, reset the window on healthy snapshot or live data, preserved fatal 4404 handling and cleanup, and added fake-timer integration coverage.",
+        "releasedAt": "2026-07-16T17:55:06.896Z"
       }
     ],
     "statusReasons": {
       "reconnect-policy": {
         "reason": "Added a pure five-minute patient reconnect policy with exponential-to-flat delays and boundary/large-attempt unit coverage.",
         "updatedAt": "2026-07-16T17:41:00.574Z"
+      },
+      "xterminal-patient-reconnect": {
+        "reason": "Replaced the five-attempt terminal retry cap with the shared five-minute policy, reset the window on healthy snapshot or live data, preserved fatal 4404 handling and cleanup, and added fake-timer integration coverage.",
+        "updatedAt": "2026-07-16T17:55:06.896Z"
       }
     }
   },
@@ -89,6 +96,10 @@
     "reconnect-policy.reconnect-policy.ac1": "completed",
     "reconnect-policy.reconnect-policy.ac2": "completed",
     "reconnect-policy.reconnect-policy.ac3": "completed",
-    "xterminal-patient-reconnect": "running"
+    "xterminal-patient-reconnect": "completed",
+    "xterminal-patient-reconnect.xterminal-patient-reconnect.ac1": "completed",
+    "xterminal-patient-reconnect.xterminal-patient-reconnect.ac2": "completed",
+    "xterminal-patient-reconnect.xterminal-patient-reconnect.ac3": "completed",
+    "xterminal-patient-reconnect.xterminal-patient-reconnect.ac4": "completed"
   }
 }
