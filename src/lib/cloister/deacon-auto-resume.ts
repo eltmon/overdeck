@@ -41,6 +41,7 @@ import {
   killSession,
   listPaneValues,
   listSessionNames,
+  querySessionSync,
   sessionExists,
   sessionExistsSync,
 } from '../tmux.js';
@@ -56,6 +57,7 @@ export interface AutoResumeNotifierDeps {
 export type { BootReconciliationApplyResult, BootReconciliationOutcome, BootReconciliationOutcomeReason } from './boot-reconciliation-outcomes.js';
 const orphanFailureRecordedForAutoResume = new Set<string>();
 const appliedBootReconciliationDecisions = new Set<string>();
+const consecutiveMissingSessionQueries = new Map<string, number>();
 
 const emptyBootReconciliationApplyResult = (): BootReconciliationApplyResult => ({ resumed: [], outcomes: [], skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 }, deferred: 0 });
 
@@ -140,13 +142,30 @@ export async function handleAgentHeartbeatDeadEvent(
     return [];
   }
 
+  const sessionQuery = querySessionSync(agentId);
+  if (sessionQuery.status === 'error') {
+    consecutiveMissingSessionQueries.delete(agentId);
+    logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} skipped — tmux query failed (${sessionQuery.detail})`);
+    return [];
+  }
+  if (sessionQuery.status === 'exists') {
+    consecutiveMissingSessionQueries.delete(agentId);
+  } else {
+    const missCount = (consecutiveMissingSessionQueries.get(agentId) ?? 0) + 1;
+    consecutiveMissingSessionQueries.set(agentId, missCount);
+    if (missCount < 2) {
+      logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} retained after first confirmed tmux miss (${sessionQuery.detail})`);
+      return [];
+    }
+  }
+
   // PAN-1557: convoy reviewers are interactive — they own a tmux session
   // (remain-on-exit on) like other specialists, so liveness is the session's
   // pane, not a launcher pid. While the pane is alive the reviewer is working
   // or idling attachably; a dead pane (Claude exited) or a missing session
   // past the startup grace means it's done — fall through to mark stopped.
   if (state.reviewSubRole) {
-    if (sessionExistsSync(agentId)) {
+    if (sessionQuery.status === 'exists') {
       try {
         const dead = ((await Effect.runPromise(listPaneValues(agentId, '#{pane_dead}')))[0]?.trim() ?? '') === '1';
         if (!dead) return []; // pane alive — still working / idling attachably
@@ -164,7 +183,7 @@ export async function handleAgentHeartbeatDeadEvent(
       }
     }
     // Session gone (or dead pane past grace) — fall through to mark stopped.
-  } else if (sessionExistsSync(agentId)) {
+  } else if (sessionQuery.status === 'exists') {
     // Planning sessions use remain-on-exit, so the tmux session persists after
     // Claude exits. Check if the pane's process is actually dead.
     if (agentId.startsWith('planning-')) {
@@ -191,6 +210,8 @@ export async function handleAgentHeartbeatDeadEvent(
 
   // Orphaned — crashed agent with no tmux session
   const oldStatus = state.status;
+  const missingSessionDetail = sessionQuery.status === 'missing' ? sessionQuery.detail : 'pane confirmed dead';
+  consecutiveMissingSessionQueries.delete(agentId);
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
   await Effect.runPromise(saveAgentState(state));
@@ -226,7 +247,7 @@ export async function handleAgentHeartbeatDeadEvent(
   }
   const msg = `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
   console.log(`[deacon] ${msg}`);
-  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing, state.json reset`);
+  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing (${missingSessionDetail}), state.json reset`);
   logAgentLifecycleSync(agentId, `status changed: ${oldStatus} → stopped (orphaned: tmux session missing)`);
   // Notify server layer so the read model and frontend update
   deps.notifyAgentStopped(agentId);
@@ -1004,8 +1025,7 @@ export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Prom
   // Orphans: agents the registry says are running/starting but have no live tmux.
   const orphanCandidates = agents
     .filter((agent) => agent.status === 'running' || agent.status === 'starting')
-    .map((agent) => agent.id)
-    .filter((id) => !sessionExistsSync(id));
+    .map((agent) => agent.id);
 
   for (const agentId of orphanCandidates) {
     const result = await handleAgentHeartbeatDeadEvent(agentId, 'reconcile', deps);
