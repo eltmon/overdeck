@@ -319,7 +319,7 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:21:53.920Z",
+  "updated": "2026-07-16T21:21:57.678Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "reviewing",
@@ -329,7 +329,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:21:45.097Z",
+    "updatedAt": "2026-07-16T21:21:57.415Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
@@ -500,7 +500,7 @@
       },
       "costAtCloseOut": {
         "usd": 211.714529,
-        "pricingAsOf": "2026-07-16T21:21:45.129Z"
+        "pricingAsOf": "2026-07-16T21:21:57.528Z"
       }
     },
     "merges": [
@@ -508,7 +508,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "codex",
+  "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 12,
