@@ -160,18 +160,18 @@
     "recordedAt": "2026-07-16T19:06:28.490Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T19:22:45.627Z",
+  "updated": "2026-07-16T19:22:56.810Z",
   "pipeline": {
     "issueId": "PAN-2045",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:22:45.460Z",
-    "reviewNotes": "happy-dom leaves Mission Control tests false-green while live localhost requests fail during teardown",
+    "updatedAt": "2026-07-16T19:22:51.211Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (643046ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2045\n\n\n Test Files  214 passed (214)\n      Tests  2008 passed (2008)\n   Start at  15:17:38\n   Duration  25.06s (transform 44.42s, setup 68.30s, import 165.12s, tests 53.33s, environment 158.61s)\n\nstdout | src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts > runForkPipeline stranded status > clears fork status after a submitted injection\n[claude-invoke] purpose=handoff-author-external | model=claude-sonnet-4-6 | harness=claude-code | source=status-parent | inputType=raw-transcript | promptChars=3725 | outputPath=/tmp/pan-2568-fork-1784229563567-lja8ba9gzsd/handoffs/status-parent-2026-07-16T19:19:23.656Z.md\n[claude-invoke] purpose=smart-summary | model=claude-sonnet-4-6 | harness=claude-code | source=smart-compaction.ts:runModelSummary | promptChars=3725 | timeoutMs=300000\n\nstdout | src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts > runForkPipeline stranded status > clears fork status after a submitted injection\n[smart-compaction] Spawning claude for summary with model claude-sonnet-4-6 (anthropic, parent provider env stripped)\n\nstdout | src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts > runForkPipeline stranded status > clears fork status after a submitted injection\n[claude-invoke] purpose=handoff-author-external | model=claude-sonnet-4-6 | harness=claude-code | source=status-parent | inputType=raw-transcript | promptChars=3724 | outputPath=/tmp/pan-2568-fork-1784229568610-jy7ie1ww3g/handoffs/status-parent-2026-07-16T19:19:28.680Z.md\n[claude-invoke] purpose=smart-summary | model=claude-sonnet-4-6 | harness=claude-code | source=smart-compaction.ts:runModelSummary | promptChars=3724 | timeoutMs=300000\n\nstdout | src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts > runForkPipeline stranded status > clears fork status after a submitted injection\n[smart-compaction] Spawning claude for summary with model claude-sonnet-4-6 (anthropic, parent provider env stripped)\n\nstdout | src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts > runForkPipeline stranded status > clears fork status after a submitted injection\n[claude-invoke] purpose=summary-fork | model=claude-sonnet-4-6 | summaryHarness=claude-code | sourceHarness=claude-code | source=summary-fork.ts:generateSummaryForFork | jsonl=/tmp/pan-2568-fork-1784229563567-lja8ba9gzsd/.claude/projects/-tmp-pan-2568-fork-1784229563567-lja8ba9gzsd-project/parent-session.jsonl\n\n ❯ |root| src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts (9 tests | 1 failed) 18566ms\n     × clears fork status after a submitted injection 10071ms (retry x1)\n\n Test Files  1 failed | 1010 passed | 3 skipped (1014)\n      Tests  1 failed | 9408 passed | 50 skipped (9466)\n   Start at  15:17:38\n   Duration  307.25s (transform 5.47s, setup 23.55s, import 452.82s, tests 622.43s, environment 105\n...(truncated)",
     "inspectNotes": "vitest.config.ts environment=happy-dom; package.json pins happy-dom@20.10.6 exact, resolved in bun.lock; test-setup.ts stubs (prompt/scrollIntoView/matchMedia/ResizeObserver) now all conditional on typeof checks. AC1/AC2 verified in diff; AC3 (three issueActions gate files exit 0) deferred to verification gate per review scope.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2799",
@@ -248,9 +248,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3173958,
-            "output": 131712,
-            "cacheRead": 50348032,
+            "input": 3177341,
+            "output": 133439,
+            "cacheRead": 50906624,
             "cacheWrite": 0
           }
         }
@@ -269,9 +269,9 @@
           "cacheWrite": 165070
         },
         "openai/gpt-5.6-sol": {
-          "input": 5928814,
-          "output": 189764,
-          "cacheRead": 61942784,
+          "input": 5932197,
+          "output": 191491,
+          "cacheRead": 62501376,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -282,8 +282,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 74.400446,
-        "pricingAsOf": "2026-07-16T19:22:45.569Z"
+        "usd": 74.748467,
+        "pricingAsOf": "2026-07-16T19:22:54.036Z"
       }
     },
     "merges": [
