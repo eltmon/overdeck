@@ -21,6 +21,9 @@ Measured with `cd src/dashboard/frontend && /usr/bin/time npx vitest run --confi
 | Date | Measurement | Environment | Test files | Test cases | Wall-clock |
 |------|-------------|-------------|------------|------------|------------|
 | 2026-07-16 | Before | jsdom | 214 | 2,008 | 26.94 s |
+| 2026-07-16 | After | happy-dom (`threads` pool) | 214 | 2,008 | 21.85 s |
+
+The after result is the better of two green runs under the committed configuration (25.92 s and 21.85 s wall-clock).
 
 ## Test Structure
 
