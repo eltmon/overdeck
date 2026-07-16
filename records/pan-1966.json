@@ -11,33 +11,33 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T06:21:35.059Z",
+  "updated": "2026-07-16T06:24:00.898Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T06:21:35.012Z",
-    "inspectNotes": "Inspecting item lens-gatherer"
+    "updatedAt": "2026-07-16T06:24:00.788Z",
+    "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1467284,
-            "output": 3119,
-            "cacheRead": 1344640,
+            "input": 1913757,
+            "output": 3659,
+            "cacheRead": 1782656,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 5945631,
-            "output": 14943,
-            "cacheRead": 5781248,
+            "input": 7300862,
+            "output": 16264,
+            "cacheRead": 7126272,
             "cacheWrite": 0
           }
         },
@@ -51,24 +51,24 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 24,
-            "output": 16353,
-            "cacheRead": 1489029,
-            "cacheWrite": 119639
+            "input": 30,
+            "output": 19378,
+            "cacheRead": 1939862,
+            "cacheWrite": 126863
           }
         }
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1467284,
-          "output": 3119,
-          "cacheRead": 1344640,
+          "input": 1913757,
+          "output": 3659,
+          "cacheRead": 1782656,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5945631,
-          "output": 14943,
-          "cacheRead": 5781248,
+          "input": 7300862,
+          "output": 16264,
+          "cacheRead": 7126272,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -78,15 +78,15 @@
           "cacheWrite": 175682
         },
         "anthropic/claude-sonnet-5": {
-          "input": 24,
-          "output": 16353,
-          "cacheRead": 1489029,
-          "cacheWrite": 119639
+          "input": 30,
+          "output": 19378,
+          "cacheRead": 1939862,
+          "cacheWrite": 126863
         }
       },
       "costAtCloseOut": {
-        "usd": 12.227719,
-        "pricingAsOf": "2026-07-16T06:21:35.048Z"
+        "usd": 13.129384,
+        "pricingAsOf": "2026-07-16T06:24:00.864Z"
       }
     },
     "merges": [],
