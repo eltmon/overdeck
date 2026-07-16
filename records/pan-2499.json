@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T00:19:54.484Z",
+  "updated": "2026-07-16T00:28:42.511Z",
   "pipeline": {
     "issueId": "PAN-2499",
     "reviewStatus": "pending",
@@ -173,7 +173,12 @@
     "rail-expand.rail-expand.ac1": "completed",
     "rail-expand.rail-expand.ac2": "completed",
     "rail-expand.rail-expand.ac3": "completed",
-    "start-agent-cta": "running"
+    "start-agent-cta": "completed",
+    "start-agent-cta.start-agent-cta.ac1": "completed",
+    "start-agent-cta.start-agent-cta.ac2": "completed",
+    "start-agent-cta.start-agent-cta.ac3": "completed",
+    "start-agent-cta.start-agent-cta.ac4": "completed",
+    "start-agent-cta.start-agent-cta.ac5": "completed"
   },
   "swarm": {
     "slotAssignments": [
@@ -199,16 +204,8 @@
     }
   },
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "start-agent-cta": {
-        "writerId": "agent-pan-2499",
-        "agentId": "agent-pan-2499",
-        "pid": 512000,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T00:19:54.484Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2499",
@@ -330,6 +327,16 @@
         "outcome": "completed",
         "reason": "The existing rail caret now promotes the same IssueView instance to cockpit density without selecting a tab, the shared full-screen control promotes to console, collapse returns to rail, row-click tab selection remains intact, and FeatureItem ratchet dropped to 1365. Commit d6e758ea00 is pushed.",
         "releasedAt": "2026-07-16T00:19:40.513Z"
+      },
+      {
+        "writerId": "agent-pan-2499",
+        "agentId": "agent-pan-2499",
+        "pid": 512000,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T00:19:54.484Z",
+        "itemId": "start-agent-cta",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T00:28:42.511Z"
       }
     ],
     "statusReasons": {
