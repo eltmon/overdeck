@@ -14,6 +14,14 @@ How to run tests and write new ones for Overdeck.
 
 Frontend tests run separately: `cd src/dashboard/frontend && npm test`.
 
+## Frontend suite performance (PAN-2045)
+
+Measured with `cd src/dashboard/frontend && /usr/bin/time npx vitest run --configLoader runner`.
+
+| Date | Measurement | Environment | Test files | Test cases | Wall-clock |
+|------|-------------|-------------|------------|------------|------------|
+| 2026-07-16 | Before | jsdom | 214 | 2,008 | 26.94 s |
+
 ## Test Structure
 
 ```
