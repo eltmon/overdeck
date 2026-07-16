@@ -103,6 +103,9 @@ export const VERIFICATION_GATES_SECTIONS = [
 
 export type VerificationGatesSection = (typeof VERIFICATION_GATES_SECTIONS)[number];
 
+/** Legacy no-loss identifiers now owned by the canonical PAN-2696 Tasks surfaces. */
+export const BEADS_PANEL_SECTIONS = ['beads-panel', 'beads-panel-compact'] as const;
+
 export const ACTIVE_AGENT_PANEL_SECTIONS = [
   'active-agent-panel',
   'active-agent-panel-header',
@@ -119,5 +122,6 @@ export const SECTION_INVENTORY: readonly string[] = [
   ...AGENT_ROW_SECTIONS,
   ...SHIP_PROGRESS_SECTIONS,
   ...VERIFICATION_GATES_SECTIONS,
+  ...BEADS_PANEL_SECTIONS,
   ...ACTIVE_AGENT_PANEL_SECTIONS,
 ];

@@ -98,7 +98,7 @@ export function TasksRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
   const now = new Date()
 
   return (
-    <aside className={styles.rail} aria-label="Tasks progress">
+    <aside data-section="beads-panel-compact" className={styles.rail} aria-label="Tasks progress">
       <div className={styles.header}>
         <span className={styles.title}>Tasks</span>
         <div className={styles.counts}>

@@ -3,7 +3,11 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
-import { ISSUE_VIEW_INVENTORY } from '../../../../src/dashboard/frontend/src/components/issue-view/inventory';
+import {
+  BEADS_PANEL_SECTIONS,
+  ISSUE_VIEW_INVENTORY,
+  SECTION_INVENTORY,
+} from '../../../../src/dashboard/frontend/src/components/issue-view/inventory';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // tests/unit/dashboard/frontend/ → repo root (four directories up).
@@ -89,6 +93,8 @@ const EXPECTED_SECTIONS = [
   ...EXPECTED_RAIL_SECTIONS,
 ] as const;
 
+const EXPECTED_SHARED_REPLACEMENT_SECTIONS = ['beads-panel', 'beads-panel-compact'] as const;
+
 describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
   it('contains every section from the mockup no-loss checklist', () => {
     const present = new Set(ISSUE_VIEW_INVENTORY.map((entry) => entry.section));
@@ -146,5 +152,15 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
       missing,
       `section(s) declared but not rendered with a data-section marker under ${componentsRoot}: ${missing.join(', ')}`,
     ).toEqual([]);
+  });
+
+  it('locks the legacy beads section family to the rendered Tasks surfaces', () => {
+    expect(BEADS_PANEL_SECTIONS).toEqual(EXPECTED_SHARED_REPLACEMENT_SECTIONS);
+    expect(EXPECTED_SHARED_REPLACEMENT_SECTIONS.filter((section) => !SECTION_INVENTORY.includes(section))).toEqual([]);
+
+    const tasksPanel = readFileSync(path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components/TasksPanel.tsx'), 'utf8');
+    const tasksRail = readFileSync(path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components/Stage/cockpit/TasksRail.tsx'), 'utf8');
+    expect(tasksPanel).toContain('data-section="beads-panel"');
+    expect(tasksRail).toContain('data-section="beads-panel-compact"');
   });
 });
