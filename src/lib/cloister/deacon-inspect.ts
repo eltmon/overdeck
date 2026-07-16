@@ -35,7 +35,10 @@ export async function checkInspectAgentTimeouts(now = new Date()): Promise<strin
     const hasStartedAt = Number.isFinite(startedMs);
     const elapsedMs = hasStartedAt ? nowMs - startedMs : Number.POSITIVE_INFINITY;
     const timedOut = elapsedMs > INSPECT_TIMEOUT_MS;
-    const sessionName = itemId ? inspectSessionName(issueId, itemId) : undefined;
+    // New inspections persist their actual owner. Derive the dedicated-session
+    // name only for rows created before that metadata existed.
+    const sessionName = status.inspectOwnerSession
+      ?? (itemId ? inspectSessionName(issueId, itemId) : undefined);
     const sessionAlive = sessionName
       ? await Effect.runPromise(sessionExists(sessionName)).catch(() => false)
       : false;
