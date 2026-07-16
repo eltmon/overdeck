@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-16T12:13:59.605Z",
+  "updated": "2026-07-16T12:14:01.822Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "no-loss-audit-test": {
-        "writerId": "agent-pan-1966",
-        "agentId": "agent-pan-1966",
-        "pid": 1796548,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T12:13:59.605Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1966",
@@ -231,6 +223,17 @@
         "outcome": "completed",
         "reason": "Pipeline-status rows now derive from the membership endpoint and expose drift buckets.",
         "releasedAt": "2026-07-16T12:13:57.295Z"
+      },
+      {
+        "writerId": "agent-pan-1966",
+        "agentId": "agent-pan-1966",
+        "pid": 1796548,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T12:13:59.605Z",
+        "itemId": "no-loss-audit-test",
+        "outcome": "completed",
+        "reason": "Runtime drift table and six-consumer inventory are pinned without violating the source-introspection guard.",
+        "releasedAt": "2026-07-16T12:14:01.822Z"
       }
     ],
     "statusReasons": {
@@ -276,8 +279,8 @@
         "updatedAt": "2026-07-16T12:13:57.295Z"
       },
       "no-loss-audit-test": {
-        "reason": "Implementation pushed in 400b5545db",
-        "updatedAt": "2026-07-16T12:13:59.605Z"
+        "reason": "Runtime drift table and six-consumer inventory are pinned without violating the source-introspection guard.",
+        "updatedAt": "2026-07-16T12:14:01.822Z"
       }
     }
   },
@@ -324,6 +327,9 @@
     "wire-pipeline-status-skill": "completed",
     "wire-pipeline-status-skill.wire-pipeline-status-skill.ac1": "completed",
     "wire-pipeline-status-skill.wire-pipeline-status-skill.ac2": "completed",
-    "no-loss-audit-test": "running"
+    "no-loss-audit-test": "completed",
+    "no-loss-audit-test.no-loss-audit-test.ac1": "completed",
+    "no-loss-audit-test.no-loss-audit-test.ac2": "completed",
+    "no-loss-audit-test.no-loss-audit-test.ac3": "completed"
   }
 }
