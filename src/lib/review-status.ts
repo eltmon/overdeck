@@ -16,9 +16,8 @@ import { registerReviewStatusMapReader } from './cloister/review-status-source.j
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
-import type { ScopeDriftRecord } from './vbrief/continue-state.js';
+import type { ScopeDriftRecord } from './vbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
 import { registerMailboxStatusReader } from './cloister/mailbox-status-source.js';
-import type { StrikeLandingStatus } from './strike-landing.js';
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {
   try {
     notifyPipelineSync({ type, issueId });
