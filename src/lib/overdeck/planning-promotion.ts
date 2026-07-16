@@ -314,6 +314,23 @@ export async function completePlanningAutoSpawn(options: {
         ? body['message']
         : `Work agent spawn returned HTTP ${response.status}`;
     const skipReason = classifyAutoSpawnSkip(response.status, body);
+    if (skipReason === 'stack-unhealthy') {
+      const recovery = await (options.fetchImpl ?? fetch)(
+        new URL(`/api/workspaces/${encodeURIComponent(options.issueId)}/rebuild-and-start`, dashboardOrigin),
+        {
+          method: 'POST',
+          headers: { origin: dashboardOrigin },
+        },
+      );
+      const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;
+      if (recovery.ok && recoveryBody['success'] !== false) {
+        emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'success', 'stack rebuild and work-agent spawn requested', {
+          agentId,
+          activityId: recoveryBody['activityId'],
+        });
+        return { workAgentSpawned: true, workAgentSession: agentId };
+      }
+    }
     emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'skipped', skipReason, {
       httpStatus: response.status,
       error,

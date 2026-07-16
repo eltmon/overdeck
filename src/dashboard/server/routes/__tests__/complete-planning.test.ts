@@ -262,14 +262,21 @@ describe('completePlanningArtifacts', () => {
     });
   });
 
-  it('maps stack-health spawn rejection to a non-fatal autoSpawn skip', async () => {
-    const fetchImpl: typeof fetch = async () => new Response(JSON.stringify({
-      success: false,
-      blocked: true,
-      skipped: true,
-      error: 'Workspace docker stack for PAN-1147 is not healthy: api unhealthy',
-      stackHealth: { healthy: false, reasons: ['api unhealthy'] },
-    }), { status: 422 });
+  it('rebuilds the stack and starts work when the initial auto-spawn finds no healthy stack', async () => {
+    const requests: string[] = [];
+    const fetchImpl: typeof fetch = async (input) => {
+      requests.push(String(input));
+      if (String(input).endsWith('/api/agents')) {
+        return new Response(JSON.stringify({
+          success: false,
+          blocked: true,
+          skipped: true,
+          error: 'Workspace docker stack for PAN-1147 is not healthy: no containers found',
+          stackHealth: { healthy: false, reasons: ['no containers found'] },
+        }), { status: 422 });
+      }
+      return new Response(JSON.stringify({ success: true, activityId: 'activity-rebuild' }), { status: 200 });
+    };
 
     await expect(completePlanningAutoSpawn({
       issueId: 'PAN-1147',
@@ -277,10 +284,13 @@ describe('completePlanningArtifacts', () => {
       dashboardOrigin: 'http://127.0.0.1:3011',
       fetchImpl,
     })).resolves.toEqual({
-      workAgentSpawned: false,
-      workAgentError: 'Workspace docker stack for PAN-1147 is not healthy: api unhealthy',
-      workAgentSkipReason: 'stack-unhealthy',
+      workAgentSpawned: true,
+      workAgentSession: 'agent-pan-1147',
     });
+    expect(requests).toEqual([
+      'http://127.0.0.1:3011/api/agents',
+      'http://127.0.0.1:3011/api/workspaces/PAN-1147/rebuild-and-start',
+    ]);
   });
 
   it('kills the planning session immediately after autoSpawn succeeds', async () => {
