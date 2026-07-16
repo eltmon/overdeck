@@ -293,10 +293,10 @@
       "src/dashboard/frontend/src/test-utils/strictFetchMock.ts",
       "src/dashboard/frontend/vitest.config.ts"
     ],
-    "recordedAt": "2026-07-16T21:44:31.906Z"
+    "recordedAt": "2026-07-16T21:46:26.591Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T21:46:18.002Z",
+  "updated": "2026-07-16T21:46:26.596Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "reviewing",
