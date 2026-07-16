@@ -63,6 +63,7 @@ import { workspaceContextFile, piGlobalContextFile } from '../context-layers/lay
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { sessionFilePath, getOverdeckHome, resolveOhmypiExtensionPath } from '../paths.js';
 import { resolvePtySupervisorScriptPath } from '../channels/pty-supervisor-locate.js';
+import { buildResumeContract } from '../resume-contract.js';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { markRespawnPending } from '../../dashboard/server/services/pending-respawn.js';
@@ -878,6 +879,7 @@ export async function handleConversationResume(
       return jsonResponse({ ...conv, status: 'active', reattached: true });
     }
     const oldSessionId = conv.claudeSessionId;
+    const resumeCause = conv.status === 'ended' ? 'operator' : 'system';
     const harness: RuntimeName = conv.harness ?? 'claude-code';
     const modelChanged = !!model && model !== conv.model;
     if (!(await validateCwdContainment(conv.cwd))) return jsonResponse({ error: 'Invalid cwd' }, { status: 400 });
@@ -896,6 +898,12 @@ export async function handleConversationResume(
       await spawnConversationSession(conv.tmuxSession, conv.cwd, oldSessionId ?? randomUUID(), model, effort, conv.issueId ?? undefined, canResume, harness);
       await waitForTmuxSession(conv.tmuxSession);
       await waitForConversationRuntimeReady(conv.tmuxSession, harness, 'respawn');
+      await deliverAgentMessage(
+        conv.tmuxSession,
+        `CONVERSATION RESUME: ${buildResumeContract(resumeCause)}`,
+        'conversation-resume',
+        resolveConversationDeliveryMethod(conv),
+      );
       markConversationActive(name);
       return jsonResponse({ ...conv, status: 'active', model: model ?? conv.model, harness, reattached: false, sessionAlive: true });
     } catch (error) {
