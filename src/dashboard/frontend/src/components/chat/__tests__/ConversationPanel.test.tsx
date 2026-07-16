@@ -3,8 +3,9 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { ConversationPanel } from '../ConversationPanel';
 import { DialogProvider } from '../../DialogProvider';
 
@@ -94,6 +95,19 @@ const mockConversation: React.ComponentProps<typeof ConversationPanel>['conversa
   model: 'claude-opus-4-6',
 };
 
+let queryClients: QueryClient[] = [];
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+function defaultConversationResponse(method: string, url: string): Response | undefined {
+  if (method === 'POST' && url === 'http://localhost:3000/api/dashboard/session') {
+    return Response.json({ csrfToken: 'test-csrf-token' });
+  }
+  if (method === 'GET' && /^\/api\/conversations\/(test-conv|next-conv)\/diffs$/.test(url)) {
+    return Response.json({ summaries: [] });
+  }
+  return undefined;
+}
+
 function makeClient(messagesData = {
   messages: [],
   workLog: [],
@@ -107,6 +121,7 @@ function makeClient(messagesData = {
   });
   // Pre-seed messages so the useQuery doesn't attempt a real fetch
   client.setQueryData(['conversation-messages', 'test-conv'], messagesData);
+  queryClients.push(client);
   return client;
 }
 
@@ -135,6 +150,8 @@ function renderPanel(
 
 describe('ConversationPanel rename flow', () => {
   beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
     vi.clearAllMocks();
     localStorage.clear();
     vi.stubGlobal('navigator', {
@@ -142,7 +159,11 @@ describe('ConversationPanel rename flow', () => {
     });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
     window.history.replaceState(null, '', '/');
     localStorage.clear();
     vi.unstubAllGlobals();
@@ -155,14 +176,16 @@ describe('ConversationPanel rename flow', () => {
   });
 
   it('shows About as a visible pressed-state toggle', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        summary: 'This conversation is about tightening dashboard behavior.',
-        messageCount: 2,
-        generatedAt: '2026-06-11T00:00:00.000Z',
-      }),
-    }));
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/test-conv/about') {
+        return Response.json({
+          summary: 'This conversation is about tightening dashboard behavior.',
+          messageCount: 2,
+          generatedAt: '2026-06-11T00:00:00.000Z',
+        });
+      }
+      return defaultConversationResponse(method, url);
+    });
 
     renderPanel();
     const toggle = screen.getByRole('button', { name: 'Show about this conversation' });
@@ -186,19 +209,14 @@ describe('ConversationPanel rename flow', () => {
 
   it('shows a pi Stop button during a running turn and posts abort', async () => {
     let resolveAbort: ((response: Response) => void) | null = null;
-    const fetchMock = vi.fn((input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.includes('/abort')) {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'POST' && url === '/api/conversations/test-conv/abort') {
         return new Promise<Response>((resolve) => {
           resolveAbort = resolve;
         });
       }
-      return Promise.resolve(new Response(JSON.stringify({ summaries: [] }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }));
+      return defaultConversationResponse(method, url);
     });
-    vi.stubGlobal('fetch', fetchMock);
 
     renderPanel(
       {
@@ -223,17 +241,22 @@ describe('ConversationPanel rename flow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop current turn' }));
 
     await waitFor(() => expect(screen.getByText('Stopping…')).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenCalledWith('/api/conversations/test-conv/abort', expect.objectContaining({ method: 'POST' }));
+    expect(fetchControl.fetchMock).toHaveBeenCalledWith('/api/conversations/test-conv/abort', expect.objectContaining({ method: 'POST' }));
 
     resolveAbort?.(new Response('{}', { status: 200 }));
     await waitFor(() => expect(screen.getByText('Stop')).toBeInTheDocument());
   });
 
   it('closes the About drawer when switching conversations', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ summary: null, messageCount: 0, generatedAt: null }),
-    }));
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && [
+        '/api/conversations/test-conv/about',
+        '/api/conversations/next-conv/about',
+      ].includes(url)) {
+        return Response.json({ summary: null, messageCount: 0, generatedAt: null });
+      }
+      return defaultConversationResponse(method, url);
+    });
 
     const { rerender, client } = renderPanel();
     fireEvent.click(screen.getByRole('button', { name: 'Show about this conversation' }));

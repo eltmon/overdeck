@@ -1,9 +1,41 @@
-import { describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
 const actionInvoke = vi.fn()
+let queryClient: QueryClient | undefined
+let unexpectedRequests: string[] = []
+
+beforeEach(() => {
+  unexpectedRequests = []
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input)
+    const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+    if (method !== 'GET') {
+      unexpectedRequests.push(`${method} ${url}`)
+      return Response.json({}, { status: 500 })
+    }
+    if (url === '/api/issues/resource-allocated') {
+      return Response.json([])
+    }
+    if (url === '/api/workspaces/PAN-1661/plan') {
+      return Response.json({ plan: { items: [] } })
+    }
+    unexpectedRequests.push(`${method} ${url}`)
+    return Response.json({}, { status: 500 })
+  }))
+})
+
+afterEach(async () => {
+  await queryClient?.cancelQueries()
+  cleanup()
+  queryClient?.clear()
+  queryClient = undefined
+  const requests = unexpectedRequests
+  vi.unstubAllGlobals()
+  expect(requests).toEqual([])
+})
 
 const queryMocks = vi.hoisted(() => {
   const activityQuery = {
@@ -88,6 +120,8 @@ vi.mock('../../IssueActionMenu/IssueActionMenu', () => ({
 }))
 
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
+vi.mock('../../ReviewPolicyControl', () => ({ ReviewPolicyControl: () => <div>Review policy</div> }))
+vi.mock('../../issue-view/StartAgentCta', () => ({ StartAgentCta: () => <div>Start agent</div> }))
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
@@ -115,14 +149,15 @@ import { IssueMissionControl } from './IssueMissionControl'
 
 function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
   const onOpenPane = extra?.onOpenPane ?? vi.fn()
-  const queryClient = new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
-      queries: { retry: false },
+      queries: { gcTime: 0, retry: false },
       mutations: { retry: false },
     },
   })
+  queryClient = client
   const view = render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={client}>
       <IssueMissionControl
         issueId="PAN-1661"
         title="Mission control"
