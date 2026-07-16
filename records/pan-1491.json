@@ -438,15 +438,7 @@
       "timestamp": "2026-07-16T17:52:40.659Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T17:52:40Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1491\n\n# Review Synthesis — PAN-1491 — 2026-07-16T17:52:12Z\n\n## Verdict: CHANGES REQUESTED — performance and requirements reviewers timed out before producing reports\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-e26572ba/context.json`\n- Branch: `feature/pan-1491`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491`\n- HEAD reviewed: `e26572ba45fb1ad80a35910d7bbda78311f92368`\n- Cycle number: 13\n- Prior cycle SHA: `ae0b48d390c89f7cbaebc3c34aa5f93a9c58a11e`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-e26572ba/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-e26572ba/correctness.md` | 0 after convergence gate |\n| performance | timeout | — | infrastructure failure |\n| requirements | timeout | — | infrastructure failure |\n\n## Blocking Findings\n\n### [performance] Reviewer timed out before producing a report\nThe performance reviewer emitted `REVIEWER_TIMEOUT performance reviewer still running past deadline 2026-07-16T17:47:53.075Z`, and no current-cycle `performance.md` output exists. Review policy requires changes whenever any reviewer fails or times out, so performance coverage is incomplete and this cycle cannot approve the branch.\n\n### [requirements] Reviewer timed out before producing a report\nThe requirements reviewer emitted `REVIEWER_TIMEOUT requirements reviewer still running past deadline 2026-07-16T17:47:53.052Z`, and no current-cycle `requirements.md` output exists. Review policy requires changes whenever any reviewer fails or times out, so requirements and acceptance-criteria coverage is incomplete and this cycle cannot approve the branch.\n\n## Non-blocking Findings\n\n### [correctness] Priority sorting can move agent-filed suggestions above operator-filed suggestions — `src/dashboard/frontend/src/components/flywheel/FlywheelStatusDetails.tsx:122`\n**[demoted: previously reviewed]** The reviewer found that `sortSuggestions()` compares priority before `filedBy`, so a higher-priority agent suggestion can appear above a lower-priority operator suggestion. The cited comparator did not change between the prior reviewed SHA and the current HEAD. Because this is cycle 13, the convergence gate prevents unchanged, previously reviewed code from becoming a new blocker.\n\n### [correctness] Existing version-61 legacy databases never receive the new column — `src/lib/database/schema.ts:1743`\nThe legacy migration remains unable to add `affected_criteria` to a database already stamped at schema version 61, while the legacy accessor now reads and writes that column. The current production Overdeck path has an independent idempotent top-up, so the reviewer classified this as a latent compatibility advisory. The cited migration did not change since the prior reviewed SHA.\n\n### [security] Normalize and authorize expensive weight requests before they enter the shared worker queue — `src/dashboard/server/routes/flywheel-substrate-bug-weights.ts:32`\nThe unauthenticated aggregate route accepts distinct oversized windows that produce separate worker coalescing keys before the service caps each request to 365 days. Repeated requests can consume the bounded shared long-worker queue and delay unrelated work. The reviewer classified this as a low-severity, bounded availability-hardening advisory; canonicalizing the effective window before queueing and applying dashboard request controls would reduce the exposure.\n\n## Clean Sub-roles\n\nNone. Security and correctness produced only non-blocking findings after the convergence gate; performance and requirements did not complete.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-e26572ba/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1491 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -520,21 +512,21 @@
     "recordedAt": "2026-07-16T17:17:23.591Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T17:53:01.251Z",
+  "updated": "2026-07-16T18:08:02.448Z",
   "pipeline": {
     "issueId": "PAN-1491",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T17:53:01.173Z",
+    "updatedAt": "2026-07-16T18:08:02.318Z",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "lastVerifiedCommit": "e26572ba45fb1ad80a35910d7bbda78311f92368",
-    "reviewSpawnedAt": "2026-07-16T17:20:55.420Z",
+    "reviewSpawnedAt": "2026-07-16T18:08:02.317Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
@@ -724,9 +716,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 1456244,
-            "output": 89566,
-            "cacheRead": 21390848,
+            "input": 2355476,
+            "output": 150400,
+            "cacheRead": 30757376,
             "cacheWrite": 0
           }
         }
@@ -745,9 +737,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 61285889,
-          "output": 433054,
-          "cacheRead": 115370496,
+          "input": 62185121,
+          "output": 493888,
+          "cacheRead": 124737024,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -812,8 +804,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 273.066677,
-        "pricingAsOf": "2026-07-16T17:53:01.246Z"
+        "usd": 284.071121,
+        "pricingAsOf": "2026-07-16T18:08:02.420Z"
       }
     },
     "merges": [
