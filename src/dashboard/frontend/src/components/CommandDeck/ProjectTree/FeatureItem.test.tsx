@@ -121,6 +121,10 @@ vi.mock('../styles/command-deck.module.css', () => ({
     sessionList: 'sessionList',
     sessionNode: 'sessionNode',
     sessionNodeSelected: 'sessionNodeSelected',
+    sessionIconSlot: 'sessionIconSlot',
+    sessionLabel: 'sessionLabel',
+    sessionModel: 'sessionModel',
+    sessionStatus: 'sessionStatus',
   },
 }));
 
@@ -1174,6 +1178,11 @@ describe('FeatureItem', () => {
     const activeLink = screen.getByTestId('conversation-42');
     expect(activeLink).toHaveAttribute('href', '/conv/42');
     expect(activeLink).toHaveTextContent('My conv');
+    expect(activeLink.children).toHaveLength(4);
+    expect(activeLink.children[0]).toHaveClass('sessionIconSlot');
+    expect(activeLink.children[1]).toHaveClass('sessionLabel');
+    expect(activeLink.children[2]).toHaveClass('sessionStatus');
+    expect(activeLink.children[3]).toHaveClass('sessionModel');
 
     const endedLink = screen.getByTestId('conversation-43');
     expect(endedLink).toHaveAttribute('href', '/conv/43');
