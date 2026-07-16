@@ -1,7 +1,7 @@
 import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
 import { buildChildEnvWithoutTmuxSync } from '../../../lib/child-env.js';
-import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
+import { spawnPanCli } from '../../../lib/pan-cli-invocation.js';
 /**
  * Workspaces route module — Effect HttpRouter.Layer (PAN-428 B8)
  *
@@ -527,12 +527,7 @@ export function spawnPanCommand(
     }
   };
 
-  const invocation = panCliInvocation(args);
-  const child = spawn(invocation.command, invocation.args, {
-    cwd: cwd || process.cwd(),
-    detached: true,
-    stdio: ['ignore', 'pipe', 'pipe'],
-  });
+  const child = spawnPanCli(args, { cwd: cwd || process.cwd(), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   attachPanOutputStreams(child, activityId);
 
   child.on('close', (code) => {
@@ -546,12 +541,7 @@ export function spawnPanCommand(
         });
       }
       appendActivityOutput(activityId, `--- ${chain.phaseLabel} ---`);
-      const nextInvocation = panCliInvocation(chain.args);
-      const next = spawn(nextInvocation.command, nextInvocation.args, {
-        cwd: cwd || process.cwd(),
-        detached: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      const next = spawnPanCli(chain.args, { cwd: cwd || process.cwd(), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
       attachPanOutputStreams(next, activityId);
       next.on('close', (nextCode) => finalize(nextCode, `pan ${chain.args.join(' ')}`));
     } else {

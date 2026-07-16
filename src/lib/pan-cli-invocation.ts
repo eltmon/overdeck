@@ -1,3 +1,4 @@
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { join } from 'node:path';
 
 import { packageRoot } from './paths.js';
@@ -21,4 +22,9 @@ export function panCliInvocation(
     command: runtime.nodePath ?? process.execPath,
     args: [join(runtime.root ?? packageRoot, 'dist', 'cli', 'index.js'), ...args],
   };
+}
+
+export function spawnPanCli(args: readonly string[], options: SpawnOptions = {}): ChildProcess {
+  const invocation = panCliInvocation(args);
+  return spawn(invocation.command, invocation.args, options);
 }
