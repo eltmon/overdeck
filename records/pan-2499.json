@@ -531,18 +531,18 @@
     "recordedAt": "2026-07-16T02:07:47.991Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T03:24:09.984Z",
+  "updated": "2026-07-16T03:25:14.915Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T03:24:09.935Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-2499-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-16T03:25:14.838Z",
+    "reviewNotes": "Security, performance, and requirements reviewers ended without reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "d53cfd7a1a8dd1c32a2c88980abf34c08c76a7e3",
     "reviewRequestedAt": "2026-07-16T03:23:36.499Z",
@@ -681,6 +681,24 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-16T02:07:47.991Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "d53cfd7a1a8dd1c32a2c88980abf34c08c76a7e3"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "d53cfd7a1a8dd1c32a2c88980abf34c08c76a7e3"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "d53cfd7a1a8dd1c32a2c88980abf34c08c76a7e3"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "d53cfd7a1a8dd1c32a2c88980abf34c08c76a7e3"
+      }
     }
   },
   "closeOut": {
@@ -775,7 +793,7 @@
       },
       "costAtCloseOut": {
         "usd": 193.756662,
-        "pricingAsOf": "2026-07-16T03:24:09.979Z"
+        "pricingAsOf": "2026-07-16T03:25:14.903Z"
       }
     },
     "merges": [
