@@ -1,9 +1,34 @@
 {
   "issueId": "PAN-2532",
   "schemaVersion": 2,
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass.",
+      "recordedAt": "2026-07-16T06:53:33.346Z"
+    }
+  ],
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-16T06:53:41.103Z",
+      "reason": "end",
+      "note": "Deviation: removed a stale planning-era .pan/records/pan-2532.json artifact from the code branch because the migrated-state push guard correctly rejected it. Test addition waived per the approved vBRIEF because existing coverage at faffae87a4820e393df079e855bbd8cf184971ad exercises the preserved row content. No skipped work or remaining hazards. Delivered the four-column PipelineRow title-first layout with inline status metadata; typecheck, lint, focused tests, and full suite pass.\n\nTest gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass."
+    }
+  ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+    ],
+    "recordedAt": "2026-07-16T06:53:38.538Z"
+  },
   "created": "2026-07-16T05:46:43.959Z",
-  "updated": "2026-07-16T06:53:38.538Z",
+  "updated": "2026-07-16T06:53:41.285Z",
   "pipeline": {
     "issueId": "PAN-2532",
     "reviewStatus": "pending",
@@ -12,11 +37,38 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T05:46:44.039Z"
+    "updatedAt": "2026-07-16T06:53:41.213Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2782",
+    "reviewRequestedAt": "2026-07-16T06:53:41.121Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+      ],
+      "actualChangedFiles": [
+        "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
+      ],
+      "recordedAt": "2026-07-16T06:53:38.538Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 451654,
+            "output": 1733,
+            "cacheRead": 411136,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 4907283,
+            "output": 7044,
+            "cacheRead": 4769792,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-opus-4-8": {
             "input": 14950,
@@ -27,6 +79,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 451654,
+          "output": 1733,
+          "cacheRead": 411136,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 4907283,
+          "output": 7044,
+          "cacheRead": 4769792,
+          "cacheWrite": 0
+        },
         "anthropic/claude-opus-4-8": {
           "input": 14950,
           "output": 10786,
@@ -35,11 +99,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 1.649946,
-        "pricingAsOf": "2026-07-16T05:46:44.082Z"
+        "usd": 4.933617,
+        "pricingAsOf": "2026-07-16T06:53:41.280Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2782"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -74,23 +140,5 @@
     "widen-title-grid.widen-title-grid.ac3": "completed",
     "widen-title-grid.widen-title-grid.ac4": "completed",
     "widen-title-grid.widen-title-grid.ac5": "completed"
-  },
-  "decisions": [
-    {
-      "id": "D-test-waived",
-      "summary": "Test gate waived: No new test required by the approved vBRIEF; existing ProjectOverview coverage at faffae87a4820e393df079e855bbd8cf184971ad asserts pipeline title, stuck-reason subline, cost, and session count, and all 24 tests pass.",
-      "recordedAt": "2026-07-16T06:53:33.346Z"
-    }
-  ],
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
-    ],
-    "actualChangedFiles": [
-      "src/dashboard/frontend/src/components/CommandDeck/PipelineRow.tsx"
-    ],
-    "recordedAt": "2026-07-16T06:53:38.538Z"
   }
 }
