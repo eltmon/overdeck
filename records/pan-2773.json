@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T17:55:10.645Z",
+  "updated": "2026-07-16T17:55:45.890Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "error",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T17:55:10.567Z",
-    "inspectNotes": "Inspection error for bead create-result-type: tmux session inspect-pan-2773-create-result-type exited before producing a verdict. No verdict was produced.",
+    "updatedAt": "2026-07-16T17:55:45.813Z",
+    "inspectNotes": "Inspecting item create-result-type",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -38,17 +38,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 4,
-            "output": 1442,
-            "cacheRead": 119482,
-            "cacheWrite": 127050
+            "input": 6,
+            "output": 1834,
+            "cacheRead": 246532,
+            "cacheWrite": 128906
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 417481,
-            "output": 29141,
-            "cacheRead": 10641920,
+            "input": 433827,
+            "output": 31490,
+            "cacheRead": 11716608,
             "cacheWrite": 0
           }
         }
@@ -61,21 +61,21 @@
           "cacheWrite": 174911
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4,
-          "output": 1442,
-          "cacheRead": 119482,
-          "cacheWrite": 127050
+          "input": 6,
+          "output": 1834,
+          "cacheRead": 246532,
+          "cacheWrite": 128906
         },
         "openai/gpt-5.6-sol": {
-          "input": 417481,
-          "output": 29141,
-          "cacheRead": 10641920,
+          "input": 433827,
+          "output": 31490,
+          "cacheRead": 11716608,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 18.909083,
-        "pricingAsOf": "2026-07-16T17:55:10.631Z"
+        "usd": 19.632601,
+        "pricingAsOf": "2026-07-16T17:55:45.873Z"
       }
     },
     "merges": [],
