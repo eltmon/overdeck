@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T17:38:36.549Z",
+  "updated": "2026-07-16T17:39:05.441Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -52,5 +52,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "reconnect-policy": {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 2223299,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T17:39:05.441Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "reconnect-policy": "running"
+  }
 }
