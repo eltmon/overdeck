@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
+
+let recordRemote: string | null = null;
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
@@ -73,10 +76,13 @@ describe('deacon-swarm ready-slot merge', () => {
   beforeEach(() => {
     resetSwarmLoopSafetyForTests();
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-2203-swarm-merge-'));
+    recordRemote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(recordRemote);
+    recordRemote = null;
+    await cleanupGitRecordRoot(workspacePath);
   });
 
   it('marks the vBRIEF item done through the write door when a slot merges', async () => {
@@ -91,7 +97,7 @@ describe('deacon-swarm ready-slot merge', () => {
       expect.objectContaining({ id: 'wi-1' }),
     );
     expect(fakeDeps.applyTaskOperationToPlanFile).toHaveBeenCalledWith(
-      join(workspacePath, '.pan', 'spec.vbrief.json'),
+      'PAN-2203',
       { type: 'done', itemId: 'wi-1', writerId: 'deacon-swarm' },
       workspacePath,
     );
@@ -151,10 +157,13 @@ describe('PAN-2372 WI-4 merge clears the durable slot-completion marker (FR-6, A
   beforeEach(() => {
     resetSwarmLoopSafetyForTests();
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-2372-swarm-merge-clear-'));
+    recordRemote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(recordRemote);
+    recordRemote = null;
+    await cleanupGitRecordRoot(workspacePath);
   });
 
   it('removes swarm.slotCompletions[slotIndex] for the merged slot and preserves siblings', async () => {
@@ -163,10 +172,10 @@ describe('PAN-2372 WI-4 merge clears the durable slot-completion marker (FR-6, A
     const fakeDeps = deps({ merged: true, conflicts: false });
     // Seed a durable marker for the slot about to merge, plus a sibling marker
     // that must survive (only the merged slot's marker is cleared).
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
       slotIndex: 1, itemId: 'wi-1', agentId: 'agent-pan-2203-slot-1', completedAt: '2026-07-01T00:00:00.000Z',
     });
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2203', {
       slotIndex: 2, itemId: 'wi-2', agentId: 'agent-pan-2203-slot-2', completedAt: '2026-07-01T00:00:00.000Z',
     });
 

@@ -89,7 +89,7 @@ export function IssueDrawer() {
   const drawer = useDashboardStore((state) => state.drawer);
   const closeIssue = useDashboardStore((state) => state.closeIssue);
   const syncDrawerFromUrl = useDashboardStore((state) => state.syncDrawerFromUrl);
-  const { issue, agents, beads } = useDrawerData();
+  const { issue, agents, tasks } = useDrawerData();
 
   // Selected agent for the Conversation/Terminal tabs. Owned here so the choice
   // survives a Conversation ⇄ Terminal tab switch; falls back to the default
@@ -223,12 +223,12 @@ export function IssueDrawer() {
                 <div data-section="DrawerWorkspaceSection"><DrawerWorkspaceSection issueId={drawer.issueId} /></div>
                 <div data-section="DrawerActiveAgent"><ActiveAgentPanel agentId={effectiveAgentId ?? ''} density="console" /></div>
                 <div data-section="DrawerVerificationGates"><VerificationGates issueId={drawer.issueId} /></div>
-                <div data-section="DrawerBeadsList"><BeadsPanel issueId={drawer.issueId} items={beads} /></div>
+                <div data-section="DrawerBeadsList"><BeadsPanel issueId={drawer.issueId} items={tasks} /></div>
                 <div data-section="DrawerReviewSpecialists"><DrawerReviewSpecialists /></div>
               </div>
-            ) : drawer.tab === 'beads' ? (
-              <div data-testid="drawer-tab-panel-beads" data-section="DrawerBeadsList">
-                <BeadsPanel issueId={drawer.issueId} items={beads} />
+            ) : drawer.tab === 'tasks' ? (
+              <div data-testid="drawer-tab-panel-tasks" data-section="DrawerBeadsList">
+                <BeadsPanel issueId={drawer.issueId} items={tasks} />
               </div>
             ) : drawer.tab === 'plan' && drawer.issueId ? (
               <div data-section="DrawerPlanPanel / VBriefViewer"><DrawerPlanPanel issueId={drawer.issueId} /></div>

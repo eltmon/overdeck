@@ -13,10 +13,11 @@ export function ColumnContent({
   issueCosts,
   costsLoading,
   selectedIssue,
+  focusedIssueId,
   onSelectIssue,
   onOpenIssue,
   onPlan,
-  onViewBeads,
+  onViewTasks,
   onViewVBrief,
   collapsedFeatures,
   onToggleFeature,
@@ -33,10 +34,12 @@ export function ColumnContent({
   issueCosts: Record<string, IssueCost>;
   costsLoading?: boolean;
   selectedIssue: string | null | undefined;
+  /** PAN-1234: keyboard navigation focus target. */
+  focusedIssueId?: string | null;
   onSelectIssue: (id: string | null) => void;
   onOpenIssue: (id: string) => void;
   onPlan: (issue: Issue, autoStart?: boolean) => void;
-  onViewBeads: (issue: Issue) => void;
+  onViewTasks: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
   collapsedFeatures: Set<string>;
   onToggleFeature: (featureId: string) => void;
@@ -71,9 +74,10 @@ export function ColumnContent({
         cost={issueCosts[issue.identifier.toLowerCase()]}
         costsLoading={costsLoading}
         isSelected={selectedIssue === issue.identifier}
+        isFocused={focusedIssueId === issue.identifier}
         onSelect={() => onOpenIssue(issue.identifier)}
         onPlan={(autoStart) => onPlan(issue, autoStart)}
-        onViewBeads={(i) => onViewBeads(i)}
+        onViewTasks={(i) => onViewTasks(i)}
         onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
         onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
@@ -127,7 +131,7 @@ export function ColumnContent({
               selectedIssue === feature.identifier ? null : feature.identifier
             )}
             onPlan={() => onPlan(feature)}
-            onViewBeads={() => onViewBeads(feature)}
+            onViewTasks={() => onViewTasks(feature)}
             onViewVBrief={onViewVBrief ? () => onViewVBrief(feature) : undefined}
             planningState={planningStateById?.[feature.identifier]}
           >

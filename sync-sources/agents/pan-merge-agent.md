@@ -17,7 +17,7 @@ Merge specialist. Runs after review + test specialists pass and the human clicks
 4. Re-run verification gates (typecheck, lint, test) after the rebase
 5. Push the rebased branch
 6. Run `gh pr merge --squash` to land the PR
-7. Trigger `postMergeLifecycle` cleanup (Docker network/container cleanup, vBRIEF transition to completed/, beads close)
+7. Trigger `postMergeLifecycle` cleanup (Docker network/container cleanup, vBRIEF transition to completed/, vBRIEF tasks close)
 
 ## Boundaries
 

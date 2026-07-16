@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { request as httpRequest } from 'node:http';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
@@ -19,6 +19,10 @@ import { isPaneDead, sendKeys, sessionExists } from '../tmux.js';
 import { BRIDGE_TOKEN_HEADER, readBridgeTokenSync } from '../bridge-token.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
+  SUPERVISOR_CLIENT_MARGIN_MS,
+  supervisorInjectionBudgetMs,
+} from '../channels/injection-budget.js';
+import {
   captureTranscriptUserRecordSnapshot,
   hasNewTranscriptUserRecord,
   type TranscriptUserRecordSnapshot,
@@ -26,7 +30,7 @@ import {
 
 export type DeliveryResult = {
   ok: boolean;
-  path: 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
   failure?: string;
 };
 
@@ -62,9 +66,10 @@ function overdeckHomeForChannels(): string {
 async function appendChannelDeliveryLog(
   agentId: string,
   entry: {
-    path: 'supervisor' | 'channel' | 'tmux';
+    path: 'app-server' | 'supervisor' | 'channel' | 'tmux';
     reason?: string;
     caller?: string;
+    appServer?: string;
     'pty-supervisor'?: string;
     channels?: string;
   },
@@ -85,6 +90,17 @@ async function appendChannelDeliveryLog(
     );
   } catch {
     // Non-critical
+  }
+}
+
+function readAppServerTokenSync(agentId: string): string | null {
+  try {
+    const tokenPath = join(overdeckHomeForSockets(), 'agents', agentId, 'appserver-token');
+    if (!existsSync(tokenPath)) return null;
+    const token = readFileSync(tokenPath, 'utf-8').trim();
+    return token || null;
+  } catch {
+    return null;
   }
 }
 
@@ -184,8 +200,9 @@ export async function deliverAgentMessage(
 
   let channelsEnabled = false;
   let resolvedMethod = deliveryMethod;
+  let state: AgentState | null = null;
   try {
-    const state = await Effect.runPromise(getAgentState(normalizedId));
+    state = await Effect.runPromise(getAgentState(normalizedId));
     channelsEnabled = Boolean(state?.channelsEnabled);
     resolvedMethod ??= state?.deliveryMethod ?? 'auto';
   } catch {
@@ -198,6 +215,33 @@ export async function deliverAgentMessage(
     return { ok: true, path: 'tmux' };
   }
 
+  let appServerFailure: string | undefined;
+  if (resolvedMethod === 'auto') {
+    const appServerSocketPath = join(overdeckHomeForSockets(), 'sockets', `appserver-${normalizedId}.sock`);
+    if (existsSync(appServerSocketPath)) {
+      const appServerToken = readAppServerTokenSync(normalizedId);
+      if (!appServerToken) {
+        appServerFailure = 'appserver-token-missing';
+      } else {
+        try {
+          const appServerBody: Record<string, unknown> = { op: 'message', content: message, meta: { caller } };
+          if (state?.model) appServerBody.model = state.model;
+          await postUnixSocketJson(
+            appServerSocketPath,
+            appServerBody,
+            8_000,
+            appServerToken,
+          );
+          await appendChannelDeliveryLog(normalizedId, { path: 'app-server', caller });
+          return { ok: true, path: 'app-server' };
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          appServerFailure = `socket-post-failed: ${reason}`;
+        }
+      }
+    }
+  }
+
   let supervisorFailure: string | undefined;
   if (resolvedMethod === 'auto' || resolvedMethod === 'supervisor') {
     const supervisorSocketPath = join(overdeckHomeForSockets(), 'sockets', `pty-${normalizedId}.sock`);
@@ -208,15 +252,14 @@ export async function deliverAgentMessage(
       supervisorFailure = 'pty-token-missing';
     } else {
       try {
-        // Must exceed the supervisor's worst-case echo-confirmation path
-        // (2 attempts × 2.5s + 2 purges × 150ms ≈ 5.3s, pty-supervisor.ts).
-        // A shorter client timeout abandons the POST mid-retry and fires the
-        // tmux fallback while the supervisor is still writing — re-creating
-        // the duplicate-submit race PAN-1769 fixed.
+        // The client deadline must remain above the supervisor's payload-aware
+        // worst-case injection budget. Abandoning the POST mid-injection would
+        // fire the tmux fallback while the supervisor is still writing and
+        // re-create the duplicate-writer race PAN-1769 fixed.
         await postUnixSocketJson(
           supervisorSocketPath,
           { content: message, meta: { caller } },
-          8_000,
+          supervisorInjectionBudgetMs(message.length) + SUPERVISOR_CLIENT_MARGIN_MS,
           ptyToken,
           PTY_TOKEN_HEADER,
         );
@@ -273,6 +316,7 @@ export async function deliverAgentMessage(
       path: 'tmux',
       reason: channelFailure,
       caller,
+      ...(appServerFailure ? { appServer: appServerFailure } : {}),
       ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
       ...(channelFailure ? { channels: channelFailure } : {}),
     });

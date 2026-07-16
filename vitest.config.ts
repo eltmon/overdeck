@@ -5,6 +5,7 @@ import { readQuarantineList } from './src/lib/test-infra/quarantine.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const includeBenchmarks = process.env['VITEST_INCLUDE_BENCH'] === '1';
+const includeSlow = process.env['VITEST_INCLUDE_SLOW'] === '1';
 const isCI = process.env['CI'] === 'true';
 const isVerification = process.env['OVERDECK_VERIFICATION'] === '1';
 const isFlakeLane = process.env['OVERDECK_FLAKE_LANE'] === '1';
@@ -48,8 +49,8 @@ export default defineConfig({
     },
     include: defaultInclude,
     exclude: excludeQuarantined
-      ? ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...quarantined]
-      : ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**'],
+      ? ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...(includeSlow ? [] : ['**/*.slow.test.ts']), ...quarantined]
+      : ['**/node_modules/**', '**/dist/**', 'src/dashboard/frontend/**', ...(includeSlow ? [] : ['**/*.slow.test.ts'])],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

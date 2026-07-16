@@ -17,6 +17,7 @@
   --pan-color-scheme: light;
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
 
   /* Surfaces */
   --background: #ffffff;
@@ -258,12 +259,12 @@ body::after {
   .pulse {
     animation: pulse 1.6s ease-out infinite;
   }
-  .drawer-bead-current-ping {
-    animation: drawer-bead-current-ping 1.6s ease-out infinite;
+  .drawer-task-current-ping {
+    animation: drawer-task-current-ping 1.6s ease-out infinite;
   }
 }
 
-@keyframes drawer-bead-current-ping {
+@keyframes drawer-task-current-ping {
   0% {
     opacity: 1;
     transform: scale(1);
@@ -386,7 +387,7 @@ body::after {
   .anim-error-shake,
   .anim-row-flash,
   .anim-round-active,
-  .drawer-bead-current-ping {
+  .drawer-task-current-ping {
     animation: none !important;
   }
   .anim-round-active {

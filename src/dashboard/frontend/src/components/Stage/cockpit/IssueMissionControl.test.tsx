@@ -38,7 +38,8 @@ const queryMocks = vi.hoisted(() => {
   }
   const issueCostsQuery = { data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }
   const workspaceQuery = { data: null, isLoading: false }
-  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery }
+  const shipLogQuery = { data: null, isLoading: false }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery, shipLogQuery }
 })
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
@@ -49,6 +50,7 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useReviewStatusQuery: () => queryMocks.reviewStatusQuery,
   useIssueCostsQuery: () => queryMocks.issueCostsQuery,
   useWorkspaceQuery: () => queryMocks.workspaceQuery,
+  useShipLogQuery: () => queryMocks.shipLogQuery,
 }))
 
 vi.mock('../../../lib/issueActions', () => ({

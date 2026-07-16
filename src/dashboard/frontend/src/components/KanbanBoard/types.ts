@@ -10,7 +10,7 @@ export interface IssueCost {
 
 export interface PlanningState {
   hasPlan: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   planningComplete: boolean;
 }
 

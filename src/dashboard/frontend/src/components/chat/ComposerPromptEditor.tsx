@@ -62,7 +62,7 @@ export interface SlashCommand {
   category?: string;
 }
 
-const SLASH_COMMANDS: SlashCommand[] = [
+export const SLASH_COMMANDS: SlashCommand[] = [
   // ─── AI CLI Commands ─────────────────────────────────────────────────────────
   {
     id: 'model',
@@ -117,11 +117,12 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-sync-main', label: 'pan sync-main', description: 'Sync latest main into feature branch', insert: 'pan sync-main ', category: 'Lifecycle' },
   { id: 'pan-done', label: 'pan done', description: 'Mark agent work complete', insert: 'pan done ', category: 'Lifecycle' },
   { id: 'pan-reopen', label: 'pan reopen', description: 'Reopen a completed issue', insert: 'pan reopen ', category: 'Lifecycle' },
+  { id: 'pan-reset-to-planned', label: 'pan reset-to-planned', description: 'Return an issue to post-planning while preserving its workspace and branch', insert: 'pan reset-to-planned ', category: 'Lifecycle' },
   { id: 'pan-wipe', label: 'pan wipe', description: 'Deep wipe: completely reset all state', insert: 'pan wipe ', category: 'Lifecycle' },
   { id: 'pan-close', label: 'pan close', description: 'Close out a completed issue', insert: 'pan close ', category: 'Lifecycle' },
   { id: 'pan-plan', label: 'pan plan', description: 'Create execution plan before spawning', insert: 'pan plan ', category: 'Lifecycle' },
   { id: 'pan-plan-auto-start', label: 'pan plan --auto --auto-start', description: 'Auto-plan the issue, then auto-start the work agent', insert: 'pan plan --auto --auto-start ', category: 'Lifecycle' },
-  { id: 'pan-plan-finalize', label: 'pan plan finalize', description: 'Materialize plan to beads', insert: 'pan plan finalize ', category: 'Lifecycle' },
+  { id: 'pan-plan-finalize', label: 'pan plan finalize', description: 'Materialize plan to tasks', insert: 'pan plan finalize ', category: 'Lifecycle' },
   { id: 'pan-issues', label: 'pan issues', description: 'List and triage issues from configured trackers', insert: 'pan issues', category: 'Lifecycle' },
 
   // ─── Observation ─────────────────────────────────────────────────────────────
@@ -177,11 +178,11 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { id: 'pan-admin-remote-resources', label: 'pan admin remote resources', description: 'Show RAM/disk usage across VMs', insert: 'pan admin remote resources', category: 'Admin' },
   { id: 'pan-admin-remote-setup', label: 'pan admin remote setup', description: 'Setup Fly.io integration', insert: 'pan admin remote setup', category: 'Admin' },
 
-  // ─── Admin: DB & Beads ───────────────────────────────────────────────────────
+  // ─── Admin: DB & Tasks ───────────────────────────────────────────────────────
   { id: 'pan-admin-db-snapshot', label: 'pan admin db snapshot', description: 'Create database snapshot', insert: 'pan admin db snapshot', category: 'Admin' },
   { id: 'pan-admin-db-seed', label: 'pan admin db seed', description: 'Seed database', insert: 'pan admin db seed ', category: 'Admin' },
-  { id: 'pan-admin-beads-compact', label: 'pan admin beads compact', description: 'Compact beads database', insert: 'pan admin beads compact', category: 'Admin' },
-  { id: 'pan-admin-beads-stats', label: 'pan admin beads stats', description: 'Show beads statistics', insert: 'pan admin beads stats', category: 'Admin' },
+  { id: 'pan-admin-tasks-compact', label: 'pan admin tasks compact', description: 'Compact tasks database', insert: 'pan admin tasks compact', category: 'Admin' },
+  { id: 'pan-admin-tasks-stats', label: 'pan admin tasks stats', description: 'Show tasks statistics', insert: 'pan admin tasks stats', category: 'Admin' },
   { id: 'pan-admin-config-shadow', label: 'pan admin config shadow', description: 'Configure shadow mode', insert: 'pan admin config shadow', category: 'Admin' },
   { id: 'pan-admin-hooks-install', label: 'pan admin hooks install', description: 'Install/update Claude Code heartbeat hooks', insert: 'pan admin hooks install', category: 'Admin' },
   { id: 'pan-admin-tldr', label: 'pan admin tldr', description: 'TLDR daemon management', insert: 'pan admin tldr ', category: 'Admin' },

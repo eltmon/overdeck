@@ -450,10 +450,10 @@ describe('SessionNode', () => {
       </div>,
     );
 
-    expect(screen.getAllByText('Restart review')).toHaveLength(2);
+    expect(screen.getAllByText('Re-run review on latest commit')).toHaveLength(2);
   });
 
-  it('labels the review coordinator restart as Restart review (quick review has no convoy to "restart all")', () => {
+  it('labels the review coordinator restart as a re-run on the latest commit', () => {
     render(
       <SessionNode
         issueId="PAN-1381"
@@ -466,7 +466,7 @@ describe('SessionNode', () => {
       />,
     );
 
-    expect(screen.getByText('Restart review')).toBeInTheDocument();
+    expect(screen.getByText('Re-run review on latest commit')).toBeInTheDocument();
   });
 
   it('uses Start for ended test and ship nodes and Restart for live test and ship nodes', () => {

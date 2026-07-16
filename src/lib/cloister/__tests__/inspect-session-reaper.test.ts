@@ -57,20 +57,20 @@ describe('cleanupOrphanedInspectSessions (PAN-1559)', () => {
   });
 
   it('kills inspect sessions whose pane is dead even when state exists', async () => {
-    mockListSessionNames.mockReturnValue(['inspect-pan-1559-bead-1']);
+    mockListSessionNames.mockReturnValue(['inspect-pan-1559-task-1']);
     mockExistsSync.mockReturnValue(true);
     mockIsPaneDead.mockReturnValue(true);
 
     const actions = await cleanupOrphanedInspectSessions();
 
     expect(actions).toEqual([
-      'Killed orphaned inspect session inspect-pan-1559-bead-1 (pane is dead)',
+      'Killed orphaned inspect session inspect-pan-1559-task-1 (pane is dead)',
     ]);
-    expect(mockKillSession).toHaveBeenCalledWith('inspect-pan-1559-bead-1');
+    expect(mockKillSession).toHaveBeenCalledWith('inspect-pan-1559-task-1');
   });
 
   it('keeps live tracked inspect sessions', async () => {
-    mockListSessionNames.mockReturnValue(['inspect-pan-1559-bead-2']);
+    mockListSessionNames.mockReturnValue(['inspect-pan-1559-task-2']);
     mockExistsSync.mockReturnValue(true);
     mockIsPaneDead.mockReturnValue(false);
 

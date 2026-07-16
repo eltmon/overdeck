@@ -3,7 +3,8 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { getAgentDir, getAgentRuntimeStateSync, getAgentStateSync, saveAgentRuntimeState, setAgentPausedSync } from '../agents.js';
+import { getAgentDir, getAgentRuntimeStateSync, getAgentStateSync, saveAgentRuntimeState, saveAgentStateSync, setAgentPausedSync } from '../agents.js';
+import { applyCodexAuthBurnFlag, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { sessionFilePath } from '../paths.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -211,6 +212,28 @@ export async function checkApiErrorAgents(): Promise<string[]> {
 
     const agentState = getAgentStateSync(sessionName);
     if (agentState?.harness === 'codex') {
+      // PAN-2285: a revoked refresh token surfaces ONLY in the live pane (never
+      // in the rollout JSONL) and leaves the agent looking "running" while it
+      // 401-loops. Trip the troubled gate so it stops silently sitting, and
+      // persist the burn flag in agent state — this patrol runs in the deacon
+      // CHILD process, so the flag must cross to the dashboard server (banner
+      // endpoint + spawn gate) through the shared agents table, not module
+      // memory. Do NOT auto-kill or auto-respawn — the shared token family is
+      // dead until re-auth.
+      if (paneShowsCodexAuthBurn(tmuxOutput)) {
+        const newlyFlagged = applyCodexAuthBurnFlag(agentState);
+        if (newlyFlagged) {
+          saveAgentStateSync(agentState);
+          emitActivityEntrySync({
+            source: 'cloister',
+            level: 'error',
+            message: `${sessionName} marked troubled: Codex refresh token revoked (401 token_invalidated). Re-authenticate Codex — the dashboard banner has a Re-authenticate button, or run \`codex login\` on the host.`,
+            issueId: agentState.issueId,
+          });
+          actions.push(`Codex-auth-burned halt: ${sessionName} marked troubled — needs re-authentication`);
+        }
+        continue;
+      }
       if (paneShowsModelSwitch(tmuxOutput, agentState.model)) {
         const reason = `needs-you: live Codex pane indicates a model switch from launch model ${agentState.model}`;
         setAgentPausedSync(sessionName, reason, true);

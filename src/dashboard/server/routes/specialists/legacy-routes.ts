@@ -7,11 +7,9 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeState, transitionIssueToInProgress } from '../../../../lib/agents.js';
-import { queryBeadById } from '../../../../lib/beads-query.js';
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
-import { syncBeadStatusToVBrief } from '../../../../lib/vbrief/beads.js';
 import { readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -119,11 +117,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { specialist, issueId, status, notes } = body as {
+    const { specialist, issueId, status, notes, itemId } = body as {
       specialist: string;
       issueId: string;
       status: string;
       notes?: string;
+      itemId?: string;
     };
 
     // Validate specialist type
@@ -149,6 +148,18 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     }
 
     const normalizedIssueId = issueId.toUpperCase();
+
+    if (specialist === 'inspect' && status === 'passed') {
+      if (!itemId) {
+        return jsonResponse({ error: 'itemId is required for a passed inspect verdict' }, { status: 400 });
+      }
+      const project = resolveProjectFromIssueSync(normalizedIssueId);
+      const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+      const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
+      if (!plan?.plan.items.some(item => item.id === itemId)) {
+        return jsonResponse({ error: `Item "${itemId}" does not exist in the vBRIEF for ${normalizedIssueId}` }, { status: 400 });
+      }
+    }
     console.log(`[specialists/done] ${specialist} signaling ${status} for ${normalizedIssueId}`);
 
     // Resolve any pending specialist completion waiters (PAN-632: event-driven completion).
@@ -304,9 +315,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
       yield* Effect.promise(async () => {
         try {
           const { onInspectComplete } = await import('../../../../lib/cloister/inspect-agent.js');
-          // Extract beadId from notes (format: "Bead <beadId> matches spec...")
-          const beadMatch = notes?.match(/[Bb]ead\s+(\S+)/);
-          const beadId = beadMatch?.[1] || 'unknown';
           // Resolve project to get workspace path
           const project = resolveProjectFromIssueSync(normalizedIssueId);
           if (project) {
@@ -316,45 +324,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
               `feature-${normalizedIssueId.toLowerCase()}`,
             );
             if (existsSync(workspacePath)) {
-              (await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, beadId, 'passed', workspacePath)));
+              await Effect.runPromise(onInspectComplete(project.projectKey, normalizedIssueId, itemId!, 'passed', workspacePath));
 
-              // Sync bead completion to vBRIEF plan
-              try {
-                const beadData = await Effect.runPromise(queryBeadById(workspacePath, beadId));
-                const updatedItemId = await Effect.runPromise(syncBeadStatusToVBrief(beadId, workspacePath, 'completed', beadData?.title));
-                if (updatedItemId) {
-                  // Check which tasks are now unblocked and wake the work agent
-                  try {
-                    const unblockedItems = getUnblockedItemsSync(workspacePath, updatedItemId);
-                    if (unblockedItems.length > 0) {
-                      console.log(
-                        `[auto-wake] ${normalizedIssueId}: items unblocked after "${updatedItemId}": ${unblockedItems.join(', ')}`,
-                      );
-                      const workAgentId = `agent-${normalizedIssueId.toLowerCase()}`;
-                      const doc = readWorkspacePlanSync(workspacePath);
-                      const unblockedTitles = unblockedItems
-                        .map((id) => {
-                          const it = doc?.plan.items.find((i) => i.id === id);
-                          return it ? `"${it.title}"` : `"${id}"`;
-                        })
-                        .join(', ');
-                      const wakeMsg = `DAG SCHEDULER: Task${unblockedItems.length > 1 ? 's' : ''} now unblocked after completing "${updatedItemId}": ${unblockedTitles}. Pick up the next available task.`;
-                      await messageAgent(workAgentId, wakeMsg).catch((err: unknown) => {
-                        const errMsg = err instanceof Error ? err.message : String(err);
-                        console.log(
-                          `[auto-wake] Could not wake ${workAgentId} (may not be running): ${errMsg}`,
-                        );
-                      });
-                    }
-                  } catch (wakeErr: unknown) {
-                    const errMsg = wakeErr instanceof Error ? wakeErr.message : String(wakeErr);
-                    console.warn(`[auto-wake] Failed to check unblocked items: ${errMsg}`);
-                  }
-                }
-              } catch (syncErr: unknown) {
-                const errMsg = syncErr instanceof Error ? syncErr.message : String(syncErr);
-                console.warn(`[specialists/done] vBRIEF sync failed: ${errMsg}`);
-              }
             }
           }
         } catch (err) {

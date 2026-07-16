@@ -2,7 +2,7 @@
  * OpenAI Codex → chat panel adapter (PAN-1520).
  *
  * Codex conversations write a "rollout" JSONL under the per-agent
- * $CODEX_HOME/sessions/YYYY/MM/DD/rollout-<uuid>-<threadId>.jsonl. The schema
+ * $CODEX_HOME/sessions/YYYY/MM/DD/rollout-<timestamp>-<threadId>.jsonl. The schema
  * is OpenAI's, not Claude Code's, so the Claude parser (and even the Pi parser,
  * which the path also happens to match) find zero message entries and the chat
  * panel renders blank. This module is the adapter — it reads a Codex rollout

@@ -691,7 +691,7 @@ export function capturePaneSync(sessionName: string, lines: number = 50): string
   }
 }
 
-async function capturePaneText(
+export async function capturePaneText(
   sessionName: string,
   lines: number = 50,
   options?: { escapeSequences?: boolean }
@@ -834,8 +834,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
   kind: TerminalApiErrorKind;
   summary: string;
 }> = [
-  // Order matters: more specific quota/usage messages first so we surface the
-  // most actionable summary even when both a 403 and a quota line are present.
+  // Specific quota messages precede generic status codes to preserve the actionable diagnosis.
   { re: /usage limit for this billing cycle/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted (billing cycle limit reached)' },
   { re: /reached your usage limit/i,           kind: 'quota_exhausted', summary: 'Provider quota exhausted (usage limit reached)' },
   { re: /(?:^|[^a-z])quota[^a-z].{0,40}(?:exceeded|exhausted|reached)/i, kind: 'quota_exhausted', summary: 'Provider quota exhausted' },
@@ -844,6 +843,7 @@ const TERMINAL_API_ERROR_PATTERNS: Array<{
   { re: /Please run \/login/i,                 kind: 'login_required',  summary: 'Provider login required' },
   { re: /authentication_error/i,               kind: 'auth_failed',     summary: 'Provider authentication failed' },
   { re: /API Error:\s*401\b/i,                 kind: 'auth_failed',     summary: 'Provider rejected request (401 unauthorized)' },
+  { re: /API Error:\s*402\b|unable to verify your membership benefits/i, kind: 'permission_denied', summary: 'Provider rejected request (402 account or membership required)' },
   { re: /permission_error/i,                   kind: 'permission_denied', summary: 'Provider returned permission_error' },
   { re: /API Error:\s*403\b/i,                 kind: 'permission_denied', summary: 'Provider rejected request (403 forbidden)' },
 ];
@@ -1123,6 +1123,7 @@ export async function sendEscapeKeyAsync(sessionName: string, times = 1): Promis
   }
 }
 
+export function deliveryVerifyLine(content: string): string { const lines = content.split('\n'); return ([...lines].reverse().find(line => line.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? ''; }
 export const sendKeys = (
   sessionName: string,
   keys: string,
@@ -1142,8 +1143,7 @@ export const sendKeys = (
         await tmuxExecAsync(['load-buffer', '-b', bufferName, tmpFile], { encoding: 'utf-8' });
         await tmuxExecAsync(['paste-buffer', '-b', bufferName, '-p', '-t', sessionName], { encoding: 'utf-8' });
 
-        const lines = keys.split('\n');
-        const verifyLine = ([...lines].reverse().find(l => l.trim().length >= 3) ?? lines[lines.length - 1])?.trim() ?? '';
+        const verifyLine = deliveryVerifyLine(keys);
         // 1.5s per attempt × 2 attempts = 3s worst case. The previous 8s × 2 = 16s
         // caused user-visible "Enter not sent" lag whenever the 10-line tail check
         // missed the verify line (e.g. tall Claude input box or wrapped paste).

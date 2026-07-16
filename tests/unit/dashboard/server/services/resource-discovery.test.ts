@@ -5,7 +5,6 @@ const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   findSpecByIssue: vi.fn(),
   getAgentRuntimeState: vi.fn(),
-  getBeadsRollupService: vi.fn(),
   getGitHubConfig: vi.fn(),
   issueService: {
     getIssues: vi.fn(),
@@ -32,10 +31,6 @@ vi.mock('node:fs/promises', () => ({
 
 vi.mock('../../../../../src/lib/agents.js', () => ({
   getAgentRuntimeState: mocks.getAgentRuntimeState,
-}));
-
-vi.mock('../../../../../src/dashboard/server/services/beads-rollup-singleton.js', () => ({
-  getBeadsRollupService: mocks.getBeadsRollupService,
 }));
 
 vi.mock('../../../../../src/lib/projects.js', () => ({
@@ -96,7 +91,6 @@ beforeEach(() => {
   mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
   mocks.listConversations.mockReturnValue([]);
   mocks.openPullRequests = [];
-  mocks.getBeadsRollupService.mockReturnValue({ getProjectRollups: () => null });
   mocks.readdir.mockResolvedValue([]);
   mocks.stat.mockRejectedValue(new Error('no such file'));
   mocks.findSpecByIssue.mockReturnValue(Effect.fail('no spec'));
@@ -149,13 +143,13 @@ describe('resource-discovery grouping', () => {
           tmuxSessionNames: [],
           prs: [],
           hasVbrief: false,
-          hasBeads: false,
+          hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
           branchAheadOfMain: false,
           conversations: [],
         },
-        beadTotals: null,
+        taskTotals: null,
       },
       {
         issueId: 'AAA-1',
@@ -186,13 +180,13 @@ describe('resource-discovery grouping', () => {
           tmuxSessionNames: [],
           prs: [],
           hasVbrief: false,
-          hasBeads: false,
+          hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
           branchAheadOfMain: false,
           conversations: [],
         },
-        beadTotals: null,
+        taskTotals: null,
       },
       {
         issueId: 'PAN-100',
@@ -228,13 +222,13 @@ describe('resource-discovery grouping', () => {
             },
           ],
           hasVbrief: true,
-          hasBeads: true,
+          hasTasks: true,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-100-db'],
           branchAheadOfMain: false,
           conversations: [],
         },
-        beadTotals: null,
+        taskTotals: null,
       },
     ];
 
@@ -282,13 +276,13 @@ describe('resource-discovery sanitization', () => {
             },
           ],
           hasVbrief: false,
-          hasBeads: false,
+          hasTasks: false,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-300-db'],
           branchAheadOfMain: false,
           conversations: [],
         },
-        beadTotals: null,
+        taskTotals: null,
       },
     ]);
 
@@ -573,83 +567,6 @@ describe('resource-discovery conversation signal', () => {
 
     expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9003']);
     expect(discovered[0]?.resourceSources).toContain('conversation');
-  });
-});
-
-describe('resource-discovery bead rollup signal', () => {
-  beforeEach(() => {
-    resetResourceAllocatedIssuesCacheForTests();
-    mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-9004', title: 'Bead rollup issue', state: 'open', rawTrackerState: 'OPEN' },
-    ]);
-  });
-
-  function setBeadRollups(
-    rollups: Record<string, { total: number; closed: number; inProgress: number; lastUpdated: string | null }>,
-  ) {
-    mocks.getBeadsRollupService.mockReturnValue({
-      getProjectRollups: () => ({ rollups: new Map(Object.entries(rollups)), stale: false }),
-    });
-  }
-
-  it('admits an inactive issue with recent partial bead completion', async () => {
-    setBeadRollups({
-      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9004']);
-    expect(discovered[0]?.beadTotals).toEqual({
-      total: 3,
-      closed: 1,
-      inProgress: 0,
-      lastUpdated: '2026-07-12T00:00:00Z',
-    });
-  });
-
-  it('excludes an inactive issue when beads are fully closed', async () => {
-    setBeadRollups({
-      'pan-9004': { total: 3, closed: 3, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
-  });
-
-  it('excludes an inactive issue when partial bead completion is stale', async () => {
-    setBeadRollups({
-      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-06-20T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
-  });
-
-  it('admits an inactive issue with in-progress beads', async () => {
-    setBeadRollups({
-      'pan-9004': { total: 2, closed: 0, inProgress: 1, lastUpdated: '2026-06-20T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual(['PAN-9004']);
-    expect(discovered[0]?.beadTotals?.inProgress).toBe(1);
-  });
-
-  it('does not admit a terminal issue even with recent partial bead completion', async () => {
-    mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-9004', title: 'Bead rollup issue', state: 'closed', rawTrackerState: 'CLOSED' },
-    ]);
-    setBeadRollups({
-      'pan-9004': { total: 3, closed: 1, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
-    });
-
-    const discovered = await discoverResourceAllocatedIssues();
-
-    expect(discovered.map((entry) => entry.issueId)).toEqual([]);
   });
 });
 

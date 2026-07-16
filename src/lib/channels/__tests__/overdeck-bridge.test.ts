@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, statSync, existsSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawn, ChildProcess } from 'node:child_process';
+import { spawn, spawnSync, ChildProcess } from 'node:child_process';
 import { request as httpRequest } from 'node:http';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
@@ -18,6 +18,10 @@ import {
 
 const REPO_ROOT = process.cwd();
 const BRIDGE_ENTRY = join(REPO_ROOT, 'src/lib/channels/overdeck-bridge.ts');
+
+const bunAvailable =
+  spawnSync('command', ['-v', 'bun'], { shell: true, encoding: 'utf-8' }).status === 0 ||
+  spawnSync('which', ['bun'], { encoding: 'utf-8' }).status === 0;
 
 let tmpHome: string;
 
@@ -290,7 +294,7 @@ describe('overdeck-bridge subprocess (Bun.serve unix listener)', () => {
     15_000,
   );
 
-  it(
+  it.skipIf(!bunAvailable)(
     'rejects unauthenticated Unix socket posts with 403 and no notification delivery',
     async () => {
       const agentId = 'int-2';

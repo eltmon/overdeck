@@ -69,6 +69,9 @@ function mockSpawnDependencies(): void {
   vi.doMock('../runtimes/codex.js', () => ({
     initCodexHome: vi.fn(),
   }));
+  vi.doMock('../codex-auth.js', () => ({
+    assertCodexNativeAuthForSpawn: vi.fn(),
+  }));
   vi.doMock('../runtimes/pi-fifo.js', () => ({
     PiNotReady: class PiNotReady extends Error {
       readonly code = 'PI_NOT_READY';
@@ -114,7 +117,10 @@ function mockSpawnDependencies(): void {
   vi.doMock('../workspace/stack-health.js', () => ({
     getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: null })),
   }));
-  vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+  vi.doMock('../vbrief/io.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+    readWorkspacePlanSync: vi.fn(() => ({ plan: { items: [{ id: 'item-1' }] } })),
+  }));
   vi.doMock('../activity-logger.js', () => ({
     emitActivityEntrySync: vi.fn(),
     emitActivityTtsSync: vi.fn(),
@@ -194,11 +200,12 @@ afterEach(() => {
   vi.doUnmock('../agents/hook-readiness.js');
   vi.doUnmock('../agent-runtime-mirror.js');
   vi.doUnmock('../runtimes/codex.js');
+  vi.doUnmock('../codex-auth.js');
   vi.doUnmock('../runtimes/pi-fifo.js');
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
-  vi.doUnmock('../beads-query.js');
+  vi.doUnmock('../vbrief/io.js');
   vi.doUnmock('../activity-logger.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');
@@ -525,10 +532,9 @@ describe('spawnAgent PTY supervisor wiring', () => {
     expect(sessionOptions.env.OVERDECK_FLYWHEEL_AGENT_ROLE).toBeUndefined();
   });
 
-  it('spawns a knowledge role as a specialist live session and skips work beads/verification gates', async () => {
+  it('spawns a knowledge role as a specialist live session without requiring a work checklist', async () => {
     writeSupervisorArtifact();
     const { spawnRun } = await import('../agents.js');
-    const { assertIssueHasBeads } = await import('../beads-query.js');
 
     const state = await spawnRun('PAN-2468', 'knowledge', {
       workspace,
@@ -543,7 +549,6 @@ describe('spawnAgent PTY supervisor wiring', () => {
       expect.stringContaining('launcher.sh'),
       expect.any(Object),
     );
-    expect(assertIssueHasBeads).not.toHaveBeenCalled();
   });
 
   it('writes Channels MCP config and bridge token when the MCP override is enabled', async () => {

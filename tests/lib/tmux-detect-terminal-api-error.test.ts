@@ -69,6 +69,12 @@ describe('detectTerminalApiError', () => {
     expect(result?.kind).toBe('permission_denied');
   });
 
+  it('detects membership-benefits 402 as permission_denied', () => {
+    const result = detectTerminalApiErrorSync("API Error: 402 We're unable to verify your membership benefits at this time.");
+    expect(result?.kind).toBe('permission_denied');
+    expect(result?.summary).toContain('402');
+  });
+
   it('does NOT match transient retry messages — those belong to the deacon retry path', () => {
     // These are the patterns the deacon already nudges as "retry" — not
     // terminal failures.

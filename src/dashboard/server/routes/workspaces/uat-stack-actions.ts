@@ -40,7 +40,9 @@ interface WorkspaceStackContext {
   issueId: string;
   projectPath: string;
   workspacePath: string;
-  composeFile: string;
+  /** Null when the workspace's devcontainer files were cleaned away — stack
+   * lifecycle commands then run by compose project name (container labels). */
+  composeFile: string | null;
   composeProjectName: string;
   projectName?: string;
 }
@@ -52,6 +54,28 @@ function findWorkspaceComposeFile(workspacePath: string): string | null {
     if (existsSync(fullPath)) return fullPath;
   }
   return null;
+}
+
+/**
+ * Discover the compose project name from existing container labels. The
+ * declared-name sources (compose file, dev script) can be gone — teardown or
+ * cleanup removes the workspace .devcontainer dir while the stack's containers
+ * survive — and the label on those containers is then the only truth.
+ */
+async function discoverComposeProjectName(issueId: string): Promise<string | null> {
+  const suffix = `feature-${issueId.toLowerCase()}`;
+  try {
+    const { stdout } = await execFileAsync('docker', [
+      'ps',
+      '-a',
+      '--format',
+      '{{.Label "com.docker.compose.project"}}',
+    ], { encoding: 'utf-8', timeout: 10_000 });
+    const projects = [...new Set(stdout.split('\n').map(line => line.trim()).filter(Boolean))];
+    return projects.find(name => name.endsWith(suffix)) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 function resolveWorkspaceStackContext(issueId: string): WorkspaceStackContext | { error: string; status: number } {
@@ -75,9 +99,6 @@ function resolveWorkspaceStackContext(issueId: string): WorkspaceStackContext | 
   }
 
   const composeFile = findWorkspaceComposeFile(workspacePath);
-  if (!composeFile) {
-    return { error: `No workspace compose file found for ${normalizedIssueId}`, status: 404 };
-  }
 
   try {
     return {
@@ -224,11 +245,29 @@ const postWorkspaceStackActionRoute = HttpRouter.add(
         ? 'stop-stack'
         : 'restart-stack';
     const description = `${action[0].toUpperCase()}${action.slice(1)} stack for ${context.issueId}`;
+
+    // Compose file gone (devcontainer dir cleaned) → operate on the existing
+    // containers by their compose-project label instead.
+    let composeArgs: string[];
+    let cwd: string;
+    if (context.composeFile) {
+      composeArgs = ['compose', '-f', context.composeFile, '-p', context.composeProjectName, action];
+      cwd = dirname(context.composeFile);
+    } else {
+      const discovered = yield* Effect.promise(() => discoverComposeProjectName(context.issueId));
+      if (!discovered) {
+        return jsonResponse({
+          error: `No compose file or stack containers found for ${context.issueId} — use Rebuild to recreate the stack`,
+        }, { status: 404 });
+      }
+      composeArgs = ['compose', '-p', discovered, action];
+      cwd = context.workspacePath;
+    }
     const activityId = spawnCommandActivity(
       'docker',
-      ['compose', '-f', context.composeFile, '-p', context.composeProjectName, action],
+      composeArgs,
       description,
-      dirname(context.composeFile),
+      cwd,
       { issueId: context.issueId, pendingOperation },
     );
 
@@ -255,11 +294,14 @@ const getWorkspaceStackLogsRoute = HttpRouter.add(
       return jsonResponse({ error: context.error }, { status: context.status });
     }
 
+    const stackName = context.composeFile
+      ? context.composeProjectName
+      : (yield* Effect.promise(() => discoverComposeProjectName(context.issueId))) ?? context.composeProjectName;
     const { stdout } = yield* Effect.promise(() => execFileAsync('docker', [
       'ps',
       '-a',
       '--filter',
-      `label=com.docker.compose.project=${context.composeProjectName}`,
+      `label=com.docker.compose.project=${stackName}`,
       '--format',
       '{{.Names}}',
     ], { encoding: 'utf-8', timeout: 10_000 }));
@@ -283,7 +325,7 @@ const getWorkspaceStackLogsRoute = HttpRouter.add(
     return jsonResponse({
       success: true,
       issueId: context.issueId,
-      stackName: context.composeProjectName,
+      stackName,
       logs: chunks.join('\n\n'),
     });
   })),
@@ -338,7 +380,7 @@ const postWorkspaceReapRoute = HttpRouter.add(
           projectName: context.projectName,
         }, {
           deleteBranches: false,
-          clearBeads: false,
+          clearTasks: false,
         }));
         for (const step of steps) {
           const detail = step.details?.length ? `: ${step.details.join('; ')}` : '';

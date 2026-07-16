@@ -141,7 +141,7 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
   forkedSessionId?: string;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
-    const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent } = await import('../agents.js');
+    const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent, stopAgent } = await import('../agents.js');
     const cfg = loadYamlConfig().config;
     const outputPath = opts.outputPath ?? reviewerAgentOutputPath(opts.workspace, opts.runId, opts.subRole);
     const synthesisAgentId = opts.synthesisAgentId ?? `agent-${opts.issueId.toLowerCase()}-review`;
@@ -207,6 +207,14 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
         return { success: true, message: `Review ${opts.subRole} resumed (session preserved): ${reviewerAgent}`, sessionId: reviewerAgent };
       }
       console.warn(`[review-agent] Convoy sub-reviewer ${opts.subRole} resume failed; falling back to a fresh session: ${resumeResult.error}`);
+      // PAN-2743: Codex reviewers intentionally remain alive at their prompt after
+      // finishing a cycle. resumeAgent correctly refuses to "resume" that healthy
+      // process, but spawnRun cannot replace it while its tmux session still exists.
+      // Stop only this explicit healthy-idle collision before the fresh spawn; other
+      // resume failures already imply no live session and need no teardown.
+      if (resumeResult.error?.includes('it appears healthy')) {
+        await Effect.runPromise(stopAgent(reviewerAgent));
+      }
     }
 
     const forkedPreface = opts.forkedSessionId
@@ -508,8 +516,13 @@ export async function handleReviewDiscoveryReady(
   // convoy launched — no-op. No evidence means launch, flag or no flag.
   try {
     const sessions = await Effect.runPromise(listSessionNames());
-    const reviewerPrefix = `agent-${normalized.toLowerCase()}-review-`;
-    if (sessions.some(name => name.startsWith(reviewerPrefix))) {
+    // PAN-2697: match ONLY the four convoy sub-role sessions. Prefix matching
+    // also caught the always-on review supervisor (agent-<id>-review-supervisor),
+    // which no-op'd every discovery-ready signal and stranded the convoy.
+    const reviewerSessionNames = new Set(
+      REVIEW_SUB_ROLES.map((subRole) => `agent-${normalized.toLowerCase()}-review-${subRole}`),
+    );
+    if (sessions.some(name => reviewerSessionNames.has(name))) {
       parent.reviewDiscoveryPending = false;
       await Effect.runPromise(saveAgentState(parent));
       return { success: true, message: `Convoy already launched for ${normalized} — no-op` };
@@ -576,5 +589,4 @@ export function resolveReReviewScope(issueId?: string): ReReviewScope {
   const scope = loadYamlConfig().config.roles?.review?.reReviewScope;
   return scope === 'all' || scope === 'blockers' ? scope : 'changed';
 }
-
 

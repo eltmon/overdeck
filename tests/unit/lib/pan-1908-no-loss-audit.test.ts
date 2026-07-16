@@ -55,7 +55,7 @@ const REVIEW_STATUS_EPHEMERAL_COLUMNS = new Set([
   'merge_retry_count', 'test_retry_count', 'review_retry_count',
   'recovery_started_at', 'review_spawned_at',
   'conflict_resolution_dispatched_at', 'merge_step', 'stuck', 'stuck_at',
-  'stuck_reason', 'stuck_details', 'inspect_started_at', 'inspect_bead_id',
+  'stuck_reason', 'stuck_details', 'inspect_started_at', 'inspect_task_id',
 ]);
 
 const REVIEW_STATUS_DELETE_COLUMNS = new Set<string>([]);

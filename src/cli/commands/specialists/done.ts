@@ -21,6 +21,8 @@ import {
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
+  /** vBRIEF item receiving an inspect verdict. Required for inspect. */
+  item?: string;
   /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
   reviewers?: string;
   notes?: string;
@@ -53,6 +55,38 @@ export async function doneCommand(
     console.error(chalk.red(`Invalid status: ${options.status}`));
     console.error(chalk.dim(`Valid options for ${specialist}: ${validStatuses.join(', ')}`));
     process.exit(1);
+  }
+
+  if (specialist === 'inspect') {
+    if (!options.item) throw new Error('--item is required for inspect verdicts');
+
+    const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
+    const { readWorkspacePlanSync } = await import('../../../lib/vbrief/io.js');
+    const { join } = await import('node:path');
+    const project = resolveProjectFromIssueSync(normalizedIssueId);
+    const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
+    const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
+    if (!plan?.plan.items.some(item => item.id === options.item)) {
+      throw new Error(`Item "${options.item}" does not exist in the vBRIEF for ${normalizedIssueId}`);
+    }
+
+    const baseUrl = (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
+    const response = await fetch(`${baseUrl}/api/specialists/done`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        specialist,
+        issueId: normalizedIssueId,
+        itemId: options.item,
+        status: options.status,
+        notes: options.notes,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Could not record inspect verdict (${response.status}): ${await response.text()}`);
+    }
+    console.log(chalk.green(`✓ Inspection ${options.status} for ${normalizedIssueId} item ${options.item}`));
+    return;
   }
 
   // Build the atomic update — setReviewStatus handles history, SQLite,
@@ -160,7 +194,7 @@ export async function doneCommand(
       if (options.notes) update.inspectNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Inspection passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent can proceed to next bead'));
+        console.log(chalk.dim('  Agent can proceed to the next vBRIEF task'));
       } else {
         console.log(chalk.yellow(`✗ Inspection blocked for ${normalizedIssueId}`));
         console.log(chalk.dim('  Agent must fix issues and re-request inspection'));
@@ -266,6 +300,11 @@ export async function doneAndExitCommand(
   options: DoneOptions,
 ): Promise<never> {
   await doneCommand(specialist, issueId, options);
+  // PAN-2689: setReviewStatusSync's journal write is fire-and-forget; in this
+  // short-lived process an immediate exit kills it — and in a sandbox (readonly
+  // DB) that write is the ONLY durable copy of the verdict. Drain it first.
+  const { flushReviewStatusJournalWrites } = await import('../../../lib/overdeck/review-status-record-sync.js');
+  await flushReviewStatusJournalWrites();
   process.exit(0);
 }
 

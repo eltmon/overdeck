@@ -60,7 +60,7 @@ export function RecoverButton({
     }
   };
 
-  const tooltip = "Recover the review/test/merge pipeline when it's stuck or failed: clears review/test/merge status to pending, resets circuit-breaker counters, removes any queued specialist tasks, and re-dispatches review and test from the latest commit. Does not touch the workspace, branch, beads, vBRIEF, or PR.";
+  const tooltip = "Recover the review/test/merge pipeline when it's stuck or failed: clears review/test/merge status to pending, resets circuit-breaker counters, removes any queued specialist tasks, and re-dispatches review and test from the latest commit. Does not touch the workspace, branch, tasks, vBRIEF, or PR.";
 
   if (variant === 'inspector') {
     return (

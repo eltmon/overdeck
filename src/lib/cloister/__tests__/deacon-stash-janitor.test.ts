@@ -730,7 +730,7 @@ describe('checkInspectAgentTimeouts', () => {
     vi.useRealTimers();
   });
 
-  it('marks a timed-out inspecting bead as error, kills the inspect session, and tells the parent exactly once', async () => {
+  it('marks a timed-out inspecting task as error, kills the inspect session, and tells the parent exactly once', async () => {
     vi.mocked((await import('../../review-status.js')).loadReviewStatuses)
       .mockReturnValueOnce({
         'PAN-1616': {
@@ -780,7 +780,7 @@ describe('checkInspectAgentTimeouts', () => {
     );
   });
 
-  it('marks an inspecting bead as error when its inspect session has disappeared', async () => {
+  it('marks an inspecting task as error when its inspect session has disappeared', async () => {
     vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
       'PAN-1616': {
         issueId: 'PAN-1616',
@@ -788,7 +788,7 @@ describe('checkInspectAgentTimeouts', () => {
         testStatus: 'pending',
         inspectStatus: 'inspecting',
         inspectStartedAt: '2026-06-05T12:11:30.000Z',
-        inspectBeadId: 'workspace-sposy',
+          inspectBeadId: 'workspace-sposy',
         updatedAt: '2026-06-05T12:11:30.000Z',
         readyForMerge: false,
       },

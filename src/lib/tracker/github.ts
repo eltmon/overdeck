@@ -305,14 +305,19 @@ export class GitHubTracker implements IssueTracker {
       );
 
     if (state === 'in_progress') {
-      return ensureLabelExists('in-progress', 'In progress', '0075ca').pipe(
+      return self.getIssue(id).pipe(
+        Effect.flatMap((issue) => {
+          const currentLabels = new Set(issue.labels ?? []);
+          return ensureLabelExists('in-progress', 'In progress', '0075ca').pipe(
         Effect.flatMap(() => addLabels(['in-progress'])),
         Effect.flatMap(() => Effect.forEach(
-          ['in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out'],
+          ['in-review', 'planned', 'in-planning', 'review-ready', 'done', 'merged', 'verifying-on-main', 'needs-close-out', 'closed-out'].filter((label) => currentLabels.has(label)),
           (label) => removeLabelSilent(label),
           { concurrency: 1 },
         )),
         Effect.asVoid,
+          );
+        }),
       );
     }
 

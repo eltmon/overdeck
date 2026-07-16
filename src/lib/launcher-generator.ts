@@ -6,6 +6,7 @@ import { getHarnessBehavior } from './runtimes/behavior.js';
 import { qualifyPiModel } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
+import { packageRoot } from './paths.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -51,8 +52,9 @@ export interface LauncherConfig {
    *   - 'exec': non-interactive `codex exec` with approval_policy=never
    *   - 'tui': bare `codex` interactive TUI (conversation panels)
    *   - 'work-tui': interactive work-agent TUI with sandbox/approval flags
+   *   - 'app-server': persistent Codex app-server host process
    */
-  codexMode?: 'exec' | 'tui' | 'work-tui';
+  codexMode?: 'exec' | 'tui' | 'work-tui' | 'app-server';
   /**
    * Per-agent CODEX_HOME directory path (e.g. ~/.overdeck/agents/<id>/codex-home).
    * When set, exported as CODEX_HOME before launching codex.
@@ -750,6 +752,19 @@ function computeCodexCommandTokens(config: LauncherConfig, useExec: boolean): st
       tokens.push(shellQuote(config.resumeSessionId));
     }
     const cmd = wrapWithSupervisor(config, tokens.join(' '));
+    return [useExec ? `exec ${cmd}` : cmd];
+  }
+
+  if (codexMode === 'app-server') {
+    const hostPath = join(packageRoot, 'dist', 'codex-app-server-host.js');
+    const tokens: string[] = ['node', shellQuote(hostPath)];
+    if (config.model) {
+      tokens.push('--model', shellQuoteModelIdSync(config.model));
+    }
+    if (config.resumeSessionId) {
+      tokens.push('--resume', shellQuote(config.resumeSessionId));
+    }
+    const cmd = tokens.join(' ');
     return [useExec ? `exec ${cmd}` : cmd];
   }
 

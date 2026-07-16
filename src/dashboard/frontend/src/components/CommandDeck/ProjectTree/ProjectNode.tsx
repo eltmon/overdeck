@@ -5,7 +5,7 @@ import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './Fea
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent' | 'conversation';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
 
 export interface ProjectFeatureResourceDetails {
   hasWorkspace: boolean;
@@ -19,7 +19,7 @@ export interface ProjectFeatureResourceDetails {
     isDraft: boolean;
   }>;
   hasVbrief: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   dockerContainerCount: number;
   /** PAN-1523: actual HEAD of the agent's workspace, or null when workspace is missing. */
   actualBranch?: string | null;
@@ -71,8 +71,8 @@ export interface ProjectFeature {
   sessions?: readonly SessionNode[];
   resourceSources?: ResourceSource[];
   resourceDetails?: ProjectFeatureResourceDetails;
-  /** PAN-2602: per-issue bead rollup totals from the cached bulk rollup. */
-  beadTotals?: { total: number; closed: number; inProgress: number; lastUpdated: string | null } | null;
+  /** PAN-2602: per-issue task rollup totals from the cached bulk rollup. */
+  taskTotals?: { total: number; closed: number; inProgress: number; lastUpdated: string | null } | null;
 }
 
 interface ProjectNodeProps {
@@ -231,7 +231,7 @@ export function ProjectNode({ name, features, selectedFeature, onSelectFeature, 
             size={14}
           />
         </span>
-        <span className={styles.projectName}>{name}</span>
+        <span data-testid="command-deck-tree-title" className={`${styles.projectName} font-display`}>{name}</span>
         <span className={styles.featureCount}>{visibleFeatures.length}</span>
         {onNewConversation && (
           <span

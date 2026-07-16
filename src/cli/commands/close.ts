@@ -6,22 +6,61 @@
  */
 
 import chalk from 'chalk';
+import type { Command } from 'commander';
 import { Effect } from 'effect';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
+import { userInfo } from 'os';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { closeOut, type WorkflowResult } from '../../lib/lifecycle/index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
+import { acceptFlagFor, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
 
 const execFileAsync = promisify(execFile);
 
 interface CloseOutOptions {
   force?: boolean;
   json?: boolean;
+  [key: string]: boolean | undefined;
+}
+
+function optionNameForRow(id: DodRowId): string {
+  return `accept${id.split('-').map(part => part[0]!.toUpperCase() + part.slice(1)).join('')}`;
+}
+
+function renderDodGate(result: WorkflowResult): void {
+  if (!result.dodGate) return;
+  console.log('Definition-of-Done gate: each row below is a step an issue must complete before close-out; MISS means the step has not verifiably happened.');
+  console.log('ROW  ID            EXPECTED                                      OBSERVED                                      RESULT');
+  for (const row of result.dodGate.rows) {
+    const outcome = row.acceptedBy ? `MISS-ACCEPTED (${row.acceptedBy.by})` : row.status.toUpperCase();
+    console.log(
+      `${String(row.num).padEnd(4)} ${row.id.padEnd(13)} ${row.expected.padEnd(45)} ${row.observed.padEnd(45)} ${outcome}`,
+    );
+  }
+  for (const row of result.dodGate.rows.filter(candidate => candidate.status === 'miss' && !candidate.acceptedBy)) {
+    console.log(chalk.yellow(`Row ${row.num} (${row.id}) blocks close-out; ${`--accept-${row.id}`} records an explicit override.`));
+  }
+  console.log();
+}
+
+export function registerCloseCommand(program: Command): void {
+  const command = program
+    .command('close <id>')
+    .description('Verify, clean up, and close issue on tracker')
+    .option('--force', 'Skip confirmation prompt')
+    .option('--json', 'Output as JSON');
+  for (const row of DOD_ROWS.filter(candidate => candidate.overridable)) {
+    command.option(
+      acceptFlagFor(row),
+      `Accept a missed DoD row ${row.num} (${row.title}) — recorded as an explicit override in the close-out record`,
+    );
+  }
+  command.action((id, options) => closeOutCommand(id, options));
 }
 
 function getGitHubConfig(): { owner: string; repo: string; prefix: string } | null {
@@ -70,7 +109,7 @@ export interface GitHubCloseState {
  * Read the raw close state of a GitHub issue, including its close reason.
  *
  * This is the same `gh issue view` door used by closeOutCommand; it is exported
- * so other CLI commands (e.g. `pan beads sweep`) can look up tracker state
+ * so other CLI commands (e.g. `pan task sweep`) can look up tracker state
  * without reaching past the tracker door.
  */
 export async function readGitHubCloseState(owner: string, repo: string, number: number): Promise<GitHubCloseState> {
@@ -183,14 +222,10 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     }
     console.log();
     console.log(chalk.gray('This will:'));
-    console.log(chalk.gray('  1. Verify PRD is preserved'));
-    console.log(chalk.gray('  2. Verify branch is fully merged'));
-    console.log(chalk.gray('  3. Archive workspace artifacts'));
-    console.log(chalk.gray('  4. Clean up workspace (tmux, Docker, worktree)'));
-    console.log(chalk.gray('  5. Clean up agent state'));
-    console.log(chalk.gray('  6. Close issue on tracker'));
-    console.log(chalk.gray('  7. Apply closed-out label'));
-    console.log(chalk.gray('  8. Clear review status'));
+    console.log(chalk.gray('  1. Run the Definition-of-Done gate before any cleanup'));
+    console.log(chalk.gray('  2. Verify PRD is preserved and archive workspace artifacts'));
+    console.log(chalk.gray('  3. Clean up workspace and agent state'));
+    console.log(chalk.gray('  4. Close the tracker issue and clear review status'));
     console.log();
 
     const readline = await import('readline');
@@ -218,12 +253,20 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
       : {}),
   };
 
-  const result = await Effect.runPromise(closeOut(ctx));
+  const dodAcceptedRows = DOD_ROWS
+    .filter(row => row.overridable && options[optionNameForRow(row.id)])
+    .map(row => row.id);
+  const result = await Effect.runPromise(closeOut(ctx, {
+    dodAcceptedRows,
+    dodAcceptedBy: process.env.OVERDECK_AGENT_ID || userInfo().username,
+  }));
 
   if (options.json) {
     console.log(JSON.stringify(result, null, 2));
     return;
   }
+
+  renderDodGate(result);
 
   // Display step results
   for (const step of result.steps) {

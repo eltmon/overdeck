@@ -356,8 +356,7 @@ $OUTPUT
 </terminal_output>
 
 Decide FORGOT_COMPLETION if ANY of these are true AND the transcript does NOT show a 'pan work done' Bash invocation in the tail:
-- the agent wrote a summary/wrap-up message ('all tests pass', 'implementation complete', 'all beads closed', 'ready for review', etc.) and then stopped
-- the agent closed beads or ran 'bd close' and finished with a prompt
+- the agent wrote a summary/wrap-up message ('all tests pass', 'implementation complete', 'all vBRIEF tasks closed', 'ready for review', etc.) and then stopped
 - the agent committed + pushed and the last message is a status summary instead of a pan-work-done command
 
 Decide STILL_WORKING only if the tail clearly shows an in-progress task (mid-edit, running tests, reading files) with no wrap-up summary.

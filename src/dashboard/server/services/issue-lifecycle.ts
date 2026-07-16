@@ -18,8 +18,7 @@ import { GitHubClientOptionalLive } from './github-client.js';
 import { LinearClient } from './linear-client.js';
 import { LinearClientOptionalLive } from './linear-client.js';
 import { RallyClient } from './rally-client.js';
-import { RallyClientLive } from './rally-client.js';
-import type { RallyClientShape } from './rally-client.js';
+import { RallyClientOptionalLive } from './rally-client.js';
 import type { LinearState } from './linear-client.js';
 import { TrackerNotConfigured, TrackerApiError, IssueNotFound, RateLimited } from './typed-errors.js';
 import { EventStoreService } from './domain-services.js';
@@ -311,31 +310,5 @@ export const IssueLifecycleLive = Layer.effect(
 export const IssueLifecycleWithClientLive = IssueLifecycleLive.pipe(
   Layer.provide(LinearClientOptionalLive),
   Layer.provide(GitHubClientOptionalLive),
-  Layer.provide(
-    // RallyClient is optional — provide a fallback that fails with TrackerNotConfigured
-    Layer.effect(
-      RallyClient,
-      Effect.gen(function* () {
-        // Dynamic: try to build RallyClientLive, fall back to stub if not configured
-        return yield* Effect.gen(function* () {
-          const { getRallyConfig } = yield* Effect.promise(() =>
-            import('./tracker-config.js'),
-          );
-          const config = getRallyConfig();
-          if (!config) {
-            const fail = <A>(): Effect.Effect<A, TrackerNotConfigured> => Effect.fail(new TrackerNotConfigured({ tracker: 'rally' }));
-            const fallback: RallyClientShape = {
-              getIssue: () => fail(),
-              getChildIssues: () => fail(),
-              updateState: () => fail(),
-              addComment: () => fail(),
-            };
-            return fallback;
-          }
-          // Delegate to RallyClientLive's logic
-          return yield* RallyClient;
-        }).pipe(Effect.provide(RallyClientLive));
-      }),
-    ),
-  ),
+  Layer.provide(RallyClientOptionalLive),
 );

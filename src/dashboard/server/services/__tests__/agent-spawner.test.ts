@@ -46,10 +46,19 @@ vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
   deepWipe: mockDeepWipe,
 }));
 
+// ─── Mock vBRIEF plan reader ─────────────────────────────────────────────────
+
+const mockReadWorkspacePlanSync = vi.fn();
+vi.mock('../../../../lib/vbrief/io.js', () => ({
+  readWorkspacePlanSync: mockReadWorkspacePlanSync,
+}));
+
 // ─── Mock projects (resolveProjectFromIssue) ─────────────────────────────────
 
 const mockResolveProjectFromIssue = vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' });
 vi.mock('../../../../lib/projects.js', () => ({
+  findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+  listProjectsSync: vi.fn(() => [{ key: 'myapp', config: { path: '/projects/myapp', name: 'myapp' } }]),
   resolveProjectFromIssue: mockResolveProjectFromIssue,
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
 }));
@@ -76,12 +85,10 @@ const WORKSPACE = '/projects/myapp/workspaces/feature-pan-1';
 describe('AgentSpawner Effect service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Default: workspace exists, beads exist, no running agent
-    mockExistsSync.mockImplementation((path: string) => {
-      if (path.includes('.beads')) return true;
-      return true; // workspace exists
-    });
+    // Default: workspace exists and no agent is running.
+    mockExistsSync.mockReturnValue(true);
     mockGetAgentState.mockReturnValue(Effect.succeed(null));
+    mockReadWorkspacePlanSync.mockReturnValue({ plan: { items: [{ id: 'wi-1' }] } });
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
     mockMessageAgent.mockResolvedValue(undefined);
@@ -117,11 +124,8 @@ describe('AgentSpawner Effect service', () => {
       expect((err as any)._tag).toBe('WorkspaceNotFound');
     });
 
-    it('fails with BeadsNotInitialized when .beads dir is missing', async () => {
-      mockExistsSync.mockImplementation((path: string) => {
-        if (path.includes('.beads')) return false;
-        return true; // workspace exists
-      });
+    it('fails with PlanEmpty when the workspace plan has no items', async () => {
+      mockReadWorkspacePlanSync.mockReturnValue({ plan: { items: [] } });
 
       const { AgentSpawner, AgentSpawnerLive } = await import('../agent-spawner.js');
 
@@ -131,9 +135,8 @@ describe('AgentSpawner Effect service', () => {
       }).pipe(Effect.provide(AgentSpawnerLive));
 
       const err = await runProgramFail(program);
-      expect((err as any)._tag).toBe('BeadsNotInitialized');
+      expect((err as any)._tag).toBe('PlanEmpty');
     });
-
     it('fails with AgentAlreadyRunning when agent status is running', async () => {
       mockGetAgentState.mockReturnValue(Effect.succeed({ status: 'running', issueId: 'PAN-1' }));
 

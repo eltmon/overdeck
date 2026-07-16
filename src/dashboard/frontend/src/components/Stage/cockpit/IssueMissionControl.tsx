@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { useQuery } from '@tanstack/react-query'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
-import { BeadsTab } from '../../CommandDeck/ZoneCOverviewTabs/BeadsTab'
+import { TasksTab } from '../../CommandDeck/ZoneCOverviewTabs/TasksTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
 import { MarkdownTab } from '../../CommandDeck/ZoneCOverviewTabs/MarkdownTab'
@@ -445,7 +445,7 @@ function IssueTreeLane({
     sessions,
     resourceSources: [
       ...(actions.state.hasPlan ? ['vbrief' as const] : []),
-      ...(actions.state.hasBeads ? ['beads' as const] : []),
+      ...(actions.state.hasTasks ? ['tasks' as const] : []),
       'workspace' as const,
     ],
     resourceDetails: {
@@ -455,11 +455,11 @@ function IssueTreeLane({
       tmuxSessionCount: sessions.length,
       prs: [],
       hasVbrief: actions.state.hasPlan,
-      hasBeads: actions.state.hasBeads,
+      hasTasks: actions.state.hasTasks,
       dockerContainerCount: 0,
       conversations: [],
     },
-  }), [actions.state.hasBeads, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
+  }), [actions.state.hasTasks, actions.state.hasPlan, issueId, projectName, review.data, sessions, title])
 
   const feature = projectFeature.data ?? fallbackFeature
   const renderedSessions = useMemo(() => feature.sessions ?? [], [feature.sessions])
@@ -976,7 +976,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'conversation' && <div data-section="Conversation / Files / Terminal tabs"><MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} /></div>}
             {activeTab === 'files' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} /></div>}
             {activeTab === 'terminal' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} /></div>}
-            {activeTab === 'beads' && <div data-section="BeadsRail / BeadsTab"><BeadsTab issueId={issueId} /></div>}
+            {activeTab === 'beads' && <div data-section="BeadsRail / BeadsTab"><TasksTab issueId={issueId} /></div>}
           </div>
         </main>
         <div data-section="BeadsRail / BeadsTab"><BeadsPanel issueId={issueId} onOpenFull={() => selectTab('beads')} /></div>

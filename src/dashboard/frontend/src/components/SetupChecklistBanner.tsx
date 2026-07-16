@@ -10,7 +10,7 @@ import { toast } from 'sonner';
  * no install flavor bundles. GET /api/prerequisites reports what the SERVER
  * sees on PATH — exactly what spawned sessions will see. The banner appears
  * only while a REQUIRED tool is missing; the expanded checklist also lists
- * optional integrations (gh, beads, Docker, Codex) with copyable install
+ * optional integrations (gh, tasks, Docker, Codex) with copyable install
  * commands. Overdeck never runs the installs itself — system packages need
  * sudo/user consent.
  */
@@ -117,6 +117,19 @@ export function SetupChecklistBanner() {
     setExpanded(false);
   };
 
+  const copyDiagnostics = async () => {
+    try {
+      const response = await fetch('/api/diagnostics/setup');
+      if (!response.ok) throw new Error('Diagnostics request failed');
+      const diagnostics = await response.json() as { markdown?: string };
+      if (!diagnostics.markdown) throw new Error('Diagnostics report was empty');
+      await navigator.clipboard.writeText(diagnostics.markdown);
+      toast.success('Diagnostics copied');
+    } catch {
+      toast.error('Could not copy diagnostics');
+    }
+  };
+
   return (
     <div className="bg-warning/8 border-b border-warning/32 shrink-0">
       <div className="px-4 py-3 flex items-center gap-3">
@@ -156,6 +169,13 @@ export function SetupChecklistBanner() {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? 'animate-spin' : ''}`} />
               Re-check
+            </button>
+            <button
+              onClick={() => void copyDiagnostics()}
+              className="px-3 py-1.5 text-sm font-medium rounded-sm bg-card border border-border text-foreground hover:bg-card-2 inline-flex items-center gap-1.5"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copy diagnostics
             </button>
             <span className="text-xs text-muted-foreground">
               Run the commands in a terminal, then re-check. Install commands are for this machine ({report.platform === 'darwin' ? 'macOS' : report.platform === 'win32' ? 'Windows' : 'Linux'}).

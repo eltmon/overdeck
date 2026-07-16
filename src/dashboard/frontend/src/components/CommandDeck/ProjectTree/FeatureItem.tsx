@@ -3,7 +3,7 @@ import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
   ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
-  BookText, Container, Radio, Workflow, MessageSquare,
+  BookText, Bug, Container, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
 import type { ProjectFeature, ProjectFeatureResourceIdentifiers, ResourceSource } from './ProjectNode';
@@ -57,7 +57,7 @@ interface FeatureItemProps {
   onOpenPlanDialog?: (issueId: string) => void;
   containerStats?: Record<string, { id: string; name: string; cpuPercent: number; memoryUsage: number; status: 'running' | 'stopped' | 'unhealthy' | 'restarting' }>;
 }
-const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'beads', 'pr', 'docker'];
+const RESOURCE_ICON_ORDER: ResourceSource[] = ['workspace', 'branch', 'tmux', 'remote-agent', 'vbrief', 'tasks', 'pr', 'docker'];
 
 function resourceColor(_feature: ProjectFeature): string {
   // v1.2 color restraint: resources are infrastructure facts, not status —
@@ -86,6 +86,8 @@ function resourceSummary(feature: ProjectFeature, source: ResourceSource): { lab
       return details.tmuxSessionCount > 0 ? { label: 'tmux', detail: `${details.tmuxSessionCount} session${details.tmuxSessionCount === 1 ? '' : 's'}` } : null;
     case 'vbrief':
       return details.hasVbrief ? { label: 'vBRIEF', detail: 'present' } : null;
+    case 'tasks':
+      return details.hasTasks ? { label: 'tasks', detail: 'present' } : null;
     case 'pr':
       return details.prs.length > 0
         ? {
@@ -117,8 +119,9 @@ function ResourceIcon({ source, feature }: { source: ResourceSource; feature: Pr
     : source === 'branch' ? <GitBranch {...props} />
       : source === 'tmux' ? <Radio {...props} />
         : source === 'vbrief' ? <BookText {...props} />
-          : source === 'pr' ? <Workflow {...props} />
-            : <Container {...props} />;
+          : source === 'tasks' ? <Bug {...props} />
+            : source === 'pr' ? <Workflow {...props} />
+              : <Container {...props} />;
   return (
     <span className={styles.featureResourceChip} title={`${summary.label}: ${summary.detail}`}>
       {icon}
@@ -205,7 +208,7 @@ function ResourceStrip({
     }
 
     if (details.hasVbrief) rows.push({ key: 'vbrief', label: 'vBRIEF present' });
-    if (details.hasBeads) rows.push({ key: 'beads', label: 'beads present' });
+    if (details.hasTasks) rows.push({ key: 'tasks', label: 'tasks present' });
     for (const pr of identifiers?.prs ?? details.prs) {
       rows.push({ key: `pr-${pr.number}`, label: `PR: #${pr.number} ${pr.title} (${formatPrState(pr)})` });
     }
@@ -537,7 +540,7 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
     feature.hasPrd ? 'PRD' : null,
     feature.hasState ? 'continue file' : null,
     feature.resourceDetails?.hasVbrief ? 'vBRIEF' : null,
-    feature.resourceDetails?.hasBeads ? 'beads' : null,
+    feature.resourceDetails?.hasTasks ? 'tasks' : null,
   ].filter((part): part is string => part !== null);
   const contextSuffix = contextParts.length > 0 ? ` Context present: ${contextParts.join(', ')}.` : '';
 
@@ -569,13 +572,14 @@ function getFeatureStateTitle(feature: ProjectFeature, aggregateSessions: readon
 const TYPE_PRIORITY: Record<string, number> = {
   work: 0,
   strike: 1,
-  review: 2,
-  test: 3,
-  reviewer: 4,
-  planning: 5,
-  ship: 6,
-  merge: 7,
-  legacy: 8,
+  lint: 2,
+  review: 3,
+  test: 4,
+  reviewer: 5,
+  planning: 6,
+  ship: 7,
+  merge: 8,
+  legacy: 9,
 };
 
 const PRESENCE_PRIORITY: Record<string, number> = {
@@ -1230,7 +1234,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       </ContextMenuTrigger>
       </div></div>
       <div data-section="ResourceStrip"><ResourceStrip feature={feature} onCleanupOrphanedResources={onCleanupOrphanedResources} /></div>
-      {feature.resourceDetails?.hasBeads && (
+      {feature.resourceDetails?.hasTasks && (
         <BeadsPanel issueId={feature.issueId} compact onOpenFull={() => onSelect?.()} />
       )}
 

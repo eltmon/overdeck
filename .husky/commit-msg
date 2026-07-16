@@ -1,4 +1,10 @@
 #!/bin/sh
+# The overdeck-state worktree shares this repo's core.hooksPath but carries
+# no package.json/node_modules, so `npx --no commitlint` fails there and
+# blocks the state write door's commits (PAN-2677). Code-repo conventions
+# only apply to code checkouts; skip when the tooling is absent.
+[ -f package.json ] || exit 0
+
 # 1. Conventional-commits lint (project convention).
 npx --no -- commitlint --edit "$1" || exit 1
 

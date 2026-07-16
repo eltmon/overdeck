@@ -1,7 +1,7 @@
 /**
  * Lifecycle workflows — Compose atomic operations into complete workflows.
  *
- * approve()  — Post-merge: archive + close + teardown + compact-beads
+ * approve()  — Post-merge: archive + close + teardown
  * close()    — Simple close: close-issue + teardown
  * closeOut() — Full ceremony: verify-merged + archive + teardown + close + label + clear-status
  * deepWipe() — Destructive: teardown(deleteBranches) + delete agent state + reset issue
@@ -21,18 +21,23 @@ import type {
   ApproveOptions,
   DeepWipeOptions,
   ArchiveOptions,
+  CloseOutOptions,
 } from './types.js';
 import { stepOk, stepSkipped, stepFailed, getLinearApiKey } from './types.js';
 import { archivePlanning, findWorkspacePath } from './archive-planning.js';
 import { closeIssue, type CloseIssueOptions } from './close-issue.js';
 import { teardownWorkspace } from './teardown-workspace.js';
-import { compactBeads } from './compact-beads.js';
-import { sweepOrphanedBeads } from './orphaned-beads-sweep.js';
 import { loadCloisterConfig } from '../cloister/config.js';
 import { extractNumberSync, extractPrefixSync } from '../issue-id.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
-import { getProjectConfigFromWorkspacePath, markRecordPipelineClosedOutSync } from '../pan-dir/record.js';
+import {
+  getProjectConfigFromWorkspacePath,
+  markRecordPipelineClosedOutSync,
+  writeCloseOutDodGate,
+} from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
+import { evaluateDodGate } from './dod-gate.js';
+import { acceptFlagFor, DOD_ROWS, type DodGateResult } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -49,6 +54,7 @@ function buildResult(
   issueId: string,
   steps: StepResult[],
   startTime: number,
+  dodGate?: DodGateResult,
 ): WorkflowResult {
   return {
     workflow,
@@ -56,6 +62,7 @@ function buildResult(
     success: steps.every(s => s.success),
     steps,
     duration: Date.now() - startTime,
+    ...(dodGate ? { dodGate } : {}),
   };
 }
 
@@ -96,12 +103,6 @@ export function approve(
     // 3. Teardown workspace (delete branches — merge is complete)
     const teardownSteps = yield* teardownWorkspace(ctx, { deleteBranches: true });
     allSteps.push(...teardownSteps);
-
-    // 4. Compact beads (non-blocking — failure doesn't affect workflow success)
-    if (!opts.skipBeadsCompaction) {
-      const beadsResult = yield* compactBeads(ctx);
-      allSteps.push(beadsResult);
-    }
 
     // 5. Clear review status
     const clearResult = yield* clearReviewStatusStep(ctx.issueId);
@@ -159,17 +160,42 @@ export function close(
  */
 export function closeOut(
   ctx: LifecycleContext,
-  opts: CloseIssueOptions & ArchiveOptions = {},
+  opts: CloseIssueOptions & ArchiveOptions & CloseOutOptions = {},
 ): Effect.Effect<WorkflowResult> {
   return Effect.gen(function* () {
     const start = Date.now();
     const allSteps: StepResult[] = [];
 
-    // 1. Verify branch merged (hard fail — must pass before we archive or clean up)
-    const mergeVerify = yield* verifyBranchMerged(ctx);
-    allSteps.push(mergeVerify);
-    if (!mergeVerify.success && !mergeVerify.skipped) {
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+    // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
+    const dodGate = yield* Effect.promise(() => evaluateDodGate(ctx, {
+      acceptedRows: opts.dodAcceptedRows,
+      acceptedBy: opts.dodAcceptedBy,
+      verifyMerged: verifyBranchMergedImpl,
+    }));
+    for (const row of dodGate.rows) {
+      const details = [`expected: ${row.expected}`, `observed: ${row.observed}`];
+      if (row.acceptedBy) {
+        allSteps.push(stepSkipped(`dod:${row.id}`, [
+          ...details,
+          `MISS accepted via ${row.acceptedBy.flag} by ${row.acceptedBy.by} at ${row.acceptedBy.at}`,
+        ]));
+      } else if (row.status === 'skip') {
+        allSteps.push(stepSkipped(`dod:${row.id}`, details));
+      } else if (row.status === 'pass') {
+        allSteps.push(stepOk(`dod:${row.id}`, details));
+      } else {
+        allSteps.push(stepFailed(`dod:${row.id}`, row.observed, details));
+      }
+    }
+    if (!dodGate.passed) {
+      const flags = dodGate.rows
+        .filter(row => row.status === 'miss' && !row.acceptedBy)
+        .map(row => `${row.id} (${acceptFlagFor(DOD_ROWS.find(def => def.id === row.id)!)})`);
+      allSteps.push(stepFailed(
+        'close-out:dod-gate',
+        `Definition-of-Done gate blocked close-out: ${flags.join(', ')}. Re-run with the named --accept-<row> flag to record an explicit override.`,
+      ));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 2. Move PRD + archive workspace artifacts
@@ -180,7 +206,7 @@ export function closeOut(
     const archiveFailed = archiveSteps.some(s => !s.success && !s.skipped);
     if (archiveFailed) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — archiving failed, workspace preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 3. Mark the vBRIEF completed on main before teardown removes local state.
@@ -188,29 +214,7 @@ export function closeOut(
     allSteps.push(vbriefStep);
     if (!vbriefStep.success && !vbriefStep.skipped) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — vBRIEF completion failed, workspace preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
-    }
-
-    // 4. Sweep any orphaned beads before teardown removes the workspace/.beads redirect.
-    const sweepReason = opts.reason && /not\s*planned|cancelled/i.test(opts.reason)
-      ? 'issue closed (not planned); bead cancelled'
-      : 'issue closed (completed); orphaned bead swept';
-    const sweepResult = yield* Effect.promise(() =>
-      sweepOrphanedBeads({ beadsCwd: ctx.projectPath, issueId: ctx.issueId, reason: sweepReason }).catch((err) => ({
-        ok: false,
-        closedIds: [],
-        skipped: 0,
-        error: err instanceof Error ? err.message : String(err),
-      })),
-    );
-    if (sweepResult.ok) {
-      if (sweepResult.closedIds.length > 0) {
-        allSteps.push(stepOk('close-out:sweep-orphaned-beads', [`Closed ${sweepResult.closedIds.length} orphaned bead(s); skipped ${sweepResult.skipped}`]));
-      } else {
-        allSteps.push(stepSkipped('close-out:sweep-orphaned-beads', [`No orphaned beads to sweep; skipped ${sweepResult.skipped}`]));
-      }
-    } else {
-      allSteps.push(stepSkipped('close-out:sweep-orphaned-beads', [`Bead sweep failed (non-fatal): ${sweepResult.error ?? 'unknown error'}`]));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 5+6. Teardown workspace + agent state
@@ -222,8 +226,15 @@ export function closeOut(
     allSteps.push(...teardownSteps);
     if (hasBlockingFailure(teardownSteps)) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — teardown failed, tracker issue and review status preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
+
+    const teardownDef = DOD_ROWS.find(row => row.id === 'teardown')!;
+    dodGate.rows.push({
+      ...teardownDef,
+      status: 'pass',
+      observed: teardownSteps.flatMap(step => step.details ?? []).join('; ') || 'close-out teardown completed',
+    });
 
     // 6+7. Close issue + apply label
     const closeSteps = yield* closeIssue(ctx, {
@@ -234,12 +245,18 @@ export function closeOut(
     allSteps.push(...closeSteps);
     if (hasBlockingFailure(closeSteps)) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — issue close failed, review status preserved'));
-      return buildResult('close-out', ctx.issueId, allSteps, start);
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
     // 8. Mark durable pipeline terminal before clearing the DB cache.
     const markTerminal = yield* markPipelineClosedOutStep(ctx);
     allSteps.push(markTerminal);
+    const recordDodGate = yield* recordDodGateStep(ctx, dodGate);
+    allSteps.push(recordDodGate);
+    if (!recordDodGate.success) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — Definition-of-Done audit could not be persisted; review status preserved'));
+      return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+    }
     if (markTerminal.success) {
       const pruned = pruneStoppedAgentsForIssue(ctx.issueId);
       allSteps.push(pruned.preserved.length > 0
@@ -254,7 +271,7 @@ export function closeOut(
     yield* Effect.promise(() => resetPostMergeStateForIssue(ctx.issueId));
     yield* Effect.promise(() => recordFeatureRegistryLifecycle({ issueId: ctx.issueId, status: 'archived' }));
 
-    return buildResult('close-out', ctx.issueId, allSteps, start);
+    return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
   });
 }
 
@@ -270,6 +287,26 @@ function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepRes
   }).pipe(
     Effect.catch((err) =>
       Effect.succeed(stepSkipped(step, [`Pipeline terminal marker failed (non-fatal): ${(err as Error).message ?? String(err)}`])),
+    ),
+  );
+}
+
+function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult): Effect.Effect<StepResult> {
+  const step = 'close-out:record-dod-gate';
+  return Effect.tryPromise({
+    try: async () => {
+      const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
+      await writeCloseOutDodGate(project, ctx.issueId.toUpperCase(), {
+        evaluatedAt: new Date().toISOString(),
+        rows: dodGate.rows,
+        accepted: dodGate.accepted,
+      });
+      return stepOk(step, ['Recorded Definition-of-Done gate with 8 rows']);
+    },
+    catch: (err) => err,
+  }).pipe(
+    Effect.catch((err) =>
+      Effect.succeed(stepFailed(step, `Definition-of-Done gate record failed: ${(err as Error).message ?? String(err)}`)),
     ),
   );
 }
@@ -322,7 +359,6 @@ function destructiveResetWorkflow(
     const teardownSteps = yield* teardownWorkspace(ctx, {
       deleteWorkspace,
       deleteBranches,
-      clearBeads: true,
       workspaceConfig: opts.workspaceConfig,
       projectName: opts.projectName,
     });
@@ -437,7 +473,7 @@ function verifyBranchMerged(ctx: LifecycleContext): Effect.Effect<StepResult> {
   );
 }
 
-async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
+export async function verifyBranchMergedImpl(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:verify-merged';
   const issueLower = ctx.issueId.toLowerCase();
   const branchName = `feature/${issueLower}`;
@@ -655,8 +691,39 @@ async function verifySquashMergedPrByBranch(
       return stepOk(step, [`${prLabel} is squash-merged and ${branchRef} matches the merged PR head`]);
     }
 
+    // A workspace may merge a newer main after its PR head was pushed. Ignore
+    // those merge commits and allow close-out when every post-PR commit is
+    // already on origin/main; only branch-unique work is unsafe to discard.
+    let commitsNotOnMain: string[] | null = null;
+    try {
+      const { stdout: commitsRaw } = await execAsync(
+        `git log --no-merges --format=%H ${mergedPr.headRefOid}..${tipSha}`,
+        { cwd: ctx.projectPath, encoding: 'utf-8' },
+      );
+      const commits = commitsRaw.split('\n').map((sha) => sha.trim()).filter(Boolean);
+      const unmerged: string[] = [];
+      for (const commit of commits) {
+        try {
+          await execAsync(
+            `git merge-base --is-ancestor ${commit} origin/main`,
+            { cwd: ctx.projectPath, encoding: 'utf-8' },
+          );
+        } catch {
+          unmerged.push(commit);
+        }
+      }
+      if (unmerged.length === 0) {
+        const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
+        return stepOk(step, [
+          `${prLabel} is squash-merged; all ${commits.length} post-PR non-merge commit(s) on ${branchRef} are already on origin/main`,
+        ]);
+      }
+
+      commitsNotOnMain = unmerged;
+    } catch { /* containment check failure falls through to the state-plane policy */ }
+
     // PAN-2406 / state-plane policy rule 3: commits after the merged head that
-    // touch ONLY state-plane paths (.pan/, .beads/) are pipeline exhaust —
+    // touch ONLY legacy state-plane paths under .pan/ are pipeline exhaust —
     // e.g. 'chore: record merge status' — and must not block close-out.
     try {
       const { stdout: deltaRaw } = await execAsync(
@@ -665,7 +732,7 @@ async function verifySquashMergedPrByBranch(
       );
       let deltaFiles = deltaRaw.split('\n').map((f) => f.trim()).filter(Boolean);
       let statePlaneOnly = deltaFiles.length > 0 && deltaFiles.every((f) =>
-        f.startsWith('.pan/') || f.startsWith('.beads/'));
+        f.startsWith('.pan/'));
       if (!statePlaneOnly) {
         // Branch may have merged main INTO itself after the PR merged — the
         // two-dot delta then contains main's own files. Judge only changes
@@ -677,17 +744,20 @@ async function verifySquashMergedPrByBranch(
         );
         deltaFiles = uniqueRaw.split('\n').map((f) => f.trim()).filter(Boolean);
         statePlaneOnly = deltaFiles.every((f) =>
-          f.startsWith('.pan/') || f.startsWith('.beads/'));
+          f.startsWith('.pan/'));
       }
       if (statePlaneOnly) {
         const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'GitHub PR';
         return stepOk(step, [
-          `${prLabel} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan/.beads) — accepted per state-plane policy`,
+          `${prLabel} is squash-merged; ${branchRef} is ahead only by state-plane commits (${deltaFiles.length} file(s): .pan) — accepted per state-plane policy`,
         ]);
       }
     } catch { /* diff failure falls through to the strict rejection below */ }
 
     const prLabel = typeof mergedPr.number === 'number' ? `PR #${mergedPr.number}` : 'merged GitHub PR';
+    if (commitsNotOnMain) {
+      return stepFailed(step, `${branchRef} has ${commitsNotOnMain.length} commit(s) after merged ${prLabel} that are not on origin/main: ${commitsNotOnMain.join(', ')}`);
+    }
     return stepFailed(step, `${branchRef} does not match the head commit of merged ${prLabel}; inspect before closing out.`);
   } catch {
     return null;

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatRelativeTime } from '../../lib/formatRelativeTime'
 import { cn } from '../../lib/utils'
-import styles from '../Stage/cockpit/beadsRail.module.css'
+import styles from '../Stage/cockpit/tasksRail.module.css'
 
 /**
  * BeadsRail — the persistent at-a-glance progress column for the issue cockpit
@@ -20,7 +20,7 @@ interface BeadTask {
   id: string
   name?: string
   title?: string
-  /** Raw bd status: 'open' | 'in_progress' | 'closed' | 'blocked' | … */
+  /** Raw vBRIEF task status; legacy beads values remain tolerated. */
   status: string
   labels: string[]
   blockedBy: string[]
@@ -125,24 +125,24 @@ export function BeadsPanel({ issueId, onOpenFull = () => undefined, compact = fa
   const queryClient = useQueryClient()
   const [showAllCompleted, setShowAllCompleted] = useState(false)
   const { data, isLoading, refetch, isRefetching } = useQuery<BeadsResponse>({
-    queryKey: ['beads', issueId],
+    queryKey: ['tasks', issueId],
     queryFn: async () => {
-      const res = await fetch(`/api/issues/${issueId}/beads`)
-      if (!res.ok) throw new Error('Failed to fetch beads')
+      const res = await fetch(`/api/issues/${issueId}/tasks`)
+      if (!res.ok) throw new Error('Failed to fetch tasks')
       return res.json() as Promise<BeadsResponse>
     },
     refetchInterval: 10_000,
   })
   useEffect(() => {
-    const invalidate = () => { void queryClient.invalidateQueries({ queryKey: ['beads', issueId] }) }
-    window.addEventListener('overdeck:beads-freshness', invalidate)
-    return () => window.removeEventListener('overdeck:beads-freshness', invalidate)
+    const invalidate = () => { void queryClient.invalidateQueries({ queryKey: ['tasks', issueId] }) }
+    window.addEventListener('overdeck:tasks-freshness', invalidate)
+    return () => window.removeEventListener('overdeck:tasks-freshness', invalidate)
   }, [issueId, queryClient])
 
   const tasks = data?.tasks ?? []
-  const done = tasks.filter((t) => t.status === 'closed')
-  const working = tasks.filter((t) => t.status === 'in_progress')
-  const upcoming = tasks.filter((t) => t.status !== 'closed' && t.status !== 'in_progress')
+  const done = tasks.filter((t) => t.status === 'closed' || t.status === 'completed')
+  const working = tasks.filter((t) => t.status === 'in_progress' || t.status === 'running')
+  const upcoming = tasks.filter((t) => !done.includes(t) && !working.includes(t))
   const total = tasks.length
   const pctDone = total ? Math.round((done.length / total) * 100) : 0
   const pctWorking = total ? Math.round((working.length / total) * 100) : 0

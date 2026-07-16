@@ -150,7 +150,7 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
       tmuxSessionNames: [],
       prs: [],
       hasVbrief: false,
-      hasBeads: false,
+      hasTasks: false,
       dockerContainerCount: 0,
       dockerContainerNames: [],
       conversations: [],
@@ -217,7 +217,7 @@ function renderReadyForMergeFeature() {
           tmuxSessionCount: 0,
           prs: [],
           hasVbrief: false,
-          hasBeads: false,
+          hasTasks: false,
           dockerContainerCount: 2,
         },
       })}
@@ -848,7 +848,7 @@ describe('FeatureItem', () => {
     const view = renderFeature(
       <FeatureItem
         feature={makeFeature({
-          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'beads'],
+          resourceSources: ['workspace', 'branch', 'tmux', 'pr', 'docker', 'vbrief', 'tasks'],
           resourceDetails: {
             hasWorkspace: true,
             localBranchCount: 1,
@@ -863,7 +863,7 @@ describe('FeatureItem', () => {
               },
             ],
             hasVbrief: true,
-            hasBeads: true,
+            hasTasks: true,
             dockerContainerCount: 2,
           },
         })}
@@ -883,7 +883,7 @@ describe('FeatureItem', () => {
     expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
     expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
-    expect(screen.getByText('beads present')).toBeInTheDocument();
+    expect(screen.getByText('tasks present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR (open)')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-cache')).toBeInTheDocument();
@@ -943,7 +943,7 @@ describe('FeatureItem', () => {
             tmuxSessionCount: 0,
             prs: [],
             hasVbrief: false,
-            hasBeads: false,
+            hasTasks: false,
             dockerContainerCount: 2,
             conversations: [],
           },
@@ -996,7 +996,7 @@ describe('FeatureItem', () => {
             tmuxSessionCount: 0,
             prs: [],
             hasVbrief: false,
-            hasBeads: false,
+            hasTasks: false,
             dockerContainerCount: 2,
             conversations: [],
           },
@@ -1147,7 +1147,7 @@ describe('FeatureItem', () => {
             tmuxSessionCount: 0,
             prs: [],
             hasVbrief: false,
-            hasBeads: false,
+            hasTasks: false,
             dockerContainerCount: 0,
             conversations: [],
           },
@@ -1182,7 +1182,7 @@ describe('FeatureItem', () => {
             tmuxSessionCount: 0,
             prs: [],
             hasVbrief: false,
-            hasBeads: false,
+            hasTasks: false,
             dockerContainerCount: 0,
             conversations: [
               { id: 42, name: 'conv-pan-821', title: 'My conv', status: 'active' },
@@ -1218,7 +1218,7 @@ describe('FeatureItem', () => {
             tmuxSessionCount: 0,
             prs: [],
             hasVbrief: false,
-            hasBeads: false,
+            hasTasks: false,
             dockerContainerCount: 0,
             conversations: [{ id: 7, name: 'conv-pan-821', title: 'Only conv', status: 'active' }],
           },

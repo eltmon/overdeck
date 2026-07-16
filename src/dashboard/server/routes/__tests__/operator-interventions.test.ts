@@ -386,65 +386,6 @@ describe('operator.intervention dashboard routes', () => {
     });
   });
 
-  it('refuses to start a paused agent from the dashboard without clearGates', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, status: 'stopped', paused: true, pausedReason: 'manual inspection' }),
-    );
-
-    const { response } = await requestAgents('/api/agents', {
-      body: JSON.stringify({ issueId: 'PAN-1' }),
-    });
-
-    expect(response.status).toBe(409);
-    expect(agentMocks.clearAgentPaused).not.toHaveBeenCalled();
-    expect(operatorInterventionMocks.appendOperatorInterventionEvent).not.toHaveBeenCalled();
-  });
-
-  it('refuses to start a troubled agent from the dashboard without clearGates', async () => {
-    agentMocks.getAgentState.mockReturnValue(
-      Effect.succeed({ ...agentState, status: 'stopped', troubled: true, consecutiveFailures: 3 }),
-    );
-
-    const { response } = await requestAgents('/api/agents', {
-      body: JSON.stringify({ issueId: 'PAN-1' }),
-    });
-
-    expect(response.status).toBe(409);
-    expect(agentMocks.clearAgentTroubled).not.toHaveBeenCalled();
-  });
-
-  it('honors clearGates by clearing a paused gate and emitting an operator intervention', async () => {
-    agentMocks.getAgentState
-      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped', paused: true, pausedReason: 'manual inspection' }))
-      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped' }));
-
-    const { response } = await requestAgents('/api/agents', {
-      body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
-    });
-
-    expect(agentMocks.clearAgentPaused).toHaveBeenCalledWith('agent-pan-1');
-    expect(operatorInterventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ issueId: 'PAN-1', kind: 'unpause', source: 'dashboard start-agent' }),
-    );
-    expect(response.status).not.toBe(409);
-  });
-
-  it('honors clearGates by clearing a troubled gate and emitting an operator intervention', async () => {
-    agentMocks.getAgentState
-      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped', troubled: true, consecutiveFailures: 3 }))
-      .mockReturnValueOnce(Effect.succeed({ ...agentState, status: 'stopped' }));
-
-    const { response } = await requestAgents('/api/agents', {
-      body: JSON.stringify({ issueId: 'PAN-1', clearGates: true }),
-    });
-
-    expect(agentMocks.clearAgentTroubled).toHaveBeenCalledWith('agent-pan-1');
-    expect(operatorInterventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ issueId: 'PAN-1', kind: 'untroubled', source: 'dashboard start-agent' }),
-    );
-    expect(response.status).not.toBe(409);
-  });
-
   // ── PAN-2499 WI-9a: clearGates on POST /api/agents ─────────────────────────
   // The spawn route must clear the troubled/paused gate through the same door
   // functions pan untroubled / pan unpause use and emit the matching intervention

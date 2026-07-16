@@ -39,25 +39,30 @@ import {
 } from '../../../../src/lib/cloister/deacon-swarm-record.js';
 import { getIssueRecordPathForWorkspace } from '../../../../src/lib/pan-dir/record.js';
 import type { PanIssueRecord } from '../../../../src/lib/pan-dir/record.js';
+import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
 
 function readRecord(workspacePath: string, issueId: string): PanIssueRecord {
   const path = getIssueRecordPathForWorkspace(workspacePath, issueId);
   return JSON.parse(readFileSync(path, 'utf-8')) as PanIssueRecord;
 }
 
+let remote: string;
+
 describe('PAN-2372 WI-3 writeSwarmSlotCompletion (FR-4)', () => {
   let workspacePath: string;
 
   beforeEach(() => {
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-completion-'));
+    remote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
   });
 
-  it('persists the marker keyed by String(slotIndex) with the required shape (AC1)', () => {
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
+  it('persists the marker keyed by String(slotIndex) with the required shape (AC1)', async () => {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
       slotIndex: 1,
       itemId: 'wi-1',
       agentId: 'agent-pan-2372-slot-1',
@@ -75,7 +80,7 @@ describe('PAN-2372 WI-3 writeSwarmSlotCompletion (FR-4)', () => {
     });
   });
 
-  it('preserves an existing record byte-for-byte except the new marker (AC4)', () => {
+  it('preserves an existing record byte-for-byte except the new marker (AC4)', async () => {
     const recordsDir = join(workspacePath, '.pan', 'records');
     mkdirSync(recordsDir, { recursive: true });
     const pre: PanIssueRecord = {
@@ -98,7 +103,7 @@ describe('PAN-2372 WI-3 writeSwarmSlotCompletion (FR-4)', () => {
     } as PanIssueRecord;
     writeFileSync(join(recordsDir, 'pan-2372.json'), JSON.stringify(pre, null, 2));
 
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
       slotIndex: 1,
       itemId: 'wi-1',
       agentId: 'agent-pan-2372-slot-1',
@@ -120,13 +125,13 @@ describe('PAN-2372 WI-3 writeSwarmSlotCompletion (FR-4)', () => {
     expect(after.pipeline).toEqual(pre.pipeline);
   });
 
-  it('coexists with markers for other slots (read-modify-write does not clobber siblings)', () => {
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
+  it('coexists with markers for other slots (read-modify-write does not clobber siblings)', async () => {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
       slotIndex: 1,
       agentId: 'agent-pan-2372-slot-1',
       completedAt: '2026-07-10T12:00:00.000Z',
     });
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
       slotIndex: 2,
       itemId: 'wi-2',
       agentId: 'agent-pan-2372-slot-2',
@@ -145,33 +150,35 @@ describe('PAN-2372 WI-3 clearSwarmSlotCompletion (FR-6)', () => {
 
   beforeEach(() => {
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-completion-clear-'));
+    remote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
   });
 
-  it('removes only the targeted slot key and leaves siblings intact', () => {
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
+  it('removes only the targeted slot key and leaves siblings intact', async () => {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
       slotIndex: 1,
       agentId: 'agent-pan-2372-slot-1',
       completedAt: '2026-07-10T12:00:00.000Z',
     });
-    writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
+    await writeSwarmSlotCompletion(workspacePath, 'PAN-2372', {
       slotIndex: 2,
       agentId: 'agent-pan-2372-slot-2',
       completedAt: '2026-07-10T12:01:00.000Z',
     });
 
-    clearSwarmSlotCompletion(workspacePath, 'PAN-2372', 1);
+    await clearSwarmSlotCompletion(workspacePath, 'PAN-2372', 1);
 
     const record = readRecord(workspacePath, 'PAN-2372');
     expect(record.swarm?.slotCompletions?.['1']).toBeUndefined();
     expect(record.swarm?.slotCompletions?.['2']).toBeDefined();
   });
 
-  it('is a no-op (no throw, no record created) when no marker exists for the slot', () => {
-    expect(() => clearSwarmSlotCompletion(workspacePath, 'PAN-2372', 7)).not.toThrow();
+  it('is a no-op when no marker exists for the slot', async () => {
+    await expect(clearSwarmSlotCompletion(workspacePath, 'PAN-2372', 7)).resolves.toBeUndefined();
     // No record file should have been created for an issue that never had one.
     expect(existsSync(getIssueRecordPathForWorkspace(workspacePath, 'PAN-2372'))).toBe(false);
   });
@@ -182,14 +189,16 @@ describe('PAN-2372 WI-3 persistAndVerifySwarmSlotCompletion (FR-4, FR-5)', () =>
 
   beforeEach(() => {
     workspacePath = mkdtempSync(join(tmpdir(), 'pan-slot-completion-verify-'));
+    remote = initGitRecordRoot(workspacePath);
   });
 
-  afterEach(() => {
-    rmSync(workspacePath, { recursive: true, force: true });
+  afterEach(async () => {
+    removeGitRecordRemote(remote);
+    await cleanupGitRecordRoot(workspacePath);
   });
 
-  it('returns true and the marker is observable on the real record door', () => {
-    const ok = persistAndVerifySwarmSlotCompletion(workspacePath, 'PAN-2372', {
+  it('returns true and the marker is observable on the real record door', async () => {
+    const ok = await persistAndVerifySwarmSlotCompletion(workspacePath, 'PAN-2372', {
       slotIndex: 1,
       itemId: 'wi-1',
       agentId: 'agent-pan-2372-slot-1',

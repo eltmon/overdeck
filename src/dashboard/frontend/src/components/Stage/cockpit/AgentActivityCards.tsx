@@ -21,7 +21,7 @@ function agentTone(status: string): CockpitTone {
 
 type PlanningState = {
   hasPlan: boolean
-  hasBeads: boolean
+  hasTasks: boolean
   planningComplete: boolean
 }
 
@@ -75,7 +75,7 @@ function AgentLaunchControl({
       queryClient.invalidateQueries({ queryKey: ['planning-state', issueId] }),
       queryClient.invalidateQueries({ queryKey: ['planningStatus', issueId] }),
       queryClient.invalidateQueries({ queryKey: ['command-deck-planning', issueId] }),
-      queryClient.invalidateQueries({ queryKey: ['beads', issueId] }),
+      queryClient.invalidateQueries({ queryKey: ['tasks', issueId] }),
       refreshDashboardState(queryClient),
     ])
   }
@@ -134,19 +134,19 @@ export function AgentCard({ issueId }: { issueId: string }) {
   const planning = planningState.data
   const status = planningStatus.data
   const hasPlan = planning?.hasPlan ?? actions.state.hasPlan
-  const hasBeads = planning?.hasBeads ?? actions.state.hasBeads
-  const canShowStart = !live && hasPlan && hasBeads
-  const canShowFinalize = !live && hasPlan && !hasBeads && status?.hasCompletionMarker === true
+  const hasTasks = planning?.hasTasks ?? actions.state.hasTasks
+  const canShowStart = !live && hasPlan && hasTasks
+  const canShowFinalize = !live && hasPlan && !hasTasks && status?.hasCompletionMarker === true
   const spawn = ['doneWork', 'startAgent', 'resumeSession', 'recoverAgent']
     .map((key) => actions.all.find((v) => v.action.key === key))
     .find((v): v is IssueActionView => !!v && v.enabled && (v.action.key !== 'startAgent' || canShowStart))
   const readinessText = useMemo(() => {
     if (planningState.isLoading || planningStatus.isLoading) return 'Checking planning readiness...'
     if (!hasPlan) return 'No finalized vBRIEF yet.'
-    if (!hasBeads && status?.hasCompletionMarker === true) return 'Planning is ready to finalize.'
-    if (!hasBeads) return 'Waiting for planning to produce a final vBRIEF.'
-    return 'vBRIEF and beads are ready.'
-  }, [hasBeads, hasPlan, planningState.isLoading, planningStatus.isLoading, status?.hasCompletionMarker])
+    if (!hasTasks && status?.hasCompletionMarker === true) return 'Planning is ready to finalize.'
+    if (!hasTasks) return 'Waiting for planning to produce a final vBRIEF.'
+    return 'vBRIEF and tasks are ready.'
+  }, [hasTasks, hasPlan, planningState.isLoading, planningStatus.isLoading, status?.hasCompletionMarker])
 
   return (
     <CockpitCard tone="success" title="Agent">

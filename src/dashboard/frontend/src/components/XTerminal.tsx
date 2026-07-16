@@ -293,20 +293,20 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     }
   }, []);
 
-  // Handle keyboard shortcuts
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+  // Handle keyboard shortcuts before xterm converts them into PTY input.
+  const handleKeyEvent = useCallback((event: KeyboardEvent): boolean => {
     const term = terminalInstance.current;
-    if (!term) return;
+    if (!term) return true;
 
     const isCmdOrCtrl = isMac ? event.metaKey : event.ctrlKey;
 
-    // Ctrl+C / Cmd+C: Copy if selection, else send interrupt
-    if (isCmdOrCtrl && event.key.toLowerCase() === 'c') {
-      if (term.hasSelection()) {
-        event.preventDefault();
-        copySelection();
-      }
-      // If no selection, let terminal handle (interrupt signal)
+    // Ctrl+C / Cmd+C: copy an active selection and tell xterm not to send ^C.
+    // Without a selection, return true so Ctrl+C keeps its terminal interrupt
+    // meaning.
+    if (event.type === 'keydown' && isCmdOrCtrl && event.key.toLowerCase() === 'c' && term.hasSelection()) {
+      event.preventDefault();
+      void copySelection();
+      return false;
     }
 
     // Ctrl+V / Cmd+V: do NOT intercept here. xterm.js handles paste natively
@@ -316,8 +316,15 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
     // navigator.clipboard.readText() here suppressed that native path and broke
     // paste wherever readText() is blocked or unfocused. (PAN-2529)
     // Plain Ctrl+V on Linux/Windows reaches that native path only because the
-    // attachCustomKeyEventHandler set at terminal creation tells xterm to skip
-    // the keystroke instead of swallowing it as a literal ^V.
+    // Returning false tells xterm to skip the keystroke instead of swallowing
+    // it as a literal ^V.
+    if (!isMac && ctrlVPasteRef.current
+      && event.type === 'keydown' && event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey
+      && event.key.toLowerCase() === 'v') {
+      return false;
+    }
+
+    return true;
   }, [copySelection]);
 
   // Handle context menu (right-click)
@@ -419,6 +426,14 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       });
       target.dispatchEvent(synthetic);
     };
+    const handleSelectionContextMouseDown = (event: MouseEvent) => {
+      if (event.button === 2 && term?.hasSelection()) {
+        // xterm clears its selection while processing a right-button mousedown.
+        // Keep that event away from xterm so the following contextmenu event can
+        // still offer Copy for the selected text.
+        event.stopPropagation();
+      }
+    };
 
     if (!term) {
       term = new Terminal({
@@ -482,11 +497,9 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         }, 300);
       });
 
-      // Add keyboard event listener to terminal element
-      terminalRef.current.addEventListener('keydown', handleKeyDown);
-
       // Add right-click handler
       terminalRef.current.addEventListener('contextmenu', handleContextMenu);
+      terminalRef.current.addEventListener('mousedown', handleSelectionContextMouseDown, true);
 
       // Keep wheel/trackpad gestures contained inside the terminal surface so
       // outer browser/app-shell handlers (like chat-input history navigation)
@@ -505,13 +518,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       // (default on, read via ctrlVPasteRef) lets users restore the raw
       // keystroke. macOS is left alone — Cmd+V is the paste gesture there and
       // Ctrl+V keeps its terminal meaning.
-      if (!isMac) {
-        term.attachCustomKeyEventHandler((e) =>
-          !(ctrlVPasteRef.current
-            && e.type === 'keydown' && e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey
-            && e.key.toLowerCase() === 'v')
-        );
-      }
+      term.attachCustomKeyEventHandler(handleKeyEvent);
 
       // On Linux/non-Mac, xterm only forces selection through mouse-reporting mode
       // when Shift is held. Claude's TUI enables mouse reporting, which makes plain
@@ -737,6 +744,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       terminalRef.current?.removeEventListener('mousedown', handleForcedSelectionMouseDown, true);
+      terminalRef.current?.removeEventListener('mousedown', handleSelectionContextMouseDown, true);
       terminalRef.current?.removeEventListener('contextmenu', handleContextMenu);
       setShouldReconnect(false);
       readyForLiveData.current = false;
@@ -753,7 +761,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       terminalInstance.current = null;
       fitAddon.current = null;
     };
-  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyDown, handleContextMenu, handleTerminalWheel, getMeasuredSize, sendResizeIfNeeded]);
+  }, [sessionName, shouldReconnect, autoCopyOnSelect, handleKeyEvent, handleContextMenu, handleTerminalWheel, getMeasuredSize, sendResizeIfNeeded]);
 
   useEffect(() => {
     const tMount = performance.now();

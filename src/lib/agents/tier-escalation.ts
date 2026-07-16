@@ -4,9 +4,9 @@ import type { ValidatedEscalationConfig } from './tier-table.js';
 import { TIERED_EXECUTION_DIFFICULTIES } from './tier-table.js';
 
 export type EscalationTrigger =
-  | { kind: 'supervisor-blocked'; beadId: string; sha: string; attemptsAtCurrentTier?: number }
-  | { kind: 'verification-failed'; beadId: string; detail: string; attemptsAtCurrentTier?: number }
-  | { kind: 'floundering'; beadId: string; dispatchedAt: string; now: string; attemptsAtCurrentTier?: number };
+  | { kind: 'supervisor-blocked'; itemId: string; sha: string; attemptsAtCurrentTier?: number }
+  | { kind: 'verification-failed'; itemId: string; detail: string; attemptsAtCurrentTier?: number }
+  | { kind: 'floundering'; itemId: string; dispatchedAt: string; now: string; attemptsAtCurrentTier?: number };
 
 export type EscalationAction =
   | { action: 'retry'; attempt: number }
@@ -56,25 +56,25 @@ export function decideEscalation(
   config: ValidatedEscalationConfig,
   overrides: TierOverridesMap,
 ): EscalationAction {
-  const beadId = trigger.beadId || bead.id;
+  const itemId = trigger.itemId || bead.id;
   const override = overrides[bead.id];
   const currentDifficulty = override?.effectiveDifficulty ?? bead.metadata?.difficulty;
   if (!currentDifficulty) {
-    return { action: 'block', reason: `bead ${beadId} has no effective difficulty` };
+    return { action: 'block', reason: `task ${itemId} has no effective difficulty` };
   }
 
   const promotions = override?.promotions ?? 0;
   if (promotions >= config.max_promotions) {
     return {
       action: 'block',
-      reason: `max promotions reached for ${beadId} at ${currentDifficulty}`,
+      reason: `max promotions reached for ${itemId} at ${currentDifficulty}`,
     };
   }
 
   if (currentDifficulty === 'expert') {
     return {
       action: 'block',
-      reason: `expert bead ${beadId} cannot promote beyond expert`,
+      reason: `expert task ${itemId} cannot promote beyond expert`,
     };
   }
 
@@ -88,7 +88,7 @@ export function decideEscalation(
   if (!to) {
     return {
       action: 'block',
-      reason: `bead ${beadId} cannot promote beyond ${currentDifficulty}`,
+      reason: `task ${itemId} cannot promote beyond ${currentDifficulty}`,
     };
   }
 
@@ -120,7 +120,7 @@ export function decideVerificationFailureEscalation(
 ): EscalationAction {
   return decideEscalation({
     kind: 'verification-failed',
-    beadId: input.bead.id,
+    itemId: input.bead.id,
     detail: input.detail,
     attemptsAtCurrentTier: input.attemptsAtCurrentTier,
   }, input.bead, input.config, input.overrides);
@@ -134,7 +134,7 @@ export function decideFlounderingEscalation(
   if (!isFloundering(input.dispatchedAt, input.now, budget)) return null;
   return decideEscalation({
     kind: 'floundering',
-    beadId: input.bead.id,
+    itemId: input.bead.id,
     dispatchedAt: input.dispatchedAt,
     now: input.now,
     attemptsAtCurrentTier: input.attemptsAtCurrentTier,

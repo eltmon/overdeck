@@ -5,7 +5,6 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { TemplatePlaceholders, replacePlaceholdersSync } from '../workspace-config.js';
 import { PRE_WORKTREE_METADATA_DIRS } from './types.js';
-import { resolveCanonicalBeadsHome } from '../beads/home.js';
 
 const execAsync = promisify(exec);
 
@@ -105,34 +104,6 @@ export async function createWorktree(
     // feature branch but not on main appear as deleted in a fresh worktree). Without this,
     // `git rebase origin/main` fails immediately with "unstaged changes" (PAN-495).
     await execAsync('git restore .', { cwd: targetPath }).catch(() => {});
-
-    // Configure beads role so agents don't get "beads.role not configured" warnings
-    await execAsync('git config beads.role contributor', { cwd: targetPath }).catch(() => {});
-
-    // Point the worktree's .beads/ at the canonical beads home via a one-hop redirect.
-    // bd refuses redirect chains and falls back to the redirect target's own directory,
-    // so the redirect must point directly at the canonical store — never at another
-    // redirecting directory. Post-Dolt-cutover the canonical home is the state worktree;
-    // when it cannot be resolved we fall back to the project-root .beads relative path.
-    // Without this, `bd` in the worktree spins up its own empty database with no issue_prefix
-    // configured, so the first `bd create` errors with "database not initialized: issue_prefix
-    // config is missing". Mirrors the pattern in src/lib/vbrief/beads.ts.
-    const canonicalHome = resolveCanonicalBeadsHome(targetPath);
-    const sourceBeadsDir = canonicalHome ?? join(repoPath, '.beads');
-    if (existsSync(sourceBeadsDir)) {
-      const worktreeBeadsDir = join(targetPath, '.beads');
-      const redirectPath = join(worktreeBeadsDir, 'redirect');
-      if (!existsSync(redirectPath)) {
-        try {
-          mkdirSync(worktreeBeadsDir, { recursive: true });
-          // bd resolves the redirect path relative to the worktree root (the parent of .beads/)
-          const redirectContent = canonicalHome ?? relative(targetPath, sourceBeadsDir);
-          writeFileSync(redirectPath, redirectContent, 'utf-8');
-        } catch {
-          // Non-fatal — if redirect creation fails, bd falls back to its usual bootstrap path.
-        }
-      }
-    }
 
     return { success: true, message: `Created worktree at ${targetPath}` };
   } catch (error) {

@@ -12,6 +12,7 @@ import { Effect } from 'effect';
 import { capturePane, killSession, listSessionNames, sendKeys, sessionExists } from '../tmux.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { loadConfigSync } from '../config-yaml.js';
+import { shouldRestartForPostMerge } from './merge-agent-step0.js';
 
 const execAsync = promisify(exec);
 
@@ -38,7 +39,6 @@ export const AUTO_COMMIT_EXCLUDED_PATHS = [
 const SYNC_MAIN_MAIN_PREFERRED_PATHS = [
   '.pan/continues',
   '.pan/specs',
-  '.beads',
 ];
 
 export function isSyncMainMainPreferredPath(relativePath: string): boolean {
@@ -84,8 +84,48 @@ function parseStatusPath(line: string): string {
  */
 export async function autoCommitWorkspaceChangesBeforeSync(
   projectPath: string,
+  issueId?: string,
 ): Promise<{ success: boolean; committed: boolean; reason?: string }> {
   try {
+    for (const operationHead of ['MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD']) {
+      try {
+        await execAsync(`git rev-parse -q --verify ${operationHead}`, {
+          cwd: projectPath,
+          encoding: 'utf-8',
+        });
+        return {
+          success: false,
+          committed: false,
+          reason: `Refusing to auto-commit while ${operationHead} exists; finish or abort the in-progress Git operation first`,
+        };
+      } catch { /* ref absent — continue */ }
+    }
+
+    try {
+      const { stdout: conflictMarkers } = await execAsync(
+        "git grep -n -I -E '^(<<<<<<<( |$)|=======$|>>>>>>>( |$))' -- .",
+        { cwd: projectPath, encoding: 'utf-8' },
+      );
+      if (conflictMarkers.trim()) {
+        const files = [...new Set(conflictMarkers.trim().split('\n').map((line) => line.split(':', 1)[0]))];
+        return {
+          success: false,
+          committed: false,
+          reason: `Refusing to auto-commit conflict markers in: ${files.join(', ')}`,
+        };
+      }
+    } catch (error: any) {
+      // git grep exits 1 when it finds no matches. Any other failure means the
+      // safety scan itself was inconclusive, so fail closed.
+      if (error?.code !== 1) {
+        return {
+          success: false,
+          committed: false,
+          reason: `Failed to scan for conflict markers: ${error.message}`,
+        };
+      }
+    }
+
     const { stdout: statusOut } = await execAsync('git status --porcelain', {
       cwd: projectPath,
       encoding: 'utf-8',
@@ -114,7 +154,10 @@ export async function autoCommitWorkspaceChangesBeforeSync(
       return { success: true, committed: false, reason: 'only excluded/ignored changes remain' };
     }
 
-    await execAsync('git commit -m "chore: auto-commit before sync with main"', {
+    const commitMessage = issueId
+      ? `chore: auto-commit before sync with main (${issueId})`
+      : 'chore: auto-commit before sync with main';
+    await execAsync(`git commit -m "${commitMessage}"`, {
       cwd: projectPath,
       encoding: 'utf-8',
     });
@@ -131,7 +174,6 @@ import {
 } from '../paths.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 
-import { restoreTrackedBeadsExport } from '../beads-restore.js';
 import { runQualityGates } from './validation.js';
 import { loadProjectsConfigSync } from '../projects.js';
 import { cleanupStaleLocks } from '../git-utils.js';
@@ -334,13 +376,7 @@ export async function postMergeLifecycle(
       console.warn(`[merge-agent] Could not set mergeStatus: ${err.message}`);
     }
 
-    // Step 0: Write pending lifecycle file and spawn detached deploy script.
-    // The deploy script rebuilds dist/, kills this server, and starts a fresh process.
-    // The fresh process reads the pending file on startup and runs the lifecycle steps
-    // with correct module chunk references (no ERR_MODULE_NOT_FOUND after merge).
-    //
-    // Skip this step when we ARE the fresh process (called from processPendingLifecycle) —
-    // dynamic imports already resolve correctly and spawning again would create an infinite loop.
+    // Step 0: restart only when the running build is stale and the deploy window is safe.
     if (!options?.skipDeploy) {
       const pendingFile = join(OVERDECK_HOME, 'pending-post-merge.json');
       let repoRoot = __dirname.includes('/src/')
@@ -356,7 +392,7 @@ export async function postMergeLifecycle(
       }
       const deployScript = join(repoRoot, 'scripts', 'post-merge-deploy.sh');
 
-      try {
+      if (await shouldRestartForPostMerge(repoRoot)) try {
         const pendingData = JSON.stringify({
           issueId,
           projectPath,
@@ -433,31 +469,6 @@ export async function postMergeLifecycle(
     triggerPostMergeReleaseIfConfigured(issueId, projectPath).catch((err) => {
       console.warn(`[merge-agent] Async post-merge release trigger failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
     });
-
-    // 2. Compact old beads (via lifecycle module)
-    try {
-      const { compactBeads } = await import('../lifecycle/compact-beads.js');
-      // PAN-1249: compactBeads returns Effect<StepResult>; bridge to Promise.
-      const beadsResult = await Effect.runPromise(compactBeads({ issueId, projectPath }));
-      if (beadsResult.success && !beadsResult.skipped) {
-        console.log(`[merge-agent] ✓ ${beadsResult.details?.join('; ')}`);
-        logActivity('beads_compaction_complete', beadsResult.details?.join('; ') || 'Beads compacted');
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Beads compaction failed: ${err}`);
-    }
-
-    // 2b. Sweep any remaining open beads (backstop for bypass/admin merges that skip verification).
-    try {
-      const { sweepOrphanedBeads } = await import('../lifecycle/orphaned-beads-sweep.js');
-      const sweepResult = await sweepOrphanedBeads({ beadsCwd: projectPath, issueId, reason: 'issue merged; remaining open beads swept' });
-      if (sweepResult.ok && sweepResult.closedIds.length > 0) {
-        console.log(`[merge-agent] ✓ Swept ${sweepResult.closedIds.length} open bead(s) for ${issueId}`);
-        logActivity('beads_sweep_complete', `Swept ${sweepResult.closedIds.length} open bead(s) for ${issueId}`);
-      }
-    } catch (err) {
-      console.warn(`[merge-agent] Beads sweep failed: ${err}`);
-    }
 
     // 3. Pause work/planning agents and kill their tmux panes to free resources.
     try {
@@ -1252,17 +1263,10 @@ export async function syncMainIntoWorkspace(
   console.log(`[sync-main] Starting sync of main into workspace for ${issueId}`);
   logActivity('sync_main_start', `Starting sync for ${issueId}`);
 
-  // PAN-1158 safety net: a workspace bd dolt DB that briefly went empty can
-  // leave `.beads/issues.jsonl` reported as deleted by `git status`. The
-  // auto-commit below would then propagate that deletion onto the feature
-  // branch. Restore the tracked export first so the auto-commit only sees
-  // intentional changes.
-  await Effect.runPromise(restoreTrackedBeadsExport(projectPath));
-
   // Pre-flight: auto-commit uncommitted changes before merge
   console.log(`[sync-main] Checking for uncommitted changes...`);
   logActivity('sync_main_auto_commit', `Auto-committing uncommitted changes before sync`);
-  const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath);
+  const autoCommit = await autoCommitWorkspaceChangesBeforeSync(projectPath, issueId);
   if (!autoCommit.success) {
     const message = autoCommit.reason || 'Failed to auto-commit uncommitted changes';
     console.error(`[sync-main] ${message}`);

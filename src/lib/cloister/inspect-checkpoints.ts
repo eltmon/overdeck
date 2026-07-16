@@ -18,7 +18,7 @@ const execAsync = promisify(exec);
 const OVERDECK_HOME = join(homedir(), '.overdeck');
 
 export interface InspectCheckpoint {
-  beadId: string;
+  itemId: string;
   commitSha: string;
   passedAt: string; // ISO 8601
 }
@@ -71,7 +71,7 @@ export function getLastCheckpoint(projectKey: string, issueId: string): InspectC
 export function saveCheckpoint(
   projectKey: string,
   issueId: string,
-  beadId: string,
+  itemId: string,
   commitSha: string
 ): InspectCheckpoint {
   const dir = getCheckpointDir(projectKey);
@@ -85,7 +85,7 @@ export function saveCheckpoint(
   };
 
   const checkpoint: InspectCheckpoint = {
-    beadId,
+    itemId,
     commitSha,
     passedAt: new Date().toISOString(),
   };

@@ -6,6 +6,7 @@ import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
+import { hasActualPendingQuestion } from '../../../lib/pipeline-state';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
 import { IssueActionMenu, useIssueActions } from '../../IssueActionMenu';
@@ -37,7 +38,7 @@ export function FeatureCard({
   isSelected,
   onSelect,
   onPlan,
-  onViewBeads,
+  onViewTasks,
   onViewVBrief,
   planningState: planningStateProp,
   children,
@@ -49,7 +50,7 @@ export function FeatureCard({
   isSelected?: boolean;
   onSelect?: () => void;
   onPlan?: () => void;
-  onViewBeads?: () => void;
+  onViewTasks?: () => void;
   onViewVBrief?: () => void;
   planningState?: PlanningState;
   children?: React.ReactNode;
@@ -65,7 +66,7 @@ export function FeatureCard({
      (feature.derivedStatus === 'closed' && feature.rawTrackerState !== 'Done'));
 
   const hasPlan = planningStateProp?.hasPlan ?? feature.hasPlan ?? false;
-  const hasBeads = planningStateProp?.hasBeads ?? feature.hasBeads ?? false;
+  const hasTasks = planningStateProp?.hasTasks ?? feature.hasTasks ?? false;
   const planLabelExists = hasPlan || feature.labels?.some(l => l.toLowerCase() === 'planned');
 
   return (
@@ -150,10 +151,10 @@ export function FeatureCard({
                 {planLabelExists ? 'See Plan' : 'Plan'}
               </button>
             )}
-            {(hasBeads || (hasPlan && !hasBeads)) && (
+            {(hasTasks || (hasPlan && !hasTasks)) && (
               <button
                 data-testid={`action-tasks-${feature.identifier}`}
-                onClick={(e) => { e.stopPropagation(); onViewBeads && onViewBeads(); }}
+                onClick={(e) => { e.stopPropagation(); onViewTasks && onViewTasks(); }}
                 className="flex items-center gap-1 text-xs text-success hover:text-success/80 transition-colors"
                 title="Tasks"
               >
@@ -543,9 +544,11 @@ interface IssueCardProps {
   cost?: IssueCost;
   costsLoading?: boolean;
   isSelected: boolean;
+  /** PAN-1234: keyboard navigation focus indicator. */
+  isFocused?: boolean;
   onSelect: () => void;
   onPlan: (autoStart?: boolean) => void; // Lifted to parent to survive re-renders
-  onViewBeads?: (issue: Issue) => void;
+  onViewTasks?: (issue: Issue) => void;
   onViewVBrief?: (issue: Issue) => void;
   isBulkSelected?: boolean;
   onBulkToggle?: () => void;
@@ -553,7 +556,7 @@ interface IssueCardProps {
   workspace?: WorkspaceData;
 }
 
-export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
+export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, specialists = [], cost, isSelected, isFocused = false, onSelect, isBulkSelected, onBulkToggle, planningState, workspace: workspaceProp }: IssueCardProps) {
   const [showCostModal, setShowCostModal] = useState(false);
   const [actionOpenSignal, setActionOpenSignal] = useState(0);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -563,10 +566,10 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const hasEnabledIssueAction = issueActions.all.some((view) => view.enabled);
 
   useEffect(() => {
-    if (isSelected && cardRef.current) {
+    if ((isSelected || isFocused) && cardRef.current) {
       cardRef.current.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
     }
-  }, [isSelected]);
+  }, [isSelected, isFocused]);
 
   const reviewStatus = useDashboardStore(selectReviewStatus(issue.identifier || ''));
   const isMerged = reviewStatus?.mergeStatus === 'merged' || issue.mergeStatus === 'merged' || issue.labels?.some(l => l.toLowerCase() === 'merged');
@@ -575,15 +578,19 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const issueWorkAgents = workAgents.length > 0 ? workAgents : (workAgent ? [workAgent] : []);
   const activeAgent = issueWorkAgents.find(isAgentSessionAttachable) ?? issueWorkAgents[0] ?? planningAgent;
   const isRunning = issueWorkAgents.some(isAgentSessionAttachable);
+  // PAN-1234: an issue is in INPUT phase when any assigned agent has an actual
+  // pending operator question (count or prompt).
+  const hasPendingInput = [...issueWorkAgents, ...specialists].some(hasActualPendingQuestion);
   const canonical = issue.state ?? STATUS_LABELS[issue.status] ?? 'backlog';
   const issueActionPhase = deriveIssueActionPhase({
     reviewStatus,
     agent: activeAgent,
     workspace: { exists: !!(workspaceProp?.path || issue.workspacePath) },
     hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
-    hasBeads: planningState?.hasBeads ?? issue.hasBeads ?? false,
+    hasTasks: planningState?.hasTasks ?? issue.hasTasks ?? false,
     issueCanonicalState: canonical,
     isMerged,
+    hasPendingInput,
   });
   const isPipelineStuck = issueActionPhase === 'STUCK';
   const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
@@ -592,7 +599,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     canonical === 'verifying_on_main' ? <VerifyingOnMainBadge compact /> :
     cardVerb ? <VerbBadge variant={cardVerb} /> :
     null;
-  const beadProgressColor =
+  const taskProgressColor =
     isReadyToMerge || isMerged || canonical === 'done' ? 'var(--success)' :
     canonical === 'in_review' ? 'var(--warning)' :
     canonical === 'in_progress' ? 'var(--info)' :
@@ -636,8 +643,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const agentSubText = activeAgent
     ? (reviewSpecialists.length > 0 && activeAgent.role === 'review'
       ? `${reviewSpecialists.length} reviewers · ${getFriendlyModelName(activeAgent.model)}`
-      : issue.beadCounts
-        ? `${getFriendlyModelName(activeAgent.model)} · bead ${issue.beadCounts.completed}/${issue.beadCounts.total}`
+      : issue.taskCounts
+        ? `${getFriendlyModelName(activeAgent.model)} · task ${issue.taskCounts.completed}/${issue.taskCounts.total}`
         : getFriendlyModelName(activeAgent.model))
     : '';
   const trackerRef = issue.source === 'github'
@@ -653,6 +660,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
       issueId={issue.identifier}
       priority={issue.priority}
       selected={isSelected}
+      focused={isFocused}
       bulkSelected={isBulkSelected}
       stuckCard={isStackUnhealthy || isPipelineStuck}
       pausedCard={!!pausedAgent}
@@ -779,11 +787,11 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           </div>
         )}
 
-        {/* Bead progress */}
-        {issue.beadCounts && (
-          <div className="flex items-center gap-2 mt-2" data-component="bead-progress" data-progress={issue.beadCounts.completed}>
+        {/* Task progress */}
+        {issue.taskCounts && (
+          <div className="flex items-center gap-2 mt-2" data-component="task-progress" data-progress={issue.taskCounts.completed}>
             <span className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground font-semibold">
-              Beads {issue.beadCounts.completed}/{issue.beadCounts.total}
+              Tasks {issue.taskCounts.completed}/{issue.taskCounts.total}
             </span>
             <div
               className="flex-1 h-[3px] rounded-[2px] overflow-hidden"
@@ -792,8 +800,8 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               <div
                 className="h-full rounded-[2px]"
                 style={{
-                  width: `${(issue.beadCounts.completed / issue.beadCounts.total) * 100}%`,
-                  background: beadProgressColor,
+                  width: `${(issue.taskCounts.completed / issue.taskCounts.total) * 100}%`,
+                  background: taskProgressColor,
                 }}
               />
             </div>

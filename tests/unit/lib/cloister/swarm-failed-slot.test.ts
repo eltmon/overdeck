@@ -4,11 +4,15 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { archiveFailedSwarmSlot, nextSwarmSlotIndex, SWARM_SUPERSEDED_RETENTION } from '../../../../src/lib/cloister/swarm-failed-slot.js';
 import { readIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
+import { cleanupGitRecordRoot, initGitRecordRoot, removeGitRecordRemote } from '../../../helpers/git-record-fixture.js';
 
 let workspace = '';
-afterEach(() => {
+let remote: string | null = null;
+afterEach(async () => {
+  removeGitRecordRemote(remote);
+  remote = null;
   if (!workspace) return;
-  rmSync(workspace, { recursive: true, force: true });
+  await cleanupGitRecordRoot(workspace);
   rmSync(`${workspace}-slot-2`, { recursive: true, force: true });
 });
 
@@ -18,6 +22,7 @@ describe('PAN-2543 failed swarm slot supersession', () => {
   });
   it('archives occupied branch/worktree metadata and preserves a monotonic next index', async () => {
     workspace = mkdtempSync(join(tmpdir(), 'pan-2543-swarm-'));
+    remote = initGitRecordRoot(workspace);
     mkdirSync(`${workspace}-slot-2`);
     const runGitCommand = vi.fn(async () => undefined);
     const clearSlotAssignment = vi.fn();
@@ -46,13 +51,14 @@ describe('PAN-2543 failed swarm slot supersession', () => {
 describe('PAN-2372 WI-4 supersession clears the durable slot-completion marker (FR-6, AC4)', () => {
   it('removes swarm.slotCompletions[slotIndex] when a slot is archived/superseded, preserving siblings', async () => {
     workspace = mkdtempSync(join(tmpdir(), 'pan-2372-swarm-requeue-'));
+    remote = initGitRecordRoot(workspace);
     const { writeSwarmSlotCompletion } = await import('../../../../src/lib/cloister/deacon-swarm-record.js');
     // Seed a durable marker for the slot about to be superseded, plus a sibling
     // marker that must survive (only the requeued slot's marker is cleared).
-    writeSwarmSlotCompletion(workspace, 'PAN-2372', {
+    await writeSwarmSlotCompletion(workspace, 'PAN-2372', {
       slotIndex: 2, itemId: 'wi-8', agentId: 'agent-pan-2372-slot-2', completedAt: '2026-07-10T01:02:03.000Z',
     });
-    writeSwarmSlotCompletion(workspace, 'PAN-2372', {
+    await writeSwarmSlotCompletion(workspace, 'PAN-2372', {
       slotIndex: 3, itemId: 'wi-9', agentId: 'agent-pan-2372-slot-3', completedAt: '2026-07-10T01:02:03.000Z',
     });
 

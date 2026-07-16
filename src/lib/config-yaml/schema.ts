@@ -2,7 +2,6 @@ import type { ModelId } from '../settings.js';
 import type { ModelProvider } from '../model-fallback.js';
 import type { EffortLevel } from '../model-capabilities.js';
 import type { SubscriptionPlan, AuthMode } from '../subscription-types.js';
-import type { Role } from '../agents.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type { BackgroundAiFeature } from '../background-ai/registry.js';
 import type { TieredExecutionConfig, ValidatedTieredExecutionConfig } from '../agents/tier-table.js';
@@ -342,6 +341,7 @@ export interface WeightedModelRef {
 
 /** Top-level role model: either a scalar model string or a weighted distribution list. */
 export type RoleModelRef = ModelRef | WeightedModelRef[];
+export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
 
 
 /**
@@ -419,7 +419,16 @@ export interface IssuesConfig {
 /**
  * Complete configuration structure (YAML schema)
  */
+export type SwarmMode = 'off' | 'auto' | 'always';
+export interface SwarmPolicyConfig {
+  mode: SwarmMode;
+  maxSlots: number;
+  autoAdvance: boolean;
+}
+
 export interface YamlConfig {
+  /** Automatic swarm-selection policy. */
+  swarm?: Partial<SwarmPolicyConfig>;
   /** Model configuration */
   models?: {
     /** Provider enable/disable and API keys */
@@ -577,6 +586,7 @@ export interface YamlConfig {
    */
   codex?: {
     permissionMode?: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
+    transport?: 'app-server' | 'tui';
   };
 
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
@@ -690,6 +700,8 @@ export interface NormalizedShadowConfig {
  * Normalized configuration (after loading and merging)
  */
 export interface NormalizedConfig {
+  /** Automatic swarm-selection policy. Off is the safe built-in default. */
+  swarm: SwarmPolicyConfig;
   /** tmux runtime configuration */
   tmux: {
     configMode: TmuxConfigMode;
@@ -869,9 +881,10 @@ export interface NormalizedConfig {
     permissionMode: 'auto' | 'bypass';
   };
 
-  /** Permission-mode for Codex TUI conversation sessions. Always defined; defaults to 'workspace'. */
+  /** Permission-mode and transport for Codex sessions. Always defined. */
   codex: {
     permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
+    transport: 'app-server' | 'tui';
   };
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */

@@ -56,7 +56,7 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan map` | No CLI verb exists; `/pan-map` is a topical skill for bootstrapping `.pan/context/codebase/` orientation files. |
 | `pan open` | Trivial — opens an editor. |
 | `pan recover`, `pan restore` | Recovery flows are documented in workflow skills (`pan-diagnose`, `pan-workflow`). |
-| `pan scope`, `pan swarm`, `pan workspace`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
+| `pan scope`, `pan staffing`, `pan swarm`, `pan workspace`, `pan test` | Power-user commands documented in topical/workflow skills as needed. |
 | `pan cost`, `pan update`, `pan serve` | Operations whose `--help` is self-contained. |
 | `pan health` | Distinct from `pan doctor`; runtime-health output is meant to be read directly. |
 | `pan admin conversations` | Internal backfill utility; `--help` covers the single subcommand. |

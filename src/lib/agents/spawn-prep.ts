@@ -253,7 +253,7 @@ export function resolveSlotTierSpawnParams(
   // PAN-2397 (Always Tiered): staffing ALWAYS resolves — explicit tier table
   // when enabled, else the implicit roles.work tier (same resolveModel +
   // spawnKey as determineModel, so distributions stay deterministic).
-  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config });
+  const staffing = resolveStaffing(item, { planMetadata, spawnKey, config, issueId: issueId ?? undefined });
   return {
     model: staffing.model,
     harness: staffing.implicit ? undefined : staffing.harness,
@@ -301,6 +301,7 @@ export function resolveSingleWorkTierSpawnParams(
   const staffing = resolveStaffing(item, {
     planMetadata,
     spawnKey,
+    issueId: issueId ?? undefined,
     config: { ...config, tieredExecution: { ...tiered, enabled: effectiveTieredEnabled } },
   });
   return {

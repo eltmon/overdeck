@@ -36,6 +36,7 @@ import { hasManagedRegion, userContentOutsideRegion } from '../../../lib/context
 import { CLAUDE_DIR, getOverdeckHome, isDevMode, SYNC_SOURCES } from '../../../lib/paths.js';
 import { listProjects, type ProjectConfig } from '../../../lib/projects.js';
 import { operatorInterventionEvent } from '../../../lib/operator-interventions.js';
+import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
 import { getHarnessBehavior } from '../../../lib/runtimes/behavior.js';
 import { jsonResponse } from '../http-helpers.js';
 import { EventStoreService } from '../services/domain-services.js';
@@ -545,7 +546,8 @@ export async function saveContextLayer(
 }
 
 async function runPanContextSync(): Promise<ContextSyncCommandResult> {
-  const { stdout, stderr } = await execFileAsync('pan', ['context', 'sync'], {
+  const invocation = panCliInvocation(['context', 'sync']);
+  const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, {
     encoding: 'utf-8',
   });
   return { stdout, stderr };

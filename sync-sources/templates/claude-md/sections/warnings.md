@@ -4,7 +4,6 @@
 
 1. **Investigate** — understand the root cause fully
 2. **Document** — write up the problem, root cause, and proposed solution
-3. **File an issue** — use `bd create` or the issue tracker with your findings so the fix is ready to implement
 4. **Do NOT fix it yourself** — unless it directly blocks your current issue
 
 This prevents scope creep, keeps changes traceable, and ensures every fix goes through the proper workspace/review pipeline. A well-investigated issue with a clear solution is more valuable than a drive-by fix buried in an unrelated PR.
@@ -70,7 +69,6 @@ Plain `tmux list-sessions` queries the default socket and will show "no server r
 1. **Tests pass** - Run the full test suite (`npm test` or equivalent)
 2. **All changes committed** - `git status` shows "nothing to commit, working tree clean"
 3. **Pushed to remote** - `git push -u origin $(git branch --show-current)`
-4. **Beads updated** - Add completion notes with `bd comments add`
 
 **Completion checklist:**
 ```bash
@@ -96,8 +94,7 @@ git push -u origin $(git branch --show-current)
 # 4. Verify clean state
 git status  # Must show "nothing to commit"
 
-# 5. Update beads
-bd comments add <task-id> "Implementation complete: <summary>"
+# 5. Update vBRIEF tasks
 ```
 
 **If ANY step fails, fix it before declaring work complete.**

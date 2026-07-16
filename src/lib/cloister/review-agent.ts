@@ -45,13 +45,17 @@ import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
+import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
+import { createPromiseCoalescer } from './in-flight-guard.js';
+import { providerDefaultHarnessSync } from '../agents/staffing.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { type ReReviewScope } from './review-rerun-scope.js';
+import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
   computeConvoyScope,
   launchConvoyReviewersPromise,
@@ -73,6 +77,9 @@ export const PARENT_REVIEW_TIMEOUT_MS = 45 * 60 * 1000;
 // Review now runs against the committed diff only. The dirty-worktree gate
 // at pan done time (and the same gate added to /api/review/:id/request)
 // guarantees the worktree is clean before specialists see the diff.
+
+const reviewSynthesisPath = (reviewDir: string): string => join(reviewDir, 'synthesis.md');
+const selfReviewReportPath = (reviewDir: string): string => join(reviewDir, 'review.md');
 
 function buildReviewRolePrompt(opts: {
   issueId: string;
@@ -98,7 +105,7 @@ function buildReviewRolePrompt(opts: {
   const carried = opts.carriedSubRoles ?? [];
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
   const expectedSignals = inScope.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
-  const synthesisPath = join(opts.reviewDir, 'synthesis.md');
+  const synthesisPath = reviewSynthesisPath(opts.reviewDir);
   const runningDesc = inScope.length === REVIEW_SUB_ROLES.length
     ? 'the four convoy reviewers (security, correctness, performance, requirements)'
     : `${inScope.length} convoy reviewer(s) this cycle (${inScope.join(', ')})`;
@@ -226,7 +233,7 @@ function buildSelfReviewPrompt(opts: {
   contextManifestPath?: string;
   tier1Summary?: string;
 }): string {
-  const reviewReportPath = join(opts.reviewDir, 'review.md');
+  const reviewReportPath = selfReviewReportPath(opts.reviewDir);
   const prompt = [
     `CODE REVIEW for ${opts.issueId} — you are the sole reviewer; review the change yourself.`,
     '',
@@ -285,6 +292,11 @@ function buildSelfReviewPrompt(opts: {
 async function spawnReviewRoleForIssuePromise(
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Promise<{ success: boolean; message: string; error?: string; gated?: boolean }> {
+  if (!opts.model) {
+    const project = resolveProjectForIssue(opts.issueId);
+    const issueModel = project ? readIssueRecordSync(project, opts.issueId)?.reviewModel : undefined;
+    if (issueModel) opts = { ...opts, model: issueModel };
+  }
   const reviewSessionName = `agent-${opts.issueId.toLowerCase()}-review`;
 
   // PAN-2420: GitHub-authoritative guard. Do not waste time on conflict-gate
@@ -390,7 +402,7 @@ async function spawnReviewRoleForIssuePromise(
           // racing the verdict (the PAN-399 shape) — skip below and leave the
           // verdict alone rather than re-entering 'reviewing'.
           const newerRequest = !!status?.reviewRequestedAt
-            && (!status.reviewSpawnedAt || status.reviewRequestedAt > status.reviewSpawnedAt);
+            && (!status.reviewSpawnedAt || Date.parse(status.reviewRequestedAt) > new Date(status.reviewSpawnedAt).getTime());
           // PAN-2584: a lost verdict leaves the status non-terminal while the
           // reviewer already wrote its report for this exact HEAD — that session
           // is finished, not reviewing. Report-on-disk for the current runId is
@@ -399,10 +411,16 @@ async function spawnReviewRoleForIssuePromise(
           let reportWritten = false;
           if (currentRunId) {
             try {
-              reportWritten = existsSync(join(opts.workspace, PAN_DIRNAME, 'review', currentRunId, 'review.md'));
+              const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', currentRunId);
+              reportWritten = existsSync(selfReviewReportPath(reviewDir))
+                || existsSync(reviewSynthesisPath(reviewDir));
             } catch { /* probe failure — fall back to verdict-only evidence */ }
           }
-          finishedIdle = (terminal || reportWritten) && newerRequest;
+          const reviewAgents = listAgentIdsByPrefixSync(reviewSessionName)
+            .map(id => getAgentStateFileSync(id))
+            .filter(state => state !== null && state !== undefined);
+          const convoyLiveness = evaluateReviewConvoyLiveness(opts.issueId, status ?? {}, reviewAgents);
+          finishedIdle = (terminal || reportWritten || !convoyLiveness.active) && newerRequest;
           if (finishedIdle) {
             console.log(
               `[review-agent] ${reviewSessionName} is finished-idle (verdict ${status?.reviewStatus}, newer request pending) — warm-reusing for the new review cycle`,
@@ -419,7 +437,7 @@ async function spawnReviewRoleForIssuePromise(
 
       if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
-        return { success: true, message: `Review already in progress: ${reviewSessionName}` };
+        return { success: false, message: `Review dispatch skipped — already running: ${reviewSessionName}` };
       }
       // Session pane is dead, force mode, stale runId, or finished-idle — kill the
       // convoy tmux and respawn (the spawn path resumes the saved session, so a
@@ -564,9 +582,20 @@ async function spawnReviewRoleForIssuePromise(
     // agent is the resume target, and model routing (not config) usually picks the
     // harness. Falling through to the 'claude-code' literal put codex parents into
     // discovery mode, where they stand by forever for a fork that can never happen.
+    // PAN-2697: first reviews have no saved state, so resolve the provider-default
+    // harness from the review model instead of ever defaulting to the literal.
     const savedReviewHarness = getAgentStateSync(`agent-${opts.issueId.toLowerCase()}-review`)?.harness;
+    const modelDefaultHarness = (() => {
+      try {
+        const cfg = loadYamlConfig().config;
+        const reviewModel = opts.model ?? resolveModel('review', undefined, cfg, `review:${opts.issueId.toLowerCase()}`);
+        return reviewModel ? providerDefaultHarnessSync(reviewModel, cfg) : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
     const discoveryForkMode = fullReview
-      && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? 'claude-code') === 'claude-code';
+      && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? modelDefaultHarness ?? 'claude-code') === 'claude-code';
 
     const prompt = fullReview
       ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
@@ -813,10 +842,24 @@ export function isReviewSessionForIssue(sessionName: string, projectKey: string 
  * fallible step; any failure here is fatal and propagates via Effect's defect
  * channel through `Effect.promise`.
  */
+// PAN-2695: dispatch has multiple legitimate callers (request route, deacon
+// reconcile, dispatch reconcile) that can fire near-simultaneously. An
+// uncoalesced second invocation sees the first's milliseconds-old agent state,
+// takes the PAN-1862 resume path against a parent that is still booting, and
+// kills it with the synthesis kickoff undelivered. Coalesce per issue: a
+// concurrent caller awaits the in-flight dispatch's result instead of re-entering.
+const reviewDispatchCoalescer = createPromiseCoalescer<{ success: boolean; message: string; error?: string; gated?: boolean }>();
+
 export const spawnReviewRoleForIssue = (
   opts: { issueId: string; workspace: string; branch: string; prUrl?: string; model?: string; harness?: RuntimeName; force?: boolean; allowHost?: boolean },
 ): Effect.Effect<{ success: boolean; message: string; error?: string; gated?: boolean }> =>
-  Effect.promise(() => spawnReviewRoleForIssuePromise(opts));
+  Effect.promise(() => {
+    const key = opts.issueId.toUpperCase();
+    if (reviewDispatchCoalescer.isInFlight(key)) {
+      console.log(`[review-agent] Review dispatch already in flight for ${key} — coalescing concurrent dispatch (PAN-2695)`);
+    }
+    return reviewDispatchCoalescer.run(key, () => spawnReviewRoleForIssuePromise(opts));
+  });
 
 /**
  * Effect variant of {@link killAllReviewerSessions}. Session-kill failures are
@@ -850,15 +893,20 @@ export {
 
 /**
  * Is the issue carrying leftover EXTENDED-review (convoy) sub-reviewer agents from a
- * prior cycle? Quick-review — the current hardcoded mode — only ever creates the single
- * `agent-<id>-review` parent, so any `agent-<id>-review-<subRole>` is a stale ghost
- * (e.g. PAN-1866's `-correctness/-security/-performance/-requirements` from an old run).
- *
- * Seam for when extended review returns: this becomes a reviewRunId-mismatch check — a
- * sub-reviewer is stale only when its run differs from the active review run.
+ * prior cycle? PAN-2697: full-convoy review runs today, so "any sub-reviewer exists"
+ * (the old quick-mode assumption) false-flagged every legitimate convoy — and the
+ * always-on review supervisor matched the prefix too. A sub-reviewer is stale only
+ * when its reviewRunId differs from the parent's active run.
  */
 export function isReviewStaleSync(issueId: string): boolean {
-  return listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review-`).length > 0;
+  const issueLower = issueId.toLowerCase();
+  const prefix = `agent-${issueLower}-review-`;
+  const parentRunId = getAgentStateFileSync(`agent-${issueLower}-review`)?.reviewRunId;
+  return listAgentIdsByPrefixSync(prefix).some((id) => {
+    const subRole = id.slice(prefix.length);
+    if (!(REVIEW_SUB_ROLES as readonly string[]).includes(subRole)) return false;
+    return !parentRunId || getAgentStateFileSync(id)?.reviewRunId !== parentRunId;
+  });
 }
 
 export function resolveReviewMode(issueId?: string): ReviewMode {

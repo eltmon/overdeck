@@ -3,7 +3,7 @@ import { Effect } from 'effect';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { ensureCompatibleNode } from './node-preflight.js';
+import { ensureCompatibleNode } from './node-preflight.js'; import { drainPendingDurableWrites } from './durable-write-drain.js';
 
 // Relaunch under a compatible Node (>=22) before anything else runs. If the
 // current runtime is already Node 22+ this is a no-op; otherwise it re-execs the
@@ -58,6 +58,7 @@ import type { RoleEffort } from '../lib/config-yaml.js';
 import type { RuntimeName } from '../lib/runtimes/types.js';
 import { tellCommand } from './commands/tell.js';
 import { killCommand } from './commands/kill.js';
+import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
 import { untroubledCommand } from './commands/untroubled.js';
@@ -71,7 +72,7 @@ import { doneCommand } from './commands/done.js';
 import { approveCommand } from './commands/approve.js';
 import { reopenCommand } from './commands/reopen.js';
 import { wipeCommand } from './commands/wipe.js';
-import { closeOutCommand } from './commands/close.js';
+import { registerCloseCommand } from './commands/close.js';
 import { showCommand } from './commands/show.js';
 import { listCommand as issuesCommand } from './commands/issues.js';
 import { triageCommand } from './commands/triage.js';
@@ -80,6 +81,7 @@ import { requestReviewCommand } from './commands/request-review.js';
 import { resetReviewCommand } from './commands/reset-review.js';
 import { abortReviewCommand } from './commands/abort-review.js';
 import { reviewModeCommand, reviewScopeCommand } from './commands/review-mode.js';
+import { staffingCommand } from './commands/staffing.js';
 // PAN-1048 R5: `pan review run` removed. Review now runs as the role primitive
 // via spawnRun(issueId, 'review', …) → roles/review.md, with convoy reviewers
 // spawned by the review role through `pan review spawn-reviewer`.
@@ -124,7 +126,7 @@ import { openCommand } from './commands/open.js';
 import { registerFlywheelCommands } from './commands/flywheel.js';
 import { registerMergeCommands } from './commands/merge.js';
 import { registerArtifactCommands } from './commands/artifacts.js';
-import { registerSwarmCommands } from './commands/swarm.js';
+import { registerSwarmCommands } from './commands/swarm.js'; import { registerTaskCommands } from './commands/task.js';
 
 // Pre-parse --yolo from argv so it works regardless of position relative to the
 // subcommand. Commander's enablePositionalOptions() routes post-subcommand options
@@ -356,17 +358,16 @@ review
   .command('abort <id>')
   .description('Kill all running reviewer sessions and leave the worker idle')
   .action(abortReviewCommand);
-
 review
   .command('mode <id> <mode>')
   .description('Set per-issue review mode (quick, full, or none)')
   .action(reviewModeCommand);
-
 review
   .command('scope <id> <scope>')
   .description('Set per-issue re-review scope (all, changed, or blockers) — which convoy reviewers re-run (PAN-1874)')
   .action(reviewScopeCommand);
 
+program.command('staffing <id>').description('Show or set per-issue work-model and swarm overrides').option('--model <model>', 'Set the work model, or default to clear the override').option('--swarm <mode>', 'Set swarm mode (off, auto, always), or default to clear the override').action(staffingCommand);
 review
   .command('restart <id>')
   .description('Kill running reviewers and dispatch fresh review pipeline')
@@ -434,7 +435,7 @@ const planCmd = program
 
 planCmd
   .command('finalize')
-  .description('Materialize plan into beads, mark the workspace spec as proposed, and promote to main')
+  .description('Mark the workspace plan as proposed and promote it to canonical state')
   .option('-w, --workspace <path>', 'Workspace path (defaults to cwd, walks up to find .pan/)')
   .option('--json', 'Emit JSON result')
   .option('--no-promote', 'Skip auto-promotion to main; leave spec at status=proposed for manual Done')
@@ -444,22 +445,21 @@ planCmd
 
 planCmd
   .command('done <id>')
-  .description('Complete planning — promote vBRIEF to proposed, sync beads, transition issue to Planned')
+  .description('Complete planning — promote the vBRIEF and transition the issue to Planned')
   .option('--no-prd', 'Bypass the PRD-first gate for a genuinely trivial issue (loud; prefer writing the PRD)')
   .action(planDoneCommand);
 
-// Lifecycle verbs: pan start, pan tell, pan kill, pan fork, pan resume, pan recover, pan sync-main, pan done, pan reopen, pan wipe, pan close
 program
   .command('tell <id> <message>')
   .description('Send message to running agent')
   .action(tellCommand);
-
 program
   .command('kill <id>')
-  .description('Stop running agent (workspace preserved)')
+  .alias('stop')
+  .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
-
+registerResetToPlannedCommand(program);
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')
@@ -558,17 +558,12 @@ program
   .option('--project <path>', 'Explicit project path (overrides registry)')
   .action(destroyWorkspaceCommand);
 
-program
-  .command('close <id>')
-  .description('Verify, clean up, and close issue on tracker')
-  .option('--force', 'Skip confirmation prompt')
-  .option('--json', 'Output as JSON')
-  .action((id, options) => closeOutCommand(id, options));
+registerCloseCommand(program);
 
 program
   .command('start <id>')
   .description('Create workspace and spawn agent for an issue')
-  .option('--model <model>', 'Model to use (sonnet/opus/haiku/kimi-k2.5/etc) - defaults to Cloister config')
+  .option('--model <model>', 'Work model to use and persist for later respawns (defaults to Cloister config)').option('--swarm <mode>', 'Per-issue swarm policy: off | auto | always').option('--review-mode <mode>', 'Per-issue review mode: quick | full | none').option('--review-model <model>', 'Per-issue review model override')
   .option('--harness <harness>', 'Coding-agent harness: claude-code | pi | codex (defaults to role/provider settings)')
   .option('--effort <level>', 'Claude Code effort: low | medium | high | xhigh | max (defaults to roles.work.effort)')
   .option('--tier <tier>', 'Remote workspace resiliency tier: ephemeral | durable (defaults to remote.resiliency_tier)')
@@ -578,7 +573,7 @@ program
   .option('--remote', 'Use remote workspace (Fly.io)')
   .option('--local', 'Use local workspace (explicit override)')
   .option('--plan <mode>', "Planning depth when no plan exists yet: interactive | auto | skip (default: config planning.default_mode, shipped default auto)")
-  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF and beads from the issue title/body')
+  .option('--auto', '[deprecated: use --plan skip] Skip planning agent by synthesizing a minimal vBRIEF from the issue title/body')
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
@@ -594,7 +589,7 @@ program
   .option('--dry-run', 'Print what would happen without spawning')
   .action((ids: string[], options: { model?: string; harness?: RuntimeName; effort?: RoleEffort; dryRun?: boolean }) => strikeCommand(ids, options));
 configureKnowledgeCommand(program);
-registerSwarmCommands(program);
+registerSwarmCommands(program); registerTaskCommands(program);
 registerWorkspaceCommands(program);
 registerTestCommands(program);
 registerTtsCommands(program);
@@ -621,7 +616,7 @@ registerOhmypiAuthCommands(program);
 // Register install command
 registerInstallCommand(program);
 
-// Register inspect command (pan inspect <issueId> --bead <beadId>)
+// Register inspect command (pan inspect <issueId> --item <itemId>)
 registerInspectCommand(program);
 
 // Register caveman commands (pan caveman-compress)
@@ -727,7 +722,7 @@ program
     // content to boot. Deferring it shaves that ~22s off time-to-available.
 
     // Ensure host tools every agent/conversation session needs are installed:
-    // tmux (fatal if missing) and beads/bd (best-effort — only the work
+    // tmux is fatal if missing; the work
     // pipeline needs it). See ensureHostTools in the prereq registry.
     {
       const { ensureHostTools } = await import('../lib/prereqs/registry.js');
@@ -1445,5 +1440,5 @@ if (process.argv.length === 2) {
   process.argv.push('serve');
 }
 
-// Parse and execute
-await program.parseAsync();
+// Short-lived commands must drain durable state writes before exit (PAN-2692).
+await program.parseAsync().finally(drainPendingDurableWrites);

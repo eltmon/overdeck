@@ -3,7 +3,7 @@ name: pan-new-project
 description: >
   Complete setup for registering a new project with Overdeck. Handles
   project registration, issue prefix, workspace config, trust setup,
-  beads init, tracker config, and validates against working projects.
+  vBRIEF tasks init, tracker config, and validates against working projects.
 triggers:
   - new project
   - add new project
@@ -31,7 +31,7 @@ license: "MIT"
 Sets up a new project for Overdeck management. This is the ONLY correct
 way to add a new project. Do NOT just run `pan project add` alone — it
 creates a skeleton entry that breaks planning agents, workspace creation,
-issue routing, and beads.
+issue routing, and vBRIEF tasks.
 
 ---
 
@@ -44,7 +44,6 @@ Running `pan project add /path --name foo` alone causes these failures:
 | `issue_prefix` (issue prefix) | Planning agents start in `$HOME`, not the project root |
 | Trust entry in `~/.claude.json` | Claude Code shows trust dialog, blocking autonomous agents |
 | `GITHUB_REPOS` entry | Issues don't appear on the dashboard kanban board |
-| `beads.role` in git config | Every `bd` command prints "beads.role not configured" warnings |
 | `workspaces/` directory | Git worktree creation fails |
 | `.gitignore` entry | `workspaces/` gets committed accidentally |
 | Test config | Specialist test agents can't run tests |
@@ -186,14 +185,13 @@ extra config needed beyond `issue_prefix` in projects.yaml.
 
 For **GitLab** projects, TBD — not yet supported in dashboard polling.
 
-### Step 5: Initialize Beads
+### Step 5: Initialize vBRIEF tasks
 
 ```bash
 cd <project-path>
-git config beads.role agent
+git config vBRIEF tasks.role agent
 ```
 
-This prevents the `"beads.role not configured"` warning on every `bd` command.
 New worktrees inherit this automatically since Overdeck now sets it during
 workspace creation (`workspace-manager.ts` and `worktree.ts`).
 
@@ -252,8 +250,8 @@ console.log(d.projects?.['<path>']?.hasTrustDialogAccepted
 grep 'GITHUB_REPOS' ~/.overdeck.env | grep -q '<PREFIX>' && \
   echo "PASS: in GITHUB_REPOS" || echo "FAIL: not in GITHUB_REPOS"
 
-# 5. Beads configured
-cd <path> && git config beads.role && echo "PASS" || echo "FAIL: beads.role not set"
+# 5. vBRIEF tasks configured
+cd <path> && git config vBRIEF tasks.role && echo "PASS" || echo "FAIL: vBRIEF tasks.role not set"
 
 # 6. workspaces/ exists
 test -d <path>/workspaces && echo "PASS" || echo "FAIL: no workspaces/"
@@ -280,7 +278,7 @@ Tracker:        GitHub (<owner/repo>)
 Workspace type: <type>
 Tests:          <command>
 Trusted:        Yes
-Beads:          Configured
+vBRIEF tasks:          Configured
 Dashboard:      Issues visible
 
 Validation: 8/8 checks passed
@@ -317,7 +315,6 @@ Next steps:
 1. **Missing `issue_prefix`** — The #1 cause of "planning agent starts in $HOME."
    Despite the name, this field is the issue PREFIX for ALL trackers, not just Linear.
 2. **Not in `GITHUB_REPOS`** — Issues don't appear on dashboard kanban board.
-3. **No `beads.role`** — Every `bd` command prints warning noise in agent output.
 4. **Not pre-trusting the directory** — Agent gets stuck on trust dialog.
 5. **Wrong `workspace.type`** — `standalone` = single repo, `monorepo` = one repo with
    worktrees, `polyrepo` = multiple repos under one parent dir.

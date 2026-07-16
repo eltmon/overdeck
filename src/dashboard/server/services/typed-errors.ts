@@ -52,14 +52,14 @@ export class AgentAlreadyRunning extends Data.TaggedError('AgentAlreadyRunning')
   readonly id: string;
 }> {}
 
-/** Beads tasks have not been initialized for this workspace. */
-export class BeadsNotInitialized extends Data.TaggedError('BeadsNotInitialized')<{
-  readonly workspace: string;
-}> {}
-
 /** The planning vBRIEF has no items — nothing to implement. */
 export class PlanEmpty extends Data.TaggedError('PlanEmpty')<{
   readonly id: string;
+}> {}
+
+/** The workspace task store is missing or has not been initialized. */
+export class TasksNotInitialized extends Data.TaggedError('TasksNotInitialized')<{
+  readonly workspace: string;
 }> {}
 
 /** The agent process failed to start. */

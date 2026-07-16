@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { ComposerPromptEditor, SlashMenu, type SlashCommand } from '../ComposerPromptEditor';
+import { ComposerPromptEditor, SlashMenu, SLASH_COMMANDS, type SlashCommand } from '../ComposerPromptEditor';
 
 // Mock the CSS module — must match class names used in ComposerPromptEditor
 vi.mock('../../CommandDeck/styles/command-deck.module.css', () => ({
@@ -133,6 +133,14 @@ describe('ComposerPromptEditor', () => {
     capturedRootElement = undefined as unknown as HTMLDivElement;
     mockLexicalText = '/';
     onChangePluginCallback = null;
+  });
+
+  it('offers reset-to-planned in composer autocomplete', () => {
+    expect(SLASH_COMMANDS).toContainEqual(expect.objectContaining({
+      id: 'pan-reset-to-planned',
+      label: 'pan reset-to-planned',
+      insert: 'pan reset-to-planned ',
+    }));
   });
 
   afterEach(() => {

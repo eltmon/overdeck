@@ -30,7 +30,7 @@ function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
       tmuxSessionCount: 0,
       prs: [],
       hasVbrief: false,
-      hasBeads: true,
+      hasTasks: true,
       dockerContainerCount: 0,
       conversations: [],
     },
@@ -50,16 +50,16 @@ describe('isStalledFeature', () => {
     expect(isStalledFeature(feature, undefined)).toBe(true);
   });
 
-  it('returns true when there is partial bead progress and no live agent', () => {
+  it('returns true when there is partial task progress and no live agent', () => {
     const feature = makeFeature({
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
     });
     expect(isStalledFeature(feature, undefined)).toBe(true);
   });
 
-  it('returns true when there is an in-progress bead and no live agent', () => {
+  it('returns true when there is an in-progress task and no live agent', () => {
     const feature = makeFeature({
-      beadTotals: { total: 3, closed: 0, inProgress: 1, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
+      taskTotals: { total: 3, closed: 0, inProgress: 1, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
     });
     expect(isStalledFeature(feature, undefined)).toBe(true);
   });
@@ -76,15 +76,15 @@ describe('isStalledFeature', () => {
 
   it('returns false when there is no artifact signal', () => {
     const feature = makeFeature({
-      resourceDetails: { ...makeFeature().resourceDetails!, branchAheadOfMain: false, hasBeads: false },
-      beadTotals: null,
+      resourceDetails: { ...makeFeature().resourceDetails!, branchAheadOfMain: false, hasTasks: false },
+      taskTotals: null,
     });
     expect(isStalledFeature(feature, undefined)).toBe(false);
   });
 
   it('returns false when a work session is active', () => {
     const feature = makeFeature({
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
       agentStatus: 'active',
     });
     expect(isStalledFeature(feature, undefined)).toBe(false);
@@ -92,7 +92,7 @@ describe('isStalledFeature', () => {
 
   it('returns false when a live agent session is present', () => {
     const feature = makeFeature({
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: new Date(Date.now() - 30 * DAYS).toISOString() },
       sessions: [
         {
           id: 'agent-pan-1',
@@ -117,10 +117,10 @@ describe('lastActivityAt', () => {
     vi.useRealTimers();
   });
 
-  it('includes beadTotals.lastUpdated when no sessions or review updates exist', () => {
+  it('includes taskTotals.lastUpdated when no sessions or review updates exist', () => {
     const entry = makeBucket(
       makeFeature({
-        beadTotals: { total: 2, closed: 1, inProgress: 0, lastUpdated: '2026-06-13T00:00:00Z' },
+        taskTotals: { total: 2, closed: 1, inProgress: 0, lastUpdated: '2026-06-13T00:00:00Z' },
       }),
     );
     expect(lastActivityAt(entry)).toBe(new Date('2026-06-13T00:00:00Z').getTime());
@@ -139,7 +139,7 @@ describe('groupPipelineEntries stalled bucket', () => {
 
   it('places an artifact-bearing, agent-less, stale feature in the stalled group', () => {
     const feature = makeFeature({
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
     });
     const groups = groupPipelineEntries([makeBucket(feature)]);
 
@@ -151,7 +151,7 @@ describe('groupPipelineEntries stalled bucket', () => {
 
   it('keeps a recently-active artifact-bearing feature out of stalled', () => {
     const feature = makeFeature({
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-07-12T00:00:00Z' },
     });
     const groups = groupPipelineEntries([makeBucket(feature)]);
 
@@ -161,7 +161,7 @@ describe('groupPipelineEntries stalled bucket', () => {
 
   it('keeps a live-agent feature out of stalled even when artifact signals exist', () => {
     const feature = makeFeature({
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
       sessions: [
         {
           id: 'agent-pan-1',
@@ -181,7 +181,7 @@ describe('groupPipelineEntries stalled bucket', () => {
   it('prefers needs-you over stalled when both apply', () => {
     const feature = makeFeature({
       readyForMerge: true,
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
     });
     const groups = groupPipelineEntries([makeBucket(feature)]);
 
@@ -191,7 +191,7 @@ describe('groupPipelineEntries stalled bucket', () => {
 
   it('does not duplicate a stalled feature into its original phase group', () => {
     const feature = makeFeature({
-      beadTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
+      taskTotals: { total: 4, closed: 2, inProgress: 0, lastUpdated: '2026-05-13T00:00:00Z' },
     });
     const groups = groupPipelineEntries([makeBucket(feature)]);
 

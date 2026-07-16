@@ -70,6 +70,25 @@ reword the hook's reason, keep the `(PAN-1520)` string** or detection breaks and
 the popup silently stops appearing. The operator's next plain-text answer turn
 clears the "denied-awaiting-user" state.
 
+## The marker contract (PAN-2530)
+
+The hook's emitted `permissionDecisionReason` is a load-bearing contract with the
+pending-input detector in `src/lib/agent-enrichment.ts`. It must contain **both**:
+
+1. The literal marker `(PAN-1520)`.
+2. The stable operative phrase `surfaced to the operator`.
+
+`isAskUserQuestionHookDenyToolResult` treats a deny-style `tool_result` as still
+pending if it sees **either** signal, so an old transcript that only has `PAN-1520`
+keeps matching and a future copy-edit that accidentally drops one signal cannot
+silently flip a deny into an answered state. The contract is enforced by
+`tests/lib/auq-hook-detector-contract.test.ts`, which executes the real hook with a
+synthetic PreToolUse payload and asserts the detector recognizes its output.
+
+If you change the REASON string in `sync-sources/hooks/ask-user-question-hook`,
+keep both signals or update the contract test. Dropping both breaks the
+AskUserQuestion popup and the "Needs you" recovery surface.
+
 ## The two root-cause bugs (fixed 2026-05-31, commit `360edc268`)
 
 ### 1. tmux liveness ignored non-`agent-` sessions

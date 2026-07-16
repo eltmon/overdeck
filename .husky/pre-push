@@ -7,10 +7,20 @@
 
 set -e
 
+# The overdeck-state worktree shares this repo's core.hooksPath, but the
+# orphan state branch carries none of the guard scripts — running them there
+# dies with 127 and blocks the state write door's pushes (PAN-2677). Skip the
+# script-backed checks when the tooling is absent; the pure-shell guards
+# below (overdeck-state deletion refusal, release-tag audit) still run.
+HAS_TOOLING=0
+[ -f scripts/lint-file-size.sh ] && HAS_TOOLING=1
+
 # PAN-2227: ratchets enforce at the write point — catch god-file growth
 # before origin does. Checks the WORKING TREE (what a direct-to-main
 # writer is about to make main), not each pushed commit.
-bash scripts/lint-file-size.sh </dev/null
+if [ "$HAS_TOOLING" = 1 ]; then
+  bash scripts/lint-file-size.sh </dev/null
+fi
 
 read_version() {
   git show "$1:$2" 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).version))"
@@ -38,13 +48,16 @@ while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
       else
         base=$(git merge-base origin/main "$local_sha" 2>/dev/null || true)
       fi
-      if [ -n "$base" ]; then
+      if [ "$HAS_TOOLING" != 1 ]; then
+        : # non-code checkout (state worktree) — script-backed guards unavailable
+      elif [ -n "$base" ]; then
         branch_name="${remote_ref#refs/heads/}"
         bash scripts/guard-state-plane-branches.sh --branch "$branch_name" --range "$base..$local_sha" </dev/null
         if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "$base..$local_sha" </dev/null
         fi
         bash scripts/lint-ratchet-audit.sh --range "$base..$local_sha" </dev/null
+        bash scripts/guard-hook-bundle-freshness.sh "$base..$local_sha" </dev/null
       else
         if [ "$remote_ref" = "refs/heads/main" ]; then
           bash scripts/guard-agent-main-push.sh --range "" </dev/null

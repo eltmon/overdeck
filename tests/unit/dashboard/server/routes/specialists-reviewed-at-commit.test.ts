@@ -92,6 +92,10 @@ let mockDiffNameOnlyStdout = '';
 
 const mockResolveProject = vi.fn();
 vi.mock('../../../../../src/lib/projects.js', () => ({
+  getProjectSync: vi.fn(() => ({ name: 'overdeck', path: '/fake/project' })),
+  listProjectsSync: vi.fn(() => [
+    { key: 'overdeck', config: { name: 'overdeck', path: '/fake/project', issue_prefix: 'PAN' } },
+  ]),
   resolveProjectFromIssue: (...args: unknown[]) => mockResolveProject(...args),
   resolveProjectFromIssueSync: (...args: unknown[]) => mockResolveProject(...args),
 }));
@@ -152,7 +156,7 @@ vi.mock('../../../../../src/lib/agents.js', () => ({
   saveAgentRuntimeState: vi.fn(),
   saveSessionId: vi.fn(),
   listRunningAgents: vi.fn().mockResolvedValue([]),
-  listRunningAgentsSync: vi.fn().mockResolvedValue([]),
+  listRunningAgentsSync: vi.fn().mockReturnValue([]),
   getAgentDir: vi.fn().mockReturnValue('/tmp'),
   getAgentState: vi.fn().mockReturnValue(null),
   getAgentStateSync: vi.fn().mockReturnValue(null),
@@ -316,7 +320,7 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     mockTreeShaByCommit.set('oldsha1', 'oldtree');
     mockTreeShaByCommit.set('newsha99', 'newtree');
     mockParentShaByCommit.set('newsha99', 'oldsha1');
-    mockDiffNameOnlyStdout = '.pan/records/pan-905.json\n.pan/test/result.json\n.beads/issues.jsonl\n';
+    mockDiffNameOnlyStdout = '.pan/records/pan-905.json\n.pan/test/result.json\n';
 
     const actions = await checkPostReviewCommits();
 
@@ -343,7 +347,7 @@ describe('checkPostReviewCommits — deacon detects new commits via reviewedAtCo
     mockParentShaByCommit.set('stateonly2', 'stateonly1');
     mockParentShaByCommit.set('stateonly1', 'codesha1');
     mockDiffNameOnlyByRange.set('stateonly1..stateonly2', '.pan/records/pan-906.json\n');
-    mockDiffNameOnlyByRange.set('codesha1..stateonly1', '.beads/issues.jsonl\n');
+    mockDiffNameOnlyByRange.set('codesha1..stateonly1', '.pan/records/pan-906.json\n');
     mockDiffNameOnlyByRange.set('codesha1..stateonly2', 'src/lib/cloister/deacon.ts\n');
 
     const actions = await checkPostReviewCommits();

@@ -87,7 +87,7 @@ describe('recordTestWaiver', () => {
       decisions: [{ id: 'D1', summary: 'Existing decision', recordedAt: now }],
       hazards: [],
       resumePoint: null,
-      beadsMapping: {},
+      tasksMapping: {},
       statusOverrides: {},
       sessionHistory: [],
       feedback: [],

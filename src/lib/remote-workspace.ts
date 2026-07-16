@@ -141,20 +141,8 @@ export interface CreateRemoteWorkspaceOptions {
   }
   await fly.configureClaudeCode(vmName);
 
-  // Step 6: Install beads CLI globally on remote VM
-  if (options.spinner) {
-    options.spinner.text = 'Installing beads CLI...';
-  }
-  const bdInstalled = await fly.installBeads(vmName);
-  if (!bdInstalled) {
-    console.warn('  ⚠ beads CLI (bd) install failed on VM — agent will have no bead tracking');
-  }
-
-  // Legacy-unmigrated compatibility only: migrated projects were rejected by
-  // assertRemoteWorkspaceBeadsSupported above and never reach this JSONL path.
-  // Step 6.5: Sync planning artifacts from the local workspace, if one exists.
-  // `.pan/continue.json` is gitignored and `.beads/issues.jsonl` is created by
-  // planning in the local worktree — neither arrives via the clone.
+  // Step 6: Sync the workspace continue artifact, which is gitignored and does
+  // not arrive via the clone.
   const localWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`);
   if (existsSync(localWorkspacePath)) {
     if (options.spinner) {
@@ -162,7 +150,6 @@ export interface CreateRemoteWorkspaceOptions {
     }
     const artifacts: Array<[string, string]> = [
       [join(localWorkspacePath, '.pan', 'continue.json'), '/workspace/.pan/continue.json'],
-      [join(localWorkspacePath, '.beads', 'issues.jsonl'), '/workspace/.beads/issues.jsonl'],
     ];
     for (const [localPath, remotePath] of artifacts) {
       if (!existsSync(localPath)) continue;
@@ -172,24 +159,7 @@ export interface CreateRemoteWorkspaceOptions {
     }
   }
 
-  // Step 6.6: Initialize the beads DB and import the synced JSONL. Must run
-  // AFTER the artifact sync — `bd init` does not auto-import a pre-existing
-  // issues.jsonl, so init-then-sync leaves the dolt DB empty and the agent
-  // sees zero beads.
-  if (bdInstalled) {
-    const initOk = await fly.initBeads(vmName, '/workspace');
-    if (!initOk) {
-      console.warn('  ⚠ bd init failed on VM — beads DB unavailable to the agent');
-    }
-    const importResult = await Effect.runPromise(
-      fly.ssh(vmName, 'cd /workspace && if [ -f .beads/issues.jsonl ]; then bd import -i .beads/issues.jsonl 2>&1; fi')
-    );
-    if (importResult.exitCode !== 0) {
-      console.warn(`  ⚠ bd import failed on VM: ${importResult.stderr || importResult.stdout}`);
-    }
-  }
-
-  // Step 6.7: Copy essential skills to remote VM
+  // Step 6.5: Copy essential skills to remote VM
   if (options.spinner) {
     options.spinner.text = 'Copying skills to remote VM...';
   }

@@ -142,13 +142,13 @@ When a user clicks **Start Agent** in the dashboard (`POST /api/agents`), the sy
 5. Work agent reads .pan/continue.json and .pan/spec.vbrief.json and implements remaining work
 ```
 
-### Beads Prerequisite
+### vBRIEF Prerequisite
 
-Beads are a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** if the canonical Dolt resolver reports no beads for the issue. Cloister automatically creates beads from the vBRIEF plan through the canonical writer when planning completes. Raw mutation commands are not needed.
+A readable, implementation-ready vBRIEF is a hard prerequisite for starting work agents. The `POST /api/agents` endpoint returns **422** when the plan is missing, unreadable, belongs to another issue, or contains no implementation items. Planning writes the checklist directly and does not create an external task store.
 
 ### DAG-Aware Task Scheduling
 
-The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. When Cloister converts items to beads, it preserves these dependencies. Work agents use `bd ready -l <issue>` to find unblocked beads, ensuring tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
+The vBRIEF plan includes dependency edges (`blocks`, `informs`) between items. Work agents use `pan task next <issue>` to find the next dispatchable checklist item, so tasks are worked in dependency order. The `criticalPath()` utility in `src/lib/vbrief/dag.ts` computes the longest dependency chain for visualization.
 
 ### Acceptance Criteria Pipeline
 
@@ -558,6 +558,8 @@ Agent runs `pan done` (Bash command)
 ```
 
 The verification gate (PAN-174) runs between agent completion and review-agent wake. It executes the `quality_gates` defined in `projects.yaml` (typecheck, lint, test). If any gate fails, feedback is sent to the agent's tmux session and the completion marker is NOT processed, allowing the agent to fix issues and re-signal completion. After 3 consecutive failures, the gate is bypassed to prevent permanent blocking. See `src/lib/cloister/verification-gate.ts`.
+
+Verification runs in a detached supervised worker, not in the dashboard server process. The worker owns the gate process groups, incremental artifact writes, and terminal result under `~/.overdeck/verification-workers/<issue>/`. A dashboard restart preserves a live worker and reconnects through its durable state; boot reconciliation resets only a `running` verification whose recorded worker is no longer alive.
 
 #### verificationStatus semantics
 

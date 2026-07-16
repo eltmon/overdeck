@@ -240,9 +240,6 @@ export function EventRouter() {
       stopScheduledReconnect()
       resetStalenessWatchdog()
       hideOverlay()
-      if (event.type === 'beads.freshness_changed') {
-        window.dispatchEvent(new CustomEvent('overdeck:beads-freshness', { detail: event.payload }))
-      }
       if (!isSequencedDomainEvent(event)) return
 
       const classification = coordinator.classifyDomainEvent(event.sequence)

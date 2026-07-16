@@ -96,6 +96,9 @@ export interface SpecialistConfig {
 export interface SwarmConfig {
   /** File paths/globs that are intentionally high-churn and ignored for overlap scheduling. */
   hotspots?: string[];
+  mode?: 'off' | 'auto' | 'always';
+  maxSlots?: number;
+  autoAdvance?: boolean;
 }
 
 export interface ReleaseComponentConfig {
@@ -302,6 +305,16 @@ export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hol
   const updated: ProjectConfig = { ...config };
   if (value === null) delete updated.auto_merge_default;
   else updated.auto_merge_default = value;
+  registerProjectSync(key, updated);
+}
+
+export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
+  const config = getProjectSync(key);
+  if (!config) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...config };
+  const hotspots = config.swarm?.hotspots;
+  if (value === null && !hotspots?.length) delete updated.swarm;
+  else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
   registerProjectSync(key, updated);
 }
 

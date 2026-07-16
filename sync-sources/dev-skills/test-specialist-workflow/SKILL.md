@@ -191,7 +191,7 @@ If merge-agent can't complete:
 cd ~/Projects/overdeck
 git status
 
-# If .beads/ files are modified, that's OK (should be ignored)
+# If .vBRIEF tasks/ files are modified, that's OK (should be ignored)
 # Other uncommitted changes need to be committed or stashed
 ```
 

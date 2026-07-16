@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { checkSystemPrerequisites, PREREQUISITES } from '../system-prerequisites.js';
+import { collectSetupDiagnostics, checkSystemPrerequisites, PREREQUISITES } from '../system-prerequisites.js';
 
 // PAN-774: host-tool setup checklist served by GET /api/prerequisites.
 
@@ -38,6 +38,26 @@ describe('checkSystemPrerequisites', () => {
       expect(definition.install.mac.length).toBeGreaterThan(0);
       expect(definition.install.win.length).toBeGreaterThan(0);
       expect(definition.purpose.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('collectSetupDiagnostics', () => {
+  it('produces a bounded support report without dumping environment secrets', async () => {
+    const previousSecret = process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'];
+    process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'] = 'must-not-appear';
+    try {
+      const report = await collectSetupDiagnostics('9.8.7');
+      expect(report.schemaVersion).toBe(1);
+      expect(report.markdown).toContain('## Overdeck setup diagnostics');
+      expect(report.markdown).toContain('Overdeck: 9.8.7');
+      expect(report.markdown).toContain('### Prerequisites');
+      expect(report.markdown).toContain('### Claude lookup');
+      expect(report.markdown).not.toContain('must-not-appear');
+      expect(report.markdown.length).toBeLessThanOrEqual(16_384);
+    } finally {
+      if (previousSecret === undefined) delete process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'];
+      else process.env['OVERDECK_DIAGNOSTIC_TEST_SECRET'] = previousSecret;
     }
   });
 });

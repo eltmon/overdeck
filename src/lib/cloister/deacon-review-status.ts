@@ -21,6 +21,7 @@ import { findWorkspacePath, inferBranchFromWorkspace } from '../lifecycle/archiv
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
+import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 
 const execAsync = promisify(exec);
 
@@ -191,7 +192,10 @@ async function recoverUnhealthyTestStack(
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ReviewStatusLike {
+  updatedAt?: string;
+  reviewSpawnedAt?: string | number;
   reviewStatus?: string;
+  verificationStatus?: string;
   testStatus?: string;
   mergeStatus?: string;
   readyForMerge?: boolean;
@@ -203,9 +207,14 @@ interface ReviewStatusLike {
   recoveryStartedAt?: string;
   history?: Array<{ type: string; status: string; notes?: string }>;
   reviewNotes?: string;
+  lastVerifiedCommit?: string;
   reviewedAtCommit?: string;
   stuckAt?: string;
   stuckDetails?: string;
+}
+
+interface OrphanRecoveryOptions {
+  readWorkspaceHead?: (workspace: string) => Promise<string>;
 }
 
 function latestHistoryEntry(
@@ -234,17 +243,29 @@ function latestHistoryByType(
   return undefined;
 }
 
-async function isReviewAgentActiveForIssue(issueId: string): Promise<boolean> {
+export function completedReviewSnapshotAfterCoordinatorExit(
+  status: Pick<ReviewStatus, 'history'>,
+): Partial<ReviewStatus> | null {
+  const review = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
+  if (review?.status !== 'passed') return null;
+  const test = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
+  return {
+    reviewStatus: 'passed',
+    reviewNotes: review.notes,
+    ...(test ? { testStatus: test.status as ReviewStatus['testStatus'], testNotes: test.notes } : {}),
+    reviewRetryCount: 0,
+    recoveryStartedAt: undefined,
+  };
+}
+
+async function isReviewAgentActiveForIssue(
+  issueId: string,
+  status: ReviewStatusLike,
+): Promise<{ active: boolean; reason: string }> {
   // PAN-1048 R5: role-primitive review/test runs (agent-<id>-review, agent-<id>-test).
   try {
     const agents = await Effect.runPromise(listRunningAgents());
-    for (const agent of agents) {
-      if (agent.status === 'stopped' || agent.status === 'error') continue;
-      const id = (agent.issueId ?? '').trim().toUpperCase();
-      if (!id || id !== issueId.toUpperCase()) continue;
-      const role = agent.role ?? (agent.id.endsWith('-review') ? 'review' : agent.id.endsWith('-test') ? 'test' : null);
-      if (role === 'review') return true;
-    }
+    return evaluateReviewConvoyLiveness(issueId, status, agents);
   } catch {
     // fall through
   }
@@ -255,7 +276,7 @@ async function isReviewAgentActiveForIssue(issueId: string): Promise<boolean> {
     if (sessionExistsSync(session)) {
       const rState = getAgentRuntimeStateSync(session);
       if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
-        return true;
+        return { active: true, reason: `active global ${type} specialist` };
       }
     }
   }
@@ -267,14 +288,14 @@ async function isReviewAgentActiveForIssue(issueId: string): Promise<boolean> {
       if (!projSpec.isRunning || projSpec.specialistType !== 'review-agent') continue;
       const rState = getAgentRuntimeStateSync(projSpec.tmuxSession);
       if (rState?.state === 'active' && rState.currentIssue?.toUpperCase() === issueId.toUpperCase()) {
-        return true;
+        return { active: true, reason: `active project review specialist ${projSpec.tmuxSession}` };
       }
     }
   } catch {
     // fall through
   }
 
-  return false;
+  return { active: false, reason: 'no active review session' };
 }
 
 async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
@@ -342,6 +363,22 @@ export async function handleReviewCoordinatorDied(
 
   if (await isIssueClosed(issueId)) {
     logDeaconEventSync(`handleReviewCoordinatorDied: ${issueId} skipped — issue closed`);
+    return actions;
+  }
+
+  const completedSnapshot = completedReviewSnapshotAfterCoordinatorExit(status);
+  if (completedSnapshot) {
+    setReviewStatusSync(issueId, completedSnapshot);
+    actions.push(`Restored completed review for ${issueId} after coordinator exit; no re-dispatch`);
+    return actions;
+  }
+
+  if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
+    markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
+      reviewRetryCount: status.reviewRetryCount ?? 0,
+      recoveryStartedAt: status.recoveryStartedAt,
+    });
+    actions.push(`Review recovery stopped for ${issueId} after ${status.reviewRetryCount} retries`);
     return actions;
   }
 
@@ -428,12 +465,16 @@ export async function handleWorkCompleted(issueId: string): Promise<string[]> {
  * PAN-1908: per-issue orphan reconciler for a single review-status row. Used by
  * the legacy checkOrphanedReviewStatuses safety net and by reactive handlers.
  */
-async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewStatusLike): Promise<string[]> {
+async function reconcileReviewStatusOrphan(
+  issueId: string,
+  rawStatus: ReviewStatusLike,
+  options: OrphanRecoveryOptions = {},
+): Promise<string[]> {
   const actions: string[] = [];
 
   const status = getReviewStatusSync(issueId) ?? rawStatus;
 
-  if (status.stuck) return actions;
+  if (status.stuck && !(status.stuckReason === 'verification_stuck' && status.reviewStatus === 'reviewing')) return actions;
   if (status.deaconIgnored) return actions;
   if (await isIssueClosed(issueId)) return actions;
 
@@ -442,7 +483,47 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
   const latestTerminalReview = latestHistoryEntry(status.history, 'review', ['passed', 'failed', 'blocked']);
   const latestTerminalTest = latestHistoryEntry(status.history, 'test', ['passed', 'failed', 'skipped']);
 
-  const reviewAgentActive = await isReviewAgentActiveForIssue(issueId);
+  const reviewLiveness = await isReviewAgentActiveForIssue(issueId, status);
+  const reviewAgentActive = reviewLiveness.active;
+  if (status.reviewStatus === 'reviewing') {
+    console.log(`[deacon] Evaluated reviewing status for ${issueId}: ${reviewLiveness.reason}`);
+  }
+
+  // A supervised verification worker can finish after the dashboard process
+  // that requested it has died. The worker records the pass, but the dead HTTP
+  // fiber never clears the prior review failure or dispatches review. Recover
+  // only when the verified commit is still current; a moved HEAD needs a fresh
+  // verification instead of carrying the old pass forward.
+  if (
+    status.verificationStatus === 'passed' &&
+    status.lastVerifiedCommit &&
+    !['pending', 'reviewing', 'passed'].includes(status.reviewStatus ?? '') &&
+    !reviewAgentActive
+  ) {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    const issueLower = issueId.toLowerCase();
+    const agentState = getAgentStateSync(`agent-${issueLower}`);
+    const workspace = agentState?.workspace || (resolved ? findWorkspacePath(resolved.projectPath, issueLower) : null);
+
+    if (workspace) {
+      try {
+        const currentHead = options.readWorkspaceHead
+          ? await options.readWorkspaceHead(workspace)
+          : (await execAsync('git rev-parse HEAD', { cwd: workspace })).stdout.trim();
+        if (currentHead === status.lastVerifiedCommit) {
+          setReviewStatusSync(issueId, {
+            reviewStatus: 'pending',
+            reviewNotes: undefined,
+          });
+          status.reviewStatus = 'pending';
+          status.reviewNotes = undefined;
+          actions.push(`Recovered review continuation for ${issueId} after verification completed during restart`);
+        }
+      } catch {
+        // A missing/unreadable workspace cannot prove the pass is current.
+      }
+    }
+  }
 
   // Orphaned reviewing status
   if (status.reviewStatus === 'reviewing' && !reviewAgentActive) {
@@ -624,7 +705,7 @@ async function reconcileReviewStatusOrphan(issueId: string, rawStatus: ReviewSta
   return actions;
 }
 
-export async function checkOrphanedReviewStatuses(): Promise<string[]> {
+export async function checkOrphanedReviewStatuses(options: OrphanRecoveryOptions = {}): Promise<string[]> {
   const actions: string[] = [];
 
   try {
@@ -633,7 +714,7 @@ export async function checkOrphanedReviewStatuses(): Promise<string[]> {
     // as a thin SQLite-only safety net for dropped events.
     const statuses = loadReviewStatuses();
     for (const [issueId, status] of Object.entries(statuses)) {
-      const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike);
+      const result = await reconcileReviewStatusOrphan(issueId, status as ReviewStatusLike, options);
       actions.push(...result);
     }
   } catch (error: unknown) {

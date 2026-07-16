@@ -58,7 +58,9 @@ export async function pendingCommand(options: { ready?: boolean; blocked?: boole
     return;
   }
 
-  const pending = Object.values(allStatuses).filter(s => s.reviewStatus === 'pending');
+  const pending = Object.values(allStatuses).filter(
+    s => s.reviewStatus === 'pending' && s.reviewRequestedAt != null,
+  );
 
   if (pending.length === 0) {
     console.log(chalk.dim('No pending reviews.'));

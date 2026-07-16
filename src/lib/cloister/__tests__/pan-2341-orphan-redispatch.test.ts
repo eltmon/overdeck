@@ -1,5 +1,5 @@
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReviewStatus } from '../../review-status.js';
 
 const mocks = vi.hoisted(() => ({
@@ -120,6 +120,10 @@ function status(fields: Partial<ReviewStatus> = {}): ReviewStatus {
 }
 
 describe('PAN-2341 orphan journal reconcile before re-dispatch', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   beforeEach(async () => {
     vi.clearAllMocks();
     mocks.loadReviewStatuses.mockReturnValue({});
@@ -176,6 +180,73 @@ describe('PAN-2341 orphan journal reconcile before re-dispatch', () => {
       branch: 'feature/pan-3002',
       force: true,
     });
+  });
+
+  it('recovers reviewing when every review agent is stale', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-07T01:00:00.000Z'));
+    const raw = status({ issueId: 'PAN-3002', updatedAt: '2026-07-07T00:50:00.000Z' });
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
+    mocks.getReviewStatusSync.mockReturnValue(raw);
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
+      { id: 'agent-pan-3002-review', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:40:00.000Z' },
+      { id: 'agent-pan-3002-review-security', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:40:00.000Z' },
+    ]));
+
+    const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
+    await checkOrphanedReviewStatuses();
+
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3002', expect.objectContaining({ reviewStatus: 'pending' }));
+  });
+
+  it('recovers reviewing when the coordinator stopped but sub-reviewers remain running', async () => {
+    const raw = status({ issueId: 'PAN-3002', updatedAt: new Date().toISOString() });
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
+    mocks.getReviewStatusSync.mockReturnValue(raw);
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
+      { id: 'agent-pan-3002-review', issueId: 'PAN-3002', role: 'review', status: 'stopped', lastActivity: new Date().toISOString() },
+      { id: 'agent-pan-3002-review-security', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: new Date().toISOString() },
+    ]));
+
+    const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
+    await checkOrphanedReviewStatuses();
+
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3002', expect.objectContaining({ reviewStatus: 'pending' }));
+  });
+
+  it('recovers reviewing after the hard watchdog deadline despite fresh agent activity', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-07T01:00:00.000Z'));
+    const raw = status({
+      issueId: 'PAN-3002',
+      reviewSpawnedAt: Date.parse('2026-07-07T00:00:00.000Z'),
+      updatedAt: '2026-07-07T00:55:00.000Z',
+    });
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
+    mocks.getReviewStatusSync.mockReturnValue(raw);
+    mocks.listRunningAgents.mockReturnValue(Effect.succeed([
+      { id: 'agent-pan-3002-review', issueId: 'PAN-3002', role: 'review', status: 'running', lastActivity: '2026-07-07T00:59:00.000Z' },
+    ]));
+
+    const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
+    await checkOrphanedReviewStatuses();
+
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3002', expect.objectContaining({ reviewStatus: 'pending' }));
+  });
+
+  it('recovers reviewing when a verification failure separately marked the issue stuck', async () => {
+    const raw = status({
+      issueId: 'PAN-3002',
+      stuck: true,
+      stuckReason: 'verification_stuck',
+    });
+    mocks.loadReviewStatuses.mockReturnValue({ 'PAN-3002': raw });
+    mocks.getReviewStatusSync.mockReturnValue(raw);
+
+    const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
+    await checkOrphanedReviewStatuses();
+
+    expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3002', expect.objectContaining({ reviewStatus: 'pending' }));
   });
 
   it('reconciles a journaled passed test verdict and does not spawn a fresh test', async () => {

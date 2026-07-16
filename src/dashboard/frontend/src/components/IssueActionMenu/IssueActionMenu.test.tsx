@@ -71,7 +71,7 @@ function mockFetch() {
       return Response.json({ csrfToken: 'test-csrf-token' });
     }
     if (url.includes('/planning-state')) {
-      return Response.json({ hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false });
+      return Response.json({ hasPlan: false, hasTasks: false, tasksCount: 0, planningComplete: false });
     }
     if (url.includes('/api/workspaces/')) {
       return Response.json({ exists: true, issueId: 'PAN-1', path: '/tmp/pan-1' });
@@ -135,16 +135,16 @@ describe('IssueActionMenu', () => {
     expect(within(menu).queryByTestId('issue-action-destroyWorkspace')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-reopen')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-syncMain')).not.toBeInTheDocument();
-    expect(within(menu).queryByTestId('issue-action-inspectBead')).not.toBeInTheDocument();
+    expect(within(menu).queryByTestId('issue-action-inspectTask')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-open')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
   });
 
   it('renders hybrid primary actions plus overflow actions', () => {
-    mockStore({ currentIssue: issue({ hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent() });
+    mockStore({ currentIssue: issue({ hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent() });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/planning-state')) return Response.json({ hasPlan: true, hasBeads: true, beadsCount: 2, planningComplete: true });
+      if (url.includes('/planning-state')) return Response.json({ hasPlan: true, hasTasks: true, tasksCount: 2, planningComplete: true });
       if (url.includes('/api/workspaces/')) return Response.json({ exists: true, issueId: 'PAN-1', path: '/tmp/pan-1' });
       if (url.includes('/has-session')) return Response.json({ lifecycle: { canResumeSession: false } });
       return Response.json({ success: true });
@@ -154,7 +154,7 @@ describe('IssueActionMenu', () => {
 
     expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    expect(screen.getByTestId('issue-action-beads')).toHaveTextContent('Beads');
+    expect(screen.getByTestId('issue-action-tasks')).toHaveTextContent('Tasks');
   });
 
   it('pins requested actions after a flex spacer', () => {
@@ -199,6 +199,26 @@ describe('IssueActionMenu', () => {
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/reset', expect.objectContaining({ method: 'POST' }));
     });
+  });
+
+  it('runs the safe post-planning reset through its distinct endpoint', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({ currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }) });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-resetToPlanned'));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent('clears task progress and claims');
+
+    const confirmButton = screen.getByRole('button', { name: 'Reset to planned' });
+    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Reset to planned' } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/issues/PAN-1/reset-to-planned',
+      expect.objectContaining({ method: 'POST' }),
+    ));
   });
 
   it('renders disabled actions with a tooltip reason', () => {
@@ -255,7 +275,7 @@ describe('IssueActionMenu', () => {
   it('disables the open action with a no-workspace tooltip', () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/planning-state')) return Response.json({ hasPlan: false, hasBeads: false, beadsCount: 0, planningComplete: false });
+      if (url.includes('/planning-state')) return Response.json({ hasPlan: false, hasTasks: false, tasksCount: 0, planningComplete: false });
       if (url.includes('/api/workspaces/')) return Response.json({ exists: false, issueId: 'PAN-1' });
       return Response.json({ success: true });
     }));
@@ -288,28 +308,28 @@ describe('IssueActionMenu', () => {
     });
   });
 
-  it('opens the inspect bead dialog and posts the selected bead id', async () => {
+  it('opens the inspect task dialog and posts the selected task id', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf-token' });
-      if (url === '/api/issues/PAN-1/beads' && !init?.method) {
-        return Response.json({ tasks: [{ id: 'bead-1', title: 'First bead', status: 'open' }], count: 1, workspacePath: '/tmp/pan-1' });
+      if (url === '/api/issues/PAN-1/tasks' && !init?.method) {
+        return Response.json({ tasks: [{ id: 'task-1', title: 'First task', status: 'open' }], count: 1, workspacePath: '/tmp/pan-1' });
       }
       return Response.json({ success: true });
     });
     vi.stubGlobal('fetch', fetchMock);
-    mockStore({ currentIssue: issue({ hasPlan: true, hasBeads: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'stopped' }) });
+    mockStore({ currentIssue: issue({ hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent({ status: 'stopped' }) });
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    fireEvent.click(screen.getByTestId('issue-action-inspectBead'));
+    fireEvent.click(screen.getByTestId('issue-action-inspectTask'));
 
-    expect(await screen.findByRole('dialog', { name: 'Inspect bead' })).toBeInTheDocument();
-    expect(await screen.findByLabelText('Bead to inspect')).toHaveValue('bead-1');
-    fireEvent.click(screen.getByRole('button', { name: 'Inspect bead' }));
+    expect(await screen.findByRole('dialog', { name: 'Inspect task' })).toBeInTheDocument();
+    expect(await screen.findByLabelText('Task to inspect')).toHaveValue('task-1');
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect task' }));
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/beads/bead-1/inspect', expect.objectContaining({
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/tasks/task-1/inspect', expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ deep: false }),
       }));

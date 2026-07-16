@@ -59,7 +59,7 @@ function hasAdmittedArtifactSignal(feature: ProjectFeature): boolean {
   if (details?.branchAheadOfMain) return true;
   if (details?.conversations && details.conversations.length > 0) return true;
 
-  const totals = feature.beadTotals;
+  const totals = feature.taskTotals;
   if (totals) {
     if (totals.inProgress > 0) return true;
     if (totals.closed > 0 && totals.closed < totals.total) return true;
@@ -73,13 +73,13 @@ function featureLastActivity(feature: ProjectFeature, reviewStatus: ReviewStatus
     .map(iso => new Date(iso!).getTime())
     .filter(t => !Number.isNaN(t));
   const reviewTime = reviewStatus?.updatedAt ? new Date(reviewStatus.updatedAt).getTime() : NaN;
-  const beadUpdated = feature.beadTotals?.lastUpdated
-    ? new Date(feature.beadTotals.lastUpdated).getTime()
+  const taskUpdated = feature.taskTotals?.lastUpdated
+    ? new Date(feature.taskTotals.lastUpdated).getTime()
     : NaN;
   const times = [
     ...sessionTimes,
     ...(Number.isNaN(reviewTime) ? [] : [reviewTime]),
-    ...(Number.isNaN(beadUpdated) ? [] : [beadUpdated]),
+    ...(Number.isNaN(taskUpdated) ? [] : [taskUpdated]),
   ];
   return times.length > 0 ? Math.max(...times) : 0;
 }

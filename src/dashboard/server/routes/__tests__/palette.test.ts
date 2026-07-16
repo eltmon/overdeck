@@ -37,7 +37,7 @@ import { listProjectsSync } from '../../../../lib/projects.js';
 import { indexConversationFile } from '../../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../../lib/database/conversation-embeddings-db.js';
 import { closeConversationSearchService } from '../../services/conversation-search-service.js';
-import { runPaletteSearch } from '../palette.js';
+import { PAN_COMMANDS, runPaletteSearch } from '../palette.js';
 
 let tmpDir: string | undefined;
 
@@ -69,6 +69,12 @@ function jsonlMessage(role: string, text: string): string {
 }
 
 describe('palette conversation search', () => {
+  it('offers reset-to-planned in the command palette', () => {
+    expect(PAN_COMMANDS).toContainEqual(expect.objectContaining({
+      name: 'pan reset-to-planned <id>',
+    }));
+  });
+
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-palette-search-'));
     vi.mocked(listProjectsSync).mockReturnValue([]);

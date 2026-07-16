@@ -71,8 +71,6 @@ export interface AgentEnrichment {
   pendingInputCount: number
   pendingInputKinds: PendingInputKind[]
   pendingAskUserQuestion?: PendingAskUserQuestionSnapshot
-  /** FR-1 — plan markdown for a pending ExitPlanMode, for the approval modal. */
-  pendingProposedPlan?: PendingProposedPlanSnapshot
   resolution: string
   resolutionCount: number
 }
@@ -251,31 +249,22 @@ async function readFileTail(filePath: string, maxBytes: number): Promise<string>
  * deny verdict with this reason string. When we see a tool_result whose content
  * matches this, treat it as a "still pending" — the operator has NOT actually
  * answered; the upstream tool was denied to force a plain-text restate.
- *
- * Two signals are accepted, because each has failed alone: the literal
- * "PAN-1520" marker (dropped once in a hook rewording, which silently killed
- * all AUQ detection — no modal, no notification — until 2026-07-13), and the
- * stable deny phrase (survives marker loss; the marker survives phrase
- * rewording). Change the hook's REASON only in lockstep with these.
  */
 const ASK_USER_QUESTION_HOOK_DENY_MARKER = 'PAN-1520'
-const ASK_USER_QUESTION_HOOK_DENY_PHRASE = 'surfaced to the operator in the Overdeck dashboard'
+const ASK_USER_QUESTION_HOOK_DENY_PHRASE = 'surfaced to the operator'
 
-function isHookDenyText(text: string): boolean {
-  return text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER)
-    || text.includes(ASK_USER_QUESTION_HOOK_DENY_PHRASE)
-}
+function askUserQuestionDenySignalPresent(content: unknown): boolean {
+  const checkString = (text: string) =>
+    text.includes(ASK_USER_QUESTION_HOOK_DENY_MARKER) ||
+    text.includes(ASK_USER_QUESTION_HOOK_DENY_PHRASE)
 
-function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
-  if (item.is_error !== true) return false
-  const content = item.content
-  if (typeof content === 'string') return isHookDenyText(content)
+  if (typeof content === 'string') return checkString(content)
   if (Array.isArray(content)) {
     return content.some((part: unknown) => {
-      if (typeof part === 'string') return isHookDenyText(part)
+      if (typeof part === 'string') return checkString(part)
       if (part && typeof part === 'object' && 'text' in part) {
         const text = (part as { text?: unknown }).text
-        return typeof text === 'string' && isHookDenyText(text)
+        return typeof text === 'string' && checkString(text)
       }
       return false
     })
@@ -283,20 +272,14 @@ function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error
   return false
 }
 
+function isAskUserQuestionHookDenyToolResult(item: { content?: unknown; is_error?: unknown }): boolean {
+  if (item.is_error !== true) return false
+  return askUserQuestionDenySignalPresent(item.content)
+}
+
 async function getPendingQuestionsPromise(jsonlPath: string): Promise<PendingQuestion[]> {
   const detection = await scanPendingInputsPromise(jsonlPath)
   return detection.askUserQuestions
-}
-
-/**
- * PAN-1520 (FR-1) — the pending plan payload. Parsed from the outstanding
- * ExitPlanMode tool_use's `input.plan` so the dashboard can render the plan
- * markdown in an approval modal instead of only the terminal.
- */
-export interface PendingProposedPlanSnapshot {
-  readonly toolUseId: string
-  readonly askedAt: string
-  readonly plan: string
 }
 
 export interface PendingInputsScan {
@@ -306,7 +289,7 @@ export interface PendingInputsScan {
   /** Outstanding ExitPlanMode tool_use without a matching tool_result (operator approval pending). */
   readonly exitPlanModePending: boolean
   /** Payload for the outstanding ExitPlanMode, when its plan text is available. */
-  readonly pendingProposedPlan?: PendingProposedPlanSnapshot
+  readonly pendingProposedPlan?: { toolUseId: string; askedAt: string; plan: string }
 }
 
 /**
@@ -349,8 +332,9 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
     // plain text. The next user-text turn resolves all of them.
     const askDeniedAwaitingUser = new Set<string>()
     const exitPlanModeIds = new Set<string>()
-    const exitPlanModeCalls = new Map<string, { plan: string; timestamp: string }>()
     const exitPlanModeAnswered = new Set<string>()
+    const exitPlanModeCalls = new Map<string, { timestamp: string; plan: string }>()
+    let pendingExitPlanId: string | undefined
     const enterPlanModeIds = new Set<string>()
     const exitPlanModeFiredAfterEnter = new Set<string>() // tracks any ExitPlanMode (signals plan-mode session ended)
 
@@ -380,12 +364,9 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
             } else if (item.name === 'ExitPlanMode' && typeof item.id === 'string') {
               exitPlanModeIds.add(item.id)
               exitPlanModeFiredAfterEnter.add(item.id)
-              if (typeof item.input?.plan === 'string' && item.input.plan.trim()) {
-                exitPlanModeCalls.set(item.id, {
-                  plan: item.input.plan,
-                  timestamp: entry.timestamp || new Date().toISOString(),
-                })
-              }
+              const planText = typeof item.input?.plan === 'string' ? item.input.plan : ''
+              exitPlanModeCalls.set(item.id, { timestamp: entry.timestamp || new Date().toISOString(), plan: planText })
+              pendingExitPlanId = item.id
             } else if (item.name === 'EnterPlanMode' && typeof item.id === 'string') {
               enterPlanModeIds.add(item.id)
             }
@@ -413,14 +394,15 @@ export async function scanPendingInputsPromise(jsonlPath: string): Promise<Pendi
       .filter(([id]) => !askAnswered.has(id))
       .map(([, question]) => question)
 
-    const pendingExitPlanId = Array.from(exitPlanModeIds).find(id => !exitPlanModeAnswered.has(id))
-    const exitPlanModePending = pendingExitPlanId !== undefined
+    const exitPlanModePending = Array.from(exitPlanModeIds).some(id => !exitPlanModeAnswered.has(id))
 
     // FR-1 — carry the plan payload so the dashboard can promote it to an
     // approval modal (instead of the plan being visible only in the terminal).
-    const pendingCall = pendingExitPlanId ? exitPlanModeCalls.get(pendingExitPlanId) : undefined
-    const pendingProposedPlan: PendingProposedPlanSnapshot | undefined = pendingExitPlanId && pendingCall
-      ? { toolUseId: pendingExitPlanId, askedAt: pendingCall.timestamp, plan: pendingCall.plan }
+    const pendingCall = pendingExitPlanId && !exitPlanModeAnswered.has(pendingExitPlanId)
+      ? exitPlanModeCalls.get(pendingExitPlanId)
+      : undefined
+    const pendingProposedPlan = pendingCall
+      ? { toolUseId: pendingExitPlanId!, askedAt: pendingCall.timestamp, plan: pendingCall.plan }
       : undefined
 
     // EnterPlanMode is "open" only if no ExitPlanMode has fired since the last
@@ -471,7 +453,6 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   let pendingQuestions: PendingQuestion[] = []
   let enterPlanModeOpen = false
   let exitPlanModePending = false
-  let scannedProposedPlan: PendingProposedPlanSnapshot | undefined
   if (!skipJsonlScan) {
     const jsonlPath = await Effect.runPromise(getAgentJsonlPath(agentId))
     if (jsonlPath) {
@@ -479,7 +460,6 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
       pendingQuestions = [...scan.askUserQuestions]
       enterPlanModeOpen = scan.enterPlanModeOpen
       exitPlanModePending = scan.exitPlanModePending
-      scannedProposedPlan = scan.pendingProposedPlan
     }
     if (pendingQuestions.length > 0 && startedAt) {
       const agentStartTime = new Date(startedAt).getTime()
@@ -554,9 +534,6 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     // PAN-1834 — also promote pane-detected rate-limit / model-switch modals.
     appendPaneDetectionKind(detection, pendingInputKinds)
   }
-  const pendingProposedPlan = !shouldSuppressPendingInput && exitPlanModePending
-    ? scannedProposedPlan
-    : undefined
 
   return {
     role,
@@ -567,7 +544,6 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     pendingInputCount: pendingInputKinds.length,
     pendingInputKinds,
     pendingAskUserQuestion,
-    pendingProposedPlan,
     resolution: runtimeState?.resolution || 'working',
     resolutionCount: runtimeState?.resolutionCount || 0,
   }

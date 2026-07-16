@@ -49,12 +49,26 @@ vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
   deepWipe: mockDeepWipe,
 }));
 
+// ─── Mock vBRIEF plan reader ─────────────────────────────────────────────────
+
+const mockReadWorkspacePlanSync = vi.fn();
+vi.mock('../../../../lib/vbrief/io.js', () => ({
+  readWorkspacePlanSync: mockReadWorkspacePlanSync,
+}));
+
 // ─── Mock projects ────────────────────────────────────────────────────────────
 
 const mockResolveProjectFromIssue = vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' });
 vi.mock('../../../../lib/projects.js', () => ({
+  findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+  listProjectsSync: vi.fn(() => [{ key: 'myapp', config: { path: '/projects/myapp', name: 'myapp' } }]),
   resolveProjectFromIssue: mockResolveProjectFromIssue,
   resolveProjectFromIssueSync: mockResolveProjectFromIssue,
+  findProjectByPathSync: vi.fn().mockReturnValue({ path: '/projects/myapp', name: 'myapp' }),
+}));
+
+vi.mock('../../../../lib/vbrief/io.js', () => ({
+  readWorkspacePlanSync: vi.fn().mockReturnValue({ plan: { items: [{ id: 'item-1' }] } }),
 }));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -81,6 +95,7 @@ describe('AgentSpawner — integration', () => {
     vi.clearAllMocks();
     mockExistsSync.mockReturnValue(true);
     mockGetAgentState.mockReturnValue(Effect.succeed(null));
+    mockReadWorkspacePlanSync.mockReturnValue({ plan: { items: [{ id: 'wi-1' }] } });
     mockSpawnAgent.mockResolvedValue({ id: 'pan-1', issueId: 'PAN-1' });
     mockStopAgent.mockReturnValue(undefined);
     mockMessageAgent.mockResolvedValue(undefined);

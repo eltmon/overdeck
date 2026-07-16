@@ -612,7 +612,7 @@ export function AgentStepRow({
   }, [issueId, onAction]);
 
   const restartLabel = session.type === 'review' || session.type === 'reviewer'
-    ? 'Restart review'
+    ? 'Re-run review on latest commit'
     : !isLive ? 'Start' : undefined;
 
   const lastHeardLabel = lastActivity ? formatRelativeTime(lastActivity, new Date()) : undefined;

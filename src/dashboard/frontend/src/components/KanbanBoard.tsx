@@ -23,7 +23,7 @@ import { BulkCloseOutProgress, type BulkCloseResult } from './BulkCloseOutProgre
 import { useWorkspaceStackHealthQuery } from './CommandDeck/ZoneCOverviewTabs/queries';
 import {
   AgentWarningDialog,
-  BeadsDialog,
+  TasksDialog,
   SyncPromptDialog,
   UndoToast,
 } from './KanbanBoard/dialogs';
@@ -95,8 +95,8 @@ interface KanbanBoardProps {
   onBulkToggle?: (issueId: string) => void;
   onBulkSelectAll?: (issueIds: string[]) => void;
   onBulkDeselectAll?: (issueIds: string[]) => void;
+  keyboardShortcutsDisabled?: boolean; // PAN-1234: suppress j/k/Enter while palette/search is open
 }
-
 // Undo history entry
 interface UndoEntry {
   issueId: string;
@@ -105,9 +105,11 @@ interface UndoEntry {
   timestamp: number;
 }
 
-export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange, bulkSelectedIds, onBulkToggle, onBulkSelectAll, onBulkDeselectAll }: KanbanBoardProps) {
+export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssue: externalOnSelectIssue, onPlanDialogChange, bulkSelectedIds, onBulkToggle, onBulkSelectAll, onBulkDeselectAll, keyboardShortcutsDisabled = false }: KanbanBoardProps) {
   const queryClient = useQueryClient();
   const [internalSelectedIssue, setInternalSelectedIssue] = useState<string | null>(null);
+  // PAN-1234: keyboard navigation focus target on the Board lens.
+  const [focusedIssueId, setFocusedIssueId] = useState<string | null>(null);
   const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set()); // Empty = all projects
   const [planDialogIssue, setPlanDialogIssue] = useState<Issue | null>(null); // Lifted dialog state
   const [planDialogAutoStart, setPlanDialogAutoStart] = useState(false);
@@ -120,7 +122,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
   useEffect(() => {
     onPlanDialogChange?.(planDialogIssue?.identifier ?? null);
   }, [planDialogIssue, onPlanDialogChange]);
-  const [beadsDialogIssue, setBeadsDialogIssue] = useState<Issue | null>(null); // Beads viewer
+  const [tasksDialogIssue, setTasksDialogIssue] = useState<Issue | null>(null); // Tasks viewer
   const [vbriefDialogIssue, setVbriefDialogIssue] = useState<Issue | null>(null); // vBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
@@ -546,7 +548,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     for (const issue of filteredIssues) {
       map[issue.identifier] = {
         hasPlan: issue.hasPlan ?? false,
-        hasBeads: issue.hasBeads ?? false,
+        hasTasks: issue.hasTasks ?? false,
         planningComplete: issue.planningComplete ?? false,
       };
     }
@@ -587,6 +589,99 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
       .flatMap((status) => sortedGrouped[status].map((issue) => issue.identifier));
   }, [cycleFilter, sortedGrouped]);
   const stackHealthByIssue = useWorkspaceStackHealthQuery(kanbanIssueIds).data?.workspaces ?? {};
+
+  // PAN-1234: board-view keyboard navigation state (j/k across columns).
+  const isBoardView = cycleFilter !== 'all' && cycleFilter !== 'backlog' && cycleFilter !== 'canceled';
+  const boardColumns = useMemo(() => {
+    if (!isBoardView) return [];
+    return STATUS_ORDER
+      .filter((status) => status !== 'backlog')
+      .map((status) => sortedGrouped[status].map((issue) => issue.identifier));
+  }, [isBoardView, sortedGrouped]);
+  const boardFlatIds = useMemo(() => boardColumns.flat(), [boardColumns]);
+
+  // Drop focus when the focused card leaves the board or the lens changes.
+  useEffect(() => {
+    if (focusedIssueId && !boardFlatIds.includes(focusedIssueId)) {
+      setFocusedIssueId(null);
+    }
+  }, [boardFlatIds, focusedIssueId]);
+
+  useEffect(() => {
+    if (!isBoardView) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (keyboardShortcutsDisabled) return;
+      const target = e.target as HTMLElement;
+      const inInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      if (inInput || e.defaultPrevented) return;
+      if (e.key !== 'j' && e.key !== 'k' && e.key !== 'Enter') return;
+
+      if (e.key === 'Enter') {
+        if (focusedIssueId && externalOnSelectIssue) {
+          e.preventDefault();
+          externalOnSelectIssue(focusedIssueId);
+        }
+        return;
+      }
+
+      e.preventDefault();
+
+      if (boardFlatIds.length === 0) return;
+
+      if (!focusedIssueId) {
+        setFocusedIssueId(e.key === 'j' ? boardFlatIds[0] : boardFlatIds[boardFlatIds.length - 1]);
+        return;
+      }
+
+      // Locate current column/row.
+      let colIndex = -1;
+      let rowIndex = -1;
+      for (let c = 0; c < boardColumns.length; c += 1) {
+        const r = boardColumns[c].indexOf(focusedIssueId);
+        if (r !== -1) {
+          colIndex = c;
+          rowIndex = r;
+          break;
+        }
+      }
+      if (colIndex === -1) {
+        setFocusedIssueId(e.key === 'j' ? boardFlatIds[0] : boardFlatIds[boardFlatIds.length - 1]);
+        return;
+      }
+
+      if (e.key === 'j') {
+        if (rowIndex + 1 < boardColumns[colIndex].length) {
+          setFocusedIssueId(boardColumns[colIndex][rowIndex + 1]);
+          return;
+        }
+        for (let c = colIndex + 1; c < boardColumns.length; c += 1) {
+          if (boardColumns[c].length > 0) {
+            setFocusedIssueId(boardColumns[c][0]);
+            return;
+          }
+        }
+        // At last card — stay put.
+        return;
+      }
+
+      // e.key === 'k'
+      if (rowIndex - 1 >= 0) {
+        setFocusedIssueId(boardColumns[colIndex][rowIndex - 1]);
+        return;
+      }
+      for (let c = colIndex - 1; c >= 0; c -= 1) {
+        if (boardColumns[c].length > 0) {
+          setFocusedIssueId(boardColumns[c][boardColumns[c].length - 1]);
+          return;
+        }
+      }
+      // At first card — stay put.
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isBoardView, boardColumns, boardFlatIds, focusedIssueId, externalOnSelectIssue, keyboardShortcutsDisabled]);
 
   return (
     <div className="space-y-4">
@@ -774,10 +869,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     issueCosts={issueCosts}
                     costsLoading={costsLoading}
                     selectedIssue={selectedIssue}
+                    focusedIssueId={focusedIssueId}
                     onSelectIssue={onSelectIssue}
                     onOpenIssue={openIssue}
                     onPlan={openPlanDialog}
-                    onViewBeads={setBeadsDialogIssue}
+                    onViewTasks={setTasksDialogIssue}
                     onViewVBrief={setVbriefDialogIssue}
                     collapsedFeatures={collapsedFeatures}
                     onToggleFeature={toggleFeature}
@@ -841,11 +937,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         />
       )}
 
-      {/* Beads Dialog - view tasks for issue */}
-      {beadsDialogIssue && (
-        <BeadsDialog
-          issue={beadsDialogIssue}
-          onClose={() => setBeadsDialogIssue(null)}
+      {/* Tasks Dialog - view tasks for issue */}
+      {tasksDialogIssue && (
+        <TasksDialog
+          issue={tasksDialogIssue}
+          onClose={() => setTasksDialogIssue(null)}
         />
       )}
 

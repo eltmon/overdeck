@@ -21,6 +21,6 @@ import { listProjectsSync, type ProjectConfig } from './projects.js';
 export function projectKey(project: ProjectConfig, explicit?: string): string {
   if (explicit) return explicit;
   const projectPath = resolve(project.path);
-  const match = listProjectsSync().find(({ config }) => resolve(config.path) === projectPath);
+  const match = (listProjectsSync() ?? []).find(({ config }) => resolve(config.path) === projectPath);
   return match?.key ?? basename(projectPath);
 }

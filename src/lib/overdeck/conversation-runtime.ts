@@ -289,7 +289,11 @@ export async function waitForTmuxSession(sessionName: string, timeoutMs = 30000)
   }
   throw new Error(`Timed out waiting for tmux session ${sessionName}`);
 }
-function shouldUseSupervisorForConversation(harness: RuntimeName): boolean {
+export function shouldUseSupervisorForConversation(
+  harness: RuntimeName,
+  options: { codexTransport?: 'app-server' | 'tui' } = {},
+): boolean {
+  if (harness === 'codex' && options.codexTransport === 'app-server') return false;
   return getHarnessBehavior(harness).supportsPtySupervisor && process.env.OVERDECK_DOCKER_WORKSPACE !== '1' && process.env.PAN_DOCKER !== '1';
 }
 export async function waitForConversationRuntimeReady(tmuxSession: string, harness: RuntimeName, mode: 'spawn' | 'respawn'): Promise<void> {
@@ -522,11 +526,12 @@ export async function spawnConversationSession(
   } | undefined;
   let codexFields: {
     harness: 'codex';
-    codexMode: 'tui';
+    codexMode: 'app-server' | 'tui';
     codexHome: string;
     codexSessionDir: string;
     resumeSessionId?: string;
   } | undefined;
+  let codexTransport: 'app-server' | 'tui' | undefined;
   if (model) {
     if (!SAFE_MODEL_PATTERN.test(model)) {
       throw new Error('Invalid model name');
@@ -564,7 +569,9 @@ export async function spawnConversationSession(
       };
     } else if (behavior.usesCodexHome) {
       const codexHome = join(getOverdeckHome(), 'agents', tmuxSession, 'codex-home');
-      const codexPermMode = loadConfigSync().config.codex?.permissionMode ?? 'workspace';
+      const codexConfig = loadConfigSync().config.codex;
+      const codexPermMode = codexConfig?.permissionMode ?? 'workspace';
+      codexTransport = codexConfig?.transport ?? 'app-server';
       const codexApprovalPolicy = codexPermMode === 'full-access' ? 'never' : 'on-request';
       const codexSandboxMode =
         codexPermMode === 'full-access' ? 'danger-full-access'
@@ -584,7 +591,7 @@ export async function spawnConversationSession(
         : undefined;
       codexFields = {
         harness: 'codex',
-        codexMode: 'tui',
+        codexMode: codexTransport,
         codexHome,
         codexSessionDir: join(codexHome, 'sessions'),
         resumeSessionId,
@@ -599,7 +606,7 @@ export async function spawnConversationSession(
   if (effort && !SAFE_EFFORT_PATTERN.test(effort)) {
     throw new Error('Invalid effort level');
   }
-  const useSupervisor = shouldUseSupervisorForConversation(harness);
+  const useSupervisor = shouldUseSupervisorForConversation(harness, { codexTransport });
   let supervisorScriptPath: string | undefined;
   if (useSupervisor) {
     supervisorScriptPath = resolvePtySupervisorScriptPath();
@@ -685,7 +692,7 @@ export async function spawnConversationSession(
   if (useSupervisor) {
     await waitForPtySupervisorSocket(tmuxSession);
   }
-  if (behavior.usesCodexHome && codexFields?.codexHome) {
+  if (behavior.usesCodexHome && codexFields?.codexHome && codexTransport === 'tui') {
     const codexHomeDir = codexFields.codexHome;
     void (async () => {
       try {

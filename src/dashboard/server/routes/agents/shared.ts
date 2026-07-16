@@ -13,8 +13,10 @@ import type { AgentStatus } from '@overdeck/contracts';
 import { jsonResponse } from '../../http-helpers.js';
 import { getHeaderFromMap } from '../origin-validation.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
+import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import {
   getAgentDir,
+  getLatestSessionIdSync,
   normalizeAgentId,
   type AgentRuntimeState,
   type AgentState,
@@ -83,7 +85,8 @@ export async function spawnPanCommandDetached(input: {
   await mkdir(agentDir, { recursive: true });
   const spawnLogPath = join(agentDir, 'spawn.log');
   const spawnLogHandle = await open(spawnLogPath, 'a');
-  const child = spawn('pan', args, {
+  const invocation = panCliInvocation(args);
+  const child = spawn(invocation.command, invocation.args, {
     cwd,
     detached: true,
     stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
@@ -314,7 +317,11 @@ function buildStoppedAgentLifecycle(
   const agentId = normalizeAgentId(agentOrIssueId);
   const hasAgentState = true;
   const hasLiveTmuxSession = false;
-  const hasSavedSession = !!runtimeData.claudeSessionId;
+  // claudeSessionId only covers claude-code agents — codex agents keep their
+  // resumable thread in codex-thread-id, which getLatestSessionIdSync resolves
+  // (PAN-1988). Without the fallback the listing reports canResumeSession=false
+  // for every stopped codex agent and the UI never offers Resume.
+  const hasSavedSession = !!runtimeData.claudeSessionId || !!getLatestSessionIdSync(agentId);
   const hasWorkspace = typeof state.workspace === 'string' && state.workspace.length > 0;
   const agentStatus = state.status || 'unknown';
   const runtime = runtimeData.state || 'uninitialized';

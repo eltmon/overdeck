@@ -28,7 +28,6 @@ import { EventStoreService } from '../../services/domain-services.js';
 import { getReviewStatusSync, type ReviewStatus } from '../../../../lib/review-status.js';
 import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
-import { restoreTrackedBeadsExport } from '../../../../lib/beads-restore.js';
 import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
 import { jsonResponse } from '../../http-helpers.js';
@@ -77,10 +76,6 @@ async function getDirtyWorkspaceErrorForReviewRequest(
   workspaceInfo: WorkspaceInfo,
 ): Promise<string | null> {
   try {
-    if (!workspaceInfo.isRemote) {
-      await Effect.runPromise(restoreTrackedBeadsExport(workspacePath));
-    }
-
     const statusCmd = 'git status --porcelain -uno';
     const status = workspaceInfo.isRemote && workspaceInfo.vmName
       ? (await execAsync(
@@ -459,9 +454,6 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         }
         const workspacePathRerun = wsInfoRerun.localPath || join(projectPathRerun, 'workspaces', `feature-${issueLowerRerun}`);
 
-        if (!wsInfoRerun.isRemote) {
-          yield* restoreTrackedBeadsExport(workspacePathRerun);
-        }
         const dirtyError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePathRerun, wsInfoRerun));
         if (dirtyError) {
           console.log(`[request-review] Rejecting ${issueId}: dirty workspace on rerun path`);
@@ -644,10 +636,6 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
         { success: false, error: 'Workspace does not exist' },
         { status: 400 }
       );
-    }
-
-    if (!workspaceInfo.isRemote) {
-      yield* restoreTrackedBeadsExport(workspacePath);
     }
 
     const dirtyWorkspaceError = yield* Effect.promise(() => getDirtyWorkspaceErrorForReviewRequest(workspacePath, workspaceInfo));

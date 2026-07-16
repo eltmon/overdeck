@@ -19,7 +19,6 @@ export const STATE_BRANCH_PATHS = [
   'feedback/',
   'backlog/',
   'notes/',
-  '.beads/',
 ] as const;
 
 export type StateBranchPath = typeof STATE_BRANCH_PATHS[number];
@@ -30,10 +29,10 @@ export const STATE_PLANE_PATHS = [
   '.pan/continue.json',
   // The policy path-includes .pan/specs/; callers must still scope this to status-field flips.
   '.pan/specs/',
-  '.beads/',
   '.pan/test/',
   '.pan/review/',
   '.pan/feedback/',
+  '.tasks/',
 ] as const;
 
 export type StatePlanePath = typeof STATE_PLANE_PATHS[number];

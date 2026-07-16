@@ -285,7 +285,7 @@ export function writeSpecForIssue(
       subject: `chore(state): update spec for ${doc.plan.id.toUpperCase()} (status=${status})`,
     })
     const flushed = yield* flushAutoCommits(projectRoot)
-    if (flushed.pushed === false) {
+    if (flushed.errored || flushed.pushed === false) {
       return yield* Effect.fail(new FsError({
         path,
         operation: 'pushSpec',
@@ -326,7 +326,7 @@ export function updateSpecStatus(
       subject: `chore(state): update spec for ${issueId.toUpperCase()} (status=${newStatus})`,
     })
     const flushed = yield* flushAutoCommits(projectRoot)
-    if (flushed.pushed === false) {
+    if (flushed.errored || flushed.pushed === false) {
       return yield* Effect.fail(new FsError({
         path: existing.path,
         operation: 'pushSpecStatus',
@@ -339,5 +339,39 @@ export function updateSpecStatus(
       status: newStatus,
       document: nextDocument,
     }
+  })
+}
+
+/**
+ * Overwrite an existing spec file's full document and commit+push through the
+ * door. Use this — never bare `writeSpec` — when rewriting an existing spec at
+ * a known path (e.g. re-promoting a workspace plan). `writeSpec` only queues a
+ * deferred auto-commit; without the flush a short-lived process exits and
+ * strands the spec as a dirty state-worktree file (PAN-2677). Mirrors
+ * `writeSpecForIssue`/`updateSpecStatus`: fails loudly if a configured origin
+ * did not accept the push.
+ */
+export function writeSpecDocument(
+  projectRoot: string,
+  path: string,
+  doc: PanSpecDocument,
+): Effect.Effect<void, FsError> {
+  return Effect.gen(function* () {
+    yield* writeSpec(path, doc)
+    const issueId = (doc as { plan?: { id?: string } }).plan?.id ?? 'unknown'
+    queueAutoCommit({
+      projectRoot,
+      paths: [path],
+      subject: `chore(state): update spec for ${String(issueId).toUpperCase()} (status=${doc.status})`,
+    })
+    const flushed = yield* flushAutoCommits(projectRoot)
+    if (flushed.errored || flushed.pushed === false) {
+      return yield* Effect.fail(new FsError({
+        path,
+        operation: 'pushSpec',
+        cause: new Error(flushed.reason ?? 'spec commit was not pushed'),
+      }))
+    }
+    invalidateVBriefIndex(projectRoot)
   })
 }

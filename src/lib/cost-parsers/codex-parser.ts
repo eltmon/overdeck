@@ -2,7 +2,7 @@
  * Codex CLI rollout JSONL parser (PAN-1574).
  *
  * Codex sessions (D-7 external store) live at:
- *   $CODEX_HOME/sessions/YYYY/MM/DD/rollout-<uuid>-<threadId>.jsonl
+ *   $CODEX_HOME/sessions/YYYY/MM/DD/rollout-<timestamp>-<threadId>.jsonl
  *
  * Two JSONL schemas exist — rollout-file and --json stdout — with different
  * event names. This parser handles the ROLLOUT-FILE schema:

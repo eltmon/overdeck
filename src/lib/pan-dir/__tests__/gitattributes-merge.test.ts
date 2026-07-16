@@ -24,29 +24,29 @@ function initRepo(dir: string) {
  * Returns the post-merge file contents and whether the merge exited cleanly.
  */
 function setupDivergentMerge(dir: string, useUnionAttr: boolean) {
-  mkdirSync(join(dir, '.beads'), { recursive: true });
+  mkdirSync(join(dir, '.tasks'), { recursive: true });
 
   if (useUnionAttr) {
-    writeFileSync(join(dir, '.gitattributes'), '.beads/issues.jsonl merge=union\n');
+    writeFileSync(join(dir, '.gitattributes'), '.tasks/issues.jsonl merge=union\n');
     execSync('git add .gitattributes', { cwd: dir });
   }
 
   // Initial commit: shared base with one entry
-  writeFileSync(join(dir, '.beads', 'issues.jsonl'), '{"id":"base"}\n');
-  execSync('git add .beads/issues.jsonl', { cwd: dir });
+  writeFileSync(join(dir, '.tasks', 'issues.jsonl'), '{"id":"base"}\n');
+  execSync('git add .tasks/issues.jsonl', { cwd: dir });
   execSync('git commit -q -m "init" --allow-empty', { cwd: dir });
   execSync('git branch -M main', { cwd: dir });
 
   // Branch A: append a second entry from one side
   execSync('git checkout -q -b branch-a', { cwd: dir });
-  writeFileSync(join(dir, '.beads', 'issues.jsonl'), '{"id":"base"}\n{"id":"side-a"}\n');
-  execSync('git add .beads/issues.jsonl', { cwd: dir });
+  writeFileSync(join(dir, '.tasks', 'issues.jsonl'), '{"id":"base"}\n{"id":"side-a"}\n');
+  execSync('git add .tasks/issues.jsonl', { cwd: dir });
   execSync('git commit -q -m "append side-a"', { cwd: dir });
 
   // Back to main: append a different entry from the other side
   execSync('git checkout -q main', { cwd: dir });
-  writeFileSync(join(dir, '.beads', 'issues.jsonl'), '{"id":"base"}\n{"id":"side-b"}\n');
-  execSync('git add .beads/issues.jsonl', { cwd: dir });
+  writeFileSync(join(dir, '.tasks', 'issues.jsonl'), '{"id":"base"}\n{"id":"side-b"}\n');
+  execSync('git add .tasks/issues.jsonl', { cwd: dir });
   execSync('git commit -q -m "append side-b"', { cwd: dir });
 
   // Attempt the merge
@@ -57,11 +57,11 @@ function setupDivergentMerge(dir: string, useUnionAttr: boolean) {
     mergeExitCode = 1;
   }
 
-  const contents = readFileSync(join(dir, '.beads', 'issues.jsonl'), 'utf-8');
+  const contents = readFileSync(join(dir, '.tasks', 'issues.jsonl'), 'utf-8');
   return { mergeExitCode, contents };
 }
 
-describe('gitattributes merge=union for .beads/issues.jsonl', () => {
+describe('gitattributes merge=union for .tasks/issues.jsonl', () => {
   let tmp: string;
 
   beforeEach(() => {

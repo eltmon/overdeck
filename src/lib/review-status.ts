@@ -94,8 +94,8 @@ export interface ReviewStatus {
   stuckAt?: string;
   /** PAN-653: JSON details about the stuck event (e.g. {localSha, remoteSha}) */
   stuckDetails?: string;
-  /** PAN-699: timestamp when review agents were dispatched (deacon timeout detection) */
-  reviewSpawnedAt?: string;
+  /** PAN-699: timestamp when review agents were dispatched (ISO in records, epoch millis in SQLite) */
+  reviewSpawnedAt?: string | number;
   /**
    * PAN-1988 auto-heal: durable JOURNAL intent set by `pan done` BEFORE it reaches the dashboard.
    * "The work agent finished and wants review." When this is newer than {@link reviewSpawnedAt}
@@ -446,11 +446,11 @@ export function setReviewStatusSync(
     })();
   }
 
-  // PAN-1908 + PAN-1988: the journal record is the SOURCE OF TRUTH for the verdict; the
-  // SQLite row is a rebuildable cache. Write the journal FIRST — it is workspace-local
-  // (<workspace>/.pan/records/<issue>.json), so it succeeds even for a sandboxed agent
-  // (codex workspace-write) that cannot reach ~/.overdeck. Fire-and-forget; queueAutoCommit
-  // debounces bursts into one commit. Do NOT mirror into canonical vBRIEF specs (PAN-1124).
+  // PAN-1908 + PAN-1988: the journal record is the SOURCE OF TRUTH for the verdict; the SQLite
+  // row is a rebuildable cache. Write the journal FIRST. Since PAN-2541 it lives in
+  // ${OVERDECK_HOME}/state/<project>/records/ — unwritable in a sandbox, so the writer falls back
+  // to <workspace>/.overdeck/pipeline-verdict.json (PAN-2583). Fire-and-forget: a short-lived CLI
+  // MUST drain via flushReviewStatusJournalWrites() before exit (PAN-2689). No vBRIEF mirror (PAN-1124).
   updateIssueRecordForReviewStatusSync(issueId, updated);
 
   // The DB cache write is best-effort. A sandboxed agent's write throws SQLITE_READONLY, but
@@ -603,11 +603,9 @@ export function setReviewStatusSync(
 
   return updated;
 }
-
-export function resetPipelineVerdictsForWorkStartSync(issueId: string): ReviewStatus | null {
+export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: { force?: boolean } = {}): ReviewStatus | null {
   const status = getReviewStatusSync(issueId);
   if (!status) return null;
-
   const isPending =
     status.reviewStatus === 'pending' &&
     status.testStatus === 'pending' &&
@@ -623,7 +621,7 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string): ReviewSt
     status.reviewedAtCommit === undefined &&
     status.lastVerifiedCommit === undefined;
 
-  if (isPending) return null;
+  if (isPending && !options.force) return null;
 
   return setReviewStatusSync(issueId, {
     reviewStatus: 'pending',
@@ -647,6 +645,8 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string): ReviewSt
     recoveryStartedAt: undefined,
     reviewedAtCommit: undefined,
     lastVerifiedCommit: undefined,
+    reviewRequestedAt: undefined, reviewSpawnedAt: undefined,
+    conflictResolutionDispatchedAt: undefined, blockerReasons: undefined, reviewerVerdicts: undefined,
   });
 }
 
@@ -798,7 +798,7 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     const target = await resolveIssueFeedbackTarget(issueId);
     if ('agentId' in target) {
       const { messageAgent } = await import('./agents.js');
-      await messageAgent(target.agentId, message);
+      await messageAgent(target.agentId, message, 'internal', { owesRework: true });
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
     } else {
       await surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });

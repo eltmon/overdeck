@@ -132,6 +132,15 @@ async function shutdown(signal: NodeJS.Signals): Promise<void> {
   } catch (err) {
     console.error('[deacon-child] Cloister stop failed:', err);
   }
+  try {
+    // PAN-2669: reap in-flight quality-gate process trees so restarts never
+    // orphan vitest/build children that wedge future runs.
+    const { killAllGateProcessGroups } = await import('../../lib/cloister/validation.js');
+    const reaped = killAllGateProcessGroups();
+    if (reaped > 0) console.log(`[deacon-child] reaped ${reaped} in-flight gate process group(s)`);
+  } catch (err) {
+    console.error('[deacon-child] gate process reap failed:', err);
+  }
   await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => {
     console.error('[deacon-child] auto-commit shutdown flush failed:', err);
   });

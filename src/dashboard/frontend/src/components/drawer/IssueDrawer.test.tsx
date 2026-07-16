@@ -75,8 +75,8 @@ function mockFetch() {
     });
     if (url.includes('/planning-state')) return Response.json({
       hasPlan: currentIssue?.hasPlan ?? false,
-      hasBeads: currentIssue?.hasBeads ?? false,
-      beadsCount: currentIssue?.hasBeads ? 1 : 0,
+      hasTasks: currentIssue?.hasTasks ?? false,
+      tasksCount: currentIssue?.hasTasks ? 1 : 0,
       planningComplete: currentIssue?.planningComplete ?? currentIssue?.hasPlan ?? false,
     });
     if (url.includes('/api/review/') && url.endsWith('/status')) {
@@ -99,10 +99,10 @@ function drawerUi(queryClient: QueryClient) {
   );
 }
 
-function renderDrawer(beads: TestBead[] = []) {
-  if (beads.length > 0) {
+function renderDrawer(tasks: TestBead[] = []) {
+  if (tasks.length > 0) {
     useDashboardStore.setState({
-      issuesRaw: [{ ...issue, beads }],
+      issuesRaw: [{ ...issue, tasks }],
     } as Parameters<typeof useDashboardStore.setState>[0]);
   }
   const queryClient = createQueryClient();
@@ -178,8 +178,8 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('drawer-tab-overview')).toHaveClass('py-[10px]', 'text-[13px]', 'font-medium', 'text-foreground');
     expect(within(screen.getByTestId('drawer-tab-overview')).getByTestId('drawer-tab-active-underline')).toHaveClass('left-[14px]', 'right-[14px]', 'h-[2px]', 'bg-primary');
     expect(screen.getByTestId('drawer-tab-plan')).toHaveClass('text-muted-foreground', 'hover:text-foreground');
-    expect(within(screen.getByTestId('drawer-tab-beads')).getByTestId('drawer-tab-beads-count')).toHaveTextContent('1/2');
-    expect(screen.getByTestId('drawer-tab-beads-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
+    expect(within(screen.getByTestId('drawer-tab-tasks')).getByTestId('drawer-tab-tasks-count')).toHaveTextContent('1/2');
+    expect(screen.getByTestId('drawer-tab-tasks-count')).toHaveClass('font-mono', 'text-[10px]', 'px-[5px]');
 
     fireEvent.click(screen.getByTestId('drawer-tab-files'));
 
@@ -753,17 +753,15 @@ describe('IssueDrawer', () => {
     expect(actionSets).toMatchInlineSnapshot(`
       {
         "READY_TO_MERGE": [
-          "issue-action-startAgent",
           "issue-action-syncMain",
-          "issue-action-rebuildAndStart",
-          "issue-action-inspectBead",
+          "issue-action-open",
+          "issue-action-tasks",
+          "issue-action-upload",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
-          "issue-action-open",
           "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
           "issue-action-cancel",
-          "issue-action-beads",
-          "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
           "issue-action-copySettings",
@@ -777,13 +775,13 @@ describe('IssueDrawer', () => {
           "issue-action-stopAgent",
           "issue-action-pause",
           "issue-action-syncMain",
-          "issue-action-inspectBead",
+          "issue-action-open",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
-          "issue-action-open",
           "issue-action-resetIssue",
+          "issue-action-resetToPlanned",
           "issue-action-cancel",
-          "issue-action-beads",
+          "issue-action-tasks",
           "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",

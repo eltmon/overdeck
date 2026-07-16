@@ -347,6 +347,26 @@ export function saveAgentStateSync(state: AgentState): void {
   }
 }
 
+/**
+ * Persist observed harness activity through the agent-state write door without
+ * re-running lifecycle side effects such as harness/model record mirroring.
+ */
+export function recordAgentActivitySync(
+  agentId: string,
+  activity: { at?: string; costSoFar?: number },
+): boolean {
+  const state = getAgentStateSync(agentId);
+  if (!state) return false;
+
+  state.lastActivity = activity.at ?? new Date().toISOString();
+  if (activity.costSoFar !== undefined && Number.isFinite(activity.costSoFar)) {
+    state.costSoFar = activity.costSoFar;
+  }
+  saveOverdeckAgentStateSync(state);
+  writeAgentStateJsonSync(state);
+  return true;
+}
+
 export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> => {
   const dir = getAgentDir(state.id);
   const stateFile = getRollbackAgentStatePath(state.id);
@@ -698,6 +718,13 @@ export type ResumeGateBlock =
 
 export type ResumeIntent = 'autonomous' | 'operator-start' | 'message-delivery';
 
+/** PAN-2668: messageAgent options — owesRework marks the message as pipeline
+ *  feedback requiring rework (failed verification/review), which may re-drive
+ *  a stopped-by-user agent that has a completed handoff. */
+export interface MessageAgentRedriveOptions {
+  owesRework?: boolean;
+}
+
 export interface ResumeGateContext {
   hasCompletedHandoff?: boolean;
   owesRework?: boolean;
@@ -745,7 +772,16 @@ export function decideResumeGate(
   context: ResumeGateContext = {},
 ): ResumeGateDecision {
   if (!block) return { decision: 'proceed' };
-  if (intent === 'message-delivery') return { decision: 'queue-message', reason: block.reason };
+  if (intent === 'message-delivery') {
+    // PAN-2668: pipeline feedback that owes rework is a re-drive, not a casual
+    // message. The same completed-handoff exception as the autonomous intent
+    // applies — otherwise verification/review feedback for an operator-stopped
+    // agent is silently mailed to a queue nothing will ever drain.
+    if (block.gate === 'stopped-by-user' && context.hasCompletedHandoff === true && context.owesRework === true) {
+      return { decision: 'proceed', clearStoppedByUser: true };
+    }
+    return { decision: 'queue-message', reason: block.reason };
+  }
 
   if (intent === 'operator-start') {
     if (block.gate === 'paused') return { decision: 'block', reason: `${block.reason}; run pan unpause first` };

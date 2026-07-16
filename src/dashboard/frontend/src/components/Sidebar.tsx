@@ -362,7 +362,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
             <div className="flex items-center gap-2 min-w-0">
             <button onClick={() => onTabChange('home')} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0" title="Go to Home">
               <OverdeckMark className="w-5 h-5 text-primary shrink-0" />
-              {/* PAN-698: Space Grotesk is reserved for the sidebar wordmark only */}
+              {/* PAN-698: Space Grotesk is used for the sidebar wordmark, drawer title, and Command Deck tree head */}
               <span className="text-base font-semibold text-foreground font-display truncate">
                 Overdeck
               </span>
@@ -638,6 +638,15 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                     {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                   </button>
                 </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                <span>Lens:</span>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground">g</kbd>
+                <span>+</span>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Pipeline">p</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Board">b</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Agents">a</kbd>
+                <kbd className="px-1 py-0.5 rounded bg-muted text-muted-foreground" title="Command Deck">c</kbd>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className={`text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded ${

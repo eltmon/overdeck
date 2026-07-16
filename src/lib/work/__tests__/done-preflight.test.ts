@@ -39,40 +39,40 @@ describe('runPreflightChecks', () => {
   });
 });
 
-describe('open-beads check follows .beads/redirect (PAN-2195)', () => {
-  const makeBead = (status: string): string =>
+describe('open-tasks check follows .tasks/redirect (PAN-2195)', () => {
+  const makeTask = (status: string): string =>
     JSON.stringify({ id: 'b1', title: 'pan-9999: x', labels: ['pan-9999'], status }) + '\n';
 
   it('reads the redirected live ledger, not the stale workspace-local snapshot', async () => {
     vi.mocked(runTestRequirementCheck).mockReturnValue(Effect.succeed([]));
     const base = mkdtempSync(join(tmpdir(), 'preflight-redirect-'));
     try {
-      // Live (main) ledger: the bead is CLOSED.
-      mkdirSync(join(base, '.beads'), { recursive: true });
-      writeFileSync(join(base, '.beads', 'issues.jsonl'), makeBead('closed'));
-      // Workspace two levels deep with a redirect + a STALE local snapshot (bead OPEN).
+      // Live (main) ledger: the task is CLOSED.
+      mkdirSync(join(base, '.tasks'), { recursive: true });
+      writeFileSync(join(base, '.tasks', 'issues.jsonl'), makeTask('closed'));
+      // Workspace two levels deep with a redirect + a STALE local snapshot (task OPEN).
       const ws = join(base, 'workspaces', 'feature-pan-9999');
-      mkdirSync(join(ws, '.beads'), { recursive: true });
-      writeFileSync(join(ws, '.beads', 'redirect'), '../../.beads');
-      writeFileSync(join(ws, '.beads', 'issues.jsonl'), makeBead('open'));
+      mkdirSync(join(ws, '.tasks'), { recursive: true });
+      writeFileSync(join(ws, '.tasks', 'redirect'), '../../.tasks');
+      writeFileSync(join(ws, '.tasks', 'issues.jsonl'), makeTask('open'));
 
       const failures = await Effect.runPromise(runPreflightChecks(ws, 'PAN-9999'));
-      expect(failures.some((f) => f.includes('Open beads'))).toBe(false);
+      expect(failures.some((f) => f.includes('Open tasks'))).toBe(false);
     } finally {
       rmSync(base, { recursive: true, force: true });
     }
   });
 
-  it('does not treat a local derived export as an open canonical bead', async () => {
+  it('does not treat a local derived export as an open canonical task', async () => {
     vi.mocked(runTestRequirementCheck).mockReturnValue(Effect.succeed([]));
     const base = mkdtempSync(join(tmpdir(), 'preflight-noredir-'));
     try {
       const ws = join(base, 'workspaces', 'feature-pan-9999');
-      mkdirSync(join(ws, '.beads'), { recursive: true });
-      writeFileSync(join(ws, '.beads', 'issues.jsonl'), makeBead('open'));
+      mkdirSync(join(ws, '.tasks'), { recursive: true });
+      writeFileSync(join(ws, '.tasks', 'issues.jsonl'), makeTask('open'));
 
       const failures = await Effect.runPromise(runPreflightChecks(ws, 'PAN-9999'));
-      expect(failures.some((f) => f.includes('Open beads'))).toBe(false);
+      expect(failures.some((f) => f.includes('Open tasks'))).toBe(false);
     } finally {
       rmSync(base, { recursive: true, force: true });
     }

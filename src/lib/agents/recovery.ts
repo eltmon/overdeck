@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
+import { getLatestSessionIdSync } from './activity.js';
 import { sendGracefulRestartWarning } from '../graceful-restart.js';
 import { checkHookSync, generateFixedPointPromptSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
@@ -54,6 +55,11 @@ export interface RestartAgentOptions {
   harness?: RuntimeName;
   graceful?: boolean;
   message?: string;
+}
+
+export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
+  if (harness !== 'codex') return undefined;
+  return getLatestSessionIdSync(agentId) ?? undefined;
 }
 
 export async function restartAgent(
@@ -358,6 +364,7 @@ export async function recoverAgent(
     baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
     appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),
     ...(recoveryHarness === 'codex' ? {} : { promptInline: recoveryPrompt }),
+    resumeSessionId: resolveRecoveryResumeSessionId(normalizedId, recoveryHarness),
     useSupervisor: recoverySupervisorLaunch.useSupervisor,
     supervisorScriptPath: recoverySupervisorLaunch.supervisorScriptPath,
     ...recoveryCodexFields,
@@ -405,7 +412,7 @@ function generateRecoveryPrompt(state: AgentState): string {
     `- Started: ${state.startedAt}`,
     '',
     '## Recovery Steps',
-    '1. Check beads for context: `bd show ' + state.issueId + '`',
+    '1. Check the vBRIEF task state: `pan task show ' + state.issueId + ' <item-id>`',
     '2. Review recent git commits: `git log --oneline -10`',
     '3. Check hook for pending work: `pan admin fpp check`',
     '4. Resume from last known state',

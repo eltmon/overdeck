@@ -1,0 +1,6 @@
+[
+  {
+    "plugin": "codex@openai-codex",
+    "marketplace": "openai/codex-plugin-cc"
+  }
+]

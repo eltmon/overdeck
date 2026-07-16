@@ -6,7 +6,6 @@ import { Effect } from 'effect';
 import type { Command } from 'commander';
 import { parseSequenceMd } from '../../lib/backlog/sequence-io.js';
 import { buildClassifyLookups } from '../../lib/backlog/lookups.js';
-import { readIssuesWithBeads } from '../../lib/beads/presence.js';
 import {
   classifyIssue,
   computeWaves,
@@ -98,12 +97,8 @@ export async function backlogForecastCommand(opts: { n?: string } = {}): Promise
   }
   const nodes = parsed.doc.nodes;
   const labelsByNumber = await fetchOpenIssueLabels();
-  // issuesWithBeads: one bulk read instead of the lookup builder's sync
-  // fallback (one ~2s bd spawn per workspace dir — minutes on a big repo).
-  const beadsPresence = await readIssuesWithBeads(projectRoot);
   const lk = buildClassifyLookups(projectRoot, {
     labels: (id) => labelsByNumber.get(id.replace(/^[A-Za-z]+-/, '')) ?? [],
-    issuesWithBeads: beadsPresence.set,
   });
   const autoPickupBacklog = isFlywheelAutoPickupBacklog();
   const inFlight = nodes

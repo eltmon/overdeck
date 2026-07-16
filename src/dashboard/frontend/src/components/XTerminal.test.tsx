@@ -40,8 +40,9 @@ vi.mock('@xterm/xterm', () => ({
     attachCustomKeyEventHandler = vi.fn((handler: (event: KeyboardEvent) => boolean) => {
       this.keyEventHandler = handler;
     });
-    getSelection(): string { return ''; }
-    hasSelection(): boolean { return false; }
+    selection = '';
+    getSelection(): string { return this.selection; }
+    hasSelection(): boolean { return this.selection.length > 0; }
     focus = vi.fn();
   },
 }));
@@ -346,6 +347,27 @@ describe('XTerminal', () => {
     expect(await screen.findByText('Paste')).toBeInTheDocument();
   });
 
+  it('preserves a selection on right-click and offers Copy', async () => {
+    const { container } = render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as { instances: Array<{ selection: string }> }).instances[0];
+    term.selection = 'selected output';
+    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement;
+    const rightMouseDown = new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
+    const stopPropagation = vi.spyOn(rightMouseDown, 'stopPropagation');
+
+    terminalSurface.dispatchEvent(rightMouseDown);
+    fireEvent.contextMenu(terminalSurface, { clientX: 32, clientY: 64 });
+
+    expect(stopPropagation).toHaveBeenCalled();
+    expect(await screen.findByText('Copy')).toBeInTheDocument();
+    expect(screen.getByText('Paste')).toBeInTheDocument();
+  });
+
   it('surfaces a visible toast when context-menu paste cannot read the clipboard (PAN-2529)', async () => {
     const { toast } = await import('sonner');
     const readTextMock = vi.fn().mockRejectedValue(
@@ -424,6 +446,31 @@ describe('XTerminal', () => {
     // keyup for the same combo must not be swallowed either.
     const ctrlVUp = new KeyboardEvent('keyup', { key: 'v', ctrlKey: true });
     expect(term.keyEventHandler!(ctrlVUp)).toBe(true);
+  });
+
+  it('copies an active selection on Ctrl+C instead of sending an interrupt', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { readText: vi.fn(), writeText },
+      writable: true,
+      configurable: true,
+    });
+
+    render(<XTerminal sessionName="test-session" />);
+
+    await waitFor(() => {
+      expect(MockWebSocket.instances).toHaveLength(1);
+    });
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ selection: string; keyEventHandler: ((event: KeyboardEvent) => boolean) | null }>;
+    }).instances[0];
+    term.selection = 'selected output';
+    const ctrlC = new KeyboardEvent('keydown', { key: 'c', ctrlKey: true, cancelable: true });
+
+    expect(term.keyEventHandler!(ctrlC)).toBe(false);
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('selected output'));
+    expect(ctrlC.defaultPrevented).toBe(true);
   });
 
   it('sends Ctrl+V to the terminal when the Ctrl+V-pastes setting is off', async () => {

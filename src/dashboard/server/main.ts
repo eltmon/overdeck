@@ -15,8 +15,6 @@ import { startSharedIssueService, getSharedIssueService } from './services/issue
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
 import { startAgentOutputService, stopAgentOutputService } from './services/agent-output-service.js';
-import { createBeadsSyncService } from './services/beads-sync-service.js';
-import { startBeadsRollupService, stopBeadsRollupService } from './services/beads-rollup-singleton.js';
 import { startConversationLifecycleService, stopConversationLifecycleService } from './services/conversation-lifecycle.js';
 import { startRestartAnnouncer, stopRestartAnnouncer } from './services/restart-announcer.js';
 import { startSubstrateBugPoller, stopSubstrateBugPoller } from './services/substrate-bug-poller.js';
@@ -70,6 +68,8 @@ import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { getAgentSessionsSync } from '../../lib/tmux.js';
 import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
+import { listProjectsSync } from '../../lib/projects.js';
+import { ensureAutomaticStateMigration, decideDeaconBootGate } from '../../lib/state-auto-migrate.js';
 
 declare const Bun: unknown;
 
@@ -487,17 +487,6 @@ console.log(conversationSearchWatcher
 
 void (async () => {
   const store = await initEventStore();
-  const beadsSync = createBeadsSyncService({
-    emit: (event) => { void store.appendAsync(event as any); },
-  });
-  void beadsSync.run().catch((err) => console.warn('[beads-sync] service stopped:', err?.message ?? err));
-  console.log('[overdeck] BeadsSyncService started');
-
-  startBeadsRollupService({
-    subscribe: (listener) => store.subscribe((event) => listener(event as any)),
-  });
-  console.log('[overdeck] BeadsRollupService started');
-
   store.subscribe((event) => {
     if (event.type === 'agent.stopped' || event.type === 'agent.heartbeat_dead') {
       const agentId = typeof (event.payload as { agentId?: unknown }).agentId === 'string'
@@ -578,8 +567,17 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   stopTranscriptPoller();
   stopCostReconcileService();
   stopRestartAnnouncer();
-  stopBeadsRollupService();
   await stopDeaconChild().catch((err) => console.warn('[deacon-supervisor] child shutdown failed:', err?.message ?? err));
+  try {
+    // Reap only quality-gate trees owned by this dashboard process. Normal
+    // verification runs in a detached supervised worker, whose process-local
+    // registry is intentionally outside this shutdown boundary.
+    const { killAllGateProcessGroups } = await import('../../lib/cloister/validation.js');
+    const reaped = killAllGateProcessGroups();
+    if (reaped > 0) console.log(`[overdeck] reaped ${reaped} in-flight gate process group(s)`);
+  } catch (err) {
+    console.warn('[overdeck] gate process reap failed:', err);
+  }
   await Effect.runPromise(flushAllPendingAutoCommits()).catch((err) => console.warn('[pan-dir/auto-commit] shutdown flush failed:', err));
   await stopConversationSearchWatcher().catch((err) => console.warn('[conversation-search] watcher shutdown failed:', err));
   closeConversationSearchService();
@@ -663,20 +661,67 @@ if (process.env.OVERDECK_DISABLE_AUTO_MERGE === '1') {
   console.log('[overdeck] Auto-merge executor started');
 }
 
+try {
+  // Preserve running statuses backed by a live supervised worker. Reset only
+  // orphaned runs whose worker died without recording a terminal result.
+  const { reconcileInterruptedVerifications } = await import('../../lib/cloister/verification-runner.js');
+  const interrupted = reconcileInterruptedVerifications();
+  if (interrupted > 0) console.log(`[overdeck] recovered ${interrupted} orphaned verification worker(s)`);
+} catch (err) {
+  console.warn('[overdeck] interrupted-verification reconciliation failed:', err);
+}
+
 if (process.env.OVERDECK_DISABLE_DEACON === '1') {
   console.log('[overdeck] Cloister auto-start SKIPPED (OVERDECK_DISABLE_DEACON=1)');
   emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: 'Cloister auto-start skipped via OVERDECK_DISABLE_DEACON — deacon is not running' });
 } else if (shouldAutoStart()) {
-  const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
-  if (reconciliation.decision !== 'pending') {
-    void applyBootReconciliationDecision();
+  // Per-project state-migration gate (PAN-2676). One blocked project — a dirty
+  // operator checkout, a dirty state worktree — must NOT take the whole Deacon
+  // down. The Deacon starts whenever at least one project is usable; blocked
+  // projects are already kept out of NEW pipeline work by the state write door
+  // (requireAutomaticStateMigration at `pan start`), so here we only decide
+  // Deacon start and report the excluded projects loudly.
+  const migrations = [];
+  for (const { key, config } of listProjectsSync()) {
+    if (!existsSync(config.path)) continue;
+    migrations.push(await ensureAutomaticStateMigration(key, config));
   }
-  startDeaconChild().catch((err) => {
-    console.error('[overdeck] Cloister auto-start failed:', err);
-    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
-  });
-  console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
-  emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  const gate = decideDeaconBootGate(migrations);
+
+  // Name each blocked project WITH its human-readable prerequisite.
+  for (const blocked of gate.blockedProjects) {
+    console.error(`[state-migration] ${blocked.notice}`);
+    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: blocked.notice });
+  }
+
+  if (gate.startDeacon) {
+    if (gate.blockedProjects.length > 0) {
+      const excluded = gate.blockedProjects.map((b) => b.projectKey).join(', ');
+      const summary = `Deacon is starting for ${gate.usableProjects.length} usable project(s) (${gate.usableProjects.join(', ')}). `
+        + `${gate.blockedProjects.length} project(s) are EXCLUDED from orchestration until fixed: ${excluded}. `
+        + 'Each excluded project has an unavailable permanent-state plane, so Overdeck will not spawn or write new pipeline work for it; the Deacon runs normally for the usable projects. '
+        + 'Resolve each prerequisite listed above, then run "pan sync".';
+      console.error(`[overdeck] ${summary}`);
+      emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
+    }
+    const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
+    if (reconciliation.decision !== 'pending') {
+      void applyBootReconciliationDecision();
+    }
+    startDeaconChild().catch((err) => {
+      console.error('[overdeck] Cloister auto-start failed:', err);
+      emitActivityEntrySync({ source: 'dashboard', level: 'error', message: `Cloister auto-start failed: ${err instanceof Error ? err.message : String(err)}` });
+    });
+    console.log('[overdeck] Cloister auto-starting (startup.auto_start=true)');
+    emitActivityEntrySync({ source: 'dashboard', level: 'info', message: 'Cloister auto-starting on dashboard boot' });
+  } else {
+    // All projects blocked: refuse to start, as before.
+    const excluded = gate.blockedProjects.map((b) => b.projectKey).join(', ');
+    const summary = `Deacon auto-start refused: all ${gate.blockedProjects.length} project(s) have an unavailable permanent-state plane (${excluded}). `
+      + 'No pipeline work can run until at least one project\'s prerequisite (listed above) is resolved; then run "pan sync".';
+    console.error(`[overdeck] ${summary}`);
+    emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
+  }
 }
 
 /**

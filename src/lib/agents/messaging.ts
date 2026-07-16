@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
@@ -16,11 +16,13 @@ import {
   waitForAgentIdle,
 } from './identity.js';
 import {
+  decideResumeGate,
   getAgentDir,
   getAgentResumeGateBlockReason,
   getAgentStateSync,
   markAgentRunning,
   saveAgentStateSync,
+  type MessageAgentRedriveOptions,
   type Role,
 } from './agent-state.js';
 import { getLatestSessionIdSync } from './activity.js';
@@ -33,6 +35,7 @@ import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
   claudeSystemPromptFiles,
   getCodexLauncherFields,
+  getCodexAppServerStatus,
   getOhmypiLauncherFields,
   getRoleRuntimeBaseCommand,
   hasAgentRuntimeInSubtree,
@@ -48,17 +51,26 @@ import {
   getProviderExportsForModel,
 } from './provider-env.js';
 
-function queueAgentMail(agentId: string, message: string): void {
+function queueAgentMail(agentId: string, message: string, pendingTurnEndDelivery = false): void {
   const mailDir = join(getAgentDir(agentId), 'mail');
   mkdirSync(mailDir, { recursive: true });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   writeFileSync(
-    join(mailDir, `${timestamp}.md`),
+    join(mailDir, `${timestamp}${pendingTurnEndDelivery ? '.pending' : ''}.md`),
     `# Message\n\n${message}\n`
   );
 }
 
 const USER_MESSAGE_INTERVENTION_SOURCES = new Set(['pan-tell', 'dashboard:user-message']);
+
+function claimCodexIdleTurn(agentId: string): boolean {
+  try {
+    unlinkSync(join(getAgentDir(agentId), 'turn-completed'));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 async function appendTellInterventionForUserSource(normalizedId: string, caller: string): Promise<void> {
   if (!USER_MESSAGE_INTERVENTION_SOURCES.has(caller)) return;
@@ -76,9 +88,36 @@ async function appendTellInterventionForUserSource(normalizedId: string, caller:
   });
 }
 
-export async function messageAgent(agentId: string, message: string, caller = 'internal'): Promise<void> {
+export async function messageAgent(
+  agentId: string,
+  message: string,
+  caller = 'internal',
+  opts: MessageAgentRedriveOptions = {},
+): Promise<void> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
+
+  // PAN-2668: pipeline feedback that owes rework (failed verification/review)
+  // is a re-drive, not a casual message. Consult the intent policy so the
+  // documented completed-handoff exception can clear stoppedByUser and deliver,
+  // instead of silently mailing feedback to a queue nothing drains.
+  const decideMessageGate = () => {
+    const block = agentState ? getAgentResumeGateBlockReason(agentState) : undefined;
+    const agentDir = getAgentDir(normalizedId);
+    const hasCompletedHandoff = existsSync(join(agentDir, 'completed'))
+      || existsSync(join(agentDir, 'completed.processed'));
+    const decision = decideResumeGate(block, 'message-delivery', {
+      hasCompletedHandoff,
+      owesRework: opts.owesRework === true,
+    });
+    if (decision.decision === 'proceed' && decision.clearStoppedByUser && agentState) {
+      console.log(`[agents] ${normalizedId} was operator-stopped but owes rework after a completed handoff — clearing stop gate to deliver feedback (PAN-2668)`);
+      logAgentLifecycleSync(normalizedId, 'stoppedByUser cleared: completed handoff owes rework; delivering pipeline feedback (PAN-2668)');
+      delete agentState.stoppedByUser;
+      saveAgentStateSync(agentState);
+    }
+    return decision;
+  };
   if (agentState?.paused === true) {
     const gateBlockReason = getAgentResumeGateBlockReason(agentState)?.reason ?? 'agent is paused';
     queueAgentMail(normalizedId, message);
@@ -90,8 +129,9 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   // Check if agent is suspended - auto-resume if so (PAN-80)
   const runtimeState = getAgentRuntimeStateSync(normalizedId);
   if (runtimeState?.state === 'suspended') {
-    const gateBlockReason = agentState ? getAgentResumeGateBlockReason(agentState)?.reason : undefined;
-    if (gateBlockReason) {
+    const suspendedGate = decideMessageGate();
+    if (suspendedGate.decision !== 'proceed') {
+      const gateBlockReason = suspendedGate.reason ?? 'agent is gated';
       queueAgentMail(normalizedId, message);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
@@ -125,8 +165,9 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   // sessionExists() returns true for that dead shell. resumeAgent() kills the zombie
   // session before re-creating it.
   if (agentState && agentState.status === 'stopped') {
-    const gateBlockReason = getAgentResumeGateBlockReason(agentState)?.reason;
-    if (gateBlockReason) {
+    const stoppedGate = decideMessageGate();
+    if (stoppedGate.decision !== 'proceed') {
+      const gateBlockReason = stoppedGate.reason ?? 'agent is gated';
       queueAgentMail(normalizedId, message);
       logAgentLifecycleSync(normalizedId, `messageAgent queued mail without resume: ${gateBlockReason}`);
       console.log(`[agents] Queued message for ${normalizedId}; ${gateBlockReason}`);
@@ -306,6 +347,31 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     return;
   }
 
+  const expectedHarness = agentState?.harness ?? 'claude-code';
+  let appServerState: string | undefined;
+  try {
+    appServerState = (await getCodexAppServerStatus(normalizedId)).state;
+  } catch {
+    // A missing/unresponsive app-server means this target uses another
+    // transport. Continue through the legacy tmux liveness path.
+  }
+  if (appServerState && appServerState !== 'closed' && appServerState !== 'error') {
+    const promptReady = claimCodexIdleTurn(normalizedId);
+    if (!promptReady) {
+      queueAgentMail(normalizedId, message, true);
+      logAgentLifecycleSync(normalizedId, 'messageAgent queued mail for codex turn-end delivery: agent busy');
+      console.log(`[agents] Queued message for ${normalizedId}; codex agent is mid-turn`);
+      await appendTellInterventionForUserSource(normalizedId, caller);
+      return;
+    }
+
+    const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
+    await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
+    queueAgentMail(normalizedId, message);
+    await appendTellInterventionForUserSource(normalizedId, caller);
+    return;
+  }
+
   if (!(await Effect.runPromise(sessionExists(normalizedId)))) {
     throw new Error(`Agent ${normalizedId} not running`);
   }
@@ -318,7 +384,6 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   // runs as a descendant. Walk the pane's process subtree and treat the pane
   // as live if any descendant is the expected runtime for the saved harness.
   const panePids = await Effect.runPromise(listPaneValues(normalizedId, '#{pane_pid}'));
-  const expectedHarness = agentState?.harness ?? 'claude-code';
   if (panePids.length > 0 && !(await hasAgentRuntimeInSubtree(panePids[0], expectedHarness))) {
     console.warn(`[agents] ${normalizedId} tmux session is a zombie (no ${expectedHarness} runtime) — attempting resume`);
     const { resumeAgent } = await import('../agents.js');
@@ -332,9 +397,10 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
     throw new Error(`Agent ${normalizedId} session is dead and resume failed: ${resumeResult.error}`);
   }
 
-  // Wait for the agent to be idle at the prompt before sending — reduces dropped
-  // Enter when Claude Code is still rendering. PAN-1594: hook-driven (runtime
-  // mirror 'idle' via Stop/SessionStart hook), not a tmux pane-scrape.
+  // Codex's notify hook writes turn-completed at every idle boundary. Claiming
+  // that marker makes the idle signal one-shot: the next message starts a turn,
+  // and further messages queue until the hook reports the next completion.
+  // Claude Code continues to use its hook-driven runtime mirror (PAN-1594).
   const promptReady = await waitForAgentIdle(normalizedId, 5000);
   if (!promptReady) {
     console.warn(`[agents] ${normalizedId} not at idle prompt after 5s — sending message anyway`);
@@ -343,7 +409,8 @@ export async function messageAgent(agentId: string, message: string, caller = 'i
   const deliveryMethod = resilientDeliveryMethod(agentState?.deliveryMethod);
   await deliverAgentMessage(normalizedId, message, `messageAgent:${caller}`, deliveryMethod);
 
-  // Also save to mail queue
+  // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook
+  // does not replay ordinary `.md` backups because they have already landed.
   queueAgentMail(normalizedId, message);
   await appendTellInterventionForUserSource(normalizedId, caller);
 }

@@ -26,7 +26,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../tmux.js');
     vi.doUnmock('../workspace/stack-health.js');
     vi.doUnmock('../workspace/rebuild-stack.js');
-    vi.doUnmock('../beads-query.js');
+    vi.doUnmock('../tasks-query.js');
     vi.doUnmock('../activity-logger.js');
     vi.doUnmock('../cloister/work-agent-prompt.js');
     vi.doUnmock('../projects.js');
@@ -371,7 +371,11 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../vbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+      readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
+    }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
@@ -428,7 +432,7 @@ describe('AgentState role persistence', () => {
       sessionExistsSync: vi.fn(() => false),
       createSession: vi.fn((...args: unknown[]) => Effect.promise(() => Promise.resolve(createSessionAsync(...args)))),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
@@ -457,6 +461,17 @@ describe('AgentState role persistence', () => {
   it('allows explicit host override when the workspace stack is unhealthy', async () => {
     ensurePtySupervisorArtifact();
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-host-'));
+    mkdirSync(join(workspace, '.pan'), { recursive: true });
+    writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
+      vBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
+      plan: {
+        id: 'PAN-1140',
+        title: 'Host override fixture',
+        status: 'running',
+        items: [{ id: 'host-override', title: 'Host override', status: 'pending' }],
+        edges: [],
+      },
+    }));
     const createSessionAsync = vi.fn(async () => undefined);
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const emitActivityEntry = vi.fn();
@@ -479,13 +494,17 @@ describe('AgentState role persistence', () => {
       capturePane: vi.fn(() => Effect.succeed('Claude Code')),
       setOption: vi.fn(() => Effect.void),
     }));
-    vi.doMock('../beads-query.js', () => ({ assertIssueHasBeads: vi.fn(() => Effect.succeed(undefined)) }));
+    vi.doMock('../tasks-query.js', () => ({ assertIssueHasTasks: vi.fn(() => Effect.succeed(undefined)) }));
     vi.doMock('../activity-logger.js', async (importOriginal) => ({
       ...((await importOriginal()) as typeof import('../activity-logger.js')),
       emitActivityEntry,
       emitActivityEntrySync: emitActivityEntry,
       emitActivityTts: vi.fn(),
       emitActivityTtsSync: vi.fn(),
+    }));
+    vi.doMock('../vbrief/io.js', async (importOriginal) => ({
+      ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+      readWorkspacePlanSync: vi.fn(() => ({ plan: { id: 'PAN-1140', items: [] } })),
     }));
     vi.doMock('../cloister/work-agent-prompt.js', () => ({
       writeStoryFeatureContext: vi.fn(async () => undefined),

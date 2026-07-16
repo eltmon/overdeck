@@ -9,7 +9,7 @@ export interface TierFeedDeliveryMetric {
   ts: string;
   issueId?: string;
   sha: string;
-  beadTitle: string;
+  itemTitle: string;
   tierName: string;
   agentId: string;
   tokenCount: number;

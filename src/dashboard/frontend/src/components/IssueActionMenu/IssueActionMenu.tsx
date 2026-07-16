@@ -97,7 +97,7 @@ function OverflowButton({ views, triggerRef, openSignal }: { views: IssueActionV
   );
 }
 
-type BeadTask = {
+type TaskTask = {
   id: string;
   title: string;
   status: string;
@@ -131,10 +131,10 @@ function ActionDialogFrame({ label, onClose, children }: ActionDialogFrameProps)
 }
 
 
-function InspectBeadDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
+function InspectTaskDialog({ issueId, actions, onClose }: { issueId: string; actions: UseIssueActionsResult; onClose: () => void }) {
   const action = actions.activeDialog?.action;
-  const [tasks, setTasks] = useState<BeadTask[]>([]);
-  const [selectedBeadId, setSelectedBeadId] = useState('');
+  const [tasks, setTasks] = useState<TaskTask[]>([]);
+  const [selectedTaskId, setSelectedTaskId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -142,16 +142,16 @@ function InspectBeadDialog({ issueId, actions, onClose }: { issueId: string; act
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/issues/${encodeURIComponent(issueId)}/beads`, { credentials: 'include' })
+    fetch(`/api/issues/${encodeURIComponent(issueId)}/tasks`, { credentials: 'include' })
       .then(async (response) => {
-        if (!response.ok) throw new Error('Failed to load beads');
-        return response.json() as Promise<{ tasks?: BeadTask[] }>;
+        if (!response.ok) throw new Error('Failed to load tasks');
+        return response.json() as Promise<{ tasks?: TaskTask[] }>;
       })
       .then((data) => {
         if (cancelled) return;
         const nextTasks = data.tasks ?? [];
         setTasks(nextTasks);
-        setSelectedBeadId(nextTasks[0]?.id ?? '');
+        setSelectedTaskId(nextTasks[0]?.id ?? '');
       })
       .catch((err: Error) => {
         if (!cancelled) setError(err.message);
@@ -166,24 +166,24 @@ function InspectBeadDialog({ issueId, actions, onClose }: { issueId: string; act
 
   const onSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!selectedBeadId) return;
-    actions.submitDialogAction(action, undefined, selectedBeadId);
+    if (!selectedTaskId) return;
+    actions.submitDialogAction(action, undefined, selectedTaskId);
     onClose();
   };
 
   return (
     <ActionDialogFrame label={action.label} onClose={onClose}>
       <form className="space-y-3" onSubmit={onSubmit}>
-        {loading ? <p className="text-xs text-muted-foreground">Loading beads…</p> : null}
+        {loading ? <p className="text-xs text-muted-foreground">Loading tasks…</p> : null}
         {error ? <p className="text-xs text-destructive">{error}</p> : null}
-        {!loading && !error && tasks.length === 0 ? <p className="text-xs text-muted-foreground">No beads are available for inspection.</p> : null}
+        {!loading && !error && tasks.length === 0 ? <p className="text-xs text-muted-foreground">No tasks are available for inspection.</p> : null}
         {tasks.length > 0 ? (
           <label className="block space-y-1 text-xs text-muted-foreground">
-            <span>Bead</span>
+            <span>Task</span>
             <select
-              value={selectedBeadId}
-              onChange={(event) => setSelectedBeadId(event.target.value)}
-              aria-label="Bead to inspect"
+              value={selectedTaskId}
+              onChange={(event) => setSelectedTaskId(event.target.value)}
+              aria-label="Task to inspect"
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
             >
               {tasks.map((task) => (
@@ -194,8 +194,8 @@ function InspectBeadDialog({ issueId, actions, onClose }: { issueId: string; act
         ) : null}
         <div className="flex justify-end gap-2">
           <button type="button" className="rounded-md px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground" onClick={onClose}>Cancel</button>
-          <button type="submit" disabled={!selectedBeadId || actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
-            {actions.isActionPending(action.key) ? 'Starting…' : 'Inspect bead'}
+          <button type="submit" disabled={!selectedTaskId || actions.isActionPending(action.key)} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            {actions.isActionPending(action.key) ? 'Starting…' : 'Inspect task'}
           </button>
         </div>
       </form>
@@ -250,8 +250,8 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
     );
   }
 
-  if (activeDialog.key === 'inspectBead') {
-    return <InspectBeadDialog issueId={issueId} actions={actions} onClose={handleClose} />;
+  if (activeDialog.key === 'inspectTask') {
+    return <InspectTaskDialog issueId={issueId} actions={actions} onClose={handleClose} />;
   }
 
   return (

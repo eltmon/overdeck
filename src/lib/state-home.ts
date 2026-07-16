@@ -166,9 +166,7 @@ export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Pro
   // in exactly the polyrepo case.
   const legacyStateRoot = project.path;
   return STATE_BRANCH_PATHS
-    .map((statePath) => statePath === '.beads/'
-      ? join(legacyStateRoot, '.beads')
-      : join(legacyStateRoot, '.pan', statePath.slice(0, -1)))
+    .map((statePath) => join(legacyStateRoot, '.pan', statePath.slice(0, -1)))
     .filter(existsSync);
 }
 
@@ -239,17 +237,16 @@ export async function ensureStateWorktree(
   }
 
   let branch: string;
-  let dirty: string;
   try {
     branch = await git(path, ['branch', '--show-current']);
-    dirty = await git(path, ['status', '--porcelain']);
   } catch (error) {
     return { status: 'error', path, detail: error instanceof Error ? error.message : String(error) };
   }
-  if (dirty) return { status: 'dirty', path, detail: 'state worktree has uncommitted changes; refusing destructive repair' };
   if (branch === STATE_BRANCH) return { status: 'healthy', path };
 
   try {
+    const dirty = await git(path, ['status', '--porcelain']);
+    if (dirty) return { status: 'dirty', path, detail: 'state worktree has uncommitted changes; refusing destructive repair' };
     await git(repoPath, ['worktree', 'remove', path]);
     await rm(path, { recursive: true, force: true });
     await addStateWorktree(repoPath, path);

@@ -5,4 +5,9 @@ export {
   getHarnessBehavior,
   getRuntimeBehavior,
 } from '@overdeck/contracts';
-export type { HarnessBehavior } from '@overdeck/contracts';
+export type {
+  HarnessBehavior,
+  HarnessDeliveryKind,
+  HarnessLaunchCommandKind,
+  HarnessReadinessKind,
+} from '@overdeck/contracts';

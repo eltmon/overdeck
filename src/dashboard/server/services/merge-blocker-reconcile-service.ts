@@ -6,10 +6,10 @@
  * 1. Ready rows with no known blockers can go stale (CONFLICTING / CI-red) when a
  *    webhook is delayed or dropped. Polling those rows writes newly discovered
  *    blockers before a human clicks MERGE.
- * 2. Rows that already carry merge_conflict / not_mergeable blockers can become
- *    clean again after a resolver rebases the branch. Re-checking those rows on a
- *    slower cadence lets refreshMergeStateFromGitHub clear stale flags even when
- *    no webhook arrives.
+ * 2. Rows that already carry merge_conflict / not_mergeable / failing_checks
+ *    blockers can become clean again after a rebase or successful CI run.
+ *    Re-checking those rows on a slower cadence lets refreshMergeStateFromGitHub
+ *    clear stale flags even when no webhook arrives.
  *
  * Bounded + cheap: each issue has a throttle. Ready/no-blocker rows use the PAN-1620
  * 3-minute cadence; already-blocked mergeability rows use a 10-minute cadence.
@@ -39,7 +39,11 @@ const POLL_INTERVAL_MS = 60_000;
 const RECHECK_INTERVAL_MS = 180_000;
 /** Re-check already-flagged mergeability blockers less often; they are not mergeable yet. */
 const STALE_BLOCKER_RECHECK_INTERVAL_MS = 10 * 60_000;
-const MERGEABILITY_BLOCKERS = new Set<BlockerReason['type']>(['merge_conflict', 'not_mergeable']);
+const MERGEABILITY_BLOCKERS = new Set<BlockerReason['type']>([
+  'merge_conflict',
+  'not_mergeable',
+  'failing_checks',
+]);
 const MAX_REFRESH_CONCURRENCY = 4;
 
 const serviceState: ServiceState = {

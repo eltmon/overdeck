@@ -192,7 +192,7 @@ describe('SessionFeedSidebar', () => {
           timestamp: '2026-05-23T01:04:00.000Z',
           source: 'work',
           level: 'info',
-          message: 'Work agent committed bead-3',
+          message: 'Work agent committed task-3',
           details: null,
           issueId: 'PAN-1507',
         },
@@ -203,7 +203,7 @@ describe('SessionFeedSidebar', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Activity' }));
 
     expect(screen.queryByTestId('session-feed-empty-activity')).toBeNull();
-    expect(screen.getByText('Work agent committed bead-3')).toBeTruthy();
+    expect(screen.getByText('Work agent committed task-3')).toBeTruthy();
   });
 
   it('updates the Activity tab when observations change without remounting', () => {
@@ -298,7 +298,7 @@ describe('SessionFeedSidebar', () => {
           timestamp: '2026-05-23T01:03:00.000Z',
           source: 'work',
           level: 'info',
-          message: 'Work agent committed bead-3',
+          message: 'Work agent committed task-3',
           details: null,
           issueId: 'OTHER-99',
         },
@@ -311,7 +311,7 @@ describe('SessionFeedSidebar', () => {
 
     // The restart (system-wide) survives the scope filter; the work entry does not.
     expect(screen.getByText(/Dashboard restarted via pan reload/)).toBeTruthy();
-    expect(screen.queryByText('Work agent committed bead-3')).toBeNull();
+    expect(screen.queryByText('Work agent committed task-3')).toBeNull();
   });
 
   it('navigates restart entries to their initiator conversation via the link field', () => {

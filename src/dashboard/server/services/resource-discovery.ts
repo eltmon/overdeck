@@ -4,13 +4,8 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import type { BeadTotals } from './resource-discovery-signals.js';
-import {
-  getBeadTotalsForIssue,
-  isWithinRecencyDate,
-  isWithinRecencyMs,
-} from './resource-discovery-signals.js';
-import { getBeadsRollupService } from './beads-rollup-singleton.js';
+import type { TaskTotals } from './resource-discovery-signals.js';
+import { isWithinRecencyDate, isWithinRecencyMs } from './resource-discovery-signals.js';
 
 import { getAgentRuntimeState } from '../../../lib/agents.js';
 import { listConversations, type LegacyConversation as Conversation } from '../../../lib/overdeck/conversations.js';
@@ -19,7 +14,6 @@ import {
   PAN_DIRNAME,
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
-import { readIssuesWithBeads, type BeadsPresence } from '../../../lib/beads/presence.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ResolvedProject } from '../../../lib/projects.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
@@ -32,9 +26,9 @@ const RESOURCE_DISCOVERY_TTL_MS = 30_000;
 const RECENT_ACTIVITY_WINDOW_MS = 5_000;
 
 export { RECENCY_DAYS } from './resource-discovery-signals.js';
-export type { BeadTotals } from './resource-discovery-signals.js';
+export type { TaskTotals } from './resource-discovery-signals.js';
 
-export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'beads' | 'docker' | 'remote-agent' | 'conversation';
+export type ResourceSource = 'tracker' | 'tmux' | 'workspace' | 'branch' | 'pr' | 'vbrief' | 'tasks' | 'docker' | 'remote-agent' | 'conversation';
 
 export interface ResourcePullRequest {
   number: number;
@@ -51,7 +45,7 @@ export interface ResourceDetails {
   tmuxSessionCount: number;
   prs: ResourcePullRequest[];
   hasVbrief: boolean;
-  hasBeads: boolean;
+  hasTasks: boolean;
   dockerContainerCount: number;
   /** Current HEAD of the agent's workspace, or null when no workspace exists. */
   actualBranch: string | null;
@@ -101,7 +95,7 @@ export interface ResourceAllocatedIssue {
   rawTrackerState?: string;
   resourceSources: ResourceSource[];
   resourceDetails: ResourceDetails;
-  beadTotals: BeadTotals | null;
+  taskTotals: TaskTotals | null;
 }
 
 interface InternalResourceDetails {
@@ -112,7 +106,7 @@ interface InternalResourceDetails {
   prs: GhPullRequest[];
   vbriefPath: string | null;
   vbriefMtime: number | null;
-  beadsPath: string | null;
+  tasksPath: string | null;
   dockerContainers: string[];
   actualBranch: string | null;
   branchDrifted: boolean;
@@ -139,7 +133,7 @@ interface MutableResourceIssue {
   lastActivity: number | null;
   resourceSources: Set<ResourceSource>;
   resourceDetails: InternalResourceDetails;
-  beadTotals: BeadTotals | null;
+  taskTotals: TaskTotals | null;
 }
 
 interface InternalDiscoveredIssue extends Omit<ResourceAllocatedIssue, 'resourceSources' | 'resourceDetails'> {
@@ -233,7 +227,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
       isDraft: pr.isDraft,
     })),
     hasVbrief: details.vbriefPath !== null,
-    hasBeads: details.beadsPath !== null,
+    hasTasks: details.tasksPath !== null,
     dockerContainerCount: details.dockerContainers.length,
     actualBranch: details.actualBranch,
     branchDrifted: details.branchDrifted,
@@ -458,13 +452,12 @@ interface WorkspaceScanResult {
   hasVbrief: boolean;
   vbriefPath: string | null;
   vbriefMtime: number | null;
-  hasBeads: boolean;
+  hasTasks: boolean;
 }
 
 async function scanWorkspace(
   workspacesDir: string,
   workspaceName: string,
-  beadsPresence: BeadsPresence,
 ): Promise<WorkspaceScanResult> {
   const workspacePath = join(workspacesDir, workspaceName);
   const projectRoot = join(workspacesDir, '..');
@@ -496,7 +489,7 @@ async function scanWorkspace(
     hasVbrief: vbriefPath !== null,
     vbriefPath,
     vbriefMtime,
-    hasBeads: issueId !== null && beadsPresence.set.has(issueId),
+    hasTasks: vbriefPath !== null,
   };
 }
 
@@ -566,7 +559,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         prs: [],
         vbriefPath: null,
         vbriefMtime: null,
-        beadsPath: null,
+        tasksPath: null,
         dockerContainers: [],
         actualBranch: null,
         branchDrifted: false,
@@ -575,7 +568,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         remoteAgent: null,
         conversations: [],
       },
-      beadTotals: null,
+      taskTotals: null,
     };
     issueMap.set(upper, created);
     return created;
@@ -656,13 +649,12 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   await Promise.all(projects.map(async (project) => {
     const projectPath = project.config.path;
     const workspacesDir = join(projectPath, 'workspaces');
-    // ONE bulk beads read per project per refresh. Per-workspace issueHasBeads
-    // here used to fire ~45 concurrent ~2s Dolt processes every 30s TTL, all
-    // contending on the global bd process lock (spawn gates queued behind it).
-    const [workspaceEntries, branches, beadsPresence] = await Promise.all([
+    // ONE bulk tasks read per project per refresh, rather than a per-workspace
+    // read each 30s TTL — the bulk shape keeps refreshes cheap as the workspace
+    // count grows.
+    const [workspaceEntries, branches] = await Promise.all([
       readdir(workspacesDir, { withFileTypes: true }).catch(() => []),
       loadProjectBranches(projectPath),
-      readIssuesWithBeads(projectPath),
     ]);
     const aheadBranches = await loadBranchesAheadOfMain(projectPath);
 
@@ -671,7 +663,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
       const issueId = entry.name.replace(/^feature-/, '').toUpperCase();
       const issue = ensureIssue(issueId, project);
       if (!issue) return;
-      const workspace = await scanWorkspace(workspacesDir, entry.name, beadsPresence);
+      const workspace = await scanWorkspace(workspacesDir, entry.name);
       issue.resourceSources.add('workspace');
       issue.resourceDetails.workspacePath = workspace.workspacePath;
       issue.hasPlanning = workspace.hasPlanning;
@@ -682,9 +674,9 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         issue.resourceDetails.vbriefPath = workspace.vbriefPath;
         issue.resourceDetails.vbriefMtime = workspace.vbriefMtime;
       }
-      if (workspace.hasBeads) {
-        issue.resourceSources.add('beads');
-        issue.resourceDetails.beadsPath = join(workspace.workspacePath, '.beads');
+      if (workspace.hasTasks) {
+        issue.resourceSources.add('tasks');
+        issue.resourceDetails.tasksPath = join(workspace.workspacePath, '.tasks');
       }
       const gitInfo = await resolveAgentGitInfo(workspace.workspacePath, issue.branch);
       issue.resourceDetails.actualBranch = gitInfo.actualBranch;
@@ -754,25 +746,6 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
     }
   }
 
-  // PAN-2602: bead rollups give a second signal for issues that have bead work in
-  // flight even when the tracker label is stale or missing. Load the cached rollup
-  // state once per discovery pass and attach totals to each issue.
-  const beadsRollupService = getBeadsRollupService();
-  const projectKeyByName = new Map<string, string>();
-  for (const project of projects) {
-    projectKeyByName.set(project.config.name ?? project.key, project.key);
-  }
-  const getIssueBeadTotals = (issue: MutableResourceIssue): BeadTotals | null => {
-    const projectKey = projectKeyByName.get(issue.projectName);
-    if (!projectKey) return null;
-    const state = beadsRollupService.getProjectRollups(projectKey);
-    if (!state) return null;
-    return getBeadTotalsForIssue(issue.issueId, state.rollups);
-  };
-  for (const issue of issueMap.values()) {
-    issue.beadTotals = getIssueBeadTotals(issue);
-  }
-
   // PRD acceptance (PAN-862): the tree shows ONLY issues with real in-flight work.
   // PAN-1966 (durable-signal membership): an active tracker LABEL is NOT sufficient
   // on its own — labels drift (an issue can stay `in-progress`/`in-review` after its
@@ -787,7 +760,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   // tmux session left behind is stale close-out residue, not active pipeline work.
   // PAN-2602 (pipeline-signal-union): non-terminal issues also qualify when they have
   // a branch ahead of main, an active linked conversation, recently-active partial
-  // bead completion, beads currently in progress, or a recently-touched vBRIEF spec.
+  // task completion, tasks currently in progress, or a recently-touched vBRIEF spec.
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
     // PAN-2054: drop terminal (closed/done/canceled) issues from the active resource
@@ -808,16 +781,16 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         if (issue.resourceDetails.branchAheadOfMain) return true;
         if (issue.resourceSources.has('conversation')) return true;
 
-        const beadTotals = issue.beadTotals;
-        if (beadTotals) {
+        const taskTotals = issue.taskTotals;
+        if (taskTotals) {
           if (
-            beadTotals.closed > 0
-            && beadTotals.closed < beadTotals.total
-            && isWithinRecencyDate(beadTotals.lastUpdated)
+            taskTotals.closed > 0
+            && taskTotals.closed < taskTotals.total
+            && isWithinRecencyDate(taskTotals.lastUpdated)
           ) {
             return true;
           }
-          if (beadTotals.inProgress > 0) return true;
+          if (taskTotals.inProgress > 0) return true;
         }
 
         if (
@@ -863,7 +836,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
           rawTrackerState: issue.rawTrackerState,
           resourceSources: new Set([...issue.resourceSources].sort()),
           resourceDetails: issue.resourceDetails,
-          beadTotals: issue.beadTotals,
+          taskTotals: issue.taskTotals,
         } satisfies InternalDiscoveredIssue;
       });
 
@@ -937,7 +910,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
         isDraft: pr.isDraft,
       })),
       hasVbrief: issue.resourceDetails.hasVbrief,
-      hasBeads: issue.resourceDetails.hasBeads,
+      hasTasks: issue.resourceDetails.hasTasks,
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,
       actualBranch: issue.resourceDetails.actualBranch,
       branchDrifted: issue.resourceDetails.branchDrifted,

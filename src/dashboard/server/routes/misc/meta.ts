@@ -13,6 +13,7 @@ import { getGitHubConfig as getGitHubConfigShared } from '../../services/tracker
 import type { IssueDataService } from '../../services/issue-data-service.js';
 import { extractPrefixSync } from '../../../../lib/issue-id.js';
 import { getIssuePrefix, listProjectsSync } from '../../../../lib/projects.js';
+import { panCliInvocation } from '../../../../lib/pan-cli-invocation.js';
 import { sendKeys } from '../../../../lib/tmux.js';
 import { jsonResponse } from '../../http-helpers.js';
 import {
@@ -87,6 +88,15 @@ const getPrerequisitesRoute = HttpRouter.add(
   }),
 );
 
+const getSetupDiagnosticsRoute = HttpRouter.add(
+  'GET',
+  '/api/diagnostics/setup',
+  Effect.promise(async () => {
+    const { collectSetupDiagnostics } = await import('../../../../lib/system-prerequisites.js');
+    return jsonResponse(await collectSetupDiagnostics(await getOverdeckVersion()));
+  }),
+);
+
 // ─── Routes: context sync status + one-click repair ──────────────────────────
 
 const getSyncStatusRoute = HttpRouter.add(
@@ -103,7 +113,8 @@ const postRunSyncRoute = HttpRouter.add(
   '/api/system/sync',
   Effect.promise(async () => {
     try {
-      const { stdout, stderr } = await execFileAsync('pan', ['sync'], { encoding: 'utf-8', timeout: 180_000 });
+      const invocation = panCliInvocation(['sync']);
+      const { stdout, stderr } = await execFileAsync(invocation.command, invocation.args, { encoding: 'utf-8', timeout: 180_000 });
       return jsonResponse({ ok: true, output: `${stdout}${stderr}`.trim() });
     } catch (error: any) {
       const detail = String(error?.stderr || error?.message || error);
@@ -514,7 +525,8 @@ const postRestartDashboardRoute = HttpRouter.add(
   '/api/system/restart-dashboard',
   Effect.sync(() => {
     try {
-      const child = spawn('pan', ['restart', '--dashboard'], {
+      const invocation = panCliInvocation(['restart', '--dashboard']);
+      const child = spawn(invocation.command, invocation.args, {
         detached: true,
         stdio: 'ignore',
       });
@@ -533,6 +545,7 @@ const postRestartDashboardRoute = HttpRouter.add(
 export const metaRouteLayer = Layer.mergeAll(
   getVersionRoute,
   getPrerequisitesRoute,
+  getSetupDiagnosticsRoute,
   getSyncStatusRoute,
   postRunSyncRoute,
   getRegisteredProjectsRoute,

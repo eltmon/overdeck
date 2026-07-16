@@ -1,6 +1,6 @@
 /**
  * Integration tests for stub-UI wiring into the review context manifest
- * (PAN-1500, review-context-wire bead).
+ * (PAN-1500, review-context-wire task).
  */
 import { spawnSync } from 'child_process';
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'fs';

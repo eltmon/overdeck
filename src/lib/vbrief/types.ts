@@ -3,7 +3,7 @@
  *
  * Conforms to vBRIEF v0.6 specification (https://github.com/deftai/vBRIEF).
  * Structured plan format produced by the planning agent and consumed by
- * Cloister for programmatic beads creation and DAG visualization.
+ * Cloister for programmatic task execution and DAG visualization.
  *
  * v0.5 compatibility fields (PAN-453):
  *   - VBriefReference: external links (issues, PRDs, specs)
@@ -16,7 +16,7 @@
  * Overdeck extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
  *   - metadata.kind: docs | api | backend | frontend | infra | test | refactor | design | spike
- *   - metadata.issueLabel: issue ID for beads label filtering
+ *   - metadata.issueLabel: issue ID retained for compatibility with older plans
  *   - child metadata.kind: "acceptance_criterion" on child items
  */
 

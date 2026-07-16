@@ -34,10 +34,11 @@ LIFECYCLE VERBS (top-level)
   pan done <id>            Mark work complete + signal pipeline
   pan approve <id>         Approve work and merge
   pan reopen <id>          Reopen a completed issue
+  pan reset-to-planned <id>  Return to post-planning; preserve workspace + branch
   pan wipe <id>            Destructive reset-to-Todo for an issue
   pan close <id>           Close-out ceremony for completed issues
   pan plan <id>            Create execution plan
-  pan plan finalize <id>   Materialize plan to beads
+  pan plan finalize <id>   Materialize plan to vBRIEF tasks
   pan issues               List and triage work across trackers
 
 OBSERVATION
@@ -69,7 +70,7 @@ ADMIN (PLUMBING)
   pan admin specialists <cmd> Review/test/merge agents
   pan admin remote <cmd>      Fly.io infra
   pan admin db <cmd>          Database seeding
-  pan admin beads <cmd>       Beads CLI management
+  pan admin vBRIEF tasks <cmd>       vBRIEF tasks CLI management
   pan admin config <cmd>      Configuration management
   pan admin hooks install     Install Claude Code heartbeat hooks
   pan admin tldr <cmd>        TLDR daemon management

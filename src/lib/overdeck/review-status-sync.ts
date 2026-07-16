@@ -16,8 +16,9 @@ import { getOverdeckDatabaseSync } from './infra.js';
 // ── Timestamp helpers — overdeck stores timestamps as integer epoch-MILLISECONDS;
 //    the ReviewStatus domain type exposes them as ISO strings, so convert at the
 //    storage boundary (PAN-1961). ─────────────────────────────────────────────
-function isoToMs(value: string | null | undefined): number | null {
+function isoToMs(value: string | number | null | undefined): number | null {
   if (!value) return null;
+  if (typeof value === 'number') return value;
   const ms = Date.parse(value);
   return Number.isFinite(ms) ? ms : null;
 }
@@ -463,6 +464,7 @@ export function getMergeBlockerReconcileCandidatesSync(): MergeBlockerReconcileC
     WHERE ready_for_merge = 1
       OR blocker_reasons LIKE '%merge_conflict%'
       OR blocker_reasons LIKE '%not_mergeable%'
+      OR blocker_reasons LIKE '%failing_checks%'
   `).all() as Array<{
     issue_id: string;
     pr_url: string | null;
