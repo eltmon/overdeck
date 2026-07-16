@@ -36,7 +36,8 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx"
+      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
     ],
     "declaredScopeUntouched": [
       "src/dashboard/frontend/src/*.test.ts",
@@ -155,12 +156,13 @@
       "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
       "src/dashboard/frontend/src/components/primitives/AgentCard.test.tsx",
       "src/dashboard/frontend/src/test-setup.ts",
-      "src/dashboard/frontend/vitest.config.ts"
+      "src/dashboard/frontend/vitest.config.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
     ],
-    "recordedAt": "2026-07-16T19:06:28.490Z"
+    "recordedAt": "2026-07-16T19:46:37.938Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T19:46:31.099Z",
+  "updated": "2026-07-16T19:46:37.940Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "failed",
