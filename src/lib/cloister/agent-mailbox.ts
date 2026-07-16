@@ -157,7 +157,7 @@ export async function listMailboxItems(options: MailboxAddress): Promise<Mailbox
     const parsed = parseMailboxMarkdown(file.content);
     if (parsed.metadata) {
       if (parsed.metadata.issueId.toUpperCase() !== options.issueId.toUpperCase() || parsed.metadata.role !== options.role) continue;
-      items.push({ ...parsed.metadata, legacy: false, markdownBody: parsed.markdownBody });
+      items.push({ ...parsed.metadata, filePath: file.path, legacy: false, markdownBody: parsed.markdownBody });
       continue;
     }
 

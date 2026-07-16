@@ -49,6 +49,22 @@ describe('agent mailbox', () => {
     expect(await readFile(filePath, 'utf8')).toContain('# Review feedback\n\nReadable details.');
   });
 
+  it('uses the discovered path after a workspace is relocated', async () => {
+    const filePath = join(feedbackDir, '001-review-agent-changes-requested.md');
+    const stalePath = '/old/workspace/.pan/feedback/001-review-agent-changes-requested.md';
+    const item = createMailboxItem({
+      issueId: 'PAN-2255', role: 'work', source: 'review-agent', summary: 'Fix the finding',
+      actionRequired: true, filePath: stalePath, markdownBody: '# Review feedback',
+      createdAt: '2026-07-16T12:00:00Z',
+    });
+    await writeFile(filePath, renderMailboxItem(item));
+
+    const listed = await listMailboxItems({ issueId: 'PAN-2255', role: 'work', workspacePath });
+    expect(listed[0].filePath).toBe(filePath);
+    await markMailboxItemDelivered({ issueId: 'PAN-2255', role: 'work', filePath: listed[0].filePath });
+    expect(parseMailboxMarkdown(await readFile(filePath, 'utf8')).metadata?.state).toBe('delivered');
+  });
+
   it('returns legacy numbered feedback only while its pipeline status requires action', async () => {
     const filePath = join(feedbackDir, '001-review-agent-changes-requested.md');
     await writeFile(filePath, '# Review blocked\n\nFix this.');

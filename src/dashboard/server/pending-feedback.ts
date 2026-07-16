@@ -30,6 +30,7 @@ export interface PendingFeedbackDelivery {
   createdAt: string;
   firstAttemptedAt?: string;
   lastAttemptedAt?: string;
+  transportDeliveredAt?: string;
 }
 
 interface PendingFeedbackStore {
@@ -171,14 +172,16 @@ export async function processPendingFeedbackDeliveries(options?: {
     delivery.firstAttemptedAt ??= attemptedAt;
     delivery.lastAttemptedAt = attemptedAt;
 
-    const target = await resolveTarget(delivery.issueId);
-    if (!('agentId' in target)) {
-      remaining.push(delivery);
-      continue;
-    }
-
     try {
-      await deliver(target.agentId, delivery.message);
+      if (!delivery.transportDeliveredAt) {
+        const target = await resolveTarget(delivery.issueId);
+        if (!('agentId' in target)) {
+          remaining.push(delivery);
+          continue;
+        }
+        await deliver(target.agentId, delivery.message);
+        delivery.transportDeliveredAt = attemptedAt;
+      }
       await markMailboxDelivered(delivery);
       emitActivityEntrySync({
         source: 'dashboard',

@@ -103,6 +103,36 @@ describe('pending feedback recovery (PAN-585)', () => {
     expect(stored.deliveries[0].kind).toBe('test-failed');
   });
 
+  it('retries only the mailbox transition after transport succeeds', async () => {
+    queueFile = await setupQueueFile();
+    await enqueuePendingFeedbackDelivery({
+      issueId: 'PAN-585', role: 'work', kind: 'review-blocked', filePath: '/tmp/review.md',
+      message: 'review feedback', createdAt: '2026-04-27T06:00:00Z',
+    }, { filePath: queueFile });
+    const deliver = vi.fn(async () => {});
+    const markMailboxDelivered = vi.fn()
+      .mockRejectedValueOnce(new Error('disk unavailable'))
+      .mockResolvedValueOnce(undefined);
+    const options = {
+      filePath: queueFile,
+      now: Date.parse('2026-04-27T06:05:00Z'),
+      _deliver: deliver,
+      _resolveTarget: vi.fn(async () => ({ agentId: 'agent-pan-585' })),
+      _markMailboxDelivered: markMailboxDelivered,
+      _loadStatuses: vi.fn(() => ({ 'PAN-585': { issueId: 'PAN-585', reviewStatus: 'blocked' } })) as any,
+      _getStatus: vi.fn() as any,
+    };
+
+    await processPendingFeedbackDeliveries(options);
+    const retained = JSON.parse(await readFile(queueFile, 'utf8'));
+    expect(retained.deliveries[0].transportDeliveredAt).toBeDefined();
+    await processPendingFeedbackDeliveries(options);
+
+    expect(deliver).toHaveBeenCalledOnce();
+    expect(markMailboxDelivered).toHaveBeenCalledTimes(2);
+    await expect(readFile(queueFile, 'utf8')).rejects.toThrow();
+  });
+
   it('drops obsolete feedback once the issue status no longer needs redelivery', async () => {
     queueFile = await setupQueueFile();
 

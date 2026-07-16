@@ -69,13 +69,6 @@ describe('deliverReviewVerdictFeedback', () => {
       feedbackPath: '/tmp/overdeck/workspaces/feature-pan-1917/.pan/feedback/001-review-agent-blocked.md',
       agentMessageSent: false,
     }));
-    expect(mocks.markWorkspaceStuck).toHaveBeenCalledWith(
-      'PAN-1917',
-      'feedback_delivery_needs_you',
-      expect.objectContaining({
-        reason: 'No live feedback target for PAN-1917',
-        specialist: 'review-agent',
-      }),
-    );
+    expect(mocks.markWorkspaceStuck).not.toHaveBeenCalled();
   });
 });

@@ -41,4 +41,37 @@ describe('mailbox escalation policy window', () => {
       role: 'work', source: 'review-agent', feedbackPath: '/workspace/.pan/feedback/001-review.md',
     }));
   });
+
+  it('bounds mailbox scans when many active workspaces are retained', async () => {
+    let active = 0;
+    let peak = 0;
+    const releases: Array<() => void> = [];
+    const listItems = vi.fn(async () => {
+      active += 1;
+      peak = Math.max(peak, active);
+      await new Promise<void>(resolve => releases.push(resolve));
+      active -= 1;
+      return [];
+    });
+    const deps: MailboxEscalationDeps = {
+      listWorkspaces: () => Array.from({ length: 40 }, (_, index) => ({
+        issueId: `PAN-${3000 + index}`, workspacePath: `/workspace-${index}`,
+      })),
+      listItems,
+      resolveTarget: vi.fn(async () => ({ needsYou: true as const, reason: 'no work agent' })),
+      alreadyEscalated: () => false,
+      escalate: vi.fn(async () => {}),
+    };
+
+    const patrol = patrolPendingMailboxEscalations({ policyWindowMs: 60_000, deps });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(active).toBe(4);
+    while (releases.length > 0 || listItems.mock.calls.length < 40) {
+      releases.splice(0).forEach(release => release());
+      await vi.advanceTimersByTimeAsync(0);
+    }
+    await patrol;
+    expect(peak).toBe(4);
+    expect(listItems).toHaveBeenCalledTimes(40);
+  });
 });

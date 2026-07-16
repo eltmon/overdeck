@@ -20,13 +20,15 @@ const defaultDeps: MailboxEscalationDeps = {
   listWorkspaces: () => listAgentStates()
     .filter(state => state.role === 'work'
       && Boolean(state.issueId && state.workspace)
-      && ['starting', 'running', 'stopped'].includes(state.status))
+      && ['starting', 'running'].includes(state.status))
     .map(state => ({ issueId: state.issueId, workspacePath: state.workspace })),
   listItems: (issueId, workspacePath) => listMailboxItems({ issueId, role: 'work', workspacePath }),
   resolveTarget: resolveIssueFeedbackTarget,
   alreadyEscalated: issueId => getReviewStatusSync(issueId)?.stuckReason === 'feedback_delivery_needs_you',
   escalate: surfaceIssueFeedbackNeedsYou,
 };
+
+const MAILBOX_SCAN_CONCURRENCY = 4;
 
 export async function patrolPendingMailboxEscalations(options: {
   policyWindowMs: number;
@@ -38,23 +40,37 @@ export async function patrolPendingMailboxEscalations(options: {
   const actions: string[] = [];
   const seen = new Set<string>();
 
-  for (const workspace of deps.listWorkspaces()) {
+  const workspaces = deps.listWorkspaces().filter(workspace => {
     const issueId = workspace.issueId.toUpperCase();
-    if (seen.has(issueId) || deps.alreadyEscalated(issueId)) continue;
+    if (seen.has(issueId) || deps.alreadyEscalated(issueId)) return false;
     seen.add(issueId);
+    return true;
+  });
+  let nextIndex = 0;
+
+  async function scanNext(): Promise<void> {
+    while (nextIndex < workspaces.length) {
+      const workspace = workspaces[nextIndex++];
+      const issueId = workspace.issueId.toUpperCase();
     const overdue = (await deps.listItems(issueId, workspace.workspacePath)).find(item =>
       item.state === 'pending' && item.actionRequired && now - Date.parse(item.createdAt) >= options.policyWindowMs);
-    if (!overdue) continue;
+      if (!overdue) continue;
 
-    const target = await deps.resolveTarget(issueId);
-    if ('agentId' in target) continue; // Resurrection/resume drains the mailbox.
-    await deps.escalate(issueId, target.reason, {
-      role: overdue.role,
-      source: overdue.source,
-      summary: overdue.summary,
-      feedbackPath: overdue.filePath,
-    });
-    actions.push(`Escalated overdue mailbox feedback for ${issueId}`);
+      const target = await deps.resolveTarget(issueId);
+      if ('agentId' in target) continue; // Resurrection/resume drains the mailbox.
+      await deps.escalate(issueId, target.reason, {
+        role: overdue.role,
+        source: overdue.source,
+        summary: overdue.summary,
+        feedbackPath: overdue.filePath,
+      });
+      actions.push(`Escalated overdue mailbox feedback for ${issueId}`);
+    }
   }
+
+  await Promise.all(Array.from(
+    { length: Math.min(MAILBOX_SCAN_CONCURRENCY, workspaces.length) },
+    () => scanNext(),
+  ));
   return actions;
 }
