@@ -338,15 +338,7 @@
       "timestamp": "2026-07-16T12:34:18.839Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-16T12:34:18Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1491\n\n# Review Synthesis — PAN-1491 — 2026-07-16T08:33:43-04:00\n\n## Verdict: CHANGES REQUESTED — requirements reviewer failed before writing a report\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/context.json\n- Branch: feature/pan-1491\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491\n- HEAD reviewed: 782a127e82f29cfa7ca44ba9eef0fcbe1321a18f\n- Cycle number: 10\n- Prior cycle SHA: dd2b032eee2553bc57642c398799be1f098a9a17\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/performance.md | 0 |\n| requirements | failed | — | 1 |\n\n## Blocking Findings\n\n### [requirements] Reviewer failed before writing a report\nThe requirements reviewer terminal signal was `REVIEWER_FAILED requirements reviewer session ended before writing a report`. Per the review role, any failed reviewer blocks approval even when the other reports are clean.\n\n## Non-blocking Findings\n\n### [performance] Weights HTTP route performs synchronous database scans on the Node.js event loop — `src/lib/overdeck/substrate-bug-weights-service.ts:52`\n[demoted: previously reviewed] The performance reviewer flagged that `GET /api/flywheel/substrate-bug-weights` calls `listSubstrateBugWeights()`, which uses synchronous SQLite-backed telemetry and substrate-bug reads before response pagination. The cited service lines existed before this cycle; the cycle diff from `dd2b032eee2553bc57642c398799be1f098a9a17` to `782a127e82f29cfa7ca44ba9eef0fcbe1321a18f` only changes the comparator at `src/lib/overdeck/substrate-bug-weights-service.ts:80` to preserve operator precedence. Per the cycle >= 3 convergence gate, this finding is not promotable to a blocker in this cycle.\n\n## Clean Sub-roles\n- security\n- correctness\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/.pan/review/agent-pan-1491-review-782a127e/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1491 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -418,23 +410,23 @@
     "recordedAt": "2026-07-16T12:07:29.315Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-16T12:50:51.316Z",
+  "updated": "2026-07-16T12:51:06.396Z",
   "pipeline": {
     "issueId": "PAN-1491",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "failed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T12:50:51.198Z",
+    "updatedAt": "2026-07-16T12:51:06.295Z",
     "reviewNotes": "[correctness] Operator-filed bugs are no longer always on top — `src/lib/overdeck/substrate-bug-weights-service.ts:79`",
     "verificationNotes": "Verification FAILED at test (389233ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1491\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/flywheel/__tests__/FlywheelStatusDetails.test.tsx \u001b[2m(\u001b[22m\u001b[2m13 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 558\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/vbrief/VBriefViewer.test.tsx \u001b[2m(\u001b[22m\u001b[2m27 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 434\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/issue-view/StartAgentCta.test.tsx \u001b[2m(\u001b[22m\u001b[2m13 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 895\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/chat/__tests__/ChatMarkdown.test.tsx \u001b[2m(\u001b[22m\u001b[2m8 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 638\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders bare assistant file paths as MarkdownFileLink chips once existence is confirmed \u001b[33m 351\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/SessionDetail.test.tsx \u001b[2m(\u001b[22m\u001b[2m22 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1124\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m calls onClose when close button is clicked \u001b[33m 348\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/chat/__tests__/MarkdownFileLink.test.tsx \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 981\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/ConversationsPage.test.tsx \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1316\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m forces keyword feed search when managed-archived is selected from semantic mode \u001b[33m 502\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/pages/__tests__/FlywheelPage.test.tsx \u001b[2m(\u001b[22m\u001b[2m16 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1239\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandPalette.test.tsx \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1174\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m shows /pan-flywheel action when searching for flywheel and navigates to the Flywheel page \u001b[33m 418\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/conversations/__tests__/sessions-\n…(387989 chars elided)…\n2m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-spawn-dirty-workspace.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/doctor-main-divergence.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/overdeck/__tests__/normalize-harness.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-start-args.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/events.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/remote/__tests__/remote-state-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b\n...(truncated)",
     "inspectNotes": "Bead b3-weight-fn BLOCKED: commit d813b8b4 does not implement computeSubstrateBugWeight(criteria, stats) at all. The diff only adds optional weight/weightReason fields to the FlywheelSuggestion interface/schema in packages/contracts/src/flywheel.ts:180-190 — no status-multiplier logic, no normalizedDistance calculation, no compound-value field reading (medianMs/p95Ms), no insufficient_data short-circuit, and no reason-string generation exist anywhere in this commit. None of AC1-AC5 can be evaluated because the function under review is absent. This is the same d813b8b4 diff already submitted (and blocked) against bead b2-parse-criteria moments ago — it looks like the wrong commit is being routed to review requests, or the actual b3-weight-fn implementation commit has not landed yet. Required fix: identify and deliver the commit that actually adds computeSubstrateBugWeight, implementing per-criterion status multiplier (red=1.6x per AC1 example: 3*(1+0.6)), a status floor that dominates over raw normalized drift for red vs green (AC2), safe reading of a configured valueField from compound values with graceful fallback to normalizedDistance 0 + floor when the field is absent (AC3), a weight-0 + insufficient-telemetry-reason short circuit when all criteria are insufficient_data (AC4), and a reason string naming the highest-contributing criterion by label/status/value-vs-target (AC5).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "lastVerifiedCommit": "782a127e82f29cfa7ca44ba9eef0fcbe1321a18f",
-    "reviewSpawnedAt": "2026-07-16T12:32:04.034Z",
+    "reviewSpawnedAt": "2026-07-16T12:51:06.294Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/server/routes/flywheel-substrate-bug-weights.ts",
@@ -501,9 +493,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 33888878,
-            "output": 56586,
-            "cacheRead": 32792064,
+            "input": 34164650,
+            "output": 56838,
+            "cacheRead": 33063168,
             "cacheWrite": 0
           }
         },
@@ -598,9 +590,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 33888878,
-          "output": 56586,
-          "cacheRead": 32792064,
+          "input": 34164650,
+          "output": 56838,
+          "cacheRead": 33063168,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -665,8 +657,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 173.90109,
-        "pricingAsOf": "2026-07-16T12:50:51.269Z"
+        "usd": 174.067542,
+        "pricingAsOf": "2026-07-16T12:51:06.370Z"
       }
     },
     "merges": [
