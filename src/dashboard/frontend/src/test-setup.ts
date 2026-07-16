@@ -10,6 +10,11 @@ if (typeof window.prompt !== 'function') {
   window.prompt = () => null;
 }
 
+// happy-dom does not implement window.confirm.
+if (typeof window.confirm !== 'function') {
+  window.confirm = () => false;
+}
+
 // Several components rely on ResizeObserver (MessagesTimeline, XTerminal,
 // GodView), so install a no-op fallback when the environment lacks it.
 class ResizeObserverMock implements ResizeObserver {
