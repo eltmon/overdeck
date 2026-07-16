@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:35:04.338Z",
+  "updated": "2026-07-16T07:37:21.832Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "thread-role-mcp-spawns": {
-        "writerId": "agent-pan-2698",
-        "agentId": "agent-pan-2698",
-        "pid": 3160023,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:31:08.012Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2698",
@@ -127,6 +119,17 @@
         "outcome": "completed",
         "reason": "Added escaped stdio MCP server TOML emission with skip warnings and Codex runtime tests",
         "releasedAt": "2026-07-16T07:30:51.840Z"
+      },
+      {
+        "writerId": "agent-pan-2698",
+        "agentId": "agent-pan-2698",
+        "pid": 3160023,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:31:08.012Z",
+        "itemId": "thread-role-mcp-spawns",
+        "outcome": "completed",
+        "reason": "Threaded role MCP definitions through all five Codex role spawn, resume, recovery, and planning paths with rewrite-preservation tests",
+        "releasedAt": "2026-07-16T07:37:21.832Z"
       }
     ],
     "statusReasons": {
@@ -137,6 +140,10 @@
       "codex-config-mcp-servers": {
         "reason": "Added escaped stdio MCP server TOML emission with skip warnings and Codex runtime tests",
         "updatedAt": "2026-07-16T07:30:51.840Z"
+      },
+      "thread-role-mcp-spawns": {
+        "reason": "Threaded role MCP definitions through all five Codex role spawn, resume, recovery, and planning paths with rewrite-preservation tests",
+        "updatedAt": "2026-07-16T07:37:21.832Z"
       }
     }
   },
@@ -151,6 +158,10 @@
     "codex-config-mcp-servers.codex-config-mcp-servers.ac3": "completed",
     "codex-config-mcp-servers.codex-config-mcp-servers.ac4": "completed",
     "codex-config-mcp-servers.codex-config-mcp-servers.ac5": "completed",
-    "thread-role-mcp-spawns": "running"
+    "thread-role-mcp-spawns": "completed",
+    "thread-role-mcp-spawns.thread-role-mcp-spawns.ac1": "completed",
+    "thread-role-mcp-spawns.thread-role-mcp-spawns.ac2": "completed",
+    "thread-role-mcp-spawns.thread-role-mcp-spawns.ac3": "completed",
+    "thread-role-mcp-spawns.thread-role-mcp-spawns.ac4": "completed"
   }
 }
