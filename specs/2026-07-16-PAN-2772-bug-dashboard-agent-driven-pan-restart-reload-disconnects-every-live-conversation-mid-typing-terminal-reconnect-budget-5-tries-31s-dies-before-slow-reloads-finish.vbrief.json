@@ -4,17 +4,17 @@
     "created": "2026-07-16T05:12:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2772: bug(dashboard): agent-driven pan restart/reload disconnects every live conversation mid-typing; terminal reconnect budget (5 tries / ~31s) dies before slow reloads finish",
-    "updated": "2026-07-16T17:38:43.167Z"
+    "updated": "2026-07-16T17:38:44.862Z"
   },
   "plan": {
     "id": "pan-2772",
     "title": "bug(dashboard): agent-driven pan restart/reload disconnects every live conversation mid-typing; terminal reconnect budget (5 tries / ~31s) dies before slow reloads finish",
-    "status": "approved",
+    "status": "running",
     "uid": "bef7a2ec-b1bb-4f40-84da-f142beeefc84",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-16T05:12:00.000Z",
-    "updated": "2026-07-16T17:38:43.167Z",
+    "updated": "2026-07-16T17:38:44.862Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2772",
