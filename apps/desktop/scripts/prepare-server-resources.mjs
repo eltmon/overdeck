@@ -29,10 +29,11 @@
  * Prerequisite: `npm run build` at the repo root.
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
+  mkdtempSync,
   mkdirSync,
   readdirSync,
   readFileSync,
@@ -43,7 +44,7 @@ import {
 } from "node:fs";
 import Module, { createRequire } from "node:module";
 import * as OS from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,6 +52,8 @@ const desktopDir = join(__dirname, "..");
 const repoRoot = resolve(desktopDir, "../..");
 const distDashboard = join(repoRoot, "dist/dashboard");
 const serverDir = join(desktopDir, "server");
+const distRoot = join(repoRoot, "dist");
+const cliDir = join(desktopDir, "cli");
 
 // ─── Preflight ────────────────────────────────────────────────────────────────
 
@@ -114,6 +117,67 @@ const packageNameOf = (specifier) => {
 };
 const VALID_PACKAGE = /^(@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/;
 
+const scanImportClosure = (rootDir, entryPoints, skipPackages = new Set()) => {
+  const seen = new Set();
+  const queue = entryPoints.filter((entry) => existsSync(join(rootDir, entry)));
+  const packages = new Set();
+
+  while (queue.length > 0) {
+    const file = queue.pop();
+    if (seen.has(file) || !existsSync(join(rootDir, file))) continue;
+    seen.add(file);
+    const source = readFileSync(join(rootDir, file), "utf8");
+    const specifiers = [
+      ...source.matchAll(/from\s*["']([^"'\n]+)["']/g),
+      ...source.matchAll(/import\(\s*["']([^"'\n]+)["']\s*\)/g),
+      ...source.matchAll(/require\(\s*["']([^"'\n]+)["']\s*\)/g),
+    ].map((match) => match[1]);
+    for (const specifier of specifiers) {
+      if (specifier.startsWith("./") || specifier.startsWith("../")) {
+        const target = resolve(dirname(join(rootDir, file)), specifier);
+        const targetRelative = relative(rootDir, target);
+        if (targetRelative.endsWith(".js") && !targetRelative.startsWith("..")) queue.push(targetRelative);
+        continue;
+      }
+      if (specifier.startsWith("node:") || specifier.startsWith("bun:")) continue;
+      const packageName = packageNameOf(specifier);
+      if (!VALID_PACKAGE.test(packageName)) continue;
+      if (builtins.has(packageName) || skipPackages.has(packageName)) continue;
+      packages.add(packageName);
+    }
+  }
+
+  return { seen, packages };
+};
+
+const pinnedDependencies = (packages, label) => {
+  const dependencies = {};
+  for (const packageName of [...packages].sort()) {
+    const manifestPath = join(repoRoot, "node_modules", packageName, "package.json");
+    if (!existsSync(manifestPath)) {
+      console.warn(`[prepare-server] Skipping '${packageName}' — imported by the ${label} but not installed at the repo root (matching pan up)`);
+      continue;
+    }
+    dependencies[packageName] = JSON.parse(readFileSync(manifestPath, "utf8")).version;
+  }
+  return dependencies;
+};
+
+const installDependencies = (runtimeDir) => {
+  execSync("npm install --omit=dev --no-audit --no-fund", {
+    cwd: runtimeDir,
+    stdio: "inherit",
+  });
+};
+
+const removeSourceMaps = (dir) => {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const entryPath = join(dir, entry.name);
+    if (entry.isDirectory()) removeSourceMaps(entryPath);
+    else if (entry.isFile() && entry.name.endsWith(".map")) rmSync(entryPath);
+  }
+};
+
 // ─── Stage the PTY supervisor (PAN-2592) ──────────────────────────────────────
 // Conversations and work agents wrap Claude in dist/pty-supervisor.js — a
 // root-build artifact the server locates via resolvePtySupervisorScriptPath()
@@ -133,32 +197,7 @@ mkdirSync(supervisorDir, { recursive: true });
 
 // Walk the supervisor's relative-import closure over repo dist/ (the root
 // build is code-split; shipping the entry alone cannot boot).
-const supervisorSeen = new Set();
-const supervisorQueue = ["pty-supervisor.js"];
-const supervisorExternals = new Set();
-while (supervisorQueue.length > 0) {
-  const file = supervisorQueue.pop();
-  if (supervisorSeen.has(file) || !existsSync(join(repoRoot, "dist", file))) continue;
-  supervisorSeen.add(file);
-  const source = readFileSync(join(repoRoot, "dist", file), "utf8");
-  const specifiers = [
-    ...source.matchAll(/from\s*["']([^"'\n]+)["']/g),
-    ...source.matchAll(/import\(\s*["']([^"'\n]+)["']\s*\)/g),
-    ...source.matchAll(/require\(\s*["']([^"'\n]+)["']\s*\)/g),
-  ].map((match) => match[1]);
-  for (const specifier of specifiers) {
-    if (specifier.startsWith("./") || specifier.startsWith("../")) {
-      const target = specifier.replace(/^\.\//, "");
-      if (target.endsWith(".js") && !target.includes("/")) supervisorQueue.push(target);
-      continue;
-    }
-    if (specifier.startsWith("node:")) continue;
-    const packageName = packageNameOf(specifier);
-    if (!VALID_PACKAGE.test(packageName)) continue;
-    if (builtins.has(packageName)) continue;
-    supervisorExternals.add(packageName);
-  }
-}
+const { seen: supervisorSeen, packages: supervisorExternals } = scanImportClosure(distRoot, ["pty-supervisor.js"]);
 for (const file of supervisorSeen) {
   cpSync(join(repoRoot, "dist", file), join(supervisorDir, file));
 }
@@ -255,47 +294,13 @@ const SKIP_PACKAGES = new Set([
   "playwright-core",
 ]);
 
-const seen = new Set();
-const queue = ENTRY_POINTS.filter((entry) => existsSync(join(serverDir, entry)));
-const packages = new Set();
-
-while (queue.length > 0) {
-  const file = queue.pop();
-  if (seen.has(file) || !existsSync(join(serverDir, file))) continue;
-  seen.add(file);
-  const source = readFileSync(join(serverDir, file), "utf8");
-  const specifiers = [
-    ...source.matchAll(/from\s*["']([^"'\n]+)["']/g),
-    ...source.matchAll(/import\(\s*["']([^"'\n]+)["']\s*\)/g),
-    ...source.matchAll(/require\(\s*["']([^"'\n]+)["']\s*\)/g),
-  ].map((match) => match[1]);
-  for (const specifier of specifiers) {
-    if (specifier.startsWith("./") || specifier.startsWith("../")) {
-      const target = specifier.replace(/^\.\//, "");
-      if (target.endsWith(".js") && !target.includes("/")) queue.push(target);
-      continue;
-    }
-    if (specifier.startsWith("node:") || specifier.startsWith("bun:")) continue;
-    const packageName = packageNameOf(specifier);
-    if (!VALID_PACKAGE.test(packageName)) continue; // string literal noise in minified code
-    if (builtins.has(packageName) || SKIP_PACKAGES.has(packageName)) continue;
-    packages.add(packageName);
-  }
-}
+const { seen, packages } = scanImportClosure(serverDir, ENTRY_POINTS, SKIP_PACKAGES);
 
 // Pin each external to the version actually installed at the repo root, so
 // the packaged server runs exactly what `pan up` runs. An external the root
 // doesn't have installed is one the live server also runs without (e.g. ws's
 // optional try/catch-guarded bufferutil) — skip it for parity.
-const dependencies = {};
-for (const packageName of [...packages].sort()) {
-  const manifestPath = join(repoRoot, "node_modules", packageName, "package.json");
-  if (!existsSync(manifestPath)) {
-    console.warn(`[prepare-server] Skipping '${packageName}' — imported by the bundle but not installed at the repo root (matching pan up)`);
-    continue;
-  }
-  dependencies[packageName] = JSON.parse(readFileSync(manifestPath, "utf8")).version;
-}
+const dependencies = pinnedDependencies(packages, "bundle");
 console.log(
   `[prepare-server] Externalized deps (${seen.size} reachable chunks): ${Object.entries(dependencies)
     .map(([name, version]) => `${name}@${version}`)
@@ -335,10 +340,7 @@ writeFileSync(
 );
 
 console.log("[prepare-server] Installing externalized deps...");
-execSync("npm install --omit=dev --no-audit --no-fund", {
-  cwd: serverDir,
-  stdio: "inherit",
-});
+installDependencies(serverDir);
 
 const desktopRequire = Module.createRequire(join(desktopDir, "package.json"));
 
@@ -379,4 +381,79 @@ try {
   console.warn("[prepare-server] electron binary not resolvable here — skipping the ABI load check");
 }
 
-console.log("[prepare-server] Done. server/ is ready for packaging.");
+// ─── Stage the pan CLI runtime (PAN-2768) ────────────────────────────────────
+
+const distCli = join(distRoot, "cli");
+if (!existsSync(join(distCli, "index.js"))) {
+  console.error("[prepare-server] dist/cli/index.js not found — run 'npm run build' at the repo root first.");
+  process.exit(1);
+}
+
+rmSync(cliDir, { recursive: true, force: true });
+mkdirSync(cliDir, { recursive: true });
+cpSync(distCli, join(cliDir, "cli"), {
+  recursive: true,
+  filter: (source) => !source.endsWith(".map"),
+});
+
+const { seen: cliSeen, packages: cliPackages } = scanImportClosure(distRoot, ["cli/index.js"]);
+for (const file of cliSeen) {
+  if (file.startsWith(`cli${OS.platform() === "win32" ? "\\" : "/"}`)) continue;
+  const destination = join(cliDir, file);
+  mkdirSync(dirname(destination), { recursive: true });
+  cpSync(join(distRoot, file), destination);
+}
+
+const cliDependencies = pinnedDependencies(cliPackages, "CLI bundle");
+writeFileSync(
+  join(cliDir, "package.json"),
+  `${JSON.stringify(
+    {
+      name: "@overdeck/desktop-cli",
+      version: rootPkg.version,
+      private: true,
+      type: "module",
+      dependencies: cliDependencies,
+    },
+    null,
+    2,
+  )}\n`,
+);
+console.log(
+  `[prepare-server] Staged pan CLI (${cliSeen.size} reachable chunks): ${Object.entries(cliDependencies)
+    .map(([name, version]) => `${name}@${version}`)
+    .join(", ")}`,
+);
+console.log("[prepare-server] Installing CLI externalized deps...");
+installDependencies(cliDir);
+removeSourceMaps(cliDir);
+
+{
+  const smokeRoot = mkdtempSync(join(OS.tmpdir(), "overdeck-cli-smoke-"));
+  const smokeRuntime = join(smokeRoot, "runtime");
+  const smokeHome = join(smokeRoot, "home");
+  cpSync(cliDir, smokeRuntime, { recursive: true });
+  // Electron exposes the app manifest at resources/package.json while
+  // extraResources maps this staged tree to resources/dist/. The CLI reads
+  // its version from that package root, but resolves externals from
+  // resources/dist/node_modules.
+  cpSync(join(cliDir, "package.json"), join(smokeRoot, "package.json"));
+  mkdirSync(smokeHome, { recursive: true });
+  try {
+    execFileSync(process.execPath, [join(smokeRuntime, "cli/index.js"), "--version"], {
+      cwd: smokeRuntime,
+      stdio: "pipe",
+      env: { ...process.env, OVERDECK_HOME: smokeHome },
+    });
+  } catch (error) {
+    console.error(`[prepare-server] Staged CLI smoke run failed with exit ${String(error?.status ?? -1)}.`);
+    if (error?.stderr) console.error(String(error.stderr));
+    process.exitCode = 1;
+  } finally {
+    rmSync(smokeRoot, { recursive: true, force: true });
+  }
+  if (process.exitCode) process.exit(process.exitCode);
+  console.log("[prepare-server] Verified: staged pan CLI boots from an isolated temp directory");
+}
+
+console.log("[prepare-server] Done. server/ and cli/ are ready for packaging.");
