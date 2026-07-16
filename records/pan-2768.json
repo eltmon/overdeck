@@ -27,11 +27,35 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T11:45:10.339Z"
+    },
+    {
+      "timestamp": "2026-07-16T11:57:10.745Z",
+      "reason": "end",
+      "note": "Initial AppImage verification exposed a missing resources/package.json manifest that the staging smoke fixture had masked; fixed and reverified. The kickoff-required rebase also required a history-preserving remote-branch merge after a non-fast-forward push rejection. No work was skipped or deferred. Delivered the self-contained packaged CLI and full sync payload, package-structure regression guards, desktop runtime documentation, and a clean AppImage verification where bundled Electron printed CLI version 0.45.20. npm run typecheck, npm run lint, and npm test pass."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "apps/desktop/.gitignore",
+      "apps/desktop/package.json",
+      "apps/desktop/scripts/prepare-server-resources.mjs",
+      "apps/desktop/tests/package-structure.test.ts",
+      "docs/DESKTOP-APP.md"
+    ],
+    "actualChangedFiles": [
+      "apps/desktop/.gitignore",
+      "apps/desktop/package.json",
+      "apps/desktop/scripts/prepare-server-resources.mjs",
+      "apps/desktop/tests/package-structure.test.ts",
+      "docs/DESKTOP-APP.md"
+    ],
+    "recordedAt": "2026-07-16T11:57:07.758Z"
+  },
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T11:57:07.759Z",
+  "updated": "2026-07-16T11:57:10.932Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -40,11 +64,26 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T04:36:27.116Z"
+    "updatedAt": "2026-07-16T11:57:10.860Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2789"
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 1839217,
+            "output": 5269,
+            "cacheRead": 1656448,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 17542471,
+            "output": 26576,
+            "cacheRead": 17035264,
+            "cacheWrite": 0
+          }
+        },
         "plan": {
           "anthropic/claude-fable-5": {
             "input": 228,
@@ -55,6 +94,18 @@
         }
       },
       "totals": {
+        "openai/codex-auto-review": {
+          "input": 1839217,
+          "output": 5269,
+          "cacheRead": 1656448,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 17542471,
+          "output": 26576,
+          "cacheRead": 17035264,
+          "cacheWrite": 0
+        },
         "anthropic/claude-fable-5": {
           "input": 228,
           "output": 53547,
@@ -63,11 +114,13 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 8.076671,
-        "pricingAsOf": "2026-07-16T04:36:27.168Z"
+        "usd": 19.927618,
+        "pricingAsOf": "2026-07-16T11:57:10.919Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2789"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "codex",
@@ -216,24 +269,5 @@
     "appimage-smoke-verify": "completed",
     "appimage-smoke-verify.appimage-smoke-verify.ac1": "completed",
     "appimage-smoke-verify.appimage-smoke-verify.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "apps/desktop/.gitignore",
-      "apps/desktop/package.json",
-      "apps/desktop/scripts/prepare-server-resources.mjs",
-      "apps/desktop/tests/package-structure.test.ts",
-      "docs/DESKTOP-APP.md"
-    ],
-    "actualChangedFiles": [
-      "apps/desktop/.gitignore",
-      "apps/desktop/package.json",
-      "apps/desktop/scripts/prepare-server-resources.mjs",
-      "apps/desktop/tests/package-structure.test.ts",
-      "docs/DESKTOP-APP.md"
-    ],
-    "recordedAt": "2026-07-16T11:57:07.758Z"
   }
 }
