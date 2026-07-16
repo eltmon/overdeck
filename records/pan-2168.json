@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-06-29T12:57:55.944Z",
-  "updated": "2026-07-16T08:22:35.556Z",
+  "updated": "2026-07-16T08:32:04.115Z",
   "pipeline": {
     "issueId": "PAN-2168",
     "reviewStatus": "pending",
@@ -59,16 +59,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "wire-indicator-into-appchrome": {
-        "writerId": "agent-pan-2168",
-        "agentId": "agent-pan-2168",
-        "pid": 3944387,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T08:22:35.556Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2168",
@@ -135,6 +127,17 @@
         "outcome": "completed",
         "reason": "FlywheelPage now consumes cold and warm reveal signals, selects Status, and smooth-scrolls the anchored questions section; both cases are covered by focused tests and all gates pass.",
         "releasedAt": "2026-07-16T08:22:22.644Z"
+      },
+      {
+        "writerId": "agent-pan-2168",
+        "agentId": "agent-pan-2168",
+        "pid": 3944387,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T08:22:35.556Z",
+        "itemId": "wire-indicator-into-appchrome",
+        "outcome": "completed",
+        "reason": "Rendered the live OpenQuestionsIndicator globally in AppChrome and routed activation to Flywheel; hardened incomplete snapshots, corrected the browser fixture, and passed the full 9,431-test suite, typecheck, and lint.",
+        "releasedAt": "2026-07-16T08:32:04.115Z"
       }
     ],
     "statusReasons": {
@@ -153,6 +156,10 @@
       "flywheel-page-consume-reveal": {
         "reason": "FlywheelPage now consumes cold and warm reveal signals, selects Status, and smooth-scrolls the anchored questions section; both cases are covered by focused tests and all gates pass.",
         "updatedAt": "2026-07-16T08:22:22.644Z"
+      },
+      "wire-indicator-into-appchrome": {
+        "reason": "Rendered the live OpenQuestionsIndicator globally in AppChrome and routed activation to Flywheel; hardened incomplete snapshots, corrected the browser fixture, and passed the full 9,431-test suite, typecheck, and lint.",
+        "updatedAt": "2026-07-16T08:32:04.115Z"
       }
     }
   },
@@ -175,7 +182,10 @@
     "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac2": "completed",
     "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac3": "completed",
     "flywheel-page-consume-reveal.flywheel-page-consume-reveal.ac4": "completed",
-    "wire-indicator-into-appchrome": "running"
+    "wire-indicator-into-appchrome": "completed",
+    "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac1": "completed",
+    "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac2": "completed",
+    "wire-indicator-into-appchrome.wire-indicator-into-appchrome.ac3": "completed"
   },
   "sessionHistory": [
     {
