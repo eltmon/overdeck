@@ -9,9 +9,10 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { Effect } from 'effect';
-import { messageAgent, getAgentState, type AgentState } from '../../lib/agents.js';
+import { messageAgent } from '../../lib/agents.js';
 import { getReviewStatusSync, loadReviewStatuses, type ReviewStatus } from '../../lib/review-status.js';
+import { resolveIssueFeedbackTarget, type IssueFeedbackTarget } from '../../lib/cloister/feedback-target.js';
+import { markMailboxItemDelivered } from '../../lib/cloister/agent-mailbox.js';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { emitActivityEntrySync } from '../../lib/activity-logger.js';
 
@@ -22,11 +23,13 @@ type FeedbackKind = 'review-blocked' | 'review-failed' | 'test-failed';
 
 export interface PendingFeedbackDelivery {
   issueId: string;
-  agentId: string;
+  role: 'work';
   kind: FeedbackKind;
   filePath: string;
   message: string;
   createdAt: string;
+  firstAttemptedAt?: string;
+  lastAttemptedAt?: string;
 }
 
 interface PendingFeedbackStore {
@@ -107,7 +110,8 @@ export async function processPendingFeedbackDeliveries(options?: {
   staleThresholdMs?: number;
   now?: number;
   _deliver?: (agentId: string, message: string) => Promise<void>;
-  _getAgentState?: (agentId: string) => Promise<AgentState | null>;
+  _resolveTarget?: (issueId: string) => Promise<IssueFeedbackTarget>;
+  _markMailboxDelivered?: (delivery: PendingFeedbackDelivery) => Promise<void>;
   _loadStatuses?: typeof loadReviewStatuses;
   _getStatus?: typeof getReviewStatusSync;
 }): Promise<void> {
@@ -115,7 +119,13 @@ export async function processPendingFeedbackDeliveries(options?: {
   const staleThresholdMs = options?.staleThresholdMs ?? STALE_THRESHOLD_MS;
   const now = options?.now ?? Date.now();
   const deliver = options?._deliver ?? messageAgent;
-  const getAgentState = options?._getAgentState ?? ((agentId: string) => Effect.runPromise(getAgentState(agentId)));
+  const resolveTarget = options?._resolveTarget ?? resolveIssueFeedbackTarget;
+  const markMailboxDelivered = options?._markMailboxDelivered ?? ((delivery: PendingFeedbackDelivery) =>
+    markMailboxItemDelivered({
+      issueId: delivery.issueId,
+      role: delivery.role,
+      filePath: delivery.filePath,
+    }).then(() => undefined));
   const loadStatuses = options?._loadStatuses ?? loadReviewStatuses;
   const getStatus = options?._getStatus ?? getReviewStatusSync;
 
@@ -141,14 +151,19 @@ export async function processPendingFeedbackDeliveries(options?: {
       continue;
     }
 
-    const agentState = await getAgentState(delivery.agentId);
-    if (!agentState) {
+    const attemptedAt = new Date(now).toISOString();
+    delivery.firstAttemptedAt ??= attemptedAt;
+    delivery.lastAttemptedAt = attemptedAt;
+
+    const target = await resolveTarget(delivery.issueId);
+    if (!('agentId' in target)) {
       remaining.push(delivery);
       continue;
     }
 
     try {
-      await deliver(delivery.agentId, delivery.message);
+      await deliver(target.agentId, delivery.message);
+      await markMailboxDelivered(delivery);
       emitActivityEntrySync({
         source: 'dashboard',
         level: 'warn',

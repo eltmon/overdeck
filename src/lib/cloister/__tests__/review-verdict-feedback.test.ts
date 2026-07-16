@@ -59,7 +59,7 @@ describe('deliverReviewVerdictFeedback', () => {
     mocks.messageAgent.mockResolvedValue(undefined);
   });
 
-  it('swallows a readonly DB failure when marking review feedback as needing human attention', async () => {
+  it('leaves review feedback pending when no live work agent exists', async () => {
     const result = await Effect.runPromise(deliverReviewVerdictFeedback({
       issueId: 'PAN-1917',
       verdict: 'blocked',
@@ -71,10 +71,6 @@ describe('deliverReviewVerdictFeedback', () => {
       feedbackPath: '/tmp/overdeck/workspaces/feature-pan-1917/.pan/feedback/001-review-agent-blocked.md',
       agentMessageSent: false,
     }));
-    expect(mocks.markWorkspaceStuck).toHaveBeenCalledWith('PAN-1917', 'feedback_delivery_needs_you', expect.objectContaining({
-      reason: 'No live feedback target for PAN-1917',
-      specialist: 'review-agent',
-      feedbackPath: '/tmp/overdeck/workspaces/feature-pan-1917/.pan/feedback/001-review-agent-blocked.md',
-    }));
+    expect(mocks.markWorkspaceStuck).not.toHaveBeenCalled();
   });
 });

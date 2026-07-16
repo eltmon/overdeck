@@ -92,6 +92,8 @@ import {
   getAgentStateSync,
   spawnRun,
 } from '../../../lib/agents.js';
+import { resolveIssueFeedbackTarget } from '../../../lib/cloister/feedback-target.js';
+import { markMailboxItemDelivered } from '../../../lib/cloister/agent-mailbox.js';
 import { getActiveSessionModelSync } from '../../../lib/cost-parsers/jsonl-parser.js';
 import { getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
@@ -228,17 +230,23 @@ async function deliverQueuedFeedback(
   filePath: string,
   message: string,
 ): Promise<void> {
-  const agentId = `agent-${issueId.toLowerCase()}`;
   await enqueuePendingFeedbackDelivery({
     issueId,
-    agentId,
+    role: 'work',
     kind,
     filePath,
     message,
     createdAt: new Date().toISOString(),
   });
-  await messageAgent(agentId, message);
-  await markPendingFeedbackDelivered(issueId, kind);
+  const target = await resolveIssueFeedbackTarget(issueId);
+  if (!('agentId' in target)) return;
+  try {
+    await messageAgent(target.agentId, message);
+    await markMailboxItemDelivered({ issueId, role: 'work', filePath });
+    await markPendingFeedbackDelivered(issueId, kind);
+  } catch {
+    // The durable issue-role mailbox remains pending for spawn/resume drain.
+  }
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────

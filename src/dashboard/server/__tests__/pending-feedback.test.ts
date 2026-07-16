@@ -27,15 +27,19 @@ describe('pending feedback recovery (PAN-585)', () => {
 
     await enqueuePendingFeedbackDelivery({
       issueId: 'PAN-585',
-      agentId: 'agent-pan-585',
+      role: 'work',
       kind: 'review-blocked',
       filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/001-review-agent-changes-requested.md',
       message: 'SPECIALIST FEEDBACK: review-agent reported BLOCKED for PAN-585',
       createdAt: '2026-04-27T06:00:00Z',
     }, { filePath: queueFile });
 
+    const durable = JSON.parse(await readFile(queueFile, 'utf-8'));
+    expect(durable.deliveries[0]).toMatchObject({ issueId: 'PAN-585', role: 'work' });
+    expect(durable.deliveries[0]).not.toHaveProperty('agentId');
+
     const deliver = vi.fn(async () => {});
-    const getAgentState = vi.fn(async () => ({ id: 'agent-pan-585' } as any));
+    const resolveTarget = vi.fn(async () => ({ agentId: 'agent-pan-585' }));
     const loadStatuses = vi.fn(() => ({
       'PAN-585': {
         issueId: 'PAN-585',
@@ -51,7 +55,8 @@ describe('pending feedback recovery (PAN-585)', () => {
       filePath: queueFile,
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: deliver,
-      _getAgentState: getAgentState,
+      _resolveTarget: resolveTarget,
+      _markMailboxDelivered: vi.fn(async () => {}),
       _loadStatuses: loadStatuses as any,
       _getStatus: getStatus as any,
     });
@@ -68,7 +73,7 @@ describe('pending feedback recovery (PAN-585)', () => {
 
     await enqueuePendingFeedbackDelivery({
       issueId: 'PAN-585',
-      agentId: 'agent-pan-585',
+      role: 'work',
       kind: 'test-failed',
       filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/002-test-agent-failed.md',
       message: 'SPECIALIST FEEDBACK: test-agent reported FAILED for PAN-585',
@@ -79,7 +84,8 @@ describe('pending feedback recovery (PAN-585)', () => {
       filePath: queueFile,
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: vi.fn(async () => { throw new Error('tmux unavailable'); }),
-      _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
+      _resolveTarget: vi.fn(async () => ({ agentId: 'agent-pan-585' })),
+      _markMailboxDelivered: vi.fn(async () => {}),
       _loadStatuses: vi.fn(() => ({
         'PAN-585': {
           issueId: 'PAN-585',
@@ -102,7 +108,7 @@ describe('pending feedback recovery (PAN-585)', () => {
 
     await enqueuePendingFeedbackDelivery({
       issueId: 'PAN-585',
-      agentId: 'agent-pan-585',
+      role: 'work',
       kind: 'review-failed',
       filePath: '/tmp/workspaces/feature-pan-585/.pan/feedback/003-review-agent-failed.md',
       message: 'SPECIALIST FEEDBACK: review-agent reported FAILED for PAN-585',
@@ -115,7 +121,8 @@ describe('pending feedback recovery (PAN-585)', () => {
       filePath: queueFile,
       now: Date.parse('2026-04-27T06:05:00Z'),
       _deliver: deliver,
-      _getAgentState: vi.fn(async () => ({ id: 'agent-pan-585' } as any)),
+      _resolveTarget: vi.fn(async () => ({ agentId: 'agent-pan-585' })),
+      _markMailboxDelivered: vi.fn(async () => {}),
       _loadStatuses: vi.fn(() => ({
         'PAN-585': {
           issueId: 'PAN-585',
@@ -137,7 +144,7 @@ describe('pending feedback recovery (PAN-585)', () => {
 
     await enqueuePendingFeedbackDelivery({
       issueId: 'PAN-585',
-      agentId: 'agent-pan-585',
+      role: 'work',
       kind: 'review-blocked',
       filePath: '/tmp/a.md',
       message: 'first',
@@ -145,7 +152,7 @@ describe('pending feedback recovery (PAN-585)', () => {
     }, { filePath: queueFile });
     await enqueuePendingFeedbackDelivery({
       issueId: 'PAN-586',
-      agentId: 'agent-pan-586',
+      role: 'work',
       kind: 'test-failed',
       filePath: '/tmp/b.md',
       message: 'second',

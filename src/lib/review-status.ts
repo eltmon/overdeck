@@ -794,14 +794,18 @@ async function deliverTestFailureToWorkAgentHostSide(issueId: string, status: Re
     } catch { /* non-fatal — the message below still carries the summary */ }
 
     const message = `SPECIALIST FEEDBACK: test-agent reported FAILED for ${issueId}.\n\n${feedbackPath ? `MUST READ: ${feedbackPath}\n\n` : ''}${notes ? `${notes.slice(0, 400)}\n\n` : ''}Fix the failing tests, commit and push, then re-run pan done ${issueId}. Do NOT stop at the prompt.`;
-    const { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } = await import('./cloister/feedback-target.js');
+    const { resolveIssueFeedbackTarget } = await import('./cloister/feedback-target.js');
     const target = await resolveIssueFeedbackTarget(issueId);
     if ('agentId' in target) {
       const { messageAgent } = await import('./agents.js');
       await messageAgent(target.agentId, message, 'internal', { owesRework: true });
+      if (feedbackPath) {
+        const { markMailboxItemDelivered } = await import('./cloister/agent-mailbox.js');
+        await markMailboxItemDelivered({ issueId, role: 'work', filePath: feedbackPath });
+      }
       console.log(`[review-status] delivered test failure to ${target.agentId} for ${issueId} (host-side)`);
     } else {
-      await surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'test-agent', feedbackPath });
+      console.warn(`[review-status] ${target.reason}; issue-role mailbox remains pending`);
     }
   } catch (err) {
     console.warn(`[review-status] host-side test-failure delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);

@@ -11,7 +11,8 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { writeFeedbackFile } from './feedback-writer.js';
-import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
+import { resolveIssueFeedbackTarget } from './feedback-target.js';
+import { markMailboxItemDelivered } from './agent-mailbox.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -145,30 +146,17 @@ async function deliverReviewVerdictFeedbackPromise(
           // stopped-by-user agent with a completed handoff instead of queueing.
           await messageAgent(target.agentId, message, 'internal', { owesRework: true });
           agentMessageSent = true;
-        } catch (err) {
-          // PAN-2228: a resolved-but-unreachable target is a real delivery failure,
-          // not a shrug. Surface it as needs-you so the stall is visible instead of
-          // the issue silently parking with an unread feedback file.
-          const reason = err instanceof Error ? err.message : String(err);
-          console.warn(`[review-verdict-feedback] Could not message ${target.agentId}; feedback file remains available: ${reason}`);
           try {
-            await surfaceIssueFeedbackNeedsYou(issueId, `Feedback delivery to ${target.agentId} failed: ${reason}`, {
-              specialist: 'review-agent',
-              feedbackPath: fileResult.filePath,
-              slotItemId: opts.slotItemId,
-            });
-          } catch { /* best-effort — the warn above still records the failure */ }
+            await markMailboxItemDelivered({ issueId, role: 'work', filePath: fileResult.filePath });
+          } catch (err) {
+            console.warn(`[review-verdict-feedback] Live message sent but mailbox state update failed: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          console.warn(`[review-verdict-feedback] Could not message ${target.agentId}; issue-role mailbox remains pending: ${reason}`);
         }
       } else {
-        try {
-          await surfaceIssueFeedbackNeedsYou(issueId, target.reason, {
-            specialist: 'review-agent',
-            feedbackPath: fileResult.filePath,
-            slotItemId: opts.slotItemId,
-          });
-        } catch (err) {
-          console.warn(`[review-verdict-feedback] Could not mark ${issueId} as needing human attention; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
-        }
+        console.warn(`[review-verdict-feedback] ${target.reason}; issue-role mailbox remains pending`);
       }
     } catch (err) {
       console.warn(`[review-verdict-feedback] Could not resolve a feedback target for ${issueId}; feedback file remains available: ${err instanceof Error ? err.message : String(err)}`);
