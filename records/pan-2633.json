@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-16T17:42:33.216Z",
+  "updated": "2026-07-16T17:44:17.515Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "pending",
@@ -98,11 +98,15 @@
     "reducer-liveness-gate.reducer-liveness-gate.ac2": "completed",
     "reducer-liveness-gate.reducer-liveness-gate.ac3": "completed",
     "reducer-liveness-gate.reducer-liveness-gate.ac4": "completed",
-    "emitter-liveness-threading": "running",
+    "emitter-liveness-threading": "completed",
     "enrichment-convergence-reemit": "running",
     "docs-pending-input-invariant": "completed",
     "docs-pending-input-invariant.docs-pending-input-invariant.ac1": "completed",
-    "docs-pending-input-invariant.docs-pending-input-invariant.ac2": "completed"
+    "docs-pending-input-invariant.docs-pending-input-invariant.ac2": "completed",
+    "emitter-liveness-threading.emitter-liveness-threading.ac1": "completed",
+    "emitter-liveness-threading.emitter-liveness-threading.ac2": "completed",
+    "emitter-liveness-threading.emitter-liveness-threading.ac3": "completed",
+    "emitter-liveness-threading.emitter-liveness-threading.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [],
@@ -120,7 +124,7 @@
     }
   },
   "tasks": {
-    "sequence": 2,
+    "sequence": 3,
     "claims": {},
     "claimHistory": [
       {
@@ -139,6 +143,11 @@
       "docs-pending-input-invariant": {
         "reason": "Existing commit 8442de99e4 documents the liveness-gated pending-input wipe and ~10s enrichment convergence invariant; ASKUSERQUESTION-DASHBOARD.md had no stop/status_changed payload-clearing description to update.",
         "updatedAt": "2026-07-16T17:42:33.215Z"
+      },
+      "emitter-liveness-threading": {
+        "reason": "Recovered orphaned running task with no claim owner. Commit e558a54701 implements the scoped emitter liveness threading and is merged into origin/feature/pan-2633.",
+        "updatedAt": "2026-07-16T17:44:17.515Z",
+        "forced": true
       }
     }
   }
