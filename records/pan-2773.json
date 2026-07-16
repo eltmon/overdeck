@@ -297,6 +297,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T21:27:36.427Z"
+    },
+    {
+      "timestamp": "2026-07-16T21:44:40.396Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -344,17 +349,17 @@
     "recordedAt": "2026-07-16T21:44:39.479Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T21:44:39.480Z",
+  "updated": "2026-07-16T21:44:42.144Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:37:03.481Z",
+    "updatedAt": "2026-07-16T21:44:40.590Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -364,7 +369,51 @@
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "lastVerifiedCommit": "c372139e5325491d1fef1abdbec6fdcff03bbe04",
+    "reviewRequestedAt": "2026-07-16T21:44:40.419Z",
     "reviewSpawnedAt": "2026-07-16T21:27:21.150Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx"
+      ],
+      "declaredScope": [
+        "reference/troubleshooting.mdx",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/Stage/HomePane/HomePane.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/stage.module.css"
+      ],
+      "actualChangedFiles": [
+        "reference/troubleshooting.mdx",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/UnknownProjectState.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/HomePane/Launcher.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueOverview.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/ProjectHome.tsx",
+        "src/dashboard/frontend/src/components/Stage/index.tsx",
+        "src/dashboard/frontend/src/components/Stage/stage.module.css",
+        "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx"
+      ],
+      "recordedAt": "2026-07-16T21:44:39.479Z"
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -442,17 +491,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1433,
-            "output": 50944,
-            "cacheRead": 22441904,
-            "cacheWrite": 410033
+            "input": 1435,
+            "output": 51199,
+            "cacheRead": 22633966,
+            "cacheWrite": 411164
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6136102,
-            "output": 399305,
-            "cacheRead": 110976000,
+            "input": 6168085,
+            "output": 403198,
+            "cacheRead": 113057280,
             "cacheWrite": 0
           }
         }
@@ -465,9 +514,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 25075891,
-          "output": 680044,
-          "cacheRead": 160531968,
+          "input": 25107874,
+          "output": 683937,
+          "cacheRead": 162613248,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -477,15 +526,15 @@
           "cacheWrite": 174911
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1443,
-          "output": 53946,
-          "cacheRead": 22947260,
-          "cacheWrite": 541769
+          "input": 1445,
+          "output": 54201,
+          "cacheRead": 23139322,
+          "cacheWrite": 542900
         }
       },
       "costAtCloseOut": {
-        "usd": 221.371199,
-        "pricingAsOf": "2026-07-16T21:37:03.534Z"
+        "usd": 222.732338,
+        "pricingAsOf": "2026-07-16T21:44:41.082Z"
       }
     },
     "merges": [
