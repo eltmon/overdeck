@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T07:31:03.893Z",
+  "updated": "2026-07-16T07:32:17.967Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -63,16 +63,8 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-desktop-app": {
-        "writerId": "agent-pan-2768",
-        "agentId": "agent-pan-2768",
-        "pid": 3155632,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T07:30:51.265Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2768",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Added package contract tests for cli-to-dist resources, preserved resource mappings, isolated CLI smoke staging, and full sync-sources staging; targeted desktop suite passes 16 tests.",
         "releasedAt": "2026-07-16T07:30:38.150Z"
+      },
+      {
+        "writerId": "agent-pan-2768",
+        "agentId": "agent-pan-2768",
+        "pid": 3155632,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T07:30:51.265Z",
+        "itemId": "docs-desktop-app",
+        "outcome": "completed",
+        "reason": "Documented resources/dist/cli layout, panCliInvocation resolution, ELECTRON_RUN_AS_NODE inheritance, npx exclusion, and refreshed staging-script outputs; grep checks and desktop package tests pass.",
+        "releasedAt": "2026-07-16T07:32:17.967Z"
       }
     ],
     "statusReasons": {
@@ -146,6 +149,10 @@
       "package-structure-tests": {
         "reason": "Added package contract tests for cli-to-dist resources, preserved resource mappings, isolated CLI smoke staging, and full sync-sources staging; targeted desktop suite passes 16 tests.",
         "updatedAt": "2026-07-16T07:30:38.150Z"
+      },
+      "docs-desktop-app": {
+        "reason": "Documented resources/dist/cli layout, panCliInvocation resolution, ELECTRON_RUN_AS_NODE inheritance, npx exclusion, and refreshed staging-script outputs; grep checks and desktop package tests pass.",
+        "updatedAt": "2026-07-16T07:32:17.967Z"
       }
     }
   },
@@ -166,6 +173,9 @@
     "package-structure-tests.package-structure-tests.ac2": "completed",
     "package-structure-tests.package-structure-tests.ac3": "completed",
     "package-structure-tests.package-structure-tests.ac4": "completed",
-    "docs-desktop-app": "running"
+    "docs-desktop-app": "completed",
+    "docs-desktop-app.docs-desktop-app.ac1": "completed",
+    "docs-desktop-app.docs-desktop-app.ac2": "completed",
+    "docs-desktop-app.docs-desktop-app.ac3": "completed"
   }
 }
