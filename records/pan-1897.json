@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-16T18:15:05.627Z",
+  "updated": "2026-07-16T18:25:37.663Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "pending",
@@ -68,18 +68,34 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "prep-progress-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-1897",
         "agentId": "agent-pan-1897",
         "pid": 3631582,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:15:05.627Z"
+        "claimedAt": "2026-07-16T18:15:05.627Z",
+        "itemId": "prep-progress-module",
+        "outcome": "completed",
+        "reason": "Added bounded prep progress with non-TTY lines, 15s heartbeats, timeout errors, timer cleanup, and fake-timer coverage; typecheck and focused tests pass.",
+        "releasedAt": "2026-07-16T18:25:37.663Z"
+      }
+    ],
+    "statusReasons": {
+      "prep-progress-module": {
+        "reason": "Added bounded prep progress with non-TTY lines, 15s heartbeats, timeout errors, timer cleanup, and fake-timer coverage; typecheck and focused tests pass.",
+        "updatedAt": "2026-07-16T18:25:37.663Z"
       }
     }
   },
   "statusOverrides": {
-    "prep-progress-module": "running"
+    "prep-progress-module": "completed",
+    "prep-progress-module.prep-progress-module.ac1": "completed",
+    "prep-progress-module.prep-progress-module.ac2": "completed",
+    "prep-progress-module.prep-progress-module.ac3": "completed",
+    "prep-progress-module.prep-progress-module.ac4": "completed",
+    "prep-progress-module.prep-progress-module.ac5": "completed"
   }
 }
