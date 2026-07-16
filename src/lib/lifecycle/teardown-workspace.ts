@@ -18,6 +18,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from '../paths.js';
+import { pidsWithCwdUnder } from '../process-cwd.js';
 import { killSession, sessionExists, listSessionNames } from '../tmux.js';
 import type { LifecycleContext, StepResult, TeardownOptions } from './types.js';
 import { stepOk, stepSkipped, stepFailed } from './types.js';
@@ -199,12 +200,11 @@ function killOrphanedProcesses(workspacePath: string): Effect.Effect<StepResult>
 async function killOrphanedProcessesImpl(workspacePath: string): Promise<StepResult> {
   const step = 'teardown:orphaned-processes';
   try {
-    // Find PIDs with cwd matching the workspace path
-    const { stdout } = await execAsync(
-      `lsof +D "${workspacePath}" -t 2>/dev/null || true`,
-      { encoding: 'utf-8', timeout: 10000 },
-    );
-    const pids = stdout.trim().split('\n').filter(Boolean).map(p => p.trim()).filter(p => /^\d+$/.test(p));
+    // Find PIDs with cwd inside the workspace. NEVER select by open files
+    // (`lsof +D`): Bun's hardlinked node_modules make the dashboard and every
+    // conversation's PTY supervisor appear to hold files "in" any workspace
+    // via mmap'd native addons — see src/lib/process-cwd.ts.
+    const pids = await pidsWithCwdUnder(workspacePath);
 
     if (pids.length === 0) {
       return stepSkipped(step, ['No orphaned processes found']);
