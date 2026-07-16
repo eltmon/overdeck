@@ -329,6 +329,35 @@ pan work tell MIN-123 "Your message"
 tmux send-keys -t agent-min-123 "Your message"
 ```
 
+## Command Deck Issues
+
+### Command Deck shows "Unknown project"
+
+A URL such as `/command-deck/<slug>` shows an **Unknown project** state when
+`<slug>` matches neither a registered project key nor its display name. This
+usually means the URL is stale, the project was renamed, or the project is not
+registered on this machine. The page does not open a functional project deck
+for that slug.
+
+Use the registered-project buttons in the recovery panel to navigate to a valid
+deck, or select **Back to Command Deck** to return to `/command-deck`. To inspect
+the registered keys from the CLI, run:
+
+```bash
+pan projects list
+```
+
+### Conversation creation fails from a launcher
+
+When a launcher cannot create a conversation, the failure appears inline beside
+the composer and the typed query remains available for correction or retry. The
+launcher blocks duplicate keyboard and pointer submissions while creation is in
+progress, and it opens a conversation pane only after the server reports a
+successful creation.
+
+If the inline error reports an unknown project, use the recovery steps above to
+open a registered project deck before retrying.
+
 ## Workspace Issues
 
 ### Workspace creation fails
