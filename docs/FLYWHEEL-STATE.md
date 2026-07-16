@@ -5316,3 +5316,25 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Fleet now**: work agents 1987,2232,2619,2760,2772,2773,1897,2045 (+1491,1966 wedged); 2252 planning;
   806 HELD (AI objection — operator decision pending). Memory 34G avail.
 - **Session: 50 merges, 21 close-outs.**
+
+---
+
+## Tick 61 — 2026-07-16 ~19:10Z — deployed c110a3a597 (strike trigger); 2794 landing blocked on systemic deacon feedback-delivery bug
+
+- **DEPLOYED current main `c110a3a597`** via `pan restart --dashboard --resume` (pid 1699337, healthy,
+  deacon=on resume=on) — build now carries registerStrikeMergeTrigger/patrolStrikeLandings (running
+  build was fb1b422abd/16:25Z which lacked them). Operator-directed to unblock PAN-2794/2232.
+- **PAN-2794 strike landing STILL blocked — SECOND bug, systemic**: every deacon cycle aborts at
+  feedback-delivery — merge-agent's needs-you can't be delivered to the strike agent's DEAD session
+  JSONL (9362a362… ENOENT) ⇒ re-marks 2794 `stuck: feedback_delivery_needs_you` BEFORE the (now-registered)
+  landing re-evaluation runs. mergeNotes frozen at pre-deploy 18:52 "trigger not registered". SAME bug
+  wedges PAN-2207 + PAN-2610 ⇒ general strike/merge-handoff defect, not 2794-specific.
+- **Exhausted flywheel levers**: strike-ready ×3, moved poison-pill feedback aside, `pan review reset`
+  (human override) — deacon re-marks stuck each cycle. **Cannot manual-land**: pre-push guard correctly
+  blocks flywheel-orchestrator code pushes to main (state files only). Strike is a CLEAN FF (main+1,
+  typecheck-clean, "fix(inspect): track actual watchdog owner"). Surfaced to operator: land directly
+  (`git push origin 20caf91d:main`) OR fix deacon dead-session feedback-delivery. PAN-2232 stays blocked.
+- **OPERATOR BOUNDARY (confirmed)**: intake = ONLY the 11 named issues (806,1897,1987,2045,2232,2252,
+  2619,2633,2760,2772,2773). DRAIN in force for all else — NO backlog/sequencer/order-book pickup.
+- **Harness question still OPEN** (openai.harness=claude-code → PAN-1865 fleet wedge; awaiting operator).
+- **Session: 50 merges, 21 close-outs.**
