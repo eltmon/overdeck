@@ -87,18 +87,17 @@
     "recordedAt": "2026-07-16T18:48:47.449Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T18:56:42.511Z",
+  "updated": "2026-07-16T19:04:08.012Z",
   "pipeline": {
     "issueId": "PAN-2773",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:56:41.601Z",
-    "reviewNotes": "Resource-derived project names bypass the registered-project guard",
+    "updatedAt": "2026-07-16T19:04:07.910Z",
     "inspectNotes": "createConversationForProject returns {error} from the existing catch block (preserves console.error/toast.error) and {name} on success; all 3 consumers (Stage/index.tsx, ProjectHome.tsx, IssueOverview.tsx) updated to the union type, no stale string|undefined usage; npm run typecheck clean (70 known errors, 0 new)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2798",
     "reviewedAtCommit": "e4df3ed248ca09f817c750675385c3be2c48b9bf",
@@ -148,24 +147,6 @@
       ],
       "recordedAt": "2026-07-16T18:48:47.449Z"
     },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "28fba3ec41adcfc0fa4f36e28bd3f230df1ae973"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -181,9 +162,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 855180,
-            "output": 25761,
-            "cacheRead": 7515136,
+            "input": 857970,
+            "output": 26137,
+            "cacheRead": 7692288,
             "cacheWrite": 0
           }
         },
@@ -229,17 +210,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 70,
-            "output": 13893,
-            "cacheRead": 5734126,
-            "cacheWrite": 165331
+            "input": 168,
+            "output": 31745,
+            "cacheRead": 16950687,
+            "cacheWrite": 237342
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1897727,
-            "output": 122509,
-            "cacheRead": 43779584,
+            "input": 2015432,
+            "output": 141748,
+            "cacheRead": 50099712,
             "cacheWrite": 0
           }
         }
@@ -252,21 +233,21 @@
           "cacheWrite": 174911
         },
         "openai/gpt-5.6-sol": {
-          "input": 8055074,
-          "output": 236572,
-          "cacheRead": 65634816,
+          "input": 8175569,
+          "output": 256187,
+          "cacheRead": 72132096,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 80,
-          "output": 16895,
-          "cacheRead": 6239482,
-          "cacheWrite": 297067
+          "input": 178,
+          "output": 34747,
+          "cacheRead": 17456043,
+          "cacheWrite": 369078
         }
       },
       "costAtCloseOut": {
-        "usd": 92.62015099999999,
-        "pricingAsOf": "2026-07-16T18:56:41.699Z"
+        "usd": 99.661771,
+        "pricingAsOf": "2026-07-16T19:04:08.005Z"
       }
     },
     "merges": [
