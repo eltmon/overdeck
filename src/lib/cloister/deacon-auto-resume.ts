@@ -47,6 +47,7 @@ import {
 import { readWorkspacePlanSync } from '../vbrief/io.js';
 import { getDispatchableItems } from '../vbrief/dag.js';
 import type { VBriefItem } from '../vbrief/types.js';
+import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
 
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
@@ -140,13 +141,16 @@ export async function handleAgentHeartbeatDeadEvent(
     return [];
   }
 
+  const [sessionQuery, retainReason] = queryConfirmedSession(agentId);
+  if (retainReason) { logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${agentId} ${retainReason}`); return []; }
+
   // PAN-1557: convoy reviewers are interactive — they own a tmux session
   // (remain-on-exit on) like other specialists, so liveness is the session's
   // pane, not a launcher pid. While the pane is alive the reviewer is working
   // or idling attachably; a dead pane (Claude exited) or a missing session
   // past the startup grace means it's done — fall through to mark stopped.
   if (state.reviewSubRole) {
-    if (sessionExistsSync(agentId)) {
+    if (sessionQuery.status === 'exists') {
       try {
         const dead = ((await Effect.runPromise(listPaneValues(agentId, '#{pane_dead}')))[0]?.trim() ?? '') === '1';
         if (!dead) return []; // pane alive — still working / idling attachably
@@ -164,7 +168,7 @@ export async function handleAgentHeartbeatDeadEvent(
       }
     }
     // Session gone (or dead pane past grace) — fall through to mark stopped.
-  } else if (sessionExistsSync(agentId)) {
+  } else if (sessionQuery.status === 'exists') {
     // Planning sessions use remain-on-exit, so the tmux session persists after
     // Claude exits. Check if the pane's process is actually dead.
     if (agentId.startsWith('planning-')) {
@@ -191,6 +195,7 @@ export async function handleAgentHeartbeatDeadEvent(
 
   // Orphaned — crashed agent with no tmux session
   const oldStatus = state.status;
+  const missingSessionDetail = consumeConfirmedSessionDetail(agentId, sessionQuery);
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
   await Effect.runPromise(saveAgentState(state));
@@ -226,7 +231,7 @@ export async function handleAgentHeartbeatDeadEvent(
   }
   const msg = `Recovered orphaned agent ${agentId} (${oldStatus}→stopped)`;
   console.log(`[deacon] ${msg}`);
-  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing, state.json reset`);
+  logDeaconEventSync(`handleAgentHeartbeatDeadEvent: ${msg} — tmux session missing (${missingSessionDetail}), state.json reset`);
   logAgentLifecycleSync(agentId, `status changed: ${oldStatus} → stopped (orphaned: tmux session missing)`);
   // Notify server layer so the read model and frontend update
   deps.notifyAgentStopped(agentId);
@@ -1001,12 +1006,7 @@ export async function reconcileAgentLiveness(deps: AutoResumeNotifierDeps): Prom
   const actions: string[] = [];
   const agents = listAllAgents();
 
-  // Orphans: agents the registry says are running/starting but have no live tmux.
-  const orphanCandidates = agents
-    .filter((agent) => agent.status === 'running' || agent.status === 'starting')
-    .map((agent) => agent.id)
-    .filter((id) => !sessionExistsSync(id));
-
+  const orphanCandidates = agents.filter((agent) => agent.status === 'running' || agent.status === 'starting').map((agent) => agent.id);
   for (const agentId of orphanCandidates) {
     const result = await handleAgentHeartbeatDeadEvent(agentId, 'reconcile', deps);
     actions.push(...result);
