@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T18:49:26.461Z",
+  "updated": "2026-07-16T19:05:07.484Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
@@ -54,16 +54,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "agent-gate-reload": {
-        "writerId": "agent-pan-2772",
-        "agentId": "agent-pan-2772",
-        "pid": 1436750,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:49:26.461Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2772",
@@ -140,6 +132,16 @@
         "itemId": "agent-gate-restart",
         "outcome": "completed",
         "releasedAt": "2026-07-16T18:49:04.406Z"
+      },
+      {
+        "writerId": "agent-pan-2772",
+        "agentId": "agent-pan-2772",
+        "pid": 1436750,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:49:26.461Z",
+        "itemId": "agent-gate-reload",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T19:05:07.484Z"
       }
     ],
     "statusReasons": {
@@ -200,6 +202,9 @@
     "agent-gate-restart.agent-gate-restart.ac2": "completed",
     "agent-gate-restart.agent-gate-restart.ac3": "completed",
     "agent-gate-restart.agent-gate-restart.ac4": "completed",
-    "agent-gate-reload": "running"
+    "agent-gate-reload": "completed",
+    "agent-gate-reload.agent-gate-reload.ac1": "completed",
+    "agent-gate-reload.agent-gate-reload.ac2": "completed",
+    "agent-gate-reload.agent-gate-reload.ac3": "completed"
   }
 }
