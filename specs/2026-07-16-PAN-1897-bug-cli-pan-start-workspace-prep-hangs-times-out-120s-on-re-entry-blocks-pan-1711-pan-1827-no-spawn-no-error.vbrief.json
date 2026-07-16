@@ -4,17 +4,17 @@
     "created": "2026-07-16T17:51:10Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1897: bug(cli): pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error)",
-    "updated": "2026-07-16T17:53:30.816Z"
+    "updated": "2026-07-16T18:14:28.885Z"
   },
   "plan": {
     "id": "pan-1897",
     "title": "bug(cli): pan start workspace-prep hangs/times out (>120s) on re-entry — blocks PAN-1711, PAN-1827 (no spawn, no error)",
-    "status": "proposed",
+    "status": "approved",
     "uid": "d76f6b6d-2adf-4bd5-ade5-2ee17963959c",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-16T17:51:10Z",
-    "updated": "2026-07-16T17:53:30.816Z",
+    "updated": "2026-07-16T18:14:28.885Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1897",
@@ -350,5 +350,5 @@
       "canonicalFilename": "2026-07-16-PAN-1897-bug-cli-pan-start-workspace-prep-hangs-times-out-120s-on-re-entry-blocks-pan-1711-pan-1827-no-spawn-no-error.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
