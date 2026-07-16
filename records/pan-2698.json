@@ -47,17 +47,17 @@
     "recordedAt": "2026-07-16T07:45:53.765Z"
   },
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T07:45:55.457Z",
+  "updated": "2026-07-16T07:45:55.911Z",
   "pipeline": {
     "issueId": "PAN-2698",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T07:45:55.410Z",
+    "updatedAt": "2026-07-16T07:45:55.855Z",
     "inspectNotes": "Inspection error for bead codex-config-mcp-servers: tmux session inspect-pan-2698-codex-config-mcp-servers exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2785"
   },
@@ -66,15 +66,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 1916923,
-            "output": 3093,
-            "cacheRead": 1744640,
+            "input": 2096279,
+            "output": 3295,
+            "cacheRead": 1917440,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 16170766,
-            "output": 21660,
-            "cacheRead": 15922688,
+            "input": 17066529,
+            "output": 22338,
+            "cacheRead": 16815360,
             "cacheWrite": 0
           }
         },
@@ -97,15 +97,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 1916923,
-          "output": 3093,
-          "cacheRead": 1744640,
+          "input": 2096279,
+          "output": 3295,
+          "cacheRead": 1917440,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 16170766,
-          "output": 21660,
-          "cacheRead": 15922688,
+          "input": 17066529,
+          "output": 22338,
+          "cacheRead": 16815360,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -122,8 +122,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 17.753896,
-        "pricingAsOf": "2026-07-16T07:45:55.453Z"
+        "usd": 18.133467,
+        "pricingAsOf": "2026-07-16T07:45:55.903Z"
       }
     },
     "merges": [
