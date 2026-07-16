@@ -117,6 +117,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T01:37:40.127Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T02:07:24.046Z"
     }
   ],
   "feedback": [],
@@ -260,22 +265,44 @@
     "recordedAt": "2026-07-16T01:13:10.379Z"
   },
   "created": "2026-07-13T13:51:25.019Z",
-  "updated": "2026-07-16T02:07:23.093Z",
+  "updated": "2026-07-16T02:07:24.294Z",
   "pipeline": {
     "issueId": "PAN-2499",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T02:07:22.842Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-07-16T02:07:24.241Z",
+    "reviewNotes": "[correctness] “Expand issue full screen” does not expand the issue view — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx:1099`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2751",
     "lastVerifiedCommit": "1107d2c62687708ca3a4f3fe37f85f34cdec422f",
     "reviewRequestedAt": "2026-07-16T02:07:20.611Z",
-    "reviewSpawnedAt": "2026-07-16T02:07:22.841Z"
+    "reviewSpawnedAt": "2026-07-16T02:07:22.841Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-1107d2c6/security.md",
+        "atCommit": "559a4b3b55891f49a725d44a7b0193693ace0e71"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-1107d2c6/correctness.md",
+        "atCommit": "559a4b3b55891f49a725d44a7b0193693ace0e71"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-1107d2c6/performance.md",
+        "atCommit": "559a4b3b55891f49a725d44a7b0193693ace0e71"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2499/.pan/review/agent-pan-2499-review-1107d2c6/requirements.md",
+        "atCommit": "559a4b3b55891f49a725d44a7b0193693ace0e71"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -369,7 +396,7 @@
       },
       "costAtCloseOut": {
         "usd": 146.54752,
-        "pricingAsOf": "2026-07-16T02:07:22.979Z"
+        "pricingAsOf": "2026-07-16T02:07:24.282Z"
       }
     },
     "merges": [
