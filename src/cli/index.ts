@@ -1297,7 +1297,7 @@ program
   .option('--cliproxy', 'Restart only the CLIProxy sidecar')
   .option('--traefik', 'Restart only Traefik')
   .option('--full', 'Restart the entire stack (equivalent to pan down && pan up)')
-  .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION)')
+  .option('--force', 'For --cliproxy: redownload binary at the pinned version before restarting (use after bumping CLIPROXY_RELEASE_VERSION). For dashboard scope: bypass the agent deploy-window gate (agent-initiated restarts are otherwise refused while deploy-window block reasons are active)')
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
   .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')

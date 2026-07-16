@@ -27,6 +27,7 @@ import { isWorkspaceRepoRoot } from '../../dashboard/server/identity.js';
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
+import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 
 import {
   openDashboardLogStdio,
@@ -237,6 +238,22 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   const lockInherited = process.env.OVERDECK_RESTART_LOCK_HELD === '1';
   const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
+  const restartInitiator = process.env.OVERDECK_AGENT_ID;
+  if (needsRestartLock && restartInitiator) {
+    const restartBlock = await agentRestartBlockReason({
+      initiator: restartInitiator,
+      force: options.force === true,
+    });
+    if (restartBlock) {
+      console.error(restartBlock);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(chalk.yellow(
+      '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
+    ));
+  }
+
   let restartLock: RestartLockHandle | null = null;
   if (needsRestartLock) {
     restartLock = await Effect.runPromise(acquireRestartLock('pan restart'));
