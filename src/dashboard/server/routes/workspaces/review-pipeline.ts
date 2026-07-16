@@ -646,42 +646,46 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
-    // Preserve immediate conflict-gate feedback while keeping the expensive fresh
-    // probe in the background dispatch path.
-    const cachedMergeability = getCachedConflictGateMergeability(issueId);
-    if (cachedMergeability === 'conflicts' || cachedMergeability === 'unknown') {
-      const gateMessage = cachedMergeability === 'conflicts'
-        ? 'Review deferred: merge conflict with main must be resolved before review dispatch'
-        : 'Review deferred: mergeability against main could not be verified; deferring review conservatively';
-      setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: gateMessage });
-      return jsonResponse({
-        success: false,
-        gated: true,
-        message: gateMessage,
-        autoRequeueCount: currentCount,
-        remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
-      }, { status: 409 });
-    }
-
-    const resolved = resolveProjectFromIssueSync(issueId);
-    if (!resolved) {
-      return jsonResponse(
-        {
-          success: false,
-          error: `No project configured for ${issueId}. Add it to projects.yaml.`,
-          autoRequeueCount: currentCount,
-        },
-        { status: 500 }
+    transitionIssueToInReview(issueId, workspacePath).catch((err: unknown) => {
+      console.warn(
+        `[request-review] Could not transition ${issueId} to in_review: ${errorMessage(err)}`
       );
-    }
+    });
 
     const newCount = currentCount + 1;
     const reviewNotes = message
       ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}`
       : undefined;
 
-    // Record the accepted request before starting the slow verification and dispatch
-    // work. Roll the count back when verification or dispatch declines the request.
+    const reqVerifyOutcome = yield* runVerificationForIssue(
+      issueId,
+      workspacePath,
+      workspaceInfo,
+      'request-review'
+    );
+    if (reqVerifyOutcome.outcome === 'failed') {
+      return jsonResponse({
+        success: false,
+        verificationFailed: true,
+        failedCheck: reqVerifyOutcome.failedCheck,
+        message: `Verification failed at ${reqVerifyOutcome.failedCheck} — fix and resubmit`,
+        cycleCount: reqVerifyOutcome.cycleCount,
+        maxCycles: reqVerifyOutcome.maxCycles,
+      });
+    }
+    if (reqVerifyOutcome.outcome === 'error') {
+      return jsonResponse(
+        {
+          success: false,
+          error: `Verification infrastructure error: ${reqVerifyOutcome.message}`,
+          autoRequeueCount: currentCount,
+        },
+        { status: 500 }
+      );
+    }
+
+    // PAN-511: set metadata fields but keep reviewStatus='pending' until dispatch succeeds.
+    // reviewStatus is set to 'reviewing' only after specialist is dispatched or queued.
     setReviewStatus(issueId, {
       reviewStatus: 'pending',
       testStatus: 'pending',
@@ -693,73 +697,66 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       `[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`
     );
 
-    // Verification and review dispatch can exceed Node fetch's five-minute headers
-    // timeout. Acknowledge the accepted request first, then report later failures
-    // through the durable review status and feedback surfaces.
-    (async () => {
-      try {
-        transitionIssueToInReview(issueId, workspacePath).catch((err: unknown) => {
-          console.warn(
-            `[request-review] Could not transition ${issueId} to in_review: ${errorMessage(err)}`
-          );
-        });
+    try {
+      const resolved = resolveProjectFromIssueSync(issueId);
 
-        const reqVerifyOutcome = await Effect.runPromise(runVerificationForIssue(
-          issueId,
-          workspacePath,
-          workspaceInfo,
-          'request-review'
-        ));
-        if (reqVerifyOutcome.outcome === 'failed') {
-          setReviewStatus(issueId, { autoRequeueCount: currentCount });
-          console.warn(
-            `[request-review] Verification failed at ${reqVerifyOutcome.failedCheck} for ${issueId}`
-          );
-          return;
-        }
-        if (reqVerifyOutcome.outcome === 'error') {
-          setReviewStatus(issueId, {
-            reviewStatus: 'pending',
-            reviewNotes: `Verification infrastructure error: ${reqVerifyOutcome.message}`,
-            autoRequeueCount: currentCount,
-          });
-          return;
-        }
+      if (!resolved) {
+        return jsonResponse(
+          {
+            success: false,
+            error: `No project configured for ${issueId}. Add it to projects.yaml.`,
+            autoRequeueCount: newCount,
+          },
+          { status: 500 }
+        );
+      }
 
+      const result = yield* Effect.promise(async () => {
         const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-        const result = await Effect.runPromise(spawnReviewRoleForIssue({
+        return (await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace: workspacePath,
           branch: branchName,
           force: true,
-        }));
+        })));
+      });
 
-        if (result.success) {
-          console.log(`[request-review] Review role spawned for ${issueId}`);
-          // spawnReviewRoleForIssue already flips reviewStatus to 'reviewing' (with
-          // reviewSpawnedAt) internally. PAN-2578: do not repeat a bare 'reviewing' write —
-          // it can clobber a fast agent's terminal verdict. Only record the requeue count.
-          setReviewStatus(issueId, { autoRequeueCount: newCount });
-          try {
-            await Effect.runPromise(eventStore.append({
-              type: 'pipeline.review-started',
-              timestamp: new Date().toISOString(),
-              payload: { issueId },
-            }));
-          } catch { /* non-fatal */ }
-          return;
-        }
-
-        if (result.gated) {
-          console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
-          setReviewStatus(issueId, {
-            reviewStatus: 'pending',
-            reviewNotes: result.message,
+      if (result.success) {
+        console.log(`[request-review] Review role spawned for ${issueId}`);
+        // spawnReviewRoleForIssue already flips reviewStatus to 'reviewing' (with
+        // reviewSpawnedAt) internally. PAN-2578: do not repeat a bare 'reviewing' write —
+        // it can clobber a fast agent's terminal verdict. Only record the requeue count.
+        setReviewStatus(issueId, { autoRequeueCount: newCount });
+        yield* Effect.promise(() => Effect.runPromise(eventStore.append({
+          type: 'pipeline.review-started',
+          timestamp: new Date().toISOString(),
+          payload: { issueId },
+        })));
+        return jsonResponse({
+          success: true,
+          queued: false,
+          message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
+          autoRequeueCount: newCount,
+          remainingRequeues: MAX_AUTO_REQUEUE - newCount,
+        });
+      } else if (result.gated) {
+        console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          reviewNotes: result.message,
+          autoRequeueCount: currentCount,
+        });
+        return jsonResponse(
+          {
+            success: false,
+            gated: true,
+            message: result.message,
             autoRequeueCount: currentCount,
-          });
-          return;
-        }
-
+            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
+          },
+          { status: 409 }
+        );
+      } else {
         console.warn(
           `[request-review] Dispatch failed for ${issueId}: ${result.error}`
         );
@@ -768,23 +765,27 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
           reviewNotes: `Dispatch failed: ${result.error || result.message}`,
           autoRequeueCount: currentCount,
         });
-      } catch (error: unknown) {
-        console.error(`[request-review] Error:`, error);
-        setReviewStatus(issueId, {
-          reviewStatus: 'pending',
-          reviewNotes: `Dispatch error: ${errorMessage(error)}`,
-          autoRequeueCount: currentCount,
-        });
+        return jsonResponse(
+          {
+            success: false,
+            error: result.error || 'Failed to dispatch review',
+            autoRequeueCount: currentCount,
+            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
+          },
+          { status: 500 }
+        );
       }
-    })();
-
-    return jsonResponse({
-      success: true,
-      queued: true,
-      message: `Review request accepted (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
-      autoRequeueCount: newCount,
-      remainingRequeues: MAX_AUTO_REQUEUE - newCount,
-    }, { status: 202 });
+    } catch (error: unknown) {
+      console.error(`[request-review] Error:`, error);
+      setReviewStatus(issueId, {
+        reviewStatus: 'pending',
+        reviewNotes: `Dispatch error: ${errorMessage(error)}`,
+      });
+      return jsonResponse(
+        { success: false, error: errorMessage(error), autoRequeueCount: newCount },
+        { status: 500 }
+      );
+    }
   }))
 );
 

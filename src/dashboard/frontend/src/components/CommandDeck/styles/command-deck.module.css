@@ -1375,6 +1375,7 @@
 }
 
 .unknownProjectList button,
+.unknownProjectRetry,
 .unknownProjectBack {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1385,6 +1386,7 @@
 }
 
 .unknownProjectList button:hover,
+.unknownProjectRetry:hover,
 .unknownProjectBack:hover {
   background: var(--accent);
 }

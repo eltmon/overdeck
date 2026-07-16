@@ -1,4 +1,4 @@
-import { Compass } from 'lucide-react';
+import { CircleAlert, Compass } from 'lucide-react';
 import { NO_PROJECT_KEY } from './projectsData';
 import styles from './styles/command-deck.module.css';
 
@@ -30,6 +30,25 @@ export function isKnownProject(
 ): boolean {
   return selectedProject === NO_PROJECT_KEY
     || findRegisteredProject(registeredProjects, selectedProject) !== undefined;
+}
+
+interface ProjectRegistryErrorStateProps {
+  onRetry: () => void;
+}
+
+export function ProjectRegistryErrorState({ onRetry }: ProjectRegistryErrorStateProps) {
+  return (
+    <div className={styles.contentEmpty} role="alert">
+      <div className={styles.unknownProject}>
+        <CircleAlert size={48} aria-hidden="true" />
+        <h2>Couldn’t load projects</h2>
+        <p>Project registration could not be verified.</p>
+        <button type="button" className={styles.unknownProjectRetry} onClick={onRetry}>
+          Retry
+        </button>
+      </div>
+    </div>
+  );
 }
 
 interface UnknownProjectStateProps {

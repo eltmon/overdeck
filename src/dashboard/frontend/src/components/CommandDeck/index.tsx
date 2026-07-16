@@ -31,7 +31,7 @@ import { WS_METHODS } from '@overdeck/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
-import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, UnknownProjectState } from './UnknownProjectState';
+import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -243,7 +243,7 @@ export function CommandDeck({
     refetchInterval: 15000,
   });
 
-  const { data: registeredProjects = [], isFetched: registeredProjectsFetched } = useQuery({
+  const { data: registeredProjects = [], isFetched: registeredProjectsFetched, isError: registeredProjectsError, refetch: refetchRegisteredProjects } = useQuery({
     queryKey: ['registered-projects'],
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
@@ -1214,7 +1214,7 @@ export function CommandDeck({
     [registeredProjects, selectedProject],
   );
   const isProjectValidationPending = Boolean(selectedProject && (!projectsFetched || !registeredProjectsFetched));
-  const showUnknownProject = Boolean(selectedProject && !isProjectValidationPending && !isKnownProject(selectedProject, registeredProjects));
+  const showUnknownProject = Boolean(selectedProject && !isProjectValidationPending && !registeredProjectsError && !isKnownProject(selectedProject, registeredProjects));
 
   // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
   // For a real project: its scoped conversations + issue ids. For the special
@@ -1430,9 +1430,9 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {isProjectValidationPending ? (
-            <div className={styles.contentEmpty} role="status">Loading project…</div>
-          ) : showUnknownProject ? (
+          {isProjectValidationPending ? <div className={styles.contentEmpty} role="status">Loading project…</div>
+          : registeredProjectsError ? <ProjectRegistryErrorState onRetry={() => void refetchRegisteredProjects()} />
+          : showUnknownProject ? (
             <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />
           ) : selectedProject ? (
             <Stage
@@ -1486,7 +1486,7 @@ export function CommandDeck({
         {/* Awareness rail (PAN-1591) — the merged feed: one column with a
             Needs-you / Project / Global scope switcher, replacing the separate
             Project Activity + global Activity Feed columns. */}
-        {selectedProject && !isProjectValidationPending && !showUnknownProject && (
+        {selectedProject && !isProjectValidationPending && !registeredProjectsError && !showUnknownProject && (
           awarenessCollapsed ? (
             <button
               type="button"

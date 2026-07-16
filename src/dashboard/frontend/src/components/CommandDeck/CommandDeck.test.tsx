@@ -25,6 +25,7 @@ vi.mock('./styles/command-deck.module.css', () => ({
     contentEmpty: 'contentEmpty',
     unknownProject: 'unknownProject',
     unknownProjectList: 'unknownProjectList',
+    unknownProjectRetry: 'unknownProjectRetry',
     unknownProjectBack: 'unknownProjectBack',
     featureHeader: 'featureHeader',
     featureTitle: 'featureTitle',
@@ -73,6 +74,7 @@ function deferred<T>() {
 let latestStageProps: any;
 let resourceProjectsResponse: unknown;
 let registeredProjectsResponse: RegisteredProjectFixture[] | Promise<RegisteredProjectFixture[]> = defaultRegisteredProjects;
+let registeredProjectsRequestError: Error | null = null;
 let conversationCreateResponse: { ok: boolean; body: unknown } = {
   ok: true,
   body: { id: 3, name: 'created-conv', title: 'Agent' },
@@ -280,6 +282,7 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
         };
       }
       if (url === '/api/registered-projects') {
+        if (registeredProjectsRequestError) throw registeredProjectsRequestError;
         return {
           ok: true,
           json: async () => registeredProjectsResponse,
@@ -422,6 +425,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     latestStageProps = undefined;
     resourceProjectsResponse = undefined;
     registeredProjectsResponse = defaultRegisteredProjects;
+    registeredProjectsRequestError = null;
     conversationCreateResponse = {
       ok: true,
       body: { id: 3, name: 'created-conv', title: 'Agent' },
@@ -519,6 +523,21 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
       await pendingProjects.promise;
     });
     expect(await screen.findByRole('heading', { name: 'Unknown project' })).toBeInTheDocument();
+  });
+
+  it('shows a retryable error when registered projects cannot be loaded', async () => {
+    registeredProjectsRequestError = new Error('Project registry unavailable');
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t load projects');
+    expect(screen.queryByRole('heading', { name: 'Unknown project' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stage')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('activity-feed')).not.toBeInTheDocument();
+
+    registeredProjectsRequestError = null;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByTestId('stage')).toHaveAttribute('data-deck', 'test-project');
   });
 
   it('navigates from the unknown-project state to a registered project or the deck root', async () => {
