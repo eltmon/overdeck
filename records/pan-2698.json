@@ -72,6 +72,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-16T08:03:40.270Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T08:20:24.925Z"
     }
   ],
   "feedback": [],
@@ -107,23 +112,23 @@
     "recordedAt": "2026-07-16T07:45:53.765Z"
   },
   "created": "2026-07-15T13:06:57.947Z",
-  "updated": "2026-07-16T08:20:18.193Z",
+  "updated": "2026-07-16T08:20:24.926Z",
   "pipeline": {
     "issueId": "PAN-2698",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "error",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T08:20:18.131Z",
+    "updatedAt": "2026-07-16T08:20:23.821Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed security finding in 35190f9f: Playwright MCP pinned to 0.0.78 and Codex rejects mutable npx selectors; current main merge is pushed at c76f4e1a",
     "inspectNotes": "Inspection error for bead codex-config-mcp-servers: tmux session inspect-pan-2698-codex-config-mcp-servers exited before producing a verdict. No verdict was produced.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2785",
     "lastVerifiedCommit": "c76f4e1a905d3add7fd0a747841f60591a9e34ca",
     "reviewRequestedAt": "2026-07-16T08:20:17.773Z",
-    "reviewSpawnedAt": "2026-07-16T08:03:36.566Z"
+    "reviewSpawnedAt": "2026-07-16T08:20:23.820Z"
   },
   "closeOut": {
     "usage": {
@@ -187,7 +192,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.528801,
-        "pricingAsOf": "2026-07-16T08:20:18.162Z"
+        "pricingAsOf": "2026-07-16T08:20:23.860Z"
       }
     },
     "merges": [
