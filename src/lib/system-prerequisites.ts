@@ -15,6 +15,10 @@
  */
 
 import { execFile } from 'node:child_process';
+import { access } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { homedir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
@@ -43,6 +47,11 @@ export interface PrerequisitesReport {
   platform: NodeJS.Platform;
   allRequiredFound: boolean;
   checks: PrerequisiteCheck[];
+}
+
+export interface SetupDiagnosticsReport {
+  schemaVersion: 1;
+  markdown: string;
 }
 
 export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
@@ -168,6 +177,93 @@ const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
 function firstLine(output: string): string | null {
   const line = output.split('\n')[0]?.trim();
   return line || null;
+}
+
+function redactHome(value: string, home = homedir()): string {
+  return home && value.includes(home) ? value.replaceAll(home, '~') : value;
+}
+
+function failureKind(error: unknown): string {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code)
+    : '';
+  if (code === 'ENOENT') return 'command not found';
+  if (code === 'EACCES') return 'permission denied';
+  if (code === 'ETIMEDOUT') return 'probe timed out';
+  return 'probe failed';
+}
+
+async function executablePath(command: string, pathValue: string): Promise<string | null> {
+  for (const directory of pathValue.split(delimiter).filter(Boolean)) {
+    const candidate = join(directory, command);
+    try {
+      await access(candidate, constants.X_OK);
+      return redactHome(candidate);
+    } catch {
+      // Continue through PATH. Diagnostics must remain best-effort.
+    }
+  }
+  return null;
+}
+
+/** Build a bounded, secret-free support report from the dashboard process environment. */
+export async function collectSetupDiagnostics(overdeckVersion: string): Promise<SetupDiagnosticsReport> {
+  const pathValue = process.env['PATH'] ?? '';
+  const toolLines = await Promise.all(PREREQUISITES.map(async ({ id, versionArgs }) => {
+    const resolvedPath = await executablePath(id, pathValue);
+    try {
+      const output = await defaultProbe(id, versionArgs);
+      return `✓ ${id}: ${firstLine(output) ?? 'version unavailable'} — ${resolvedPath ?? 'path unresolved'}`;
+    } catch (error) {
+      return `✗ ${id}: ${failureKind(error)}${resolvedPath ? ` — ${resolvedPath}` : ''}`;
+    }
+  }));
+
+  const claudeCandidates = [
+    join(homedir(), '.local', 'bin', 'claude'),
+    join(homedir(), '.npm-global', 'bin', 'claude'),
+    join(homedir(), '.bun', 'bin', 'claude'),
+  ];
+  const candidateLines = await Promise.all(claudeCandidates.map(async (candidate) => {
+    try {
+      await access(candidate, constants.X_OK);
+      return `- ${redactHome(candidate)}: executable`;
+    } catch {
+      return `- ${redactHome(candidate)}: missing`;
+    }
+  }));
+  const claudeOnPath = await executablePath('claude', pathValue);
+  const candidateFound = candidateLines.some((line) => line.endsWith(': executable'));
+  const likelyCause = !claudeOnPath && candidateFound
+    ? 'Claude appears to be installed, but its directory is absent from the dashboard server PATH. Restart Overdeck after correcting PATH.'
+    : !claudeOnPath
+      ? 'The dashboard server cannot find a Claude executable on PATH or in the common user install locations checked.'
+      : 'Claude is visible on the dashboard server PATH; use the probe result above if startup still fails.';
+
+  const markdown = [
+    '## Overdeck setup diagnostics',
+    '',
+    `Generated: ${new Date().toISOString()}`,
+    `Overdeck: ${overdeckVersion}`,
+    `Platform: ${process.platform} ${process.arch}`,
+    `Node: ${process.version}`,
+    `Shell: ${redactHome(process.env['SHELL'] ?? 'unknown')}`,
+    `Server PATH: ${redactHome(pathValue) || 'empty'}`,
+    '',
+    '### Prerequisites',
+    ...toolLines,
+    '',
+    '### Claude lookup',
+    `Dashboard PATH lookup: ${claudeOnPath ?? 'not found'}`,
+    'Common user install locations:',
+    ...candidateLines,
+    '',
+    `Likely cause: ${likelyCause}`,
+    '',
+    '_Secrets, environment variable values other than PATH, credentials, project data, and raw error output are omitted._',
+  ].join('\n');
+
+  return { schemaVersion: 1, markdown: markdown.slice(0, 16_384) };
 }
 
 export async function checkSystemPrerequisites(

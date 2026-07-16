@@ -88,6 +88,15 @@ const getPrerequisitesRoute = HttpRouter.add(
   }),
 );
 
+const getSetupDiagnosticsRoute = HttpRouter.add(
+  'GET',
+  '/api/diagnostics/setup',
+  Effect.promise(async () => {
+    const { collectSetupDiagnostics } = await import('../../../../lib/system-prerequisites.js');
+    return jsonResponse(await collectSetupDiagnostics(await getOverdeckVersion()));
+  }),
+);
+
 // ─── Routes: context sync status + one-click repair ──────────────────────────
 
 const getSyncStatusRoute = HttpRouter.add(
@@ -536,6 +545,7 @@ const postRestartDashboardRoute = HttpRouter.add(
 export const metaRouteLayer = Layer.mergeAll(
   getVersionRoute,
   getPrerequisitesRoute,
+  getSetupDiagnosticsRoute,
   getSyncStatusRoute,
   postRunSyncRoute,
   getRegisteredProjectsRoute,
