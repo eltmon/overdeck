@@ -1,15 +1,40 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
 const actionInvoke = vi.fn()
 let queryClient: QueryClient | undefined
+let unexpectedRequests: string[] = []
 
-afterEach(() => {
+beforeEach(() => {
+  unexpectedRequests = []
+  vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input)
+    const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+    if (method !== 'GET') {
+      unexpectedRequests.push(`${method} ${url}`)
+      return Response.json({}, { status: 500 })
+    }
+    if (url === '/api/issues/resource-allocated') {
+      return Response.json([])
+    }
+    if (url === '/api/workspaces/PAN-1661/plan') {
+      return Response.json({ plan: { items: [] } })
+    }
+    unexpectedRequests.push(`${method} ${url}`)
+    return Response.json({}, { status: 500 })
+  }))
+})
+
+afterEach(async () => {
+  await queryClient?.cancelQueries()
   cleanup()
   queryClient?.clear()
   queryClient = undefined
+  const requests = unexpectedRequests
+  vi.unstubAllGlobals()
+  expect(requests).toEqual([])
 })
 
 const queryMocks = vi.hoisted(() => {
@@ -95,6 +120,8 @@ vi.mock('../../IssueActionMenu/IssueActionMenu', () => ({
 }))
 
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
+vi.mock('../../ReviewPolicyControl', () => ({ ReviewPolicyControl: () => <div>Review policy</div> }))
+vi.mock('../../issue-view/StartAgentCta', () => ({ StartAgentCta: () => <div>Start agent</div> }))
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))

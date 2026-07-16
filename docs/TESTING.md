@@ -29,7 +29,7 @@ The frontend suite now uses happy-dom with Vitest's `threads` pool. happy-dom re
 
 The migration fixed these divergence classes:
 
-- IssueMissionControl now unmounts deterministically and clears its QueryClient with query garbage collection and retries disabled. The pre-change solo hang did not reproduce on 2026-07-16, but this removes the retained QueryClient lifecycle identified by PAN-1918 part 1; wiring the complete frontend suite into CI remains PAN-1918's scope.
+- IssueMissionControl tests now own every rendered request with a strict local fetch stub, cancel QueryClient work before unmounting, and fail on unexpected endpoints. Query garbage collection and retries remain disabled. The pre-change solo hang did not reproduce on 2026-07-16, but this removes the retained query/request lifecycle identified by PAN-1918 part 1; wiring the complete frontend suite into CI remains PAN-1918's scope.
 - happy-dom CSS differences are covered with behavior-equivalent assertions for custom properties, outline longhands, phase colors, and WebKit line clamping.
 - Accessible-name checks retain role-based queries while allowing the text boundaries that happy-dom computes around highlighted command text.
 - Missing browser APIs, including `window.prompt` and `window.confirm`, use guarded fallbacks only when the environment does not provide them. Canvas/xterm setup order and the asynchronous Streamdown renderer test cover the remaining render/configuration mismatches.

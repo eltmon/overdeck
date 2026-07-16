@@ -65,9 +65,12 @@ describe('WorkspaceStatusCard', () => {
       />,
     );
 
-    expect(screen.getByTestId('workspace-status-phase-icon')).toHaveAttribute('data-phase', 'verifying');
+    const phaseIcon = screen.getByTestId('workspace-status-phase-icon');
+    expect(phaseIcon).toHaveAttribute('data-phase', 'verifying');
     expect(screen.getByTestId('workspace-status-phase-label')).toHaveTextContent('Verifying');
-    expect(colorSetter).toHaveBeenCalledWith('var(--warning, #f59e0b)');
+    expect(colorSetter.mock.calls.some(
+      ([color], index) => color === 'var(--warning, #f59e0b)' && colorSetter.mock.contexts[index] === phaseIcon.style,
+    )).toBe(true);
   });
 
   it('line-clamps the summary to three lines', () => {
