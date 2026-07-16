@@ -237,10 +237,11 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
    `architecture` / `v1.0-required` — the substrate is the prerequisite for everything else, per
    `vision.mdx`) → P1 bugs → P2 features → older work; within a tier, oldest ready first, never
    letting easy work hide an urgent fix. **Within the substrate-hardening tier, run
-   `pan flywheel weights --json` each tick and order substrate-bug suggestions by weight
-   descending.** Set each substrate suggestion's `weight` and `weightReason` fields from that
+   `pan flywheel weights --json` each tick and keep operator-filed rows first, then order each
+   filing-source group by weight descending.** Set each substrate suggestion's `filedBy`,
+   `weight`, and `weightReason` fields from that
    output. Weight only re-orders within the tier — it never overrides red-main/P0 work and never
-   filters operator-injected items. Adopt externally-completed green work (review+test
+   filters or displaces operator-injected items. Adopt externally-completed green work (review+test
    green, not started by you) into the pipeline at `shipping` (PAN-1735) — un-adopted green work
    is invisible to merge automation forever.
 4. **Act.** Saturate toward `roles.flywheel.minAgents` always-running, ceiling
@@ -270,12 +271,13 @@ Each revolution is a tick; run a full one at least every 20 minutes even with no
 ]
 ```
 
-Within the substrate-hardening tier, emit suggestions in that weight order and set each
-suggestion's `weight` and `weightReason` from the matching row:
+Within the substrate-hardening tier, emit operator-filed suggestions first, then follow weight
+order within each filing-source group. Set each suggestion's `filedBy`, `weight`, and
+`weightReason` from the matching row:
 
 ```json
-{ "priority": "high", "action": "start", "issueId": "PAN-2418", "rationale": "MTTR criterion is red", "weight": 3.2, "weightReason": "Criterion 4 (MTTR) is red" }
-{ "priority": "high", "action": "start", "issueId": "PAN-2419", "rationale": "P0-bug criterion stable but keep watch", "weight": 1.5, "weightReason": "Criterion 2 (P0 bugs) is green" }
+{ "priority": "high", "action": "start", "issueId": "PAN-2418", "rationale": "MTTR criterion is red", "filedBy": "operator", "weight": 3.2, "weightReason": "Criterion 4 (MTTR) is red" }
+{ "priority": "high", "action": "start", "issueId": "PAN-2419", "rationale": "P0-bug criterion stable but keep watch", "filedBy": "agent", "weight": 1.5, "weightReason": "Criterion 2 (P0 bugs) is green" }
 ```
 
 `PAN-2420` is still surfaced (no filtering), but it ranks below the weighted bugs until telemetry

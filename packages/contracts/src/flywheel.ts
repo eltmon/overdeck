@@ -180,6 +180,7 @@ export interface FlywheelSuggestion {
   issueId?: string | undefined
   rationale: string
   priority: FlywheelSuggestionPriority
+  filedBy?: "agent" | "operator" | undefined
   weight?: number | undefined
   weightReason?: string | undefined
 }
@@ -189,6 +190,7 @@ export const FlywheelSuggestion = Schema.Struct({
   issueId: Schema.optional(Schema.String),
   rationale: Schema.String,
   priority: FlywheelSuggestionPriority,
+  filedBy: Schema.optional(Schema.Literals(["agent", "operator"])),
   weight: Schema.optional(Schema.Number),
   weightReason: Schema.optional(Schema.String),
 })

@@ -175,6 +175,20 @@ describe('FlywheelStatusDetails', () => {
     expect(within(rows[2]).getByRole('button', { name: 'PAN-1' })).toBeInTheDocument();
   });
 
+  it('keeps operator-filed suggestions ahead of higher-weight agent suggestions at the same priority', () => {
+    render(<FlywheelStatusDetails status={{
+      ...status,
+      suggestions: [
+        { priority: 'high', action: 'start', issueId: 'PAN-AGENT', rationale: 'Higher weight', filedBy: 'agent', weight: 5 },
+        { priority: 'high', action: 'start', issueId: 'PAN-OPERATOR', rationale: 'Operator requested', filedBy: 'operator', weight: 1 },
+      ],
+    }} />);
+
+    const rows = screen.getAllByTestId('flywheel-suggestion');
+    expect(within(rows[0]).getByRole('button', { name: 'PAN-OPERATOR' })).toBeInTheDocument();
+    expect(within(rows[1]).getByRole('button', { name: 'PAN-AGENT' })).toBeInTheDocument();
+  });
+
   it('navigates issue suggestions but leaves system suggestions without click-through', () => {
     const onNavigateAgent = vi.fn();
     const onNavigateIssue = vi.fn();

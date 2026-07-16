@@ -121,6 +121,10 @@ function sortSuggestions(suggestions: ReadonlyArray<FlywheelSuggestion>): Flywhe
     .sort((left, right) => {
       const priorityDiff = SUGGESTION_PRIORITY_ORDER[left.suggestion.priority] - SUGGESTION_PRIORITY_ORDER[right.suggestion.priority];
       if (priorityDiff !== 0) return priorityDiff;
+      if (left.suggestion.filedBy !== right.suggestion.filedBy) {
+        if (left.suggestion.filedBy === 'operator') return -1;
+        if (right.suggestion.filedBy === 'operator') return 1;
+      }
       const leftWeight = left.suggestion.weight ?? 0;
       const rightWeight = right.suggestion.weight ?? 0;
       if (rightWeight !== leftWeight) return rightWeight - leftWeight;
