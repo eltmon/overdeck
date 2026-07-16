@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ViewMode } from '../chat/ConversationPanel'
 import type { Conversation } from '../CommandDeck/ConversationList'
 import { HomePane } from './HomePane'
@@ -61,6 +61,8 @@ export function ProjectHome({
   onSelectFeature,
   api,
 }: ProjectHomeProps) {
+  const [launchBusy, setLaunchBusy] = useState(false)
+  const [launchError, setLaunchError] = useState<string | null>(null)
   const timelineConversations: TimelineConversation[] = useMemo(
     () =>
       conversations.map((c) => ({
@@ -91,13 +93,23 @@ export function ProjectHome({
   }
 
   const onAgentSelected = async (id: string, message?: string) => {
+    if (launchBusy) return
     writeLastUsedAgent(api.deckKey, id)
-    const result = await onCreateConversation?.(id, message, 'terminal')
-    if (result && 'name' in result) api.openOrFocusAgentPane(result.name, 'Agent')
+    setLaunchError(null)
+    setLaunchBusy(true)
+    try {
+      const result = await onCreateConversation?.(id, message, 'terminal')
+      if (result && 'name' in result) api.openOrFocusAgentPane(result.name, 'Agent')
+      if (result && 'error' in result) setLaunchError(result.error)
+    } finally {
+      setLaunchBusy(false)
+    }
   }
 
   const launcher = (
     <Launcher
+      busy={launchBusy}
+      errorText={launchError ?? undefined}
       lastUsedAgentId={readLastUsedAgent(api.deckKey)}
       onSelect={(intent, query) =>
         dispatchLauncherIntent(intent, query, {
