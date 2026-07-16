@@ -622,7 +622,7 @@
     "recordedAt": "2026-07-16T21:42:09.171Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T21:47:25.778Z",
+  "updated": "2026-07-16T21:48:49.224Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "pending",
@@ -631,12 +631,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T21:47:25.363Z",
+    "updatedAt": "2026-07-16T21:48:49.173Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2760-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2797",
     "reviewedAtCommit": "42df3363046d97d9319bda1aa8ab9ac30a87ac17",
     "lastVerifiedCommit": "42df3363046d97d9319bda1aa8ab9ac30a87ac17",
-    "reviewRequestedAt": "2026-07-16T21:42:10.145Z",
+    "reviewRequestedAt": "2026-07-16T21:48:48.781Z",
     "reviewSpawnedAt": "2026-07-16T21:42:11.489Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -728,10 +728,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1327,
-            "output": 35127,
-            "cacheRead": 9885731,
-            "cacheWrite": 403858
+            "input": 1329,
+            "output": 35259,
+            "cacheRead": 10047426,
+            "cacheWrite": 405332
           }
         },
         "work": {
@@ -763,15 +763,15 @@
           "cacheWrite": 520882
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1327,
-          "output": 35127,
-          "cacheRead": 9885731,
-          "cacheWrite": 403858
+          "input": 1329,
+          "output": 35259,
+          "cacheRead": 10047426,
+          "cacheWrite": 405332
         }
       },
       "costAtCloseOut": {
-        "usd": 94.376008,
-        "pricingAsOf": "2026-07-16T21:47:25.541Z"
+        "usd": 94.41335600000001,
+        "pricingAsOf": "2026-07-16T21:48:49.176Z"
       }
     },
     "merges": [
