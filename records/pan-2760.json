@@ -17,6 +17,11 @@
       "timestamp": "2026-07-16T18:27:00.862Z",
       "reason": "end",
       "note": "No deviations. Implemented roster and board crew creation through one create-and-assign path; added collapsed and expanded removal through the guarded atomic heir hand-off; committed the approved mockup verbatim and marked PAN-2684 create/delete behavior superseded; updated Tiered Execution docs. All vBRIEF items are complete, npm run typecheck and npm run lint pass, and npm test passes (1025 root files plus 3 frontend parity files). Branch is clean and fully pushed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-16T18:27:22.483Z"
     }
   ],
   "feedback": [],
@@ -42,7 +47,7 @@
     "recordedAt": "2026-07-16T18:26:57.727Z"
   },
   "created": "2026-07-16T01:54:55.366Z",
-  "updated": "2026-07-16T18:27:21.034Z",
+  "updated": "2026-07-16T18:27:22.483Z",
   "pipeline": {
     "issueId": "PAN-2760",
     "reviewStatus": "reviewing",
