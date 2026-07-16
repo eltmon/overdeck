@@ -88,17 +88,18 @@
     "recordedAt": "2026-07-16T19:14:41.281Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T20:13:10.631Z",
+  "updated": "2026-07-16T20:13:28.678Z",
   "pipeline": {
     "issueId": "PAN-1987",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:13:09.464Z",
+    "updatedAt": "2026-07-16T20:13:28.663Z",
+    "reviewNotes": "[correctness] Tree rename can target a different project — `src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx:232`",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
     "lastVerifiedCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e",
@@ -146,6 +147,28 @@
         "tests/unit/lib/projects-rename.test.ts"
       ],
       "recordedAt": "2026-07-16T19:14:41.281Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/security.md",
+        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/correctness.md",
+        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
+      },
+      "performance": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/performance.md",
+        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1987/.pan/review/agent-pan-1987-review-d2adb82d/requirements.md",
+        "atCommit": "d2adb82d96f6c0b740ecd14fd1bdbbdfed6af85e"
+      }
     },
     "strikeRecoveryCount": 0
   },
@@ -239,7 +262,7 @@
       },
       "costAtCloseOut": {
         "usd": 101.209606,
-        "pricingAsOf": "2026-07-16T20:13:09.472Z"
+        "pricingAsOf": "2026-07-16T20:13:28.666Z"
       }
     },
     "merges": [
