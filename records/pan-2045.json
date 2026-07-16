@@ -264,7 +264,6 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/App.test.tsx",
-      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
       "src/dashboard/frontend/src/test-utils/strictFetchMock.ts"
     ],
     "declaredScopeUntouched": [
@@ -278,7 +277,6 @@
       "src/dashboard/frontend/src/components/Pipeline/*.test.tsx",
       "src/dashboard/frontend/src/components/Settings/__tests__/*.test.tsx",
       "src/dashboard/frontend/src/components/Settings/primitives/__tests__/*.test.tsx",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/*.test.tsx",
       "src/dashboard/frontend/src/components/Sidebar.test.tsx",
       "src/dashboard/frontend/src/components/Stage/*.test.tsx",
       "src/dashboard/frontend/src/components/Stage/HomePane/*.test.tsx",
@@ -378,13 +376,12 @@
       "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
       "src/dashboard/frontend/src/components/EventRouter.test.tsx",
       "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+      "src/dashboard/frontend/src/components/Settings/sections/__tests__/TieredExecutionSection.test.tsx",
       "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
       "src/dashboard/frontend/src/components/Stage/panes/BrowserPane.test.tsx",
-      "src/dashboard/frontend/src/components/chat/__tests__/ChatMarkdown.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/ComposerPromptEditor.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/ConversationPanel.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/MessagesTimeline.test.tsx",
-      "src/dashboard/frontend/src/components/chat/messagesTimeline/MessagesTimeline.tsx",
       "src/dashboard/frontend/src/components/primitives/AgentCard.test.tsx",
       "src/dashboard/frontend/src/components/resources/MachineRoom.test.tsx",
       "src/dashboard/frontend/src/components/sessionFeed/__tests__/SessionFeedSidebar.test.tsx",
@@ -393,10 +390,10 @@
       "src/dashboard/frontend/src/test-utils/strictFetchMock.ts",
       "src/dashboard/frontend/vitest.config.ts"
     ],
-    "recordedAt": "2026-07-16T21:48:55.460Z"
+    "recordedAt": "2026-07-16T22:16:41.470Z"
   },
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T22:16:33.820Z",
+  "updated": "2026-07-16T22:16:41.472Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "passed",
