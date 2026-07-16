@@ -26,6 +26,7 @@ import {
   ProcessSpawnError,
   ProcessTimeoutError,
 } from '../errors.js';
+import { pidsWithCwdUnder } from '../process-cwd.js';
 import { isStartingWithinGrace } from './agent-grace.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { checkInspectAgentTimeouts } from './deacon-inspect.js';
@@ -2422,12 +2423,11 @@ async function killOrphanedWorkspaceProcesses(workspacePath: string): Promise<vo
       }
     } catch { /* non-fatal */ }
 
-    // 2. Find processes with files open in the workspace
-    const { stdout } = await execAsync(
-      `lsof +D "${workspacePath}" -t 2>/dev/null || true`,
-      { encoding: 'utf-8', timeout: 10000 },
-    );
-    const pids = stdout.trim().split('\n').filter(Boolean).map(p => p.trim()).filter(p => /^\d+$/.test(p));
+    // 2. Find processes with cwd inside the workspace. NEVER select by open
+    //    files (`lsof +D`): Bun's hardlinked node_modules make the dashboard and
+    //    every PTY supervisor appear to hold files "in" any workspace via mmap'd
+    //    native addons — that kill list downs the platform (src/lib/process-cwd.ts).
+    const pids = await pidsWithCwdUnder(workspacePath);
 
     // 3. Filter out protected PIDs (agent tmux panes and descendants)
     //    AND Docker container processes — they have files open via volume mounts

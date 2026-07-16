@@ -611,7 +611,8 @@ function sessionQueryFailure(cause: unknown): Exclude<SessionQueryResult, { stat
 
 export function querySessionSync(name: string): SessionQueryResult {
   try {
-    tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8' });
+    // Explicit stdio — without it execFileSync echoes the routine "can't find session" stderr of dead-session probes into the server log.
+    tmuxExecSync(['has-session', '-t', exactSession(name)], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] });
     return { status: 'exists' };
   } catch (cause) {
     return sessionQueryFailure(cause);
@@ -621,7 +622,6 @@ export function querySessionSync(name: string): SessionQueryResult {
 export function sessionExistsSync(name: string): boolean {
   return querySessionSync(name).status === 'exists';
 }
-
 
 /**
  * @deprecated Legacy sync function — blocks the event loop. Use `createSession` instead.
@@ -657,11 +657,11 @@ export function createSessionSync(
   tmuxExecSync(buildNewSessionArgs(name, cwd, initialCommand, options));
 }
 
-
 export function killSessionSync(name: string): void {
   // Exact-match target — a bare name prefix-matches and would kill e.g.
   // `agent-pan-977-review` when asked to kill `agent-pan-977`.
-  tmuxExecSync(['kill-session', '-t', exactSession(name)]);
+  // Explicit stdio — killing a maybe-dead session is routine; see querySessionSync.
+  tmuxExecSync(['kill-session', '-t', exactSession(name)], { stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
 
