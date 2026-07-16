@@ -53,7 +53,7 @@
     "recordedAt": "2026-07-16T19:14:41.281Z"
   },
   "created": "2026-07-16T17:40:41.582Z",
-  "updated": "2026-07-16T19:20:18.653Z",
+  "updated": "2026-07-16T19:21:33.602Z",
   "pipeline": {
     "issueId": "PAN-1987",
     "reviewStatus": "pending",
@@ -63,10 +63,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:20:18.563Z",
+    "updatedAt": "2026-07-16T19:21:33.453Z",
     "inspectNotes": "Pure extraction of postProjectRenameRoute into project-rename.ts, wired into projectsRouteLayer at projects.ts:1037; auth gate, 404/400/409 mapping, and renameProjectSync-only mutation all preserved verbatim",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2800",
-    "reviewRequestedAt": "2026-07-16T19:20:15.346Z",
+    "reviewRequestedAt": "2026-07-16T19:21:30.379Z",
     "reviewSpawnedAt": "2026-07-16T19:14:50.508Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -203,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 85.792802,
-        "pricingAsOf": "2026-07-16T19:20:18.616Z"
+        "pricingAsOf": "2026-07-16T19:21:33.557Z"
       }
     },
     "merges": [
