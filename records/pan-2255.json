@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-16T06:48:07.173Z",
+  "updated": "2026-07-16T06:48:19.504Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "pending",
@@ -87,8 +87,16 @@
   "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "delayed-escalation": {
+        "writerId": "agent-pan-2255",
+        "agentId": "agent-pan-2255",
+        "pid": 2558946,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T06:48:19.504Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2255",
@@ -154,6 +162,7 @@
     "drain-spawn-resume.drain-spawn-resume.ac1": "completed",
     "drain-spawn-resume.drain-spawn-resume.ac2": "completed",
     "drain-spawn-resume.drain-spawn-resume.ac3": "completed",
-    "drain-spawn-resume.drain-spawn-resume.ac4": "completed"
+    "drain-spawn-resume.drain-spawn-resume.ac4": "completed",
+    "delayed-escalation": "running"
   }
 }
