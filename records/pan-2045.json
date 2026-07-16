@@ -17,7 +17,7 @@
   ],
   "feedback": [],
   "created": "2026-06-25T04:39:27.335Z",
-  "updated": "2026-07-16T18:29:31.344Z",
+  "updated": "2026-07-16T18:40:39.403Z",
   "pipeline": {
     "issueId": "PAN-2045",
     "reviewStatus": "pending",
@@ -90,16 +90,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "fix-accessible-name-tests": {
-        "writerId": "agent-pan-2045",
-        "agentId": "agent-pan-2045",
-        "pid": 261387,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-16T18:29:31.344Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2045",
@@ -143,6 +135,16 @@
         "itemId": "fix-style-serialization-tests",
         "outcome": "completed",
         "releasedAt": "2026-07-16T18:29:13.893Z"
+      },
+      {
+        "writerId": "agent-pan-2045",
+        "agentId": "agent-pan-2045",
+        "pid": 261387,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-16T18:29:31.344Z",
+        "itemId": "fix-accessible-name-tests",
+        "outcome": "completed",
+        "releasedAt": "2026-07-16T18:40:39.402Z"
       }
     ],
     "statusReasons": {
@@ -175,6 +177,9 @@
     "fix-style-serialization-tests": "completed",
     "fix-style-serialization-tests.fix-style-serialization-tests.ac1": "completed",
     "fix-style-serialization-tests.fix-style-serialization-tests.ac2": "completed",
-    "fix-accessible-name-tests": "running"
+    "fix-accessible-name-tests": "completed",
+    "fix-accessible-name-tests.fix-accessible-name-tests.ac1": "completed",
+    "fix-accessible-name-tests.fix-accessible-name-tests.ac2": "completed",
+    "fix-accessible-name-tests.fix-accessible-name-tests.ac3": "completed"
   }
 }
