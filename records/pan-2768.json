@@ -2,7 +2,7 @@
   "issueId": "PAN-2768",
   "schemaVersion": 2,
   "created": "2026-07-16T03:34:22.913Z",
-  "updated": "2026-07-16T03:34:22.913Z",
+  "updated": "2026-07-16T03:34:23.717Z",
   "pipeline": {
     "issueId": "PAN-2768",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2768: Sync Now fails in packaged desktop (AppImage): panCliInvocation points at dist/cli/index.js, which extraResources never ships",
       "timestamp": "2026-07-16T03:34:22.913Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
