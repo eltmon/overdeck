@@ -5295,3 +5295,24 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   submit) + 1966 (correctness reviewer died → synthesis wedge → no merge). Expect some of the 9 to wedge at
   review→merge identically until the substrate fix lands. Shepherding per tick.
 - **Session: 49 merges, 21 close-outs. Fleet: 9 work + 3 planning active.**
+
+---
+
+## Tick 60 — 2026-07-16 ~18:12Z — 2633 MERGED (1st intake-fleet land); DOCKER NETWORK EXHAUSTION fixed
+
+- **PAN-2633 MERGED `d4c372a71e`** (#2793) — complete claude-code review convoy (all 4 reviewers +
+  synthesis APPROVED), run fea50269 == PR head fea5026986e0 (fresh), overdeck/review+test PASS, CLEAN.
+  Proves the claude-code+gpt-5.6 harness is NOT a universal blocker — some issues complete clean, others
+  wedge in manual mode. Close-out DEFERRED to next batched deploy (merge post-dates live build fb1b422abd).
+- **DOCKER NETWORK EXHAUSTION (pipeline blocker) fixed**: starting 1897/2045 failed with "all predefined
+  address pools have been fully subnetted" — the 11-issue launch + orphan networks from merged/closed
+  workspaces filled Docker's ~31-network pool. `docker network prune -f` removed 13 unused networks
+  (safe — only prunes networks with no attached container; running agents' _devnet nets stayed). Retry
+  succeeded. **RECURRING RISK with a large fleet — prune when spawns fail on address-pool.**
+- **HARNESS ROUTING**: operator did NOT flip `models.providers.openai.harness: claude-code` — kept as-is.
+  So the claude-code+CLIProxy(gpt-5.6-sol) combo (PAN-1865 risk) stands; 2633 proves it can complete, but
+  1491/1966/2760/2619 wedge in "⏸ manual mode on" where pan-tell nudges land in the composer but don't
+  submit. Not thrashing them.
+- **Fleet now**: work agents 1987,2232,2619,2760,2772,2773,1897,2045 (+1491,1966 wedged); 2252 planning;
+  806 HELD (AI objection — operator decision pending). Memory 34G avail.
+- **Session: 50 merges, 21 close-outs.**
