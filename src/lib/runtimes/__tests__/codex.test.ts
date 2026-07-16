@@ -150,6 +150,7 @@ describe('initCodexHome', () => {
       mcpServers: {
         playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@0.0.78'] },
         'quoted.server': {
+          type: 'stdio',
           command: 'path\\to"command',
           args: ['arg\\with"quotes'],
           env: { 'API"KEY': 'value\\path' },
@@ -170,7 +171,7 @@ describe('initCodexHome', () => {
     const codexDir = join(ctx.codexHome, 'agent-init-mcp-unsupported')
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
-    initCodexHome(codexDir, { mcpServers: { remote: { type: 'http' } } })
+    initCodexHome(codexDir, { mcpServers: { remote: { type: 'http', command: 'proxy' } } })
 
     const { readFileSync: readNode } = require('node:fs')
     const config = readNode(join(codexDir, 'config.toml'), 'utf8')
@@ -184,7 +185,7 @@ describe('initCodexHome', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
 
     initCodexHome(codexDir, {
-      mcpServers: { playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest'] } },
+      mcpServers: { playwright: { type: 'stdio', command: 'npx', args: ['-y', '@playwright/mcp@latest'] } },
     })
 
     const { readFileSync: readNode } = require('node:fs')

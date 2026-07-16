@@ -347,7 +347,7 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
       lines.push('', `[projects."${escaped}"]`, 'trust_level = "trusted"')
     }
     for (const [name, definition] of Object.entries(opts.mcpServers ?? {})) {
-      if (typeof definition.command !== 'string' || definition.command.length === 0) {
+      if (definition.type !== 'stdio' || typeof definition.command !== 'string' || definition.command.length === 0) {
         console.warn(`[codex] skipping MCP server "${name}" — only stdio command servers are provisioned into codex config`)
         continue
       }
