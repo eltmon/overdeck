@@ -57,16 +57,16 @@
     "recordedAt": "2026-07-16T19:18:10.850Z"
   },
   "created": "2026-07-16T04:56:05.248Z",
-  "updated": "2026-07-16T19:19:22.597Z",
+  "updated": "2026-07-16T19:19:23.632Z",
   "pipeline": {
     "issueId": "PAN-2772",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T19:19:20.133Z",
+    "updatedAt": "2026-07-16T19:19:23.558Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-2772-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2801",
     "reviewRequestedAt": "2026-07-16T19:18:11.507Z",
@@ -140,9 +140,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2091135,
-            "output": 158724,
-            "cacheRead": 53021184,
+            "input": 2097553,
+            "output": 159832,
+            "cacheRead": 53568512,
             "cacheWrite": 0
           }
         }
@@ -155,15 +155,15 @@
           "cacheWrite": 167646
         },
         "openai/gpt-5.6-sol": {
-          "input": 2202131,
-          "output": 159432,
-          "cacheRead": 53343744,
+          "input": 2208549,
+          "output": 160540,
+          "cacheRead": 53891072,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 50.554166,
-        "pricingAsOf": "2026-07-16T19:19:20.395Z"
+        "usd": 50.89316,
+        "pricingAsOf": "2026-07-16T19:19:23.619Z"
       }
     },
     "merges": [
