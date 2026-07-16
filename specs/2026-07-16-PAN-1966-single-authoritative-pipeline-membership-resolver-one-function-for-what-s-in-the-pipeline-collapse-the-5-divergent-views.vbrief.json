@@ -1,0 +1,1022 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-16T04:11:41Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-1966: Single authoritative pipeline-membership resolver — one function for \"what's in the pipeline\" (collapse the 5 divergent views)",
+    "updated": "2026-07-16T04:18:30.430Z"
+  },
+  "plan": {
+    "id": "pan-1966",
+    "title": "Single authoritative pipeline-membership resolver — one function for \"what's in the pipeline\" (collapse the 5 divergent views)",
+    "status": "proposed",
+    "uid": "6e96d8c4-8387-4a5b-be24-033484527a17",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-16T04:11:41Z",
+    "updated": "2026-07-16T04:18:30.430Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1966",
+        "label": "PAN-1966",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1980",
+        "label": "PAN-1980 (resolver shipped here)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1920",
+        "label": "PAN-1920 (enumerate-in-flight, subsumed)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1965",
+        "label": "PAN-1965 (pipeline VIEW, consumer)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "read-door",
+      "single-source-of-truth",
+      "refactor"
+    ],
+    "narratives": {
+      "Problem": "Pipeline membership (\"what's in the pipeline\") is computed in 6 independent places from different signal subsets — resource-discovery (L5 liveness + tracker state), frontend pipeline-state (labels + review_status DB), pan pending (review_status rows only), enumerate-in-flight (open issue ∩ workspace dir), flywheel (LLM judgment + workspace-dir existence), and the pipeline-status skill (tracker-state filter). They drift, producing zombie PRs, post-merge limbo, and ghost worktrees that no surface owns. The authoritative classifier resolvePipelineMembership() already exists (src/lib/pipeline-membership.ts, PAN-1980) with 8/8 unit tests, but NOTHING in production imports it — the only importer is its own test.",
+      "Proposal": "Extend the shipped resolver with two additive pieces (a hasVbriefSpec lens so planned issues are members per the 2026-07-16 operator comment, and a labelDrift annotation for FR-4). Build one batch lens-signal gatherer over durable sources only (GitHub issues+labels, open/merged PR lists, feature/* branches + squash-aware merge checks, specs on overdeck-state). Expose the read door as a cached server service + GET /api/pipeline/membership. Rewire all 6 sites to delegate: in-process TS consumers import the lib; out-of-process consumers (pipeline-status skill, flywheel orchestrator prompt) hit the endpoint. Land a no-loss audit test enumerating every legacy consumer, and an import-boundary lint guard so no site can regrow independent membership math. L5 (DB/state.json/tmux) becomes annotation-only everywhere.",
+      "NonGoals": "- No orphan_branch bucket: closed issue + leftover branch stays clean_terminal per shipped PAN-1980 §2d (only an open PR makes a closed issue a zombie_pr)\n- No changes to phase-within-pipeline lane semantics (getPipelineIssuePhase lanes stay; only the membership gate moves to the resolver)\n- No removal of the review_status table or any L5 surface — they remain phase/liveness annotations\n- No PAN-1965 view/UI work (lens matrix rendering is the consumer issue)\n- No new pan CLI verb (pan pending is rewired; no pan pipeline command)\n- No DoR/DoD redesign (the interim Ready-lane behavior is preserved, not extended)\n- No destructive cutover acceptance test (never 'rm ~/.overdeck and observe' — mechanical import-graph assertion instead)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Planned membership = new durable lens hasVbriefSpec (spec present on overdeck-state via findSpecByIssue); the GitHub 'planned' label is a hint only.",
+        "rationale": "Operator comment 2026-07-16 requires planned issues in the pipeline; the label is applied on a swallowed-failure path (planning-promotion.ts:646) and actively stripped by label-reconciler/close-issue, so spec presence is the only reliable durable signal."
+      },
+      {
+        "summary": "Keep the shipped resolver's bucket set (no orphan_branch bucket) and classification semantics; scope this issue to extensions + wiring.",
+        "rationale": "The 2026-06-19 issue comment declares the resolver built and shipped with the remaining work being wiring; PAN-1980 §2d deliberately decided closed ⇒ terminal except open PR."
+      },
+      {
+        "summary": "FR-4 label drift ships as an additive labelDrift annotation field on PipelineMembership, not as new buckets.",
+        "rationale": "Drift direction is orthogonal to membership; annotation preserves the 5-bucket contract PAN-1965 will render."
+      },
+      {
+        "summary": "Read door = GET /api/pipeline/membership for out-of-process consumers; pan pending calls the shared lib directly.",
+        "rationale": "The CLI must work when the dashboard is down; both transports execute the same single gather+resolve module, so membership math still exists exactly once (FR-5)."
+      },
+      {
+        "summary": "One vBRIEF rather than sibling issues.",
+        "rationale": "All wiring items share one foundation (the gatherer) and one exit gate (no-loss audit + lint guard); sibling issues would fragment the audit FR-5 requires."
+      },
+      {
+        "summary": "hasMergedPr gathered from one batched merged-PR listing per project (--limit 500), with isBranchMerged (close-out.ts:97) as the squash-aware per-branch fallback.",
+        "rationale": "Avoids N+1 gh API calls; merges old enough to fall off the limit pair with closed issues, which are clean_terminal regardless."
+      }
+    ],
+    "items": [
+      {
+        "id": "resolver-planned-lens",
+        "title": "Extend resolver: hasVbriefSpec lens makes planned issues pipeline members",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "lens-gatherer",
+            "membership-endpoint",
+            "wire-enumerate-in-flight",
+            "wire-resource-discovery",
+            "wire-pan-pending",
+            "wire-flywheel"
+          ],
+          "files_scope": [
+            "src/lib/pipeline-membership.ts",
+            "src/lib/__tests__/pipeline-membership.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/pipeline-membership.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all pipeline-membership tests pass including new planned-lens cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `hasVbriefSpec: boolean` to IssueLensSignals in src/lib/pipeline-membership.ts (doc comment: durable — vBRIEF spec exists on the overdeck-state git branch; gather via findSpecByIssue, never from the DB). In resolvePipelineMembership, change the final open-issue branch: when the issue is open with no PR (open or merged) and no live/convention branch, return `planned_backlog` (inPipeline: true) if `hasVbriefSpec` is true, with reason 'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning'; otherwise keep the existing clean_terminal 'backlog, never started' result. Closed issues are unaffected (spec never overrides closed ⇒ terminal). Update the test file's sig() helper with a `hasVbriefSpec: false` default and add the new cases. Update the module header comment to list the new lens (call it L6-spec)."
+        },
+        "items": [
+          {
+            "id": "resolver-planned-lens.ac1",
+            "title": "Given an open issue with hasVbriefSpec true and all other lenses false, resolvePipelineMembership returns bucket planned_backlog with inPipeline true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-planned-lens.ac2",
+            "title": "Given a closed issue with hasVbriefSpec true and no open PR, the resolver returns clean_terminal (a spec never overrides closed ⇒ terminal)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-planned-lens.ac3",
+            "title": "The pipeline-membership test suite passes with all 8 pre-existing PAN-1980 cases unchanged, hasVbriefSpec defaulting to false in the sig() helper",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-label-drift",
+        "title": "Add labelDrift annotation to PipelineMembership (FR-4, both directions)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership.ts",
+            "src/lib/__tests__/pipeline-membership.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/pipeline-membership.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "label-drift test cases pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `labelDrift: 'stale_present' | 'stale_absent' | null` to PipelineMembership in src/lib/pipeline-membership.ts, computed inside resolvePipelineMembership: 'stale_present' when the result bucket is clean_terminal (or the issue is closed) but phaseLabel is non-null; 'stale_absent' when hasOpenPr is true but phaseLabel is null; otherwise null. Do not change any bucket outcomes — this is a pure annotation. The phaseLabel values are whatever the gatherer maps from the canonical pipeline label set (src/lib/cloister/label-reconciler.ts:9 STALE_PIPELINE_LABELS is the reference list — quote it in a comment). Add test cases."
+        },
+        "items": [
+          {
+            "id": "resolver-label-drift.ac1",
+            "title": "Given a closed issue with phaseLabel 'in-progress' and no open PR, the result carries labelDrift 'stale_present' and bucket clean_terminal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-label-drift.ac2",
+            "title": "Given an open issue with an open PR and phaseLabel null, the result carries labelDrift 'stale_absent' and bucket in_flight",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-label-drift.ac3",
+            "title": "Given an open in_flight issue with phaseLabel 'in-review', labelDrift is null and no bucket changes versus the pre-change classification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lens-gatherer",
+        "title": "Batch lens-signal gatherer from durable sources (git + GitHub + specs)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "membership-endpoint",
+            "wire-enumerate-in-flight",
+            "wire-resource-discovery",
+            "wire-pan-pending",
+            "wire-flywheel"
+          ],
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gatherer unit tests pass with mocked gh/git",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/pipeline-membership-gather.ts exporting `gatherProjectLensSignals(project): Promise<IssueLensSignals[]>`. Candidate universe = dedup-by-issue-id union of: (a) open GitHub issues with labels (listOpenIssuesWithLabelsPromise, src/lib/github-app.ts:601); (b) issue ids parsed from open-PR head branches `feature/<id>` (pattern: loadOpenPullRequests, src/dashboard/server/services/resource-discovery.ts:345 — gh pr list --state open --json number,state,headRefName); (c) local+remote feature/* convention branches (pattern: loadProjectBranches, resource-discovery.ts:383); (d) issues with a vBRIEF spec (findSpecByIssue, src/lib/pan-dir/specs.ts:224, or its sync variant). Lens fills: issueOpen from (a) membership or getIssueStatePromise (github-app.ts:592) for candidates not in the open set; hasOpenPr from (b); hasMergedPr from ONE batched `gh pr list --state merged --json headRefName,mergedAt --limit 500` (never per-issue calls); hasConventionBranch from (c); branchUnmerged via `git for-each-ref --no-merged=main` batch (pattern: loadBranchesAheadOfMain, resource-discovery.ts:422) — the resolver's L1-merged pairing already corrects the squash blind spot (FR-3); phaseLabel = first label in the canonical set from label-reconciler.ts:9; hasVbriefSpec from (d). HARD CONSTRAINTS: async exec only (execAsync/spawn — no execSync, this is server-reachable, PAN-70); the module must import NOTHING from the SQLite DB layer, review-status, agent state, or tmux modules (NFR-1 — membership must be computable with an empty overdeck.db). Unit tests mock the gh/git executor and assert candidate union, lens values, batching (call counts), and the squash case end-to-end through resolvePipelineMembership."
+        },
+        "items": [
+          {
+            "id": "lens-gatherer.ac1",
+            "title": "Given mocked sources containing an open issue, an open-PR-only branch, a branch-only issue, and a spec-only issue, gatherProjectLensSignals returns one deduplicated IssueLensSignals per issue with all six lenses filled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lens-gatherer.ac2",
+            "title": "Given any candidate count, the gatherer emits exactly one merged-PR listing call (test asserts executor call counts — no per-issue gh calls)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lens-gatherer.ac3",
+            "title": "A squash-merged branch (merged PR exists, lineage says unmerged) produces signals that resolve to post_merge_limbo, not planned_backlog, when passed through resolvePipelineMembership",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lens-gatherer.ac4",
+            "title": "A test asserts the module's import graph contains no DB/review-status/agent-state/tmux modules, so gathering succeeds against a fresh empty overdeck.db by construction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lens-gatherer.ac5",
+            "title": "The module contains no execSync/spawnSync calls (async exec only), verified by the existing dashboard-server lint rules passing with the new file in scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "membership-endpoint",
+        "title": "Pipeline-membership read door: cached service + GET /api/pipeline/membership",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/pipeline-membership.ts",
+            "src/dashboard/server/routes/issues.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/dashboard/pipeline-membership-service.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/pipeline-membership-service.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "service/route tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/server/services/pipeline-membership.ts: a service that runs gatherProjectLensSignals + resolvePipelineMembership per project behind a short TTL cache (~30s, matching resource-discovery's cache idiom) so bursty consumers don't stampede gh. Add route GET /api/pipeline/membership?project=<key> returning the array of PipelineMembership objects (issueId, inPipeline, bucket, reasons, lenses, labelDrift). Register in the existing route composition (src/dashboard/server/routes/issues.ts or a new small route module wired in server.ts — follow the 12-route-module structure). This endpoint is the pipeline domain's read door for out-of-process consumers (pipeline-status skill, flywheel orchestrator). No DB reads in the service."
+        },
+        "items": [
+          {
+            "id": "membership-endpoint.ac1",
+            "title": "GET /api/pipeline/membership returns a JSON array where each element carries issueId, inPipeline, bucket, reasons, lenses, and labelDrift for the requested project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-endpoint.ac2",
+            "title": "Given two calls within the TTL, the endpoint returns cached results and the gatherer runs exactly once (fake-timer test, no real sleeps)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-endpoint.ac3",
+            "title": "The route responds through the registered Effect route composition (server route table includes it; a request against the test harness returns 200)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-enumerate-in-flight",
+        "title": "Rewire enumerate-in-flight (PAN-1920) to delegate to the resolver",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/reconstruct/enumerate-in-flight.ts",
+            "src/lib/reconstruct/reconstruct-cache.ts",
+            "tests/unit/lib/reconstruct/enumerate-in-flight.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/reconstruct",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "reconstruct tests pass with resolver-backed enumeration",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the membership predicate in src/lib/reconstruct/enumerate-in-flight.ts:22-79 (openIssueIds ∩ feature-<id> workspace dir/worktree) with: gather lens signals, call resolvePipelineMembership, and return issues where inPipeline is true. Keep the workspace-dir/worktree scan ONLY as runtime-plane enrichment for the reconstruct cache (where is the worktree), not as the membership gate. Adapt the sole caller src/lib/reconstruct/reconstruct-cache.ts in the same commit. The old function's callers must not lose the workspacePath info they consume today (no-loss)."
+        },
+        "items": [
+          {
+            "id": "wire-enumerate-in-flight.ac1",
+            "title": "enumerate-in-flight derives membership by calling resolvePipelineMembership; git grep shows no remaining openIssueIds∩workspace-dir membership predicate in the module",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-enumerate-in-flight.ac2",
+            "title": "The enumerated in-flight set contains a post_merge_limbo issue (open issue, merged PR, no workspace dir) — previously invisible without a workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-enumerate-in-flight.ac3",
+            "title": "reconstruct-cache still receives each issue's workspacePath when a worktree exists (existing consumers keep their data)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-resource-discovery",
+        "title": "Rewire resource-discovery membership through the resolver; L5 becomes annotation-only",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "tests/unit/dashboard/resource-discovery*.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard --reporter=basic",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resource-discovery tests pass with resolver-gated membership",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/resource-discovery.ts, replace the membership predicate chain in computeResourceAllocatedIssues (lines ~764-806, helpers isLiveResource/isActiveTrackerState/isTerminalTrackerState/hasOpenPr at ~261-284) with resolvePipelineMembership over signals from gatherProjectLensSignals (the service already loads most raw inputs — reuse its loaders where they match, but the membership decision must come from the resolver only). tmux/docker/remote-agent/conversation/readyForMerge signals become annotations on the emitted issue (which resources exist), never membership. Per decision D7: an issue with live resources whose verdict is clean_terminal is still emitted, flagged with an orphan-resource drift marker (additive field, e.g. resourceDrift: true) so the Command Deck tree loses nothing silently. Add each issue's bucket to toPublicResourceIssue output (additive). Keep the /api/issues/resource-allocated route shape backward-compatible (only additions)."
+        },
+        "items": [
+          {
+            "id": "wire-resource-discovery.ac1",
+            "title": "Given an issue whose only signals are an in_progress tracker state with no durable lenses, computeResourceAllocatedIssues returns no membership for it — resolvePipelineMembership alone decides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-resource-discovery.ac2",
+            "title": "Given an issue with a live tmux session but a clean_terminal verdict, the output still contains it flagged with an orphan-resource drift marker (nothing silently dropped from the Command Deck tree)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-resource-discovery.ac3",
+            "title": "GET /api/issues/resource-allocated returns each issue's pipeline bucket and preserves every pre-existing response field (additive shape change only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-resource-discovery.ac4",
+            "title": "The resource-allocated set contains a zombie_pr issue (closed issue, open PR) with bucket zombie_pr — preserves today's open-PR affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-pipeline-state-frontend",
+        "title": "Serve membership on the issue DTO; frontend pipeline gate reads it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/*.ts",
+            "src/dashboard/server/routes/issues.ts",
+            "src/dashboard/frontend/src/lib/pipeline-state.ts",
+            "src/dashboard/frontend/src/lib/pipeline-state.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "cd packages/contracts && npm run build",
+            "npm run typecheck",
+            "npx vitest run --project frontend src/dashboard/frontend/src/lib/pipeline-state.test.ts"
+          ],
+          "expected_outputs": [
+            "contracts build succeeds",
+            "typecheck completes without errors",
+            "pipeline-state frontend tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add an optional pipelineMembership field ({ inPipeline: boolean; bucket: PipelineBucket; labelDrift: string | null }) to the issue DTO in packages/contracts (rebuild contracts after editing — workspace rule). Populate it server-side where issues are served to the frontend (the issues route / enrichment that feeds the store), sourced from the cached membership service. In src/dashboard/frontend/src/lib/pipeline-state.ts, make the MEMBERSHIP decision (isPipelineReady at lines 116-125 and any todo-hiding gates) read the server-computed field when present, falling back to current behavior when absent (older cached DTOs). Do NOT change getPipelineIssuePhase lane assignment for in-pipeline issues — phase-within-pipeline stays as-is. Surface bucket so PAN-1965 can render it later (no UI work here beyond the gate)."
+        },
+        "items": [
+          {
+            "id": "wire-pipeline-state-frontend.ac1",
+            "title": "The issue DTO in @overdeck/contracts contains pipelineMembership with inPipeline, bucket, and labelDrift, which the server populates for every served issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pipeline-state-frontend.ac2",
+            "title": "An issue with bucket post_merge_limbo renders in the /pipeline page's issue set (previously invisible when review_status rows were absent)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pipeline-state-frontend.ac3",
+            "title": "getPipelineIssuePhase returns the same lanes as before for in_flight issues (frontend test pins lane outcomes for a fixture set)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pipeline-state-frontend.ac4",
+            "title": "When pipelineMembership is absent from a DTO, the frontend gate falls back to the pre-change label/stateType behavior without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-pan-pending",
+        "title": "Rewire pan pending: resolver defines the universe, review_status annotates phase",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/pending.ts",
+            "tests/unit/cli/pending.test.ts",
+            "skills/pan-review/SKILL.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/pending.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "pending command tests pass",
+            "typecheck and lint (including skills lint) complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/pending.ts, derive the issue universe from gatherProjectLensSignals + resolvePipelineMembership (direct lib call — the CLI must work with the dashboard down). The existing review_status-derived sets (--ready: readyForMerge && !merged; --blocked: blockerKind; default: reviewStatus pending) become phase filters WITHIN the membership set, preserving their current meanings for the flywheel consumer (PAN-1735 adoption path). Add a drift section to the default output listing zombie_pr and post_merge_limbo issues with their reasons, so the exception queue is visible where operators already look. The command must complete (with the drift/membership output) when the review_status table is empty. If skills lint flags pan-review/pending skill docs for drift, update the affected SKILL.md in the same commit."
+        },
+        "items": [
+          {
+            "id": "wire-pan-pending.ac1",
+            "title": "pan pending prints a post_merge_limbo issue that has no review_status row, tagged with its bucket and reason (membership no longer requires a DB row)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-pending.ac2",
+            "title": "Given issues inside the membership set, --ready and --blocked each returns the same issue set as before (meanings preserved for the flywheel adoption path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pan-pending.ac3",
+            "title": "pan pending exits 0 against an empty review_status table and prints the resolver-derived pipeline set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-flywheel",
+        "title": "Rewire flywheel: code-side isInPipeline delegates; orchestrator prompt names the read door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/flywheel.ts",
+            "src/lib/cloister/uat-promote-notify.ts",
+            "roles/flywheel.md",
+            "tests/unit/lib/cloister/flywheel*.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister --reporter=basic",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "cloister flywheel tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace isInPipeline in src/lib/cloister/flywheel.ts (~line 171: existsSync(workspaces/feature-<id>)) with a resolver-verdict check (gather signals for the candidate or reuse the membership service's cache when available; workspace-dir existence stops deciding). Update the orchestrator instruction text that says 'Re-derive activePipeline from current source of truth' (src/lib/cloister/uat-promote-notify.ts:23 and the corresponding roles/flywheel.md section) to name GET /api/pipeline/membership as the authoritative source the agent must derive activePipeline from, including the bucket vocabulary. The FlywheelPipelineItem contract in packages/contracts/src/flywheel.ts is unchanged."
+        },
+        "items": [
+          {
+            "id": "wire-flywheel.ac1",
+            "title": "isInPipeline returns false for an issue with a workspace directory whose resolver verdict is clean_terminal (closed issue, no open PR), and true for a post_merge_limbo issue without a workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-flywheel.ac2",
+            "title": "The orchestrator prompt text contains GET /api/pipeline/membership as the required activePipeline source and names the five buckets",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-pipeline-status-skill",
+        "title": "Rewire the pipeline-status skill onto the membership endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pipeline-status/SKILL.md",
+            "skills/pipeline-status/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "scripts/lint-skills.sh passes with the updated skill"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Update sync-sources/skills/pipeline-status/SKILL.md (source of truth) and the synced repo copy: the issue universe comes from GET /api/pipeline/membership instead of filtering /api/issues by tracker state in {in_progress, in_review}. The board must include drift buckets — zombie_pr and post_merge_limbo issues get rows (they were invisible under the old filter). The per-phase cell fills (review_status columns, agent state, tmux) stay as annotations for member issues. Keep scripts/lint-skills.sh green."
+        },
+        "items": [
+          {
+            "id": "wire-pipeline-status-skill.ac1",
+            "title": "SKILL.md's data-fetch step routes the issue universe through GET /api/pipeline/membership; the tracker-state in_progress/in_review filter is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-pipeline-status-skill.ac2",
+            "title": "SKILL.md's board layout shows rows for zombie_pr and post_merge_limbo issues so drift is visible on the board",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-audit-test",
+        "title": "No-loss audit test: every legacy view's consumers accounted for, drift table pinned",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/pipeline-membership-audit.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-audit.test.ts"
+          ],
+          "expected_outputs": [
+            "audit test passes, enumerating all six sites"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create tests/unit/lib/pipeline-membership-audit.test.ts implementing the refactor rule's no-loss audit gate. Part 1 — delegation: for each of the six sites (resource-discovery.ts, frontend pipeline-state.ts, cli/commands/pending.ts, reconstruct/enumerate-in-flight.ts, cloister/flywheel.ts, skills/pipeline-status/SKILL.md), read the file content and assert it references the resolver path (imports resolvePipelineMembership / gatherProjectLensSignals, reads the DTO pipelineMembership field, or names /api/pipeline/membership) AND no longer contains its named legacy predicate (e.g. isActiveTrackerState gating membership, the openIssueIds∩FEATURE_DIR_RE gate, the in_progress/in_review tracker filter). Part 2 — behavior: a table-driven run of resolvePipelineMembership pinning the issue's acceptance drift cases (closed+openPR→zombie_pr; open+mergedPR→post_merge_limbo; open+spec-only→planned_backlog; squash-merged branch→post_merge_limbo not planned_backlog; closed+branch-only→clean_terminal). This test is the gate that blocks silent replacement — if a future change removes a site's delegation, it goes red."
+        },
+        "items": [
+          {
+            "id": "no-loss-audit-test.ac1",
+            "title": "The audit test fails when any of the six sites drops its resolver delegation (verified by the assertions reading each site's source and matching resolver usage)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit-test.ac2",
+            "title": "The audit test fails when a named legacy membership predicate reappears in a site (negative pattern assertions per site)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-audit-test.ac3",
+            "title": "The drift-case table passes: zombie_pr, post_merge_limbo, planned_backlog (spec-only), squash-merge, and closed-branch cases classify exactly as the issue's acceptance criteria state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "lint-guard-fr5",
+        "title": "Import-boundary lint guard: membership math only in the resolver module",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/lint-pipeline-membership.sh",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-pipeline-membership.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "guard exits 0 on the current tree",
+            "npm run lint invokes the guard and passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create scripts/lint-pipeline-membership.sh modeled on scripts/lint-overdeck-boundaries.sh (grep-based boundary gate with counted violations and clear per-violation messages). It fails when: (1) any of the six consumer sites no longer imports/references the resolver path; (2) a consumer site matches a banned legacy-membership pattern (maintain the pattern list in the script with a comment per site); (3) src/lib/pipeline-membership-gather.ts or src/lib/pipeline-membership.ts imports DB/review-status/agent-state/tmux modules (NFR-1 boundary). Include a self-test mode (--self-test) that runs the checks against embedded fixture snippets and asserts a seeded violation is caught, so the guard's own detection is verifiable without mutating the tree. Wire it into npm run lint in package.json alongside the existing lint-*.sh scripts."
+        },
+        "items": [
+          {
+            "id": "lint-guard-fr5.ac1",
+            "title": "scripts/lint-pipeline-membership.sh exits 0 on the current tree and npm run lint invokes it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-guard-fr5.ac2",
+            "title": "The guard's --self-test mode exits non-zero for a seeded violation fixture (a consumer computing membership without the resolver) and reports which pattern matched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lint-guard-fr5.ac3",
+            "title": "The guard rejects a DB/agent-state/tmux import inside pipeline-membership-gather.ts (seeded self-test fixture demonstrates the NFR-1 boundary)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pipeline-membership",
+        "title": "Document the pipeline-membership read door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-16T04:11:41Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-1966",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes with the new doc in place"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Write docs/PIPELINE-MEMBERSHIP.md: the exception-queue definition (in the pipeline iff not provably clean-terminal), the six lens signals including the hasVbriefSpec planned-lens and why the 'planned' label is only a hint, the five buckets with their reasons, labelDrift semantics, the L5-is-annotation-only rule and how it makes membership cutover-safe, the read door surfaces (lib function, GET /api/pipeline/membership, DTO field), and the FR-5 guard (which script, what it bans). Add a short 'Pipeline membership — the canonical resolver' section to CLAUDE.md pointing at the doc and the module, mirroring the existing 'Decisions' section's style."
+        },
+        "items": [
+          {
+            "id": "docs-pipeline-membership.ac1",
+            "title": "docs/PIPELINE-MEMBERSHIP.md contains the exception-queue definition, all six lenses and five buckets, and shows GET /api/pipeline/membership plus the lib entry points as the only read doors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-membership.ac2",
+            "title": "CLAUDE.md contains a pipeline-membership section that routes readers to the doc and the resolver module and records that no surface may compute membership independently",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolver-planned-lens",
+        "to": "lens-gatherer",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-planned-lens",
+        "to": "resolver-label-drift",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-label-drift",
+        "to": "membership-endpoint",
+        "type": "informs"
+      },
+      {
+        "from": "lens-gatherer",
+        "to": "membership-endpoint",
+        "type": "blocks"
+      },
+      {
+        "from": "lens-gatherer",
+        "to": "wire-enumerate-in-flight",
+        "type": "blocks"
+      },
+      {
+        "from": "lens-gatherer",
+        "to": "wire-resource-discovery",
+        "type": "blocks"
+      },
+      {
+        "from": "lens-gatherer",
+        "to": "wire-pan-pending",
+        "type": "blocks"
+      },
+      {
+        "from": "lens-gatherer",
+        "to": "wire-flywheel",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-endpoint",
+        "to": "wire-pipeline-state-frontend",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-endpoint",
+        "to": "wire-pipeline-status-skill",
+        "type": "blocks"
+      },
+      {
+        "from": "membership-endpoint",
+        "to": "wire-flywheel",
+        "type": "informs"
+      },
+      {
+        "from": "membership-endpoint",
+        "to": "docs-pipeline-membership",
+        "type": "informs"
+      },
+      {
+        "from": "wire-enumerate-in-flight",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-resource-discovery",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-pipeline-state-frontend",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-pan-pending",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-flywheel",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-pipeline-status-skill",
+        "to": "no-loss-audit-test",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-enumerate-in-flight",
+        "to": "lint-guard-fr5",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-resource-discovery",
+        "to": "lint-guard-fr5",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-pipeline-state-frontend",
+        "to": "lint-guard-fr5",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-pan-pending",
+        "to": "lint-guard-fr5",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-flywheel",
+        "to": "lint-guard-fr5",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-pipeline-status-skill",
+        "to": "lint-guard-fr5",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-16-PAN-1966-single-authoritative-pipeline-membership-resolver-one-function-for-what-s-in-the-pipeline-collapse-the-5-divergent-views.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
