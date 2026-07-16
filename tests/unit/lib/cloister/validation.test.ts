@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { runMergeValidation, autoRevertMerge } from '../../../../src/lib/cloister/validation.js';
+import { runMergeValidation, autoRevertMerge, runQualityGates } from '../../../../src/lib/cloister/validation.js';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -236,6 +236,58 @@ exit 0
       expect(result.valid).toBe(true);
       expect(result.buildPassed).toBe(null); // Skipped, not passed or failed
       expect(result.testsPassed).toBe(null); // Skipped
+    });
+  });
+
+  describe('runQualityGates', () => {
+    it('preserves stdout failure details when trailing stderr noise exceeds its budget', async () => {
+      const scriptPath = join(testDir, 'failing-gate.sh');
+      writeFileSync(
+        scriptPath,
+        `#!/bin/bash
+echo "FAIL src/example.test.ts > reports the actual assertion"
+echo "AssertionError: expected true to be false"
+for i in {1..500}; do echo "stdout filler $i"; done
+for i in {1..500}; do echo "hint: noisy git advice $i" >&2; done
+echo "stderr diagnostic survives too" >&2
+exit 1
+`,
+        { mode: 0o755 },
+      );
+
+      const [result] = await Effect.runPromise(runQualityGates({
+        test: { command: scriptPath },
+      }, testDir));
+
+      expect(result.passed).toBe(false);
+      expect(result.output).toContain('FAIL src/example.test.ts');
+      expect(result.output).toContain('AssertionError: expected true to be false');
+      expect(result.output).toContain('stderr diagnostic survives too');
+      expect(result.output).not.toContain('hint: noisy git advice');
+      expect(result.output).toContain('chars elided');
+    });
+
+    it('uses the same separate stream budgets for passing gates', async () => {
+      const scriptPath = join(testDir, 'passing-gate.sh');
+      writeFileSync(
+        scriptPath,
+        `#!/bin/bash
+echo "pass output starts here"
+for i in {1..500}; do echo "stdout filler $i"; done
+for i in {1..500}; do echo "warning: noisy tooling chatter $i" >&2; done
+echo "pass stderr diagnostic" >&2
+`,
+        { mode: 0o755 },
+      );
+
+      const [result] = await Effect.runPromise(runQualityGates({
+        test: { command: scriptPath },
+      }, testDir));
+
+      expect(result.passed).toBe(true);
+      expect(result.output).toContain('pass output starts here');
+      expect(result.output).toContain('pass stderr diagnostic');
+      expect(result.output).not.toContain('warning: noisy tooling chatter');
     });
   });
 

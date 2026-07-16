@@ -20,6 +20,23 @@ import { GitError } from '../errors.js';
 const execAsync = promisify(exec);
 const DASHBOARD_RUNTIME_ENV_KEYS = ['API_PORT', 'PORT', 'DASHBOARD_URL'] as const;
 
+function clipGateStream(stream: string, limit: number): string {
+  const signal = stream
+    .split('\n')
+    .filter(line => !/^\s*(?:hint|warning):\s/i.test(line))
+    .join('\n');
+  if (signal.length <= limit) return signal;
+
+  const headLength = Math.floor(limit / 2);
+  const tailLength = limit - headLength;
+  return `${signal.slice(0, headLength)}\n…(${signal.length - limit} chars elided)…\n${signal.slice(-tailLength)}`;
+}
+
+function formatGateOutput(stdout: string, stderr: string): string {
+  const streams = [clipGateStream(stdout, 4000), clipGateStream(stderr, 2000)].filter(Boolean);
+  return streams.join('\n--- stderr ---\n');
+}
+
 function buildQualityGateEnv(gateEnv: Record<string, string> | undefined): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const key of DASHBOARD_RUNTIME_ENV_KEYS) {
@@ -557,7 +574,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
         const { stdout, stderr } = await execPromise;
         killGateProcessGroup(gatePgid);
         passedGate = true;
-        passOutput = (stdout + stderr).slice(-2000); // keep last 2KB
+        passOutput = formatGateOutput(stdout, stderr);
         break;
       } catch (error: any) {
         killGateProcessGroup(gatePgid);
@@ -584,7 +601,7 @@ export const DEFAULT_GATES: Record<string, QualityGateConfig> = {
     } else {
       const error: any = lastError;
       const durationMs = Date.now() - startTime;
-      const output = ((error.stdout || '') + (error.stderr || '')).slice(-2000);
+      const output = formatGateOutput(error.stdout || '', error.stderr || '');
       console.log(`[quality-gate] ✗ "${name}" failed (${durationMs}ms): ${error.message?.slice(0, 200)}`);
       opts.onLog?.(`✗ ${name} FAILED (${Math.round(durationMs/1000)}s): ${error.message?.slice(0, 160)}`);
       results.push({
