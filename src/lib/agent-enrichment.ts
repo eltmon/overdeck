@@ -29,6 +29,7 @@ import {
 import { resolveProjectFromIssueSync } from './projects.js'
 import { getGitHubConfig } from '../dashboard/server/services/tracker-config.js'
 import { extractPrefixSync } from './issue-id.js'
+import { getLatestSessionIdSync } from './agents/activity.js'
 
 const execAsync = promisify(exec)
 
@@ -191,10 +192,30 @@ function getProjectPathByPrefix(issuePrefix: string): string {
   } catch {
     return null
   }
-}async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
+}/**
+ * Resolve the transcript belonging to THIS agent.
+ *
+ * A Claude project dir is keyed on the cwd, so every session that ever ran in
+ * the same cwd shares one directory. Agents whose cwd is the primary repo — the
+ * flywheel orchestrator, conversations, any `--cwd <repo>` handoff — therefore
+ * sit in a directory alongside each other's transcripts. Picking the freshest
+ * file there attributes whichever session wrote last to whoever asks, so the
+ * flywheel was observed reporting a conversation's open question as its own.
+ *
+ * The agent's own session id is recorded at spawn, so resolve that first and
+ * only fall back to freshest-wins when the agent has no identifiable transcript
+ * of its own (codex/omp keep their history elsewhere, and their thread ids are
+ * not `.jsonl` files here).
+ */
+async function getAgentJsonlPathPromise(agentId: string): Promise<string | null> {
   const workspace = await Effect.runPromise(getAgentWorkspace(agentId))
   if (!workspace) return null
   const projectDir = getClaudeProjectDir(workspace)
+  const sessionId = getLatestSessionIdSync(agentId)
+  if (sessionId) {
+    const ownPath = join(projectDir, `${sessionId}.jsonl`)
+    if (existsSync(ownPath)) return ownPath
+  }
   return await getActiveSessionPath(projectDir)
 }
 
