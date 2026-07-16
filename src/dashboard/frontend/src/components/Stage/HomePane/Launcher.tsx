@@ -53,6 +53,10 @@ export interface LauncherProps {
   /** History / file-completion content shown below the rows; hidden in compact. */
   extras?: ReactNode
   placeholder?: string
+  /** Suppress submissions while an existing launch is in progress. */
+  busy?: boolean
+  /** Presentational launch error shown below the input without clearing its query. */
+  errorText?: string
   /** Id of the last-run agent in this workspace; floats it to position 1. */
   lastUsedAgentId?: string | null
 }
@@ -69,30 +73,37 @@ export function Launcher({
   compact = false,
   extras,
   placeholder = 'Ask, run, or search…',
+  busy = false,
+  errorText,
   lastUsedAgentId,
 }: LauncherProps) {
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState(0)
-  const open = query.length > 0
+  const [menuOpen, setMenuOpen] = useState(false)
+  const hasQuery = query.length > 0
+  const open = hasQuery && menuOpen
   const ordered = orderIntents({ intents, query, lastUsedAgentId })
 
-  const choose = (index: number) => {
-    const intent = ordered[index]
-    if (intent) onSelect?.(intent, query)
+  const chooseIntent = (intent: LauncherIntent | undefined) => {
+    if (busy || !intent) return
+    setMenuOpen(false)
+    onSelect?.(intent, query)
   }
 
-  const chooseIntent = (intent: LauncherIntent | undefined) => {
-    if (intent) onSelect?.(intent, query)
+  const choose = (index: number) => {
+    chooseIntent(ordered[index])
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (!open) return
+    if (!hasQuery) return
     if (e.key === 'ArrowDown') {
+      if (!open) return
       e.preventDefault()
       setSelected((s) => Math.min(s + 1, ordered.length - 1))
       return
     }
     if (e.key === 'ArrowUp') {
+      if (!open) return
       e.preventDefault()
       setSelected((s) => Math.max(s - 1, 0))
       return
@@ -128,10 +139,12 @@ export function Launcher({
           onChange={(e) => {
             setQuery(e.target.value)
             setSelected(0)
+            setMenuOpen(e.target.value.length > 0)
           }}
           onKeyDown={onKeyDown}
         />
       </div>
+      {errorText && <div className={styles.launchError} role="alert">{errorText}</div>}
       {open && (
         <div className={styles.dropdown} role="listbox" aria-label="Quick actions">
           {ordered.map((intent, index) => (

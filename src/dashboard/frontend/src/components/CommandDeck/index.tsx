@@ -31,6 +31,7 @@ import { WS_METHODS } from '@overdeck/contracts';
 import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -55,19 +56,6 @@ async function fetchVersion(): Promise<{ version: string }> {
   const res = await fetch('/api/version');
   if (!res.ok) throw new Error('Failed to fetch version');
   return res.json();
-}
-
-interface RegisteredProject {
-  key: string;
-  name: string;
-  path: string;
-}
-
-async function fetchRegisteredProjects(): Promise<RegisteredProject[]> {
-  const res = await fetch('/api/registered-projects');
-  if (!res.ok) throw new Error('Failed to fetch registered projects');
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
 }
 
 async function fetchAllSessionTrees(projectKeys: string[]): Promise<ProjectSessionTree[]> {
@@ -243,7 +231,7 @@ export function CommandDeck({
   const currentWidth = useRef(sidebarWidth);
   const queryClient = useQueryClient();
 
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: projects = [], isLoading, isFetched: projectsFetched } = useQuery({
     queryKey: ['command-deck-projects', projectQueryEpoch],
     queryFn: fetchProjects,
     refetchInterval: 30000,
@@ -255,7 +243,7 @@ export function CommandDeck({
     refetchInterval: 15000,
   });
 
-  const { data: registeredProjects = [] } = useQuery({
+  const { data: registeredProjects = [], isFetched: registeredProjectsFetched, isError: registeredProjectsError, refetch: refetchRegisteredProjects } = useQuery({
     queryKey: ['registered-projects'],
     queryFn: fetchRegisteredProjects,
     staleTime: 60000,
@@ -1063,9 +1051,9 @@ export function CommandDeck({
 
   // Create a conversation (optionally scoped to a project) and open it as an
   // agent tab in the current project's deck. Returns the new conversation's
-  // name so the deck's launch components can focus the tab.
+  // name or the creation error so launch components can render the outcome.
   const createConversationForProject = useCallback(
-    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
+    async (projectKey?: string, harnessOverride?: Harness, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       try {
         const payload: Record<string, unknown> = {
           model: sidebarModel,
@@ -1095,11 +1083,11 @@ export function CommandDeck({
           prevSelectedRef.current = conv.name;
         }
         queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        return conv.name;
+        return { name: conv.name };
       } catch (err) {
         console.error('[CommandDeck] Failed to create conversation:', err);
         toast.error(err instanceof Error ? err.message : 'Failed to create conversation');
-        return undefined;
+        return { error: err instanceof Error ? err.message : 'Failed to create conversation' };
       }
     },
     [sidebarModel, sidebarHarness, queryClient, onConvIdChange, convsCollapsed, selectedProject, openConversationTabIn],
@@ -1115,10 +1103,10 @@ export function CommandDeck({
   }, [createConversationForProject]);
 
   // Launch-component conversation creator (ProjectHome / IssueOverview): create
-  // a project conversation for the chosen agent and return its name so the deck
-  // can open/focus an agent tab on it.
+  // a project conversation for the chosen agent and return its result so the
+  // caller can open the tab or surface the creation error.
   const createDeckConversation = useCallback(
-    (agentId: string, message?: string, viewMode?: ViewMode): Promise<string | undefined> => {
+    (agentId: string, message?: string, viewMode?: ViewMode): Promise<{ name: string } | { error: string }> => {
       const harness: Harness = agentId === 'codex' ? 'codex' : agentId === 'ohmypi' ? 'ohmypi' : 'claude-code';
       // The No-project bucket creates unscoped conversations (no projectKey).
       const projectKey = selectedProject && selectedProject !== NO_PROJECT_KEY ? selectedProject : undefined;
@@ -1220,6 +1208,13 @@ export function CommandDeck({
     if (!selectedProject) return null;
     return projectsWithSessions.find(p => p.name === selectedProject) ?? null;
   }, [projectsWithSessions, selectedProject]);
+
+  const selectedRegisteredProject = useMemo(
+    () => findRegisteredProject(registeredProjects, selectedProject),
+    [registeredProjects, selectedProject],
+  );
+  const isProjectValidationPending = Boolean(selectedProject && (!projectsFetched || !registeredProjectsFetched));
+  const showUnknownProject = Boolean(selectedProject && !isProjectValidationPending && !registeredProjectsError && !isKnownProject(selectedProject, registeredProjects));
 
   // ── Project-scoped deck data (PAN-1561) ──────────────────────────────────────
   // For a real project: its scoped conversations + issue ids. For the special
@@ -1435,7 +1430,11 @@ export function CommandDeck({
 
         {/* Content Area — the project-scoped deck (PAN-1561) */}
         <div className={styles.content}>
-          {selectedProject ? (
+          {isProjectValidationPending ? <div className={styles.contentEmpty} role="status">Loading project…</div>
+          : registeredProjectsError ? <ProjectRegistryErrorState onRetry={() => void refetchRegisteredProjects()} />
+          : showUnknownProject ? (
+            <UnknownProjectState project={selectedProject!} registeredProjects={registeredProjects} onSelectProject={onSelectProject} />
+          ) : selectedProject ? (
             <Stage
               key={selectedProject}
               deckKey={selectedProject}
@@ -1443,13 +1442,11 @@ export function CommandDeck({
               resolveSession={resolveSession}
               onCreateConversation={createDeckConversation}
               onActiveConversationChange={setSelectedConversation}
-              terminalCwd={
-                registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.path
-              }
+              terminalCwd={selectedRegisteredProject?.path}
               renderHome={(api) => (
                 <ProjectHome
                   projectName={isNoProject ? NO_PROJECT_LABEL : selectedProject}
-                  projectKey={registeredProjects.find((rp) => (rp.name ?? rp.key) === selectedProject)?.key}
+                  projectKey={selectedRegisteredProject?.key}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
                   features={selectedProjectData?.features}
@@ -1489,7 +1486,7 @@ export function CommandDeck({
         {/* Awareness rail (PAN-1591) — the merged feed: one column with a
             Needs-you / Project / Global scope switcher, replacing the separate
             Project Activity + global Activity Feed columns. */}
-        {selectedProject && (
+        {selectedProject && !isProjectValidationPending && !registeredProjectsError && !showUnknownProject && (
           awarenessCollapsed ? (
             <button
               type="button"

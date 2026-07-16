@@ -3,7 +3,7 @@
 1412 src/cli/index.ts
 1012 src/dashboard/frontend/src/components/AwaitingMergePage.tsx
 1350 src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx
-1540 src/dashboard/frontend/src/components/CommandDeck/index.tsx
+1537 src/dashboard/frontend/src/components/CommandDeck/index.tsx
 1106 src/dashboard/frontend/src/components/PlanDialog.tsx
 1530 src/dashboard/frontend/src/components/chat/ConversationPanel.tsx
 1440 src/dashboard/server/routes/command-deck.ts
