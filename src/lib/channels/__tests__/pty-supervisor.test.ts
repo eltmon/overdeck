@@ -1,4 +1,4 @@
-import type * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import type * as pty from '@lydell/node-pty';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { request as httpRequest } from 'node:http';

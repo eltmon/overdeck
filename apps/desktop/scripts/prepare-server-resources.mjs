@@ -15,10 +15,8 @@
  *     The externals are DISCOVERED by scanning the reachable chunk graph for
  *     bare import specifiers (so a build-config change cannot silently ship a
  *     broken package), then installed at the repo's installed versions.
- *     node-pty is additionally rebuilt for the ELECTRON ABI: the packaged
- *     server child runs under the Electron binary with ELECTRON_RUN_AS_NODE=1,
- *     which reports Electron's NODE_MODULE_VERSION (143 for Electron 40), not
- *     stock Node's — so a stock-Node build cannot be reused.
+ *     @lydell/node-pty ships Node-API prebuilds, so the packaged server child
+ *     can use the same platform package under stock Node and Electron.
  *
  * Deliberately skipped externals: bun-only modules (never imported under
  * Node), and playwright (lazy import for artifact thumbnails, PAN-1645 —
@@ -43,7 +41,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import Module from "node:module";
+import Module, { createRequire } from "node:module";
 import * as OS from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -168,7 +166,7 @@ for (const file of supervisorSeen) {
 // Guard: the supervisor must stay runnable from the vendored tree alone. A
 // build change that adds a new external would ship a supervisor that cannot
 // boot on user machines — fail the build instead of shipping it.
-const SUPERVISOR_ALLOWED_EXTERNALS = new Set(["@homebridge/node-pty-prebuilt-multiarch"]);
+const SUPERVISOR_ALLOWED_EXTERNALS = new Set(["@lydell/node-pty"]);
 const unexpectedExternals = [...supervisorExternals].filter((name) => !SUPERVISOR_ALLOWED_EXTERNALS.has(name));
 if (unexpectedExternals.length > 0) {
   console.error(`[prepare-server] pty-supervisor gained unvendored externals: ${unexpectedExternals.join(", ")}`);
@@ -182,6 +180,21 @@ for (const packageName of supervisorExternals) {
     process.exit(1);
   }
   cpSync(packageDir, join(supervisorDir, "vendor", packageName), { recursive: true, dereference: true });
+  const packageJson = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf8"));
+  const packageRequire = createRequire(realpathSync(join(packageDir, "package.json")));
+  for (const optionalName of Object.keys(packageJson.optionalDependencies ?? {})) {
+    let optionalEntry;
+    try {
+      optionalEntry = packageRequire.resolve(optionalName);
+    } catch {
+      continue; // Only the current platform's optional prebuild is installed.
+    }
+    let optionalDir = dirname(optionalEntry);
+    while (optionalDir !== dirname(optionalDir) && !existsSync(join(optionalDir, "package.json"))) {
+      optionalDir = dirname(optionalDir);
+    }
+    cpSync(optionalDir, join(supervisorDir, "vendor", optionalName), { recursive: true, dereference: true });
+  }
 }
 console.log(
   `[prepare-server] Staged pty-supervisor (${supervisorSeen.size} chunks, vendored: ${[...supervisorExternals].join(", ") || "none"}) → server/supervisor/`,
@@ -298,15 +311,10 @@ if (typeof rootPkg.version !== "string" || !rootPkg.version) {
 }
 
 const desktopPkg = JSON.parse(readFileSync(join(desktopDir, "package.json"), "utf8"));
-// electron lives in devDependencies normally, but build-for-publish.mjs
-// promotes it to dependencies for the npm package — and npm publish re-runs
-// this script via prepublishOnly after that promotion.
-const electronRange = desktopPkg.devDependencies?.electron ?? desktopPkg.dependencies?.electron;
-if (!electronRange) {
+if (!(desktopPkg.devDependencies?.electron ?? desktopPkg.dependencies?.electron)) {
   console.error("[prepare-server] Cannot determine the Electron version from apps/desktop/package.json");
   process.exit(1);
 }
-const electronVersion = electronRange.replace(/^[\^~]/, "");
 
 writeFileSync(
   join(serverDir, "package.json"),
@@ -332,71 +340,7 @@ execSync("npm install --omit=dev --no-audit --no-fund", {
   stdio: "inherit",
 });
 
-// The npm tarball ships prebuilds only for stock-Node ABIs, but the packaged
-// server child runs under the Electron binary (ELECTRON_RUN_AS_NODE=1) whose
-// NODE_MODULE_VERSION is Electron's own (143 for Electron 40). Compile from
-// source for that ABI; node-pty's runtime loader falls back to
-// build/Release/pty.node when no matching prebuild exists.
-//
-// Use @electron/rebuild's programmatic API rather than a `npx electron-rebuild`
-// shell-out: bun's workspace install does not reliably link the scoped
-// package's bin where npx/PATH can see it on CI (the v0.45.3 failure), and
-// the in-process call also removes shell-quoting and Windows .cmd-shim
-// concerns. Resolve the tool from the workspace when bun did link it; fall
-// back to a private npm install (npm's linking is deterministic everywhere).
-console.log(`[prepare-server] Rebuilding node-pty for Electron ${electronVersion}...`);
-const rebuildRange =
-  desktopPkg.devDependencies?.["@electron/rebuild"] ?? desktopPkg.dependencies?.["@electron/rebuild"];
-if (!rebuildRange) {
-  console.error("[prepare-server] @electron/rebuild is missing from apps/desktop/package.json");
-  process.exit(1);
-}
-
 const desktopRequire = Module.createRequire(join(desktopDir, "package.json"));
-let rebuild;
-try {
-  ({ rebuild } = desktopRequire("@electron/rebuild"));
-} catch {
-  const toolsDir = join(OS.tmpdir(), "overdeck-desktop-rebuild-tools");
-  console.log(`[prepare-server] @electron/rebuild not resolvable from the workspace — installing into ${toolsDir}`);
-  mkdirSync(toolsDir, { recursive: true });
-  writeFileSync(
-    join(toolsDir, "package.json"),
-    `${JSON.stringify(
-      { name: "overdeck-desktop-rebuild-tools", private: true, dependencies: { "@electron/rebuild": rebuildRange } },
-      null,
-      2,
-    )}\n`,
-  );
-  execSync("npm install --omit=dev --no-audit --no-fund", { cwd: toolsDir, stdio: "inherit" });
-  ({ rebuild } = Module.createRequire(join(toolsDir, "package.json"))("@electron/rebuild"));
-}
-
-await rebuild({
-  buildPath: serverDir,
-  electronVersion,
-  force: true,
-  onlyModules: ["@homebridge/node-pty-prebuilt-multiarch"],
-});
-
-const ptyBinary = join(
-  serverDir,
-  "node_modules/@homebridge/node-pty-prebuilt-multiarch/build/Release/pty.node",
-);
-if (!existsSync(ptyBinary)) {
-  console.error(`[prepare-server] node-pty native binary missing: ${ptyBinary}`);
-  console.error("  The electron-targeted rebuild did not produce a build/Release/pty.node.");
-  process.exit(1);
-}
-
-// Prune node-pty's prebuilds/ and @electron/rebuild's bin/ artifact dirs.
-// Neither is on the runtime path we ship (no electron-ABI prebuild exists, so
-// the loader always falls back to build/Release), and bin/ contains a file
-// HARDLINKED to build/Release/pty.node — intra-package hardlinks make npm
-// publish fail with "415 Hard link is not allowed" (the v0.45.4 npm failure).
-const ptyPackageDir = join(serverDir, "node_modules/@homebridge/node-pty-prebuilt-multiarch");
-rmSync(join(ptyPackageDir, "prebuilds"), { recursive: true, force: true });
-rmSync(join(ptyPackageDir, "bin"), { recursive: true, force: true });
 
 // Break any remaining intra-tree hardlinks the same way: rewrite multi-link
 // files as independent copies so `npm pack` never emits hard-link tar entries.
@@ -415,20 +359,21 @@ const breakHardLinks = (dir) => {
 };
 breakHardLinks(serverDir);
 
-// Belt-and-suspenders ABI check: a fresh npm install also leaves a stock-Node
-// prebuild copied to build/Release, so existence alone cannot prove the
-// rebuild ran. Load the binary under the actual Electron binary when it is
-// resolvable (ELECTRON_RUN_AS_NODE needs no display).
+// @lydell/node-pty uses Node-API prebuilds, so one binary works across the
+// supported Node and Electron runtimes without an ABI-specific rebuild. Load
+// it under the actual Electron binary (ELECTRON_RUN_AS_NODE needs no display)
+// so packaging fails before release if the platform prebuild is absent.
 try {
   const electronBinary = desktopRequire("electron");
-  execSync(`"${electronBinary}" -e "require(process.env.PTY_BINARY)"`, {
+  execSync(`"${electronBinary}" -e "require('@lydell/node-pty')"`, {
+    cwd: serverDir,
     stdio: "inherit",
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", PTY_BINARY: ptyBinary },
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
   });
-  console.log("[prepare-server] Verified: pty.node loads under the Electron ABI");
+  console.log("[prepare-server] Verified: @lydell/node-pty loads under Electron");
 } catch (error) {
   if (error?.status) {
-    console.error("[prepare-server] pty.node failed to load under the Electron binary — wrong ABI.");
+    console.error("[prepare-server] @lydell/node-pty failed to load under Electron.");
     process.exit(1);
   }
   console.warn("[prepare-server] electron binary not resolvable here — skipping the ABI load check");

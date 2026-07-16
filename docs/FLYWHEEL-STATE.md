@@ -4520,3 +4520,58 @@ nothing.
 **Filed (10):** PAN-2733/2734/2735(landed+proven)/2738/2739/2741/2742/2743(landed)/2746 + #2744,#2745.
 **NEXT:** PAN-2710 needs a REAL verdict on working infra, or an explicit operator decision to accept
 the bypass. **I will not merge it silently.** Phase 2 otherwise ready: v0.45.19 + 62 commits ⇒ **0.45.20**.
+
+---
+
+## Tick 36 — 2026-07-16 ~01:00Z — post-reboot resume; **MAIN IS RED**; Phase 2 BLOCKED
+
+Host rebooted; session auto-compacted on resume and **dropped my pending wakeup** — I sat idle at an
+empty prompt from 00:42Z until nudged. **Wakeup re-armed first (~17min).** Losing the heartbeat to a
+compact is itself the PAN-2747 latch family: the run gate says `running` while nothing ticks.
+
+### 🔴 MAIN CI RED since `8e458171b5` (00:25Z) — struck as PAN-2748
+Last green: `a300945dbe` (22:59Z). **Three commits landed ON TOP of the red** (`8e458171b5`,
+`dc297001a8`, `1ffbaa795f`) — nothing stopped them stacking.
+
+One failing test, and **it has never passed in ANY environment** — I reproduced it locally, identical:
+```
+FAIL src/dashboard/server/routes/__tests__/workspaces-rebuild-and-start.test.ts:54
+AssertionError: expected { …(2) } to deeply equal { cmd: 'pan', …(1) }
+-   "cmd": "pan"
++   "cmd": "/opt/hostedtoolcache/node/22.23.1/x64/bin/node"
++   args[0]: ".../dist/cli/index.js"
+```
+**Root cause:** `panCliInvocation()` (`src/lib/pan-cli-invocation.ts`) returns
+`command: runtime.nodePath ?? process.execPath` — **always** node, never the literal `pan`. The
+assertion is unsatisfiable by construction. The **implementation is right** (node + `dist/cli/index.js`
+drops the PATH dependency); the **test is stale** — it asserts a binary-resolution detail it never meant
+to test. Its other 2 cases (the real chaining intent) pass.
+
+**How it landed:** `8e458171b5` = *refactor(dashboard): keep pan launcher within size guard* —
+a **direct push to main, single parent, NO PR, no CI before landing**. A refactor taken **only to satisfy
+`scripts/file-size-baseline.txt`** moved the spawn out of `workspaces.ts` into `spawnPanCli` and never
+re-ran the test that proved that spawn. The size guard shoved code around; nothing checked the shove.
+
+**Filed PAN-2748** (`blocks-main`) + struck → `strike-pan-2748`, codex/gpt-5.6-sol (provider default,
+harness NOT forced). Red main is the explicit exemption to drain-only.
+
+### ✅ Deploy row green; the "second server" is NOT an orphan
+Host `652717`: systemd-parented, cwd=primary, binds :3011, health 200, dist built 00:38:26Z = **19s
+after HEAD `1ffbaa795f`** ⇒ live server contains HEAD. The second pid `336657` is the **workspace
+devcontainer peer**: parent `containerd-shim`, cwd `/workspaces/overdeck`, `OVERDECK_DISABLE_DEACON=1`,
+**binds nothing host-visible, 0 auto-resume churn**. Single-deacon invariant HOLDS — checked, not assumed.
+
+### Flywheel gate is stale (PAN-2747 corroboration)
+`pan flywheel status` reports `Main HEAD: 274a18b` / `Last tick: 14:15:06Z` — both hours stale while
+the run is live. Same write-only-state pattern as PAN-2725/2731/2735/2743/2746: **the gate is never
+maintained, and every consumer trusts it.**
+
+### Unchanged / still pending
+- **PAN-2710 (#2736)** — sole open PR, MERGEABLE, still **HELD**. Its `review_status=passed` is the
+  infra-failure bypass (`review_notes = NULL` is the tell), not a verdict. **Will not merge silently.**
+- **Two operator decisions outstanding, seen — NOT re-asked:** (1) accept PAN-2710's bypass vs hold;
+  (2) cut v0.45.20.
+- **Phase 2 is now BLOCKED regardless of (2): you cannot cut a release off a red main.** PAN-2748
+  must land first. The 0.45.20 suggestion stands, gated on green.
+
+**Drain: 29 merged / 27 closed out.** Filed (11): +PAN-2748.

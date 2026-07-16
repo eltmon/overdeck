@@ -90,7 +90,7 @@ class BunPtyProcess implements PtyProcess {
 // ─── Node PTY wrapper ─────────────────────────────────────────────────────────
 
 class NodePtyProcess implements PtyProcess {
-  constructor(private readonly proc: import('@homebridge/node-pty-prebuilt-multiarch').IPty) {}
+  constructor(private readonly proc: import('@lydell/node-pty').IPty) {}
 
   write(data: string): void { this.proc.write(data); }
   resize(cols: number, rows: number): void { this.proc.resize(cols, rows); }
@@ -120,9 +120,9 @@ async function waitForTmuxSession(sessionName: string, timeoutMs = 60000): Promi
 }
 
 // Cache the node-pty module so spawn + onData registration have no async gap
-let _nodePtyModule: typeof import('@homebridge/node-pty-prebuilt-multiarch') | null = null;
+let _nodePtyModule: typeof import('@lydell/node-pty') | null = null;
 async function getNodePty() {
-  if (!_nodePtyModule) _nodePtyModule = await import('@homebridge/node-pty-prebuilt-multiarch');
+  if (!_nodePtyModule) _nodePtyModule = await import('@lydell/node-pty');
   return _nodePtyModule;
 }
 

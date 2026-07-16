@@ -20,7 +20,7 @@
  * permission path for agents that opt into it.
  */
 
-import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import * as pty from '@lydell/node-pty';
 import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { existsSync } from 'node:fs';

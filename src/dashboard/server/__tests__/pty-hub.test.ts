@@ -12,7 +12,7 @@ function makeMockWs(readyState: number = WebSocket.OPEN): WebSocket {
 
 // Minimal mock PTY — only the interface shape; never called in these tests.
 function makeMockPty() {
-  return {} as import('@homebridge/node-pty-prebuilt-multiarch').IPty;
+  return {} as import('@lydell/node-pty').IPty;
 }
 
 function makeHub(...clients: WebSocket[]): PtyHub {

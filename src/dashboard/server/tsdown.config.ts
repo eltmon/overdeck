@@ -75,7 +75,7 @@ export default defineConfig(async () => {
     deps: {
       alwaysBundle: [/^@overdeck\//],
       neverBundle: [
-        '@homebridge/node-pty-prebuilt-multiarch',
+        '@lydell/node-pty',
         'ssh2',
         // PAN-1645: playwright is loaded only via a runtime `await import('playwright')`
         // (artifact thumbnails). Bundling it pulls in playwright-core's prebundled

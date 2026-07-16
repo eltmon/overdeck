@@ -19,7 +19,7 @@ import http from 'node:http';
 import { homedir } from 'node:os';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Effect } from 'effect';
-import * as pty from '@homebridge/node-pty-prebuilt-multiarch';
+import * as pty from '@lydell/node-pty';
 import { activePtyHubs, addClientToHub, broadcastToHub, removeClientFromHub, setClientReady, type PtyHub } from './pty-hub.js';
 import { buildTmuxArgs, capturePane, getWindowDimensions, listSessionNames, resizeWindow, sessionExists } from '../../lib/tmux.js';
 import { consumeReauthTerminalToken } from './routes/codex-auth.js';
