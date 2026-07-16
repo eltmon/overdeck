@@ -308,6 +308,26 @@ export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hol
   registerProjectSync(key, updated);
 }
 
+export function renameProjectSync(key: string, newName: string): void {
+  const config = loadProjectsConfigSync();
+  const project = config.projects[key];
+  if (!project) throw new Error(`Unknown project: ${key}`);
+
+  const name = newName.trim();
+  if (!name) throw new Error('Project name must not be empty');
+  if (name === project.name) return;
+
+  const normalizedName = name.toLowerCase();
+  for (const [otherKey, otherProject] of Object.entries(config.projects)) {
+    if (otherKey === key) continue;
+    if (otherKey.toLowerCase() === normalizedName || otherProject.name.toLowerCase() === normalizedName) {
+      throw new Error(`Project name '${name}' conflicts with existing project '${otherKey}'`);
+    }
+  }
+
+  registerProjectSync(key, { ...project, name });
+}
+
 export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
   const config = getProjectSync(key);
   if (!config) throw new Error(`Unknown project: ${key}`);
