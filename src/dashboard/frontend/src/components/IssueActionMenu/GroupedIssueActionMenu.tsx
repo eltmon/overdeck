@@ -10,7 +10,6 @@ import {
   type IssueActionGroupedBodyProps,
   type IssueActionMenuItemPrimitiveProps,
   type IssueActionMenuPrimitives,
-  type NonIssueActionInvocation,
 } from './IssueActionGroupedBody';
 
 export type { NonIssueActionInvocation } from './IssueActionGroupedBody';
