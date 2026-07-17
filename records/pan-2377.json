@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-17T13:06:03.592Z",
+  "updated": "2026-07-17T13:15:02.987Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -64,18 +64,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "contracts-orders": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2377",
         "agentId": "agent-pan-2377",
         "pid": 4091850,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:06:03.592Z"
+        "claimedAt": "2026-07-17T13:06:03.592Z",
+        "itemId": "contracts-orders",
+        "outcome": "completed",
+        "reason": "Added and tested OrderBook contracts and the FlywheelStatus orders projection",
+        "releasedAt": "2026-07-17T13:15:02.987Z"
+      }
+    ],
+    "statusReasons": {
+      "contracts-orders": {
+        "reason": "Added and tested OrderBook contracts and the FlywheelStatus orders projection",
+        "updatedAt": "2026-07-17T13:15:02.987Z"
       }
     }
   },
   "statusOverrides": {
-    "contracts-orders": "running"
+    "contracts-orders": "completed",
+    "contracts-orders.contracts-orders.ac1": "completed",
+    "contracts-orders.contracts-orders.ac2": "completed",
+    "contracts-orders.contracts-orders.ac3": "completed"
   }
 }
