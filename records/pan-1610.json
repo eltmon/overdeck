@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T14:23:04.098Z",
+  "updated": "2026-07-17T14:23:58.839Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T14:23:04.080Z",
-    "inspectNotes": "Inspecting item session-action-contract"
+    "updatedAt": "2026-07-17T14:23:58.634Z",
+    "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive."
   },
   "closeOut": {
     "usage": {
@@ -45,17 +45,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 6,
-            "output": 4996,
-            "cacheRead": 262067,
-            "cacheWrite": 100006
+            "input": 10,
+            "output": 7177,
+            "cacheRead": 400337,
+            "cacheWrite": 192986
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2808200,
-            "output": 204756,
-            "cacheRead": 35233792,
+            "input": 2812017,
+            "output": 205623,
+            "cacheRead": 35911168,
             "cacheWrite": 0
           }
         }
@@ -74,21 +74,21 @@
           "cacheWrite": 180202
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6,
-          "output": 4996,
-          "cacheRead": 262067,
-          "cacheWrite": 100006
+          "input": 10,
+          "output": 7177,
+          "cacheRead": 400337,
+          "cacheWrite": 192986
         },
         "openai/gpt-5.6-sol": {
-          "input": 2808200,
-          "output": 204756,
-          "cacheRead": 35233792,
+          "input": 2812017,
+          "output": 205623,
+          "cacheRead": 35911168,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 50.054949,
-        "pricingAsOf": "2026-07-17T14:23:04.086Z"
+        "usd": 50.720654,
+        "pricingAsOf": "2026-07-17T14:23:58.703Z"
       }
     },
     "merges": [],
