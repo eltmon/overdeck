@@ -1,19 +1,60 @@
 {
   "issueId": "PAN-1896",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T11:18:25.871Z",
+  "updated": "2026-07-17T12:12:20.545Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T11:18:25.871Z"
+    "updatedAt": "2026-07-17T12:12:20.525Z",
+    "strikeReadyHead": "dea3c2074b865303484eaad5a5b9d288299393df",
+    "strikeReadyAt": "2026-07-17T12:12:20.525Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-opus-4-8": {
+            "input": 19057,
+            "output": 75648,
+            "cacheRead": 9991884,
+            "cacheWrite": 315565
+          }
+        },
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 1378502,
+            "output": 105607,
+            "cacheRead": 18444800,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 19057,
+          "output": 75648,
+          "cacheRead": 9991884,
+          "cacheWrite": 315565
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1378502,
+          "output": 105607,
+          "cacheRead": 18444800,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 28.237835,
+        "pricingAsOf": "2026-07-17T12:12:20.540Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
