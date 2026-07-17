@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T00:52:01.394Z",
+  "updated": "2026-07-17T00:57:39.510Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
@@ -68,16 +68,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "linked-worktree-detection": {
-        "writerId": "agent-pan-2252",
-        "agentId": "agent-pan-2252",
-        "pid": 1030999,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T00:52:01.394Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2252",
@@ -89,16 +81,31 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2252 dead)",
         "releasedAt": "2026-07-17T00:36:22.350Z"
+      },
+      {
+        "writerId": "agent-pan-2252",
+        "agentId": "agent-pan-2252",
+        "pid": 1030999,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T00:52:01.394Z",
+        "itemId": "linked-worktree-detection",
+        "outcome": "completed",
+        "reason": "Detects .git pointer files as linked worktrees, resolves their primary checkout roots, refuses host-port binds outside containers, and passes 11 focused identity tests plus typecheck.",
+        "releasedAt": "2026-07-17T00:57:39.509Z"
       }
     ],
     "statusReasons": {
       "linked-worktree-detection": {
-        "reason": "stale claim released (agent-pan-2252 dead)",
-        "updatedAt": "2026-07-17T00:36:22.350Z"
+        "reason": "Detects .git pointer files as linked worktrees, resolves their primary checkout roots, refuses host-port binds outside containers, and passes 11 focused identity tests plus typecheck.",
+        "updatedAt": "2026-07-17T00:57:39.509Z"
       }
     }
   },
   "statusOverrides": {
-    "linked-worktree-detection": "running"
+    "linked-worktree-detection": "completed",
+    "linked-worktree-detection.linked-worktree-detection.ac1": "completed",
+    "linked-worktree-detection.linked-worktree-detection.ac2": "completed",
+    "linked-worktree-detection.linked-worktree-detection.ac3": "completed",
+    "linked-worktree-detection.linked-worktree-detection.ac4": "completed"
   }
 }
