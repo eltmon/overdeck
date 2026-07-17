@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T14:50:33.233Z",
+  "updated": "2026-07-17T15:27:02.827Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "pending",
@@ -64,16 +64,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "spine-collapse": {
-        "writerId": "agent-pan-2842",
-        "agentId": "agent-pan-2842",
-        "pid": 2482352,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T14:50:33.233Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2842",
@@ -105,6 +97,16 @@
         "itemId": "tasks-chip-drawer",
         "outcome": "completed",
         "releasedAt": "2026-07-17T14:49:55.971Z"
+      },
+      {
+        "writerId": "agent-pan-2842",
+        "agentId": "agent-pan-2842",
+        "pid": 2482352,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T14:50:33.233Z",
+        "itemId": "spine-collapse",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T15:27:02.827Z"
       }
     ],
     "statusReasons": {
@@ -131,6 +133,9 @@
     "tasks-chip-drawer.tasks-chip-drawer.ac3": "completed",
     "tasks-chip-drawer.tasks-chip-drawer.ac4": "completed",
     "tasks-chip-drawer.tasks-chip-drawer.ac5": "completed",
-    "spine-collapse": "running"
+    "spine-collapse": "completed",
+    "spine-collapse.spine-collapse.ac1": "completed",
+    "spine-collapse.spine-collapse.ac2": "completed",
+    "spine-collapse.spine-collapse.ac3": "completed"
   }
 }
