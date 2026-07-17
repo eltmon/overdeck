@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync } from 'node:fs';
+import { createReadStream } from 'node:fs';
+import { lstat } from 'node:fs/promises';
 
 export interface StateMigrationManifestEntry {
   source: string;
@@ -9,21 +10,40 @@ export interface StateMigrationManifestEntry {
   sha256: string;
 }
 
-export function manifestEntry(source: string, destination: string): StateMigrationManifestEntry {
-  const stat = lstatSync(source);
-  const bytes = readFileSync(source);
+async function sha256(path: string, signal?: AbortSignal): Promise<string> {
+  const hash = createHash('sha256');
+  for await (const chunk of createReadStream(path, { signal })) {
+    signal?.throwIfAborted();
+    hash.update(chunk);
+  }
+  return hash.digest('hex');
+}
+
+export async function manifestEntry(
+  source: string,
+  destination: string,
+  signal?: AbortSignal,
+): Promise<StateMigrationManifestEntry> {
+  signal?.throwIfAborted();
+  const [stat, digest] = await Promise.all([
+    lstat(source),
+    sha256(source, signal),
+  ]);
+  signal?.throwIfAborted();
   return {
     source,
     destination,
     mode: stat.mode & 0o777,
     size: stat.size,
-    sha256: createHash('sha256').update(bytes).digest('hex'),
+    sha256: digest,
   };
 }
 
-export function verifyStateMigrationManifest(entries: readonly StateMigrationManifestEntry[]): void {
+export async function verifyStateMigrationManifest(
+  entries: readonly StateMigrationManifestEntry[],
+): Promise<void> {
   for (const expected of entries) {
-    const actual = manifestEntry(expected.destination, expected.destination);
+    const actual = await manifestEntry(expected.destination, expected.destination);
     // Compare modes the way git preserves them: only the executable bit is
     // tracked, so a checkout legitimately re-derives group/other bits from the
     // process umask (e.g. 0644 source vs 0664 worktree checkout). Content is

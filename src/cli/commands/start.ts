@@ -31,6 +31,7 @@ import {
   printPlanningConnectionError,
   streamPlanningSession,
 } from './planning-stream.js';
+import { createPlanningProgress, createPrepProgress, runStartPrepStep, runStateReconcile, warnSyncMainFailure } from './start-prep-progress.js';
 
 /**
  * Check if an issue ID is a Linear issue (has team prefix like MIN-, PAN-, etc.)
@@ -836,16 +837,12 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     process.exit(1);
   }
   const spinner = ora(`Preparing workspace for ${id}...`).start();
+  const prep = createPrepProgress(spinner);
   try {
     const locationPreference = determineWorkspaceLocation(options);
     // Log project resolution info
     const resolved = resolveProjectFromIssueSync(id);
-    if (resolved) {
-      spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
-      spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
-      await requireAutomaticStateMigration(resolved);
-      await applyStartPolicyOptions(resolved, id, options, options.dryRun === true);
-    }
+    if (resolved) spinner.text = `Resolved project: ${resolved.projectName} (${resolved.projectPath})`;
     const { workspacePath, isRemote } = findWorkspaceWithLocation(id, locationPreference);
 
     // Overflow scale-out (PAN-1676): a FRESH issue (no workspace anywhere, no
@@ -869,6 +866,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       }
     }
     const effectiveRemote = isRemote || overflowToRemote || (locationPreference === 'remote' && !workspacePath);
+    if (resolved) {
+      const reconcileState = async (signal: AbortSignal) => {
+        spinner.text = `Reconciling permanent state for ${resolved.projectName}...`;
+        await requireAutomaticStateMigration(resolved, signal);
+        await applyStartPolicyOptions(resolved, id, options, options.dryRun === true, signal);
+      };
+      await runStateReconcile(prep, spinner, effectiveRemote, reconcileState);
+    }
 
     // PAN-2407: route unplanned issues to the start-planning endpoint before
     // any workspace creation or remote provisioning.
@@ -918,8 +923,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
 
           await streamPlanningSession(response, {
             issueId: id,
-            setSpinnerText: (text) => { spinner.text = text; },
-            onComplete: (name) => { sessionName = name; },
+            ...createPlanningProgress(spinner, (name) => { sessionName = name; }),
           });
 
           spinner.succeed(
@@ -996,7 +1000,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     let skipSyncMainForUnsafeWorkspace = false;
 
     if (!workspace) {
-      spinner.text = `Creating workspace for ${id}...`;
+      prep.update(`Creating workspace for ${id}...`);
       const expectedWorkspacePath = join(projectRoot, 'workspaces', `feature-${normalizedId}`);
       try {
         const nodeDir = dirname(process.execPath);
@@ -1022,10 +1026,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         if (branch === 'main' || branch === 'master') {
           const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
           if (repairedBranch) {
-            spinner.text = `Moved clean workspace to branch: ${repairedBranch}`;
+            prep.update(`Moved clean workspace to branch: ${repairedBranch}`);
           } else {
             skipSyncMainForUnsafeWorkspace = true;
-            spinner.text = `Workspace is on ${branch} branch; skipping sync-main until validation runs`;
+            prep.update(`Workspace is on ${branch} branch; skipping sync-main until validation runs`);
           }
         }
       } catch {
@@ -1036,31 +1040,27 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     // If workspace was created during planning, main may have moved forward.
     // Fetch and merge latest main before the agent starts working.
     if (workspaceExisted && !skipSyncMainForUnsafeWorkspace) {
-      spinner.text = 'Syncing latest main into workspace...';
+      prep.update('Syncing latest main into workspace...');
       let syncConflictFiles: string[] | undefined;
       try {
-        const syncResult = await syncMainIntoWorkspace(workspace, id);
-        if (syncResult.success) {
-          if (syncResult.alreadyUpToDate) {
-            spinner.text = 'Workspace already up to date with main';
+        await runStartPrepStep(prep, spinner, 'sync-main', async (signal) => {
+          const syncResult = await syncMainIntoWorkspace(workspace, id, signal);
+          if (syncResult.success) {
+            prep.update(syncResult.alreadyUpToDate ? 'Workspace already up to date with main' : `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`);
           } else {
-            spinner.text = `Synced main into workspace (${syncResult.commitCount ?? 0} commit(s))`;
+            syncConflictFiles = syncResult.conflictFiles;
+            const conflictHint = syncConflictFiles?.length ? ` Conflicts: ${syncConflictFiles.join(', ')}.` : '';
+            spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
           }
-        } else {
-          syncConflictFiles = syncResult.conflictFiles;
-          const conflictHint = syncConflictFiles?.length
-            ? ` Conflicts: ${syncConflictFiles.join(', ')}.`
-            : '';
-          spinner.warn(`Could not sync main: ${syncResult.reason || 'unknown reason'}${conflictHint}`);
-        }
-      } catch (syncErr: any) {
-        spinner.warn(`Sync main failed: ${syncErr.message}`);
+        });
+      } catch (syncErr: unknown) {
+        warnSyncMainFailure(spinner, syncErr);
       }
 
       // PAN-1872: a sync-main conflict must not strand the issue. Continue
       // spawning the work agent so it can resolve the conflicts and re-submit.
       if (syncConflictFiles && syncConflictFiles.length > 0) {
-        spinner.text = `Preparing agent to resolve ${syncConflictFiles.length} sync-main conflict(s)...`;
+        prep.update(`Preparing agent to resolve ${syncConflictFiles.length} sync-main conflict(s)...`);
       }
     }
 
@@ -1088,7 +1088,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
               }).trim();
               if (subBranch !== 'main' && subBranch !== 'master' && subBranch.length > 0) {
                 hasFeatureBranch = true;
-                spinner.text = `Found polyrepo workspace — sub-repo ${entry} on branch: ${subBranch}`;
+                prep.update(`Found polyrepo workspace — sub-repo ${entry} on branch: ${subBranch}`);
                 break;
               }
             }
@@ -1098,7 +1098,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         if (!hasFeatureBranch) {
           const repairedBranch = await repairMainBranchWorkspace(workspace, normalizedId);
           if (repairedBranch) {
-            spinner.text = `Moved clean workspace to branch: ${repairedBranch}`;
+            prep.update(`Moved clean workspace to branch: ${repairedBranch}`);
           } else {
             await failPostCreateValidation({
               spinner,
@@ -1119,14 +1119,14 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
           }
         }
       } else {
-        spinner.text = `Found workspace on branch: ${branch}`;
+        prep.update(`Found workspace on branch: ${branch}`);
       }
     } catch (e) {
       // If git check fails, continue but warn
       spinner.warn('Could not verify branch - ensure you are NOT on main');
     }
 
-    spinner.text = `Found workspace: ${workspace}`;
+    prep.update(`Found workspace: ${workspace}`);
 
     if (options.dryRun) {
       spinner.info('Dry run mode');
@@ -1151,7 +1151,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // Validate continue file belongs to this issue (prevent cross-contamination from git merges)
-    spinner.text = 'Validating workspace state...';
+    prep.update('Validating workspace state...');
     const stateValidation = validateAndCleanStateFile(workspace, id);
     if (stateValidation.removed) {
       spinner.warn(`Cleaned stale planning state from ${stateValidation.wrongIssue}`);
@@ -1188,7 +1188,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     if (options.auto && !findPlanSync(workspace)) {
-      spinner.text = `Synthesizing minimal vBRIEF for ${id}...`;
+      prep.update(`Synthesizing minimal vBRIEF for ${id}...`);
       const issue = await fetchIssueForAutoStart(id);
       await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspace, issue));
     }
@@ -1206,11 +1206,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       });
     }
 
-    spinner.text = 'Building agent prompt with planning context...';
-    const trackerContext = await getTrackerContext(id, workspace);
+    prep.update('Building agent prompt with planning context...');
+    const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', (signal) => getTrackerContext(id, workspace, signal), '');
     const prompt = await buildWorkAgentPrompt({ issueId: id, env: 'LOCAL', workspacePath: workspace, projectRoot, trackerContext });
-
-    spinner.text = 'Spawning agent...';
+    prep.update('Spawning agent...');
 
     // `pan start --host --yes` does not attach to the work-agent tmux session.
     // After spawnAgent finishes session creation, this command only prints the
@@ -1219,7 +1218,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       clearAgentPausedSync(agentId);
     }
 
-    const agent = await spawnAgent({
+    const agent = await runStartPrepStep(prep, spinner, 'spawn', () => spawnAgent({
       issueId: id,
       workspace,
       harness: requestedHarness,
@@ -1228,7 +1227,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       prompt,
       allowHost: options.host,
       effort: resolvedEffort,
-    });
+    }));
 
     if (agent.role === 'work' && agent.kickoffDelivered === false) {
       spinner.fail(`Agent spawned but kickoff delivery was not confirmed: ${agent.id}`);
@@ -1299,8 +1298,4 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   }
 }
 
-export const __testInternals = {
-  failPostCreateValidation,
-  repairMainBranchWorkspace,
-  resolveExplicitHarnessFlag,
-};
+export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep };

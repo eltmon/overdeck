@@ -36,7 +36,9 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
+const DEFAULT_STATE_GIT_TIMEOUT_MS = 30_000;
 const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
+const DEFAULT_STATE_FLUSH_TIMEOUT_MS = 60_000;
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -101,8 +103,15 @@ export interface FlushResult {
   reason?: string;
 }
 
+interface ActiveFlush {
+  controller: AbortController;
+  gitRoot: string;
+  promise: Promise<FlushResult>;
+}
+
 const pending = new Map<string, QueuedCommit>();
-let serializer: Promise<unknown> = Promise.resolve();
+const active = new Map<string, ActiveFlush>();
+const serializers = new Map<string, Promise<unknown>>();
 
 interface GitResult {
   stdout: string;
@@ -111,10 +120,10 @@ interface GitResult {
 }
 
 /** Run a git subcommand. Fails with GitError on non-zero exit. */
-function runGit(
+function runGitRaw(
   args: readonly string[],
   cwd: string,
-): Effect.Effect<GitResult, GitError> {
+): Effect.Effect<GitResult, unknown> {
   return Effect.gen(function* () {
     // HUSKY=0 disables client-side git hooks for the door's own commits.
     // A migrated state worktree shares `core.hooksPath` with the code repo's
@@ -158,10 +167,18 @@ function runGit(
   }).pipe(
     Effect.scoped,
     Effect.provide(spawnerLayer),
-    Effect.catchCause((cause) =>
-      Effect.fail(causeToGitError(cause, args)),
-    ),
   );
+}
+
+function runGit(
+  args: readonly string[],
+  cwd: string,
+): Effect.Effect<GitResult, GitError> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_GIT_TIMEOUT_MS,
+    DEFAULT_STATE_GIT_TIMEOUT_MS,
+  );
+  return runGitWithTimeout(args, cwd, timeoutMs);
 }
 
 function runGitWithTimeout(
@@ -169,7 +186,7 @@ function runGitWithTimeout(
   cwd: string,
   timeoutMs: number,
 ): Effect.Effect<GitResult, GitError> {
-  return runGit(args, cwd).pipe(
+  return runGitRaw(args, cwd).pipe(
     Effect.timeout(Duration.millis(timeoutMs)),
     Effect.catchCause((cause) =>
       Effect.fail(causeToGitError(cause, args)),
@@ -290,13 +307,16 @@ export function reconcileStatePlaneDrift(
 }
 
 /**
- * Force a flush of any pending commits for `projectRoot`. Returns an Effect that
- * resolves after the commit attempt (success or no-op).
+ * Force a flush of every pending or active commit that targets the same Git
+ * checkout as `projectRoot`. Callers may pass either a logical project root or
+ * the effective Git root; the Effect resolves only after every matching writer
+ * has settled.
  */
 export function flushAutoCommits(
   projectRoot: string,
+  signal?: AbortSignal,
 ): Effect.Effect<FlushResult, never> {
-  return Effect.promise(() => flushPromise(projectRoot));
+  return Effect.promise(() => flushPromise(projectRoot, signal));
 }
 
 /**
@@ -306,26 +326,180 @@ export function flushAutoCommits(
  */
 export function flushAllPendingAutoCommits(): Effect.Effect<FlushResult[], never> {
   return Effect.promise(() => {
-    const projectRoots = Array.from(pending.keys());
+    const projectRoots = [...new Set([...pending.keys(), ...active.keys()])];
     return Promise.all(projectRoots.map((projectRoot) => flushPromise(projectRoot)));
   });
 }
 
-function flushPromise(projectRoot: string): Promise<FlushResult> {
-  const batch = pending.get(projectRoot);
-  if (!batch) return Promise.resolve({ committed: false, reason: 'no pending' });
-  clearTimeout(batch.timer);
-  return flushInner(projectRoot);
+function flushPromise(
+  projectRoot: string,
+  signal?: AbortSignal,
+): Promise<FlushResult> {
+  const gitRoot = pending.get(projectRoot)?.repoRoot
+    ?? active.get(projectRoot)?.gitRoot
+    ?? projectRoot;
+  const matching = new Set<ActiveFlush>();
+
+  for (const [queuedProjectRoot, batch] of pending) {
+    if ((batch.repoRoot ?? queuedProjectRoot) !== gitRoot) continue;
+    clearTimeout(batch.timer);
+    const started = flushInner(queuedProjectRoot);
+    if (started) matching.add(started);
+  }
+  for (const activeFlush of active.values()) {
+    if (activeFlush.gitRoot === gitRoot) matching.add(activeFlush);
+  }
+
+  if (matching.size === 0) {
+    signal?.throwIfAborted();
+    return Promise.resolve({ committed: false, reason: 'no pending' });
+  }
+  return waitForFlushes(gitRoot, [...matching], signal);
 }
 
-function flushInner(projectRoot: string): Promise<FlushResult> {
+function flushInner(projectRoot: string): ActiveFlush | undefined {
   const batch = pending.get(projectRoot);
-  if (!batch) return Promise.resolve({ committed: false, reason: 'no pending' });
+  if (!batch) return active.get(projectRoot);
   pending.delete(projectRoot);
 
-  const task = serializer.then(() => Effect.runPromise(doCommit(projectRoot, batch)));
-  serializer = task.catch(() => undefined);
-  return task;
+  const gitRoot = batch.repoRoot ?? projectRoot;
+  return startSerializedFlush(
+    projectRoot,
+    gitRoot,
+    doBoundedCommit(projectRoot, batch),
+  );
+}
+
+function startSerializedFlush(
+  projectRoot: string,
+  gitRoot: string,
+  operation: Effect.Effect<FlushResult, never>,
+): ActiveFlush {
+  const prior = serializers.get(gitRoot) ?? Promise.resolve();
+  const controller = new AbortController();
+  const promise = prior.then(() => {
+    controller.signal.throwIfAborted();
+    return Effect.runPromise(operation, { signal: controller.signal });
+  });
+  const activeFlush = { controller, gitRoot, promise };
+  active.set(projectRoot, activeFlush);
+
+  const tail = promise.catch(() => undefined);
+  serializers.set(gitRoot, tail);
+  void promise.then(
+    () => clearActiveFlush(projectRoot, activeFlush, tail),
+    () => clearActiveFlush(projectRoot, activeFlush, tail),
+  );
+  return activeFlush;
+}
+
+function waitForFlush(
+  activeFlush: ActiveFlush,
+  signal?: AbortSignal,
+): Promise<FlushResult> {
+  return waitForFlushes(activeFlush.gitRoot, [activeFlush], signal);
+}
+
+async function waitForFlushes(
+  gitRoot: string,
+  activeFlushes: readonly ActiveFlush[],
+  signal?: AbortSignal,
+): Promise<FlushResult> {
+  const completion = Promise.all(activeFlushes.map((flush) => flush.promise))
+    .then(combineFlushResults);
+  if (!signal) return completion;
+  if (signal.aborted) {
+    await abortAndSettleGitRoot(gitRoot, signal.reason);
+    throw signal.reason;
+  }
+
+  return new Promise((resolve, reject) => {
+    let completed = false;
+    const onAbort = () => {
+      if (completed) return;
+      completed = true;
+      signal.removeEventListener('abort', onAbort);
+      void abortAndSettleGitRoot(gitRoot, signal.reason).then(
+        () => reject(signal.reason),
+        reject,
+      );
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    void completion.then(
+      (result) => {
+        if (completed) return;
+        completed = true;
+        signal.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      (error) => {
+        if (completed) return;
+        completed = true;
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+    if (signal.aborted) onAbort();
+  });
+}
+
+function combineFlushResults(results: FlushResult[]): FlushResult {
+  if (results.length === 1) return results[0];
+
+  const combined: FlushResult = {
+    committed: results.some((result) => result.committed),
+  };
+  const committed = results.filter((result) => result.committed);
+  if (committed.some((result) => result.pushed === false)) combined.pushed = false;
+  else if (committed.length > 0 && committed.every((result) => result.pushed === true)) {
+    combined.pushed = true;
+  }
+  if (results.some((result) => result.errored)) combined.errored = true;
+  const reasons = results.flatMap((result) => result.reason ? [result.reason] : []);
+  if (reasons.length > 0) combined.reason = reasons.join('; ');
+  return combined;
+}
+
+async function abortAndSettleGitRoot(
+  gitRoot: string,
+  reason: unknown,
+): Promise<void> {
+  const matching = [...active.values()].filter((flush) => flush.gitRoot === gitRoot);
+  for (const flush of matching) flush.controller.abort(reason);
+  await Promise.allSettled(matching.map((flush) => flush.promise));
+}
+
+function clearActiveFlush(
+  projectRoot: string,
+  activeFlush: ActiveFlush,
+  tail: Promise<unknown>,
+): void {
+  if (active.get(projectRoot) === activeFlush) active.delete(projectRoot);
+  if (serializers.get(activeFlush.gitRoot) === tail) serializers.delete(activeFlush.gitRoot);
+}
+
+function doBoundedCommit(
+  projectRoot: string,
+  batch: QueuedCommit,
+): Effect.Effect<FlushResult, never> {
+  return boundStateFlush(doCommit(projectRoot, batch));
+}
+
+function boundStateFlush(
+  operation: Effect.Effect<FlushResult, never>,
+  timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_FLUSH_TIMEOUT_MS,
+    DEFAULT_STATE_FLUSH_TIMEOUT_MS,
+  ),
+): Effect.Effect<FlushResult, never> {
+  return operation.pipe(
+    Effect.timeout(Duration.millis(timeoutMs)),
+    Effect.catchCause((cause) => {
+      const reason = `state writer timed out after ${timeoutMs / 1_000}s: ${String(Cause.squash(cause))}`;
+      console.warn(`[pan-dir/auto-commit] ${reason}`);
+      return Effect.succeed({ committed: false, errored: true, reason });
+    }),
+  );
 }
 
 function doCommit(
@@ -600,6 +774,12 @@ export function deriveProjectRoot(path: string): string | null {
   }
   return null;
 }
+
+export const __testInternals = {
+  boundStateFlush,
+  startSerializedFlush,
+  waitForFlush,
+};
 
 function relativizeToRoot(absOrRel: string, projectRoot: string): string {
   const rootPrefix = projectRoot.endsWith(sep) ? projectRoot : projectRoot + sep;

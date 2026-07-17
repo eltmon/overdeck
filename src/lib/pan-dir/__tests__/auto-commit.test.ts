@@ -5,7 +5,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { vi } from 'vitest';
-import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
+import { __testInternals, deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
 
 function exec(root: string, command: string): string {
   return execSync(command, { cwd: root, encoding: 'utf-8' }).trim();
@@ -68,6 +68,141 @@ describe('auto-commit', () => {
       expect(log).toContain('chore(state): update continue for PAN-1');
     }),
   );
+
+  it('bounds a stalled state-writer flush', async () => {
+    vi.useFakeTimers();
+    try {
+      const flush = Effect.runPromise(
+        __testInternals.boundStateFlush(Effect.never, 60_000),
+      );
+
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await expect(flush).resolves.toMatchObject({
+        committed: false,
+        errored: true,
+        reason: expect.stringContaining('state writer timed out after 60s'),
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('makes an active flush visible to concurrent durability waiters', async () => {
+    mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+    const path = join(tmp, '.pan', 'continues', 'pan-active.vbrief.json');
+    writeFileSync(path, '{"issue":"PAN-ACTIVE"}');
+
+    queueAutoCommit({
+      projectRoot: tmp,
+      paths: [path],
+      subject: 'chore(state): active flush test',
+    });
+    const first = Effect.runPromise(flushAutoCommits(tmp));
+    const second = Effect.runPromise(flushAutoCommits(tmp));
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult.committed).toBe(true);
+    expect(secondResult).toEqual(firstResult);
+  });
+
+  it.effect('flushes every project root targeting the requested Git root', () =>
+    Effect.gen(function* () {
+      mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+      const firstPath = join(tmp, '.pan', 'records', 'pan-shared-first.json');
+      const secondPath = join(tmp, '.pan', 'records', 'pan-shared-second.json');
+      writeFileSync(firstPath, '{"writer":"first"}');
+      writeFileSync(secondPath, '{"writer":"second"}');
+
+      queueAutoCommit({
+        projectRoot: `${tmp}-logical-first`,
+        repoRoot: tmp,
+        paths: [firstPath],
+        subject: 'chore(state): shared root first writer',
+      });
+      queueAutoCommit({
+        projectRoot: `${tmp}-logical-second`,
+        repoRoot: tmp,
+        paths: [secondPath],
+        subject: 'chore(state): shared root second writer',
+      });
+
+      const result = yield* flushAutoCommits(tmp);
+
+      expect(result.committed).toBe(true);
+      const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
+      expect(log).toContain('chore(state): shared root first writer');
+      expect(log).toContain('chore(state): shared root second writer');
+      expect(log.split('\n').filter(Boolean).length).toBe(3);
+    }),
+  );
+
+  it('cancels and settles active and serializer-blocked flushes for one Git root', async () => {
+    vi.useFakeTimers();
+    try {
+      let firstStarted = false;
+      let secondStarted = false;
+      let markFirstStarted!: () => void;
+      const firstStartedPromise = new Promise<void>((resolve) => { markFirstStarted = resolve; });
+      let finishFirstFinalizer!: () => void;
+      const firstFinalizer = new Promise<void>((resolve) => { finishFirstFinalizer = resolve; });
+      const firstOperation = Effect.scoped(Effect.gen(function* () {
+        yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            firstStarted = true;
+            markFirstStarted();
+          }),
+          () => Effect.promise(() => firstFinalizer),
+        );
+        return yield* Effect.never;
+      }));
+      const secondOperation = Effect.sync(() => {
+        secondStarted = true;
+        return { committed: false };
+      });
+      const gitRoot = join(tmp, 'shared-state-root');
+      const first = __testInternals.startSerializedFlush(
+        `${tmp}-first`,
+        gitRoot,
+        firstOperation,
+      );
+      const second = __testInternals.startSerializedFlush(
+        `${tmp}-second`,
+        gitRoot,
+        secondOperation,
+      );
+      void first.promise.catch(() => undefined);
+      void second.promise.catch(() => undefined);
+      await firstStartedPromise;
+      expect(firstStarted).toBe(true);
+      expect(secondStarted).toBe(false);
+
+      const controller = new AbortController();
+      const reason = new Error('state reconciliation timed out');
+      let waiterSettled = false;
+      const waiter = __testInternals.waitForFlush(second, controller.signal);
+      const rejection = expect(waiter).rejects.toBe(reason);
+      void waiter.then(
+        () => { waiterSettled = true; },
+        () => { waiterSettled = true; },
+      );
+
+      controller.abort(reason);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(waiterSettled).toBe(false);
+      expect(secondStarted).toBe(false);
+      finishFirstFinalizer();
+      await vi.advanceTimersByTimeAsync(0);
+      await rejection;
+      expect(waiterSettled).toBe(true);
+      expect(secondStarted).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it.effect('does not commit when on a non-main branch', () =>
     Effect.gen(function* () {

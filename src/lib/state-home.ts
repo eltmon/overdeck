@@ -52,17 +52,20 @@ export type StateWorktreeStatus =
 
 interface StateHomeOptions {
   projectKey?: string;
+  signal?: AbortSignal;
 }
 
 const migrationCache = new Map<string, { remoteTip: string | null; migrated: boolean }>();
 
-async function git(repoPath: string, args: string[]): Promise<string> {
+async function git(repoPath: string, args: string[], signal?: AbortSignal): Promise<string> {
+  signal?.throwIfAborted();
   const { stdout } = await execFileAsync('git', args, {
     cwd: repoPath,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
     timeout: 15_000,
     killSignal: 'SIGTERM',
+    signal,
   });
   return stdout.trim();
 }
@@ -84,26 +87,27 @@ export function parseMigrationCompleteMarker(value: unknown): MigrationCompleteM
   return marker as MigrationCompleteMarker;
 }
 
-async function remoteStateTip(repoPath: string): Promise<string | null> {
-  const output = await git(repoPath, ['ls-remote', '--heads', 'origin', `refs/heads/${STATE_BRANCH}`]);
+async function remoteStateTip(repoPath: string, signal?: AbortSignal): Promise<string | null> {
+  const output = await git(repoPath, ['ls-remote', '--heads', 'origin', `refs/heads/${STATE_BRANCH}`], signal);
   const sha = output.split(/\s+/)[0];
   return isSha(sha) ? sha : null;
 }
 
-async function markerAtRemoteTip(repoPath: string, tip: string): Promise<MigrationCompleteMarker | null> {
+async function markerAtRemoteTip(repoPath: string, tip: string, signal?: AbortSignal): Promise<MigrationCompleteMarker | null> {
   await git(repoPath, [
     'fetch',
     '--quiet',
     'origin',
     `refs/heads/${STATE_BRANCH}:refs/remotes/origin/${STATE_BRANCH}`,
-  ]);
-  const fetchedTip = await git(repoPath, ['rev-parse', `refs/remotes/origin/${STATE_BRANCH}`]);
+  ], signal);
+  const fetchedTip = await git(repoPath, ['rev-parse', `refs/remotes/origin/${STATE_BRANCH}`], signal);
   if (fetchedTip !== tip) return null;
 
   let raw: string;
   try {
-    raw = await git(repoPath, ['show', `${tip}:${MIGRATION_COMPLETE_MARKER}`]);
+    raw = await git(repoPath, ['show', `${tip}:${MIGRATION_COMPLETE_MARKER}`], signal);
   } catch {
+    signal?.throwIfAborted();
     return null;
   }
   let marker: MigrationCompleteMarker | null;
@@ -119,13 +123,16 @@ async function markerAtRemoteTip(repoPath: string, tip: string): Promise<Migrati
   // so requiring the marker to be the LAST commit would un-migrate the project
   // on its first post-migration state write. Ancestry still proves the marker
   // belongs to this branch's history rather than a graft from elsewhere.
-  const anchored = await git(repoPath, ['merge-base', '--is-ancestor', marker.stateBranchSha, tip])
+  const anchored = await git(repoPath, ['merge-base', '--is-ancestor', marker.stateBranchSha, tip], signal)
     .then(() => true)
-    .catch(() => false);
+    .catch(() => {
+      signal?.throwIfAborted();
+      return false;
+    });
   return anchored ? marker : null;
 }
 
-export async function inspectStateMigration(project: ProjectConfig): Promise<{
+export async function inspectStateMigration(project: ProjectConfig, options: StateHomeOptions = {}): Promise<{
   migrated: boolean;
   migrationInProgress: boolean;
   remoteTip: string | null;
@@ -133,15 +140,16 @@ export async function inspectStateMigration(project: ProjectConfig): Promise<{
   const { repoPath } = resolveInfraRepo(project);
   let tip: string | null;
   try {
-    tip = await remoteStateTip(repoPath);
+    tip = await remoteStateTip(repoPath, options.signal);
   } catch {
+    options.signal?.throwIfAborted();
     return { migrated: false, migrationInProgress: false, remoteTip: null };
   }
   const cached = migrationCache.get(repoPath);
   if (cached?.remoteTip === tip) {
     return { migrated: cached.migrated, migrationInProgress: tip !== null && !cached.migrated, remoteTip: tip };
   }
-  const migrated = tip !== null && await markerAtRemoteTip(repoPath, tip) !== null;
+  const migrated = tip !== null && await markerAtRemoteTip(repoPath, tip, options.signal) !== null;
   migrationCache.set(repoPath, { remoteTip: tip, migrated });
   return { migrated, migrationInProgress: tip !== null && !migrated, remoteTip: tip };
 }
@@ -172,7 +180,7 @@ export async function findRecreatedLegacyStatePaths(project: ProjectConfig): Pro
 
 export async function resolveStateHome(project: ProjectConfig, options: StateHomeOptions = {}): Promise<StateHome> {
   const legacy = resolveInfraRepo(project);
-  const migration = await inspectStateMigration(project);
+  const migration = await inspectStateMigration(project, options);
   const worktreePath = stateWorktreePath(project, options);
   return migration.migrated
     ? { ...migration, worktreePath, repoPath: worktreePath, recordsPath: '.' }
@@ -212,46 +220,53 @@ export function resolveStateDomainPathSync(
   return home.migrated ? join(home.root, domain) : join(home.root, '.pan', domain);
 }
 
-async function addStateWorktree(repoPath: string, path: string): Promise<void> {
+async function addStateWorktree(repoPath: string, path: string, signal?: AbortSignal): Promise<void> {
+  signal?.throwIfAborted();
   await mkdir(dirname(path), { recursive: true });
-  const localBranchExists = await git(repoPath, ['show-ref', '--verify', '--quiet', `refs/heads/${STATE_BRANCH}`])
-    .then(() => true, () => false);
+  const localBranchExists = await git(repoPath, ['show-ref', '--verify', '--quiet', `refs/heads/${STATE_BRANCH}`], signal)
+    .then(() => true)
+    .catch(() => {
+      signal?.throwIfAborted();
+      return false;
+    });
   const args = localBranchExists
     ? ['worktree', 'add', path, STATE_BRANCH]
     : ['worktree', 'add', '--track', '-b', STATE_BRANCH, path, `origin/${STATE_BRANCH}`];
-  await git(repoPath, args);
+  await git(repoPath, args, signal);
 }
 
 export async function ensureStateWorktree(
   project: ProjectConfig,
   options: StateHomeOptions = {},
 ): Promise<StateWorktreeStatus> {
-  const migration = await inspectStateMigration(project);
+  const migration = await inspectStateMigration(project, options);
   const path = stateWorktreePath(project, options);
   if (!migration.migrated) return { status: 'legacy', path };
 
   const { repoPath } = resolveInfraRepo(project);
   if (!existsSync(path)) {
-    await addStateWorktree(repoPath, path);
+    await addStateWorktree(repoPath, path, options.signal);
     return { status: 'created', path };
   }
 
   let branch: string;
   try {
-    branch = await git(path, ['branch', '--show-current']);
+    branch = await git(path, ['branch', '--show-current'], options.signal);
   } catch (error) {
+    options.signal?.throwIfAborted();
     return { status: 'error', path, detail: error instanceof Error ? error.message : String(error) };
   }
   if (branch === STATE_BRANCH) return { status: 'healthy', path };
 
   try {
-    const dirty = await git(path, ['status', '--porcelain']);
+    const dirty = await git(path, ['status', '--porcelain'], options.signal);
     if (dirty) return { status: 'dirty', path, detail: 'state worktree has uncommitted changes; refusing destructive repair' };
-    await git(repoPath, ['worktree', 'remove', path]);
+    await git(repoPath, ['worktree', 'remove', path], options.signal);
     await rm(path, { recursive: true, force: true });
-    await addStateWorktree(repoPath, path);
+    await addStateWorktree(repoPath, path, options.signal);
     return { status: 'recreated', path };
   } catch (error) {
+    options.signal?.throwIfAborted();
     return { status: 'error', path, detail: error instanceof Error ? error.message : String(error) };
   }
 }

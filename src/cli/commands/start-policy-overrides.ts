@@ -41,8 +41,14 @@ export function hasStartPolicyOverrides(overrides: StartPolicyOverrides): boolea
   return Object.values(overrides).some((value) => value !== undefined);
 }
 
-export async function persistStartPolicyOverrides(project: ProjectConfig, issueId: string, overrides: StartPolicyOverrides): Promise<void> {
+export async function persistStartPolicyOverrides(
+  project: ProjectConfig,
+  issueId: string,
+  overrides: StartPolicyOverrides,
+  signal?: AbortSignal,
+): Promise<void> {
   if (!hasStartPolicyOverrides(overrides)) return;
+  signal?.throwIfAborted();
   await updateIssueRecord(project, issueId, (record) => {
     if (overrides.workModel !== undefined) record.workModel = overrides.workModel;
     if (overrides.reviewMode !== undefined) record.reviewMode = overrides.reviewMode;
@@ -58,11 +64,12 @@ export async function applyStartPolicyOptions(
   issueId: string,
   options: StartPolicyOptions,
   dryRun: boolean,
+  signal?: AbortSignal,
 ): Promise<void> {
   if (dryRun) return;
   const overrides = parseStartPolicyOverrides(options);
   if (!hasStartPolicyOverrides(overrides)) return;
   const project = getProjectSync(resolved.projectKey);
   if (!project) throw new Error(`Project configuration not found for ${resolved.projectName}`);
-  await persistStartPolicyOverrides(project, issueId, overrides);
+  await persistStartPolicyOverrides(project, issueId, overrides, signal);
 }

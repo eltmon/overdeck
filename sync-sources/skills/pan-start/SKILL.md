@@ -78,6 +78,29 @@ different model, where the existing session can't resume under different provide
 `--fresh` is non-destructive: it clears only the resume pointer, never the JSONL transcript,
 and refuses while the agent is still running (stop it first with `pan kill <id>`).
 
+## Slow or hanging workspace prep
+
+Workspace preparation bounds its slow external phases with these default budgets:
+
+| Phase | Budget | Timeout behavior |
+| --- | ---: | --- |
+| `state-reconcile` | 60s | Fail fast |
+| `sync-main` | 240s | Warn and continue to spawn |
+| `tracker-context` | 60s | Warn, use empty tracker context, and continue to spawn |
+| `spawn` | 600s | Fail fast |
+
+Ora spinner text updates render only on a TTY, so non-interactive callers receive plain
+progress lines and a heartbeat every 15 seconds while a phase is still running:
+
+```text
+[prep] still running: sync-main (45s elapsed)
+```
+
+A fail-fast timeout exits with the step name and budget. A degraded timeout warns and keeps
+preparation moving toward agent spawn. Supervisors that invoke `pan start` non-interactively
+should allow an outer budget of at least 300 seconds under load; RUN-35 completed after earlier
+120-second and 200-second supervisors timed out while workspace preparation was still making progress.
+
 ## When to Use
 
 - Starting work on a new issue

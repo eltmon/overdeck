@@ -18,23 +18,33 @@ export type AutomaticStateMigrationResult =
 export interface AutomaticStateMigrationDependencies {
   inspect: typeof inspectStateMigration;
   ensureWorktree: typeof ensureStateWorktree;
-  migrate: (projectKey: string, project: ProjectConfig) => Promise<void>;
+  migrate: (projectKey: string, project: ProjectConfig, signal?: AbortSignal) => Promise<void>;
   clearCache: typeof clearStateMigrationCache;
   /** True when `path` is inside a git work tree — gates the migration cleanliness check. */
-  isGitWorkTree: (path: string) => Promise<boolean>;
+  isGitWorkTree: (path: string, signal?: AbortSignal) => Promise<boolean>;
 }
 
-const inFlight = new Map<string, Promise<AutomaticStateMigrationResult>>();
+interface InFlightMigration {
+  controller: AbortController;
+  task: Promise<AutomaticStateMigrationResult>;
+  persistentOwner: boolean;
+  waiters: Map<symbol, boolean>;
+}
 
-async function pathIsGitWorkTree(path: string): Promise<boolean> {
+const inFlight = new Map<string, InFlightMigration>();
+
+async function pathIsGitWorkTree(path: string, signal?: AbortSignal): Promise<boolean> {
   try {
+    signal?.throwIfAborted();
     const { stdout } = await execFileAsync('git', ['rev-parse', '--is-inside-work-tree'], {
       cwd: path,
       encoding: 'utf8',
       timeout: 15_000,
+      signal,
     });
     return stdout.trim() === 'true';
   } catch {
+    signal?.throwIfAborted();
     return false;
   }
 }
@@ -42,9 +52,9 @@ async function pathIsGitWorkTree(path: string): Promise<boolean> {
 const defaultDependencies: AutomaticStateMigrationDependencies = {
   inspect: inspectStateMigration,
   ensureWorktree: ensureStateWorktree,
-  migrate: async (projectKey, project) => {
+  migrate: async (projectKey, project, signal) => {
     const { migrateProjectState } = await import('../cli/commands/admin/state-migrate.js');
-    await migrateProjectState(projectKey, {}, project);
+    await migrateProjectState(projectKey, { signal }, project);
   },
   clearCache: clearStateMigrationCache,
   isGitWorkTree: pathIsGitWorkTree,
@@ -82,26 +92,27 @@ async function reconcile(
   projectKey: string,
   project: ProjectConfig,
   dependencies: AutomaticStateMigrationDependencies,
+  signal: AbortSignal,
 ): Promise<AutomaticStateMigrationResult> {
   try {
-    const before = await dependencies.inspect(project);
+    const before = await dependencies.inspect(project, { signal });
     if (!before.migrated) {
       // A polyrepo container root / non-git project path cannot run the
       // top-level git-cleanliness migration check; classify it clearly instead
       // of surfacing a raw "Command failed: git status --porcelain" (PAN-2676).
       const { repoPath } = resolveInfraRepo(project);
-      if (!(await dependencies.isGitWorkTree(repoPath))) {
+      if (!(await dependencies.isGitWorkTree(repoPath, signal))) {
         return blocked(projectKey, describeUnmigratableProjectPath(projectKey, project, repoPath));
       }
-      await dependencies.migrate(projectKey, project);
+      await dependencies.migrate(projectKey, project, signal);
       dependencies.clearCache();
-      const after = await dependencies.inspect(project);
+      const after = await dependencies.inspect(project, { signal });
       if (!after.migrated) {
         return blocked(projectKey, 'Migration completed without a valid marker on origin/overdeck-state.');
       }
     }
 
-    const worktree = await dependencies.ensureWorktree(project, { projectKey });
+    const worktree = await dependencies.ensureWorktree(project, { projectKey, signal });
     if (worktree.status === 'dirty' || worktree.status === 'error') {
       return blocked(projectKey, worktreeBlockReason(worktree));
     }
@@ -110,6 +121,7 @@ async function reconcile(
     }
     return { status: 'ready', projectKey, worktree: worktree.status };
   } catch (error) {
+    signal.throwIfAborted();
     return blocked(projectKey, error);
   }
 }
@@ -123,13 +135,51 @@ export function ensureAutomaticStateMigration(
   projectKey: string,
   project: ProjectConfig,
   dependencies: AutomaticStateMigrationDependencies = defaultDependencies,
+  signal?: AbortSignal,
 ): Promise<AutomaticStateMigrationResult> {
-  const existing = inFlight.get(projectKey);
-  if (existing) return existing;
-  const task = reconcile(projectKey, project, dependencies)
-    .finally(() => inFlight.delete(projectKey));
-  inFlight.set(projectKey, task);
-  return task;
+  signal?.throwIfAborted();
+  let entry = inFlight.get(projectKey);
+  if (!entry) {
+    const controller = new AbortController();
+    const task = reconcile(projectKey, project, dependencies, controller.signal)
+      .finally(() => inFlight.delete(projectKey));
+    entry = {
+      controller,
+      persistentOwner: signal === undefined,
+      waiters: new Map(),
+      task,
+    };
+    inFlight.set(projectKey, entry);
+  } else if (!signal) {
+    entry.persistentOwner = true;
+  }
+
+  if (!signal) return entry.task;
+
+  const token = Symbol(projectKey);
+  entry.waiters.set(token, false);
+  const maybeAbortSharedMigration = () => {
+    entry?.waiters.set(token, true);
+    if (!entry?.persistentOwner && [...entry.waiters.values()].every(Boolean)) {
+      entry.controller.abort(signal.reason);
+    }
+  };
+  signal.addEventListener('abort', maybeAbortSharedMigration, { once: true });
+  if (signal.aborted) maybeAbortSharedMigration();
+
+  return entry.task.then(
+    (result) => {
+      signal.throwIfAborted();
+      return result;
+    },
+    (error) => {
+      signal.throwIfAborted();
+      throw error;
+    },
+  ).finally(() => {
+    signal.removeEventListener('abort', maybeAbortSharedMigration);
+    entry?.waiters.delete(token);
+  });
 }
 
 export function formatAutomaticStateMigrationBlock(result: Extract<AutomaticStateMigrationResult, { status: 'blocked' }>): string {
@@ -187,7 +237,10 @@ export function decideDeaconBootGate(migrations: AutomaticStateMigrationResult[]
   return { startDeacon, blockedProjects, usableProjects };
 }
 
-export async function requireAutomaticStateMigration(resolved: ResolvedProject): Promise<void> {
+export async function requireAutomaticStateMigration(
+  resolved: ResolvedProject,
+  signal?: AbortSignal,
+): Promise<void> {
   let projectEntry: { key: string; config: ProjectConfig } | undefined;
   try {
     projectEntry = listProjectsSync().find(({ key, config }) =>
@@ -197,6 +250,11 @@ export async function requireAutomaticStateMigration(resolved: ResolvedProject):
     // polyrepo metadata comes from the registered project entry above.
   }
   projectEntry ??= { key: resolved.projectKey, config: { name: resolved.projectName, path: resolved.projectPath } };
-  const result = await ensureAutomaticStateMigration(projectEntry.key, projectEntry.config);
+  const result = await ensureAutomaticStateMigration(
+    projectEntry.key,
+    projectEntry.config,
+    defaultDependencies,
+    signal,
+  );
   if (result.status === 'blocked') throw new Error(formatAutomaticStateMigrationBlock(result));
 }
