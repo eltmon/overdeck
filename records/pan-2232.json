@@ -54,17 +54,18 @@
     "recordedAt": "2026-07-17T02:59:42.835Z"
   },
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T03:03:00.279Z",
+  "updated": "2026-07-17T03:13:57.035Z",
   "pipeline": {
     "issueId": "PAN-2232",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T03:02:59.506Z",
+    "updatedAt": "2026-07-17T03:13:57.013Z",
+    "reviewNotes": "Extracted seam modules export three declarations that were private before the refactor",
     "inspectNotes": "All 7 functions moved byte-for-byte verbatim (verified via body-diff); only specialists.ts/specialists-spawn.ts touched; buildSpecialistBaseCommand + buildSpecialistCavemanExports re-exported, both existing test importers (specialist-resolve-harness.test.ts, specialists-caveman.test.ts) pass 13/13; resolveWorkspaceGitInfo/buildProviderExportLines/buildTmuxEnvFlags were pre-existing dead code before this move, unaffected.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2818",
     "lastVerifiedCommit": "5a29ce43f3924b1a4b912453bfc76dd7a1e60358",
@@ -98,6 +99,24 @@
       ],
       "recordedAt": "2026-07-17T02:59:42.835Z"
     },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "5a29ce43f3924b1a4b912453bfc76dd7a1e60358"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "5a29ce43f3924b1a4b912453bfc76dd7a1e60358"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "5a29ce43f3924b1a4b912453bfc76dd7a1e60358"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "5a29ce43f3924b1a4b912453bfc76dd7a1e60358"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -113,9 +132,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 237377,
-            "output": 6831,
-            "cacheRead": 1334272,
+            "input": 893822,
+            "output": 15480,
+            "cacheRead": 4269568,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1413497,
+            "output": 17892,
+            "cacheRead": 2503680,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 986794,
+            "output": 12509,
+            "cacheRead": 2183168,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 1642573,
+            "output": 29661,
+            "cacheRead": 2343936,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 991966,
+            "output": 11525,
+            "cacheRead": 2180096,
             "cacheWrite": 0
           }
         },
@@ -129,9 +180,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6834164,
-            "output": 403007,
-            "cacheRead": 102407680,
+            "input": 7033667,
+            "output": 409897,
+            "cacheRead": 103917056,
             "cacheWrite": 0
           }
         }
@@ -144,9 +195,9 @@
           "cacheWrite": 152114
         },
         "openai/gpt-5.6-sol": {
-          "input": 7071541,
-          "output": 409838,
-          "cacheRead": 103741952,
+          "input": 12962319,
+          "output": 496964,
+          "cacheRead": 117397504,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -157,8 +208,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 109.661789,
-        "pricingAsOf": "2026-07-17T03:02:59.574Z"
+        "usd": 148.557235,
+        "pricingAsOf": "2026-07-17T03:13:57.027Z"
       }
     },
     "merges": [
