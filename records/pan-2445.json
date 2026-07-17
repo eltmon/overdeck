@@ -51,19 +51,18 @@
     "recordedAt": "2026-07-17T16:48:19.602Z"
   },
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T16:48:19.602Z",
+  "updated": "2026-07-17T16:48:20.410Z",
   "pipeline": {
     "issueId": "PAN-2445",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:42:28.652Z",
+    "updatedAt": "2026-07-17T16:48:20.385Z",
     "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Verification FAILED at lint (12892ms):\n\n\n> @overdeck/core@0.45.21 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.45.21 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.45.21 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.45.21 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.45.21 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n\n--- stderr ---\n✗ overdeck boundary gate: 1 site(s) across 1 file(s) still on the OLD panopticon.db\n\nsrc/lib/cloister/autonomous-plan-dispatch.ts:11:import { isFlywheelAutoPickupBacklog } from '../database/app-settings.js';\n\nEach must go through an overdeck door (src/lib/overdeck/*) — not getDatabase() or a database/* store.\n",
     "inspectNotes": "All 5 ACs verified against diff: not-released/parked/vetoed/objection/labels-unavailable precedence matches code order (labels-unavailable checked first, then parked>vetoed>objection>not-released); recordedModel short-circuits before derefWorkhorse (proven via invalid workhorse:missing test); workhorse:cheap dereferences to claude-haiku-4-5 via config-yaml.js barrel -> roles.ts derefWorkhorse; no-autonomous-model covers both absent and unresolvable autonomousModel. Label constants confirmed lowercase in backlog/pickup.ts so case-insensitive matching is correct. Pure module, no I/O.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2852",
     "reviewRequestedAt": "2026-07-17T16:41:11.158Z",
@@ -112,9 +111,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 528209,
-            "output": 13622,
-            "cacheRead": 1614848,
+            "input": 1201984,
+            "output": 32392,
+            "cacheRead": 4935168,
             "cacheWrite": 0
           }
         },
@@ -128,9 +127,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2514001,
-            "output": 109630,
-            "cacheRead": 28453888,
+            "input": 2726812,
+            "output": 113657,
+            "cacheRead": 30838272,
             "cacheWrite": 0
           }
         }
@@ -143,9 +142,9 @@
           "cacheWrite": 175687
         },
         "openai/gpt-5.6-sol": {
-          "input": 3042210,
-          "output": 123252,
-          "cacheRead": 30068736,
+          "input": 3928796,
+          "output": 146049,
+          "cacheRead": 35773440,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -156,8 +155,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 44.832091,
-        "pricingAsOf": "2026-07-17T16:42:28.836Z"
+        "usd": 52.801283,
+        "pricingAsOf": "2026-07-17T16:48:20.406Z"
       }
     },
     "merges": [
