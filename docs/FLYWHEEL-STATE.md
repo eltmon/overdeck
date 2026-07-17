@@ -5673,3 +5673,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **USEFUL: `pan start`'s prep DOES `sync-main` into the workspace** (`[prep] Syncing latest main into workspace...`). So a stale worktree self-heals on start — the tick-8 workspace staleness would have resolved itself; the SPEC staleness was the part that genuinely needed the re-plan.
 - **Fleet: 6 work agents live** — 1610 (final sequence item), 2445 (A13), 2377, 2665, 2829, 2831. Cap 20.
 - **B11=PAN-2233 still NOT started** — TENET-10/needs-handoff execution-mode question is with the operator (see tick 9). A8 prereq satisfied; Lane B slot free.
+
+## Tick 11 — 2026-07-17 ~13:35 — all 6 agents healthy and progressing; nothing to drive
+- **Main GREEN** (81033b9c6e). Live build c95b980d0d. Operator sequence items 1+2 remain COMPLETE (2822 + 2661 merged→deployed→closed out).
+- **All 6 work agents alive with real diffs** (read via pane, not liveness): 1610 `+363/-190` (compacting), 2445 working, 2377 `+263/-2` (+ review-supervisor at inspect), 2665 `+178/-0`, 2829 `+2/-2`, 2831 `+105/-10`. All review/test/verification `pending`, no PRs yet — normal mid-work. **Nothing stalled ⇒ nothing to drive this tick.** No PAN-2839 half-spawns recurred.
+- **`strike-pan-2840` is NOT mine — leave it alone.** `flywheelRunId: None` ⇒ operator-started (PAN-2840, "fix(state): task mutation stays locally terminal after overdeck-state ..."). Same posture as `strike-pan-1896`. **Check `flywheelRunId` before touching any strike session** — absent means operator-owned and exempt.
+- **B11=PAN-2233 still NOT started** — the TENET-10 execution-mode question (supervised `pan handoff` vs autonomous pickup) is with the operator since tick 9. A8=PAN-2297 prereq satisfied; Lane B slot free; B12=PAN-2190 → B13=PAN-2189 strictly serial after.
+- Reminder for whoever picks this up: ordering is **merge → redeploy → close out** (close-out's DoD deploy row fails if the merge postdates the live build), and when PAN-2377 lands, **migrate** the manual order book into the new feature rather than recreating it.
