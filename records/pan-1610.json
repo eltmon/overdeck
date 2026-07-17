@@ -75,19 +75,18 @@
     "recordedAt": "2026-07-17T16:23:03.495Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:23:03.497Z",
+  "updated": "2026-07-17T16:23:04.518Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:14:47.864Z",
+    "updatedAt": "2026-07-17T16:23:04.382Z",
     "reviewNotes": "Verification failed at frontend-typecheck",
-    "verificationNotes": "Verification FAILED at frontend-typecheck (19288ms):\n\nsrc/components/IssueActionMenu/GroupedIssueActionMenu.tsx(13,8): error TS6133: 'NonIssueActionInvocation' is declared but its value is never read.\nsrc/lib/issueActions.ts(223,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(234,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(245,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(256,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(267,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(278,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(289,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(300,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(311,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void\n…(1144 chars elided)…\nfined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(406,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(417,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(428,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.ts(439,26): error TS2322: Type 'void | \"\" | Promise<void> | undefined' is not assignable to type 'void | Promise<void>'.\n  Type 'string' is not assignable to type 'void | Promise<void>'.\nsrc/lib/issueActions.t\n...(truncated)",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "reviewRequestedAt": "2026-07-17T16:13:33.284Z",
@@ -178,9 +177,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 188201,
-            "output": 6788,
-            "cacheRead": 1201664,
+            "input": 861868,
+            "output": 18747,
+            "cacheRead": 3936256,
             "cacheWrite": 0
           }
         },
@@ -194,9 +193,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6752222,
-            "output": 490317,
-            "cacheRead": 105094656,
+            "input": 7124233,
+            "output": 500593,
+            "cacheRead": 109406208,
             "cacheWrite": 0
           }
         }
@@ -215,9 +214,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 6940423,
-          "output": 497105,
-          "cacheRead": 106296320,
+          "input": 7986101,
+          "output": 519340,
+          "cacheRead": 113342464,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -228,8 +227,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 115.337555,
-        "pricingAsOf": "2026-07-17T16:14:47.901Z"
+        "usd": 124.756067,
+        "pricingAsOf": "2026-07-17T16:23:04.442Z"
       }
     },
     "merges": [
