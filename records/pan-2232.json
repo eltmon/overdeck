@@ -77,17 +77,17 @@
     "recordedAt": "2026-07-17T02:59:42.835Z"
   },
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T04:40:38.429Z",
+  "updated": "2026-07-17T04:40:50.829Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T04:40:38.389Z",
+    "updatedAt": "2026-07-17T04:40:50.816Z",
     "inspectNotes": "All 7 functions moved byte-for-byte verbatim (verified via body-diff); only specialists.ts/specialists-spawn.ts touched; buildSpecialistBaseCommand + buildSpecialistCavemanExports re-exported, both existing test importers (specialist-resolve-harness.test.ts, specialists-caveman.test.ts) pass 13/13; resolveWorkspaceGitInfo/buildProviderExportLines/buildTmuxEnvFlags were pre-existing dead code before this move, unaffected.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2818",
     "scopeDrift": {
@@ -218,7 +218,7 @@
       },
       "costAtCloseOut": {
         "usd": 179.302388,
-        "pricingAsOf": "2026-07-17T04:40:38.422Z"
+        "pricingAsOf": "2026-07-17T04:40:50.823Z"
       }
     },
     "merges": [
