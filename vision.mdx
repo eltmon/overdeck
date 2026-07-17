@@ -199,9 +199,12 @@ here goes stale while the label stays true:
 
 The minimum bar underneath every criterion is **substrate-bug provenance + telemetry** (so the
 seven criteria can be measured at all) and **metric-aware prioritization** (so the bottleneck
-criterion bubbles to the top of the sequencer rather than P-level and age alone). The Flywheel
-and the backlog sequencer prioritize substrate-hardening epics first: a stable substrate is the
-prerequisite for everything else on the path.
+criterion bubbles to the top of the sequencer rather than P-level and age alone). Substrate bugs
+declare affected v1.0 criteria via the `Flywheel-Affects-Criterion` trailer; `pan flywheel weights --json`
+computes a per-bug weight from live telemetry, and the Flywheel orders substrate-hardening
+suggestions by that weight within the tier. See `docs/FLYWHEEL.md` for the trailer format and the
+weight model. The Flywheel and the backlog sequencer prioritize substrate-hardening epics first:
+a stable substrate is the prerequisite for everything else on the path.
 
 ## Open questions
 

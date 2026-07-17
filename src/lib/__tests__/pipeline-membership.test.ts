@@ -10,6 +10,8 @@ const sig = (over: Partial<IssueLensSignals>): IssueLensSignals => ({
   hasConventionBranch: false,
   branchUnmerged: false,
   phaseLabel: null,
+  hasVbriefSpec: false,
+  explicitlyReady: false,
   ...over,
 });
 
@@ -48,6 +50,49 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
     const r = resolvePipelineMembership(sig({ issueOpen: true }));
     expect(r.bucket).toBe('clean_terminal');
     expect(r.inPipeline).toBe(false);
+  });
+
+  it('planned_backlog: open issue with a vBRIEF spec but no branch or PR', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, hasVbriefSpec: true }));
+    expect(r.bucket).toBe('planned_backlog');
+    expect(r.inPipeline).toBe(true);
+  });
+
+  it('planned_backlog: open issue with only the explicit ready label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, explicitlyReady: true }));
+    expect(r.bucket).toBe('planned_backlog');
+    expect(r.inPipeline).toBe(true);
+  });
+
+  it('clean_terminal: closed issue with a vBRIEF spec and no open PR remains terminal', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: false, hasVbriefSpec: true }));
+    expect(r.bucket).toBe('clean_terminal');
+    expect(r.inPipeline).toBe(false);
+  });
+
+  it('label drift stale_present: closed issue retains an in-progress phase label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: false, phaseLabel: 'in-progress' }));
+    expect(r.bucket).toBe('clean_terminal');
+    expect(r.labelDrift).toBe('stale_present');
+  });
+
+  it('label drift stale_absent: open PR has no phase label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, hasOpenPr: true, phaseLabel: null }));
+    expect(r.bucket).toBe('in_flight');
+    expect(r.labelDrift).toBe('stale_absent');
+  });
+
+  it('closed zombie PR does not request a missing phase label', () => {
+    expect(resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true, phaseLabel: null })).labelDrift)
+      .toBeNull();
+    expect(resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true, phaseLabel: 'in-review' })).labelDrift)
+      .toBe('stale_present');
+  });
+
+  it('label drift absent: open PR has the in-review phase label', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: true, hasOpenPr: true, phaseLabel: 'in-review' }));
+    expect(r.bucket).toBe('in_flight');
+    expect(r.labelDrift).toBeNull();
   });
 
   it('squash-merge pairing: branch reads UNMERGED (L2) but a merged PR exists → post_merge_limbo, L1-merged wins', () => {

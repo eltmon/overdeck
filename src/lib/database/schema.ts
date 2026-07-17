@@ -1,8 +1,8 @@
 /**
  * Overdeck database schema for panopticon.db.
- * PAN-1249: migration steps still use raw try/catch because ALTER TABLE /
- * CREATE INDEX may legitimately fail on duplicate columns/indexes; typed
- * errors for non-migration paths remain deferred to PAN-447.
+ * PAN-1249: idempotent DDL tolerates duplicate columns/indexes while
+ * unexpected SQLite failures stop the migration ladder before user_version
+ * advances; typed errors for non-migration paths remain deferred to PAN-447.
  */
 import { existsSync, readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
@@ -12,6 +12,18 @@ import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
 export const SCHEMA_VERSION = 61;
+
+function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
+  try {
+    db.exec(statement);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/duplicate column name|already exists/i.test(message)) return;
+    console.error(`[schema] migration to v${targetVersion} failed: ${statement}\n${message}`);
+    throw error;
+  }
+}
+
 function parseArrayColumn(value: string | null): string[] {
   if (!value) return [];
   try {
@@ -367,6 +379,7 @@ export function initSchema(db: SqliteDatabase): void {
       filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
       discovered_in_issue_id TEXT,
       severity               TEXT NOT NULL DEFAULT 'P2',
+      affected_criteria      TEXT,
       status                 TEXT NOT NULL DEFAULT 'open',
       fix_merged_at          TEXT,
       fix_commit_sha         TEXT,
@@ -772,6 +785,9 @@ export function initSchema(db: SqliteDatabase): void {
 export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
+  if (currentVersion === SCHEMA_VERSION) {
+    tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+  }
   if (currentVersion >= SCHEMA_VERSION) {
     return; // Already at or ahead of this build's schema version
   }
@@ -800,11 +816,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // v2 → v3: add session_id to cost_events, extend processed_sessions for reconciler
   if (currentVersion < 3) {
     // Add session_id column to cost_events (nullable, no data loss)
-    try {
-      db.exec(`ALTER TABLE cost_events ADD COLUMN session_id TEXT`);
-    } catch {
-      // Column may already exist if schema was manually applied
-    }
+    tryIdempotentDdl(db, 3, `ALTER TABLE cost_events ADD COLUMN session_id TEXT`);
 
     // Add index on session_id
     db.exec(`
@@ -813,18 +825,10 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     `);
 
     // Extend processed_sessions with new columns for reconciler
-    try {
-      db.exec(`ALTER TABLE processed_sessions ADD COLUMN agent_id TEXT`);
-    } catch { /* already exists */ }
-    try {
-      db.exec(`ALTER TABLE processed_sessions ADD COLUMN issue_id TEXT`);
-    } catch { /* already exists */ }
-    try {
-      db.exec(`ALTER TABLE processed_sessions ADD COLUMN transcript_path TEXT`);
-    } catch { /* already exists */ }
-    try {
-      db.exec(`ALTER TABLE processed_sessions ADD COLUMN byte_offset INTEGER NOT NULL DEFAULT 0`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 3, `ALTER TABLE processed_sessions ADD COLUMN agent_id TEXT`);
+    tryIdempotentDdl(db, 3, `ALTER TABLE processed_sessions ADD COLUMN issue_id TEXT`);
+    tryIdempotentDdl(db, 3, `ALTER TABLE processed_sessions ADD COLUMN transcript_path TEXT`);
+    tryIdempotentDdl(db, 3, `ALTER TABLE processed_sessions ADD COLUMN byte_offset INTEGER NOT NULL DEFAULT 0`);
   }
 
   // v3 → v4: add events table for push-first architecture (PAN-428)
@@ -870,16 +874,12 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v6 → v7: add session_file column to conversations (PAN-451)
   if (currentVersion < 7) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN session_file TEXT`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 7, `ALTER TABLE conversations ADD COLUMN session_file TEXT`);
   }
 
   // v7 → v8: add title column to conversations (auto-set from first message)
   if (currentVersion < 8) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN title TEXT`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 8, `ALTER TABLE conversations ADD COLUMN title TEXT`);
   }
 
   // v8 → v9: add title_source and title_seed columns to conversations
@@ -888,48 +888,32 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // canReplaceThreadTitle logic — only auto-generated titles get AI replacement.
   // title_seed stores the original truncated message for replacement eligibility.
   if (currentVersion < 9) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN title_source TEXT`);
-    } catch { /* already exists */ }
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN title_seed TEXT`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 9, `ALTER TABLE conversations ADD COLUMN title_source TEXT`);
+    tryIdempotentDdl(db, 9, `ALTER TABLE conversations ADD COLUMN title_seed TEXT`);
   }
 
   // v9 → v10: add total_cost column to conversations (cached cost in USD)
   if (currentVersion < 10) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN total_cost REAL DEFAULT 0`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 10, `ALTER TABLE conversations ADD COLUMN total_cost REAL DEFAULT 0`);
   }
 
   // v10 → v11: expression index for UPPER(issue_id) on cost_events
   // The N+1 queries in getCostsByIssueFromDb use UPPER(issue_id) which defeats
   // the existing idx_cost_issue_id index. This expression index fixes that.
   if (currentVersion < 11) {
-    try {
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_cost_issue_upper ON cost_events(UPPER(issue_id))`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 11, `CREATE INDEX IF NOT EXISTS idx_cost_issue_upper ON cost_events(UPPER(issue_id))`);
   }
 
   // v11 → v12: archived_at column + index for conversations (T3Code pattern)
   if (currentVersion < 12) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN archived_at TEXT`);
-    } catch { /* already exists */ }
-    try {
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(archived_at)`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 12, `ALTER TABLE conversations ADD COLUMN archived_at TEXT`);
+    tryIdempotentDdl(db, 12, `CREATE INDEX IF NOT EXISTS idx_conversations_archived ON conversations(archived_at)`);
   }
 
   // v12 → v13: add model + effort columns to conversations (preserve model on resume)
   if (currentVersion < 13) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN model TEXT`);
-    } catch { /* already exists */ }
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN effort TEXT`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 13, `ALTER TABLE conversations ADD COLUMN model TEXT`);
+    tryIdempotentDdl(db, 13, `ALTER TABLE conversations ADD COLUMN effort TEXT`);
   }
 
   // v13 → v14: add merge_queue table (PAN-632: persistent merge serialization)
@@ -1042,19 +1026,13 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v17 → v18: add caveman_variant column to cost_events (PAN-611 A/B experiment tracking)
   if (currentVersion < 18) {
-    try {
-      db.exec(`ALTER TABLE cost_events ADD COLUMN caveman_variant TEXT`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 18, `ALTER TABLE cost_events ADD COLUMN caveman_variant TEXT`);
   }
 
   // v18 → v19: add fork_status/fork_error to conversations + create discovered_sessions tables
   if (currentVersion < 19) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN fork_status TEXT`);
-    } catch { /* already exists */ }
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 19, `ALTER TABLE conversations ADD COLUMN fork_status TEXT`);
+    tryIdempotentDdl(db, 19, `ALTER TABLE conversations ADD COLUMN fork_error TEXT`);
     db.exec(`
       CREATE TABLE IF NOT EXISTS discovered_sessions (
         id                INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1111,13 +1089,13 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   }
 
   // v19 → v20: add persistent stuck state columns to review_status (PAN-653)
-  // Each ALTER TABLE is wrapped in try/catch — SQLite requires separate statements
-  // per column and columns may pre-exist if a prior attempt partially ran.
+  // Each ALTER TABLE runs separately because columns may pre-exist if a prior
+  // migration attempt partially completed.
   if (currentVersion < 20) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_at TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN stuck_details TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 20, `ALTER TABLE review_status ADD COLUMN stuck INTEGER NOT NULL DEFAULT 0`);
+    tryIdempotentDdl(db, 20, `ALTER TABLE review_status ADD COLUMN stuck_reason TEXT`);
+    tryIdempotentDdl(db, 20, `ALTER TABLE review_status ADD COLUMN stuck_at TEXT`);
+    tryIdempotentDdl(db, 20, `ALTER TABLE review_status ADD COLUMN stuck_details TEXT`);
   }
 
   // v20 → v21: add git_operations table (PAN-653: persistent git event log)
@@ -1146,35 +1124,35 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // Stores the HEAD commit SHA at which review passed; deacon uses this to detect
   // new commits pushed after review and invalidate the approved status.
   if (currentVersion < 22) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN reviewed_at_commit TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 22, `ALTER TABLE review_status ADD COLUMN reviewed_at_commit TEXT`);
   }
 
   // v22 → v23: add merge_retry_count column to review_status (PAN-653)
   // Deacon's circuit breaker for failed-merge retries — must persist across restarts.
   if (currentVersion < 23) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 23, `ALTER TABLE review_status ADD COLUMN merge_retry_count INTEGER DEFAULT 0`);
   }
 
   // v23 → v24: add review_spawned_at and test_retry_count columns (PAN-699)
   // review_spawned_at: tracks when parallel review was dispatched for orphan detection
   // test_retry_count: circuit breaker for test-agent dispatch retries
   if (currentVersion < 24) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN review_spawned_at TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 24, `ALTER TABLE review_status ADD COLUMN review_spawned_at TEXT`);
+    tryIdempotentDdl(db, 24, `ALTER TABLE review_status ADD COLUMN test_retry_count INTEGER DEFAULT 0`);
   }
 
   // v24 → v25: add review_retry_count and recovery_started_at columns (PAN-794)
   // Circuit breaker for parallel-review re-dispatch loops + explicit cycle boundary.
   if (currentVersion < 25) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN review_retry_count INTEGER DEFAULT 0`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN recovery_started_at TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 25, `ALTER TABLE review_status ADD COLUMN review_retry_count INTEGER DEFAULT 0`);
+    tryIdempotentDdl(db, 25, `ALTER TABLE review_status ADD COLUMN recovery_started_at TEXT`);
   }
 
   // v25 → v26: add human-set deacon-ignore flag (per-issue opt-out of patrol).
   if (currentVersion < 26) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_at TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN deacon_ignored_reason TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 26, `ALTER TABLE review_status ADD COLUMN deacon_ignored INTEGER NOT NULL DEFAULT 0`);
+    tryIdempotentDdl(db, 26, `ALTER TABLE review_status ADD COLUMN deacon_ignored_at TEXT`);
+    tryIdempotentDdl(db, 26, `ALTER TABLE review_status ADD COLUMN deacon_ignored_reason TEXT`);
   }
 
   // v26 → v27: add app_settings table for persisted global flags.
@@ -1182,15 +1160,13 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // the dashboard comes up with Deacon frozen during the PAN-794 cutover. The
   // toggle in the UI flips it back to false when we're ready to let Deacon run.
   if (currentVersion < 27) {
-    try {
-      db.exec(`
-        CREATE TABLE IF NOT EXISTS app_settings (
-          key         TEXT PRIMARY KEY,
-          value       TEXT NOT NULL,
-          updated_at  TEXT NOT NULL
-        )
-      `);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 27, `
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key         TEXT PRIMARY KEY,
+        value       TEXT NOT NULL,
+        updated_at  TEXT NOT NULL
+      )
+    `);
     try {
       db.prepare(
         `INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`
@@ -1205,7 +1181,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // were restarted — the path could go stale while a new JSONL file was written.
   // Store the session UUID instead and compute the path on demand.
   if (currentVersion < 28) {
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN claude_session_id TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 28, `ALTER TABLE conversations ADD COLUMN claude_session_id TEXT`);
 
     const conversations = db
       .prepare(`SELECT id, session_file FROM conversations WHERE session_file IS NOT NULL`)
@@ -1222,44 +1198,42 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // v28 → v29: add composite index on conversations(status, archived_at, created_at)
   // for the kanban list query that filters by status + archived_at and orders by created_at.
   if (currentVersion < 29) {
-    try {
-      db.exec(`
-        CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
-          ON conversations(status, archived_at, created_at)
-      `);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 29, `
+      CREATE INDEX IF NOT EXISTS idx_conversations_status_archived_created
+        ON conversations(status, archived_at, created_at)
+    `);
   }
 
   // v29 → v30: add blocker_reasons column to review_status (PAN-905)
   if (currentVersion < 30) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 30, `ALTER TABLE review_status ADD COLUMN blocker_reasons TEXT`);
   }
 
   // v30 → v31: add pr_head_sha and pr_number for webhook PR identity validation (PAN-905)
   if (currentVersion < 31) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN pr_head_sha TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN pr_number INTEGER`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 31, `ALTER TABLE review_status ADD COLUMN pr_head_sha TEXT`);
+    tryIdempotentDdl(db, 31, `ALTER TABLE review_status ADD COLUMN pr_number INTEGER`);
   }
 
   // v31 → v32: add last_verified_commit and merge_step to review_status
   if (currentVersion < 32) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN last_verified_commit TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN merge_step TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 32, `ALTER TABLE review_status ADD COLUMN last_verified_commit TEXT`);
+    tryIdempotentDdl(db, 32, `ALTER TABLE review_status ADD COLUMN merge_step TEXT`);
   }
 
   // v32 → v33: persist harness used by conversations and forks (PAN-1055)
   if (currentVersion < 33) {
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN harness TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 33, `ALTER TABLE conversations ADD COLUMN harness TEXT`);
   }
 
   // v33 → v34: add delivery_method to conversations for channels/tmux toggle
   if (currentVersion < 34) {
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN delivery_method TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 34, `ALTER TABLE conversations ADD COLUMN delivery_method TEXT`);
   }
 
   // v34 → v35: add spawn_error column for background spawn failures (quota, auth, etc.)
   if (currentVersion < 35) {
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN spawn_error TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 35, `ALTER TABLE conversations ADD COLUMN spawn_error TEXT`);
   }
 
   // v35 → v36: ensure PAN-457 conversation discovery tables exist for upgraded databases
@@ -1356,10 +1330,10 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v39 → v40: add in-flight claim fields to transcript_checkpoints for atomic range reservation
   if (currentVersion < 40) {
-    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_owner TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_from INTEGER`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_to INTEGER`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 40, `ALTER TABLE transcript_checkpoints ADD COLUMN claim_owner TEXT`);
+    tryIdempotentDdl(db, 40, `ALTER TABLE transcript_checkpoints ADD COLUMN claim_from INTEGER`);
+    tryIdempotentDdl(db, 40, `ALTER TABLE transcript_checkpoints ADD COLUMN claim_to INTEGER`);
+    tryIdempotentDdl(db, 40, `ALTER TABLE transcript_checkpoints ADD COLUMN claim_expires_at TEXT`);
   }
 
   // v40 → v41: index discovered session UUIDs for archived-conversation enrichment joins
@@ -1372,9 +1346,9 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v41 → v42: add handoff fork artifact and fallback metadata to conversations
   if (currentVersion < 42) {
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN handoff_doc_path TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN handoff_target_conv_id INTEGER`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 42, `ALTER TABLE conversations ADD COLUMN handoff_doc_path TEXT`);
+    tryIdempotentDdl(db, 42, `ALTER TABLE conversations ADD COLUMN handoff_target_conv_id INTEGER`);
+    tryIdempotentDdl(db, 42, `ALTER TABLE conversations ADD COLUMN fork_fallback_reason TEXT`);
   }
 
   // v42 → v43: track post-/clear sibling relationship for Claude Code conversations (PAN-1458).
@@ -1382,11 +1356,9 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   // background orphan detector in conversation-lifecycle.ts creates a sibling conversation row
   // for the new JSONL and links the parent via this column. UI can then surface the boundary.
   if (currentVersion < 43) {
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN cleared_to_conv_id INTEGER`); } catch { /* already exists */ }
-    try {
-      db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
+    tryIdempotentDdl(db, 43, `ALTER TABLE conversations ADD COLUMN cleared_to_conv_id INTEGER`);
+    tryIdempotentDdl(db, 43, `CREATE INDEX IF NOT EXISTS idx_conversations_cleared_to
                  ON conversations(cleared_to_conv_id) WHERE cleared_to_conv_id IS NOT NULL`);
-    } catch { /* already exists */ }
   }
 
   // v43 → v44: add Flywheel pending auto-merge schedule table (PAN-1486)
@@ -1454,6 +1426,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
         filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
         discovered_in_issue_id TEXT,
         severity               TEXT NOT NULL DEFAULT 'P2',
+        affected_criteria      TEXT,
         status                 TEXT NOT NULL DEFAULT 'open',
         fix_merged_at          TEXT,
         fix_commit_sha         TEXT,
@@ -1499,22 +1472,20 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v47 → v48: cache total token throughput on conversations (PAN: conversation token display)
   if (currentVersion < 48) {
-    try {
-      db.exec(`ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 48, `ALTER TABLE conversations ADD COLUMN total_tokens INTEGER DEFAULT 0`);
   }
 
   // v48 → v49: persist per-bead inspect status metadata for watchdogs (PAN-1616)
   if (currentVersion < 49) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_status TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 49, `ALTER TABLE review_status ADD COLUMN inspect_status TEXT`);
+    tryIdempotentDdl(db, 49, `ALTER TABLE review_status ADD COLUMN inspect_notes TEXT`);
+    tryIdempotentDdl(db, 49, `ALTER TABLE review_status ADD COLUMN inspect_started_at TEXT`);
+    tryIdempotentDdl(db, 49, `ALTER TABLE review_status ADD COLUMN inspect_bead_id TEXT`);
   }
 
   // v49 → v50: add per-issue auto_merge routing key to review_status (PAN-1691)
   if (currentVersion < 50) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 50, `ALTER TABLE review_status ADD COLUMN auto_merge INTEGER`);
   }
 
   // v50 → v51: uat_generations chain for UAT batch trains (PAN-1737)
@@ -1544,22 +1515,20 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v51 → v52: mark UAT generation artifacts as cleaned after branch/worktree cleanup (PAN-1737)
   if (currentVersion < 52) {
-    try { db.exec(`ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 52, `ALTER TABLE uat_generations ADD COLUMN cleaned_at TEXT`);
   }
 
   // v52 → v53: persist fork pipeline restart recovery parameters (PAN-1744)
   if (currentVersion < 53) {
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_request TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 53, `ALTER TABLE conversations ADD COLUMN fork_request TEXT`);
+    tryIdempotentDdl(db, 53, `ALTER TABLE conversations ADD COLUMN fork_retry_count INTEGER NOT NULL DEFAULT 0`);
   }
 
   // v53 → v54: persist conflict-resolution dispatch throttles (PAN-1765)
   //             and add forge column to pending_auto_merges (PAN-1887)
   if (currentVersion < 54) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`); } catch { /* already exists */ }
-    try {
-      db.exec(`ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
-    } catch { /* already exists */ }
+    tryIdempotentDdl(db, 54, `ALTER TABLE review_status ADD COLUMN conflict_resolution_dispatched_at TEXT`);
+    tryIdempotentDdl(db, 54, `ALTER TABLE pending_auto_merges ADD COLUMN forge TEXT NOT NULL DEFAULT 'github'`);
   }
 
   // v54 → v55: add authoritative agents runtime registry (PAN-1908)
@@ -1682,15 +1651,15 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v57 -> v58: record the harness that produced each discovered session.
   if (currentVersion < 58 && db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'discovered_sessions'`).get()) {
-    try { db.exec(`ALTER TABLE discovered_sessions ADD COLUMN harness TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 58, `ALTER TABLE discovered_sessions ADD COLUMN harness TEXT`);
     db.exec(`UPDATE discovered_sessions SET harness = 'claude-code' WHERE harness IS NULL`);
   }
 
   // v58 -> v59: PAN-2507 preemptive scheduler yield attribution on agents.
   if (currentVersion < 59) {
-    try { db.exec(`ALTER TABLE agents ADD COLUMN yielded_by_scheduler INTEGER`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE agents ADD COLUMN yielded_at TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE agents ADD COLUMN last_yield_resume_at TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 59, `ALTER TABLE agents ADD COLUMN yielded_by_scheduler INTEGER`);
+    tryIdempotentDdl(db, 59, `ALTER TABLE agents ADD COLUMN yielded_at TEXT`);
+    tryIdempotentDdl(db, 59, `ALTER TABLE agents ADD COLUMN last_yield_resume_at TEXT`);
   }
 
   // v59 -> v60: add release set tables for coordinated post-merge release state (PAN-399).
@@ -1730,11 +1699,26 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
     `);
   }
 
-  if (currentVersion < 61) for (const column of ['strike_ready_head TEXT', 'strike_ready_at TEXT', 'strike_landing_state TEXT', 'strike_recovery_count INTEGER DEFAULT 0', 'strike_landing_attempts TEXT']) try { db.exec(`ALTER TABLE review_status ADD COLUMN ${column}`); } catch { /* already exists */ }
+  if (currentVersion < 61) {
+    for (const column of [
+      'strike_ready_head TEXT',
+      'strike_ready_at TEXT',
+      'strike_landing_state TEXT',
+      'strike_recovery_count INTEGER DEFAULT 0',
+      'strike_landing_attempts TEXT',
+    ]) {
+      tryIdempotentDdl(db, 61, `ALTER TABLE review_status ADD COLUMN ${column}`);
+    }
+  }
   // v59 -> v60: add release status columns to review_status.
   if (currentVersion < 60) {
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN release_status TEXT`); } catch { /* already exists */ }
-    try { db.exec(`ALTER TABLE review_status ADD COLUMN release_notes TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 60, `ALTER TABLE review_status ADD COLUMN release_status TEXT`);
+    tryIdempotentDdl(db, 60, `ALTER TABLE review_status ADD COLUMN release_notes TEXT`);
+  }
+
+  // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
+  if (currentVersion < 61) {
+    tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
   }
 
   // After all migrations, set the version

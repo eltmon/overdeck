@@ -1,3 +1,5 @@
+import type { IssuePipelineMembership } from '@overdeck/contracts';
+
 export type {
   AgentHealthSnapshot as AgentHealth,
   SystemHealthConsumer,
@@ -52,6 +54,7 @@ export interface Issue {
   planningComplete?: boolean;
   workspacePath?: string;
   taskCounts?: { completed: number; total: number } | null;
+  pipelineMembership?: IssuePipelineMembership;
 }
 
 export interface GitStatus {

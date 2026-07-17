@@ -22,8 +22,16 @@ import {
 import { resolveLiveFlywheelRunId, saveRunCohort } from '../../dashboard/server/services/flywheel-run-state.js';
 import { buildClassifyLookups } from '../backlog/lookups.js';
 import { computeCohort } from '../backlog/pickup.js';
+import { gatherProjectLensSignals } from '../pipeline-membership-gather.js';
+import { resolvePipelineMembership, type PipelineMembership } from '../pipeline-membership.js';
 
 export const FLYWHEEL_ORCHESTRATOR_AGENT_ID = 'flywheel-orchestrator';
+
+export function isIssueInResolvedPipeline(issueId: string, memberships: PipelineMembership[]): boolean {
+  return memberships.some((membership) =>
+    membership.issueId.toUpperCase() === issueId.toUpperCase() && membership.inPipeline,
+  );
+}
 
 const FlywheelRunIdSchema = Schema.String.check(Schema.isPattern(/^RUN-\d+$/));
 const decodeFlywheelRunId = Schema.decodeUnknownSync(FlywheelRunIdSchema);
@@ -142,7 +150,6 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
 
           const projectRoot = process.cwd();
           const specsDir = join(projectRoot, '.pan', 'specs');
-          const workspacesDir = join(projectRoot, 'workspaces');
           const issuesWithSpecs = new Set<string>();
           const declaredFootprints: IssueFileFootprint[] = [];
           if (existsSync(specsDir)) {
@@ -160,16 +167,21 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
               }
             }
           }
+          const projectConfig = findProjectByPathSync(projectRoot);
           const predictedConflictSignals = computePredictedConflictSignals(declaredFootprints, {
-            hotspots: getProjectSwarmHotspots(findProjectByPathSync(projectRoot)),
+            hotspots: getProjectSwarmHotspots(projectConfig),
           });
           const isReadyOrHasPrd = (issueId: string): boolean => {
             const id = issueId.toUpperCase();
             if (issuesWithSpecs.has(id)) return true;
             return existsSync(join(projectRoot, '.pan', 'drafts', `${id}.md`));
           };
+          const membershipAvailable = Boolean(projectConfig?.github_repo);
+          const memberships = projectConfig?.github_repo
+            ? (await gatherProjectLensSignals(projectConfig)).map(resolvePipelineMembership)
+            : [];
           const isInPipeline = (issueId: string): boolean =>
-            existsSync(join(workspacesDir, `feature-${issueId.toLowerCase()}`));
+            membershipAvailable ? isIssueInResolvedPipeline(issueId, memberships) : true;
 
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
@@ -177,7 +189,10 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true, autoPickupBacklog: options.autoPickupBacklog, predictedConflictSignals });
           let nextLine: string;
           let pickInstruction: string;
-          if (!nextPick) {
+          if (!membershipAvailable) {
+            nextLine = 'MEMBERSHIP UNAVAILABLE: project has no GitHub repository; auto-pickup is disabled';
+            pickInstruction = '\n\nIMPORTANT: Canonical pipeline membership is unavailable for this project. Do NOT auto-start backlog work; surface the missing github_repo configuration to the operator.';
+          } else if (!nextPick) {
             nextLine = 'No eligible issue found in sequence — fall back to normal priority';
             pickInstruction = '';
           } else if (nextPick.planning === 'interactive') {

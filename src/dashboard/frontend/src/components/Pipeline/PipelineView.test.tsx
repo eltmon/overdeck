@@ -132,6 +132,94 @@ describe('PipelineView', () => {
     expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(6);
   });
 
+  it('keeps phase derivation unchanged when server membership is attached', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-10',
+        title: 'Merged but still open',
+        state: 'in_review',
+        pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const reviewPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="review"]') as HTMLElement;
+    expect(within(reviewPhase).getByText('Merged but still open')).toBeInTheDocument();
+  });
+
+  it('excludes open clean-terminal issues before lane derivation and metric counting', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-11',
+        title: 'Stale open work',
+        state: 'in_progress',
+        pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.queryByText('Stale open work')).not.toBeInTheDocument();
+    const activeTile = screen.getByText('Active issues').closest('[data-component="metric-tile"]') as HTMLElement;
+    expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
+  });
+
+  it('excludes completed issues when membership is missing', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({ identifier: 'PAN-14', title: 'Completed without residue', state: 'completed' })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.queryByText('Completed without residue')).not.toBeInTheDocument();
+    const activeTile = screen.getByText('Active issues').closest('[data-component="metric-tile"]') as HTMLElement;
+    expect(activeTile.querySelector('[data-component="metric-tile-value"]')).toHaveTextContent('0');
+  });
+
+  it('falls back to tracker state when membership is unavailable', () => {
+    useDashboardStore.setState({
+      issuesRaw: [
+        issue({
+          identifier: 'PAN-15', title: 'Open while unavailable', state: 'in_progress',
+          pipelineMembership: { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null },
+        }),
+        issue({
+          identifier: 'PAN-16', title: 'Closed while unavailable', state: 'completed',
+          pipelineMembership: { available: false, inPipeline: false, bucket: 'clean_terminal', labelDrift: null },
+        }),
+      ],
+      reviewStatusByIssueId: {}, agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    renderPipelineView();
+
+    expect(screen.getByText('Open while unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('Closed while unavailable')).not.toBeInTheDocument();
+  });
+
+  it('renders an explicitly ready issue admitted by canonical membership in the Ready lane', () => {
+    useDashboardStore.setState({
+      issuesRaw: [issue({
+        identifier: 'PAN-12',
+        title: 'Explicitly ready work',
+        labels: ['ready'],
+        pipelineMembership: { inPipeline: true, bucket: 'planned_backlog', labelDrift: null },
+      })],
+      reviewStatusByIssueId: {},
+      agentsById: {},
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+
+    const { container } = renderPipelineView();
+    const readyPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="ready"]') as HTMLElement;
+    expect(within(readyPhase).getByText('Explicitly ready work')).toBeInTheDocument();
+  });
+
   it('sorts rows within each phase by priority rank then updatedAt descending', () => {
     const { container } = renderPipelineView();
     const workPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="work"]') as HTMLElement;

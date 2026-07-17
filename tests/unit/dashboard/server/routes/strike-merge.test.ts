@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { activeStrikeMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
+import { activeStrikeMerge, mergeCompletionStatus, normalMergeEligibility, parseStrikeMergeRequest, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
 import type { ReviewStatus } from '../../../../../src/lib/review-status.js';
 
 const markerHead = 'a'.repeat(40);
@@ -31,6 +31,12 @@ function git(remoteHead = markerHead) {
 }
 
 describe('strike merge-door eligibility', () => {
+  it('accepts only complete strike transport requests', () => {
+    expect(parseStrikeMergeRequest(request)).toEqual(request);
+    expect(parseStrikeMergeRequest({ ...request, markerHead: undefined })).toBeNull();
+    expect(parseStrikeMergeRequest({ kind: 'normal' })).toBeNull();
+  });
+
   it('clears a queued strike marker at canonical merge completion', () => {
     expect(mergeCompletionStatus(request)).toEqual({ strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
     expect(mergeCompletionStatus({ kind: 'normal' })).toEqual({});

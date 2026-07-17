@@ -124,6 +124,8 @@ CREATE INDEX `cost_issue_idx` ON `cost_events` (`issue_id`);--> statement-breakp
 CREATE INDEX `cost_ts_idx` ON `cost_events` (`ts`);--> statement-breakpoint
 CREATE INDEX `cost_session_id_idx` ON `cost_events` (`session_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `cost_request_id_idx` ON `cost_events` (`request_id`) WHERE request_id IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `idx_cost_agent_id` ON `cost_events` (`agent_id`,`ts`);--> statement-breakpoint
+CREATE INDEX `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`));--> statement-breakpoint
 CREATE TABLE `events` (
 	`sequence` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`type` text NOT NULL,
@@ -519,6 +521,7 @@ CREATE TABLE `flywheel_substrate_bugs` (
 	`filed_by` text NOT NULL,
 	`discovered_in_issue_id` text,
 	`severity` text NOT NULL DEFAULT 'P2',
+	`affected_criteria` text,
 	`status` text NOT NULL DEFAULT 'open',
 	`fix_merged_at` integer,
 	`fix_commit_sha` text,

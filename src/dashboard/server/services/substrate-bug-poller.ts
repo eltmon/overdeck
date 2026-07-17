@@ -9,6 +9,7 @@ import {
   type FlywheelSubstrateBug,
   type FlywheelSubstrateBugFiledBy,
 } from '../../../lib/overdeck/flywheel-substrate-bugs.js';
+import { parseAffectedCriteria } from '../../../lib/overdeck/affected-criteria.js';
 
 type Severity = 'P0' | 'P1' | 'P2';
 
@@ -230,6 +231,8 @@ export function createSubstrateBugPoller(options: SubstrateBugPollerOptions = {}
           if (!issueId) continue;
           const trailer = parseSubstrateBugTrailer(issue.body);
           const filedBy = trailer.filedBy ?? (issue.user?.login === BOT_LOGIN ? 'agent' : 'operator');
+          const labelNames = (issue.labels ?? []).map((label) => typeof label === 'string' ? label : label.name ?? '');
+          const affectedCriteria = parseAffectedCriteria(issue.body, labelNames);
           const existing = repository.getByIssueId(issueId);
           const bug = repository.upsert({
             issueId,
@@ -238,6 +241,7 @@ export function createSubstrateBugPoller(options: SubstrateBugPollerOptions = {}
             filedBy,
             discoveredInIssueId: trailer.discoveredIn ?? null,
             severity: severityFromLabels(issue.labels),
+            affectedCriteria,
             updatedAt: issue.updated_at ?? now().toISOString(),
           });
           if (!existing) await appendSubstrateBugFiledEvent(store, bug);

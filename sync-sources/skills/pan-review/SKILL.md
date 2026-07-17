@@ -36,12 +36,11 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
 
 ## What each subcommand does
 
-- **`pending`** — Lists every issue whose work agent has signaled `done` but
-  whose review pipeline hasn't completed (in-flight, blocked, or stalled).
-  This is the first command to run when you want to know "what's waiting on
-  me right now?" `--ready` lists SQLite-backed issues ready for merge;
-  `--blocked` lists SQLite-backed review/test/merge blockers with their
-  blocker kind.
+- **`pending`** — Uses durable pipeline membership as the issue universe, then
+  shows review state as an annotation. The default view lists pending reviews
+  plus `zombie_pr` and `post_merge_limbo` drift; with no pending review rows it
+  still prints the resolver-derived pipeline set. `--ready` and `--blocked`
+  preserve their review/test/merge meanings, filtered to pipeline members.
 - **`request <id>`** — After fixing the issues a reviewer flagged, this
   re-triggers the review pipeline against the current branch state. Use this
   when the worker has committed fixes and you want the existing review pass

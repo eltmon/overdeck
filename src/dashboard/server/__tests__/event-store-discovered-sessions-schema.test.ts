@@ -67,16 +67,13 @@ describe('event-store database startup schema', () => {
   it('migrates v57 discovered_sessions rows by adding and backfilling harness idempotently', () => {
     const db = openDatabase(':memory:');
     try {
+      runMigrations(db);
       db.exec(`
-        CREATE TABLE discovered_sessions (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          jsonl_path TEXT NOT NULL UNIQUE,
-          scanned_at TEXT NOT NULL
-        );
+        ALTER TABLE discovered_sessions DROP COLUMN harness;
         INSERT INTO discovered_sessions (jsonl_path, scanned_at)
         VALUES ('/legacy/claude.jsonl', '2026-07-02T00:00:00.000Z');
+        PRAGMA user_version = 57;
       `);
-      db.pragma('user_version = 57');
 
       runMigrations(db);
       runMigrations(db);

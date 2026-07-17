@@ -22,6 +22,10 @@ function makeTestHome(prefix: string): string {
   return testHome;
 }
 
+function initializeCurrentSchema(db: SqliteDatabase): void {
+  runMigrations(db);
+}
+
 describe('pending auto-merges schema', { timeout: 30_000 }, () => {
   it('uses current schema version and creates pending_auto_merges on fresh init', () => {
     makeTestHome('pan-pending-auto-merges-fresh');
@@ -81,15 +85,10 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
     const home = makeTestHome('pan-events-stats-indexes-migrate');
     const db = openDatabase(join(home, 'panopticon.db'));
     try {
+      initializeCurrentSchema(db);
       db.exec(`
-        CREATE TABLE events (
-          sequence  INTEGER PRIMARY KEY AUTOINCREMENT,
-          type      TEXT    NOT NULL,
-          timestamp TEXT    NOT NULL,
-          payload   TEXT    NOT NULL
-        );
-        CREATE INDEX idx_events_type ON events(type);
-        CREATE INDEX idx_events_timestamp ON events(timestamp);
+        DROP INDEX idx_events_issue_type_timestamp_sequence;
+        DROP INDEX idx_events_type_timestamp_issue_sequence;
         PRAGMA user_version = 46;
       `);
 
@@ -110,23 +109,11 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
     const home = makeTestHome('pan-pending-auto-merges-v44-indexes');
     const db = openDatabase(join(home, 'panopticon.db'));
     try {
+      initializeCurrentSchema(db);
       db.exec(`
-        CREATE TABLE pending_auto_merges (
-          id               INTEGER PRIMARY KEY AUTOINCREMENT,
-          issueId          TEXT NOT NULL,
-          prUrl            TEXT NOT NULL,
-          prNumber         INTEGER,
-          projectKey       TEXT NOT NULL,
-          "status"         TEXT NOT NULL CHECK ("status" IN ('pending','merging','blocked','failed','merged','cancelled')),
-          scheduledMergeAt TEXT NOT NULL,
-          scheduledAt      TEXT NOT NULL,
-          mergedAt         TEXT,
-          failureReason    TEXT,
-          cancelledAt      TEXT,
-          cancelledBy      TEXT
-        );
-        CREATE UNIQUE INDEX idx_pending_auto_merges_active_issue
-          ON pending_auto_merges(issueId) WHERE "status" IN ('pending','merging');
+        DROP INDEX idx_pending_auto_merges_due_pending;
+        DROP INDEX idx_pending_auto_merges_actionable_issue;
+        DROP INDEX idx_pending_auto_merges_actionable_schedule;
         PRAGMA user_version = 44;
       `);
 
@@ -148,12 +135,9 @@ describe('pending auto-merges schema', { timeout: 30_000 }, () => {
     const home = makeTestHome('pan-pending-auto-merges-migrate');
     const db = openDatabase(join(home, 'panopticon.db'));
     try {
+      initializeCurrentSchema(db);
       db.exec(`
-        CREATE TABLE app_settings (
-          key        TEXT PRIMARY KEY,
-          value      TEXT NOT NULL,
-          updated_at TEXT NOT NULL
-        );
+        DROP TABLE pending_auto_merges;
         INSERT INTO app_settings (key, value, updated_at)
           VALUES ('sentinel', 'kept', '2026-05-25T09:00:00.000Z');
         PRAGMA user_version = 43;

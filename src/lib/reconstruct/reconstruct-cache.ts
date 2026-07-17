@@ -255,25 +255,7 @@ function isIssueClosed(issue: {
 async function loadInFlightIssueIds(
   projects: ProjectConfig[],
 ): Promise<Set<string>> {
-  const { getSharedIssueService, startSharedIssueService } = await import(
-    '../../dashboard/server/services/issue-service-singleton.js'
-  );
-  const issueService = getSharedIssueService();
-  await startSharedIssueService({ skipPolling: true });
-
-  const issues = issueService.getIssues({ includeCompleted: true });
-  const openIssueIds = new Set<string>();
-  for (const issue of issues) {
-    if (!issue || typeof issue !== 'object') continue;
-    const item = issue as { identifier?: unknown; id?: unknown };
-    const issueId = normalizeIssueId(item.identifier) ?? normalizeIssueId(item.id);
-    if (!issueId) continue;
-    if (!isIssueClosed(issue as any)) {
-      openIssueIds.add(issueId);
-    }
-  }
-
-  return enumerateInFlightIssuesFromSources(projects, openIssueIds);
+  return enumerateInFlightIssuesFromSources(projects);
 }
 
 async function fetchPrState(

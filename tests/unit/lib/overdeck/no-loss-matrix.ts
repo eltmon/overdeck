@@ -264,6 +264,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/flywheel/uat-generations/:name/promote',    kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.promoteUat' },
   { surface: 'POST /api/flywheel/assemble-uat',                     kind: 'http', disposition: 'WRITE',       door: 'MergeWriter.assembleUat' },
   { surface: 'GET /api/flywheel/state',                             kind: 'http', disposition: 'AGGREGATE',   door: 'SettingsResolver.getFlywheelRuntime + run-state' },
+  { surface: 'GET /api/flywheel/substrate-bug-weights',             kind: 'http', disposition: 'AGGREGATE',   door: 'SubstrateBugWeightsService.listSubstrateBugWeights + FlywheelStats' },
 
   // ── hooks.ts ──────────────────────────────────────────────────────────────
   { surface: 'POST /api/memory/inject',                   kind: 'http', disposition: 'READ',        door: 'MemoryResolver.injectPromptTime' },
@@ -295,6 +296,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/issues/:id/discussions',                     kind: 'http', disposition: 'RELOCATE',    door: 'live GitHub' },
   { surface: 'GET /api/issues/:id/costs',                           kind: 'http', disposition: 'RELOCATE',    door: 'CostResolver.issueDetail' },
   { surface: 'GET /api/issues/resource-allocated',                  kind: 'http', disposition: 'READ',        door: 'IssuesResolver.list({resourceAllocated:true})' },
+  { surface: 'GET /api/pipeline/membership',                        kind: 'http', disposition: 'READ',        door: 'PipelineMembershipService.getCached()' },
   { surface: 'GET /api/issues/:id/resource-details',                kind: 'http', disposition: 'AGGREGATE',   door: 'IssuesResolver.get + AgentsResolver' },
   { surface: 'POST /api/issues/:id/start-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("planning")' },
   { surface: 'POST /api/issues/:id/abort-planning',                 kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("todo","abort-planning") + AgentWriter.stop' },

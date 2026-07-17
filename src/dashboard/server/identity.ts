@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { cwd } from 'node:process';
 import { relative, resolve, sep } from 'node:path';
 
@@ -26,9 +26,36 @@ export function isWorkspaceRepoRoot(repoRoot: string): boolean {
   return /(^|\/)workspaces\/feature-[^/]+$/i.test(repoRoot.replaceAll('\\', '/'));
 }
 
+export function isLinkedWorktreeRoot(repoRoot: string): boolean {
+  try {
+    return statSync(resolve(repoRoot, '.git')).isFile();
+  } catch {
+    return false;
+  }
+}
+
+export function primaryRootFromLinkedWorktree(repoRoot: string): string | null {
+  try {
+    const match = readFileSync(resolve(repoRoot, '.git'), 'utf-8').match(/^gitdir:\s*(.+)$/m);
+    const gitDir = match?.[1]?.trim().replaceAll('\\', '/');
+    if (!gitDir) return null;
+
+    const worktreeMarker = '/.git/worktrees/';
+    const markerIndex = gitDir.indexOf(worktreeMarker);
+    return markerIndex === -1 ? null : gitDir.slice(0, markerIndex);
+  } catch {
+    return null;
+  }
+}
+
 function isSameOrInside(parent: string, candidate: string): boolean {
   const rel = relative(resolve(parent), resolve(candidate));
   return rel === '' || (!rel.startsWith('..') && !rel.startsWith(sep));
+}
+
+export function isNonPrimaryCheckoutRoot(repoRoot: string): boolean {
+  const resolvedRoot = resolve(repoRoot);
+  return isLinkedWorktreeRoot(resolvedRoot) || isWorkspaceRepoRoot(resolvedRoot);
 }
 
 export function readHostDashboardApiPort(defaultPort = 3011): number {
@@ -61,8 +88,7 @@ export function shouldRefuseHostDashboardPort(input: {
     return false;
   }
   if (input.mode === 'peer') return true;
-
-  if (isWorkspaceRepoRoot(repoRoot)) return true;
+  if (isNonPrimaryCheckoutRoot(repoRoot)) return true;
 
   const workspacesDir = resolve(repoRoot, '..');
   return workspacesDir.endsWith(`${sep}workspaces`) && isSameOrInside(workspacesDir, repoRoot);

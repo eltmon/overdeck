@@ -19,10 +19,14 @@ import { Effect } from 'effect';
 
 import chalk from 'chalk';
 import { execFileSync, spawn } from 'child_process';
-import { dirname, join, parse, resolve } from 'path';
+import { dirname, join, parse, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, mkdirSync } from 'fs';
-import { isWorkspaceRepoRoot } from '../../dashboard/server/identity.js';
+import {
+  isNonPrimaryCheckoutRoot,
+  isWorkspaceRepoRoot,
+  primaryRootFromLinkedWorktree,
+} from '../../dashboard/server/identity.js';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
@@ -80,14 +84,22 @@ export function resolveGitRepoRoot(cwd: string): string | null {
   }
 }
 
-function refuseWorkspaceDashboardRestart(cwd: string): boolean {
-  const repoRoot = resolveGitRepoRoot(cwd);
-  if (!repoRoot || !isWorkspaceRepoRoot(repoRoot)) return false;
+export function refuseNonPrimaryDashboardCwd(cwd: string, verb: string): boolean {
+  if (existsSync('/.dockerenv')) return false;
 
-  const primaryRepoRoot = dirname(dirname(repoRoot));
+  const repoRoot = resolveGitRepoRoot(cwd);
+  if (!repoRoot) return false;
+
+  const isWorkspace = isWorkspaceRepoRoot(repoRoot);
+  if (!isNonPrimaryCheckoutRoot(repoRoot)) return false;
+
+  const primaryRepoRoot = primaryRootFromLinkedWorktree(repoRoot) ??
+    (isWorkspace ? dirname(dirname(repoRoot)) : null);
+  const primaryGuidance = primaryRepoRoot
+    ? ` Run this command from the primary checkout at ${primaryRepoRoot}.`
+    : '';
   console.error(chalk.red(
-    `Refusing to restart the host dashboard from workspace checkout ${repoRoot}. ` +
-      `Run this command from the primary checkout at ${primaryRepoRoot}.`,
+    `Refusing to ${verb} the host dashboard from non-primary checkout ${repoRoot}.${primaryGuidance}`,
   ));
   process.exitCode = 2;
   return true;
@@ -107,6 +119,14 @@ type DashboardBundleCandidate = {
 function dashboardBundleCandidates(): DashboardBundleCandidate[] {
   const currentDir = dirname(fileURLToPath(import.meta.url));
   return [
+    {
+      // Code-split CLI chunk living directly in dist/ (tsdown chunk layout can
+      // place this module at dist/<chunk>.js — PAN-2820: all relative-parent
+      // candidates missed and pan restart stopped the server then failed to
+      // respawn it).
+      path: join(currentDir, 'dashboard', 'server.js'),
+      preferred: currentDir.endsWith(sep + 'dist'),
+    },
     {
       path: join(currentDir, '..', 'dashboard', 'server.js'),
       preferred: currentDir.endsWith(join('dist', 'cli')),
@@ -138,6 +158,13 @@ export function resolveBundledServerPath(): string {
     ?? candidates[0].path;
 }
 
+export function resolvePrimaryDashboardIdentity(): { repoRoot: string; mode: 'primary' } {
+  return {
+    repoRoot: resolve(resolveBundledServerPath(), '..', '..', '..'),
+    mode: 'primary',
+  };
+}
+
 function searchedBundlePaths(): string[] {
   return uniqueBundleCandidates().map(candidate => candidate.path);
 }
@@ -167,15 +194,17 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
     PORT: String(config.dashboardApiPort),
     OVERDECK_MODE: 'production',
   };
+  const identity = resolvePrimaryDashboardIdentity();
 
   // PAN-2804: a plain detached spawn stays in the INVOKER's cgroup — a
   // watchdog-spawned dashboard dies when overdeck-supervisor.service restarts,
   // and a conversation/flywheel-spawned one dies with that tmux pane's scope.
   // Run the server in its own transient systemd unit (same isolation the
   // shared tmux server gets, PAN-1798) so its lifecycle belongs to nobody.
-  if (spawnDashboardSystemdUnit(serverPath, fullEnv)) return;
+  if (spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot)) return;
 
   const child = spawn(resolveNode22(), [serverPath], {
+    cwd: identity.repoRoot,
     detached: true,
     stdio: openDashboardLogStdio(),
     env: fullEnv,
@@ -190,7 +219,11 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
 /** Valid systemd --setenv names; skips exported bash functions etc. */
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-function spawnDashboardSystemdUnit(serverPath: string, fullEnv: Record<string, string | undefined>): boolean {
+function spawnDashboardSystemdUnit(
+  serverPath: string,
+  fullEnv: Record<string, string | undefined>,
+  repoRoot: string,
+): boolean {
   if (process.platform !== 'linux') return false;
   try {
     mkdirSync(dirname(DASHBOARD_LOG_FILE), { recursive: true });
@@ -207,7 +240,7 @@ function spawnDashboardSystemdUnit(serverPath: string, fullEnv: Record<string, s
         `--property=StandardOutput=append:${DASHBOARD_LOG_FILE}`,
         `--property=StandardError=append:${DASHBOARD_LOG_FILE}`,
         // /api/health identity derives repoRoot from the server's cwd; keep it.
-        `--property=WorkingDirectory=${process.cwd()}`,
+        `--property=WorkingDirectory=${repoRoot}`,
         ...setenvArgs,
         resolveNode22(), serverPath,
       ],
@@ -256,7 +289,7 @@ export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = pr
 export async function restartCommand(options: RestartOptions): Promise<void> {
   const startedAt = Date.now();
   const scope = resolveScope(options);
-  if ((scope === 'dashboard' || scope === 'full') && refuseWorkspaceDashboardRestart(process.cwd())) {
+  if ((scope === 'dashboard' || scope === 'full') && refuseNonPrimaryDashboardCwd(process.cwd(), 'restart')) {
     return;
   }
   const config = readPlatformConfigSync();
@@ -322,7 +355,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
         await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
-          expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+          expectedIdentity: resolvePrimaryDashboardIdentity(),
         }));
         await recordRestartStatus(startedAt, true);
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
@@ -439,7 +472,7 @@ async function runFullRestart(
   spawnDashboardDetached(config, opts.bootGateOptions);
   await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
-    expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+    expectedIdentity: resolvePrimaryDashboardIdentity(),
   }));
 
   try {

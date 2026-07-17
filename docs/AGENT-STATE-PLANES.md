@@ -9,7 +9,7 @@ Durable portable state is committed through domain writers to the orphan
 `overdeck-state` branch in a dedicated worktree at
 `${OVERDECK_HOME}/state/<projectKey>`:
 
-- `specs/` — immutable vBRIEF content; only lifecycle status changes.
+- `specs/` — canonical vBRIEF content. Work and task operations change only lifecycle status; explicit re-planning may replace the document at its stable filename through the spec writer.
 - `drafts/` — PRD narrative.
 - `records/` and `continues/` — per-issue decisions, hazards, progress,
   verdicts, ownership, and close-out.

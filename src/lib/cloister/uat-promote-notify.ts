@@ -20,7 +20,10 @@ function buildPromoteNudge(result: Extract<PromoteResult, { success: true }>): s
   const members = result.members.length > 0 ? result.members.join(', ') : '(no members recorded)';
   return (
     `The operator just promoted UAT generation ${result.generation} to main at ${result.mergeSha}. ` +
-    `Run a fresh Observe->Act loop NOW. Re-derive activePipeline from current source of truth and EXCLUDE ` +
+    `Run a fresh Observe->Act loop NOW. Fetch GET /api/registered-projects, then for every returned ` +
+    `project key call GET /api/pipeline/membership?project=<URL-encoded-project-key>. Combine the responses ` +
+    `and re-derive activePipeline from only rows where inPipeline === true; clean_terminal rows are audit-only ` +
+    `and excluded. EXCLUDE ` +
     `the merged member(s): ${members}. Re-assemble a clean UAT batch with only members that are currently ` +
     `review+test passed, close out the promoted issue(s), emit a fresh status snapshot, and re-arm the next ` +
     `tick. Do NOT ask the operator a question, do NOT pause, and do NOT reuse the stale pre-promote ready set.`

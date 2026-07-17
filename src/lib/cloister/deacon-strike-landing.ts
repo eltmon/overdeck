@@ -9,6 +9,7 @@ import { messageAgent } from '../agents/messaging.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import type { StrikeLandingAttempt } from '../strike-landing.js';
+import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 const execFileAsync = promisify(execFile);
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
@@ -16,11 +17,38 @@ export interface StrikeMergeRequest {
 
 export interface StrikeMergeResult { success: boolean; mergeStatus?: string; error?: string }
 type StrikeMergeTrigger = (issueId: string, request: StrikeMergeRequest) => Promise<StrikeMergeResult>;
-let strikeMergeTrigger: StrikeMergeTrigger | null = null;
-let strikeOwnershipProbe: ((issueId: string) => boolean) | null = null;
 
-export function registerStrikeMergeTrigger(trigger: StrikeMergeTrigger): void { strikeMergeTrigger = trigger; }
-export function registerStrikeOwnershipProbe(probe: (issueId: string) => boolean): void { strikeOwnershipProbe = probe; }
+function internalDashboardUrl(): string {
+  const port = Number.parseInt(process.env.API_PORT ?? process.env.PORT ?? '3011', 10);
+  return process.env.OVERDECK_INTERNAL_DASHBOARD_URL ?? `http://127.0.0.1:${port}`;
+}
+
+export async function requestStrikeMerge(
+  issueId: string,
+  request: StrikeMergeRequest,
+  options: { dashboardUrl?: string; token?: string; fetchImpl?: typeof fetch } = {},
+): Promise<StrikeMergeResult> {
+  const dashboardUrl = options.dashboardUrl ?? internalDashboardUrl();
+  const token = options.token ?? ensureInternalTokenSync();
+  const fetchImpl = options.fetchImpl ?? fetch;
+  try {
+    const response = await fetchImpl(new URL(`/api/internal/strikes/${issueId}/merge`, dashboardUrl), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: dashboardUrl,
+        [INTERNAL_TOKEN_HEADER]: token,
+      },
+      body: JSON.stringify(request),
+    });
+    const body = await response.json() as StrikeMergeResult;
+    return typeof body.success === 'boolean'
+      ? body
+      : { success: false, error: `Strike merge endpoint returned HTTP ${response.status} without a structured result` };
+  } catch (error) {
+    return { success: false, error: `Strike merge request failed: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
 
 export interface StrikeLandingDeps {
   loadStatuses: () => Record<string, ReviewStatus>;
@@ -64,9 +92,7 @@ function defaultDeps(): StrikeLandingDeps {
     getStatus: getReviewStatusSync,
     setStatus: setReviewStatusSync,
     resolveProject: resolveProjectFromIssueSync,
-    mergeIssue: async (issueId, request) => strikeMergeTrigger
-      ? strikeMergeTrigger(issueId, request)
-      : { success: false, error: 'Strike merge trigger is not registered' },
+    mergeIssue: requestStrikeMerge,
     getMainHead: async (projectPath) => (await execFileAsync('git', ['rev-parse', 'origin/main'], { cwd: projectPath, encoding: 'utf8' })).stdout.trim(),
     deliverRecovery: (agentId, message) => messageAgent(agentId, message, 'deacon-strike-landing', { owesRework: true }),
     writeFeedback: async (issueId, workspacePath, markdownBody) => (await Effect.runPromise(writeFeedbackFile({ issueId, workspacePath, specialist: 'merge-agent', outcome: 'needs-you', summary: 'Strike landing needs operator attention', markdownBody }))).success,
@@ -74,7 +100,7 @@ function defaultDeps(): StrikeLandingDeps {
     now: () => new Date().toISOString(),
     schedule: (key, work) => strikeLandingSupervisor.enqueue(key, work),
     isScheduled: key => strikeLandingSupervisor.has(key),
-    isPersistentlyOwned: issueId => strikeOwnershipProbe?.(issueId) ?? false,
+    isPersistentlyOwned: () => false,
   };
 }
 

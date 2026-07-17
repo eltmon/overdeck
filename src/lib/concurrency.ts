@@ -1,4 +1,6 @@
-import { Effect } from 'effect';function withConcurrencyLimitPromise<T>(
+import { Effect } from 'effect';
+
+export function withConcurrencyLimitPromise<T>(
   tasks: Array<() => Promise<T>>,
   max: number,
 ): Promise<T[]> {
@@ -33,6 +35,47 @@ import { Effect } from 'effect';function withConcurrencyLimitPromise<T>(
     }
 
     next();
+  });
+}
+
+interface SettledTtlEntry<T> {
+  promise: Promise<T>;
+  settledAt: number | null;
+}
+
+/** Cache settled values for a TTL while preserving single-flight for pending work regardless of age. */
+export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => number = Date.now) {
+  const entries = new Map<K, SettledTtlEntry<V>>();
+  return (key: K, load: () => Promise<V>): Promise<V> => {
+    const cached = entries.get(key);
+    if (cached && (cached.settledAt === null || now() - cached.settledAt < ttlMs)) return cached.promise;
+
+    const entry: SettledTtlEntry<V> = { promise: load(), settledAt: null };
+    entries.set(key, entry);
+    entry.promise.then(
+      () => { entry.settledAt = now(); },
+      () => { if (entries.get(key) === entry) entries.delete(key); },
+    );
+    return entry.promise;
+  };
+}
+
+/** Schedule promise work through one limiter shared by every caller of the returned function. */
+export function createPromiseConcurrencyLimiter(max: number) {
+  let active = 0;
+  const queue: Array<() => void> = [];
+  const drain = () => {
+    while (active < max && queue.length > 0) queue.shift()!();
+  };
+  return <T>(task: () => Promise<T>): Promise<T> => new Promise<T>((resolve, reject) => {
+    queue.push(() => {
+      active++;
+      task().then(resolve, reject).finally(() => {
+        active--;
+        drain();
+      });
+    });
+    drain();
   });
 }
 
