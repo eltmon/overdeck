@@ -354,15 +354,7 @@
       "timestamp": "2026-07-17T05:55:13.180Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T05:55:13Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1897\n\n# Review Synthesis — PAN-1897 — 2026-07-17\n\n## Verdict: CHANGES REQUESTED\n\n## Context\n\n- Branch: `feature/pan-1897`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1897`\n- HEAD reviewed: `f388395039506627228eab2b4f522a36475508e6`\n- Current merge base: `ce55a292cc52f68afc7bac7d9f8926148da780d3`\n- Prior reviewed HEAD: `684416cbccdeb9175820d4bf4a3854594ca03618`\n- Review source: `.pan/review/agent-pan-1897-review-f3883950/review.md`\n- Manifest: `.pan/review/agent-pan-1897-review-f3883950/context.json`\n- The workspace has later uncommitted edits, which were excluded; every finding below was re-checked against committed HEAD `f3883950`.\n\nThe cycle diff after the prior verdict contains only merges from `origin/main`, so this synthesis introduces no finding from unrelated mainline code. The findings below are unresolved requested changes already raised against PR-owned code; they are carried forward rather than newly promoted.\n\n## Blocking Findings\n\n### [correctness / security / requirements] Symbolic links bypass the migration no-loss and cleanup boundary — `src/cli/commands/admin/state-migrate.ts:180-221`, `src/cli/commands/admin/state-migrate.ts:443-447`, `src/lib/state-migration-manifest.ts:5-10`\n\n`copyLegacyState()` copies symbolic links but does not add them to the manifest. Verification and source cleanup operate only on manifest entries, so migration can preserve an absolute target into the legacy `.pan` tree, delete that target, write the completion marker, and finish with a broken canonical link. Relative links that escape the migrated subtree can also resolve somewhere different after relocation, while host-repository source links remain outside cleanup accounting.\n\nThis is a destructive-boundary data-integrity defect and violates the migration's no-loss requirement. Represent and verify link type and target, including validity after cleanup, or reject links before mutation. Add a focused test that proves an invalid post-cleanup link prevents source deletion and completion.\n\n### [performance / requirements] The state-writer flush still falls outside the 60-second reconciliation bound — `src/cli/commands/admin/state-migrate.ts:305-312`, `src/lib/pan-dir/auto-commit.ts:325-345`, `src/lib/pan-dir/auto-commit.ts:367-388`\n\nThe prior flush finding is partially resolved: individual state-writer Git operations and each `doBoundedCommit()` now have deadlines. The committed migration still awaits `flushAutoCommits(repo)` without the preparation `AbortSignal`, and a queued flush waits on `serializers.get(gitRoot)` before `doBoundedCommit()` starts. That serializer wait is outside the 60-second flush timeout.\n\nWhen another project-root flush for the same Git checkout is ahead in the serializer, reconciliation can wait for the full preceding queue and then its own bounded commit. The 60-second prep timer aborts its controller, but `state-reconcile` uses `awaitQuiescence: true`, so `pan start` continues waiting for the uncancellable flush. Queue growth makes the delay arbitrarily exceed the advertised per-step budget even though each individual Git subprocess is bounded.\n\nInclude serializer wait in one end-to-end flush deadline and make the wait observe the reconciliation signal while preserving safe quiescence. Cover both an active flush and a caller queued behind another flush with fake-timer tests.\n\n### [performance / requirements] Synchronous full-file copies still freeze reconciliation timers — `src/cli/commands/admin/state-migrate.ts:92-113`, `src/cli/commands/admin/state-migrate.ts:372-395`\n\nThe exact prior `cpSync({ recursive: true })` mechanism is resolved: recursive legacy-state traversal now uses asynchronous `readdir()` and an abort-aware stream pipeline. The current head still copies every tracked state path with `copyFileSync()` and compares or copies untracked notes with whole-file `readFileSync()` and `copyFileSync()`.\n\nThese operations run in the same 60-second reconciliation phase. While a large file or slow filesystem call is executing, Node cannot run the deadline timer or 15-second heartbeat, and the operation cannot observe the abort signal. The tracked path list is recursively derived with `git ls-tree -r`, so total synchronous work scales with migrated state, while one large file can exceed the complete budget before cancellation runs.\n\nUse the existing abort-aware temporary-file pipeline for tracked files and untracked notes, and use streaming comparison or hashing instead of whole-file synchronous reads. Add fake-timer coverage proving the timer fires and active copy settles on abort.\n\n## Dimension Summary\n\n- **Correctness / logic:** Changes requested because migration can finalize broken canonical symbolic links while verification passes.\n- **Security:** No separate command-injection or privilege-escalation issue was found. The symbolic-link path remains a security-relevant integrity failure at a destructive migration boundary.\n- **Requirements / acceptance criteria:** The traced per-step budget and fail-fast behavior are not met by the state-writer serializer wait or remaining synchronous copy paths. The no-loss migration requirement is also unmet for symbolic links. The manifest contains no standalone acceptance-criteria list, so this review used the supplied FR/NFR traces and documented behavior.\n- **Performance:** The former unbounded Git subprocesses and recursive `cpSync()` were improved, but the end-to-end flush queue and remaining synchronous file operations still let state reconciliation exceed its 60-second budget.\n\n## Resolved or Clean Areas\n\n- Abort-aware recursive regular-file copying now uses a temporary destination, stream cancellation, atomic rename, and partial-output cleanup.\n- State-migration Git subprocesses have explicit deadlines and process-tree termination.\n- Manifest hashing is streaming rather than whole-file buffered.\n- No new PR-owned performance, security, or correctness issue was introduced by the main-only cycle diff.\n\n## Required Changes\n\n1. Put symbolic links inside the no-loss verification and cleanup contract, or reject them before mutation.\n2. Bound the complete state-writer flush, including serializer queue wait, and make reconciliation cancellation observable without detaching live durability work.\n3. Replace the remaining synchronous tracked-state and note copies/comparisons with abort-aware asynchronous operations.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-f3883950/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1897 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -424,23 +416,23 @@
     "recordedAt": "2026-07-17T05:45:07.089Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T06:08:01.468Z",
+  "updated": "2026-07-17T06:08:02.128Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T06:08:01.450Z",
+    "updatedAt": "2026-07-17T06:08:02.083Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "d1fe4426c3c18aa7fc6c32b3102330757d71c2f3",
     "reviewRequestedAt": "2026-07-17T05:45:37.346Z",
-    "reviewSpawnedAt": "2026-07-17T05:53:08.151Z",
+    "reviewSpawnedAt": "2026-07-17T06:08:02.082Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -627,7 +619,7 @@
       },
       "costAtCloseOut": {
         "usd": 497.767812,
-        "pricingAsOf": "2026-07-17T06:08:01.464Z"
+        "pricingAsOf": "2026-07-17T06:08:02.111Z"
       }
     },
     "merges": [
