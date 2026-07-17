@@ -16,6 +16,7 @@ import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
 import { getAgentStateSync, saveAgentStateSync } from '../agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
+import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { checkPrdGateSync, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
@@ -91,7 +92,7 @@ export interface CompletePlanningAutoSpawnResult {
   workAgentSpawned: boolean;
   workAgentSession?: string;
   workAgentError?: string;
-  workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'spawn-failed';
+  workAgentSkipReason?: 'stack-unhealthy' | 'guardrails' | 'paused' | 'troubled' | 'unauthorized' | 'spawn-failed';
 }
 
 type CompletePlanningPhase = 'prdGate' | 'beadsMaterialize' | 'specWrite' | 'autoSpawn' | 'terminal';
@@ -268,11 +269,19 @@ function getInternalDashboardOrigin(): string {
 
 function classifyAutoSpawnSkip(status: number, body: Record<string, unknown>): NonNullable<CompletePlanningAutoSpawnResult['workAgentSkipReason']> {
   const error = typeof body['error'] === 'string' ? body['error'] : '';
+  if (status === 401 || status === 403) return 'unauthorized';
   if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
   if (body['paused'] === true) return 'paused';
   if (body['troubled'] === true) return 'troubled';
   if (body['guardrails'] || body['requiresAcknowledgement'] === true || status === 409) return 'guardrails';
   return 'spawn-failed';
+}
+
+export function resolveCompletePlanningTerminalStatus(
+  autoSpawnRequested: boolean,
+  autoSpawnResult: CompletePlanningAutoSpawnResult | null,
+): CompletePlanningPhaseStatus {
+  return autoSpawnRequested && autoSpawnResult?.workAgentSpawned !== true ? 'failure' : 'success';
 }
 
 export async function completePlanningAutoSpawn(options: {
@@ -287,6 +296,8 @@ export async function completePlanningAutoSpawn(options: {
   }
 
   const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
+  const internalToken = getInternalTokenSync();
+  const internalTokenHeaders = internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {};
   emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'start', 'posting work-agent spawn request', { dashboardOrigin });
   try {
     const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
@@ -294,6 +305,7 @@ export async function completePlanningAutoSpawn(options: {
       headers: {
         'content-type': 'application/json',
         origin: dashboardOrigin,
+        ...internalTokenHeaders,
       },
       body: JSON.stringify({ issueId: options.issueId, role: 'work' }),
     });
@@ -319,7 +331,7 @@ export async function completePlanningAutoSpawn(options: {
         new URL(`/api/workspaces/${encodeURIComponent(options.issueId)}/rebuild-and-start`, dashboardOrigin),
         {
           method: 'POST',
-          headers: { origin: dashboardOrigin },
+          headers: { origin: dashboardOrigin, ...internalTokenHeaders },
         },
       );
       const recoveryBody = await recovery.json().catch(() => ({})) as Record<string, unknown>;
@@ -705,7 +717,7 @@ export async function completePlanningForIssue(options: {
       skipKill,
       sessionName,
     });
-    emitCompletePlanningPhase(id, 'terminal', 'success', autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
+    emitCompletePlanningPhase(id, 'terminal', resolveCompletePlanningTerminalStatus(effectiveAutoSpawn, autoSpawnResult), autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
       autoSpawn: effectiveAutoSpawn,
       workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
       workAgentSkipReason: autoSpawnResult?.workAgentSkipReason,
