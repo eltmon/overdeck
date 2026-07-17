@@ -2,7 +2,7 @@
   "issueId": "PAN-2665",
   "schemaVersion": 2,
   "created": "2026-07-17T12:54:12.069Z",
-  "updated": "2026-07-17T13:02:20.653Z",
+  "updated": "2026-07-17T13:02:21.610Z",
   "pipeline": {
     "issueId": "PAN-2665",
     "reviewStatus": "pending",
@@ -37,5 +37,6 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-fable-5"
+  "model": "claude-fable-5",
+  "workModel": "gpt-5.6-sol"
 }
