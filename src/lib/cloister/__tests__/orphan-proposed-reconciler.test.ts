@@ -28,6 +28,10 @@ const childProcessMocks = vi.hoisted(() => ({
   }),
 }));
 
+const internalTokenMocks = vi.hoisted(() => ({
+  getInternalTokenSync: vi.fn(() => 'test-internal-token'),
+}));
+
 vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return { ...actual, exec: childProcessMocks.exec };
@@ -35,6 +39,11 @@ vi.mock('child_process', async (importOriginal) => {
 
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: activityLogger.emitActivityEntrySync,
+}));
+
+vi.mock('../../internal-token.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../internal-token.js')>(),
+  getInternalTokenSync: internalTokenMocks.getInternalTokenSync,
 }));
 
 vi.mock('../../review-status.js', () => ({
@@ -70,6 +79,7 @@ vi.mock('../../tasks/presence.js', () => ({
   },
 }));
 
+import { INTERNAL_TOKEN_HEADER } from '../../internal-token.js';
 import {
   clearOrphanProposedAttemptCooldowns,
   findOrphanProposedSpecsForReconciler,
@@ -585,8 +595,21 @@ describe('orphan proposed spec reconciler', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe('http://127.0.0.1:3011/api/agents');
     expect(init?.method).toBe('POST');
-    expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
+    expect(init?.headers).toMatchObject({
+      origin: 'http://127.0.0.1:3011',
+      [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+    });
     expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-3301', role: 'work' });
+  });
+
+  it('classifies unauthorized spawn responses explicitly', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 })));
+
+    await expect(spawnWorkAgentThroughAgentsEndpoint('PAN-3301', 'http://127.0.0.1:3011')).resolves.toEqual({
+      spawned: false,
+      skippedReason: 'unauthorized',
+      error: 'unauthorized',
+    });
   });
 
   // PAN-2520: the deacon dead-end path invokes rebuild-and-start when a respawn
@@ -601,7 +624,10 @@ describe('orphan proposed spec reconciler', () => {
     const [url, init] = fetchMock.mock.calls[0];
     expect(String(url)).toBe('http://127.0.0.1:3011/api/workspaces/PAN-3301/rebuild-and-start');
     expect(init?.method).toBe('POST');
-    expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
+    expect(init?.headers).toMatchObject({
+      origin: 'http://127.0.0.1:3011',
+      [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+    });
   });
 
   it('reports a failed rebuild-and-start without throwing', async () => {

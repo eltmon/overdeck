@@ -1,8 +1,19 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+const internalTokenMocks = vi.hoisted(() => ({
+  getInternalTokenSync: vi.fn(() => 'test-internal-token'),
+}));
+
+vi.mock('../../../../lib/internal-token.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../../../../lib/internal-token.js')>(),
+  getInternalTokenSync: internalTokenMocks.getInternalTokenSync,
+}));
+
+import { INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import {
   beginCompletePlanningLease,
   completePlanningArtifacts,
@@ -10,6 +21,7 @@ import {
   completePlanningAutoSpawnAndKill,
   completePlanningFilesToStage,
   completePlanningWorkspaceGitAddCommands,
+  resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
 import { applyStatusOverrides } from '../../../../lib/vbrief/io.js';
 import { lintPlanQuality, PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
@@ -384,7 +396,10 @@ describe('completePlanningArtifacts', () => {
     const fetchImpl: typeof fetch = async (input, init) => {
       expect(String(input)).toBe('http://127.0.0.1:3011/api/agents');
       expect(init?.method).toBe('POST');
-      expect(init?.headers).toMatchObject({ origin: 'http://127.0.0.1:3011' });
+      expect(init?.headers).toMatchObject({
+        origin: 'http://127.0.0.1:3011',
+        [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+      });
       expect(JSON.parse(String(init?.body))).toEqual({ issueId: 'PAN-1146', role: 'work' });
       return new Response(JSON.stringify({ success: true, agentId: 'agent-pan-1146' }), { status: 200 });
     };
@@ -400,10 +415,30 @@ describe('completePlanningArtifacts', () => {
     });
   });
 
+  it('classifies unauthorized auto-spawn responses and fails the terminal phase', async () => {
+    const result = await completePlanningAutoSpawn({
+      issueId: 'PAN-1146',
+      autoSpawn: true,
+      dashboardOrigin: 'http://127.0.0.1:3011',
+      fetchImpl: async (_input, init) => {
+        expect(init?.headers).toMatchObject({ [INTERNAL_TOKEN_HEADER]: 'test-internal-token' });
+        return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
+      },
+    });
+
+    expect(result).toEqual({
+      workAgentSpawned: false,
+      workAgentError: 'unauthorized',
+      workAgentSkipReason: 'unauthorized',
+    });
+    expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
+  });
+
   it('rebuilds the stack and starts work when the initial auto-spawn finds no healthy stack', async () => {
     const requests: string[] = [];
-    const fetchImpl: typeof fetch = async (input) => {
+    const fetchImpl: typeof fetch = async (input, init) => {
       requests.push(String(input));
+      expect(init?.headers).toMatchObject({ [INTERNAL_TOKEN_HEADER]: 'test-internal-token' });
       if (String(input).endsWith('/api/agents')) {
         return new Response(JSON.stringify({
           success: false,
