@@ -3,15 +3,15 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T19:47:29.273Z",
-  "updated": "2026-07-17T02:42:52.556Z",
+  "updated": "2026-07-17T02:42:53.027Z",
   "pipeline": {
     "issueId": "PAN-2795",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "failed",
+    "mergeStatus": "merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:42:52.542Z",
+    "updatedAt": "2026-07-17T02:42:52.987Z",
     "mergeNotes": "Work agent did not push the rebased branch within 30 minutes",
     "strikeReadyHead": "586375f586961a69dde9d78f514fc93aec047966",
     "strikeReadyAt": "2026-07-17T02:42:13.740Z",
@@ -56,7 +56,7 @@
       },
       "costAtCloseOut": {
         "usd": 41.793117,
-        "pricingAsOf": "2026-07-17T02:42:52.548Z"
+        "pricingAsOf": "2026-07-17T02:42:53.020Z"
       }
     },
     "merges": [],
