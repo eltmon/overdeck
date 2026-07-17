@@ -6,6 +6,7 @@ import {
   AgentSnapshot,
   ReviewStatusSnapshot,
   type AgentHealthSnapshot,
+  type SpecialistLifecycle,
 } from '@overdeck/contracts';
 import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -16,10 +17,10 @@ import {
   type AgentHealthRuntimeState,
 } from '../../../../lib/agents/health.js';
 import {
-  isRoleTerminal,
+  classifyAdvancingSessionLifecycle,
   type AdvancingRole,
-  type ReapableStatus,
-} from '../../../../lib/cloister/reap-terminal-sessions.js';
+  type WarmIdleStatusShape,
+} from '../../../../lib/cloister/review-status-source.js';
 import { getOverdeckHome } from '../../../../lib/paths.js';
 import { listSessionNames } from '../../../../lib/tmux.js';
 import { checkAgentHealth } from '../../../lib/health-filtering.js';
@@ -141,8 +142,8 @@ function runtimeHealthState(
   }
 }
 
-function decodeReviewStatuses(value: readonly unknown[] | undefined): Map<string, ReapableStatus> {
-  const statuses = new Map<string, ReapableStatus>();
+function decodeReviewStatuses(value: readonly unknown[] | undefined): Map<string, WarmIdleStatusShape> {
+  const statuses = new Map<string, WarmIdleStatusShape>();
   for (const candidate of value ?? []) {
     const decoded = Schema.decodeUnknownResult(ReviewStatusSnapshot)(candidate);
     if (decoded._tag === 'Success') {
@@ -154,14 +155,17 @@ function decodeReviewStatuses(value: readonly unknown[] | undefined): Map<string
 
 function reviewLifecycle(
   agent: typeof AgentSnapshot.Type,
-  statuses: ReadonlyMap<string, ReapableStatus>,
-): 'active' | 'warm' | 'unknown' {
+  statuses: ReadonlyMap<string, WarmIdleStatusShape>,
+  tmuxActive: boolean,
+): SpecialistLifecycle {
   if (agent.role !== 'review' && agent.role !== 'test' && agent.role !== 'ship') {
     return 'unknown';
   }
-  const status = statuses.get(agent.issueId.toUpperCase());
-  if (!status) return 'unknown';
-  return isRoleTerminal(agent.role as AdvancingRole, status) ? 'warm' : 'active';
+  return classifyAdvancingSessionLifecycle(
+    agent.role as AdvancingRole,
+    statuses.get(agent.issueId.toUpperCase()),
+    tmuxActive,
+  );
 }
 
 function snapshotSource(value: unknown): HealthAgentsRouteSnapshot {
@@ -239,7 +243,11 @@ async function projectAgentHealth(
       },
       runtime: runtimeHealthState(runtime),
       liveSessions,
-      reviewLifecycle: reviewLifecycle(agent, reviewStatuses),
+      reviewLifecycle: reviewLifecycle(
+        agent,
+        reviewStatuses,
+        liveSessions.has(agent.id),
+      ),
       observations,
       nowMs,
     });

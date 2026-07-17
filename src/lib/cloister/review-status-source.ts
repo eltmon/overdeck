@@ -12,12 +12,50 @@
  * the ceiling stays conservative.
  */
 
-/** Minimal status shape needed for warm-idle classification (mirrors ReapableStatus). */
+/** Minimal status shape needed for advancing-session lifecycle classification. */
 export interface WarmIdleStatusShape {
   reviewStatus?: string;
   testStatus?: string;
   readyForMerge?: boolean;
   mergeStatus?: string;
+}
+
+export type AdvancingRole = 'review' | 'test' | 'ship';
+export type AdvancingSessionLifecycle = 'active' | 'warm' | 'orphaned' | 'unknown';
+
+const TERMINAL_REVIEW: ReadonlySet<string> = new Set(['passed', 'failed', 'blocked']);
+const TERMINAL_TEST: ReadonlySet<string> = new Set(['passed', 'failed']);
+
+export function isRoleTerminal(
+  role: AdvancingRole,
+  status: WarmIdleStatusShape,
+): boolean {
+  switch (role) {
+    case 'review':
+      return TERMINAL_REVIEW.has(status.reviewStatus ?? '');
+    case 'test':
+      return TERMINAL_TEST.has(status.testStatus ?? '');
+    case 'ship':
+      return status.readyForMerge === true
+        || status.mergeStatus === 'merged'
+        || status.mergeStatus === 'failed';
+  }
+}
+
+export function classifyAdvancingSessionLifecycle(
+  role: AdvancingRole,
+  status: WarmIdleStatusShape | null | undefined,
+  tmuxActive: boolean,
+): AdvancingSessionLifecycle {
+  if (!status || !tmuxActive) return 'unknown';
+  if (status.mergeStatus === 'merged') return 'orphaned';
+  return isRoleTerminal(role, status) ? 'warm' : 'active';
+}
+
+export function isAdvancingLifecycleReclaimable(
+  lifecycle: AdvancingSessionLifecycle,
+): boolean {
+  return lifecycle === 'orphaned';
 }
 
 type StatusMapReader = () => Record<string, WarmIdleStatusShape>;

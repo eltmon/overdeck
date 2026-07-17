@@ -50,7 +50,7 @@ export interface ClassifyAgentHealthInput {
   persisted: ResolvedPersistedAgentHealthState;
   runtime: AgentHealthRuntimeState | null;
   liveSessions: ReadonlySet<string>;
-  reviewLifecycle?: 'active' | 'warm' | 'unknown';
+  reviewLifecycle?: SpecialistLifecycle;
   observations?: AgentHealthObservations;
   nowMs: number;
 }
@@ -103,7 +103,9 @@ function lifecycleFor(
   input: ClassifyAgentHealthInput,
   state: PersistedAgentHealthState,
 ): SpecialistLifecycle {
-  if (input.reviewLifecycle === 'warm') return 'warm';
+  if (input.reviewLifecycle === 'warm' || input.reviewLifecycle === 'orphaned') {
+    return input.reviewLifecycle;
+  }
   if (input.liveSessions.has(input.agentId) && !intentionalInactive(state)) return 'active';
   return input.reviewLifecycle ?? 'unknown';
 }
@@ -204,7 +206,7 @@ export function classifyAgentHealth(
   }
 
   if (
-    input.reviewLifecycle === 'warm'
+    (input.reviewLifecycle === 'warm' || input.reviewLifecycle === 'orphaned')
     || input.runtime?.state === 'idle'
     || input.runtime?.state === 'suspended'
     || input.runtime?.state === 'stopped'

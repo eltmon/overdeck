@@ -7,7 +7,7 @@
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { Effect } from 'effect';
-import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
+import type { AgentRuntimeSnapshot, SpecialistLifecycle } from '@overdeck/contracts';
 import { getRuntimeSnapshot } from '../../lib/agent-runtime-mirror.js';
 import {
   classifyAgentHealth,
@@ -16,10 +16,9 @@ import {
   type ResolvedPersistedAgentHealthState,
 } from '../../lib/agents/health.js';
 import {
-  isRoleTerminal,
-  type AdvancingRole,
-} from '../../lib/cloister/reap-terminal-sessions.js';
-import { readReviewStatusMap } from '../../lib/cloister/review-status-source.js';
+  classifyAdvancingSessionLifecycle,
+  readReviewStatusMap,
+} from '../../lib/cloister/review-status-source.js';
 import { capturePane, sessionExists } from '../../lib/tmux.js';
 
 /**
@@ -72,15 +71,18 @@ function runtimeHealthState(
 
 function reviewLifecycle(
   state: PersistedAgentHealthState,
-): 'active' | 'warm' | 'unknown' {
+  tmuxActive: boolean,
+): SpecialistLifecycle {
   const role = state.role;
   if (role !== 'review' && role !== 'test' && role !== 'ship') return 'unknown';
   if (!state.issueId) return 'unknown';
   const statuses = readReviewStatusMap();
   if (!statuses) return 'unknown';
-  const status = statuses[state.issueId.toUpperCase()];
-  if (!status) return 'unknown';
-  return isRoleTerminal(role as AdvancingRole, status) ? 'warm' : 'active';
+  return classifyAdvancingSessionLifecycle(
+    role,
+    statuses[state.issueId.toUpperCase()],
+    tmuxActive,
+  );
 }
 
 async function resolvePersistedState(
@@ -133,7 +135,7 @@ export const determineHealthStatus = (
     const persisted = yield* Effect.promise(() => resolvePersistedState(stateFile));
     const runtime = yield* getRuntimeSnapshot(agentId);
     const lifecycle = persisted.status === 'available'
-      ? reviewLifecycle(persisted.value)
+      ? reviewLifecycle(persisted.value, liveSessions.has(agentId))
       : 'unknown';
     const snapshot = classifyAgentHealth({
       agentId,

@@ -3,7 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { cpus, freemem, loadavg, totalmem, platform } from 'node:os';
 import { promisify } from 'node:util';
 
-import type { DashboardSnapshot, HealthReason, HealthState } from '@overdeck/contracts';
+import type {
+  DashboardSnapshot,
+  HealthReason,
+  HealthState,
+  SpecialistLifecycle,
+} from '@overdeck/contracts';
 
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
@@ -13,6 +18,10 @@ import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
 import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
+import {
+  classifyAdvancingSessionLifecycle,
+  type WarmIdleStatusShape,
+} from '../../../lib/cloister/review-status-source.js';
 import { getBuildInfo } from '../../../lib/deploy/build-info.js';
 import {
   SYSTEM_HEALTH_DEFAULTS,
@@ -64,8 +73,10 @@ interface ProcessRow {
 export interface HealthAgentProcess {
   id: string;
   issueId: string;
+  role?: string;
   kind: 'work' | 'planning' | 'specialist' | 'other';
   status: AgentState['status'];
+  lifecycle: SpecialistLifecycle;
   tmuxActive: boolean;
   memoryBytes: number;
   memoryGb: number;
@@ -454,25 +465,14 @@ function sumProcessMemory(descendants: Set<number>, processes: Map<number, Proce
 }
 
 function buildLeakedSpecialists(
-  snapshot: DashboardSnapshot | undefined,
-  runningAgents: HealthAgentProcess[],
+  agents: readonly HealthAgentProcess[],
 ): HealthLeakedSpecialist[] {
-  if (!snapshot) return [];
-
-  const activeWorkIssues = new Set(
-    runningAgents
-      .filter((agent) => agent.kind === 'work' && agent.status !== 'stopped' && agent.tmuxActive)
-      .map((agent) => agent.issueId.toUpperCase()),
-  );
-
-  type SpecialistSnapshot = { isRunning?: boolean; currentIssue?: string | null; name?: string };
-  return (snapshot.specialists as readonly SpecialistSnapshot[])
-    .filter((specialist) => specialist.isRunning && !!specialist.currentIssue)
-    .filter((specialist) => !activeWorkIssues.has((specialist.currentIssue ?? '').toUpperCase()))
-    .map((specialist) => ({
-      name: specialist.name ?? '',
-      currentIssue: specialist.currentIssue ?? '',
-      reason: `Specialist is active for ${specialist.currentIssue} but no running work agent exists for that issue.`,
+  return agents
+    .filter((agent) => agent.kind === 'specialist' && agent.lifecycle === 'orphaned')
+    .map((agent) => ({
+      name: agent.id,
+      currentIssue: agent.currentIssue ?? agent.issueId,
+      reason: `Advancing session remains live after ${agent.issueId} merged.`,
     }));
 }
 
@@ -566,6 +566,31 @@ function collectSmeeRelayHealth(): SmeeRelayHealth {
   }
 }
 
+function reviewStatusMap(
+  snapshot: DashboardSnapshot | undefined,
+): ReadonlyMap<string, WarmIdleStatusShape> {
+  return new Map(
+    (snapshot?.reviewStatuses ?? []).map((status) => [
+      status.issueId.toUpperCase(),
+      status,
+    ]),
+  );
+}
+
+function agentLifecycle(
+  role: string | undefined,
+  issueId: string,
+  tmuxActive: boolean,
+  statuses: ReadonlyMap<string, WarmIdleStatusShape>,
+): SpecialistLifecycle {
+  if (role !== 'review' && role !== 'test' && role !== 'ship') return 'unknown';
+  return classifyAdvancingSessionLifecycle(
+    role,
+    statuses.get(issueId.toUpperCase()),
+    tmuxActive,
+  );
+}
+
 async function collectAgentProcesses(): Promise<{
   agents: HealthAgentProcess[];
   admittedWorkAgentCount: number;
@@ -574,6 +599,7 @@ async function collectAgentProcesses(): Promise<{
   const admittedWorkAgentCount = countAdmittedWorkAgents(registeredAgents, Date.now());
   const activeAgents = registeredAgents.filter((agent) => agent.status !== 'stopped');
   const processTable = await readProcessTable().catch(() => new Map<number, ProcessRow>());
+  const reviewStatuses = reviewStatusMap(latestDashboardSnapshot);
 
   const agents = await Promise.all(
     activeAgents.map(async (agent) => {
@@ -590,8 +616,15 @@ async function collectAgentProcesses(): Promise<{
       return {
         id: agent.id,
         issueId: agent.issueId,
+        role: agent.role,
         kind: classifyAgentKind(agent.id, agent.role),
         status: agent.status,
+        lifecycle: agentLifecycle(
+          agent.role,
+          agent.issueId,
+          agent.tmuxActive,
+          reviewStatuses,
+        ),
         tmuxActive: agent.tmuxActive,
         memoryBytes,
         memoryGb: bytesToGb(memoryBytes),
@@ -606,13 +639,10 @@ async function collectAgentProcesses(): Promise<{
 function buildTopConsumers(
   agents: HealthAgentProcess[],
   containers: ContainerStats[],
-  leakedSpecialists: HealthLeakedSpecialist[],
 ): HealthConsumer[] {
-  const leakedByName = new Map(leakedSpecialists.map((item) => [item.name, item]));
-
   const agentConsumers = agents.map((agent) => {
     const isSpecialist = agent.kind === 'specialist';
-    const leaked = leakedByName.has(agent.id.replace(/^specialist-/, '')) || leakedByName.has(agent.id);
+    const leaked = agent.lifecycle === 'orphaned';
     const currentIssue = agent.currentIssue ?? agent.issueId;
     const resolved = currentIssue ? resolveProjectFromIssueSync(currentIssue) : null;
     const specialistType = isSpecialist
@@ -744,7 +774,7 @@ async function collectSystemHealth(): Promise<CollectedSystemHealthSnapshot> {
   const usedMemoryBytes = Math.max(memory.memTotal - memory.memAvailable, 0);
   const swapUsedBytes = Math.max(memory.swapTotal - memory.swapFree, 0);
   const overcommitPercent = toPercent(memory.committedAs, memory.memTotal);
-  const leakedSpecialists = buildLeakedSpecialists(latestDashboardSnapshot, agents);
+  const leakedSpecialists = buildLeakedSpecialists(agents);
   const evaluation = evaluateSeverity(thresholds, {
     availableMemoryBytes: memory.memAvailable,
     swapUsedPercent: toPercent(swapUsedBytes, memory.swapTotal),
@@ -795,7 +825,7 @@ async function collectSystemHealth(): Promise<CollectedSystemHealthSnapshot> {
     reasons: evaluation.reasons,
     agents: sortedAgents,
     leakedSpecialists,
-    topConsumers: buildTopConsumers(sortedAgents, containers, leakedSpecialists),
+    topConsumers: buildTopConsumers(sortedAgents, containers),
     smeeRelay,
     deployStaleness: await getDeployStaleness(),
   };
