@@ -13,7 +13,7 @@ import { IssueMetricStrip } from './cockpit/IssueMetricStrip'
  *   2. PhaseTimeline — 6-step lifecycle (TRIAGED→…→MERGED).
  *   3. MetricStrip — cost · diff · PR · sessions · last-activity, single-sourced
  *      so the scan cards below never repeat these figures.
- *   4. ActionStrip — the phase-gated action registry (IssueActionMenu, hybrid).
+ *   4. ActionStrip — the phase-gated action registry (IssueActionMenu, primary-strip).
  *
  * Verification gates, the PR card, and the cost breakdown deliberately live in
  * the SCAN cards below — the band states each figure exactly once.
@@ -27,7 +27,7 @@ export function IssueStatusBand({ issueId }: { issueId: string }) {
       </div>
       <IssueMetricStrip issueId={issueId} />
       <div className="mt-4 rounded-[var(--radius)] border border-border bg-card px-2 py-1.5">
-        <IssueActionMenu issueId={issueId} mode="hybrid" />
+        <IssueActionMenu issueId={issueId} mode="primary-strip" />
       </div>
     </div>
   )

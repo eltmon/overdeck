@@ -841,7 +841,7 @@ describe('IssueCard', () => {
     expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
   });
 
-  it('renders a hover-revealed hybrid action row on ordinary Board cards', () => {
+  it('renders a hover-revealed primary-strip action row on ordinary Board cards', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
     });
@@ -941,7 +941,7 @@ describe('IssueCard', () => {
     expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
   });
 
-  it('opens the hybrid Board action overflow menu on right-click', async () => {
+  it('opens the primary-strip Board action overflow menu on right-click', async () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
     });

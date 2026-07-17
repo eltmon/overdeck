@@ -115,7 +115,7 @@ function drawerActionBar() {
 
 function drawerIssueActionIds() {
   return Array.from(drawerActionBar().querySelectorAll('button[data-testid^="issue-action-"]'))
-    .filter((button) => button.getAttribute('data-testid') !== 'issue-action-overflow-button')
+    .filter((button) => !['issue-action-overflow-button', 'issue-action-explain-toggle'].includes(button.getAttribute('data-testid') ?? ''))
     .filter((button) => !(button as HTMLButtonElement).disabled)
     .map((button) => button.getAttribute('data-testid'));
 }
@@ -670,7 +670,7 @@ describe('IssueDrawer', () => {
     expect(screen.getByLabelText('Tell agent-PAN-1')).toHaveValue('');
   });
 
-  it('renders action bar with the shared hybrid menu and pinned merge control', () => {
+  it('renders action bar with the shared primary-strip menu and pinned merge control', () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, workspacePath: '/tmp/pan-1' }],
       reviewStatusByIssueId: {
@@ -722,6 +722,7 @@ describe('IssueDrawer', () => {
 
     const first = renderDrawer();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     const actionSets: Record<string, (string | null)[]> = {
       WORK_RUNNING: drawerIssueActionIds(),
     };
@@ -748,46 +749,47 @@ describe('IssueDrawer', () => {
 
     renderDrawer();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     actionSets.READY_TO_MERGE = drawerIssueActionIds();
 
     expect(actionSets).toMatchInlineSnapshot(`
       {
         "READY_TO_MERGE": [
+          "issue-action-resetToPlanned",
           "issue-action-syncMain",
-          "issue-action-open",
+          "issue-action-copySettings",
           "issue-action-tasks",
           "issue-action-upload",
+          "issue-action-syncDiscussions",
+          "issue-action-statusReview",
+          "issue-action-open",
           "issue-action-wipe",
           "issue-action-destroyWorkspace",
           "issue-action-resetIssue",
-          "issue-action-resetToPlanned",
           "issue-action-cancel",
-          "issue-action-syncDiscussions",
-          "issue-action-statusReview",
-          "issue-action-copySettings",
           "issue-action-restartFromPlan",
           "issue-action-viewPr",
         ],
         "WORK_RUNNING": [
           "issue-action-tell",
           "issue-action-doneWork",
+          "issue-action-resetToPlanned",
           "issue-action-stopAgent",
           "issue-action-pause",
+          "issue-action-restartAgent",
           "issue-action-syncMain",
-          "issue-action-open",
-          "issue-action-wipe",
-          "issue-action-destroyWorkspace",
-          "issue-action-resetIssue",
-          "issue-action-resetToPlanned",
-          "issue-action-cancel",
+          "issue-action-copySettings",
           "issue-action-tasks",
           "issue-action-upload",
           "issue-action-syncDiscussions",
           "issue-action-statusReview",
-          "issue-action-copySettings",
+          "issue-action-open",
+          "issue-action-wipe",
+          "issue-action-destroyWorkspace",
+          "issue-action-resetIssue",
+          "issue-action-cancel",
           "issue-action-completeWorkReset",
           "issue-action-restartFromPlan",
-          "issue-action-restartAgent",
         ],
       }
     `);
@@ -826,6 +828,7 @@ describe('IssueDrawer', () => {
     renderDrawer();
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
     const resetDialog = await screen.findByRole('alertdialog');
     fireEvent.change(within(resetDialog).getByLabelText('Confirmation text'), { target: { value: 'Reset issue' } });

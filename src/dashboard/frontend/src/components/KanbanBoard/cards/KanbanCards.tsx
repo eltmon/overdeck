@@ -847,7 +847,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
           )}
           onClick={(event) => event.stopPropagation()}
         >
-          <IssueActionMenu issueId={issue.identifier} mode="hybrid" className="flex w-full items-center gap-1" openSignal={actionOpenSignal} />
+          <IssueActionMenu issueId={issue.identifier} mode="primary-strip" className="flex w-full items-center gap-1" openSignal={actionOpenSignal} />
         </div>
 
         <CostBreakdownModal
