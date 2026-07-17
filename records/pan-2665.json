@@ -48,16 +48,15 @@
     "recordedAt": "2026-07-17T13:44:00.438Z"
   },
   "created": "2026-07-17T12:54:12.069Z",
-  "updated": "2026-07-17T14:38:26.257Z",
+  "updated": "2026-07-17T14:38:29.062Z",
   "pipeline": {
     "issueId": "PAN-2665",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T14:14:22.658Z",
+    "updatedAt": "2026-07-17T14:38:29.043Z",
     "reviewNotes": "Approved: requirements met with focused coverage; no correctness, security, or performance blockers.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2843",
     "reviewedAtCommit": "1f1f55df8ac977470fd4243f76810119540e4bad",
@@ -80,7 +79,9 @@
         "tests/unit/dashboard/command-deck-lint-node.test.ts"
       ],
       "recordedAt": "2026-07-17T13:44:00.438Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T14:38:29.043Z"
   },
   "closeOut": {
     "usage": {
@@ -146,7 +147,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2843"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T14:38:29.056Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 1f1f55df8ac977470fd4243f76810119540e4bad",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2843 MERGED at 2026-07-17T14:13:39Z",
+          "status": "pass",
+          "mergedAt": "2026-07-17T14:13:39Z",
+          "mergeCommit": "e58a106ec726151c88ed2ec93960e0f9cddadea9"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on e58a106ec726151c88ed2ec93960e0f9cddadea9",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T14:16:40.000Z, dist built 2026-07-17T14:15:37.889Z, merge 2026-07-17T14:13:39.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 5 agent state directories; No strike branch strike/pan-2665 found; Pruned 72 checkpoint ref(s) for agent-pan-2665, planning-pan-2665, strike-pan-2665; No specialist registry entries for PAN-2665"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
