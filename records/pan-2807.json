@@ -19,15 +19,7 @@
       "timestamp": "2026-07-17T02:19:21.152Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T02:19:21Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2807\n\n# Review Synthesis — PAN-2807 — 2026-07-17T02:20:00Z\n\n## Verdict: CHANGES REQUESTED — unexpected schema failures are still silently swallowed in both migration paths\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-5ca6f844/context.json\n- Branch: feature/pan-2807\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2807\n- HEAD reviewed: 5ca6f844b9c45397ba0a8bb808ea607c723f3a61\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-5ca6f844/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-5ca6f844/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-5ca6f844/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-5ca6f844/requirements.md | 2 |\n\n## Blocking Findings\n\n### [correctness; requirements FR-3] The final v61 DDL can fail while `user_version` still advances — `src/lib/database/schema.ts:1721`\nThe new `tryIdempotentDdl()` policy is not applied to the two `affected_criteria` ALTER paths at lines 789 and 1721. In the ladder path, any SQLite error is swallowed and execution reaches the version-61 stamp at line 1725. The correctness reviewer reproduced this with a version-60 database lacking `flywheel_substrate_bugs`: migration returned successfully with `user_version = 61` while the required table remained absent. Route both ALTER statements through the duplicate-only helper and add a version-60 regression test proving unexpected failure leaves `user_version` at 60.\n\n### [requirements FR-2] Runtime top-ups silently swallow missing-table failures — `src/lib/overdeck/infra.ts:115`\n`runSchemaTopUp()` classifies `no such table` as an expected idempotency result, even though FR-2 requires only duplicate errors to be silent and all other SQLite failures to be logged while startup continues. The new missing-table test explicitly locks in the contradictory behavior. Remove `no such table` from the silent-error classifier and update the test to require the error log while confirming later top-ups still run and startup remains available.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories in the changed schema, migration, audit, test, or documentation code.\n- Performance found the new indexes aligned with existing queries and the startup-only schema audit bounded by the fixed expected table set.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-5ca6f844/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2807 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -63,20 +55,20 @@
     "recordedAt": "2026-07-17T02:12:22.787Z"
   },
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T02:27:44.276Z",
+  "updated": "2026-07-17T02:27:45.212Z",
   "pipeline": {
     "issueId": "PAN-2807",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:27:44.236Z",
+    "updatedAt": "2026-07-17T02:27:45.090Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2816",
     "lastVerifiedCommit": "5ca6f844b9c45397ba0a8bb808ea607c723f3a61",
     "reviewRequestedAt": "2026-07-17T02:27:43.884Z",
-    "reviewSpawnedAt": "2026-07-17T02:12:26.690Z",
+    "reviewSpawnedAt": "2026-07-17T02:27:45.089Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -188,7 +180,7 @@
       },
       "costAtCloseOut": {
         "usd": 92.341077,
-        "pricingAsOf": "2026-07-17T02:27:44.239Z"
+        "pricingAsOf": "2026-07-17T02:27:45.144Z"
       }
     },
     "merges": [
