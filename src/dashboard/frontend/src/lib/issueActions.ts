@@ -115,46 +115,269 @@ export interface IssueActionState {
   hasPendingInput?: boolean;
 }
 
-export interface IssueActionEntry {
-  key: IssueActionKey;
+interface ActionEntryBase<Key extends string> {
+  key: Key;
   label: string;
   description: string;
+  kind: IssueActionKind;
+}
+
+export interface IssueActionEntry extends ActionEntryBase<IssueActionKey> {
+  scope: 'issue';
   panVerb: string | null;
   endpoint: string | null;
   enabledWhen: (state: IssueActionState) => boolean;
   phasePrimary: PipelinePhase[];
-  kind: IssueActionKind;
   group: IssueActionGroup;
 }
 
 export type NonIssueActionScope = 'project' | 'container' | 'session-artifact' | 'agent-state' | 'session';
+export type NonIssueActionOwnerSurface = 'ProjectNode' | 'ContainerNode' | 'FeatureItem' | 'ZoneBActionStrip';
+export type NonIssueActionKey =
+  | 'copyProjectName'
+  | 'viewContainerLogs'
+  | 'inspectContainer'
+  | 'restartContainer'
+  | 'stopContainer'
+  | 'startContainer'
+  | 'openStateDir'
+  | 'viewJsonl'
+  | 'deepWipe'
+  | 'stopSession'
+  | 'viewTerminal'
+  | 'viewState'
+  | 'viewVbrief'
+  | 'copySessionId'
+  | 'copyTmuxCommand';
 
-export interface NonIssueActionEntry {
-  key: string;
-  label: string;
-  scope: NonIssueActionScope;
-  ownerSurface: 'ProjectNode' | 'ContainerNode' | 'FeatureItem' | 'ZoneBActionStrip';
+export interface NonIssueActionContext {
+  projectName?: string;
+  containerName?: string;
+  containerStatus?: 'running' | 'stopped' | 'unhealthy' | 'restarting';
+  sessionId?: string;
+  issueId?: string;
+  sessionPresence?: string;
+  tmuxSession?: string | null;
+  hasJsonl?: boolean;
+  onCopyProjectName?: (projectName: string) => void | Promise<void>;
+  onViewContainerLogs?: (containerName: string) => void | Promise<void>;
+  onInspectContainer?: (containerName: string) => void | Promise<void>;
+  onRestartContainer?: (containerName: string) => void | Promise<void>;
+  onStopContainer?: (containerName: string) => void | Promise<void>;
+  onStartContainer?: (containerName: string) => void | Promise<void>;
+  onOpenStateDir?: (sessionId: string) => void | Promise<void>;
+  onViewJsonl?: (sessionId: string) => void | Promise<void>;
+  onDeepWipe?: (issueId: string) => void | Promise<void>;
+  onStopSession?: (sessionId: string) => void | Promise<void>;
+  onViewTerminal?: (sessionId: string) => void | Promise<void>;
+  onViewState?: (sessionId: string) => void | Promise<void>;
+  onViewVbrief?: (issueId: string) => void | Promise<void>;
+  onCopySessionId?: (sessionId: string) => void | Promise<void>;
+  onCopyTmuxCommand?: (tmuxSession: string) => void | Promise<void>;
 }
 
+export interface NonIssueActionConfirmSpec {
+  title: string;
+  message: (context: NonIssueActionContext) => string;
+  confirmLabel: string;
+  variant: 'default' | 'destructive';
+}
+
+export interface NonIssueActionEntry extends ActionEntryBase<NonIssueActionKey> {
+  scope: NonIssueActionScope;
+  ownerSurface: NonIssueActionOwnerSurface;
+  enabledWhen: (context: NonIssueActionContext) => boolean;
+  invoke: (context: NonIssueActionContext) => void | Promise<void>;
+  confirm: NonIssueActionConfirmSpec | null;
+}
+
+export type ActionEntry = IssueActionEntry | NonIssueActionEntry;
+
+const hasText = (value: string | null | undefined): value is string => !!value;
+const canStopSession = (context: NonIssueActionContext) =>
+  hasText(context.sessionId)
+  && !!context.onStopSession
+  && ['active', 'idle', 'suspended'].includes(context.sessionPresence ?? '');
+
 export const PROJECT_TREE_CONTEXT_ACTIONS: NonIssueActionEntry[] = [
-  { key: 'copyProjectName', label: 'Copy project name', scope: 'project', ownerSurface: 'ProjectNode' },
-  { key: 'viewContainerLogs', label: 'View Logs', scope: 'container', ownerSurface: 'ContainerNode' },
-  { key: 'inspectContainer', label: 'Inspect', scope: 'container', ownerSurface: 'ContainerNode' },
-  { key: 'restartContainer', label: 'Restart', scope: 'container', ownerSurface: 'ContainerNode' },
-  { key: 'stopContainer', label: 'Stop', scope: 'container', ownerSurface: 'ContainerNode' },
-  { key: 'startContainer', label: 'Start', scope: 'container', ownerSurface: 'ContainerNode' },
-  { key: 'openStateDir', label: 'Open State Dir', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
-  { key: 'viewJsonl', label: 'View JSONL', scope: 'session-artifact', ownerSurface: 'FeatureItem' },
-  { key: 'deepWipe', label: 'Deep Wipe', scope: 'agent-state', ownerSurface: 'FeatureItem' },
+  {
+    key: 'copyProjectName',
+    label: 'Copy project name',
+    description: 'Copy the project name to the clipboard.',
+    scope: 'project',
+    ownerSurface: 'ProjectNode',
+    enabledWhen: (context) => hasText(context.projectName) && !!context.onCopyProjectName,
+    invoke: (context) => context.projectName && context.onCopyProjectName?.(context.projectName),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'viewContainerLogs',
+    label: 'View Logs',
+    description: 'Open the selected container logs.',
+    scope: 'container',
+    ownerSurface: 'ContainerNode',
+    enabledWhen: (context) => hasText(context.containerName) && !!context.onViewContainerLogs,
+    invoke: (context) => context.containerName && context.onViewContainerLogs?.(context.containerName),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'inspectContainer',
+    label: 'Inspect',
+    description: 'Inspect the selected container.',
+    scope: 'container',
+    ownerSurface: 'ContainerNode',
+    enabledWhen: (context) => hasText(context.containerName) && !!context.onInspectContainer,
+    invoke: (context) => context.containerName && context.onInspectContainer?.(context.containerName),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'restartContainer',
+    label: 'Restart',
+    description: 'Restart the running container.',
+    scope: 'container',
+    ownerSurface: 'ContainerNode',
+    enabledWhen: (context) => context.containerStatus === 'running' && hasText(context.containerName) && !!context.onRestartContainer,
+    invoke: (context) => context.containerName && context.onRestartContainer?.(context.containerName),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'stopContainer',
+    label: 'Stop',
+    description: 'Stop the running container.',
+    scope: 'container',
+    ownerSurface: 'ContainerNode',
+    enabledWhen: (context) => context.containerStatus === 'running' && hasText(context.containerName) && !!context.onStopContainer,
+    invoke: (context) => context.containerName && context.onStopContainer?.(context.containerName),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'startContainer',
+    label: 'Start',
+    description: 'Start the stopped container.',
+    scope: 'container',
+    ownerSurface: 'ContainerNode',
+    enabledWhen: (context) => context.containerStatus === 'stopped' && hasText(context.containerName) && !!context.onStartContainer,
+    invoke: (context) => context.containerName && context.onStartContainer?.(context.containerName),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'openStateDir',
+    label: 'Open State Dir',
+    description: 'Open the selected session state directory.',
+    scope: 'session-artifact',
+    ownerSurface: 'FeatureItem',
+    enabledWhen: (context) => hasText(context.sessionId) && !!context.onOpenStateDir,
+    invoke: (context) => context.sessionId && context.onOpenStateDir?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'viewJsonl',
+    label: 'View JSONL',
+    description: 'Open the selected session JSONL transcript.',
+    scope: 'session-artifact',
+    ownerSurface: 'FeatureItem',
+    enabledWhen: (context) => hasText(context.sessionId) && context.hasJsonl === true && !!context.onViewJsonl,
+    invoke: (context) => context.sessionId && context.onViewJsonl?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'deepWipe',
+    label: 'Deep Wipe',
+    description: 'Destroy the issue workspace, agent state, and git branches.',
+    scope: 'agent-state',
+    ownerSurface: 'FeatureItem',
+    enabledWhen: (context) => hasText(context.issueId) && !!context.onDeepWipe,
+    invoke: (context) => context.issueId && context.onDeepWipe?.(context.issueId),
+    kind: 'destructive',
+    confirm: {
+      title: 'Deep Wipe',
+      message: (context) => `Deep wipe will destroy all data for ${context.issueId ?? 'this issue'} including workspace, state, and git branches. This cannot be undone.`,
+      confirmLabel: 'Deep Wipe',
+      variant: 'destructive',
+    },
+  },
 ];
 
 export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
-  { key: 'stopSession', label: 'Stop session', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
-  { key: 'viewTerminal', label: 'View terminal', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
-  { key: 'viewState', label: 'View State.md', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
-  { key: 'viewVbrief', label: 'View vBRIEF', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
-  { key: 'copySessionId', label: 'Copy Session ID', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
-  { key: 'copyTmuxCommand', label: 'Copy tmux command', scope: 'session', ownerSurface: 'ZoneBActionStrip' },
+  {
+    key: 'stopSession',
+    label: 'Stop session',
+    description: 'Stop the focused session while preserving its work and state.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: canStopSession,
+    invoke: (context) => context.sessionId && context.onStopSession?.(context.sessionId),
+    kind: 'destructive',
+    confirm: {
+      title: 'Stop Session',
+      message: (context) => `Stop session ${context.sessionId ?? ''}?`,
+      confirmLabel: 'Stop',
+      variant: 'destructive',
+    },
+  },
+  {
+    key: 'viewTerminal',
+    label: 'View terminal',
+    description: 'Open the focused session terminal.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.sessionId) && hasText(context.tmuxSession) && !!context.onViewTerminal,
+    invoke: (context) => context.sessionId && context.onViewTerminal?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'viewState',
+    label: 'View State.md',
+    description: 'Open the focused session state file.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.sessionId) && !!context.onViewState,
+    invoke: (context) => context.sessionId && context.onViewState?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'viewVbrief',
+    label: 'View vBRIEF',
+    description: 'Open the focused issue vBRIEF plan.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.issueId) && !!context.onViewVbrief,
+    invoke: (context) => context.issueId && context.onViewVbrief?.(context.issueId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'copySessionId',
+    label: 'Copy Session ID',
+    description: 'Copy the focused session ID to the clipboard.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.sessionId) && !!context.onCopySessionId,
+    invoke: (context) => context.sessionId && context.onCopySessionId?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'copyTmuxCommand',
+    label: 'Copy tmux command',
+    description: 'Copy the command for attaching to the focused tmux session.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.tmuxSession) && !!context.onCopyTmuxCommand,
+    invoke: (context) => context.tmuxSession && context.onCopyTmuxCommand?.(context.tmuxSession),
+    kind: 'safe',
+    confirm: null,
+  },
 ];
 
 const always = () => true;
@@ -238,7 +461,7 @@ const PHASE_PRIMARY_ACTION_KEYS_BY_ACTION: Partial<Record<IssueActionKey, Pipeli
     }, new Map())
 ) as Partial<Record<IssueActionKey, PipelinePhase[]>>;
 
-export const ISSUE_ACTIONS: IssueActionEntry[] = [
+const ISSUE_ACTION_DEFINITIONS: Omit<IssueActionEntry, 'scope'>[] = [
   { key: 'plan', label: 'Plan', description: 'Have an AI planner interview you and write the implementation plan for this issue.', panVerb: 'plan', endpoint: '/api/issues/:id/start-planning', enabledWhen: canPlan, phasePrimary: phasePrimary('plan'), kind: 'dialog', group: 'planning' },
   { key: 'autoPlan', label: 'Auto-plan', description: 'Write the plan automatically, no questions asked. Good for well-understood work.', panVerb: 'plan --auto', endpoint: '/api/issues/:id/plan', enabledWhen: canPlan, phasePrimary: [], kind: 'dialog', group: 'planning' },
   { key: 'watchPlanning', label: 'Watch planning', description: 'Open the live planning session to watch or steer it.', panVerb: null, endpoint: null, enabledWhen: (state) => deriveIssueActionPhase(state) === 'PLANNING', phasePrimary: phasePrimary('watchPlanning'), kind: 'dialog', group: 'planning' },
@@ -283,6 +506,11 @@ export const ISSUE_ACTIONS: IssueActionEntry[] = [
   { key: 'restartFromPlan', label: 'Restart from plan', description: 'Start a brand-new run from the existing plan.', panVerb: null, endpoint: '/api/agents', enabledWhen: (state) => state.hasPlan && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'restartAgent', label: 'Restart agent', description: 'Stop the agent and start a replacement that keeps the issue context.', panVerb: null, endpoint: '/api/agents/:agentId/restart', enabledWhen: (state) => hasAgent(state) && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'agent' },
 ];
+
+export const ISSUE_ACTIONS: IssueActionEntry[] = ISSUE_ACTION_DEFINITIONS.map((action) => ({
+  ...action,
+  scope: 'issue',
+}));
 
 const ACTION_BY_KEY = new Map(ISSUE_ACTIONS.map((action) => [action.key, action]));
 

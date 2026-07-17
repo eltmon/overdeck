@@ -160,6 +160,7 @@ describe('issueActions no-actions-lost audit', () => {
     for (const action of projectTreeUtilityActions) {
       expect(action.scope, action.label).not.toBe('issue');
       expect(action.ownerSurface, action.label).toMatch(/ProjectNode|ContainerNode|FeatureItem/);
+      expect(registryKeys.has(action.key as IssueActionKey), action.label).toBe(false);
     }
   });
 
@@ -171,6 +172,10 @@ describe('issueActions no-actions-lost audit', () => {
     fireEvent.click(screen.getByTestId('zone-b-overflow'));
     for (const action of zoneBSessionActions.filter((entry) => !['stopSession', 'viewTerminal'].includes(entry.key))) {
       expect(screen.getByText(action.label), action.key).toBeInTheDocument();
+    }
+    for (const action of zoneBSessionActions) {
+      expect(action.scope, action.label).toBe('session');
+      expect(action.ownerSurface, action.label).toBe('ZoneBActionStrip');
       expect(registryKeys.has(action.key as IssueActionKey), action.label).toBe(false);
     }
   });

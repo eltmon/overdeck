@@ -1,9 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   GROUP_LABELS,
   GROUP_ORDER,
   ISSUE_ACTIONS,
+  PROJECT_TREE_CONTEXT_ACTIONS,
+  ZONE_B_SESSION_ACTIONS,
   deriveIssueActionPhase,
   getEnabledActions,
   getPhasePrimaryActions,
@@ -130,6 +132,43 @@ describe('ISSUE_ACTIONS', () => {
       expect(['safe', 'dialog', 'destructive']).toContain(action.kind);
       expect(action.group.trim(), action.key).not.toBe('');
     }
+  });
+
+  it('discriminates issue entries from executable non-issue entries by scope', () => {
+    expect(ISSUE_ACTIONS.every((entry) => entry.scope === 'issue')).toBe(true);
+
+    for (const action of [...PROJECT_TREE_CONTEXT_ACTIONS, ...ZONE_B_SESSION_ACTIONS]) {
+      expect(action.scope, action.key).not.toBe('issue');
+      expect(action.description.trim(), action.key).not.toBe('');
+      expect(typeof action.enabledWhen, action.key).toBe('function');
+      expect(typeof action.invoke, action.key).toBe('function');
+      expect(['safe', 'dialog', 'destructive'], action.key).toContain(action.kind);
+      expect(action, action.key).toHaveProperty('confirm');
+    }
+  });
+
+  it('executes callback-backed session actions through surface-provided context', async () => {
+    const onViewTerminal = vi.fn();
+    const viewTerminal = ZONE_B_SESSION_ACTIONS.find((entry) => entry.key === 'viewTerminal');
+    if (!viewTerminal) throw new Error('Missing viewTerminal action');
+
+    const context = {
+      sessionId: 'agent-pan-1610',
+      tmuxSession: 'agent-pan-1610',
+      onViewTerminal,
+    };
+
+    expect(viewTerminal.enabledWhen(context)).toBe(true);
+    await viewTerminal.invoke(context);
+    expect(onViewTerminal).toHaveBeenCalledWith('agent-pan-1610');
+  });
+
+  it('derives confirmation copy for destructive non-issue actions from invocation context', () => {
+    const stopSession = ZONE_B_SESSION_ACTIONS.find((entry) => entry.key === 'stopSession');
+    const deepWipe = PROJECT_TREE_CONTEXT_ACTIONS.find((entry) => entry.key === 'deepWipe');
+
+    expect(stopSession?.confirm?.message({ sessionId: 'agent-pan-1610' })).toBe('Stop session agent-pan-1610?');
+    expect(deepWipe?.confirm?.message({ issueId: 'PAN-1610' })).toContain('PAN-1610');
   });
 
   it('filters enabled actions without mutating registry order', () => {
