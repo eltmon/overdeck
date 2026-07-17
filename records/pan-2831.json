@@ -22,6 +22,11 @@
       "timestamp": "2026-07-17T13:41:06.302Z",
       "reason": "end",
       "note": "Added a shared numeric-aware issue ID comparator, applied it across frontend and server issue lists while preserving primary ordering, and passed typecheck, lint, and the full test suite."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-17T13:41:10.288Z"
     }
   ],
   "feedback": [],
@@ -55,16 +60,16 @@
     "recordedAt": "2026-07-17T13:41:02.914Z"
   },
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:41:09.919Z",
+  "updated": "2026-07-17T13:41:10.289Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T13:41:07.931Z",
+    "updatedAt": "2026-07-17T13:41:08.989Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2841",
     "reviewRequestedAt": "2026-07-17T13:41:06.329Z",
     "reviewSpawnedAt": "2026-07-17T13:41:07.559Z",
@@ -134,7 +139,7 @@
       },
       "costAtCloseOut": {
         "usd": 21.289674,
-        "pricingAsOf": "2026-07-17T13:41:08.367Z"
+        "pricingAsOf": "2026-07-17T13:41:09.033Z"
       }
     },
     "merges": [
