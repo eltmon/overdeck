@@ -75,16 +75,15 @@
     "recordedAt": "2026-07-17T13:41:02.914Z"
   },
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:53:04.633Z",
+  "updated": "2026-07-17T14:44:38.962Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T13:53:04.560Z",
+    "updatedAt": "2026-07-17T14:44:38.949Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2831-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -121,7 +120,9 @@
         "src/dashboard/server/services/resource-discovery.ts"
       ],
       "recordedAt": "2026-07-17T13:41:02.914Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T14:44:38.949Z"
   },
   "closeOut": {
     "usage": {
@@ -173,7 +174,87 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2841"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T14:44:38.962Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at b88dd681c3a7f297fd146947f3b60637b34adfa9",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2841 MERGED at 2026-07-17T13:52:57Z",
+          "status": "pass",
+          "mergedAt": "2026-07-17T13:52:57Z",
+          "mergeCommit": "6e1fdfeddbee8850fc6781b6ae656d1a8b6cf602"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; running agents: agent-pan-2831",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-post-merge",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-17T14:44:28.211Z"
+          }
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 6e1fdfeddbee8850fc6781b6ae656d1a8b6cf602",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T14:16:40.000Z, dist built 2026-07-17T14:15:37.889Z, merge 2026-07-17T13:52:57.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed 5 agent state directories; No strike branch strike/pan-2831 found; Pruned 64 checkpoint ref(s) for agent-pan-2831, planning-pan-2831, strike-pan-2831; No specialist registry entries for PAN-2831"
+        }
+      ],
+      "accepted": [
+        "post-merge"
+      ]
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
