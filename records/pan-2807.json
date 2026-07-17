@@ -75,16 +75,17 @@
     "recordedAt": "2026-07-17T02:12:22.787Z"
   },
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T02:59:29.448Z",
+  "updated": "2026-07-17T03:09:31.080Z",
   "pipeline": {
     "issueId": "PAN-2807",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:59:29.422Z",
+    "updatedAt": "2026-07-17T03:09:31.021Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2816",
     "lastVerifiedCommit": "bf5fd0c2f6f784fe8af7bdc5d0c9140c2eb3497a",
     "reviewRequestedAt": "2026-07-17T02:43:29.121Z",
@@ -122,6 +123,28 @@
         "tests/unit/lib/database/schema-migrations.test.ts"
       ],
       "recordedAt": "2026-07-17T02:12:22.787Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-bf5fd0c2/security.md",
+        "atCommit": "bf5fd0c2f6f784fe8af7bdc5d0c9140c2eb3497a"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-bf5fd0c2/correctness.md",
+        "atCommit": "bf5fd0c2f6f784fe8af7bdc5d0c9140c2eb3497a"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-bf5fd0c2/performance.md",
+        "atCommit": "bf5fd0c2f6f784fe8af7bdc5d0c9140c2eb3497a"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2807/.pan/review/agent-pan-2807-review-bf5fd0c2/requirements.md",
+        "atCommit": "bf5fd0c2f6f784fe8af7bdc5d0c9140c2eb3497a"
+      }
     }
   },
   "closeOut": {
@@ -137,49 +160,49 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 502468,
-            "output": 18557,
-            "cacheRead": 5477888,
+            "input": 1134163,
+            "output": 28084,
+            "cacheRead": 8251904,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 487561,
-            "output": 24802,
-            "cacheRead": 5257216,
+            "input": 1715609,
+            "output": 61651,
+            "cacheRead": 9536000,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 491518,
-            "output": 11542,
-            "cacheRead": 2911744,
+            "input": 1308664,
+            "output": 22711,
+            "cacheRead": 5082624,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 714025,
-            "output": 17086,
-            "cacheRead": 2969600,
+            "input": 1440733,
+            "output": 26748,
+            "cacheRead": 4330496,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 406704,
-            "output": 8124,
-            "cacheRead": 2564096,
+            "input": 1182723,
+            "output": 15664,
+            "cacheRead": 3538944,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4209356,
-            "output": 294986,
-            "cacheRead": 69168640,
+            "input": 4267242,
+            "output": 312600,
+            "cacheRead": 75187712,
             "cacheWrite": 0
           }
         }
@@ -192,15 +215,15 @@
           "cacheWrite": 211131
         },
         "openai/gpt-5.6-sol": {
-          "input": 6811632,
-          "output": 375097,
-          "cacheRead": 88349184,
+          "input": 11049134,
+          "output": 467458,
+          "cacheRead": 105927680,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 101.190605,
-        "pricingAsOf": "2026-07-17T02:59:29.429Z"
+        "usd": 133.938193,
+        "pricingAsOf": "2026-07-17T03:09:31.029Z"
       }
     },
     "merges": [
