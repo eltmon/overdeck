@@ -1,18 +1,29 @@
 /**
- * Health filtering logic for dashboard health API
- * Determines which agents should be visible in health checks
+ * Health filtering logic for dashboard health API.
+ * Resolves one coherent evidence set and delegates classification to the pure
+ * agent-health module.
  */
 
 import { existsSync } from 'fs';
 import { readFile } from 'fs/promises';
 import { Effect } from 'effect';
-import { loadCloisterConfig } from '../../lib/cloister/config.js';
+import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
+import { getRuntimeSnapshot } from '../../lib/agent-runtime-mirror.js';
+import {
+  classifyAgentHealth,
+  type AgentHealthRuntimeState,
+  type PersistedAgentHealthState,
+  type ResolvedPersistedAgentHealthState,
+} from '../../lib/agents/health.js';
+import {
+  isRoleTerminal,
+  type AdvancingRole,
+} from '../../lib/cloister/reap-terminal-sessions.js';
+import { readReviewStatusMap } from '../../lib/cloister/review-status-source.js';
 import { capturePane, sessionExists } from '../../lib/tmux.js';
 
-const KICKOFF_STALL_GRACE_MS = 5 * 60 * 1000;
-
 /**
- * Check if agent tmux session is alive
+ * Check if agent tmux session is alive.
  */
 export const checkAgentHealth = (agentId: string) =>
   Effect.gen(function* () {
@@ -26,102 +37,115 @@ export const checkAgentHealth = (agentId: string) =>
     return { alive: true, lastOutput: stdout.trim() };
   }).pipe(Effect.catch(() => Effect.succeed({ alive: false })));
 
+function runtimeHealthState(
+  runtime: AgentRuntimeSnapshot | null,
+): AgentHealthRuntimeState | null {
+  if (!runtime) return null;
+  switch (runtime.activity) {
+    case 'working':
+    case 'thinking':
+      return {
+        state: 'active',
+        lastActivity: runtime.lastActivity,
+        contextSaturatedAt: runtime.contextSaturatedAt,
+      };
+    case 'waiting':
+      return {
+        state: 'waiting-on-human',
+        lastActivity: runtime.lastActivity,
+        contextSaturatedAt: runtime.contextSaturatedAt,
+      };
+    case 'idle':
+      return {
+        state: 'idle',
+        lastActivity: runtime.lastActivity,
+        contextSaturatedAt: runtime.contextSaturatedAt,
+      };
+    case 'stopped':
+      return {
+        state: 'stopped',
+        lastActivity: runtime.lastActivity,
+        contextSaturatedAt: runtime.contextSaturatedAt,
+      };
+  }
+}
+
+function reviewLifecycle(
+  state: PersistedAgentHealthState,
+): 'active' | 'warm' | 'unknown' {
+  const role = state.role;
+  if (role !== 'review' && role !== 'test' && role !== 'ship') return 'unknown';
+  if (!state.issueId) return 'unknown';
+  const statuses = readReviewStatusMap();
+  if (!statuses) return 'unknown';
+  const status = statuses[state.issueId.toUpperCase()];
+  if (!status) return 'unknown';
+  return isRoleTerminal(role as AdvancingRole, status) ? 'warm' : 'active';
+}
+
+async function resolvePersistedState(
+  stateFile: string,
+): Promise<ResolvedPersistedAgentHealthState> {
+  if (!existsSync(stateFile)) {
+    return {
+      status: 'unavailable',
+      reason: 'Agent state file is missing.',
+    };
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(await readFile(stateFile, 'utf-8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return {
+        status: 'unavailable',
+        reason: 'Agent state file does not contain an object.',
+      };
+    }
+    return {
+      status: 'available',
+      value: parsed as PersistedAgentHealthState,
+    };
+  } catch (error) {
+    return {
+      status: 'unavailable',
+      reason: error instanceof Error
+        ? `Agent state could not be read: ${error.message}`
+        : 'Agent state could not be read.',
+    };
+  }
+}
+
 /**
- * Determine health status based on activity
- * Returns null if agent should be hidden (completed/stopped/no state.json)
+ * Resolve persisted/runtime/lifecycle evidence and return the legacy adapter
+ * shape consumed by the current route. Rich V2 snapshots are produced by
+ * classifyAgentHealth and will be exposed directly by the route migration.
  *
- * `liveSessions` is REQUIRED — pass the session list fetched once per request.
- * Iterating ~150 agent dirs and spawning a tmux subprocess per agent was pinning
- * the dashboard process at 100% CPU on every 5s `/api/health/agents` poll.
- * State is also read before the tmux check so stopped/completed/missing
- * agents short-circuit without any extra work.
+ * `liveSessions` is required and must be fetched once per request. Iterating
+ * agent directories and spawning a tmux subprocess per entry previously pinned
+ * the dashboard process on every health poll.
  */
 export const determineHealthStatus = (
   agentId: string,
   stateFile: string,
-  liveSessions: Set<string>
+  liveSessions: Set<string>,
 ) =>
   Effect.gen(function* () {
-    let agentStatus: string | undefined;
-    let lastActivity: Date | null = null;
-    let contextSaturatedAt: string | undefined;
-
-    if (!existsSync(stateFile)) return null;
-
-    const state = yield* Effect.tryPromise({
-      try: () => readFile(stateFile, 'utf-8').then((content) => JSON.parse(content)),
-      catch: () => null,
-    }).pipe(Effect.catch(() => Effect.succeed(null)));
-
-    if (state === null) return null;
-
-    agentStatus = state.status;
-    lastActivity = state.lastActivity ? new Date(state.lastActivity) : null;
-
-    if (!agentStatus) return null;
-    if (agentStatus === 'stopped' || agentStatus === 'completed') return null;
-
-    const runtimeFile = stateFile.replace('state.json', 'runtime.json');
-    if (existsSync(runtimeFile)) {
-      const runtime = yield* Effect.tryPromise({
-        try: () => readFile(runtimeFile, 'utf-8').then((content) => JSON.parse(content)),
-        catch: () => null,
-      }).pipe(Effect.catch(() => Effect.succeed(null)));
-
-      if (runtime?.lastActivity) {
-        const runtimeDate = new Date(runtime.lastActivity);
-        if (!lastActivity || runtimeDate > lastActivity) {
-          lastActivity = runtimeDate;
-        }
-      }
-      if (runtime?.contextSaturatedAt) {
-        contextSaturatedAt = runtime.contextSaturatedAt;
-      }
-    }
-
-    const alive = liveSessions.has(agentId);
-
-    if (!alive) {
-      const cloisterConfig = yield* loadCloisterConfig();
-      const stalenessHours = cloisterConfig.retention?.health_staleness_hours ?? 24;
-      const STALE_THRESHOLD_MS = stalenessHours * 60 * 60 * 1000;
-      if (lastActivity) {
-        const ageMs = Date.now() - lastActivity.getTime();
-        if (ageMs > STALE_THRESHOLD_MS) return null;
-      } else {
-        return null;
-      }
-      return { status: 'dead', reason: 'Agent crashed unexpectedly' };
-    }
-
-    if (contextSaturatedAt) {
-      return {
-        status: 'wedged',
-        reason: 'Context window exhausted (400) — recovery in progress',
-      };
-    }
-
-    const startedAtMs = typeof state.startedAt === 'string' ? Date.parse(state.startedAt) : Number.NaN;
-    if (
-      state.role === 'work' &&
-      agentStatus === 'running' &&
-      state.kickoffDelivered === false &&
-      Number.isFinite(startedAtMs) &&
-      Date.now() - startedAtMs > KICKOFF_STALL_GRACE_MS
-    ) {
-      return { status: 'stalled', reason: 'Work agent running with no kickoff delivered since spawn' };
-    }
-
-    if (lastActivity) {
-      const ageMs = Date.now() - lastActivity.getTime();
-      const ageMinutes = ageMs / (1000 * 60);
-
-      if (ageMinutes > 30) {
-        return { status: 'stuck', reason: `No activity for ${Math.round(ageMinutes)} minutes` };
-      } else if (ageMinutes > 15) {
-        return { status: 'warning', reason: `Low activity (${Math.round(ageMinutes)} minutes)` };
-      }
-    }
-
-    return { status: 'healthy' };
+    const persisted = yield* Effect.promise(() => resolvePersistedState(stateFile));
+    const runtime = yield* getRuntimeSnapshot(agentId);
+    const lifecycle = persisted.status === 'available'
+      ? reviewLifecycle(persisted.value)
+      : 'unknown';
+    const snapshot = classifyAgentHealth({
+      agentId,
+      persisted,
+      runtime: runtimeHealthState(runtime),
+      liveSessions,
+      reviewLifecycle: lifecycle,
+      nowMs: Date.now(),
+    });
+    const firstReason = snapshot.reasons[0]?.message;
+    return {
+      status: snapshot.status,
+      ...(firstReason ? { reason: firstReason } : {}),
+    };
   });
