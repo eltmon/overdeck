@@ -113,10 +113,11 @@ export {
   type ReclaimVenvCandidate,
 } from './resources/reclaim.js';
 export {
+  getResourcesHealthEvidenceEffect,
   getSpawnGatePayloadEffect,
   mapSpawnGateDecision,
-  resetSpawnGateHealthSnapshotReaderForTests,
-  setSpawnGateHealthSnapshotReaderForTests,
+  resetSpawnGateHealthSnapshotReadersForTests,
+  setSpawnGateHealthSnapshotReadersForTests,
   type SpawnGatePayload,
   type SpawnGateState,
 } from './resources/spawn-gate.js';

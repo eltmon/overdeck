@@ -13,7 +13,10 @@ import { buildHostVitalsSnapshot } from './host-vitals.js';
 import { enrichContainersWithLimits } from './limits.js';
 import { buildReclaimPayload } from './reclaim.js';
 import { getCurrentDockerStats } from './shared.js';
-import { getSpawnGatePayloadEffect } from './spawn-gate.js';
+import {
+  getResourcesHealthEvidenceEffect,
+  getSpawnGatePayloadEffect,
+} from './spawn-gate.js';
 import { getResourceStacks } from './stacks.js';
 
 /** Build the GET /api/resources response from the SQLite agents table. */
@@ -21,7 +24,8 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
   return Effect.gen(function* () {
     const containers = enrichContainersWithLimits(getCurrentDockerStats());
     const agentStats = yield* getAgentStatsSnapshotEffect();
-    const spawnGate = yield* getSpawnGatePayloadEffect();
+    const healthEvidence = yield* getResourcesHealthEvidenceEffect();
+    const spawnGate = yield* getSpawnGatePayloadEffect(healthEvidence);
     const stoppedContainers: unknown[] = [];
 
     // PAN-1908: authoritative agent registry is the SQLite agents table.
@@ -38,6 +42,7 @@ export function getResourcesEffect(): Effect.Effect<ReturnType<typeof jsonRespon
       }));
     const agentStatsById = new Map(agentStats.agents.map((agent) => [agent.id, agent]));
     const baseHostVitals = buildHostVitalsSnapshot({
+      hostMetrics: healthEvidence.accepted?.host.metrics,
       containers,
       agents: agents.map((agent) => ({
         id: String(agent.id),
