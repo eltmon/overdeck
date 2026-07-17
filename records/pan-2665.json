@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:12.069Z",
-  "updated": "2026-07-17T13:03:02.374Z",
+  "updated": "2026-07-17T13:03:35.953Z",
   "pipeline": {
     "issueId": "PAN-2665",
     "reviewStatus": "pending",
@@ -64,18 +64,29 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "lint-row-label-icon": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2665",
         "agentId": "agent-pan-2665",
         "pid": 4061885,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:03:02.374Z"
+        "claimedAt": "2026-07-17T13:03:02.374Z",
+        "itemId": "lint-row-label-icon",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2665 dead)",
+        "releasedAt": "2026-07-17T13:03:35.928Z"
+      }
+    ],
+    "statusReasons": {
+      "lint-row-label-icon": {
+        "reason": "stale claim released (agent-pan-2665 dead)",
+        "updatedAt": "2026-07-17T13:03:35.928Z"
       }
     }
   },
   "statusOverrides": {
-    "lint-row-label-icon": "running"
+    "lint-row-label-icon": "pending"
   }
 }
