@@ -115,7 +115,7 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T17:54:32.994Z",
+  "updated": "2026-07-17T17:54:37.099Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -125,11 +125,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T17:54:32.943Z",
+    "updatedAt": "2026-07-17T17:54:37.067Z",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
-    "reviewRequestedAt": "2026-07-17T17:38:35.484Z",
+    "reviewRequestedAt": "2026-07-17T17:54:34.456Z",
     "reviewSpawnedAt": "2026-07-17T17:38:39.016Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -233,9 +233,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 10596974,
-            "output": 598489,
-            "cacheRead": 139900416,
+            "input": 10597688,
+            "output": 598548,
+            "cacheRead": 140013568,
             "cacheWrite": 0
           }
         }
@@ -254,9 +254,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 15931512,
-          "output": 732132,
-          "cacheRead": 152672256,
+          "input": 15932226,
+          "output": 732191,
+          "cacheRead": 152785408,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -267,8 +267,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 190.531778,
-        "pricingAsOf": "2026-07-17T17:54:32.949Z"
+        "usd": 190.593694,
+        "pricingAsOf": "2026-07-17T17:54:37.069Z"
       }
     },
     "merges": [
