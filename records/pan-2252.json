@@ -112,21 +112,21 @@
     "recordedAt": "2026-07-17T01:22:29.077Z"
   },
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T01:42:24.918Z",
+  "updated": "2026-07-17T01:47:05.005Z",
   "pipeline": {
     "issueId": "PAN-2252",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:42:24.878Z",
-    "reviewNotes": "[correctness] The host-port override still permits linked worktrees — `src/dashboard/server/identity.ts:87`",
+    "updatedAt": "2026-07-17T01:47:04.979Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "isLinkedWorktreeRoot/primaryRootFromLinkedWorktree correctly detect .git-as-file vs directory/absent (identity.ts:29-47); new check in shouldRefuseHostDashboardPort (identity.ts:87) placed after the pre-existing runningInContainer early-return (line 82-84), so container exemption is preserved; purely additive OR-branch only fires when .git is a file, so pre-existing tests using nonexistent repoRoots are unaffected. All 4 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2812",
-    "lastVerifiedCommit": "d9f551ef5cdbe3ae0ddb8068d77feccba232cfcd",
+    "lastVerifiedCommit": "86bf035bf9d92fae01fbcfd96a5d3d97869d6494",
     "reviewRequestedAt": "2026-07-17T01:28:45.537Z",
     "reviewSpawnedAt": "2026-07-17T01:41:36.283Z",
     "strikeRecoveryCount": 0
@@ -200,9 +200,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1784850,
-            "output": 107831,
-            "cacheRead": 38957568,
+            "input": 1797656,
+            "output": 109732,
+            "cacheRead": 40531968,
             "cacheWrite": 0
           }
         }
@@ -221,9 +221,9 @@
           "cacheWrite": 176879
         },
         "openai/gpt-5.6-sol": {
-          "input": 7741350,
-          "output": 189173,
-          "cacheRead": 51245568,
+          "input": 7754156,
+          "output": 191074,
+          "cacheRead": 52819968,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -234,8 +234,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 80.150345,
-        "pricingAsOf": "2026-07-17T01:42:24.903Z"
+        "usd": 81.058605,
+        "pricingAsOf": "2026-07-17T01:47:04.997Z"
       }
     },
     "merges": [
