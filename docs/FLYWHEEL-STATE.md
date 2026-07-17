@@ -5481,3 +5481,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Gates verified by me on the merged tree: typecheck (no new), lint, 21/21 tests in the 3 touched suites, production build. (Strike itself reported 9,564 tests green; main CI validates full matrix post-push.)
 - **Deployed:** server pid 1850998 @ 21:17:05 owns :3011, health 200. Primary FF'd clean (checked porcelain first).
 - Watch main CI on a1426db49f; if red, investigate before anything else lands.
+
+## Tick 77 — 2026-07-16 ~21:30 — 2811 CI green; 1966 unstuck (nudge works); yield bug filed
+- **Main CI ALL GREEN on a1426db49f** (PAN-2811 landing verified).
+- **The pan-tell nudge UNSTICKS resume-idle review convoys:** 1966 coordinator wrote a fresh synthesis (21:17) after the nudge — verdict CHANGES REQUESTED, one real blocking finding (post-UAT flywheel nudge calls GET /api/pipeline/membership without required ?project= — route 400s; uat-promote-notify.ts:23 / issues.ts:908). Playbook for wedged convoys: pan tell the coordinator with run-dir + output-file instructions.
+- 1966 work agent fresh-started (was ANOTHER stuck yield: "making room for review of PAN-1491") + told the precise fix. **Yield self-clear bug now 2x reproduced (2232, 1966) → filed PAN-2813** (backstop-as-symptom, not driven).
+- 1491 review coordinator nudged the same way (was idle since 00:53); expect synthesis next tick.
+- Session landings: 6 merges + 2811 strike. Deploys: 2 (a9e301526b, a1426db49f). Close-outs: 14 done (11 operator + 3 evidence-verified accepts).
