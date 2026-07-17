@@ -75,7 +75,7 @@
     "recordedAt": "2026-07-17T02:12:22.787Z"
   },
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T03:12:46.687Z",
+  "updated": "2026-07-17T03:14:22.018Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "passed",
@@ -224,7 +224,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 14,
     "claims": {},
