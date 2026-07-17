@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { compareIssueIds } from '@overdeck/contracts';
 import { Issue, IssueSource } from '../types';
 
 export interface SearchFilters {
@@ -143,7 +144,7 @@ export function useSearch(query: string, filters: SearchFilters, options: UseSea
       if (b.score !== a.score) {
         return b.score - a.score;
       }
-      return a.issue.identifier.localeCompare(b.issue.identifier);
+      return compareIssueIds(a.issue.identifier, b.issue.identifier);
     });
 
     // Limit results

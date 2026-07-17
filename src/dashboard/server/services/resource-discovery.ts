@@ -3,6 +3,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
+import { compareIssueIds } from '@overdeck/contracts';
 
 import type { TaskTotals } from './resource-discovery-signals.js';
 import { isWithinRecencyDate, isWithinRecencyMs } from './resource-discovery-signals.js';
@@ -806,7 +807,7 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
         } satisfies InternalDiscoveredIssue;
       });
 
-  return discoveredIssues.sort((a, b) => a.issueId.localeCompare(b.issueId));
+  return discoveredIssues.sort((a, b) => compareIssueIds(a.issueId, b.issueId));
 }
 
 function toPublicResourceIssue(issue: InternalDiscoveredIssue): ResourceAllocatedIssue {
@@ -927,7 +928,7 @@ export function groupResourceAllocatedIssuesByProject(issues: ResourceAllocatedI
   return [...projectTree.values()]
     .map((project) => ({
       ...project,
-      features: project.features.sort((a, b) => a.issueId.localeCompare(b.issueId)),
+      features: project.features.sort((a, b) => compareIssueIds(a.issueId, b.issueId)),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }

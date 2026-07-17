@@ -30,7 +30,7 @@ import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
-import type { AgentSnapshot, SessionNode, SessionNodePresence, SessionNodeType } from '@overdeck/contracts';
+import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodePresence, type SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
@@ -656,7 +656,7 @@ export async function fetchProjectSessionTree(
   }
 
   // Sort features by issueId for stable ordering
-  features.sort((a, b) => a.issueId.localeCompare(b.issueId));
+  features.sort((a, b) => compareIssueIds(a.issueId, b.issueId));
 
   return { projectKey, features };
 }

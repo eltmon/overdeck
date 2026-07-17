@@ -3,7 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { NotificationClassBadge } from '../components/NotificationClassBadge';
 import { ActionStatusChip } from '../components/ActionStatusChip';
-import type { AgentSnapshot, FeatureRegistryEntry, MemoryHealthSnapshot, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
+import { compareIssueIds, type AgentSnapshot, type FeatureRegistryEntry, type MemoryHealthSnapshot, type MemoryObservation, type MemoryStatus, type ReviewStatusSnapshot } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
 import { fetchProjects, filterSpecOnlyPlanned, type ProjectData } from '../components/CommandDeck/projectsData';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
@@ -526,7 +526,7 @@ function buildHomeWorkspaceCards({
     if (agent.issueId && isActiveWorkspaceAgent(agent)) issueIds.add(agent.issueId);
   }
 
-  return [...issueIds].sort().map((issueId) => {
+  return [...issueIds].sort(compareIssueIds).map((issueId) => {
     const status = statusByIssueId[issueId];
     const observations = observationsByIssueId[issueId] ?? [];
     return {
