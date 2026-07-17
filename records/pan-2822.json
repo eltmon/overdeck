@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T10:54:24.925Z",
+  "updated": "2026-07-17T10:57:12.957Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "homepage-counts": {
-        "writerId": "agent-pan-2822",
-        "agentId": "agent-pan-2822",
-        "pid": 2110869,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:54:24.925Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2822",
@@ -117,6 +109,16 @@
         "itemId": "sidebar-rail-counts",
         "outcome": "completed",
         "releasedAt": "2026-07-17T10:54:14.323Z"
+      },
+      {
+        "writerId": "agent-pan-2822",
+        "agentId": "agent-pan-2822",
+        "pid": 2110869,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:54:24.925Z",
+        "itemId": "homepage-counts",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T10:57:12.956Z"
       }
     ],
     "statusReasons": {
@@ -161,6 +163,8 @@
     "sidebar-rail-counts": "completed",
     "sidebar-rail-counts.sidebar-rail-counts.ac1": "completed",
     "sidebar-rail-counts.sidebar-rail-counts.ac2": "completed",
-    "homepage-counts": "running"
+    "homepage-counts": "completed",
+    "homepage-counts.homepage-counts.ac1": "completed",
+    "homepage-counts.homepage-counts.ac2": "completed"
   }
 }
