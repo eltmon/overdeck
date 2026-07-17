@@ -102,7 +102,7 @@ export function DeaconStatus() {
   const [showLogs, setShowLogs] = useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  const { data: status } = useQuery({
+  const { data: status, isLoading } = useQuery({
     queryKey: ['deacon-status'],
     queryFn: fetchDeaconStatus,
     refetchInterval: 15000,
@@ -122,7 +122,19 @@ export function DeaconStatus() {
     }
   }, [logData, showLogs]);
 
-  if (!status) return null;
+  if (!status) {
+    return (
+      <div className={styles.deaconPanel}>
+        <div className={styles.deaconHeader}>
+          <Shield size={12} style={{ color: 'var(--muted-foreground)', flexShrink: 0 }} />
+          <span className={styles.deaconTitle}>Deacon</span>
+          <span className={styles.deaconMeta}>
+            {isLoading ? 'loading' : 'unavailable'}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const specialists = Object.values(status.state.specialists || {});
   const actions = status.lastPatrol?.actions || [];

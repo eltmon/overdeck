@@ -268,8 +268,11 @@ pan down
 # Restart dashboard
 pan restart
 
-# Check system health
+# Check live runtime health of Overdeck services
 pan health
+
+# Check dependencies, installation, configuration, and broader diagnostics
+pan doctor
 
 # View dashboard logs
 pan logs dashboard

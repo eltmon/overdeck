@@ -13,6 +13,35 @@ autonomous paths never called it. Boot-reconciliation resuming a large stopped-a
 memory pressure caused a real out-of-memory incident that required a hard reboot — see
 [GitHub issue #2390](https://github.com/eltmon/overdeck/issues/2390).
 
+## System-health domains and state derivation
+
+The V2 system-health snapshot separates evidence into four domains so one kind of signal cannot
+silently stand in for another:
+
+- **Host** reports current CPU and memory-pressure evidence from the operating system.
+- **Admission** reports whether a new work agent fits inside the configured HTTP spawn reserves.
+- **Agent** reports each agent's runtime and session health.
+- **Service** reports required and optional Overdeck services; an optional service that is not
+  configured is neutral rather than degraded.
+
+Overall health is derived in a fixed order. A critical host, dead agent, or wedged agent makes the
+snapshot `critical`. A warning host, warning or stalled agent, or degraded or stopped service makes it
+`warning`. Host warmup produces `measuring`; after warmup, unavailable host, agent, or service evidence
+produces `unavailable`; otherwise the snapshot is `healthy`. The sampler begins in `measuring`, accepts
+state changes only after three consecutive matching assessments, and moves state, reasons, and metrics
+together. An invalid later sample retains the last accepted assessment but marks its evidence stale.
+
+Admission is intentionally a separate domain and does not promote overall health by itself. Low memory
+headroom can make admission `soft` or `blocked` without claiming that the host is under active pressure.
+On Linux, host pressure is raised only when low headroom is paired with current evidence: memory PSI
+`some` has a warning threshold of 5 over 10 seconds, PSI `full` has a critical threshold of 1 over 10
+seconds, and swap activity warns at 64 MiB/min and becomes critical at 256 MiB/min. On macOS, the native
+memory-pressure free percentage warns at 10% or less and becomes critical at 5% or less.
+
+Swap occupancy and virtual memory commitment remain visible diagnostics because they explain historical
+or configured memory use, but neither indicates current pressure. Unsupported platforms and collectors
+that cannot produce a signal return `unavailable`/`null`; they never fabricate a measured zero.
+
 ## The two-gates-now-one-door model
 
 Two admission checks exist. They are deliberately separate and must stay that way:
@@ -229,8 +258,38 @@ durable obligation is re-derived on the next deterministic patrol.
 
 ## Config keys and defaults
 
-All keys live under `resources:` in `~/.overdeck/config.yaml`. Snake_case in the YAML file; the
-normalized in-process config uses the camelCase names shown in parentheses.
+### Live health and HTTP admission
+
+The health sampler reads the `resources.memory_warn_gb`, `memory_block_gb`, `agent_warn_count`, and
+`agent_block_count` settings from `~/.overdeck/config.yaml`; environment variables can override those
+values and the sampler-specific settings:
+
+| Environment key | Default | Meaning |
+|---|---|---|
+| `PAN_HEALTH_POLL_SECONDS` | `15` | Poll interval after the initial three-sample warmup. |
+| `PAN_MEMORY_WARN_GB` | `4` | Available-memory reserve below which HTTP spawn admission becomes `soft`. |
+| `PAN_MEMORY_BLOCK_GB` | `2` | Available-memory reserve at or below which HTTP spawn admission becomes `blocked`. |
+| `PAN_AGENT_WARN_COUNT` | `8` | Agent-count warning context retained by health configuration. |
+| `PAN_AGENT_BLOCK_COUNT` | `10` | Agent-count block context retained by health configuration. |
+| `PAN_HEALTH_SWAP_WARN_PERCENT` / `PAN_HEALTH_SWAP_CRITICAL_PERCENT` | `20` / `50` | Diagnostic reference bands for swap occupancy; occupancy does not change health state. |
+| `PAN_HEALTH_LOAD_WARN_PER_CORE` / `PAN_HEALTH_LOAD_CRITICAL_PER_CORE` | `1` / `1.5` | Diagnostic load-per-core reference bands. |
+| `PAN_HEALTH_OVERCOMMIT_WARN_PERCENT` / `PAN_HEALTH_OVERCOMMIT_CRITICAL_PERCENT` | `150` / `200` | Diagnostic reference bands for virtual commitment; commitment does not change health state. |
+
+Normalization accepts finite nonnegative numbers, floors poll seconds and agent counts to integers, and
+requires warning/critical pairs to be ordered. Memory reserves are the decreasing pair (`warn >= block`)
+because less available memory is more severe; the other pairs are increasing. An invalid value or
+reversed pair falls back to its named defaults, and startup emits one consolidated warning listing every
+fallback.
+
+These HTTP admission reserves answer a one-shot question: whether one requested spawn has enough
+headroom. The autonomous governor reserves below answer a stateful patrol question: whether Deacon
+should admit, hold, or shed work over time. They have separate settings and thresholds by design, so a
+health admission result must not be substituted for the governor's hysteretic decision.
+
+### Autonomous governor
+
+All governor keys live under `resources:` in `~/.overdeck/config.yaml`. Snake_case in the YAML file;
+the normalized in-process config uses the camelCase names shown in parentheses.
 
 | Key | Normalized field | Default | Meaning |
 |---|---|---|---|

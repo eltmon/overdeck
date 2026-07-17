@@ -18,19 +18,19 @@
  *     close-out and are still reaped).
  */
 
-export type AdvancingRole = 'review' | 'test' | 'ship';
+import {
+  classifyAdvancingSessionLifecycle,
+  isRoleTerminal,
+  type AdvancingRole,
+  type WarmIdleStatusShape,
+} from './review-status-source.js';
 
-/** Review/test statuses that mean the phase is over and the session has no more work. */
-const TERMINAL_REVIEW: ReadonlySet<string> = new Set(['passed', 'failed', 'blocked']);
-const TERMINAL_TEST: ReadonlySet<string> = new Set(['passed', 'failed']);
+export {
+  isRoleTerminal,
+  type AdvancingRole,
+} from './review-status-source.js';
 
-/** Minimal review-status shape this module reads. */
-export interface ReapableStatus {
-  reviewStatus?: string;
-  testStatus?: string;
-  readyForMerge?: boolean;
-  mergeStatus?: string;
-}
+export type ReapableStatus = WarmIdleStatusShape;
 
 /**
  * Of the alive sessions, the ones belonging to `issueId`'s advancing `role`.
@@ -53,24 +53,6 @@ export function sessionsToReapForRole(
     }
     return s.startsWith('specialist-') && s.includes(`-${lo}-`) && legacy.test(s);
   });
-}
-
-/**
- * Whether an advancing role's phase verdict is terminal — the session can be reaped.
- * Ship is terminal once it has pushed (readyForMerge) or the merge itself resolved;
- * the merge is a separate server-side flow, not the ship tmux session's job.
- */
-export function isRoleTerminal(role: AdvancingRole, status: ReapableStatus): boolean {
-  switch (role) {
-    case 'review':
-      return TERMINAL_REVIEW.has(status.reviewStatus ?? '');
-    case 'test':
-      return TERMINAL_TEST.has(status.testStatus ?? '');
-    case 'ship':
-      return status.readyForMerge === true
-        || status.mergeStatus === 'merged'
-        || status.mergeStatus === 'failed';
-  }
 }
 
 /**
@@ -139,8 +121,8 @@ export function selectMergedAdvancingSessions(
 ): string[] {
   const kill = new Set<string>();
   for (const [issueId, status] of Object.entries(statuses)) {
-    if (status.mergeStatus !== 'merged') continue;
     for (const role of ['review', 'test', 'ship'] as const) {
+      if (classifyAdvancingSessionLifecycle(role, status, true) !== 'orphaned') continue;
       for (const session of sessionsToReapForRole(issueId, role, aliveSessions)) {
         kill.add(session);
       }

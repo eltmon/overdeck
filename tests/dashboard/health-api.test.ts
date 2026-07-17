@@ -1,263 +1,346 @@
-/**
- * Tests for dashboard health API filtering
- *
- * sessionExistsAsync is mocked because it uses the managed tmux socket
- * (-L overdeck), which is separate from the default socket. Tests that
- * previously created real tmux sessions on the default socket would always
- * see them as missing when checked on the managed socket (CI / managed mode).
- */
-
 import { Effect } from 'effect';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { describe, expect, it } from 'vitest';
 
-// ─── Controlled session set (replaces real tmux calls) ───────────────────────
+import {
+  buildGodviewSystemHealthResponse,
+  buildHealthAgentsResponse,
+  buildSystemHealthResponse,
+} from '../../src/dashboard/server/routes/misc/health.js';
 
-const { activeSessions } = vi.hoisted(() => ({
-  activeSessions: new Set<string>(),
-}));
+const NOW = Date.parse('2026-07-16T12:00:00.000Z');
 
-vi.mock('../../src/lib/tmux.js', () => ({
-  sessionExists: (name: string) => Effect.succeed(activeSessions.has(name)),
-  sessionExistsSync: (name: string) => Effect.succeed(activeSessions.has(name)),
-  capturePane: vi.fn(() => Effect.succeed('')),
-  getTmuxConfigMode: vi.fn(() => 'inherit-user'),
-  getManagedTmuxSocketName: vi.fn(() => 'overdeck'),
-  getManagedTmuxConfigPath: vi.fn(() => '/tmp/overdeck.tmux.conf'),
-  getTmuxBaseArgs: vi.fn(() => []),
-  buildTmuxArgs: vi.fn((args: string[]) => args),
-  getTmuxCommand: vi.fn((args: string[]) => ({ command: 'tmux', args })),
-  buildTmuxCommandString: vi.fn((args: string[]) => ['tmux', ...args].join(' ')),
-}));
+type ResponseBody = Record<string, unknown> | Array<Record<string, unknown>>;
 
-import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.js';
+async function runResponse(
+  effect:
+    | ReturnType<typeof buildHealthAgentsResponse>
+    | ReturnType<typeof buildSystemHealthResponse>
+    | ReturnType<typeof buildGodviewSystemHealthResponse>,
+): Promise<{ status: number; body: ResponseBody }> {
+  const response = await Effect.runPromise(effect);
+  const raw = response.body as { body: Uint8Array } | null;
+  const text = raw?.body ? new TextDecoder().decode(raw.body) : '{}';
+  return { status: response.status, body: JSON.parse(text) as ResponseBody };
+}
 
-const runDetermineHealthStatus = (...args: Parameters<typeof determineHealthStatus>) =>
-  Effect.runPromise(determineHealthStatus(...args));
+function agent(
+  id: string,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id,
+    issueId: 'PAN-2647',
+    role: 'work',
+    status: 'running',
+    startedAt: '2026-07-16T11:50:00.000Z',
+    lastActivity: '2026-07-16T11:59:00.000Z',
+    ...overrides,
+  };
+}
 
-let testDir: string;
+function snapshot(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    agents: [],
+    agentRuntimeById: {},
+    reviewStatuses: [],
+    ...overrides,
+  };
+}
 
-beforeEach(() => {
-  activeSessions.clear();
-  testDir = mkdtempSync(join(tmpdir(), 'health-api-test-'));
-  mkdirSync(join(testDir, '.overdeck', 'agents'), { recursive: true });
+function systemHealthSnapshot(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    version: 2,
+    state: 'healthy',
+    updatedAt: '2026-07-16T12:00:00.000Z',
+    nextPollMs: 15_000,
+    host: {
+      state: 'healthy',
+      platform: 'linux',
+      reasons: [],
+      metrics: {
+        cpuPercent: 12,
+        loadAverage1m: 1.2,
+        loadPerCore1m: 0.15,
+        totalMemoryBytes: 32 * 1024 ** 3,
+        usedMemoryBytes: 12 * 1024 ** 3,
+        availableMemoryBytes: 20 * 1024 ** 3,
+        memoryUsedPercent: 37.5,
+        memoryPressureSomeAvg10: 0,
+        memoryPressureFullAvg10: 0,
+        memoryPressureFreePercent: null,
+        swapTotalBytes: 8 * 1024 ** 3,
+        swapUsedBytes: 0,
+        swapUsedPercent: 0,
+        swapActivityBytesPerMinute: 0,
+        committedMemoryBytes: 10 * 1024 ** 3,
+        commitLimitBytes: 40 * 1024 ** 3,
+        virtualCommitmentPercent: 25,
+      },
+    },
+    admission: {
+      state: 'open',
+      availableMemoryBytes: 20 * 1024 ** 3,
+      admittedWorkAgentCount: 1,
+      reasons: [],
+    },
+    agents: [],
+    services: [{
+      id: 'smee-relay',
+      label: 'Webhook relay',
+      required: false,
+      status: 'not_configured',
+      message: 'Webhook relay is not configured.',
+      reasons: [],
+    }],
+    topConsumers: [],
+    summary: {
+      cpuPercent: 12,
+      loadAverage1m: 1.2,
+      loadPerCore1m: 0.15,
+      totalMemoryBytes: 32 * 1024 ** 3,
+      usedMemoryBytes: 12 * 1024 ** 3,
+      availableMemoryBytes: 20 * 1024 ** 3,
+      memoryUsedPercent: 37.5,
+      swapTotalBytes: 8 * 1024 ** 3,
+      swapUsedBytes: 0,
+      swapUsedPercent: 0,
+      committedMemoryBytes: 10 * 1024 ** 3,
+      commitLimitBytes: 40 * 1024 ** 3,
+      overcommitPercent: 25,
+      agentCount: 0,
+      workAgentCount: 0,
+      planningAgentCount: 0,
+      specialistSessionCount: 0,
+      leakedSpecialistCount: 0,
+      containerCount: 0,
+      containerMemoryBytes: 0,
+      overdeckMemoryBytes: 0,
+      overdeckMemoryPercent: 0,
+      smeeRelay: {
+        configured: false,
+        running: false,
+        status: 'not_configured',
+        message: 'Webhook relay is not configured.',
+      },
+    },
+    ...overrides,
+  };
+}
+
+describe('accepted system health routes', () => {
+  it('decodes one accepted snapshot and keeps God View evidence aligned', async () => {
+    const accepted = systemHealthSnapshot();
+    const system = await runResponse(buildSystemHealthResponse({
+      snapshot: Effect.succeed(accepted),
+    }));
+    const godview = await runResponse(buildGodviewSystemHealthResponse({
+      snapshot: Effect.succeed(accepted),
+    }));
+
+    expect(system.status).toBe(200);
+    expect(godview.status).toBe(200);
+    expect(godview.body).toMatchObject({
+      version: 2,
+      state: system.body['state'],
+      host: system.body['host'],
+      admission: system.body['admission'],
+      cpu: 12,
+      memPercent: 37.5,
+      memUsed: 12 * 1024 ** 3,
+      memTotal: 32 * 1024 ** 3,
+      updatedAt: '2026-07-16T12:00:00.000Z',
+    });
+  });
+
+  it('keeps unavailable host signals as null in an otherwise valid HTTP 200 snapshot', async () => {
+    const accepted = systemHealthSnapshot({
+      state: 'unavailable',
+      host: {
+        ...(systemHealthSnapshot()['host'] as Record<string, unknown>),
+        state: 'unavailable',
+        reasons: [{
+          code: 'host.current_pressure.unavailable',
+          domain: 'host',
+          severity: 'info',
+          message: 'Current pressure could not be measured.',
+        }],
+        metrics: {
+          ...((systemHealthSnapshot()['host'] as Record<string, unknown>)['metrics'] as Record<string, unknown>),
+          memoryPressureSomeAvg10: null,
+          memoryPressureFullAvg10: null,
+        },
+      },
+    });
+    const response = await runResponse(buildSystemHealthResponse({
+      snapshot: Effect.succeed(accepted),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(response.body).toMatchObject({
+      state: 'unavailable',
+      host: {
+        state: 'unavailable',
+        metrics: {
+          memoryPressureSomeAvg10: null,
+          memoryPressureFullAvg10: null,
+        },
+      },
+    });
+  });
+
+  it.each([
+    ['production failure', Effect.fail(new Error('collector offline'))],
+    ['shared-schema failure', Effect.succeed({ version: 1 })],
+  ])('returns one structured HTTP 503 body on %s', async (_label, health) => {
+    const system = await runResponse(buildSystemHealthResponse({ snapshot: health }));
+    const godview = await runResponse(buildGodviewSystemHealthResponse({ snapshot: health }));
+
+    expect(system.status).toBe(503);
+    expect(godview.status).toBe(503);
+    expect(system.body).toEqual(godview.body);
+    expect(system.body).toEqual({
+      status: 'unavailable',
+      reasons: [{
+        code: 'system.health_snapshot.unavailable',
+        domain: 'host',
+        severity: 'critical',
+        message: 'The accepted system health snapshot could not be produced or decoded.',
+      }],
+    });
+  });
 });
 
-afterEach(() => {
-  activeSessions.clear();
-  rmSync(testDir, { recursive: true, force: true });
-});
+describe('GET /api/health/agents response', () => {
+  it('keeps healthy agents visible when another canonical entry is malformed', async () => {
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.succeed(snapshot({
+        agents: [
+          agent('agent-healthy'),
+          agent('agent-corrupt', { status: 'not-a-real-status' }),
+        ],
+      })),
+      sessionNames: Effect.succeed(['agent-healthy']),
+      readObservations: async () => ({}),
+      nowMs: NOW,
+    }));
 
-// Helper to create agent directory with state.json
-function createAgent(name: string, status?: string, lastActivity?: string): string {
-  const agentDir = join(testDir, '.overdeck', 'agents', name);
-  mkdirSync(agentDir, { recursive: true });
+    expect(status).toBe(200);
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'agent-healthy', status: 'healthy' }),
+      expect.objectContaining({
+        id: 'agent-corrupt',
+        status: 'unavailable',
+        reasons: [expect.objectContaining({
+          code: 'agent.persisted_state.unavailable',
+        })],
+      }),
+    ]));
+  });
 
-  if (status !== undefined) {
-    const state = {
-      status,
-      lastActivity: lastActivity || new Date().toISOString(),
-    };
-    writeFileSync(join(agentDir, 'state.json'), JSON.stringify(state, null, 2));
-  }
+  it('returns structured unavailable evidence with a non-2xx status on whole-read failure', async () => {
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.fail(new Error('resolver offline')),
+      sessionNames: Effect.succeed([]),
+      nowMs: NOW,
+    }));
 
-  return agentDir;
-}
-
-function writeRuntime(agentDir: string, runtime: Record<string, unknown>): void {
-  writeFileSync(join(agentDir, 'runtime.json'), JSON.stringify(runtime, null, 2));
-}
-
-// Helpers that register/deregister in the mock set (no real tmux calls)
-function createTmuxSession(name: string): void {
-  activeSessions.add(name);
-}
-
-function killTmuxSession(name: string): void {
-  activeSessions.delete(name);
-}
-
-describe('health-api', () => {
-  describe('agent filtering', () => {
-    it('should exclude agents with status "stopped"', async () => {
-      const agentDir = createAgent('agent-stopped', 'stopped');
-
-      const result = await runDetermineHealthStatus(
-        'agent-stopped',
-        join(agentDir, 'state.json'),
-        activeSessions
-      );
-
-      expect(result).toBeNull();
+    expect(status).toBe(503);
+    expect(body).toEqual({
+      status: 'unavailable',
+      reasons: [{
+        code: 'agent.health_snapshot.unavailable',
+        domain: 'agent',
+        severity: 'critical',
+        message: 'The canonical agent health snapshot could not be loaded.',
+      }],
     });
+  });
 
-    it('should exclude agents with status "completed"', async () => {
-      const agentDir = createAgent('agent-completed', 'completed');
+  it('returns real activity, preserves zero context, and never fabricates lastPing', async () => {
+    const lastActivityAt = '2026-07-16T11:59:30.000Z';
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.succeed(snapshot({
+        agents: [agent('agent-zero-context')],
+        agentRuntimeById: {
+          'agent-zero-context': {
+            id: 'agent-zero-context',
+            activity: 'working',
+            lastActivity: lastActivityAt,
+            updatedAtSequence: 1,
+          },
+        },
+      })),
+      sessionNames: Effect.succeed(['agent-zero-context']),
+      readObservations: async () => ({ contextPercent: 0 }),
+      nowMs: NOW,
+    }));
 
-      const result = await runDetermineHealthStatus(
-        'agent-completed',
-        join(agentDir, 'state.json'),
-        activeSessions
-      );
-
-      expect(result).toBeNull();
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    const [health] = body as Array<Record<string, unknown>>;
+    expect(health).toMatchObject({
+      id: 'agent-zero-context',
+      status: 'healthy',
+      lastActivityAt,
+      contextPercent: 0,
     });
+    expect(health).not.toHaveProperty('lastPing');
+  });
 
-    it('should exclude agents without state.json', async () => {
-      const agentDir = createAgent('agent-no-state');
-      // Don't create state.json (status param undefined creates dir only)
+  it('keeps terminal specialists warm and human-blocked work agents waiting', async () => {
+    const oldActivity = '2026-07-16T10:00:00.000Z';
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.succeed(snapshot({
+        agents: [
+          agent('agent-pan-2647-review', {
+            role: 'review',
+            lastActivity: oldActivity,
+          }),
+          agent('agent-pan-2647', { lastActivity: oldActivity }),
+        ],
+        agentRuntimeById: {
+          'agent-pan-2647-review': {
+            id: 'agent-pan-2647-review',
+            activity: 'working',
+            lastActivity: oldActivity,
+            updatedAtSequence: 2,
+          },
+          'agent-pan-2647': {
+            id: 'agent-pan-2647',
+            activity: 'waiting',
+            lastActivity: oldActivity,
+            updatedAtSequence: 3,
+          },
+        },
+        reviewStatuses: [{
+          issueId: 'PAN-2647',
+          reviewStatus: 'passed',
+        }],
+      })),
+      sessionNames: Effect.succeed([
+        'agent-pan-2647-review',
+        'agent-pan-2647',
+      ]),
+      readObservations: async () => ({}),
+      nowMs: NOW,
+    }));
 
-      const result = await runDetermineHealthStatus(
-        'agent-no-state',
-        join(agentDir, 'state.json'),
-        activeSessions
-      );
-
-      expect(result).toBeNull();
-    });
-
-    it('should show crashed agents (status "running", no tmux)', async () => {
-      const agentDir = createAgent('agent-crashed', 'running');
-
-      const result = await runDetermineHealthStatus(
-        'agent-crashed',
-        join(agentDir, 'state.json'),
-        activeSessions
-      );
-
-      expect(result).not.toBeNull();
-      expect(result?.status).toBe('dead');
-      expect(result?.reason).toBe('Agent crashed unexpectedly');
-    });
-
-    it('should show crashed agents (status "in_progress", no tmux)', async () => {
-      const agentDir = createAgent('agent-crashed-2', 'in_progress');
-
-      const result = await runDetermineHealthStatus(
-        'agent-crashed-2',
-        join(agentDir, 'state.json'),
-        activeSessions
-      );
-
-      expect(result).not.toBeNull();
-      expect(result?.status).toBe('dead');
-      expect(result?.reason).toBe('Agent crashed unexpectedly');
-    });
-
-    it('should show healthy running agents with tmux session', async () => {
-      const agentName = 'agent-healthy-test';
-      const agentDir = createAgent(agentName, 'running');
-      createTmuxSession(agentName);
-
-      try {
-        const result = await runDetermineHealthStatus(
-          agentName,
-          join(agentDir, 'state.json'),
-          activeSessions
-        );
-
-        expect(result).not.toBeNull();
-        expect(result?.status).toBe('healthy');
-        expect(result?.reason).toBeUndefined();
-      } finally {
-        killTmuxSession(agentName);
-      }
-    });
-
-    it('should show wedged for alive context-saturated agents even with recent activity', async () => {
-      const agentName = 'agent-wedged-test';
-      const agentDir = createAgent(agentName, 'running', new Date().toISOString());
-      writeRuntime(agentDir, {
-        lastActivity: new Date().toISOString(),
-        contextSaturatedAt: '2026-06-05T12:00:00.000Z',
-      });
-      createTmuxSession(agentName);
-
-      try {
-        const result = await runDetermineHealthStatus(
-          agentName,
-          join(agentDir, 'state.json'),
-          activeSessions
-        );
-
-        expect(result).not.toBeNull();
-        expect(result?.status).toBe('wedged');
-        expect(result?.reason).toContain('Context window exhausted');
-      } finally {
-        killTmuxSession(agentName);
-      }
-    });
-
-    it('should show warning for agents with 15-30 min inactivity', async () => {
-      const agentName = 'agent-warning-test';
-      const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000).toISOString();
-      const agentDir = createAgent(agentName, 'running', twentyMinutesAgo);
-      createTmuxSession(agentName);
-
-      try {
-        const result = await runDetermineHealthStatus(
-          agentName,
-          join(agentDir, 'state.json'),
-          activeSessions
-        );
-
-        expect(result).not.toBeNull();
-        expect(result?.status).toBe('warning');
-        expect(result?.reason).toContain('Low activity');
-      } finally {
-        killTmuxSession(agentName);
-      }
-    });
-
-    it('should show stuck for agents with >30 min inactivity', async () => {
-      const agentName = 'agent-stuck-test';
-      const fortyMinutesAgo = new Date(Date.now() - 40 * 60 * 1000).toISOString();
-      const agentDir = createAgent(agentName, 'running', fortyMinutesAgo);
-      createTmuxSession(agentName);
-
-      try {
-        const result = await runDetermineHealthStatus(
-          agentName,
-          join(agentDir, 'state.json'),
-          activeSessions
-        );
-
-        expect(result).not.toBeNull();
-        expect(result?.status).toBe('stuck');
-        expect(result?.reason).toContain('No activity for');
-      } finally {
-        killTmuxSession(agentName);
-      }
-    });
-
-    it('should handle corrupted state.json gracefully', async () => {
-      const agentDir = createAgent('agent-corrupted-state');
-      writeFileSync(join(agentDir, 'state.json'), 'not valid json{{{');
-
-      const result = await runDetermineHealthStatus(
-        'agent-corrupted-state',
-        join(agentDir, 'state.json'),
-        activeSessions
-      );
-
-      // Corrupted state.json treated as missing -> excluded
-      expect(result).toBeNull();
-    });
-
-    it('should treat unknown status values as running (crash if no tmux)', async () => {
-      const agentDir = createAgent('agent-unknown-status', 'weird_status_value');
-
-      const result = await runDetermineHealthStatus(
-        'agent-unknown-status',
-        join(agentDir, 'state.json'),
-        activeSessions
-      );
-
-      // Unknown status + no tmux = treat as crashed
-      expect(result).not.toBeNull();
-      expect(result?.status).toBe('dead');
-    });
+    expect(status).toBe(200);
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'agent-pan-2647-review',
+        status: 'idle',
+        lifecycle: 'warm',
+      }),
+      expect.objectContaining({
+        id: 'agent-pan-2647',
+        status: 'waiting',
+        reasons: [expect.objectContaining({
+          code: 'agent.runtime.waiting_on_human',
+        })],
+      }),
+    ]));
   });
 });

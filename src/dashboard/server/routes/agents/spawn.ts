@@ -367,9 +367,7 @@ export const postAgentsRoute = HttpRouter.add(
       }, { status: 422 });
     }
 
-    const health = yield* readModel.getSnapshot.pipe(
-      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
-    );
+    const health = yield* Effect.promise(() => getSystemHealthSnapshot());
     emitStartAgentPhase(issueId, 'guardrails', 'start', 'evaluating spawn guardrails');
     const spawnGuardrails = evaluateSpawnGuardrails(health);
     if (spawnGuardrails.blocked) {

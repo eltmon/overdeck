@@ -1,4 +1,4 @@
-import { freemem, loadavg, totalmem } from 'node:os';
+import type { SystemHealthSnapshot } from '@overdeck/contracts';
 
 export interface HostVitalsContainer {
   id?: string;
@@ -20,18 +20,11 @@ export interface HostVitalsAgentFleet {
 
 export interface HostVitalsOptions {
   nowMs?: number;
-  cpuPercent?: number;
-  load?: [number, number, number];
+  hostMetrics?: SystemHealthSnapshot['host']['metrics'];
   containers?: HostVitalsContainer[];
   dockerStale?: boolean;
   agents?: HostVitalsAgent[];
   agentFleet?: HostVitalsAgentFleet;
-  mem?: {
-    usedBytes: number;
-    availableBytes: number;
-    swapUsedBytes: number;
-    swapTotalBytes: number;
-  };
   disk?: {
     usedBytes: number;
     freeBytes: number;
@@ -44,15 +37,15 @@ export interface HostVitalsOptions {
 export interface HostVitalsSnapshot {
   stale: boolean;
   cpu: {
-    percent: number;
-    load: [number, number, number];
+    percent: number | null;
+    load: [number | null, number | null, number | null];
     spark: number[];
   };
   mem: {
-    usedBytes: number;
-    availableBytes: number;
-    swapUsedBytes: number;
-    swapTotalBytes: number;
+    usedBytes: number | null;
+    availableBytes: number | null;
+    swapUsedBytes: number | null;
+    swapTotalBytes: number | null;
   };
   disk: {
     usedBytes: number;
@@ -113,16 +106,24 @@ export function resetHostVitalsForTests(): void {
 }
 
 export function buildHostVitalsSnapshot(options: HostVitalsOptions = {}): HostVitalsSnapshot {
-  const cpuPercent = roundOneDecimal(options.cpuPercent ?? 0);
-  cpuSpark.push(cpuPercent);
-  cpuSpark = cpuSpark.slice(-CPU_SPARK_MAX);
+  const metrics = options.hostMetrics;
+  const cpuPercent = metrics?.cpuPercent ?? null;
+  if (cpuPercent !== null) {
+    cpuSpark.push(cpuPercent);
+    cpuSpark = cpuSpark.slice(-CPU_SPARK_MAX);
+  }
 
   const dockerCounts = options.dockerStale
     ? cachedDockerCounts
     : computeDockerCounts(options.containers ?? [], options.networkCount ?? 0, options.networkPoolTotal ?? 31);
   if (!options.dockerStale) cachedDockerCounts = dockerCounts;
 
-  const memory = options.mem ?? getDefaultMemoryVitals();
+  const memory = {
+    usedBytes: metrics?.usedMemoryBytes ?? null,
+    availableBytes: metrics?.availableMemoryBytes ?? null,
+    swapUsedBytes: metrics?.swapUsedBytes ?? null,
+    swapTotalBytes: metrics?.swapTotalBytes ?? null,
+  };
   const disk = options.disk ?? { usedBytes: 0, freeBytes: 0, reclaimableBytes: 0 };
   const agentCounts = computeAgentCounts(options.agents ?? [], options.agentFleet ?? {}, options.nowMs ?? Date.now());
 
@@ -130,7 +131,7 @@ export function buildHostVitalsSnapshot(options: HostVitalsOptions = {}): HostVi
     stale: options.dockerStale === true,
     cpu: {
       percent: cpuPercent,
-      load: options.load ?? normalizeLoad(loadavg()),
+      load: [metrics?.loadAverage1m ?? null, null, null],
       spark: [...cpuSpark],
     },
     mem: memory,
@@ -186,27 +187,4 @@ function computeAgentCounts(
     hypotheticalUsdPerHour: fleet.hypotheticalUsdPerHour ?? 0,
     totalUsd: fleet.totalUsd ?? 0,
   };
-}
-
-function getDefaultMemoryVitals(): HostVitalsSnapshot['mem'] {
-  const total = totalmem();
-  const available = freemem();
-  return {
-    usedBytes: Math.max(0, total - available),
-    availableBytes: available,
-    swapUsedBytes: 0,
-    swapTotalBytes: 0,
-  };
-}
-
-function normalizeLoad(load: number[]): [number, number, number] {
-  return [
-    roundOneDecimal(load[0] ?? 0),
-    roundOneDecimal(load[1] ?? 0),
-    roundOneDecimal(load[2] ?? 0),
-  ];
-}
-
-function roundOneDecimal(value: number): number {
-  return Math.round(value * 10) / 10;
 }

@@ -1,3 +1,4 @@
+import type { SystemHealthSnapshot as AcceptedSystemHealthSnapshot } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,14 +9,14 @@ import {
   resetCurrentDockerStatsReaderForTests,
   resetReclaimForTests,
   resetResourceStackReviewStatusReaderForTests,
-  resetSpawnGateHealthSnapshotReaderForTests,
+  resetSpawnGateHealthEvidenceReaderForTests,
   setCurrentDockerStatsReaderForTests,
   setReclaimIssueClosedReaderForTests,
   setReclaimProjectRootForTests,
   setReclaimVenvCandidatesForTests,
   setReclaimVenvDeleteForTests,
   setResourceStackReviewStatusReaderForTests,
-  setSpawnGateHealthSnapshotReaderForTests,
+  setSpawnGateHealthEvidenceReaderForTests,
   type ResourceStack,
 } from '../../../../src/dashboard/server/routes/resources.js';
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
@@ -24,7 +25,7 @@ import type { SystemHealthSnapshot } from '../../../../src/dashboard/server/serv
 afterEach(() => {
   resetCurrentDockerStatsReaderForTests();
   resetResourceStackReviewStatusReaderForTests();
-  resetSpawnGateHealthSnapshotReaderForTests();
+  resetSpawnGateHealthEvidenceReaderForTests();
   resetReclaimForTests();
 });
 
@@ -32,7 +33,10 @@ describe('resources reclaim payload', () => {
   it('returns a RAM and disk reclaim candidate for a merged stack with no live agent', async () => {
     setMergedReviewStatus();
     setCurrentDockerStatsReaderForTests(() => [container('api', { memoryUsage: 2 * 1024 ** 3 })]);
-    setSpawnGateHealthSnapshotReaderForTests(async () => healthFixture());
+    setSpawnGateHealthEvidenceReaderForTests(async () => ({
+      accepted: acceptedHealthFixture(),
+      compatibility: healthFixture(),
+    }));
 
     const body = await getResourcesJson();
 
@@ -74,7 +78,10 @@ describe('resources reclaim payload', () => {
   it('returns reclaim totals and mirrors disk total into hostVitals.disk.reclaimableBytes', async () => {
     setMergedReviewStatus();
     setCurrentDockerStatsReaderForTests(() => [container('api', { memoryUsage: 1 })]);
-    setSpawnGateHealthSnapshotReaderForTests(async () => healthFixture());
+    setSpawnGateHealthEvidenceReaderForTests(async () => ({
+      accepted: acceptedHealthFixture(),
+      compatibility: healthFixture(),
+    }));
 
     const body = await getResourcesJson();
 
@@ -143,9 +150,54 @@ function reviewStatus(overrides: Partial<ReviewStatus>): ReviewStatus {
   };
 }
 
+function acceptedHealthFixture(): AcceptedSystemHealthSnapshot {
+  const gib = 1024 ** 3;
+  return {
+    version: 2,
+    state: 'healthy',
+    updatedAt: '2026-07-07T12:00:00.000Z',
+    nextPollMs: 15_000,
+    host: {
+      state: 'healthy',
+      platform: 'linux',
+      reasons: [],
+      metrics: {
+        cpuPercent: 0,
+        loadAverage1m: 0,
+        loadPerCore1m: 0,
+        totalMemoryBytes: 16 * gib,
+        usedMemoryBytes: 8 * gib,
+        availableMemoryBytes: 8 * gib,
+        memoryUsedPercent: 50,
+        memoryPressureSomeAvg10: 0,
+        memoryPressureFullAvg10: 0,
+        memoryPressureFreePercent: null,
+        swapTotalBytes: 0,
+        swapUsedBytes: 0,
+        swapUsedPercent: 0,
+        swapActivityBytesPerMinute: 0,
+        committedMemoryBytes: 8 * gib,
+        commitLimitBytes: 24 * gib,
+        virtualCommitmentPercent: 33.3,
+      },
+    },
+    admission: {
+      state: 'open',
+      availableMemoryBytes: 8 * gib,
+      admittedWorkAgentCount: 0,
+      reasons: [],
+    },
+    agents: [],
+    services: [],
+    topConsumers: [],
+    summary: healthFixture().summary,
+  };
+}
+
 function healthFixture(): SystemHealthSnapshot {
   return {
     severity: 'normal',
+    state: 'healthy',
     updatedAt: '2026-07-07T12:00:00.000Z',
     summary: {
       cpuPercent: 0,
@@ -180,9 +232,17 @@ function healthFixture(): SystemHealthSnapshot {
       overcommitCriticalPercent: 95,
     },
     reasons: [],
+    structuredReasons: [],
+    admission: { admittedWorkAgentCount: 0 },
     agents: [],
     leakedSpecialists: [],
     topConsumers: [],
     smeeRelay: { configured: false, running: false, status: 'not_configured', message: 'not configured' },
+    deployStaleness: null,
+    freshness: {
+      status: 'fresh',
+      observedAt: '2026-07-07T12:00:00.000Z',
+    },
+    transitionVersion: 1,
   };
 }

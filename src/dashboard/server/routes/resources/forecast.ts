@@ -27,8 +27,8 @@ export interface StackForecastRow {
 export interface CapacityForecastPayload {
   stacks: StackForecastRow[];
   headroom: {
-    freeRamBytes: number;
-    loadHeadroom: number;
+    freeRamBytes: number | null;
+    loadHeadroom: number | null;
   };
 }
 
@@ -64,7 +64,9 @@ export function buildCapacityForecast(
       }),
     headroom: {
       freeRamBytes: options.hostVitals.mem.availableBytes,
-      loadHeadroom: Math.max(0, 100 - options.hostVitals.cpu.percent),
+      loadHeadroom: options.hostVitals.cpu.percent === null
+        ? null
+        : Math.max(0, 100 - options.hostVitals.cpu.percent),
     },
   };
 }

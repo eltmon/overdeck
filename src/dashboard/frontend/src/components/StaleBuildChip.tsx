@@ -1,12 +1,11 @@
-import { useSystemHealth } from '../hooks/useSystemHealth';
+import { useDeployStaleness } from '../hooks/useDeployStaleness';
 
 function shortCommit(commit: string | null): string {
   return commit?.slice(0, 8) || 'unknown';
 }
 
 export function StaleBuildChip() {
-  const { data } = useSystemHealth();
-  const staleness = data?.deployStaleness;
+  const { data: staleness } = useDeployStaleness();
 
   if (staleness?.status !== 'stale' || (staleness.behindBuildInputs ?? 0) < 1) {
     return null;

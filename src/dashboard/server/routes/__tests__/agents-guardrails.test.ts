@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { evaluateAgentStartGate, evaluateSpawnGuardrails, hasActiveAgentGateOrRetry } from '../agents.js';
-import { readGlobalResourceConfig } from '../../services/system-health-service.js';
+import {
+  countAdmittedWorkAgents,
+  readGlobalResourceConfig,
+} from '../../services/system-health-service.js';
 import type { SystemHealthSnapshot } from '../../services/system-health-service.js';
 
 const GIB = 1024 ** 3;
@@ -17,7 +20,11 @@ type DeepPartial<T> = {
 function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {}): SystemHealthSnapshot {
   const base: SystemHealthSnapshot = {
     severity: 'normal',
+    state: 'healthy',
     updatedAt: '2026-04-27T00:00:00.000Z',
+    admission: {
+      admittedWorkAgentCount: 2,
+    },
     summary: {
       cpuPercent: 12.5,
       loadAverage1m: 1.2,
@@ -51,14 +58,31 @@ function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {})
       overcommitCriticalPercent: 200,
     },
     reasons: [],
+    structuredReasons: [],
     agents: [],
     leakedSpecialists: [],
     topConsumers: [],
+    smeeRelay: {
+      configured: false,
+      running: false,
+      status: 'not_configured',
+      message: 'not configured',
+    },
+    deployStaleness: null,
+    freshness: {
+      status: 'fresh',
+      observedAt: '2026-04-27T00:00:00.000Z',
+    },
+    transitionVersion: 1,
   };
 
   return {
     ...base,
     ...overrides,
+    admission: {
+      ...base.admission,
+      ...overrides.admission,
+    },
     summary: {
       ...base.summary,
       ...overrides.summary,
@@ -150,10 +174,70 @@ describe('hasActiveAgentGateOrRetry', () => {
   });
 });
 
+describe('countAdmittedWorkAgents', () => {
+  const now = Date.parse('2026-07-16T12:00:00.000Z');
+
+  it('excludes errored, stopped, unknown, and stale-starting work agents', () => {
+    expect(countAdmittedWorkAgents([
+      { role: 'work', status: 'error', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'stopped', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'unknown', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'starting', startedAt: '2026-07-16T11:55:00.000Z', tmuxActive: false },
+      { role: 'work', status: 'starting', startedAt: 'not-a-date', tmuxActive: false },
+    ], now)).toBe(0);
+  });
+
+  it('counts live work agents and fresh starts without counting other roles', () => {
+    expect(countAdmittedWorkAgents([
+      { role: 'work', status: 'running', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'starting', startedAt: '2026-07-16T11:55:01.000Z', tmuxActive: false },
+      { role: 'work', status: 'starting', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: false },
+      { role: 'plan', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'review', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'test', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'ship', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'conversation', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+    ], now)).toBe(3);
+  });
+});
+
 describe('evaluateSpawnGuardrails', () => {
   afterEach(async () => {
     vi.unstubAllEnvs();
     await readGlobalResourceConfig();
+  });
+
+  it('fails closed when the retained health assessment is stale', () => {
+    const decision = evaluateSpawnGuardrails(createHealthSnapshot({
+      freshness: {
+        status: 'stale',
+        observedAt: '2026-04-27T00:01:00.000Z',
+        reason: {
+          code: 'host.sampler.collection_failed',
+          domain: 'host',
+          severity: 'critical',
+          message: 'System health collection failed.',
+        },
+      },
+    }));
+
+    expect(decision).toMatchObject({
+      blocked: true,
+      requiresAcknowledgement: false,
+      status: 503,
+      error: 'System health evidence is stale: System health collection failed.',
+      hint: 'Wait for a fresh system health assessment before starting this agent.',
+      warnings: [{
+        severity: 'critical',
+        code: 'health_snapshot_unavailable',
+      }],
+      health: {
+        freshness: {
+          status: 'stale',
+        },
+      },
+    });
   });
 
   it('does not block exactly at the memory threshold boundary', async () => {
@@ -178,14 +262,35 @@ describe('evaluateSpawnGuardrails', () => {
     );
   });
 
+  it('ignores the broad compatibility count when no work agents are admitted', async () => {
+    vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
+    vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
+    await readGlobalResourceConfig();
+
+    const decision = evaluateSpawnGuardrails(createHealthSnapshot({
+      admission: {
+        admittedWorkAgentCount: 0,
+      },
+      summary: {
+        workAgentCount: 99,
+      },
+    }));
+
+    expect(decision.blocked).toBe(false);
+    expect(decision.requiresAcknowledgement).toBe(false);
+    expect(decision.warnings).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'agent_capacity' })]),
+    );
+  });
+
   it('returns acknowledgement-required warnings when work agent count is high but below the hard limit', async () => {
     vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
     vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
     await readGlobalResourceConfig();
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
-      summary: {
-        workAgentCount: 5,
+      admission: {
+        admittedWorkAgentCount: 5,
       },
     }));
 
@@ -233,8 +338,10 @@ describe('evaluateSpawnGuardrails', () => {
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       severity: 'critical',
+      admission: {
+        admittedWorkAgentCount: 6,
+      },
       summary: {
-        workAgentCount: 6,
         leakedSpecialistCount: 4,
       },
       leakedSpecialists: [
