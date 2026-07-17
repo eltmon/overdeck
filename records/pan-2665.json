@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:12.069Z",
-  "updated": "2026-07-17T13:15:53.794Z",
+  "updated": "2026-07-17T13:18:20.685Z",
   "pipeline": {
     "issueId": "PAN-2665",
     "reviewStatus": "pending",
@@ -64,16 +64,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "lint-row-label-icon": {
-        "writerId": "agent-pan-2665",
-        "agentId": "agent-pan-2665",
-        "pid": 408552,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:15:53.794Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2665",
@@ -85,16 +77,31 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2665 dead)",
         "releasedAt": "2026-07-17T13:03:35.928Z"
+      },
+      {
+        "writerId": "agent-pan-2665",
+        "agentId": "agent-pan-2665",
+        "pid": 408552,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:15:53.794Z",
+        "itemId": "lint-row-label-icon",
+        "outcome": "completed",
+        "reason": "Added the Lint label, ListChecks icon, verification-gate purpose text, and rail rendering coverage.",
+        "releasedAt": "2026-07-17T13:18:20.685Z"
       }
     ],
     "statusReasons": {
       "lint-row-label-icon": {
-        "reason": "stale claim released (agent-pan-2665 dead)",
-        "updatedAt": "2026-07-17T13:03:35.928Z"
+        "reason": "Added the Lint label, ListChecks icon, verification-gate purpose text, and rail rendering coverage.",
+        "updatedAt": "2026-07-17T13:18:20.685Z"
       }
     }
   },
   "statusOverrides": {
-    "lint-row-label-icon": "running"
+    "lint-row-label-icon": "completed",
+    "lint-row-label-icon.lint-row-label-icon.ac1": "completed",
+    "lint-row-label-icon.lint-row-label-icon.ac2": "completed",
+    "lint-row-label-icon.lint-row-label-icon.ac3": "completed",
+    "lint-row-label-icon.lint-row-label-icon.ac4": "completed"
   }
 }
