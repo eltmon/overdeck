@@ -91,11 +91,10 @@
     "issueId": "PAN-2341",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-08T03:57:07.404Z",
+    "updatedAt": "2026-07-17T00:33:38.182Z",
     "reviewNotes": "review passed; committed dynamic import fix verified",
     "testNotes": "typecheck PASSED, lint PASSED, focused PAN-2341 tests PASSED (6 files, 24 tests). Full npm test FAILED: 12 test files failed / 8 tests failed. Four failures are deterministic regressions introduced by PAN-2341: src/lib/cloister/advancing-selfheal.ts imports loadReviewStatuses from ../review-status.js and logDeaconEventSync from ../persistent-logger.js at the top level, and src/lib/cloister/deacon.ts imports advancing-selfheal.ts at the top level. Existing tests that partially mock those modules now fail to load with 'No <export> export is defined on the ... mock'. Affected files: src/lib/cloister/__tests__/deacon-auto-closeout.test.ts, tests/unit/lib/cloister/guard-advancing-dispatch.test.ts, tests/unit/dashboard/server/routes/merge-reconciliation.test.ts. Eight additional tests timed out under full-suite parallel load but pass in isolation, indicating resource contention rather than code defects. UAT not required: PRD explicitly states 'Browser/Playwright verification — backend-only change.' Fix: either update the partial mocks to include loadReviewStatuses/logDeaconEventSync, or make advancing-selfheal.ts imports lazy inside the patrol/boot call sites.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -139,7 +138,9 @@
         "src/lib/cloister/reap-terminal-sessions.ts"
       ],
       "recordedAt": "2026-07-07T09:50:43.123Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T00:33:38.182Z"
   },
   "closeOut": {
     "usage": {
@@ -233,8 +234,81 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2463"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T00:33:38.200Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at f3ac82a3a80571b651e66e543c786bdf82548958",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2463 MERGED at 2026-07-07T11:55:29Z",
+          "status": "pass",
+          "mergedAt": "2026-07-07T11:55:29Z",
+          "mergeCommit": "656cd7313d21cb01a02bb50c32071389acaf38ac"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: done; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "7 check-runs concluded successfully on 656cd7313d21cb01a02bb50c32071389acaf38ac",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T00:31:08.000Z, dist built 2026-07-17T00:28:58.492Z, merge 2026-07-07T11:55:29.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2341 found; Pruned 0 checkpoint ref(s) for agent-pan-2341, planning-pan-2341, strike-pan-2341; No specialist registry entries for PAN-2341"
+        }
+      ],
+      "accepted": []
+    }
   },
   "created": "2026-07-07T10:53:20.710Z",
-  "updated": "2026-07-08T03:57:07.434Z"
+  "updated": "2026-07-17T00:33:38.201Z"
 }
