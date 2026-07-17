@@ -5756,3 +5756,11 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **2829 still idle 144min** (frozen $23.0888). **2377 still dead-inspection** (PAN-2848). No change.
 - **Loop that's working:** I surface the specific idle agent + exactly what it needs → operator nudges → I drive. 2445 needs ANOTHER nudge (fix the 1-line boundary import + resubmit). Surfaced precisely.
 - **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9.
+
+## Tick 21 — 2026-07-17 ~17:01 — 2445 RECOVERED & advancing; 1610 (FINAL item) idle-at-prompt at review-feedback
+- **Main GREEN** (2b872f6ddf). **PAN-2445 recovered fully** — the operator nudge + its 1-line boundary-lint fix landed: verification PASSED, review re-running on head b3ef1608, PR#2852 all checks green (0 fail/0 pending), mergeState CLEAN. Healthy, advancing. Nothing to do but let review finish.
+- **PAN-1610 (FINAL SEQUENCE ITEM) is now idle-at-prompt at review-feedback (PAN-2817).** Review came back **CHANGES REQUESTED** with a REAL blocking finding: *"Issue/session action identities overlap and the required six-surface parity gate skips four real integrations"* (legit design finding for the shared action registry, not a false block). Feedback delivered (`001-review-agent-changes-requested.md`), agent told "Do NOT stop at the prompt" — but it's at a bare `❯`, no activity in 5000 events, cost frozen $45.00. Same PAN-2817 wall 2445 hit; now blocking the LAST item of the operator sequence.
+- **Surfaced as TOP priority:** 1610 needs an operator nudge to address the parity-gate finding (fix the 4 skipped integrations + the identity overlap, then `pan review request PAN-1610`). Flywheel can't nudge or edit. The surface→nudge→drive loop already cleared 2445 twice (submit, then fix) — 1610 needs the same.
+- **2829 still idle** (frozen $23.0888, ~160min). **2377 dead-inspection** (PAN-2848). No change.
+- **Run scorecard:** 4 closed out (2822/2661/2831/2665). In flight: 2445 advancing (review), 1610 blocked-idle (needs nudge, final item), 2829 idle (needs nudge), 2377 dead (needs 2848 fix or swarm re-enable). The whole tail is gated on PAN-2817 nudges + PAN-2848.
+- **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9 (12 ticks).
