@@ -74,7 +74,7 @@
     "recordedAt": "2026-07-17T12:01:04.835Z"
   },
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T12:12:40.360Z",
+  "updated": "2026-07-17T12:13:42.662Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -84,12 +84,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T12:12:40.267Z",
+    "updatedAt": "2026-07-17T12:13:42.622Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2661-review",
     "inspectNotes": "AC3 fix verified: GroupedIssueActionMenu.tsx:49 now passes aria-describedby directly to <Item>, which forwards it via {...props} onto the real role=menuitem Radix node (confirmed against @radix-ui/react-menu source), so the disabled reason is now correctly associated with the focusable menuitem for AT. Test updated to assert on the menuitem element itself, not just the wrapper. All 5 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2832",
     "lastVerifiedCommit": "29493c7c9d9b39978e62923b5c170db00287a4cf",
-    "reviewRequestedAt": "2026-07-17T12:12:39.856Z",
+    "reviewRequestedAt": "2026-07-17T12:13:42.250Z",
     "reviewSpawnedAt": "2026-07-17T12:01:38.575Z"
   },
   "closeOut": {
@@ -105,9 +105,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1382621,
-            "output": 22258,
-            "cacheRead": 3467776,
+            "input": 2085471,
+            "output": 32561,
+            "cacheRead": 4134400,
             "cacheWrite": 0
           }
         },
@@ -136,9 +136,9 @@
           "cacheWrite": 184049
         },
         "openai/gpt-5.6-sol": {
-          "input": 5922591,
-          "output": 323077,
-          "cacheRead": 67407872,
+          "input": 6625441,
+          "output": 333380,
+          "cacheRead": 68074496,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -149,8 +149,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 82.419782,
-        "pricingAsOf": "2026-07-17T12:12:40.296Z"
+        "usd": 86.576434,
+        "pricingAsOf": "2026-07-17T12:13:42.626Z"
       }
     },
     "merges": [
