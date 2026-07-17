@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 #
 # lint-ratchet-audit.sh — require issue references for ratchet increases.
-# Lowering file-size baselines and removing allowlist entries is always free.
-# Raising/adding either ratchet must happen in a commit whose message includes
-# an issue reference matching ([A-Z]+-[0-9]+|#[0-9]+).
+# Lowering file-size baselines, removing allowlist entries, and updating circular
+# baseline paths to follow source-file renames are always free. Raising/adding a
+# ratchet must happen in a commit whose message includes an issue reference
+# matching ([A-Z]+-[0-9]+|#[0-9]+).
 #
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -94,13 +95,66 @@ allowlist_increases_for_commit() {
 circular_baseline_increases_for_commit() {
   local commit="$1"
   shift
-  local old_file new_file
+  local old_file new_file added_file removed_file renames_file
   old_file=$(mktemp)
   new_file=$(mktemp)
+  added_file=$(mktemp)
+  removed_file=$(mktemp)
+  renames_file=$(mktemp)
   parent_circular_baseline_at "$@" > "$old_file"
   circular_baseline_at "$commit" > "$new_file"
-  comm -13 "$old_file" "$new_file" | sed 's/^/circular baseline added: /'
-  rm -f "$old_file" "$new_file"
+  comm -13 "$old_file" "$new_file" > "$added_file"
+  comm -23 "$old_file" "$new_file" > "$removed_file"
+  git log --format= --name-status --find-renames "$commit" > "$renames_file"
+  node - "$removed_file" "$added_file" "$renames_file" <<'NODE'
+const fs = require('fs')
+const [removedPath, addedPath, renamesPath] = process.argv.slice(2)
+const lines = (path) => fs.readFileSync(path, 'utf8').split('\n').filter(Boolean)
+const removed = lines(removedPath)
+const added = lines(addedPath)
+const renameEdges = new Map()
+
+for (const line of lines(renamesPath)) {
+  const [status, from, to] = line.split('\t')
+  if (!/^R\d*$/.test(status) || !from || !to) continue
+  const destinations = renameEdges.get(from) ?? new Set()
+  destinations.add(to)
+  renameEdges.set(from, destinations)
+}
+
+function followsRename(from, to) {
+  if (from === to) return true
+  const pending = [from]
+  const seen = new Set(pending)
+  while (pending.length > 0) {
+    const current = pending.pop()
+    for (const next of renameEdges.get(current) ?? []) {
+      if (next === to) return true
+      if (!seen.has(next)) {
+        seen.add(next)
+        pending.push(next)
+      }
+    }
+  }
+  return false
+}
+
+for (const addition of added) {
+  const addedPaths = addition.split(' > ')
+  const migratedIndex = removed.findIndex((candidate) => {
+    const removedPaths = candidate.split(' > ')
+    return removedPaths.length === addedPaths.length &&
+      removedPaths.some((path, index) => path !== addedPaths[index]) &&
+      removedPaths.every((path, index) => followsRename(path, addedPaths[index]))
+  })
+  if (migratedIndex >= 0) {
+    removed.splice(migratedIndex, 1)
+  } else {
+    console.log(`circular baseline added: ${addition}`)
+  }
+}
+NODE
+  rm -f "$old_file" "$new_file" "$added_file" "$removed_file" "$renames_file"
 }
 
 commit_has_issue_ref() {
