@@ -229,10 +229,13 @@ export const postAgentPauseRoute = HttpRouter.add(
     }));
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction.
+    // PAN-2633: assert tmux liveness at emission time so the reducer knows whether
+    // this stop-shaped transition is idle-alive (preserve pending-input payload).
+    const hasLiveTmuxSession = yield* sessionExists(id);
     yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
-      payload: buildAgentControlEventPayload(updatedState, previousStatus),
+      payload: buildAgentControlEventPayload(updatedState, previousStatus, hasLiveTmuxSession),
     });
 
     invalidateAgentsCache();
@@ -276,10 +279,13 @@ export const postAgentUnpauseRoute = HttpRouter.add(
     }
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction.
+    // PAN-2633: assert tmux liveness at emission time so the reducer knows whether
+    // this stop-shaped transition is idle-alive (preserve pending-input payload).
+    const hasLiveTmuxSession = yield* sessionExists(id);
     yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
-      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeUnpause.status)),
+      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeUnpause.status), hasLiveTmuxSession),
     });
 
     invalidateAgentsCache();
@@ -323,10 +329,13 @@ export const postAgentUntroubledRoute = HttpRouter.add(
     }
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
     // append in one SQLite transaction.
+    // PAN-2633: assert tmux liveness at emission time so the reducer knows whether
+    // this stop-shaped transition is idle-alive (preserve pending-input payload).
+    const hasLiveTmuxSession = yield* sessionExists(id);
     yield* saveAgentStateAndEmitEventProgram(updatedState, {
       type: 'agent.status_changed',
       timestamp: new Date().toISOString(),
-      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeClear.status)),
+      payload: buildAgentControlEventPayload(updatedState, toAgentStatusPayload(stateBeforeClear.status), hasLiveTmuxSession),
     });
 
     invalidateAgentsCache();

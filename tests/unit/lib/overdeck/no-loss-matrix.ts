@@ -381,6 +381,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/session-trees',                              kind: 'http', disposition: 'RELOCATE',    door: 'Conversations' },
   { surface: 'GET /api/projects/:projectKey/auto-merge-default',    kind: 'http', disposition: 'READ',        door: 'ConfigResolver.getProject (autoMergeDefault field)' },
   { surface: 'POST /api/projects/:projectKey/auto-merge-default',   kind: 'http', disposition: 'RELOCATE',    door: 'Config (ConfigWriter.setAutoMergeDefault, to be designed)' },
+  { surface: 'POST /api/projects/:projectKey/rename',               kind: 'http', disposition: 'WRITE',       door: 'Project registry rename write door (renameProject)' },
 
   // ── remote.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/remote/status',                                      kind: 'http', disposition: 'RELOCATE',    door: 'Infra/Settings (remote substrate health)' },

@@ -75,6 +75,7 @@ import { isSmeeConfiguredSync, startSmeeProcessSync } from '../../lib/smee.js';
 import { flushAllPendingAutoCommits } from '../../lib/pan-dir/auto-commit.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { ensureAutomaticStateMigration, decideDeaconBootGate } from '../../lib/state-auto-migrate.js';
+import { broadcastServerRestarting } from './ws-terminal.js';
 
 declare const Bun: unknown;
 
@@ -400,10 +401,12 @@ setAgentStoppedNotifier((agentId) => {
         } as any);
         // PAN-1908: write-through projection — agents-row upsert + lifecycle
         // event append in one SQLite transaction.
+        // PAN-2633: heartbeat_dead means the deacon has determined the tmux
+        // session is gone, so assert hasLiveTmuxSession: false explicitly.
         saveAgentStateAndEmitEvent(state, {
           type: 'agent.status_changed',
           timestamp: new Date().toISOString(),
-          payload: buildAgentStatusChangedPayload(state),
+          payload: buildAgentStatusChangedPayload(state, undefined, false),
         });
         return;
       }
@@ -554,6 +557,12 @@ const handleShutdownSignal = async (signal: NodeJS.Signals) => {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[overdeck] received ${signal} (pid=${process.pid} ppid=${process.ppid}) — shutting down`);
+  try {
+    const notifiedClients = broadcastServerRestarting();
+    console.log(`[overdeck] notified ${notifiedClients} terminal client(s) of restart`);
+  } catch (err) {
+    console.warn('[overdeck] failed to notify terminal clients of restart:', err);
+  }
   emitShutdownActivity();
   const forkGrace = await waitForInFlightForkPipelines(10_000);
   if (forkGrace.count > 0) {

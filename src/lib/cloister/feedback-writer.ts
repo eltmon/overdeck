@@ -12,7 +12,6 @@ import { Data, Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
 import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../vbrief/lifecycle-io.js';
-import { createMailboxItem, renderMailboxItem } from './agent-mailbox.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;
@@ -162,17 +161,7 @@ async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<Wri
 
   if (workspacePath) {
     try {
-      const mailboxItem = createMailboxItem({
-        issueId: opts.issueId,
-        role: 'work',
-        source: opts.specialist,
-        summary: opts.summary,
-        actionRequired: !['passed', 'approved', 'success', 'skipped'].includes(opts.outcome.toLowerCase()),
-        filePath: filePath!,
-        markdownBody: opts.markdownBody,
-        createdAt: timestamp,
-      });
-      await Effect.runPromise(writeFeedback(workspacePath, filename, renderMailboxItem(mailboxItem)));
+      await Effect.runPromise(writeFeedback(workspacePath, filename, opts.markdownBody));
     } catch (err: any) {
       console.error(`[feedback-writer] Failed to mirror feedback file for ${opts.issueId}:`, err.message);
       return { success: false, error: err.message };

@@ -129,12 +129,15 @@ vi.mock('./lib/store', () => ({
   selectAgents: (state: { agents: unknown[] }) => state.agents,
   selectChannelPermissionRequests: (state: { channelPermissionRequestsById?: Record<string, unknown> }) =>
     Object.values(state.channelPermissionRequestsById ?? {}),
+  selectPendingInputSubjects: () => [],
   selectIssues: (state: { issues: unknown[] }) => state.issues,
   selectDashboardLifecycle: (state: { dashboardLifecycle: { active: boolean } }) => state.dashboardLifecycle,
+  selectPendingInputSubjects: () => [],
   selectAgentsWithPendingAskUserQuestion: (state: { agentsWithPendingAskUserQuestion?: unknown[] }) =>
     state.agentsWithPendingAskUserQuestion ?? [],
   selectAgentsWithPendingProposedPlan: (state: { agentsById?: Record<string, unknown> }) =>
     Object.values(state.agentsById ?? {}).filter((a) => (a as { pendingProposedPlan?: unknown }).pendingProposedPlan != null),
+  selectPendingInputSubjects: () => [],
 }));
 vi.mock('./lib/refresh-dashboard-state', () => ({
   refreshDashboardState: mockRefreshDashboardState,

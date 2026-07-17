@@ -30,6 +30,33 @@ function configYamlSingleChunkAssertion() {
   };
 }
 
+function strikeLandingDeaconChunkAssertion() {
+  return {
+    name: 'strike-landing-deacon-chunk-assertion',
+    writeBundle(
+      _outputOptions: unknown,
+      bundle: Record<string, { type: string; fileName: string; modules?: Record<string, unknown> }>,
+    ) {
+      const chunks = Object.values(bundle).filter((output) => {
+        if (output.type !== 'chunk' || !output.modules) return false;
+        return Object.keys(output.modules).some((moduleId) => {
+          const normalized = moduleId.replaceAll('\\', '/');
+          return normalized.endsWith('/src/lib/cloister/deacon-strike-landing.ts');
+        });
+      });
+
+      const fileName = chunks[0]?.fileName;
+      if (chunks.length !== 1 || !(fileName === 'deacon.js' || fileName?.startsWith('deacon-'))) {
+        const chunkList = chunks.map((chunk) => chunk.fileName).join(', ') || '(none)';
+        throw new Error(
+          'Expected src/lib/cloister/deacon-strike-landing.ts only in the forked deacon.js entry; '
+          + `found ${chunks.length} chunk(s): ${chunkList}`,
+        );
+      }
+    },
+  };
+}
+
 export default defineConfig(async () => {
   const { stdout } = await execFileAsync('git', ['rev-parse', 'HEAD'], {
     cwd: resolve(import.meta.dirname, '../../..'),
@@ -71,7 +98,7 @@ export default defineConfig(async () => {
         ],
       },
     },
-    plugins: [configYamlSingleChunkAssertion()],
+    plugins: [configYamlSingleChunkAssertion(), strikeLandingDeaconChunkAssertion()],
     deps: {
       alwaysBundle: [/^@overdeck\//],
       neverBundle: [

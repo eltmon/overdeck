@@ -1,10 +1,11 @@
 ---
 name: pan-projects
-description: "pan project <subcommand> — add, remove, and manage Overdeck-monitored projects"
+description: "pan project <subcommand> — add, rename, remove, and manage Overdeck-monitored projects"
 triggers:
   - pan projects
   - add project
   - remove project
+  - rename project
   - list projects
   - manage projects
   - register project
@@ -23,6 +24,7 @@ This skill guides you through managing projects with Overdeck. Projects must be 
 
 - Adding a new project to Overdeck
 - Listing managed projects
+- Renaming a project's display name
 - Removing a project from Overdeck
 - Setting up project-to-tracker mappings
 
@@ -63,6 +65,14 @@ Registered Projects:
   backend     /home/user/projects/backend
   frontend    /home/user/projects/frontend
 ```
+
+### Rename a Project
+
+```bash
+pan project rename myproject "My Project"
+```
+
+The registration key (`myproject`) is immutable. The display name (`My Project`) is the human-facing label shown in Overdeck.
 
 ### Remove a Project
 

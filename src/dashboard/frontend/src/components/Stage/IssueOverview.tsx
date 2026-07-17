@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { ViewMode } from '../chat/ConversationPanel'
 import type { PaneType } from '../../lib/panesStore'
 import type { Conversation } from '../CommandDeck/ConversationList'
@@ -26,9 +26,8 @@ export interface IssueOverviewProps {
   agentId?: string
   /** All conversations; filtered to this issue. */
   conversations?: Conversation[]
-  /** Create a conversation for this issue, returning the new conversation's
-   * name so the deck can open an agent tab on it. */
-  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<string | undefined>
+  /** Create a conversation for this issue, returning its name or creation error. */
+  onCreateConversation?: (agentId: string, message?: string, viewMode?: ViewMode) => Promise<{ name: string } | { error: string }>
   api: StageApi
 }
 
@@ -50,6 +49,8 @@ export function IssueOverview({
   onCreateConversation,
   api,
 }: IssueOverviewProps) {
+  const [launchBusy, setLaunchBusy] = useState(false)
+  const [launchError, setLaunchError] = useState<string | null>(null)
   const issueConversations = useMemo(
     () =>
       conversations.filter((c) => (c.issueId ?? '').toUpperCase() === issueId.toUpperCase()),
@@ -67,9 +68,17 @@ export function IssueOverview({
   )
 
   const onAgentSelected = async (id: string, message?: string) => {
+    if (launchBusy) return
     writeLastUsedAgent(issueId, id)
-    const conversationName = await onCreateConversation?.(id, message, 'terminal')
-    if (conversationName) api.openOrFocusAgentPane(conversationName, 'Agent')
+    setLaunchError(null)
+    setLaunchBusy(true)
+    try {
+      const result = await onCreateConversation?.(id, message, 'terminal')
+      if (result && 'name' in result) api.openOrFocusAgentPane(result.name, 'Agent')
+      if (result && 'error' in result) setLaunchError(result.error)
+    } finally {
+      setLaunchBusy(false)
+    }
   }
   // PAN-1561: terminal actions open the drawer stacked below, not a tab.
   const openTerminal = () => api.toggleTerminal()
@@ -87,6 +96,8 @@ export function IssueOverview({
 
   const launcher = (
     <Launcher
+      busy={launchBusy}
+      errorText={launchError ?? undefined}
       lastUsedAgentId={readLastUsedAgent(issueId)}
       onSelect={(intent, query) =>
         dispatchLauncherIntent(intent, query, {

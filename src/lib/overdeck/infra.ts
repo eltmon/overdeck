@@ -71,6 +71,7 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL"); } catch { /* table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_status` text'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_notes` text'); } catch { /* already exists or table absent */ }
+  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer'); } catch { /* already exists or table absent */ }
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text'); } catch { /* already exists or table absent */ }

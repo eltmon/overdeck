@@ -449,7 +449,7 @@ describe('ComposerPromptEditor', () => {
       // Menu should still be open and filtered
       expect(screen.getByRole('listbox', { name: 'Slash commands' })).toBeInTheDocument();
       expect(screen.queryByText('/model')).not.toBeInTheDocument();
-      expect(screen.getByRole('option', { name: /pan workspace create/i })).toBeInTheDocument();
+      expect(screen.getByRole('option', { name: /pan work\s*space create/i })).toBeInTheDocument();
     });
 
     it('navigates up with ArrowUp', () => {

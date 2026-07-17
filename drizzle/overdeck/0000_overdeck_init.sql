@@ -309,6 +309,7 @@ CREATE TABLE `review_status` (
 	`inspect_notes` text,
 	`inspect_started_at` integer,
 	`inspect_bead_id` text,
+	`inspect_owner_session` text,
 	`verification_status` text,
 	`verification_notes` text,
 	`verification_cycle_count` integer DEFAULT 0,

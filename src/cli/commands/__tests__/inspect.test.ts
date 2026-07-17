@@ -28,6 +28,36 @@ describe('inspect command', () => {
     expect(mocks.spawn).toHaveBeenCalledWith(expect.anything(), { deep: true });
   });
 
+  it('omits the run id when inspection is routed to the standing supervisor', async () => {
+    mocks.spawn.mockReturnValue(Effect.succeed({
+      success: true,
+      message: 'routed',
+      tmuxSession: 'agent-pan-1-review-supervisor',
+    }));
+
+    await inspectCommand('pan-1', { item: 'PAN-1-a', workspace: '/repo/workspaces/feature-pan-1' });
+
+    const output = vi.mocked(console.log).mock.calls.flat().join('\n');
+    expect(output).toContain('Session: agent-pan-1-review-supervisor');
+    expect(output).not.toContain('Run ID:');
+    expect(output).not.toContain('undefined');
+  });
+
+  it('prints the run id for a dedicated inspection session', async () => {
+    mocks.spawn.mockReturnValue(Effect.succeed({
+      success: true,
+      message: 'spawned',
+      tmuxSession: 'inspect-pan-1-pan-1-a',
+      runId: 'inspect-run-123',
+    }));
+
+    await inspectCommand('pan-1', { item: 'PAN-1-a', workspace: '/repo/workspaces/feature-pan-1' });
+
+    const output = vi.mocked(console.log).mock.calls.flat().join('\n');
+    expect(output).toContain('Session: inspect-pan-1-pan-1-a');
+    expect(output).toContain('Run ID:  inspect-run-123');
+  });
+
   it('rejects ids absent from the vBRIEF without a tracker fallback', async () => {
     await expect(resolveInspectItem('legacy-task', '/repo/workspaces/feature-pan-1')).rejects.toThrow('does not exist');
   });

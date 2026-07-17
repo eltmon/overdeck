@@ -1,20 +1,21 @@
 ---
 scope: dev
 ---
-### Never force `--harness claude-code` for a CLIProxy-routed model — trust the provider default
+### Harness routing: never override `--harness` ad hoc — the resolved config routing wins
 
-When spawning ANY agent (work, strike, plan, conversation), do NOT override `--harness` to
-`claude-code` for a non-native, CLIProxy-routed model — kimi (`kimi-k2.*`), gpt-5.5, gpt-5.6,
-glm, gemini-via-pi, etc. Claude Code routes those through CLIProxy, which advertises a false ~200k
-context window; long sessions sail past it and **deadlock** (the "200k-window illusion",
-PAN-1865). A $22 silent burn and a stranded critical red-main strike both came from exactly this.
+When spawning ANY agent (work, strike, plan, conversation), do NOT pass `--harness` (or
+`--model`) to override the resolved routing unless the operator explicitly asked. Routing is
+config-owned: `providers.<name>.harness` in `~/.overdeck/config.yaml` overrides the code
+default (`src/lib/providers.ts`), and the operator sets it deliberately — e.g. since
+2026-07-16 `openai.harness: claude-code` is an intentional operator choice (codex harness
+regressions), not a mistake to "fix" back to codex.
 
-**Trust the provider default routing — it exists to prevent this:** kimi → ohmypi (omp), gpt-5.5/gpt-5.6 → codex,
-native Anthropic models (`claude-*`) → claude-code. Run `pan strike <id>` / `pan start <id>` with
-**no `--harness`** (and no `--model`) unless the operator explicitly asked — and never pair
-`--harness claude-code` with a CLIProxy model. `claude-code` is correct only for native Anthropic
-models; reaching for it because it feels "more reliable" for a critical fix is the exact trap.
+Claude-code + CLIProxy for GPT/kimi models is **supported** when configured: the PAN-1865
+"200k-window illusion" deadlock is mitigated by PAN-2441 — launchers export
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW=<model window>` (150000 for gpt-5.6 family) for every
+non-Anthropic model, in both agent and conversation spawns. Do not cite PAN-1865 as a reason
+to reroute; if a claude-code+CLIProxy session stalls while the dashboard is healthy, capture
+pane + transcript + `~/.overdeck/cliproxy/cliproxy.log` as NEW evidence instead (2026-07-16
+lesson: an event-loop-starved server mimicked a harness wedge and cost an afternoon).
 
-This is an orchestrator-knowledge rule, deliberately NOT enforced in `resolveHarness`: a hard
-refusal would block PAN-1865's goal of eventually making claude-code safe for kimi. The
-orchestrator (you, and the flywheel) simply knows better.
+This stays orchestrator-knowledge, deliberately NOT enforced in `resolveHarness`.

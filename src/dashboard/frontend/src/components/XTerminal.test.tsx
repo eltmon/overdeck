@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { PATIENT_WINDOW_MS } from '../lib/terminalReconnectPolicy';
 import { XTerminal } from './XTerminal';
 
 // Mock xterm.js — it performs real DOM/media-query operations that break in jsdom.
@@ -76,7 +77,7 @@ class MockWebSocket {
   readyState = 1;
   binaryType = 'blob';
   onopen: (() => void) | null = null;
-  onclose: (() => void) | null = null;
+  onclose: ((event: { code: number; reason: string }) => void) | null = null;
   onmessage: ((event: unknown) => void) | null = null;
   onerror: (() => void) | null = null;
   send = vi.fn();
@@ -176,13 +177,24 @@ describe('XTerminal', () => {
     });
   });
 
-  it('allows the terminal frame to shrink inside constrained flex layouts (PAN-2619)', () => {
+  it('keeps padding off the measured terminal host (PAN-2619)', async () => {
     const { container } = render(<XTerminal sessionName="test-session" />);
     const frame = container.firstElementChild;
-    const terminalSurface = container.querySelector('.absolute.inset-2');
+    const terminalHost = container.querySelector('.xterm-host') as HTMLDivElement;
+    const terminalMock = Terminal as unknown as {
+      instances: Array<{ open: ReturnType<typeof vi.fn> }>;
+    };
+
+    await waitFor(() => {
+      expect(terminalMock.instances).toHaveLength(1);
+    });
+    const term = terminalMock.instances[0];
 
     expect(frame).toHaveClass('min-w-0', 'min-h-0', 'overflow-hidden');
-    expect(terminalSurface).not.toHaveStyle({ padding: '8px' });
+    expect(terminalHost).toHaveClass('xterm-host', 'absolute', 'inset-0');
+    expect(term.open).toHaveBeenCalledWith(terminalHost);
+    // FitAddon subtracts padding from the generated .xterm element, not this measured host.
+    expect(terminalHost.style.padding).toBe('');
   });
 
   it('loads auto-copy setting from localStorage', async () => {
@@ -339,7 +351,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement | null;
     expect(terminalSurface).toBeTruthy();
 
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
@@ -356,7 +368,7 @@ describe('XTerminal', () => {
 
     const term = (Terminal as unknown as { instances: Array<{ selection: string }> }).instances[0];
     term.selection = 'selected output';
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement;
     const rightMouseDown = new MouseEvent('mousedown', { button: 2, bubbles: true, cancelable: true });
     const stopPropagation = vi.spyOn(rightMouseDown, 'stopPropagation');
 
@@ -384,7 +396,7 @@ describe('XTerminal', () => {
       expect(MockWebSocket.instances).toHaveLength(1);
     });
 
-    const terminalSurface = container.querySelector('.absolute.inset-2') as HTMLDivElement | null;
+    const terminalSurface = container.querySelector('.xterm-host') as HTMLDivElement | null;
     fireEvent.contextMenu(terminalSurface!, { clientX: 32, clientY: 64 });
     fireEvent.click(await screen.findByText('Paste'));
 
@@ -602,6 +614,185 @@ describe('XTerminal - WebSocket', () => {
     await waitFor(() => {
       expect(screen.getByTitle('Terminal settings')).toBeInTheDocument();
     });
+  });
+});
+
+describe('XTerminal - patient reconnect', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.clearAllMocks();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    MockWebSocket.instances = [];
+    (Terminal as unknown as { instances: unknown[] }).instances = [];
+    (FitAddon as unknown as { instances: unknown[] }).instances = [];
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      value: 800,
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      value: 600,
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('adds stable per-terminal jitter to reconnect attempts', async () => {
+    vi.mocked(Math.random).mockReturnValue(0.5);
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_249));
+    expect(MockWebSocket.instances).toHaveLength(1);
+
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it('keeps reconnecting past five attempts without writing retry messages to scrollback', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ writeln: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    const delays = [1_000, 2_000, 4_000, 5_000, 5_000, 5_000, 5_000, 5_000];
+    for (const delay of delays) {
+      const socket = MockWebSocket.instances.at(-1)!;
+      act(() => socket.onclose?.({ code: 1006, reason: 'restart' }));
+      expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+    }
+
+    expect(MockWebSocket.instances).toHaveLength(9);
+    expect(term.writeln).not.toHaveBeenCalled();
+  });
+
+  it('treats close code 4503 as a planned restart and clears the banner after recovery', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 4503, reason: 'server-restarting' }));
+
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Dashboard restarting — reconnecting automatically…');
+    expect(status).toHaveClass('text-muted-foreground');
+    expect(status).not.toHaveTextContent('Connection lost');
+
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    act(() => {
+      MockWebSocket.instances[1].onmessage?.({
+        data: `\u0000${JSON.stringify({ type: 'snapshot', data: 'healthy', cols: 80, rows: 24 })}`,
+      });
+    });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('shows a manual Reconnect button when the five-minute window expires', async () => {
+    const onDisconnect = vi.fn();
+    render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    expect(MockWebSocket.instances).toHaveLength(2);
+
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENT_WINDOW_MS - 1_000));
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 1006, reason: 'still down' }));
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+    expect(screen.getByRole('status')).toHaveTextContent('Connection unavailable.');
+    expect(screen.getByRole('button', { name: 'Reconnect' })).toBeInTheDocument();
+    expect(onDisconnect).not.toHaveBeenCalled();
+  });
+
+  it('reconnects immediately when requested and clears the overlay on snapshot data', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENT_WINDOW_MS));
+    act(() => MockWebSocket.instances[1].onclose?.({ code: 1006, reason: 'still down' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
+
+    expect(MockWebSocket.instances).toHaveLength(3);
+    expect(screen.getByRole('status')).toHaveTextContent('Connection lost — reconnecting…');
+
+    const snapshot = '\u001b[31mreconnected snapshot\u001b[0m';
+    act(() => {
+      MockWebSocket.instances[2].onmessage?.({
+        data: `\u0000${JSON.stringify({ type: 'snapshot', data: snapshot, cols: 80, rows: 24 })}`,
+      });
+    });
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ write: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    expect(term.write).toHaveBeenCalledWith(snapshot, expect.any(Function));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('starts a fresh reconnect window after a snapshot proves the connection healthy', async () => {
+    render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+    await act(async () => vi.advanceTimersByTimeAsync(PATIENT_WINDOW_MS));
+
+    const reconnected = MockWebSocket.instances[1];
+    act(() => reconnected.onmessage?.({
+      data: `\u0000${JSON.stringify({ type: 'snapshot', cols: 100, rows: 30, data: 'healthy' })}`,
+    }));
+    act(() => reconnected.onclose?.({ code: 1006, reason: 'another restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+    expect(MockWebSocket.instances).toHaveLength(3);
+  });
+
+  it('closes the replacement socket on unmount without scheduling another retry', async () => {
+    const { unmount } = render(<XTerminal sessionName="test-session" />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 1006, reason: 'restart' }));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
+
+    const replacement = MockWebSocket.instances[1];
+    const queuedCloseHandler = replacement.onclose;
+    unmount();
+
+    expect(replacement.close).toHaveBeenCalledOnce();
+    expect(replacement.onclose).toBeNull();
+
+    act(() => queuedCloseHandler?.({ code: 1006, reason: 'queued-after-unmount' }));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    expect(MockWebSocket.instances).toHaveLength(2);
+  });
+
+  it('treats close code 4404 as fatal without scheduling a retry', async () => {
+    const onDisconnect = vi.fn();
+    render(<XTerminal sessionName="test-session" onDisconnect={onDisconnect} />);
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+
+    act(() => MockWebSocket.instances[0].onclose?.({ code: 4404, reason: 'missing' }));
+    await act(async () => vi.runOnlyPendingTimersAsync());
+
+    const term = (Terminal as unknown as {
+      instances: Array<{ writeln: ReturnType<typeof vi.fn> }>;
+    }).instances[0];
+    expect(term.writeln).toHaveBeenCalledWith(expect.stringContaining('has ended'));
+    expect(onDisconnect).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(MockWebSocket.instances).toHaveLength(1);
   });
 });
 

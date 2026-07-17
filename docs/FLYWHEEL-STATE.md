@@ -5250,3 +5250,234 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   2255 held on operator keep/revert. 2760/2772/2773 = dormant filed bugs, no agents (not in-flight).
 - **Pipeline genuinely drained to 1491 + 1966** (both working) + 2255 (operator decision).
 - **Session: 49 merges, 21 close-outs.**
+
+---
+
+## Tick 58 — 2026-07-16 ~17:35Z — pipeline drained to 2 issues, BOTH wedged on codex review-path deaths (PAN-2775)
+
+- After the resume-on deploy, the drain is down to **PAN-1491 + PAN-1966**, and BOTH are blocked by the
+  same unsolved substrate bug — codex hosts dying in the REVIEW path:
+  - **1966**: 3/4 convoy reviewers PASS (performance/requirements/security), but the **correctness
+    reviewer died at 17:03Z** (stopped, pane gone) right after starting, producing no correctness.md ⇒
+    the synthesis parent waits forever ⇒ no APPROVED verdict ⇒ no merge. Convoy has re-run rounds
+    (4d7202ba→3580c137); correctness dies each round. CI green, PR #2790 CLEAN. `pan review request
+    PAN-1966` HANGS (2min timeout, no new convoy spawned) — the re-trigger path itself wedges.
+  - **1491**: work agent (claude-code after --fresh) reached pan done and a review convoy ran, but the
+    convoy also died mid-flight — review run e26572ba has ONLY correctness.md, no synthesis, and NO open
+    PR. Work agent now sits "⏸ manual mode on", delivered nudges land in the composer but don't submit.
+    3 fresh/nudge cycles this session; fix commit ae0b48d390 safe on branch.
+- **This is PAN-2775 (codex host death) as the FINAL drain blocker.** Not a code problem in either issue
+  — the substrate kills reviewers/agents mid-turn. Re-driving cannot fix a substrate bug. Both PARKED
+  pending the operator's PAN-2775 substrate fix. Evidence already on PAN-2775 (resume-lies + silent death
+  + no exit instrumentation). New this tick: the death also hits (a) convoy sub-reviewers ⇒ synthesis
+  wedge, and (b) `pan review request` itself hangs.
+- Server pid 1714664 stable (PAN-2792 holding — no dashboard kills). 2702/2768 closed. 2255 held on
+  operator. Loop cadence slowed to heartbeat — nothing advances until the substrate is fixed.
+- **Session: 49 merges, 21 close-outs. Pipeline at rest: 2 substrate-blocked, 1 operator-decision.**
+
+---
+
+## Tick 59 — 2026-07-16 ~17:42Z — OPERATOR LIFTED DRAIN → intake authorized; launched 11-issue PAN set
+
+- **Operator directive (3 parts):** (1) PAN-2255 PARKED (reverted 6573791e69, spec deleted 905a2b4aa1,
+  issue+PRD retained) — do NOT re-drive/close/treat-as-regression. (2) Prune closed-issue residue. (3)
+  DRIVE open set aggressively (intake overrides DRAIN): 806,1897,1987,2045,2232,2252,2619,2760,2772,2773,2633.
+- **Launched 11/11 (806 held):** work agents live = 1987,2232,2619,2633(--force),2760,2772,2773 (+1491,1966
+  continuing); auto-planning = 1897,2045,2252 (work auto-starts on finalize). All gpt-5.6-sol/codex, fresh
+  (resume lies — started --fresh per directive). Memory 37G avail.
+- **PAN-806 HELD**: carries a standing AI objection ("not ready to plan as written" re: git-history-rewrite
+  guard). Surfaced to operator for drive-anyway-vs-replan decision. Did NOT start it blind.
+- **Residue prune (item 2): backend already clean** — 0 state.json dirs on disk, 0 agents in /api/agents,
+  `pan admin db gc-agents` reaps 0 for 1969/1970/1971/1976/1978/1996/1997/2040. The RESUME SESSION buttons
+  are STALE FRONTEND view (pre-16:57-restart cache), not reapable data-layer residue → refresh clears; if
+  persistent = frontend bug to file. (sqlite3 CLI can't read the node:sqlite WAL DB — use /api, not sqlite3.)
+- **SUBSTRATE CAVEAT**: PAN-2775 codex-death still live — it's what wedges 1491 (manual-mode, nudges don't
+  submit) + 1966 (correctness reviewer died → synthesis wedge → no merge). Expect some of the 9 to wedge at
+  review→merge identically until the substrate fix lands. Shepherding per tick.
+- **Session: 49 merges, 21 close-outs. Fleet: 9 work + 3 planning active.**
+
+---
+
+## Tick 60 — 2026-07-16 ~18:12Z — 2633 MERGED (1st intake-fleet land); DOCKER NETWORK EXHAUSTION fixed
+
+- **PAN-2633 MERGED `d4c372a71e`** (#2793) — complete claude-code review convoy (all 4 reviewers +
+  synthesis APPROVED), run fea50269 == PR head fea5026986e0 (fresh), overdeck/review+test PASS, CLEAN.
+  Proves the claude-code+gpt-5.6 harness is NOT a universal blocker — some issues complete clean, others
+  wedge in manual mode. Close-out DEFERRED to next batched deploy (merge post-dates live build fb1b422abd).
+- **DOCKER NETWORK EXHAUSTION (pipeline blocker) fixed**: starting 1897/2045 failed with "all predefined
+  address pools have been fully subnetted" — the 11-issue launch + orphan networks from merged/closed
+  workspaces filled Docker's ~31-network pool. `docker network prune -f` removed 13 unused networks
+  (safe — only prunes networks with no attached container; running agents' _devnet nets stayed). Retry
+  succeeded. **RECURRING RISK with a large fleet — prune when spawns fail on address-pool.**
+- **HARNESS ROUTING**: operator did NOT flip `models.providers.openai.harness: claude-code` — kept as-is.
+  So the claude-code+CLIProxy(gpt-5.6-sol) combo (PAN-1865 risk) stands; 2633 proves it can complete, but
+  1491/1966/2760/2619 wedge in "⏸ manual mode on" where pan-tell nudges land in the composer but don't
+  submit. Not thrashing them.
+- **Fleet now**: work agents 1987,2232,2619,2760,2772,2773,1897,2045 (+1491,1966 wedged); 2252 planning;
+  806 HELD (AI objection — operator decision pending). Memory 34G avail.
+- **Session: 50 merges, 21 close-outs.**
+
+---
+
+## Tick 61 — 2026-07-16 ~19:10Z — deployed c110a3a597 (strike trigger); 2794 landing blocked on systemic deacon feedback-delivery bug
+
+- **DEPLOYED current main `c110a3a597`** via `pan restart --dashboard --resume` (pid 1699337, healthy,
+  deacon=on resume=on) — build now carries registerStrikeMergeTrigger/patrolStrikeLandings (running
+  build was fb1b422abd/16:25Z which lacked them). Operator-directed to unblock PAN-2794/2232.
+- **PAN-2794 strike landing STILL blocked — SECOND bug, systemic**: every deacon cycle aborts at
+  feedback-delivery — merge-agent's needs-you can't be delivered to the strike agent's DEAD session
+  JSONL (9362a362… ENOENT) ⇒ re-marks 2794 `stuck: feedback_delivery_needs_you` BEFORE the (now-registered)
+  landing re-evaluation runs. mergeNotes frozen at pre-deploy 18:52 "trigger not registered". SAME bug
+  wedges PAN-2207 + PAN-2610 ⇒ general strike/merge-handoff defect, not 2794-specific.
+- **Exhausted flywheel levers**: strike-ready ×3, moved poison-pill feedback aside, `pan review reset`
+  (human override) — deacon re-marks stuck each cycle. **Cannot manual-land**: pre-push guard correctly
+  blocks flywheel-orchestrator code pushes to main (state files only). Strike is a CLEAN FF (main+1,
+  typecheck-clean, "fix(inspect): track actual watchdog owner"). Surfaced to operator: land directly
+  (`git push origin 20caf91d:main`) OR fix deacon dead-session feedback-delivery. PAN-2232 stays blocked.
+- **OPERATOR BOUNDARY (confirmed)**: intake = ONLY the 11 named issues (806,1897,1987,2045,2232,2252,
+  2619,2633,2760,2772,2773). DRAIN in force for all else — NO backlog/sequencer/order-book pickup.
+- **Harness question still OPEN** (openai.harness=claude-code → PAN-1865 fleet wedge; awaiting operator).
+- **Session: 50 merges, 21 close-outs.**
+
+---
+
+## Tick 62 — 2026-07-16 ~20:10Z — LANDED PAN-2806/2802/2794 (operator-directed recoverable merge) + deployed
+
+- **Operator gave verified-head signal**: strike/pan-2794 @ 3d265b08 (prod build + single-chunk regression
+  + Node22 boot/health + typecheck/lint + full suite all passed). Directed flywheel to own recoverable
+  landing (split registry can't land its own repair — chicken-and-egg).
+- **LANDED via merge `c11346c335`**: main had diverged (becf4bcc) so FF impossible → `git merge --no-ff
+  origin/strike/pan-2794` in isolated worktree (CONFLICT-FREE), bun install + `npm run build` GREEN, pushed
+  with `OVERDECK_OPERATOR_PUSH=1` (the sanctioned operator escape hatch; file-size+ratchet guards passed).
+  All 3 strike commits now on main: 20caf91d (2794 inspect), 1ca4 (2802 re-arm), 3d265b08 (2806 unify module).
+- **DEPLOYED**: primary FF→c11346c335, build, `pan restart --dashboard --resume` → pid 138448, build
+  c11346c335, healthy. Unified strike-landing module now live.
+- **2794 content is landed** (moot to "land" again); reset its stuck cycle. **NOTE: the deacon still marks
+  2794/2207/2610 `feedback_delivery_needs_you` — that's a SEPARATE bug (merge-agent tries to deliver
+  feedback to a DEAD strike session JSONL, ENOENT), NOT the 2806 module-split. 2806 fixed trigger
+  registration; the dead-session feedback-delivery bug persists and may affect future strikes.**
+- **2232 still needs its OTHER blocker PAN-2795** (ratchet-vs-clean-tree-lint contract) — strike wedged on
+  the claude-code+gpt-5.6 harness. Harness flip remains the keystone for the fleet.
+- **Session: 50 merges (+ 1 operator-directed strike landing), 21 close-outs.**
+
+---
+
+## Tick 63 — 2026-07-16 ~20:16Z — deployed a081a9ce59 (PAN-2318 real root cause); PAN-2807 added; hygiene lesson
+
+- **PAN-2318 REAL root cause (operator-found, fixed a081a9ce59)**: watchdog "busy-but-alive" churn was
+  `queryCostEventsSync` FULL-SCANNING 215k cost_events rows synchronously 2×/agent/poll (61% server CPU;
+  /api/health 10s). Live DB missing idx_cost_agent_id + idx_cost_issue_upper — **schema declares them but
+  migrations SILENTLY FAIL (user_version=0)**. Operator created indexes live (health 10s→41ms→now 0.5ms) +
+  removed the duplicate per-agent query (also fixed burn/totalUsd double-counting). My earlier "watchdog
+  false-positive" + PAN-2792 diagnoses were PARTIAL — this CPU starvation was the deeper cause.
+- **DEPLOYED a081a9ce59** (pid 698579, build a081a9ce59, healthy 0.5ms) — includes PAN-2805 honest flywheel
+  empty state ('orchestrator unreachable' not false 'No active run') + badge (2f4648e673, ancestor).
+- **PAN-2804 (becf4bcc, closed)**: `pan restart` now launches dashboard in its own transient systemd unit —
+  survives spawner death (operator's supervisor restart had killed my 15:31 server). Now automatic.
+- **PAN-2807 ADDED to drive set (now 13 issues)**: silent-migration defect (the user_version=0 bug behind
+  the missing indexes). Auto-planning started (planning-pan-2807). Operator: no new debt this run.
+- **PRIMARY-WORKTREE HYGIENE LESSON**: my tick-62 `git reset --hard origin/main` in primary WIPED operator's
+  uncommitted edits (~16:05; they recovered from checkpoints, no loss). RULE: never reset --hard primary;
+  `git status` first, `git merge --ff-only` if clean, surface if dirty. Two actors on main = check before touching.
+- **Session: 50 merges + 1 operator-directed strike landing, 21 close-outs.**
+
+## Tick 64 — 2026-07-16 ~17:23 — codex path proven: TWO real merges
+- Harness flip to codex working end-to-end. First fleet merges post-flip:
+  - **PAN-1987 MERGED → 1e1efdb358** (fresh APPROVED run 8dbd15a7==head, all CI green, overdeck/review+test pass).
+  - **PAN-2772 MERGED → 7b24be7f82** (fresh APPROVED run 96ab92d9==head, CI green, mergeState CLEAN). Freshness invariant (review run suffix==PR headRefOid) satisfied for both — no PAN-2499 stale-verdict risk.
+- Fleet driving on codex: 2760 respawned FRESH on codex (was claude-code resumable; harness=codex model=gpt-5.6-sol confirmed) to address CHANGES REQUESTED; 2045 work agent alive (tmux 17:22); 2619/2773/1897/1966/1491 review convoys spinning on codex.
+- Pending fresh reviews not yet synthesized: 1966 (verdict none), 1897, 1491. UNSTABLE (fixing): 2773, 2619. CHANGES REQUESTED (driving): 2760, 2045.
+- Resources healthy: mem 32G avail, 15 devnets (<31 limit).
+- Close-out for 1987/2772 pending main CI green (2772 run in_progress at report time).
+
+## Tick 64b — PAN-2619 test disposition + infra follow-ups filed
+- PAN-2619 **test** role reported TESTS FAILED, but all three failures are pre-existing/environmental — NOT defects in the XTerminal padding fix (typecheck/lint/targeted XTerminal.test.tsx pass). Verified each:
+  - Container live-terminal UAT unrunnable: node-pty (`@lydell/node-pty` 1.2.0-beta.14, glibc prebuilt) segfaults (139) on musl devcontainer base (`node:22-alpine`/`node:20-alpine`); + Vite/Traefik WS proxy drops Origin → `/ws/terminal` 403. → filed **PAN-2809**.
+  - Workspace `vitest --changed` fails on `App.test.tsx` (selectPendingInputSubjects mock, from 2f4648e673) while **GitHub CI `test` on main is GREEN** — workspace-vs-CI harness divergence, NOT red-main. → filed **PAN-2810**.
+- 2619 itself is mid-fix: work agent alive (17:30, codex), head e3568752 past stale review run 2f507575 → review will re-run. No override now.
+- **DECISION RULE for 2619 close-out:** its AC-mandated browser UAT is un-runnable in-container (PAN-2809). When 2619's review APPROVES + code CI green, close with an HONEST `pan close --accept-<uat/verification>` citing PAN-2809 as the reason — do NOT block 2619 indefinitely on infra that affects all containerized workspaces. Only ever accept AFTER review approves the code.
+- Both PAN-2809/2810 filed as backstop-as-symptom, NOT driven (DRAIN in force outside authorized set).
+
+## Tick 65 — 2026-07-16 ~17:46 — HARNESS REVERSED to claude-code (CORRECTS tick 64)
+- **Operator REVERSED the codex flip.** `providers.openai.harness` is back to **claude-code** (config line 6 verified). Codex was only an emergency stopgap; operator says codex has serious problems right now and set claude-code deliberately.
+- **Real root cause of the afternoon review-synthesis wedge was PAN-2318 event-loop starvation (fixed ~17:00), NOT the harness.** claude-code agents depend on server-mediated delivery so they looked wedged; codex agents don't, which is why only claude-code appeared stuck. Do NOT re-attribute to PAN-1865/harness. Do NOT re-flip to codex.
+- Evidence backing reversal: live gpt-5.6-sol/claude-code conv passed git/read/test/write cleanly; direct 170k-token gpt-5.6-sol CLIProxy request 200 in 3s; PAN-2441 CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000 present in agent+conv launchers.
+- **Posture now:** let IN-FLIGHT codex reviews finish (don't kill working convoys); NEW spawns = claude-code+CLIProxy. WATCH the first claude-code review convoy — if synthesis stalls with server HEALTHY, capture pane+transcript+cliproxy.log window immediately and report (that's NEW evidence, not the old wedge).
+- Merges landed earlier this session on the (now-reverted) codex path remain valid: PAN-1987 (1e1efdb358), PAN-2772 (7b24be7f82) — both fresh APPROVED against exact head, CI green.
+- **Merge queue:** PAN-2760 PR#2797 FRESH APPROVED (run 42df3363==head), all checks green EXCEPT `test` still PENDING → hold until test passes, then merge. Do NOT --admin over pending test.
+
+## Tick 66 — 2026-07-16 ~17:55 — two more merges (2760, 2619)
+- **PAN-2760 MERGED → 92dfb73638** — FRESH APPROVED (run 42df3363==head), waited out pending `test` job to green (did NOT --admin over pending test), then merged clean.
+- **PAN-2619 MERGED → 7c46c64e02** — APPROVED review at e3568752; head advanced to 416d0cb2 but VERIFIED the only delta is docs/FLYWHEEL-STATE.md — feature src diff (XTerminal.tsx+index.css, 24/7) byte-identical at both heads. Browser UAT infra-blocked (PAN-2809), reviewed+CI-green, merged per tick-64b decision rule (honest disposition).
+- **Session merge tally: PAN-1987, 2772, 2760, 2619 (4).** All fresh-verified against exact feature code, all GitHub CI green.
+- **CLOSE-OUT OWED (DoD):** 1987, 2772, 2760, 2619 all need post-merge verify-on-main + deploy + teardown. Batch after main CI settles.
+- Still driving: 1897, 1966 (stale review→re-trigger), 2045, 2773 — reviews synthesizing. Harness now claude-code for new spawns; watch first claude-code convoy for stalls.
+
+## Tick 67 — 2026-07-16 ~18:10 — PAN-2773 merged (6 total); 2045 rebase handed to work agent
+- **PAN-2773 MERGED → 3ac755abc0** — CLEAN, FRESH APPROVED (run c9ec5767==head), all CI green. Session tally: 1987, 2772, 2760, 2619, 2773 = 5 merged. (Correction to header: 5, not 6.)
+- **PAN-2045**: FRESH APPROVED but went DIRTY after 2773 moved main — real code conflict in ChatMarkdown.test.tsx (main hardened the test with an explicit findByRole await; 2045 had the old waitFor-only form). Resolution = take main's superset (drops the hunk out of the feature diff, so APPROVED verdict holds).
+- **OPERATIONAL LESSON (persist):** the flywheel-orchestrator PRE-COMMIT guard (`guard-flywheel-orchestrator-commit.sh`) blocks the flywheel from committing code — a merge-conflict resolution commit is NOT exempt (the merge also staged .beads/). So the flywheel CANNOT hand-resolve a work agent's merge conflict. Correct path: abort the manual merge (recoverable), and hand the DIRTY branch back to its WORK agent to rebase+resolve+push (work agents pass the guard).
+- **Session-drift caveat:** `pan resume` REFUSED 2045 (codex→claude-code session drift, rotation disabled PAN-1980). Must `pan start --fresh` for a new claude-code session, then `pan tell` the precise minimal rebase task so it doesn't re-litigate the whole approved issue. 2045 fresh agent alive on claude-code+gpt-5.6-sol, told to rebase+resolve(keep main's block)+push only.
+- 1966 claude-code canary convoy HEALTHY (2/4 sub-reviews written, progressing, no stall).
+
+## Tick 68 — 2026-07-16 ~18:22 — CANARY WEDGED: review-convoy wedge is AUTOCOMPACT THRASH (new evidence)
+- **The 1966 claude-code+gpt-5.6-sol review convoy WEDGED with a healthy server (PAN-2318 fixed).** Harness reversal did NOT prevent it. This is the evidence the operator asked me to capture.
+- **Wedged agent:** agent-pan-1966-review-requirements. status=running but lastActivity frozen 21:58Z (~23min), pid=null. env confirmed: CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000 (PAN-2441) + ANTHROPIC_BASE_URL=127.0.0.1:8317 (CLIProxy).
+- **Mechanism (pane's own diagnostic):** "Autocompact is thrashing: context refilled to the limit within 3 turns of the previous compact, 3x in a row. A file being read or a tool output is likely too large." Frozen at `❯ ⏸ manual mode on`. Repeated large reads: pipeline-membership-gather.ts (314 lines) 2x + rules files re-loaded each compact.
+- **THIRD failure mode**, distinct from PAN-1865 (200k-window deadlock) and PAN-2318 (event-loop starvation): the 150k compact window collides with a review convoy that re-reads large source files → compact loop → wedge at prompt.
+- Evidence saved: scratchpad/1966-wedge-evidence.txt + 1966-req-pane.txt. Live session PRESERVED (not killed) for operator transcript inspection. 1966 synthesis BLOCKED (3/4 sub-reviews; requirements wedged).
+- **PAN-2045**: work agent rebased+pushed (head 9257982b), GitHub CI test PENDING, all else green. Review stale→needs re-run on new head. Work agent being nudged by pipeline to "fix failing tests" = the PAN-2810 workspace-vitest divergence (NOT its bug) — risk of thrash.
+
+## Tick 69 — 2026-07-16 ~18:31 — wedge scope refined; 2045 thrashed (unreviewed test change)
+- **Wedge scope correction:** "manual mode on" over-matches (it's just auto-accept-off status line). Genuinely STALE (lastActivity frozen): 1966-review-requirements (~23min), 1897-review-performance (~33min). agent-pan-1491-review is ACTIVE (lastActivity 18:28). So ~2-3 review convoys genuinely wedged on autocompact thrash, not 7. Still a real systemic pattern on claude-code+CLIProxy review convoys.
+- **PAN-2045 NOT mergeable on prior approval:** feature src diff at current head 9257982b DIFFERS from approved head 75308e1d — the work agent, chasing the PAN-2810 test-gate nag, ALSO modified TieredExecutionSection.test.tsx (weakened assertion `expect(row).not.toHaveAttribute('open')` → `expect(removeButton).toBeInTheDocument()`). Unreviewed + potential coverage regression. Its re-review (run e07906ff) must actually evaluate this — but that convoy may be wedging too. Do NOT admin-merge past it.
+- No merges this tick. 1897 CHANGES REQUESTED stale. 1966 wedged. Pipeline partially wedge-blocked on review convoys = operator-owned (compact-window fix pending). Session merges hold at 5.
+- 1966 wedged session still PRESERVED for operator transcript inspection.
+
+## Tick 70 — 2026-07-16 ~18:44 — PAN-2045 merged (6 total); wedge intermittent
+- **PAN-2045 MERGED → 67b150ebdc.** Its re-review COMPLETED APPROVED on head 9257982b (all 4 sub-reviews + synthesis), all CI green, CLEAN. The TieredExecutionSection test change WAS reviewed+approved (not merged-past). 12min "staleness" was post-completion idle, not a wedge. Session tally: 1987, 2772, 2760, 2619, 2773, 2045 = 6.
+- **Wedge is INTERMITTENT, not total:** some claude-code+CLIProxy review convoys complete (2045), others wedge on autocompact thrash. Still genuinely wedged (lastActivity frozen): 1966 whole convoy (~46min), 1897-review-performance (~45min), 1491-review (~256min, old). These block 1966/1897/1491.
+- **Restarting wedged convoys pre-fix is FUTILE** — a fresh claude-code+CLIProxy convoy re-wedges on the same large-file autocompact thrash. Leave wedged 1966/1897 for operator's compact-window root-cause fix. NOTE: killing tmux does NOT delete the JSONL transcript (survives on disk), so evidence is safe regardless.
+- Operator has 2 open questions from me: (1) kill/restart 1966 wedge, (2) 150k compact window for review convoys. Holding on both (irreversible/operator-owned) until they respond.
+
+## Tick 71 — 2026-07-16 ~18:56 — quiet; DoD deploy+close-out OWED and HELD
+- No new merges (1897 CHANGES REQUESTED, 1966 wedged 59min, 1897-perf wedged 58min). Wedge unchanged — operator compact-window fix still pending.
+- **DoD DEPLOY OWED for 6 merges** (1987, 2772, 2760, 2619, 2773, 2045) — all landed after last deploy a081a9ce59. Live dashboard is STALE relative to them. Close-out can't fully pass (deploy row) until deployed.
+- **DEPLOY HELD ON PURPOSE:** restarting the live dashboard mid-operator-debug would disconnect their active session (convo-disconnect blast radius) and disrupt wedge debugging. Waiting for operator OK or a natural break. When cleared: git fetch, checked-clean FF-only, npm run build, pan restart --dashboard --resume --health-timeout 120000, then pan close each of the 6.
+- Session merge tally holds at 6.
+
+## Tick 72 — 2026-07-16 ~20:30 — operator re-focus; directive list reconciled as STALE; real live set re-driven
+- Operator: close-out backlog is THEIRS (14 issues + hands-off PAN-2255 parked/REVERTED + PAN-2633). Compact-window wedge RESOLVED — no longer a blocker. My job: live merges, report each.
+- **Directive "still-in-review" list reconciled at CODE level — ALL ALREADY DONE:** PAN-2167/2230/2374/2375/2420 merged+branch-cleaned+issue CLOSED; PAN-2203 (PR#2206, merged 07-01) and PAN-2257 (PR#2281, merged 07-03) squash-merged (my earlier "branch exists NOT merged" read was the squash-merge ancestor fallacy); MIN-860 backend MR !51 MERGED, no open MRs in either myn repo. These are stale dashboard review rows — same class as the stale paused labels the operator is sweeping. Nothing to drive there.
+- **Actual live pipeline re-driven this tick:** 1966 review restarted (wedge fix in effect); 2252/2647/2807 work agents STARTED (were completely dead — no agents at all); **2232 was scheduler-yielded "making room for review of PAN-1987" and NEVER self-cleared** (1987 merged 3h ago) — unpaused + resumed. Yield self-clear failure = real bug to file if reproduced.
+- 1897: work agent actively fixing CHANGES REQUESTED ($71 spent, 74k ctx, alive). 1491: PR#1636 CLOSED but branch has 42 commits incl. "address review findings" — needs disposition (re-open PR or operator call).
+- Live set now: 1491, 1897, 1966, 2232, 2252, 2647, 2807 (+806 HELD).
+
+## Tick 72b — 2026-07-16 ~20:32 — DEPLOY EXECUTED (operator go-ahead)
+- **Deployed dist@a9e301526b** via `pan restart --dashboard --resume --health-timeout 120000`. New server: pid 467521, Node 22, started 20:31:08, owns :3011, /api/health 200 (<1ms). Every merge today (1987, 2772, 2760, 2619, 2773, 2045 + operator's 14-issue close-out set) is now IN the live build → DoD deploy row passes.
+- Killed 5 orphaned host server.js processes (no listen sockets; reconnect-storm class, PAN-2318 playbook). Two remaining server.js pids are workspace devcontainer peers (cwd=/workspaces/overdeck, no host listeners) — left alone per single-deacon rule.
+- Operator now runs the 14 close-outs. My focus stays: live merges on the real set (1491, 1897, 1966, 2232, 2252, 2647, 2807).
+
+## Tick 73 — 2026-07-16 ~20:45 — 3 DoD investigations closed with evidence (2773, 2045, 2619)
+- **PAN-2773 closed --accept-main-verify.** Its merge commit (3ac755abc077) failed only `test`: ONE test — hygiene.test.ts "fix-safe deletes a locally merged feature branch in a synthetic repository" (10.7s, retry x1). 2773's diff is frontend-only (CommandDeck/Stage) + docs — zero hygiene overlap — and the very next commit (8682e414bd, docs-only, same code tree) ran test=SUCCESS. Flake, not 2773's breakage.
+- **PAN-2045 closed --accept-main-verify.** Its merge commit (67b150ebdcf8) failed lint+build+test+clean-install — but so did f69144f873 (tick 69, DOCS-ONLY, BEFORE 2045 merged) with the IDENTICAL failure signature, and recovery commit a9e301526b (also docs-only) went all-green. Docs can't break lint/build ⇒ infra-red window ~18:31–20:25 (corroborated by GitHub API 503 I hit at 19:31). 2045's own PR CI at merged head 9257982b was fully green. 2045 merged ONTO red, did not cause it.
+- **PAN-2619 closed --accept-tests.** DoD row 2 (test-specialist verdict) missed because the test agent RAN and reported TESTS FAILED — but every failure was verified environmental (PAN-2809 container terminal-UAT blockers, PAN-2810 workspace-vitest divergence; tick 64b), not the diff. Merge commit 7c46c64e02ec CI: ALL green. Honest accept per the pre-recorded tick-64b decision rule.
+- All 14 close-outs now done (operator: 11, me: 3). Fleet merges 1987/2772/2760/2619/2773/2045 fully DoD-complete including deploy (server 467521 @ a9e301526b).
+- REMINDER standing: operator's "in-review convoys" list (MIN-860, 2167/2203/2230/2257/2375/2420, 2374) reconciled in tick 72 as ALREADY MERGED+CLOSED (stale dashboard rows). Live set: 1491, 1897, 1966, 2232, 2252, 2647, 2807, +806 HELD. Hands off: PAN-2255 (parked/reverted), PAN-2633 (operator).
+
+## Tick 74 — 2026-07-16 ~20:52 — collateral kill owned + fixed; 1491 re-reviewed
+- **MY ERROR, owned:** the 20:33 "orphan server.js" kill took down 2252/2647/2807's freshly-started stacks — the 3 killed pids' start times (20:26:05/28/52) match their stack spin-ups exactly; agents orphaned at 20:35. I checked listen sockets but NOT cwd/parentage before killing — the exact PAN-2792 lesson (pidsWithCwdUnder). RULE REINFORCED: before killing "orphan" processes, verify cwd + parent + age; a listen-socket check alone is insufficient. All 3 restarted --fresh and alive (only ~5min of session lost).
+- **PAN-1491 untangled:** workspace synthesis (14:42) said APPROVED @1196ce67, but LATER syntheses (16:27, 17:52) posted CHANGES REQUESTED to the CLOSED PR#1636 — both citing wedged reviewer sessions (wedge-era poisoned verdicts, not code findings). PR#1636 closed 06-19; branch has 42 commits, no open PR. Action: pan review restart PAN-1491 for a clean post-wedge-fix verdict on head 1196ce67 → if APPROVED, open NEW PR → CI → merge.
+- Live set: 1897 (work fixing), 1966 (review running), 1491 (review running), 2232 (work running), 2252/2647/2807 (work restarted).
+
+## Tick 75 — 2026-07-16 ~21:05 — 1966 review resume-loop diagnosed; nudged
+- **`pan review restart` cannot produce a fresh session for a wedged convoy:** it resumes via `~/.overdeck/agents/agent-pan-1966-review/session.id` + `sessions.json` even after tmux kill AND `pan kill` — always "resumed (session preserved)", bringing the thrash-poisoned context back. No --fresh flag exists on review restart (only --model/--role). TOOLING GAP to file if nudge fails.
+- New session env still has CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000 — operator's "wedge resolved" was NOT an env change. Watching behavior, not assuming.
+- Resumed coordinator sits idle at prompt post-compact (83k ctx, out=51). Nudged via pan tell: resume convoy, synthesize from existing sub-review files (correctness/performance/security.md exist from earlier run) + fresh requirements pass. Next tick: check for synthesis; if still idle → rotate session.id (backup, not delete) for a genuinely fresh spawn and file the tooling-gap issue.
+- Rest of set: 1897 work fixing, 2232/2252/2647/2807 work agents running, 1491 fresh review dispatched.
+
+## Tick 76 — 2026-07-16 ~21:17 — PAN-2811 strike LANDED + DEPLOYED
+- **Landed a1426db49f051d90a8b027f426edb1fce408f4fb** (merge --no-ff of origin/strike/pan-2811 @ 97b7290cd9, operator-directed recovery path). Fix: replaces in-process strike-merge trigger registration (broken across tsdown dual-module/deacon fork boundary — PAN-2806 family) with authenticated internal HTTP route /api/internal/strikes/:id/merge. Deacon can now invoke dashboard-parent strike merges across the fork.
+- Gates verified by me on the merged tree: typecheck (no new), lint, 21/21 tests in the 3 touched suites, production build. (Strike itself reported 9,564 tests green; main CI validates full matrix post-push.)
+- **Deployed:** server pid 1850998 @ 21:17:05 owns :3011, health 200. Primary FF'd clean (checked porcelain first).
+- Watch main CI on a1426db49f; if red, investigate before anything else lands.

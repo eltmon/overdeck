@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   acquireRestartLock: vi.fn(),
@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   fsRename: vi.fn(),
   readDevSupervisorMarker: vi.fn(),
   devSupervisorRefusalLines: vi.fn(),
+  agentRestartBlockReason: vi.fn(),
 }));
 
 // reloadCommand refuses to run when a `pan dev` supervisor marker is present.
@@ -34,6 +35,10 @@ vi.mock('../../../lib/dev-supervisor.js', () => ({
 vi.mock('../../../lib/restart-lock.js', () => ({
   acquireRestartLock: mocks.acquireRestartLock,
   readRestartLockHolder: mocks.readRestartLockHolder,
+}));
+
+vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
+  agentRestartBlockReason: mocks.agentRestartBlockReason,
 }));
 
 vi.mock('../../../lib/platform-lifecycle.js', () => ({
@@ -111,10 +116,18 @@ function mockExecByCommand(handlers: Record<string, Array<{ stdout?: string; cod
   });
 }
 
+const originalAgentId = process.env.OVERDECK_AGENT_ID;
+
+function restoreAgentId(): void {
+  if (originalAgentId === undefined) delete process.env.OVERDECK_AGENT_ID;
+  else process.env.OVERDECK_AGENT_ID = originalAgentId;
+}
+
 describe('reloadCommand', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    delete process.env.OVERDECK_AGENT_ID;
     vi.spyOn(process, 'cwd').mockReturnValue('/repo');
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -133,6 +146,7 @@ describe('reloadCommand', () => {
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
+    mocks.agentRestartBlockReason.mockResolvedValue(null);
     mocks.fsRm.mockResolvedValue(undefined);
     mocks.fsCp.mockResolvedValue(undefined);
     mocks.fsRename.mockResolvedValue(undefined);
@@ -141,6 +155,11 @@ describe('reloadCommand', () => {
       "git 'fetch' 'origin' 'main'": [{ stdout: '' }],
       "git 'merge-base' '--is-ancestor' 'origin/main' 'HEAD'": [{ stdout: '' }],
     });
+  });
+
+  afterEach(() => {
+    restoreAgentId();
+    process.exitCode = undefined;
   });
 
   it('signals a running pan dev supervisor (SIGUSR2) instead of refusing or restarting (PAN-1662)', async () => {
@@ -205,6 +224,54 @@ describe('reloadCommand', () => {
       expect.objectContaining({ success: false, error: expect.stringContaining('restart in progress') }),
     );
     expect(process.exitCode).toBe(2);
+  });
+
+  it('refuses a blocked agent reload before acquiring the restart lock or building', async () => {
+    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
+    mocks.agentRestartBlockReason.mockResolvedValue('Restart refused by active deployment gate.');
+
+    await reloadCommand({});
+
+    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
+      initiator: 'agent-pan-2772',
+      force: false,
+    });
+    expect(console.error).toHaveBeenCalledWith('Restart refused by active deployment gate.');
+    expect(process.exitCode).toBe(1);
+    expect(mocks.acquireRestartLock).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.restartDashboard).not.toHaveBeenCalled();
+  });
+
+  it('allows --force to proceed through the agent reload gate', async () => {
+    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
+
+    await reloadCommand({ force: true, skipBuild: true });
+
+    expect(mocks.agentRestartBlockReason).toHaveBeenCalledWith({
+      initiator: 'agent-pan-2772',
+      force: true,
+    });
+    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the agent reload gate when no initiator is present', async () => {
+    await reloadCommand({ skipBuild: true });
+
+    expect(mocks.agentRestartBlockReason).not.toHaveBeenCalled();
+    expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
+    expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('warns that a proceeding agent reload disconnects live sessions', async () => {
+    process.env.OVERDECK_AGENT_ID = 'agent-pan-2772';
+
+    await reloadCommand({ skipBuild: true });
+
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining(
+      'disconnect every live conversation and terminal until clients reconnect',
+    ));
   });
 
   it('runs bun install before the build, then restartDashboard, on success', async () => {

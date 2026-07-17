@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDashboardStore } from '../lib/store';
+import { installStrictFetchMock } from '../test-utils/strictFetchMock';
 import type { Agent, Issue } from '../types';
 import { CommandPalette } from './CommandPalette';
 
@@ -63,6 +64,25 @@ function getOptionByValue(value: string): HTMLElement {
   return el as HTMLElement;
 }
 
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+beforeEach(() => {
+  fetchControl = installStrictFetchMock(({ method, url }) => {
+    if (method === 'GET' && url === '/api/palette/commands') {
+      return Response.json({ commands: [] });
+    }
+    if (method === 'GET' && url.startsWith('/api/palette/search')) {
+      return Response.json({ observations: [], conversations: [], memory: [], summaries: [] });
+    }
+    return undefined;
+  });
+});
+
+afterEach(async () => {
+  await fetchControl.assertNoUnexpectedRequests();
+  vi.unstubAllGlobals();
+});
+
 describe('CommandPalette issue results', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -119,50 +139,49 @@ describe('CommandPalette conversation results', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      if (url.startsWith('/api/palette/search')) {
-        return {
-          ok: true,
-          json: async () => ({
-            observations: [],
-            conversations: [{
-              sessionId: 'session-a',
-              conversationId: 'session-a',
-              projectId: '-home-eltmon-Projects-overdeck-workspaces-feature-pan-1896',
-              projectKey: 'overdeck',
-              role: 'assistant',
-              ts: '2026-06-02T01:00:00.000Z',
-              byteOffset: 42,
-              displayContent: 'semantic transcript hit',
-              excerpt: 'before ⦇needle⦈ after',
-              excerptSegments: [
-                { text: 'before ', match: false },
-                { text: 'needle', match: true },
-                { text: ' after', match: false },
-              ],
-              rank: 1,
-            }],
-            memory: [{
-              kind: 'memory',
-              id: 'mem-a',
-              projectId: 'overdeck',
-              workspaceId: '',
-              issueId: '',
-              timestamp: '2026-06-02T01:00:00.000Z',
-              displayContent: 'memory hit',
-              excerpt: 'memory excerpt',
-              excerptSegments: [{ kind: 'text', value: 'memory excerpt' }],
-              tags: [],
-              docType: 'memory',
-              rank: 1,
-            }],
-            summaries: [],
-          }),
-        };
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') {
+        return Response.json({ commands: [] });
       }
-      return { ok: true, json: async () => ({ commands: [] }) };
-    }));
+      if (method === 'GET' && url.startsWith('/api/palette/search')) {
+        return Response.json({
+          observations: [],
+          conversations: [{
+            sessionId: 'session-a',
+            conversationId: 'session-a',
+            projectId: '-home-eltmon-Projects-overdeck-workspaces-feature-pan-1896',
+            projectKey: 'overdeck',
+            role: 'assistant',
+            ts: '2026-06-02T01:00:00.000Z',
+            byteOffset: 42,
+            displayContent: 'semantic transcript hit',
+            excerpt: 'before ⦇needle⦈ after',
+            excerptSegments: [
+              { text: 'before ', match: false },
+              { text: 'needle', match: true },
+              { text: ' after', match: false },
+            ],
+            rank: 1,
+          }],
+          memory: [{
+            kind: 'memory',
+            id: 'mem-a',
+            projectId: 'overdeck',
+            workspaceId: '',
+            issueId: '',
+            timestamp: '2026-06-02T01:00:00.000Z',
+            displayContent: 'memory hit',
+            excerpt: 'memory excerpt',
+            excerptSegments: [{ kind: 'text', value: 'memory excerpt' }],
+            tags: [],
+            docType: 'memory',
+            rank: 1,
+          }],
+          summaries: [],
+        });
+      }
+      return undefined;
+    });
   });
 
   afterEach(() => {

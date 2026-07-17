@@ -26,6 +26,7 @@ function dependencies(overrides: Partial<StrikeReadyDependencies> = {}): StrikeR
     resolveProject: vi.fn().mockReturnValue({ projectPath: projectRoot, projectKey: 'overdeck' }),
     getStatus: vi.fn().mockReturnValue(current),
     setStatus: vi.fn((issueId, update) => status({ issueId, ...update })),
+    clearStuck: vi.fn(),
     git: vi.fn(async (args) => {
       const command = args.join(' ');
       if (command === 'rev-parse --show-toplevel') return workspace;
@@ -66,19 +67,45 @@ describe('strikeReadyCommand', () => {
     expect(deps.setStatus).not.toHaveBeenCalled();
   });
 
-  it('treats an identical HEAD as idempotent', async () => {
+  it('re-arms an identical HEAD from needs_you and clears the ephemeral stuck gate', async () => {
+    const attempts = [{ timestamp: 't', strikeHead: head, mainHead: 'm', outcome: 'failed' as const, detail: 'transient failure' }];
     const existing = status({
       strikeReadyHead: head,
       strikeReadyAt: '2026-07-16T11:00:00.000Z',
-      strikeLandingState: 'recovering',
+      strikeLandingState: 'needs_you',
       strikeRecoveryCount: 2,
-      strikeLandingAttempts: [{ timestamp: 't', strikeHead: head, mainHead: 'm', outcome: 'failed', detail: 'conflict' }],
+      strikeLandingAttempts: attempts,
+      stuck: true,
+      stuckReason: 'feedback_delivery_needs_you',
     });
     const deps = dependencies({ getStatus: vi.fn().mockReturnValue(existing) });
 
-    await expect(strikeReadyCommand('PAN-2702', deps)).resolves.toBe(existing);
-    expect(deps.setStatus).not.toHaveBeenCalled();
+    await strikeReadyCommand('PAN-2702', deps);
+
+    expect(deps.clearStuck).toHaveBeenCalledWith('PAN-2702');
+    expect(deps.setStatus).toHaveBeenCalledWith('PAN-2702', {
+      strikeLandingState: 'ready',
+      strikeRecoveryCount: 0,
+      strikeLandingAttempts: attempts,
+    });
   });
+
+  it.each(['ready', 'landing', 'recovering'] as const)(
+    'keeps an identical HEAD in %s idempotent',
+    async (strikeLandingState) => {
+      const existing = status({
+        strikeReadyHead: head,
+        strikeReadyAt: '2026-07-16T11:00:00.000Z',
+        strikeLandingState,
+        strikeRecoveryCount: 2,
+      });
+      const deps = dependencies({ getStatus: vi.fn().mockReturnValue(existing) });
+
+      await expect(strikeReadyCommand('PAN-2702', deps)).resolves.toBe(existing);
+      expect(deps.clearStuck).not.toHaveBeenCalled();
+      expect(deps.setStatus).not.toHaveBeenCalled();
+    },
+  );
 
   it('resets a new HEAD readiness cycle while preserving attempt history', async () => {
     const attempts = [{ timestamp: 't', strikeHead: 'b'.repeat(40), mainHead: 'm', outcome: 'failed', detail: 'conflict' }];

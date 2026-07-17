@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { afterEach, describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
 vi.mock('../../../hooks/useCostStream', () => ({
   useIssueCostStream: () => ({
@@ -63,6 +66,15 @@ function renderHeader() {
 
 describe('IssueHeader', () => {
   beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method !== 'GET') return undefined;
+      if (url === '/api/review/PAN-895/config') return Response.json({});
+      if (url === '/api/issues/PAN-895/staffing') return Response.json({});
+      if (url === '/api/issues/PAN-895/swarm-policy') return Response.json({});
+      if (url === '/api/settings/available-models') return Response.json({ models: [] });
+      if (url === '/api/flywheel/config') return Response.json({});
+      return undefined;
+    });
     planningSummaryResult.data = {
       hasPrd: true,
       hasState: true,
@@ -82,6 +94,11 @@ describe('IssueHeader', () => {
       readyForMerge: false,
       updatedAt: '2026-04-28T00:00:00Z',
     };
+  });
+
+  afterEach(async () => {
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
   });
 
   it('renders issue id, title, and cost', () => {

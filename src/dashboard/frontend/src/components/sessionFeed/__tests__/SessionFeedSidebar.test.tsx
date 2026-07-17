@@ -1,17 +1,22 @@
-import { act, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactElement } from 'react';
 import type { MemoryObservation } from '@overdeck/contracts';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDashboardStore } from '../../../lib/store';
+import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
 import { SESSION_FEED_TAB_STORAGE_KEY, SessionFeedSidebar } from '../SessionFeedSidebar';
 import type { ConversationSessionFeedEntry, GitSessionFeedEntry } from '../types';
 
 // The sidebar's pending-input count now spans two domains: agents from the read
 // model and conversations from the REST door, which it reads via react-query.
 // Every call site renders through a provider so the union can be fetched.
+let queryClients: QueryClient[] = [];
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
 function render(ui: ReactElement) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClients.push(client);
   return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
 }
 
@@ -89,6 +94,13 @@ function conversationEntry(overrides: Partial<ConversationSessionFeedEntry> = {}
 
 describe('SessionFeedSidebar', () => {
   beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/conversations/pending-input') {
+        return Response.json([]);
+      }
+      return undefined;
+    });
     window.history.pushState(null, '', '/');
     window.localStorage.clear();
     hookSources.conversations = { entries: [], isLoading: false, error: null };
@@ -98,6 +110,14 @@ describe('SessionFeedSidebar', () => {
     hookSources.useConversationFeed.mockClear();
     hookSources.useGitFeed.mockClear();
     useDashboardStore.setState({ observationsByIssueId: {}, recentActivity: [] });
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
   });
 
   it('renders the six tabs in reference order and calls onClose', () => {

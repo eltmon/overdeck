@@ -780,6 +780,67 @@ describe('checkInspectAgentTimeouts', () => {
     );
   });
 
+  it('keeps a live standing supervisor inspection active without probing a dedicated inspect session', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
+      'PAN-1616': {
+        issueId: 'PAN-1616',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        inspectStatus: 'inspecting',
+        inspectStartedAt: '2026-06-05T12:11:30.000Z',
+        inspectBeadId: 'workspace-sposy',
+        inspectOwnerSession: 'agent-pan-1616-review-supervisor',
+        updatedAt: '2026-06-05T12:11:30.000Z',
+        readyForMerge: false,
+      },
+    } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) => (
+      Effect.succeed(name === 'agent-pan-1616-review-supervisor') as any
+    ));
+
+    const actions = await checkInspectAgentTimeouts();
+
+    expect(actions).toEqual([]);
+    expect(mockSessionExistsAsync).toHaveBeenCalledTimes(1);
+    expect(mockSessionExistsAsync).toHaveBeenCalledWith('agent-pan-1616-review-supervisor');
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('fails loudly when the recorded standing supervisor owner has disappeared', async () => {
+    vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
+      'PAN-1616': {
+        issueId: 'PAN-1616',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        inspectStatus: 'inspecting',
+        inspectStartedAt: '2026-06-05T12:11:30.000Z',
+        inspectBeadId: 'workspace-sposy',
+        inspectOwnerSession: 'agent-pan-1616-review-supervisor',
+        updatedAt: '2026-06-05T12:11:30.000Z',
+        readyForMerge: false,
+      },
+    } as any);
+    mockSessionExistsAsync.mockReturnValue(Effect.succeed(false) as any);
+
+    const actions = await checkInspectAgentTimeouts();
+
+    expect(actions).toEqual([
+      'Inspection watchdog tripped for PAN-1616 bead workspace-sposy: tmux session agent-pan-1616-review-supervisor exited before producing a verdict',
+    ]);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1616', expect.objectContaining({
+      inspectStatus: 'error',
+      inspectNotes: expect.stringContaining('agent-pan-1616-review-supervisor'),
+    }));
+    expect(mockKillSessionAsync).not.toHaveBeenCalled();
+    expect(mockMessageAgent).toHaveBeenCalledWith(
+      'agent-pan-1616',
+      expect.stringContaining('tmux session agent-pan-1616-review-supervisor exited'),
+      'deacon:inspect-watchdog',
+    );
+  });
+
   it('marks an inspecting task as error when its inspect session has disappeared', async () => {
     vi.mocked((await import('../../review-status.js')).loadReviewStatuses).mockReturnValue({
       'PAN-1616': {

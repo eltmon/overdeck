@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { installStrictFetchMock } from '../test-utils/strictFetchMock';
 import { AwaitingMergeRow } from './AwaitingMergePage';
 
 vi.mock('sonner', () => ({
@@ -10,7 +11,37 @@ vi.mock('sonner', () => ({
   },
 }));
 
-afterEach(() => {
+let queryClients: QueryClient[] = [];
+let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+beforeEach(() => {
+  queryClients = [];
+  fetchControl = installStrictFetchMock(({ method, url }) => {
+    if (method === 'GET' && url === '/api/flywheel/config') {
+      return Response.json({ auto_pickup_backlog: false, require_uat_before_merge: false });
+    }
+    if (method === 'GET' && url === '/api/workspaces/PAN-1686/uat-context') {
+      return Response.json({
+        acceptanceCriteria: [
+          {
+            id: 'uat.ac1',
+            title: 'Fetched checklist item',
+            status: 'pending',
+            itemId: 'frontend-what-to-test',
+            itemTitle: 'Frontend checklist',
+          },
+        ],
+      });
+    }
+    return undefined;
+  });
+});
+
+afterEach(async () => {
+  cleanup();
+  await Promise.all(queryClients.map((queryClient) => queryClient.cancelQueries()));
+  queryClients.forEach((queryClient) => queryClient.clear());
+  await fetchControl.assertNoUnexpectedRequests();
   vi.unstubAllGlobals();
 });
 
@@ -21,6 +52,7 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof AwaitingMergeR
       mutations: { retry: false },
     },
   });
+  queryClients.push(queryClient);
 
   return render(
     <QueryClientProvider client={queryClient}>
@@ -38,25 +70,7 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof AwaitingMergeR
 describe('AwaitingMergeRow UAT context', () => {
   it('lazy-loads UAT context only after the section expands', async () => {
     const uatContextUrl = '/api/workspaces/PAN-1686/uat-context';
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url !== uatContextUrl) {
-        return new Response(JSON.stringify({ enabled: false }), { status: 200 });
-      }
-
-      return new Response(JSON.stringify({
-        acceptanceCriteria: [
-          {
-            id: 'uat.ac1',
-            title: 'Fetched checklist item',
-            status: 'pending',
-            itemId: 'frontend-what-to-test',
-            itemTitle: 'Frontend checklist',
-          },
-        ],
-      }), { status: 200 });
-    });
-    const uatContextCalls = () => fetchMock.mock.calls.filter(([url]) => url === uatContextUrl);
-    vi.stubGlobal('fetch', fetchMock);
+    const uatContextCalls = () => fetchControl.fetchMock.mock.calls.filter(([url]) => url === uatContextUrl);
 
     renderRow();
 
@@ -65,7 +79,7 @@ describe('AwaitingMergeRow UAT context', () => {
     fireEvent.click(screen.getByTestId('merge-uat-toggle-PAN-1686'));
 
     await waitFor(() => expect(uatContextCalls()).toHaveLength(1));
-    expect(fetchMock).toHaveBeenCalledWith(uatContextUrl);
+    expect(fetchControl.fetchMock).toHaveBeenCalledWith(uatContextUrl);
     expect(await screen.findByText('Fetched checklist item')).toBeTruthy();
   });
 

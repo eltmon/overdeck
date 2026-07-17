@@ -31,6 +31,7 @@ import { isStartingWithinGrace } from './agent-grace.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
+import { patrolStrikeLandings } from './deacon-strike-landing.js';
 import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
@@ -49,7 +50,6 @@ import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { haveSameEffectiveCodeCommit, haveSameCodeContribution } from '../pipeline-state-paths.js';
-
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 
@@ -933,14 +933,15 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
  * running AND no review is in flight AND feedback files are still sitting in
  * `.pan/feedback/`.
  *
- * Actionable mailbox files remain durable until acknowledged.
+ * The feedback is useless once consumed, so we always delete — no archive, no
+ * retention. See docs/REVIEW-AGENT-ARCHITECTURE.md.
  */
 export async function cleanupAbandonedFeedback(): Promise<string[]> {
   const actions: string[] = [];
 
   const { getReviewStatusSync } = await import('../review-status.js');
   const { clearFeedbackFiles } = await import('./feedback-writer.js');
-  const { hasActionableMailboxItems, listMailboxItems } = await import('./agent-mailbox.js');
+
   for (const { issueId, workspacePath } of listFeatureWorkspaces()) {
     const panFeedbackDir = join(workspacePath, '.pan', 'feedback');
     if (!existsSync(panFeedbackDir)) continue;
@@ -964,9 +965,8 @@ export async function cleanupAbandonedFeedback(): Promise<string[]> {
       // No status entry → safe to clean.
     }
 
+    // Both gates passed — feedback is abandoned, safe to delete.
     try {
-      const mailboxItems = await listMailboxItems({ issueId, role: 'work', workspacePath });
-      if (hasActionableMailboxItems(mailboxItems)) continue;
       const countFeedbackFiles = (dir: string) => existsSync(dir)
         ? readdirSync(dir).filter(f => /^\d{3}-/.test(f) && f.endsWith('.md')).length
         : 0;
@@ -2753,7 +2753,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   hasLoggedGlobalPauseSkip = false;
   addLog('info', `Patrol cycle ${state.patrolCycle} — checking per-project specialists`, state.patrolCycle);
   console.log(`[deacon] Patrol cycle ${state.patrolCycle} - checking per-project specialists`);
-  for (const a of await (await import('./agent-mailbox-escalation.js')).patrolPendingMailboxEscalations({ policyWindowMs: config.patrolIntervalMs })) { actions.push(a); addLog('action', a, state.patrolCycle); }
+
   for (const a of await (await import('./stale-task-claims.js')).patrolStaleTaskClaims()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   const stuckRemediationActions = await checkStuckAgentRemediation();
   actions.push(...stuckRemediationActions);
@@ -3085,7 +3085,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   const failedMergeRetryActions = await checkFailedMergeRetry();
   actions.push(...failedMergeRetryActions);
   for (const a of failedMergeRetryActions) addLog('action', a, state.patrolCycle);
-  for (const a of await (await import('./deacon-strike-landing.js')).patrolStrikeLandings()) { actions.push(a); addLog('action', a, state.patrolCycle); }
+  for (const a of await patrolStrikeLandings()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // PAN-2203: deterministic swarm coordination. This pass derives active
   // swarms from workspaces + vBRIEF readiness; later beads fill in merge,
   // dispatch, recovery, and cooldown behavior.

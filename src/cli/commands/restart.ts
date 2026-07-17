@@ -18,17 +18,19 @@ import { Effect } from 'effect';
  */
 
 import chalk from 'chalk';
-import { spawn } from 'child_process';
+import { execFileSync, spawn } from 'child_process';
 import { dirname, join, parse, resolve } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync } from 'fs';
+import { existsSync, mkdirSync } from 'fs';
 import { isWorkspaceRepoRoot } from '../../dashboard/server/identity.js';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
+import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 
 import {
+  DASHBOARD_LOG_FILE,
   openDashboardLogStdio,
   readPlatformConfigSync,
   restartDashboard,
@@ -157,19 +159,64 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
         OVERDECK_TRUSTED_ORIGINS: [process.env.OVERDECK_TRUSTED_ORIGINS, `https://${config.traefikDomain}`].filter(Boolean).join(','),
       }
     : {};
+  const fullEnv = {
+    ...env,
+    ...traefikEnv,
+    DASHBOARD_PORT: String(config.dashboardPort),
+    API_PORT: String(config.dashboardApiPort),
+    PORT: String(config.dashboardApiPort),
+    OVERDECK_MODE: 'production',
+  };
+
+  // PAN-2804: a plain detached spawn stays in the INVOKER's cgroup — a
+  // watchdog-spawned dashboard dies when overdeck-supervisor.service restarts,
+  // and a conversation/flywheel-spawned one dies with that tmux pane's scope.
+  // Run the server in its own transient systemd unit (same isolation the
+  // shared tmux server gets, PAN-1798) so its lifecycle belongs to nobody.
+  if (spawnDashboardSystemdUnit(serverPath, fullEnv)) return;
+
   const child = spawn(resolveNode22(), [serverPath], {
     detached: true,
     stdio: openDashboardLogStdio(),
-    env: {
-      ...env,
-      ...traefikEnv,
-      DASHBOARD_PORT: String(config.dashboardPort),
-      API_PORT: String(config.dashboardApiPort),
-      PORT: String(config.dashboardApiPort),
-      OVERDECK_MODE: 'production',
-    },
+    env: fullEnv,
   });
   child.unref();
+  console.warn(
+    '[dashboard] WARNING (PAN-2804): could not start the dashboard via systemd-run. ' +
+      'It shares the invoking process tree\'s cgroup; restarting that unit/scope will kill it.',
+  );
+}
+
+/** Valid systemd --setenv names; skips exported bash functions etc. */
+const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function spawnDashboardSystemdUnit(serverPath: string, fullEnv: Record<string, string | undefined>): boolean {
+  if (process.platform !== 'linux') return false;
+  try {
+    mkdirSync(dirname(DASHBOARD_LOG_FILE), { recursive: true });
+    const setenvArgs = Object.entries(fullEnv)
+      .filter(([k, v]) => v !== undefined && ENV_NAME_RE.test(k))
+      .flatMap(([k, v]) => ['--setenv', `${k}=${v}`]);
+    execFileSync(
+      'systemd-run',
+      [
+        '--user', '--unit', `overdeck-dashboard-${Date.now()}`,
+        '--collect', '--quiet',
+        // The dashboard is the orchestrator — shed agents before it (PAN-2500).
+        '--property=ManagedOOMPreference=avoid',
+        `--property=StandardOutput=append:${DASHBOARD_LOG_FILE}`,
+        `--property=StandardError=append:${DASHBOARD_LOG_FILE}`,
+        // /api/health identity derives repoRoot from the server's cwd; keep it.
+        `--property=WorkingDirectory=${process.cwd()}`,
+        ...setenvArgs,
+        resolveNode22(), serverPath,
+      ],
+      { stdio: 'ignore' },
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function recordRestartStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
@@ -237,6 +284,22 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
   const lockInherited = process.env.OVERDECK_RESTART_LOCK_HELD === '1';
   const needsRestartLock = (scope === 'dashboard' || scope === 'full') && !lockInherited;
+  const restartInitiator = process.env.OVERDECK_AGENT_ID;
+  if (needsRestartLock && restartInitiator) {
+    const restartBlock = await agentRestartBlockReason({
+      initiator: restartInitiator,
+      force: options.force === true,
+    });
+    if (restartBlock) {
+      console.error(restartBlock);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(chalk.yellow(
+      '  This agent-issued restart will disconnect every live conversation and terminal until clients reconnect.',
+    ));
+  }
+
   let restartLock: RestartLockHandle | null = null;
   if (needsRestartLock) {
     restartLock = await Effect.runPromise(acquireRestartLock('pan restart'));
