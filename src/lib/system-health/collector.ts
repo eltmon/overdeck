@@ -1,3 +1,8 @@
+/**
+ * Selects the platform host-health collector. Linux and macOS expose native
+ * current-pressure signals; unsupported platforms return unavailable signals
+ * so callers never mistake missing measurements for measured zeroes.
+ */
 import { platform as getPlatform } from 'node:os';
 
 import { createDarwinHostHealthCollector } from './darwin.js';

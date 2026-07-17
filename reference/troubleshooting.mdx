@@ -419,11 +419,10 @@ docker system prune -a
 
 ### Health page
 
-Before reaching for the CLI, the dashboard's **Health** page surfaces the same
-diagnostics as `pan doctor` in one place — system health checks across the
-orchestrator, trackers, Docker, networking, and the agents and conversations
-it's managing. Use it as the first stop when something looks off across the
-fleet rather than a single agent.
+The dashboard's **Health** page reports live host, admission, agent, and
+optional-service health. Use it when the running fleet looks unhealthy: it
+shows current pressure evidence, spawn headroom, agent/session state, and
+service state without turning unavailable measurements into zeroes.
 
 <ThemedImage
   light="/images/dashboard/health-light.png"
@@ -432,9 +431,10 @@ fleet rather than a single agent.
 />
 
 <Tip>
-The Health page is the visual equivalent of the `pan doctor` output below —
-handy when you want to scan overall system state, but the CLI commands are
-still the right thing to paste into a bug report.
+These surfaces answer different questions. `pan health` reports runtime health
+of Overdeck services, while `pan doctor` checks dependencies, installation,
+configuration, and broader system diagnostics. They overlap, but neither CLI
+command is a textual equivalent of the live Health page.
 </Tip>
 
 ### Diagnostic Information

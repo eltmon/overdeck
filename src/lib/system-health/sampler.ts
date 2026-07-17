@@ -1,3 +1,9 @@
+/**
+ * Accepts atomic host-health assessments with warmup and symmetric hysteresis.
+ * The public snapshot remains measuring until evidence is collected, and later
+ * state changes require three matching samples so state, metrics, and reasons
+ * always advance together.
+ */
 import type { HealthReason, HealthState } from '@overdeck/contracts';
 
 const DEFAULT_WARMUP_INTERVAL_MS = 1_000;

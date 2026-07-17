@@ -40,6 +40,12 @@ Consequences:
 - **BLOCKED feedback goes agent-to-agent.** The review agent's `pan admin specialists done review --status blocked` delivers feedback directly to the live work agent (`deliverReviewVerdictFeedback` → `messageAgent`); the deacon is a recovery backstop, not the primary path.
 - **Idle-warm sessions are free capacity**, not load: they must not count against the advancing-role concurrency ceiling, and they are the first thing the governor sheds under memory pressure.
 
+Health reporting follows the same lifecycle semantics. `warm` describes a reusable session lifecycle,
+not a fault; idle and intentionally stopped sessions are neutral `idle`, and an agent awaiting operator
+input is neutral `waiting` rather than stalled. A specialist is reclaimable/leaked only when its
+lifecycle is `orphaned`; a warm or merely idle session is retained capacity and must not be labeled as a
+leak.
+
 > **Implementation status (2026-07-11, landed):** reap-on-verdict is gone — `pan specialists done` (CLI and HTTP route) records the verdict and leaves the session alive; the deacon's terminal/idle-terminal advancing reapers are removed (only MERGED-issue sessions still reap). `countRunningAgents()` excludes warm-idle advancing sessions from the ceiling, the memory governor sheds them first under HARD pressure, and the review dispatch guard distinguishes finished-idle (warm-reuse for a newer request) from actively-reviewing (PAN-1131). Convoy-wide warm re-review landed with PAN-1862: selective re-review resumes only the in-scope sub-reviewers (carried verdicts become stub reports), and first-cycle reviewers fork the parent's discovery session for warm-cache sharing — see [REVIEW-AGENT-ARCHITECTURE.md](./REVIEW-AGENT-ARCHITECTURE.md).
 
 ---

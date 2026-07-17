@@ -1,3 +1,8 @@
+/**
+ * Shared V2 system-health contract. Domain measurements use null for unavailable
+ * evidence, unknown enum values decode to safe unavailable/unknown states, and
+ * the legacy summary is a compatibility projection from the accepted V2 snapshot.
+ */
 import { Schema, SchemaGetter } from "effect"
 
 const HealthStateValue = Schema.Literals([
