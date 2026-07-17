@@ -421,17 +421,17 @@
     "recordedAt": "2026-07-17T05:45:07.089Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T06:08:03.309Z",
+  "updated": "2026-07-17T06:08:31.512Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T06:08:02.083Z",
+    "updatedAt": "2026-07-17T06:08:31.491Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
@@ -583,9 +583,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 29238876,
-            "output": 1158024,
-            "cacheRead": 241353216,
+            "input": 29250160,
+            "output": 1159908,
+            "cacheRead": 242430464,
             "cacheWrite": 0
           }
         }
@@ -598,9 +598,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 56068922,
-          "output": 1879423,
-          "cacheRead": 327950080,
+          "input": 56080206,
+          "output": 1881307,
+          "cacheRead": 329027328,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -623,8 +623,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 497.767812,
-        "pricingAsOf": "2026-07-17T06:08:02.111Z"
+        "usd": 498.419376,
+        "pricingAsOf": "2026-07-17T06:08:31.506Z"
       }
     },
     "merges": [
