@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-16T19:47:29.273Z",
-  "updated": "2026-07-17T01:38:59.644Z",
+  "updated": "2026-07-17T01:44:07.451Z",
   "pipeline": {
     "issueId": "PAN-2795",
     "reviewStatus": "pending",
@@ -11,12 +11,12 @@
     "mergeStatus": "merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:38:59.593Z",
-    "mergeNotes": "Strike merge trigger is not registered",
+    "updatedAt": "2026-07-17T01:44:07.437Z",
+    "mergeNotes": "Strike merge request failed: fetch failed",
     "strikeReadyHead": "f9f23ead9cb7ad229a728fb18df4fc01656b6a83",
     "strikeReadyAt": "2026-07-16T20:49:17.367Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-16T20:49:32.599Z",
@@ -24,6 +24,13 @@
         "mainHead": "fd517078d47e5ec57ddb8f5cabe0de3f12e68e3c",
         "outcome": "failed",
         "detail": "Strike merge trigger is not registered"
+      },
+      {
+        "timestamp": "2026-07-17T01:43:58.197Z",
+        "strikeHead": "f9f23ead9cb7ad229a728fb18df4fc01656b6a83",
+        "mainHead": "6179ece80fa7b51bc2b61fddef3abaac84453393",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -32,24 +39,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 2190115,
-            "output": 158805,
-            "cacheRead": 28402688,
+            "input": 2199882,
+            "output": 160348,
+            "cacheRead": 29018112,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2190115,
-          "output": 158805,
-          "cacheRead": 28402688,
+          "input": 2199882,
+          "output": 160348,
+          "cacheRead": 29018112,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 29.916069,
-        "pricingAsOf": "2026-07-17T01:38:59.638Z"
+        "usd": 30.318906000000002,
+        "pricingAsOf": "2026-07-17T01:44:07.441Z"
       }
     },
     "merges": [],
