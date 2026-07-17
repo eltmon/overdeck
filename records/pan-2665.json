@@ -17,11 +17,33 @@
       "timestamp": "2026-07-17T13:02:20.640Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:44:03.460Z",
+      "reason": "end",
+      "note": "Anomaly first: the initial npm test run found the dashboard bundle absent; the repository CI order builds before testing, so I ran SKIP_DOCS_INDEX=1 npm run build and then npm test passed 9,764 root tests plus 38 frontend parity tests. Added the Lint rail label, ListChecks icon, and verification-gate purpose text; added buildLintSessionNode coverage for absent, skipped, failed, running, legacy-passed, and transcript-disabled states; documented the synthesized Lint node and verification artifact. npm run typecheck, npm run lint, targeted frontend and builder tests, the production build, and the full test suite all pass. Branch is clean and pushed."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/MISSION-CONTROL.md",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+      "tests/unit/dashboard/command-deck-lint-node.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/MISSION-CONTROL.md",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+      "tests/unit/dashboard/command-deck-lint-node.test.ts"
+    ],
+    "recordedAt": "2026-07-17T13:44:00.438Z"
+  },
   "created": "2026-07-17T12:54:12.069Z",
-  "updated": "2026-07-17T13:44:00.440Z",
+  "updated": "2026-07-17T13:44:03.783Z",
   "pipeline": {
     "issueId": "PAN-2665",
     "reviewStatus": "pending",
@@ -30,7 +52,26 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T13:02:24.437Z"
+    "updatedAt": "2026-07-17T13:44:03.583Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2843",
+    "reviewRequestedAt": "2026-07-17T13:44:03.478Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/MISSION-CONTROL.md",
+        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+        "tests/unit/dashboard/command-deck-lint-node.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/MISSION-CONTROL.md",
+        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+        "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+        "tests/unit/dashboard/command-deck-lint-node.test.ts"
+      ],
+      "recordedAt": "2026-07-17T13:44:00.438Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -42,6 +83,14 @@
             "cacheRead": 3348158,
             "cacheWrite": 131197
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 922371,
+            "output": 37631,
+            "cacheRead": 15682048,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -50,14 +99,22 @@
           "output": 26229,
           "cacheRead": 3348158,
           "cacheWrite": 131197
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 922371,
+          "output": 37631,
+          "cacheRead": 15682048,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.305455,
-        "pricingAsOf": "2026-07-17T13:02:24.448Z"
+        "usd": 19.887264,
+        "pricingAsOf": "2026-07-17T13:44:03.701Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2843"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -132,22 +189,5 @@
     "lint-node-docs.lint-node-docs.ac1": "completed",
     "lint-node-docs.lint-node-docs.ac2": "completed",
     "lint-node-docs.lint-node-docs.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/MISSION-CONTROL.md",
-      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
-      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
-      "tests/unit/dashboard/command-deck-lint-node.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/MISSION-CONTROL.md",
-      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
-      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
-      "tests/unit/dashboard/command-deck-lint-node.test.ts"
-    ],
-    "recordedAt": "2026-07-17T13:44:00.438Z"
   }
 }
