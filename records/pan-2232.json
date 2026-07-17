@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T02:59:36.156Z",
+  "updated": "2026-07-17T02:59:42.836Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -200,5 +200,33 @@
     "wi-7-reconcile.wi-7-reconcile.ac2": "completed",
     "wi-7-reconcile.wi-7-reconcile.ac3": "completed",
     "wi-7-reconcile.wi-7-reconcile.ac4": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "scripts/circular-deps-baseline.txt"
+    ],
+    "declaredScope": [
+      "scripts/circular-deps-baseline.txt",
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/specialists-feedback.ts",
+      "src/lib/cloister/specialists-lifecycle.ts",
+      "src/lib/cloister/specialists-project-meta.ts",
+      "src/lib/cloister/specialists-registry.ts",
+      "src/lib/cloister/specialists-spawn.ts",
+      "src/lib/cloister/specialists-status.ts",
+      "src/lib/cloister/specialists.ts"
+    ],
+    "actualChangedFiles": [
+      "scripts/file-size-baseline.txt",
+      "src/lib/cloister/specialists-feedback.ts",
+      "src/lib/cloister/specialists-lifecycle.ts",
+      "src/lib/cloister/specialists-project-meta.ts",
+      "src/lib/cloister/specialists-registry.ts",
+      "src/lib/cloister/specialists-spawn.ts",
+      "src/lib/cloister/specialists-status.ts",
+      "src/lib/cloister/specialists.ts"
+    ],
+    "recordedAt": "2026-07-17T02:59:42.835Z"
   }
 }
