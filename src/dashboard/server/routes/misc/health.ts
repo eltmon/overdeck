@@ -5,8 +5,10 @@ import {
   AgentRuntimeSnapshot,
   AgentSnapshot,
   ReviewStatusSnapshot,
+  SystemHealthSnapshot,
   type AgentHealthSnapshot,
   type SpecialistLifecycle,
+  type SystemHealthSnapshot as SystemHealthSnapshotType,
 } from '@overdeck/contracts';
 import { Effect, Layer, Schema } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -25,41 +27,77 @@ import { getOverdeckHome } from '../../../../lib/paths.js';
 import { listSessionNames } from '../../../../lib/tmux.js';
 import { checkAgentHealth } from '../../../lib/health-filtering.js';
 import { ReadModelService } from '../../read-model.js';
-import { getSystemHealthSnapshot } from '../../services/system-health-service.js';
+import { getAcceptedSystemHealthSnapshot } from '../../services/system-health-service.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 
-// ─── Route: GET /api/system/health ───────────────────────────────────────────
+// ─── Routes: accepted system health ──────────────────────────────────────────
+
+interface SystemHealthRouteDependencies {
+  snapshot: Effect.Effect<unknown, unknown>;
+}
+
+function unavailableSystemHealthResponse() {
+  return jsonResponse({
+    status: 'unavailable',
+    reasons: [{
+      code: 'system.health_snapshot.unavailable',
+      domain: 'host',
+      severity: 'critical',
+      message: 'The accepted system health snapshot could not be produced or decoded.',
+    }],
+  }, { status: 503 });
+}
+
+function decodeAcceptedSystemHealth(value: unknown): SystemHealthSnapshotType {
+  const decoded = Schema.decodeUnknownResult(SystemHealthSnapshot)(value);
+  if (decoded._tag === 'Failure') {
+    throw new Error('The accepted system health snapshot failed shared-contract decoding.');
+  }
+  return decoded.success;
+}
+
+export function buildSystemHealthResponse(
+  dependencies: SystemHealthRouteDependencies,
+) {
+  return dependencies.snapshot.pipe(
+    Effect.map((snapshot) => jsonResponse(decodeAcceptedSystemHealth(snapshot))),
+    Effect.catchCause(() => Effect.succeed(unavailableSystemHealthResponse())),
+  );
+}
+
+export function buildGodviewSystemHealthResponse(
+  dependencies: SystemHealthRouteDependencies,
+) {
+  return dependencies.snapshot.pipe(
+    Effect.map((snapshot) => {
+      const health = decodeAcceptedSystemHealth(snapshot);
+      return jsonResponse({
+        ...health,
+        cpu: health.summary.cpuPercent,
+        memPercent: health.summary.memoryUsedPercent,
+        memUsed: health.summary.usedMemoryBytes,
+        memTotal: health.summary.totalMemoryBytes,
+        updatedAt: health.updatedAt,
+      });
+    }),
+    Effect.catchCause(() => Effect.succeed(unavailableSystemHealthResponse())),
+  );
+}
 
 const getSystemHealthRoute = HttpRouter.add(
   'GET',
   '/api/system/health',
-  httpHandler(Effect.gen(function* () {
-    const readModel = yield* ReadModelService;
-    const health = yield* readModel.getSnapshot.pipe(
-      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
-    );
-    return jsonResponse(health);
+  httpHandler(buildSystemHealthResponse({
+    snapshot: Effect.promise(() => getAcceptedSystemHealthSnapshot()),
   })),
 );
-
-// ─── Route: GET /api/godview/system-health ───────────────────────────────────
 
 const getGodviewSystemHealthRoute = HttpRouter.add(
   'GET',
   '/api/godview/system-health',
-  httpHandler(Effect.gen(function* () {
-    const readModel = yield* ReadModelService;
-    const health = yield* readModel.getSnapshot.pipe(
-      Effect.flatMap((snapshot) => Effect.promise(() => getSystemHealthSnapshot(snapshot))),
-    );
-    return jsonResponse({
-      cpu: health.summary.cpuPercent,
-      memPercent: health.summary.memoryUsedPercent,
-      memUsed: health.summary.usedMemoryBytes,
-      memTotal: health.summary.totalMemoryBytes,
-      updatedAt: health.updatedAt,
-    });
+  httpHandler(buildGodviewSystemHealthResponse({
+    snapshot: Effect.promise(() => getAcceptedSystemHealthSnapshot()),
   })),
 );
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyAgentKind, evaluateSeverity } from '../system-health-service.js';
+import {
+  buildSystemHealthTransitionPayload,
+  classifyAgentKind,
+  evaluateSeverity,
+} from '../system-health-service.js';
 
 const GIB = 1024 ** 3;
 
@@ -52,6 +56,29 @@ describe('classifyAgentKind (PAN-1257)', () => {
 
   it('classifies legacy specialist prefixes as specialists', () => {
     expect(classifyAgentKind('specialist-foo')).toBe('specialist');
+  });
+});
+
+describe('accepted system health transitions', () => {
+  it('preserves legacy fields and adds versioned accepted evidence', () => {
+    expect(buildSystemHealthTransitionPayload({
+      version: 7,
+      previousState: 'healthy',
+      state: 'warning',
+      reasonCodes: ['host.linux.psi.some.warning'],
+      acceptedAt: '2026-07-16T12:00:00.000Z',
+    }, 2)).toEqual({
+      version: 2,
+      transitionVersion: 7,
+      previousSeverity: 'normal',
+      severity: 'warning',
+      previousState: 'healthy',
+      state: 'warning',
+      reasons: ['host.linux.psi.some.warning'],
+      reasonCodes: ['host.linux.psi.some.warning'],
+      acceptedAt: '2026-07-16T12:00:00.000Z',
+      leakedSpecialistCount: 2,
+    });
   });
 });
 

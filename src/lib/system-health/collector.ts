@@ -1,5 +1,6 @@
 import { platform as getPlatform } from 'node:os';
 
+import { createDarwinHostHealthCollector } from './darwin.js';
 import { createLinuxHostHealthCollector } from './linux.js';
 import {
   unavailable,
@@ -83,6 +84,6 @@ export function createHostHealthCollector(
 ): HostHealthCollector {
   const platform = selection.platform ?? getPlatform();
   if (platform === 'linux') return selection.linux ?? createLinuxHostHealthCollector();
-  if (platform === 'darwin') return selection.darwin ?? createUnsupportedCollector('darwin');
+  if (platform === 'darwin') return selection.darwin ?? createDarwinHostHealthCollector();
   return createUnsupportedCollector();
 }

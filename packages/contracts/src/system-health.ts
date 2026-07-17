@@ -254,7 +254,7 @@ export const SystemHealthSnapshot = Schema.Struct({
   }),
   admission: Schema.Struct({
     state: AdmissionState,
-    availableMemoryBytes: Schema.Number,
+    availableMemoryBytes: Schema.NullOr(Schema.Number),
     admittedWorkAgentCount: Schema.Number,
     reasons: Schema.Array(HealthReason),
   }),

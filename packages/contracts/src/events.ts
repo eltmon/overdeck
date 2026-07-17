@@ -755,6 +755,7 @@ export const SystemHealthSeverityChangedEvent = Schema.Struct({
     previousState: Schema.optional(HealthState),
     state: Schema.optional(HealthState),
     reasonCodes: Schema.optional(Schema.Array(Schema.String)),
+    acceptedAt: Schema.optional(Schema.String),
   }),
 })
 export type SystemHealthSeverityChangedEvent = typeof SystemHealthSeverityChangedEvent.Type
