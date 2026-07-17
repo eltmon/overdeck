@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T04:08:59.162Z",
+  "updated": "2026-07-17T04:09:15.844Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "resources-projectors": {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 1270725,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T04:09:15.844Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -272,6 +280,7 @@
     "routes-health-unify.routes-health-unify.ac1": "completed",
     "routes-health-unify.routes-health-unify.ac2": "completed",
     "routes-health-unify.routes-health-unify.ac3": "completed",
-    "routes-health-unify.routes-health-unify.ac4": "completed"
+    "routes-health-unify.routes-health-unify.ac4": "completed",
+    "resources-projectors": "running"
   }
 }
