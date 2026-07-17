@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:22:56.232Z",
+  "updated": "2026-07-17T12:22:57.971Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -138,5 +138,6 @@
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
     }
-  ]
+  ],
+  "workModel": "gpt-5.6-sol"
 }
