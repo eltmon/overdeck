@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, truncateSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -79,6 +79,35 @@ describe('state migration Git command cancellation', () => {
       expect(readdirSync(join(root, 'destination'))).toEqual([]);
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects legacy symlinks before copying any state', async () => {
+    const sourceRoot = mkdtempSync(join(tmpdir(), 'pan-state-symlink-source-'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'pan-state-symlink-destination-'));
+    const records = join(sourceRoot, '.pan', 'records');
+    const sourceFile = join(records, 'a-record.json');
+    const sourceLink = join(records, 'z-record-link.json');
+    mkdirSync(records, { recursive: true });
+    writeFileSync(sourceFile, '{}');
+    symlinkSync(sourceFile, sourceLink);
+    const copyFile = vi.fn(async () => {});
+
+    try {
+      await expect(__testInternals.copyLegacyState(
+        sourceRoot,
+        stateRoot,
+        undefined,
+        copyFile,
+      )).rejects.toThrow(`Legacy state contains unsupported symbolic link: ${sourceLink}`);
+
+      expect(copyFile).not.toHaveBeenCalled();
+      expect(readdirSync(stateRoot)).toEqual([]);
+      expect(existsSync(sourceFile)).toBe(true);
+      expect(existsSync(sourceLink)).toBe(true);
+    } finally {
+      rmSync(sourceRoot, { recursive: true, force: true });
+      rmSync(stateRoot, { recursive: true, force: true });
     }
   });
 

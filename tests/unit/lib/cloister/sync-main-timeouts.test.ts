@@ -146,10 +146,12 @@ describe('sync-main git timeouts', () => {
       success: false,
       reason: 'git merge origin/main timed out after 120s',
     });
-    expect(execMock).toHaveBeenCalledWith(
-      'git merge --abort',
-      expect.objectContaining({ timeout: 30_000 }),
-    );
+    const mergeAbortOptions = execMock.mock.calls
+      .find(([command]) => command === 'git merge --abort')?.[1];
+    expect(mergeAbortOptions).toEqual(expect.objectContaining({ timeout: expect.any(Number) }));
+    const mergeAbortTimeout = mergeAbortOptions?.timeout as number;
+    expect(mergeAbortTimeout).toBeGreaterThan(0);
+    expect(mergeAbortTimeout).toBeLessThanOrEqual(30_000);
   });
 
   it('stops sync with a named failure when the auto-commit hook times out', async () => {

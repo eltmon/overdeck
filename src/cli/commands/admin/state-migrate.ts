@@ -1,6 +1,6 @@
 import { execFile, type ChildProcess, type ExecFileException } from 'node:child_process';
 import { copyFileSync, createReadStream, createWriteStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { chmod, lstat, mkdir, readlink, readdir, rename, rm, symlink, utimes } from 'node:fs/promises';
+import { chmod, lstat, mkdir, readdir, rename, rm, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
@@ -177,23 +177,28 @@ async function copyFileAbortable(
   }
 }
 
-async function copySymlinkAbortable(
+async function assertNoLegacySymlinks(
   source: string,
-  destination: string,
   signal?: AbortSignal,
+  allowMissing = false,
 ): Promise<void> {
   signal?.throwIfAborted();
-  const temporary = join(
-    dirname(destination),
-    `.overdeck-migrate-${process.pid}-${copySequence++}`,
-  );
-  await mkdir(dirname(destination), { recursive: true });
+  let stat;
   try {
-    await symlink(await readlink(source), temporary);
-    signal?.throwIfAborted();
-    await rename(temporary, destination);
-  } finally {
-    await rm(temporary, { force: true });
+    stat = await lstat(source);
+  } catch (error) {
+    if (allowMissing && (error as NodeJS.ErrnoException).code === 'ENOENT') return;
+    throw error;
+  }
+  if (stat.isSymbolicLink()) {
+    throw new Error(
+      `Legacy state contains unsupported symbolic link: ${source}. `
+      + 'Resolve it before migrating so canonical state cannot depend on the legacy tree.',
+    );
+  }
+  if (!stat.isDirectory()) return;
+  for (const entry of await readdir(source, { withFileTypes: true })) {
+    await assertNoLegacySymlinks(join(source, entry.name), signal);
   }
 }
 
@@ -204,6 +209,19 @@ async function copyLegacyState(
   copyFile: CopyFileOperation = copyFileAbortable,
 ): Promise<StateMigrationManifestEntry[]> {
   const manifest: StateMigrationManifestEntry[] = [];
+  const sources = STATE_BRANCH_PATHS
+    .map((sourcePath) => ({
+      source: join(sourceRoot, '.pan', sourcePath),
+      destination: join(stateRoot, sourcePath),
+    }))
+    .filter(({ source }) => existsSync(source));
+
+  // Symlinks cannot be made durable by the regular-file manifest: absolute
+  // targets can still point into the legacy tree after cleanup, and relative
+  // targets can resolve differently under the state worktree. Check the whole
+  // legacy tree so ignored top-level entries cannot be deleted without notice.
+  await assertNoLegacySymlinks(join(sourceRoot, '.pan'), signal, true);
+
   const visit = async (sourceDir: string, destinationDir: string): Promise<void> => {
     await mkdir(destinationDir, { recursive: true });
     for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
@@ -217,16 +235,14 @@ async function copyLegacyState(
         signal?.throwIfAborted();
         manifest.push(await manifestEntry(sourceEntry, destinationEntry, signal));
       } else if (entry.isSymbolicLink()) {
-        await copySymlinkAbortable(sourceEntry, destinationEntry, signal);
+        throw new Error(`Legacy state changed during migration: symbolic link appeared at ${sourceEntry}`);
       }
     }
   };
 
-  for (const sourcePath of STATE_BRANCH_PATHS) {
+  for (const { source, destination } of sources) {
     signal?.throwIfAborted();
-    const source = join(sourceRoot, '.pan', sourcePath);
-    if (!existsSync(source)) continue;
-    await visit(source, join(stateRoot, sourcePath));
+    await visit(source, destination);
   }
   return manifest;
 }
@@ -310,6 +326,10 @@ export async function migrateProjectState(
       throw new Error(`State writer did not quiesce before migration: ${flush.reason ?? 'unknown error'}`);
     }
     options.signal?.throwIfAborted();
+    // This read-only preflight runs before fetches, branch creation, worktree
+    // creation, or destination writes. copyLegacyState repeats it immediately
+    // before copying to defend against changes outside the migration lock.
+    await assertNoLegacySymlinks(join(legacyStateSource, '.pan'), options.signal, true);
     if (hasNonStateDirtyState(await git(repo, ['status', '--porcelain'], options.signal))) {
       throw new Error('Primary checkout is dirty outside legacy state paths; migration refused before mutation');
     }
