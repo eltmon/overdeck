@@ -219,10 +219,11 @@ describe('IssueMissionControl', () => {
     const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
     const buttons = Array.from(nav.querySelectorAll('button'))
 
-    expect(buttons).toHaveLength(11)
-    for (const label of ['Overview', 'Code', 'PRD / Plan', 'Timeline', 'Discussion', 'Costs', 'Artifacts', 'Ship', 'Conversation', 'Files', 'Terminal']) {
+    expect(buttons).toHaveLength(10)
+    for (const label of ['Overview', 'Code', 'PRD / Plan', 'Timeline', 'Discussion', 'Costs', 'Artifacts', 'Ship', 'Files', 'Terminal']) {
       expect(buttons.some((button) => button.textContent?.includes(label)), label).toBe(true)
     }
+    expect(screen.queryByRole('button', { name: 'Conversation' })).toBeNull()
     expect(screen.getByRole('button', { name: /Code/ })).toHaveTextContent('✓')
     expect(screen.getByRole('button', { name: 'Overview' })).toHaveClass('rounded-[9px]', 'font-medium', 'bg-primary/9', 'text-primary')
     for (const button of buttons) expect(button).not.toHaveClass('font-semibold')
@@ -257,14 +258,23 @@ describe('IssueMissionControl', () => {
     expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
   })
 
-  it('moves the launch composition into the Conversation tab', () => {
-    renderMissionControl()
+  it('shows a selected session, then relocates the conversation cards below the issue overview', () => {
+    const { container } = renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Conversation' }))
+    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
 
-    expect(screen.getByText('Launcher')).toBeTruthy()
-    expect(screen.getByText('Agent dock')).toBeTruthy()
-    expect(screen.getByText('Action dock')).toBeTruthy()
+    expect(container.querySelector('[data-section="SessionPanel"]')).toBeInTheDocument()
+    expect(screen.getByTestId('session-panel')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
+
+    const conversation = container.querySelector('[data-section="Conversation / Files / Terminal tabs"]')
+    expect(conversation).toBeInTheDocument()
+    expect(conversation?.previousElementSibling).toHaveTextContent('Review blocked — awaiting the work agent')
+    expect(conversation).toHaveTextContent('Launcher')
+    expect(conversation).toHaveTextContent('Agent dock')
+    expect(conversation).toHaveTextContent('Action dock')
+    expect(conversation).toHaveTextContent('Timeline')
   })
 
   it('keeps tabs visible but unselected when an issue-tree node drives the pane', () => {
@@ -276,7 +286,7 @@ describe('IssueMissionControl', () => {
     expect(screen.getByTestId('session-panel')).toBeTruthy()
     expect(screen.getByText('Issue overview')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-selected')).toBe('false')
-    expect(screen.getByRole('button', { name: 'Conversation' }).getAttribute('aria-selected')).toBe('false')
+    expect(screen.queryByRole('button', { name: 'Conversation' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
     expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()

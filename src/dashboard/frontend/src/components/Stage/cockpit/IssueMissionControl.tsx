@@ -66,7 +66,6 @@ type MissionTab =
   | 'costs'
   | 'artifacts'
   | 'ship'         // PAN-2487: Ship & Merge view — live merge-door progress + log
-  | 'conversation' // tool — relocates to a pane in #10
   | 'files'        // tool — #10
   | 'terminal'     // tool — #10
   | 'beads'        // not a visible tab; reachable from the rail's "open full"
@@ -85,7 +84,6 @@ const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'costs', label: 'Costs' },
   { id: 'artifacts', label: 'Artifacts' },
   { id: 'ship', label: 'Ship' },
-  { id: 'conversation', label: 'Conversation' },
   { id: 'files', label: 'Files' },
   { id: 'terminal', label: 'Terminal' },
 ]
@@ -525,8 +523,14 @@ function IssueTreeContextPanel({
         />
       )
     }
-    if (context === 'issue') return <OverviewTab issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
-    return <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />
+    if (context === 'issue') return (
+      <div className="space-y-3.5">
+        <OverviewTab issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
+        <div data-section="Conversation / Files / Terminal tabs">
+          <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />
+        </div>
+      </div>
+    )
   })()
 
   const title = selectedSession
@@ -952,7 +956,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'costs' && <div data-section="Costs / Artifacts / Ship tabs"><CostsTab issueId={issueId} /></div>}
             {activeTab === 'artifacts' && <div data-section="Costs / Artifacts / Ship tabs"><DrawerArtifactsPanel issueId={issueId} /></div>}
             {activeTab === 'ship' && <div data-section="Costs / Artifacts / Ship tabs"><ShipTab issueId={issueId} /></div>}
-            {activeTab === 'conversation' && <div data-section="Conversation / Files / Terminal tabs"><MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} /></div>}
             {activeTab === 'files' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Files" description="Open the issue-scoped workspace file browser in a deck pane." action="Open files pane" onOpen={() => onOpenPane('files')} /></div>}
             {activeTab === 'terminal' && <div data-section="Conversation / Files / Terminal tabs"><OpenPaneCard title="Terminal" description="Open the issue terminal drawer for the current workspace." action="Open terminal" onOpen={() => onOpenPane('terminal')} /></div>}
             {activeTab === 'beads' && <div data-section="TasksRail / TasksTab"><TasksTab issueId={issueId} /></div>}
