@@ -35,16 +35,17 @@
     "issueId": "PAN-2450",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "readyForMerge": false,
-    "updatedAt": "2026-07-07T08:40:37.856Z",
+    "updatedAt": "2026-07-17T00:34:00.460Z",
     "reviewNotes": "Approved; UI pipeline and merge-verification checks passed",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2455",
     "reviewedAtCommit": "73a179d1f3255692b50ade003709bac6bf573a83",
     "lastVerifiedCommit": "b38b154a25571c95ae8bfcff69ece7de96c257bc",
-    "reviewRequestedAt": "2026-07-07T06:56:40.928Z"
+    "reviewRequestedAt": "2026-07-07T06:56:40.928Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T00:34:00.460Z"
   },
   "closeOut": {
     "usage": {
@@ -122,11 +123,84 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2455"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T00:34:00.470Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at b38b154a25571c95ae8bfcff69ece7de96c257bc",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2455 MERGED at 2026-07-07T07:19:59Z",
+          "status": "pass",
+          "mergedAt": "2026-07-07T07:19:59Z",
+          "mergeCommit": "faffae87a4820e393df079e855bbd8cf184971ad"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: done; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "7 check-runs concluded successfully on faffae87a4820e393df079e855bbd8cf184971ad",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T00:31:08.000Z, dist built 2026-07-17T00:28:58.492Z, merge 2026-07-07T07:19:59.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No workspace found to clean up; No agent state directories found; No strike branch strike/pan-2450 found; Pruned 0 checkpoint ref(s) for agent-pan-2450, planning-pan-2450, strike-pan-2450; No specialist registry entries for PAN-2450"
+        }
+      ],
+      "accepted": []
+    }
   },
   "swarm": {
     "finalizedAt": "2026-07-07T04:18:45.208Z"
   },
   "created": "2026-07-07T06:28:28.585Z",
-  "updated": "2026-07-17T00:33:58.595Z"
+  "updated": "2026-07-17T00:34:00.470Z"
 }
