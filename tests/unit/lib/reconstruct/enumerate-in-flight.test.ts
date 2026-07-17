@@ -24,4 +24,19 @@ describe('enumerateInFlightIssuesFromSources', () => {
     expect([...result].sort()).toEqual(['PAN-1', 'PAN-2']);
     expect(gather).toHaveBeenCalledWith(project);
   });
+
+  it('degrades per project on gather failure instead of throwing (PAN-2820 boot safety)', async () => {
+    const broken: ProjectConfig = { name: 'lexerra', path: '/projects/lexerra' };
+    const gather = vi.fn(async (p: ProjectConfig) => {
+      if (p.name === 'lexerra') throw new Error('GitHub API GET /repos/eltmon/lexerra/issues failed: 404');
+      return [signal({ issueId: 'PAN-1', hasOpenPr: true })];
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await enumerateInFlightIssuesFromSources([project, broken], gather);
+
+    expect([...result]).toEqual(['PAN-1']);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Skipping project lexerra'));
+    errorSpy.mockRestore();
+  });
 });
