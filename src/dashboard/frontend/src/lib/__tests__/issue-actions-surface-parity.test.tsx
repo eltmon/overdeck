@@ -88,7 +88,10 @@ vi.mock('../../components/Stage/cockpit/ChangedFilesView', () => ({ ChangedFiles
 vi.mock('../../components/Stage/cockpit/IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker</div> }));
 vi.mock('../../components/Stage/cockpit/PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }));
 vi.mock('../../components/Stage/cockpit/StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>History</div> }));
-vi.mock('../../components/Stage/cockpit/TasksRail', () => ({ TasksRail: () => <div>Task rail</div> }));
+vi.mock('../../components/Stage/cockpit/TasksRail', () => ({
+  TasksRail: () => <div>Task rail</div>,
+  useTasksQuery: () => ({ data: { tasks: [] }, isLoading: false, error: null }),
+}));
 
 type Surface = 'cockpit' | 'rail' | 'board' | 'drawer' | 'pipeline' | 'zone-b';
 type FixtureName = 'unplanned' | 'planned' | 'working' | 'paused' | 'ready_to_merge' | 'merged';
