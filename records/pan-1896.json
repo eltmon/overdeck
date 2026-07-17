@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:18:08.737Z",
+  "updated": "2026-07-17T12:18:24.686Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -74,16 +74,21 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
+    "sequence": 2,
     "claims": {},
     "statusReasons": {
       "codex-mode-enum": {
         "reason": "Cancelled after current Codex 0.144.4 investigation: native per-command execpolicy rules make a new workspace-net permission mode unnecessary.",
         "updatedAt": "2026-07-17T12:18:08.736Z"
+      },
+      "codex-init-network": {
+        "reason": "Cancelled after live app-server reproduction: linking the user's native execpolicy rules removes repeated prompts without enabling workspace-wide sandbox networking.",
+        "updatedAt": "2026-07-17T12:18:24.686Z"
       }
     }
   },
   "statusOverrides": {
-    "codex-mode-enum": "cancelled"
+    "codex-mode-enum": "cancelled",
+    "codex-init-network": "cancelled"
   }
 }
