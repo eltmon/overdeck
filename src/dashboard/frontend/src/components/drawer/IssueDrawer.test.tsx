@@ -670,7 +670,7 @@ describe('IssueDrawer', () => {
     expect(screen.getByLabelText('Tell agent-PAN-1')).toHaveValue('');
   });
 
-  it('renders action bar with the shared primary-strip menu and pinned merge control', () => {
+  it('renders action bar with the shared primary-strip menu and pinned merge control', async () => {
     useDashboardStore.setState({
       issuesRaw: [{ ...issue, status: 'In Review', state: 'in_review', hasPlan: true, workspacePath: '/tmp/pan-1' }],
       reviewStatusByIssueId: {
@@ -694,8 +694,14 @@ describe('IssueDrawer', () => {
     expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('View PR');
-    expect(screen.getByTestId('merge-btn')).toBeEnabled();
-    expect(screen.getByTestId('merge-btn')).toHaveClass('bg-success', 'text-success-foreground');
+    await waitFor(() => {
+      const mergeButton = screen.getByTestId('merge-btn');
+      const mergePin = mergeButton.closest('[data-issue-action-pinned-component="merge"]');
+      expect(mergePin).toBeInTheDocument();
+      expect(screen.getByTestId('issue-action-menu')).toContainElement(mergePin as HTMLElement);
+      expect(mergeButton).toBeEnabled();
+      expect(mergeButton).toHaveClass('bg-success', 'text-success-foreground');
+    });
     expect(screen.queryByTestId('drawer-action-reset')).toBeNull();
     expect(screen.queryByTestId('drawer-action-stop')).toBeNull();
   });
