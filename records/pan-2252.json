@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T01:01:09.075Z",
+  "updated": "2026-07-17T01:03:28.599Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
@@ -98,16 +98,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "guard-pan-up-cwd": {
-        "writerId": "agent-pan-2252",
-        "agentId": "agent-pan-2252",
-        "pid": 1305287,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:01:09.075Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2252",
@@ -141,6 +133,17 @@
         "outcome": "completed",
         "reason": "Generalized the restart workspace guard to reject any host-side linked worktree or feature workspace, preserve container and non-repo exceptions, derive primary checkout guidance, and pass focused guard tests plus typecheck.",
         "releasedAt": "2026-07-17T01:00:47.772Z"
+      },
+      {
+        "writerId": "agent-pan-2252",
+        "agentId": "agent-pan-2252",
+        "pid": 1305287,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:01:09.075Z",
+        "itemId": "guard-pan-up-cwd",
+        "outcome": "completed",
+        "reason": "pan up now invokes the shared non-primary checkout guard as the first action statement, before config reads, dev-supervisor checks, tmux, Traefik, host-tool, or server side effects; typecheck and lint pass.",
+        "releasedAt": "2026-07-17T01:03:28.599Z"
       }
     ],
     "statusReasons": {
@@ -151,6 +154,10 @@
       "cli-guard-non-primary": {
         "reason": "Generalized the restart workspace guard to reject any host-side linked worktree or feature workspace, preserve container and non-repo exceptions, derive primary checkout guidance, and pass focused guard tests plus typecheck.",
         "updatedAt": "2026-07-17T01:00:47.772Z"
+      },
+      "guard-pan-up-cwd": {
+        "reason": "pan up now invokes the shared non-primary checkout guard as the first action statement, before config reads, dev-supervisor checks, tmux, Traefik, host-tool, or server side effects; typecheck and lint pass.",
+        "updatedAt": "2026-07-17T01:03:28.599Z"
       }
     }
   },
@@ -165,6 +172,8 @@
     "cli-guard-non-primary.cli-guard-non-primary.ac2": "completed",
     "cli-guard-non-primary.cli-guard-non-primary.ac3": "completed",
     "cli-guard-non-primary.cli-guard-non-primary.ac4": "completed",
-    "guard-pan-up-cwd": "running"
+    "guard-pan-up-cwd": "completed",
+    "guard-pan-up-cwd.guard-pan-up-cwd.ac1": "completed",
+    "guard-pan-up-cwd.guard-pan-up-cwd.ac2": "completed"
   }
 }
