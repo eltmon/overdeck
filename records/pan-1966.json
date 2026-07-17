@@ -673,18 +673,18 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-17T01:04:20.296Z",
+  "updated": "2026-07-17T01:18:01.672Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-16T21:05:09.012Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-1966-review already running. Use 'pan tell' to message it.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-17T01:18:01.649Z",
+    "reviewNotes": "Cycle 10 changes requested: the post-UAT flywheel nudge calls the project-scoped membership endpoint without the required project query.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
@@ -693,6 +693,24 @@
     "lastVerifiedCommit": "e6c7f946156764b213be4732dde5ec75d33b1401",
     "reviewRequestedAt": "2026-07-16T19:57:06.241Z",
     "reviewSpawnedAt": "2026-07-16T21:04:04.061Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "e6c7f946156764b213be4732dde5ec75d33b1401"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "e6c7f946156764b213be4732dde5ec75d33b1401"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "e6c7f946156764b213be4732dde5ec75d33b1401"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "e6c7f946156764b213be4732dde5ec75d33b1401"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -700,15 +718,15 @@
       "byStage": {
         "codex": {
           "openai/codex-auto-review": {
-            "input": 11567492,
-            "output": 18990,
-            "cacheRead": 10527232,
+            "input": 11598403,
+            "output": 19102,
+            "cacheRead": 10534784,
             "cacheWrite": 0
           },
           "openai/gpt-5.6-sol": {
-            "input": 237035856,
-            "output": 370214,
-            "cacheRead": 231832320,
+            "input": 237359006,
+            "output": 370832,
+            "cacheRead": 232130304,
             "cacheWrite": 0
           }
         },
@@ -722,41 +740,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18255380,
-            "output": 354771,
-            "cacheRead": 43874816,
+            "input": 21899324,
+            "output": 444055,
+            "cacheRead": 53011968,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 1770791,
-            "output": 48153,
-            "cacheRead": 12958208,
+            "input": 3568053,
+            "output": 90942,
+            "cacheRead": 20652544,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 718442,
-            "output": 19576,
-            "cacheRead": 4896768,
+            "input": 1660437,
+            "output": 59501,
+            "cacheRead": 10253312,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 988573,
-            "output": 19577,
-            "cacheRead": 5510656,
+            "input": 2739397,
+            "output": 41276,
+            "cacheRead": 9216000,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 536488,
-            "output": 11460,
-            "cacheRead": 2782208,
+            "input": 1437675,
+            "output": 31113,
+            "cacheRead": 6925824,
             "cacheWrite": 0
           }
         },
@@ -771,15 +789,15 @@
       },
       "totals": {
         "openai/codex-auto-review": {
-          "input": 11567492,
-          "output": 18990,
-          "cacheRead": 10527232,
+          "input": 11598403,
+          "output": 19102,
+          "cacheRead": 10534784,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 259305530,
-          "output": 823751,
-          "cacheRead": 301854976,
+          "input": 268663892,
+          "output": 1037719,
+          "cacheRead": 332189952,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -796,8 +814,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 321.254875,
-        "pricingAsOf": "2026-07-16T21:05:09.032Z"
+        "usd": 388.143293,
+        "pricingAsOf": "2026-07-17T01:18:01.664Z"
       }
     },
     "merges": [
@@ -805,7 +823,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "harness": "claude-code",
+  "harness": "codex",
   "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 26,
