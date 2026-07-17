@@ -73,5 +73,5 @@ src/lib/overdeck/review-status-record-sync.ts > src/lib/pan-dir/records.ts > src
 src/lib/overdeck/review-status-record-sync.ts > src/lib/review-status.ts
 src/lib/overdeck/review-status-sync.ts > src/lib/review-status-normalize.ts > src/lib/review-status.ts
 src/lib/overdeck/review-status-sync.ts > src/lib/review-status.ts
-src/lib/pan-dir/specs.ts > src/lib/vbrief/io.ts
-src/lib/pan-dir/specs.ts > src/lib/vbrief/vbrief-index.ts > src/lib/vbrief/io.ts
+src/lib/pan-dir/specs.ts > src/lib/xbrief/io.ts
+src/lib/pan-dir/specs.ts > src/lib/xbrief/xbrief-index.ts > src/lib/xbrief/io.ts
