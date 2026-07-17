@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T00:58:45.070Z",
+  "updated": "2026-07-17T00:59:05.271Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "narrow-ladder-error-swallowing": {
+        "writerId": "agent-pan-2807",
+        "agentId": "agent-pan-2807",
+        "pid": 1200621,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T00:59:05.271Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2807",
@@ -109,6 +117,7 @@
     "narrow-topup-error-swallowing": "completed",
     "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac1": "completed",
     "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac2": "completed",
-    "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac3": "completed"
+    "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac3": "completed",
+    "narrow-ladder-error-swallowing": "running"
   }
 }
