@@ -479,7 +479,7 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-17T08:50:43.375Z",
+  "updated": "2026-07-17T09:51:29.585Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "passed",
@@ -489,7 +489,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T08:50:43.359Z",
+    "updatedAt": "2026-07-17T09:51:29.570Z",
     "testNotes": "Skipped: issue is already merged",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
@@ -569,7 +569,7 @@
       },
       "costAtCloseOut": {
         "usd": 120.65239,
-        "pricingAsOf": "2026-07-17T08:50:43.371Z"
+        "pricingAsOf": "2026-07-17T09:51:29.582Z"
       }
     },
     "merges": [
