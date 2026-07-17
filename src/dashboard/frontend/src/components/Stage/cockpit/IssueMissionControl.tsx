@@ -29,9 +29,11 @@ import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { GROUP_LABELS, GROUP_ORDER, ISSUE_ACTIONS } from '../../../lib/issueActions'
+import { taskStatusRollup } from '../../../lib/taskStatus'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
-import { TasksRail } from './TasksRail'
+import { useTasksQuery } from './TasksRail'
+import { TasksDrawer } from './TasksDrawer'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
@@ -781,6 +783,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
+  const [tasksDrawerOpen, setTasksDrawerOpen] = useState(false)
+  const tasksQuery = useTasksQuery(issueId)
+  const tasksRollup = taskStatusRollup(tasksQuery.data?.tasks ?? [])
   const review = useReviewStatusQuery(issueId)
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
@@ -903,6 +908,20 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             </button>
           )
         })}
+        <button
+          type="button"
+          data-section="TasksRail / TasksTab"
+          aria-expanded={tasksDrawerOpen}
+          aria-label={`Tasks: ${tasksRollup.done} of ${tasksRollup.total} complete. Open plan progress`}
+          onClick={() => setTasksDrawerOpen(true)}
+          className="sticky right-0 ml-auto flex shrink-0 items-center gap-2 rounded-[9px] border badge-border-primary badge-bg-primary px-3 py-2 text-[12px] font-medium text-primary shadow-[-10px_0_14px_var(--card)] transition-colors hover:bg-primary/15"
+        >
+          <span>Tasks</span>
+          <span className="tabular-nums">{tasksRollup.done}/{tasksRollup.total}</span>
+          <span className="h-1 w-12 overflow-hidden rounded-[var(--radius-sm)] bg-border" aria-hidden="true">
+            <span className="block h-full bg-primary" style={{ width: `${tasksRollup.percentDone}%` }} />
+          </span>
+        </button>
       </nav>
 
       <div className={styles.missionBody}>
@@ -961,8 +980,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'beads' && <div data-section="TasksRail / TasksTab"><TasksTab issueId={issueId} /></div>}
           </div>
         </main>
-        <div data-section="TasksRail / TasksTab"><TasksRail issueId={issueId} onOpenFull={() => selectTab('beads')} /></div>
       </div>
+      <TasksDrawer
+        issueId={issueId}
+        open={tasksDrawerOpen}
+        query={tasksQuery}
+        rollup={tasksRollup}
+        onClose={() => setTasksDrawerOpen(false)}
+        onOpenFull={() => selectTab('beads')}
+      />
     </IssueView>
   )
 }
