@@ -74,23 +74,23 @@
     "recordedAt": "2026-07-17T12:01:04.835Z"
   },
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T12:16:39.523Z",
+  "updated": "2026-07-17T12:17:14.916Z",
   "pipeline": {
     "issueId": "PAN-2661",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T12:16:39.478Z",
+    "updatedAt": "2026-07-17T12:17:14.667Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2661-review",
     "inspectNotes": "AC3 fix verified: GroupedIssueActionMenu.tsx:49 now passes aria-describedby directly to <Item>, which forwards it via {...props} onto the real role=menuitem Radix node (confirmed against @radix-ui/react-menu source), so the disabled reason is now correctly associated with the focusable menuitem for AT. Test updated to assert on the menuitem element itself, not just the wrapper. All 5 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2832",
     "lastVerifiedCommit": "29493c7c9d9b39978e62923b5c170db00287a4cf",
     "reviewRequestedAt": "2026-07-17T12:16:39.113Z",
-    "reviewSpawnedAt": "2026-07-17T12:01:38.575Z"
+    "reviewSpawnedAt": "2026-07-17T12:17:14.666Z"
   },
   "closeOut": {
     "usage": {
@@ -105,9 +105,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2085471,
-            "output": 32561,
-            "cacheRead": 4134400,
+            "input": 2564745,
+            "output": 36488,
+            "cacheRead": 4559872,
             "cacheWrite": 0
           }
         },
@@ -136,9 +136,9 @@
           "cacheWrite": 184049
         },
         "openai/gpt-5.6-sol": {
-          "input": 6625441,
-          "output": 333380,
-          "cacheRead": 68074496,
+          "input": 7104715,
+          "output": 337307,
+          "cacheRead": 68499968,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -149,8 +149,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 86.576434,
-        "pricingAsOf": "2026-07-17T12:16:39.480Z"
+        "usd": 89.30335,
+        "pricingAsOf": "2026-07-17T12:17:14.813Z"
       }
     },
     "merges": [
