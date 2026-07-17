@@ -132,9 +132,11 @@ describe("FlywheelStatus orders", () => {
     expect(reparsed).toEqual(parsed)
   })
 
-  it("remains compatible with status payloads without orders", () => {
+  it("roundtrips status payloads without orders", () => {
     const parsed = decodeFlywheelStatus(validFlywheelStatus)
+    const reparsed = decodeFlywheelStatus(JSON.parse(JSON.stringify(parsed)))
 
-    expect(parsed.orders).toBeUndefined()
+    expect(reparsed).toEqual(parsed)
+    expect(reparsed.orders).toBeUndefined()
   })
 })
