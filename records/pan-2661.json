@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T11:15:17.880Z",
+  "updated": "2026-07-17T11:33:18.839Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "adopt-rail-menu": {
-        "writerId": "agent-pan-2661",
-        "agentId": "agent-pan-2661",
-        "pid": 2544060,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T11:15:17.880Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2661",
@@ -153,6 +145,16 @@
         "itemId": "explain-toggle",
         "outcome": "completed",
         "releasedAt": "2026-07-17T11:15:02.571Z"
+      },
+      {
+        "writerId": "agent-pan-2661",
+        "agentId": "agent-pan-2661",
+        "pid": 2544060,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T11:15:17.880Z",
+        "itemId": "adopt-rail-menu",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T11:33:18.838Z"
       }
     ]
   },
@@ -181,6 +183,10 @@
     "explain-toggle.explain-toggle.ac1": "completed",
     "explain-toggle.explain-toggle.ac2": "completed",
     "explain-toggle.explain-toggle.ac3": "completed",
-    "adopt-rail-menu": "running"
+    "adopt-rail-menu": "completed",
+    "adopt-rail-menu.adopt-rail-menu.ac1": "completed",
+    "adopt-rail-menu.adopt-rail-menu.ac2": "completed",
+    "adopt-rail-menu.adopt-rail-menu.ac3": "completed",
+    "adopt-rail-menu.adopt-rail-menu.ac4": "completed"
   }
 }
