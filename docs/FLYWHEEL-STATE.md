@@ -5689,3 +5689,13 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Main HEAD also picked up operator docs commit 1e8a7bc6c9 (issue-cockpit full-width conversation mockup) — docs-only, not intake.
 - **Still working:** 1610 (final sequence item), 2445 (A13), 2377, 2829. No PAN-2839 half-spawns recurred this tick.
 - **B11=PAN-2233 still NOT started** — TENET-10 execution-mode question open with the operator since tick 9 (A8 prereq satisfied, Lane B slot free).
+
+## Tick 13 — 2026-07-17 ~14:15 — PAN-2665 MERGED (e58a106ec7) + deployed; filed PAN-2846 (stale-liveness blocks close-out)
+- **PAN-2665 MERGED → e58a106ec7** (PR#2843, lint-node tree work). Verified: CLEAN, approved at exact head (1f1f55df == `reviewed_at_commit`), 0 failing / 0 pending, ready=1.
+- **Deployed e58a106ec7** — pid **4126023**, health ok. Carries BOTH 2831 + 2665.
+- **PAN-2831 close-out STILL blocked on `dod:post-merge` — and the row is asserting something FALSE.** main-verify now ✓ (9 check-runs green on 6e1fdfeddb), deploy ✓. But post-merge says *"running agents: agent-pan-2831"* while **there is NO tmux session for it**; `state.json` = `{status:'running', paused:true}`. So `postMergeLifecycle` DID pause it and end the session — only `status` is stale, and `status` is what the gate reads.
+- **FILED https://github.com/eltmon/overdeck/issues/2846.** 2nd occurrence this run (PAN-1897 tick 3 had the identical signature and self-healed). It's a **backstop-as-symptom**: the deacon's `reconcileAgentLiveness` repairs what postMergeLifecycle should have written when it paused the agent. Fix = set a terminal `status` in the same write as `paused:true`, and/or have the post-merge row resolve liveness against the **tmux oracle** (per `docs/AGENT-STATE-PLANES.md`) instead of the `status` field. **Danger: this row is USUALLY wrong here, which trains `--accept-post-merge` — the same override-habit trap as PAN-2828.** Do NOT accept it; it self-heals on the next reconcile patrol.
+- **Proof it's a RACE, not deterministic:** PAN-2665's post-merge row passed cleanly ("no running work/planning agents") minutes later, while 2831's did not across two attempts.
+- **PAN-2665 close-out blocked ONLY on `main-verify`** (test still running on e58a106ec7) — legitimate, not overridden. Close both 2831 + 2665 next tick.
+- **Still working:** 1610 (final sequence item), 2445 (A13), 2377, 2829 — all review/test `pending`, no PRs yet.
+- **B11=PAN-2233 still NOT started** — TENET-10 execution-mode question open with the operator since tick 9.
