@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T04:50:47.248Z",
+  "updated": "2026-07-17T05:04:15.796Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "pill-repair": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 1900573,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T04:50:47.248Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -235,6 +227,16 @@
         "itemId": "frontend-hook",
         "outcome": "completed",
         "releasedAt": "2026-07-17T04:50:37.229Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 1900573,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T04:50:47.248Z",
+        "itemId": "pill-repair",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T05:04:15.796Z"
       }
     ],
     "statusReasons": {
@@ -309,6 +311,11 @@
     "frontend-hook.frontend-hook.ac1": "completed",
     "frontend-hook.frontend-hook.ac2": "completed",
     "frontend-hook.frontend-hook.ac3": "completed",
-    "pill-repair": "running"
+    "pill-repair": "completed",
+    "pill-repair.pill-repair.ac1": "completed",
+    "pill-repair.pill-repair.ac2": "completed",
+    "pill-repair.pill-repair.ac3": "completed",
+    "pill-repair.pill-repair.ac4": "completed",
+    "pill-repair.pill-repair.ac5": "completed"
   }
 }
