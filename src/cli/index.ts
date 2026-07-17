@@ -655,7 +655,7 @@ program
   .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
   .option('--no-open', 'Do not open the dashboard app/browser after startup')
   .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.')
-  .action(async (options) => {
+  .action(async (options) => { if ((await import('./commands/restart.js')).refuseNonPrimaryDashboardCwd(process.cwd(), 'start')) return;
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
     const { spawn, execSync, exec } = await import('child_process');
