@@ -67,6 +67,21 @@ describe('schema migrations', () => {
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
 
+  it('does not advance v60 when the affected_criteria migration fails', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    initSchema(db);
+    db.exec('DROP TABLE flywheel_substrate_bugs');
+    db.pragma('user_version = 60');
+
+    expect(() => runMigrations(db)).toThrow(/no such table/i);
+    expect(db.pragma('user_version', { simple: true })).toBe(60);
+
+    const logged = errorSpy.mock.calls.flat().join(' ');
+    expect(logged).toContain('[schema] migration to v61 failed');
+    expect(logged).toContain('ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
+    expect(logged).toMatch(/no such table/i);
+  });
+
   it('repairs stale session_file paths when the corrected transcript exists', () => {
     initSchema(db);
     db.pragma('user_version = 15');
@@ -550,14 +565,9 @@ describe('schema migrations', () => {
   });
 
   it('v54 → v55: creates agents table idempotently on an existing database', () => {
+    initSchema(db);
+    db.exec('DROP TABLE agents');
     db.pragma('user_version = 54');
-    db.exec(`
-      CREATE TABLE review_status (
-        issue_id TEXT PRIMARY KEY,
-        review_status TEXT NOT NULL DEFAULT 'pending',
-        updated_at TEXT NOT NULL
-      );
-    `);
 
     const before = db
       .prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='agents'`)

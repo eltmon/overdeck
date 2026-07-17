@@ -786,7 +786,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
   if (currentVersion === SCHEMA_VERSION) {
-    try { db.exec(`ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT`); } catch { /* already exists or table absent */ }
+    tryIdempotentDdl(db, SCHEMA_VERSION, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
   }
   if (currentVersion >= SCHEMA_VERSION) {
     return; // Already at or ahead of this build's schema version
@@ -1718,7 +1718,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
 
   // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
   if (currentVersion < 61) {
-    try { db.exec(`ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT`); } catch { /* already exists */ }
+    tryIdempotentDdl(db, 61, 'ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT');
   }
 
   // After all migrations, set the version

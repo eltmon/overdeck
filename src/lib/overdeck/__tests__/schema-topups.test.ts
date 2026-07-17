@@ -117,13 +117,21 @@ describe('overdeck schema top-ups', () => {
     ).toContain('recovered');
   });
 
-  it('silently tolerates a missing table reported by SQLite', () => {
+  it('logs a missing-table top-up failure while startup and later top-ups continue', () => {
+    const dbPath = makeDbPath();
+    const initial = getOverdeckDatabaseSync(dbPath);
+    initial.exec('DROP TABLE `flywheel_substrate_bugs`');
+    initial.exec('DROP INDEX `idx_cost_agent_id`');
+    closeOverdeckDatabaseSync();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
-    const db = getOverdeckDatabaseSync(makeDbPath());
 
-    expect(() =>
-      runSchemaTopUp(db, 'ALTER TABLE `missing_schema_topup_table` ADD COLUMN `value` text'),
-    ).not.toThrow();
-    expect(errorSpy).not.toHaveBeenCalled();
+    const reopened = getOverdeckDatabaseSync(dbPath);
+
+    const logged = errorSpy.mock.calls.flat().join(' ');
+    expect(logged).toContain('[schema] top-up failed');
+    expect(logged).toContain('ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text');
+    expect(logged).toMatch(/no such table/i);
+    expect(reopened.prepare('SELECT 1 AS ok').get<{ ok: number }>()).toEqual({ ok: 1 });
+    expect(costIndexRows(reopened).map((row) => row.name)).toContain('idx_cost_agent_id');
   });
 });

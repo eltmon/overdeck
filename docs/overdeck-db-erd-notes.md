@@ -11,7 +11,9 @@ Every new `overdeck.db` column or index must land in both
 `drizzle/overdeck/0000_overdeck_init.sql`, for fresh databases, and the
 `ensureRuntimeIndexesSync` top-ups in `src/lib/overdeck/infra.ts`, for existing
 databases. The init migration never runs again after the `agents` table exists,
-so changing only the migration leaves existing installations behind.
+so changing only the migration leaves existing installations behind. Runtime
+top-ups silence duplicate DDL, log missing-table and other unexpected failures,
+and continue so later top-ups and startup can still complete.
 
 Startup runs the report-only audit in `src/lib/overdeck/schema-audit.ts` after
 the top-ups. It reads SQLite schema metadata, never mutates the database, and

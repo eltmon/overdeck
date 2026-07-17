@@ -104,15 +104,15 @@ function runOverdeckMigrationSync(db: SqliteDatabase): void {
 
 /**
  * Run one idempotent schema top-up without hiding unexpected SQLite failures.
- * Missing tables are tolerated because partially initialized cache databases may
- * not contain every optional runtime table yet.
+ * Only duplicate DDL is silent; missing tables and other failures are logged so
+ * schema drift remains observable without blocking later top-ups or startup.
  */
 export function runSchemaTopUp(db: SqliteDatabase, statement: string): void {
   try {
     db.exec(statement);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/duplicate column name|already exists|no such table/i.test(message)) return;
+    if (/duplicate column name|already exists/i.test(message)) return;
     console.error(`[schema] top-up failed: ${statement}\n${message}`);
   }
 }
