@@ -1,3 +1,4 @@
+import type { SystemHealthSnapshot as AcceptedSystemHealthSnapshot } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,14 +9,14 @@ import {
   resetCurrentDockerStatsReaderForTests,
   resetReclaimForTests,
   resetResourceStackReviewStatusReaderForTests,
-  resetSpawnGateHealthSnapshotReaderForTests,
+  resetSpawnGateHealthSnapshotReadersForTests,
   setCurrentDockerStatsReaderForTests,
   setReclaimIssueClosedReaderForTests,
   setReclaimProjectRootForTests,
   setReclaimVenvCandidatesForTests,
   setReclaimVenvDeleteForTests,
   setResourceStackReviewStatusReaderForTests,
-  setSpawnGateHealthSnapshotReaderForTests,
+  setSpawnGateHealthSnapshotReadersForTests,
   type ResourceStack,
 } from '../../../../src/dashboard/server/routes/resources.js';
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
@@ -24,7 +25,7 @@ import type { SystemHealthSnapshot } from '../../../../src/dashboard/server/serv
 afterEach(() => {
   resetCurrentDockerStatsReaderForTests();
   resetResourceStackReviewStatusReaderForTests();
-  resetSpawnGateHealthSnapshotReaderForTests();
+  resetSpawnGateHealthSnapshotReadersForTests();
   resetReclaimForTests();
 });
 
@@ -32,7 +33,10 @@ describe('resources reclaim payload', () => {
   it('returns a RAM and disk reclaim candidate for a merged stack with no live agent', async () => {
     setMergedReviewStatus();
     setCurrentDockerStatsReaderForTests(() => [container('api', { memoryUsage: 2 * 1024 ** 3 })]);
-    setSpawnGateHealthSnapshotReaderForTests(async () => healthFixture());
+    setSpawnGateHealthSnapshotReadersForTests({
+      accepted: async () => acceptedHealthFixture(),
+      compatibility: async () => healthFixture(),
+    });
 
     const body = await getResourcesJson();
 
@@ -74,7 +78,10 @@ describe('resources reclaim payload', () => {
   it('returns reclaim totals and mirrors disk total into hostVitals.disk.reclaimableBytes', async () => {
     setMergedReviewStatus();
     setCurrentDockerStatsReaderForTests(() => [container('api', { memoryUsage: 1 })]);
-    setSpawnGateHealthSnapshotReaderForTests(async () => healthFixture());
+    setSpawnGateHealthSnapshotReadersForTests({
+      accepted: async () => acceptedHealthFixture(),
+      compatibility: async () => healthFixture(),
+    });
 
     const body = await getResourcesJson();
 
@@ -143,6 +150,50 @@ function reviewStatus(overrides: Partial<ReviewStatus>): ReviewStatus {
   };
 }
 
+function acceptedHealthFixture(): AcceptedSystemHealthSnapshot {
+  const gib = 1024 ** 3;
+  return {
+    version: 2,
+    state: 'healthy',
+    updatedAt: '2026-07-07T12:00:00.000Z',
+    nextPollMs: 15_000,
+    host: {
+      state: 'healthy',
+      platform: 'linux',
+      reasons: [],
+      metrics: {
+        cpuPercent: 0,
+        loadAverage1m: 0,
+        loadPerCore1m: 0,
+        totalMemoryBytes: 16 * gib,
+        usedMemoryBytes: 8 * gib,
+        availableMemoryBytes: 8 * gib,
+        memoryUsedPercent: 50,
+        memoryPressureSomeAvg10: 0,
+        memoryPressureFullAvg10: 0,
+        memoryPressureFreePercent: null,
+        swapTotalBytes: 0,
+        swapUsedBytes: 0,
+        swapUsedPercent: 0,
+        swapActivityBytesPerMinute: 0,
+        committedMemoryBytes: 8 * gib,
+        commitLimitBytes: 24 * gib,
+        virtualCommitmentPercent: 33.3,
+      },
+    },
+    admission: {
+      state: 'open',
+      availableMemoryBytes: 8 * gib,
+      admittedWorkAgentCount: 0,
+      reasons: [],
+    },
+    agents: [],
+    services: [],
+    topConsumers: [],
+    summary: healthFixture().summary,
+  };
+}
+
 function healthFixture(): SystemHealthSnapshot {
   return {
     severity: 'normal',
@@ -180,6 +231,7 @@ function healthFixture(): SystemHealthSnapshot {
       overcommitCriticalPercent: 95,
     },
     reasons: [],
+    admission: { admittedWorkAgentCount: 0 },
     agents: [],
     leakedSpecialists: [],
     topConsumers: [],

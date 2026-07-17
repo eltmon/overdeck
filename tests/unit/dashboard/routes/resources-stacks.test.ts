@@ -1,3 +1,4 @@
+import type { SystemHealthSnapshot as AcceptedSystemHealthSnapshot } from '@overdeck/contracts';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -13,10 +14,10 @@ import {
   getResourcesEffect,
   resetCurrentDockerStatsReaderForTests,
   resetResourceStackReviewStatusReaderForTests,
-  resetSpawnGateHealthSnapshotReaderForTests,
+  resetSpawnGateHealthSnapshotReadersForTests,
   setCurrentDockerStatsReaderForTests,
   setResourceStackReviewStatusReaderForTests,
-  setSpawnGateHealthSnapshotReaderForTests,
+  setSpawnGateHealthSnapshotReadersForTests,
   type ResourceStack,
   type StackContainerResource,
 } from '../../../../src/dashboard/server/routes/resources.js';
@@ -26,7 +27,7 @@ import type { SystemHealthSnapshot } from '../../../../src/dashboard/server/serv
 afterEach(() => {
   resetCurrentDockerStatsReaderForTests();
   resetResourceStackReviewStatusReaderForTests();
-  resetSpawnGateHealthSnapshotReaderForTests();
+  resetSpawnGateHealthSnapshotReadersForTests();
   vi.restoreAllMocks();
 });
 
@@ -103,11 +104,58 @@ describe('resources stack payload', () => {
 });
 
 async function getResourcesJson(): Promise<Record<string, any>> {
-  setSpawnGateHealthSnapshotReaderForTests(async () => healthFixture());
+  setSpawnGateHealthSnapshotReadersForTests({
+    accepted: async () => acceptedHealthFixture(),
+    compatibility: async () => healthFixture(),
+  });
   const response = await Effect.runPromise(getResourcesEffect());
   const raw = response.body as { body: Uint8Array } | null;
   const text = raw?.body ? new TextDecoder().decode(raw.body) : '{}';
   return JSON.parse(text) as Record<string, any>;
+}
+
+function acceptedHealthFixture(): AcceptedSystemHealthSnapshot {
+  const gib = 1024 ** 3;
+  return {
+    version: 2,
+    state: 'healthy',
+    updatedAt: '2026-07-07T12:00:00.000Z',
+    nextPollMs: 15_000,
+    host: {
+      state: 'healthy',
+      platform: 'linux',
+      reasons: [],
+      metrics: {
+        cpuPercent: 0,
+        loadAverage1m: 0,
+        loadPerCore1m: 0,
+        totalMemoryBytes: 16 * gib,
+        usedMemoryBytes: 8 * gib,
+        availableMemoryBytes: 8 * gib,
+        memoryUsedPercent: 50,
+        memoryPressureSomeAvg10: 0,
+        memoryPressureFullAvg10: 0,
+        memoryPressureFreePercent: null,
+        swapTotalBytes: 0,
+        swapUsedBytes: 0,
+        swapUsedPercent: 0,
+        swapActivityBytesPerMinute: 0,
+        committedMemoryBytes: 8 * gib,
+        commitLimitBytes: 24 * gib,
+        virtualCommitmentPercent: 33.3,
+      },
+    },
+    admission: {
+      state: 'open',
+      availableMemoryBytes: 8 * gib,
+      admittedWorkAgentCount: 0,
+      reasons: [],
+    },
+    agents: [],
+    services: [],
+    topConsumers: [],
+    summary: healthFixture().summary,
+  };
 }
 
 function healthFixture(): SystemHealthSnapshot {
@@ -147,6 +195,7 @@ function healthFixture(): SystemHealthSnapshot {
       overcommitCriticalPercent: 95,
     },
     reasons: [],
+    admission: { admittedWorkAgentCount: 0 },
     agents: [],
     leakedSpecialists: [],
     topConsumers: [],
