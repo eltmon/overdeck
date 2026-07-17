@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2252",
   "schemaVersion": 2,
-  "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-16T17:45:23.005Z",
-  "pipeline": {
-    "issueId": "PAN-2252",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-03T07:33:18.171Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-fable-5",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,63 @@
       "note": "Planning session started for PAN-2252: Dashboard port has no identity check — workspace peer server squatted :3011 for 6 minutes and passed all health checks",
       "timestamp": "2026-07-16T17:45:19.711Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-07-03T07:33:18.171Z",
+  "updated": "2026-07-17T00:26:06.600Z",
+  "pipeline": {
+    "issueId": "PAN-2252",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-17T00:26:06.580Z",
+    "strikeRecoveryCount": 0
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 676,
+            "output": 139,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 287,
+            "output": 50822,
+            "cacheRead": 5096819,
+            "cacheWrite": 176879
+          }
+        }
+      },
+      "totals": {
+        "cliproxy/gpt-5.4-mini": {
+          "input": 676,
+          "output": 139,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-fable-5": {
+          "input": 287,
+          "output": 50822,
+          "cacheRead": 5096819,
+          "cacheWrite": 176879
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.851783,
+        "pricingAsOf": "2026-07-17T00:26:06.595Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
 }
