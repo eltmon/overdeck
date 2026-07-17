@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T13:51:18.107Z",
+  "updated": "2026-07-17T14:18:48.242Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "pending",
@@ -64,18 +64,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "lift-tab-band": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2842",
         "agentId": "agent-pan-2842",
         "pid": 2263041,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:51:18.107Z"
+        "claimedAt": "2026-07-17T13:51:18.107Z",
+        "itemId": "lift-tab-band",
+        "outcome": "completed",
+        "reason": "Lifted the Detail Tabs into the full-width cockpit band, preserved all tab labels and badges, added active pill styling, and verified one-row horizontal overflow in an isolated browser plus 11 focused tests.",
+        "releasedAt": "2026-07-17T14:18:48.241Z"
+      }
+    ],
+    "statusReasons": {
+      "lift-tab-band": {
+        "reason": "Lifted the Detail Tabs into the full-width cockpit band, preserved all tab labels and badges, added active pill styling, and verified one-row horizontal overflow in an isolated browser plus 11 focused tests.",
+        "updatedAt": "2026-07-17T14:18:48.241Z"
       }
     }
   },
   "statusOverrides": {
-    "lift-tab-band": "running"
+    "lift-tab-band": "completed",
+    "lift-tab-band.lift-tab-band.ac1": "completed",
+    "lift-tab-band.lift-tab-band.ac2": "completed",
+    "lift-tab-band.lift-tab-band.ac3": "completed",
+    "lift-tab-band.lift-tab-band.ac4": "completed"
   }
 }
