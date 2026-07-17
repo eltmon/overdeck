@@ -138,16 +138,16 @@
     "recordedAt": "2026-07-17T15:57:29.020Z"
   },
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T19:31:39.438Z",
+  "updated": "2026-07-17T19:31:45.350Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T19:31:38.377Z",
+    "updatedAt": "2026-07-17T19:31:45.342Z",
     "reviewNotes": "Rebase preserves the shared issue-action registry and all cockpit no-loss requirements; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2849",
@@ -169,9 +169,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5229021,
-            "output": 179789,
-            "cacheRead": 20221440,
+            "input": 5273776,
+            "output": 188289,
+            "cacheRead": 20705280,
             "cacheWrite": 0
           }
         },
@@ -192,15 +192,15 @@
           "cacheWrite": 133090
         },
         "openai/gpt-5.6-sol": {
-          "input": 14825522,
-          "output": 797575,
-          "cacheRead": 140840448,
+          "input": 14870277,
+          "output": 806075,
+          "cacheRead": 141324288,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 173.278617,
-        "pricingAsOf": "2026-07-17T19:31:38.391Z"
+        "usd": 173.999312,
+        "pricingAsOf": "2026-07-17T19:31:45.345Z"
       }
     },
     "merges": [
