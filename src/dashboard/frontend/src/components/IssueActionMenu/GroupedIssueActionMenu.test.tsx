@@ -132,9 +132,11 @@ describe('GroupedIssueActionMenu', () => {
     expect(wrapper).toHaveAttribute('title', 'Plan is gated for this test.');
     expect(reasonId).toBeTruthy();
     expect(document.getElementById(reasonId!)).toHaveTextContent('Plan is gated for this test.');
-    expect(within(wrapper).getByRole('menuitem')).toHaveAttribute('data-disabled');
+    const disabledItem = within(wrapper).getByRole('menuitem');
+    expect(disabledItem).toHaveAttribute('data-disabled');
+    expect(disabledItem).toHaveAttribute('aria-describedby', reasonId);
 
-    fireEvent.click(within(wrapper).getByRole('menuitem'));
+    fireEvent.click(disabledItem);
     expect(invokes.get('plan')).not.toHaveBeenCalled();
   });
 

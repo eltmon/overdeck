@@ -46,7 +46,7 @@ function ActionRow({ view }: { view: IssueActionView }) {
         aria-describedby={reasonId}
         data-testid={`issue-action-disabled-${view.action.key}`}
       >
-        <Item disabled className="w-full opacity-50">
+        <Item disabled aria-describedby={reasonId} className="w-full opacity-50">
           {label}
         </Item>
         <span id={reasonId} className="sr-only">{reason}</span>
