@@ -339,40 +339,82 @@
     "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T02:45:52.908Z",
+  "updated": "2026-07-17T02:45:53.988Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:20:03.794Z",
+    "updatedAt": "2026-07-17T02:45:53.906Z",
     "reviewNotes": "Three convoy reviewers failed before producing reports; performance also found two current-cycle unbounded reconciliation paths.",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96",
-    "reviewRequestedAt": "2026-07-17T02:14:32.072Z",
+    "reviewRequestedAt": "2026-07-17T02:45:53.794Z",
     "reviewSpawnedAt": "2026-07-17T02:14:37.841Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
-      }
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/__tests__/start-policy-overrides.test.ts",
+        "src/cli/commands/admin/state-migrate.ts",
+        "src/cli/commands/start-policy-overrides.ts",
+        "src/lib/__tests__/state-auto-migrate.test.ts",
+        "src/lib/cloister/sync-main-git.ts",
+        "src/lib/cloister/work-agent-prompt.ts",
+        "src/lib/git-utils.ts",
+        "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+        "src/lib/pan-dir/__tests__/auto-commit.test.ts",
+        "src/lib/pan-dir/auto-commit.ts",
+        "src/lib/state-auto-migrate.ts",
+        "src/lib/state-home.ts",
+        "src/lib/state-migration-manifest.ts",
+        "tests/cloister/sync-main.test.ts",
+        "tests/unit/cli/state-migrate-cancellation.test.ts",
+        "tests/unit/lib/git-utils-process-probes.test.ts",
+        "tests/unit/lib/git-utils.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/cli/commands/start-prep-progress.ts",
+        "src/cli/commands/start.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "sync-sources/skills/pan-start/SKILL.md",
+        "tests/unit/cli/start-prep-progress.test.ts",
+        "tests/unit/cli/start-prep-wiring.test.ts",
+        "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+      ],
+      "actualChangedFiles": [
+        "scripts/file-size-baseline.txt",
+        "src/cli/commands/__tests__/start-policy-overrides.test.ts",
+        "src/cli/commands/admin/state-migrate.ts",
+        "src/cli/commands/start-policy-overrides.ts",
+        "src/cli/commands/start-prep-progress.ts",
+        "src/cli/commands/start.ts",
+        "src/lib/__tests__/state-auto-migrate.test.ts",
+        "src/lib/cloister/merge-agent.ts",
+        "src/lib/cloister/sync-main-git.ts",
+        "src/lib/cloister/work-agent-prompt.ts",
+        "src/lib/git-utils.ts",
+        "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+        "src/lib/pan-dir/__tests__/auto-commit.test.ts",
+        "src/lib/pan-dir/auto-commit.ts",
+        "src/lib/state-auto-migrate.ts",
+        "src/lib/state-home.ts",
+        "src/lib/state-migration-manifest.ts",
+        "sync-sources/skills/pan-start/SKILL.md",
+        "tests/cloister/sync-main.test.ts",
+        "tests/unit/cli/start-prep-progress.test.ts",
+        "tests/unit/cli/start-prep-wiring.test.ts",
+        "tests/unit/cli/state-migrate-cancellation.test.ts",
+        "tests/unit/lib/cloister/sync-main-timeouts.test.ts",
+        "tests/unit/lib/git-utils-process-probes.test.ts",
+        "tests/unit/lib/git-utils.test.ts"
+      ],
+      "recordedAt": "2026-07-17T02:45:52.906Z"
     },
     "strikeRecoveryCount": 0
   },
@@ -411,9 +453,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7272400,
-            "output": 159821,
-            "cacheRead": 24170496,
+            "input": 7294292,
+            "output": 165781,
+            "cacheRead": 24636416,
             "cacheWrite": 0
           }
         },
@@ -459,9 +501,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 23974024,
-            "output": 778150,
-            "cacheRead": 163308032,
+            "input": 25081431,
+            "output": 919048,
+            "cacheRead": 178919424,
             "cacheWrite": 0
           }
         }
@@ -474,9 +516,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 39293834,
-          "output": 1079150,
-          "cacheRead": 206831360,
+          "input": 40423133,
+          "output": 1226008,
+          "cacheRead": 222908672,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -499,8 +541,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 329.324822,
-        "pricingAsOf": "2026-07-17T02:20:03.816Z"
+        "usd": 347.415713,
+        "pricingAsOf": "2026-07-17T02:45:53.980Z"
       }
     },
     "merges": [
