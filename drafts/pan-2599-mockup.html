@@ -1,0 +1,241 @@
+<title>Telemetry opt-out — Settings mockup (PAN-2599)</title>
+<style>
+  :root {
+    color-scheme: light;
+    --radius: 0.625rem;
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --surface-2: color-mix(in srgb, black 3%, transparent);
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --success-foreground: #047857;
+    --track-off: color-mix(in srgb, black 14%, transparent);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --background: #080b10;
+      --foreground: #e5e7eb;
+      --card: #080b10;
+      --muted-foreground: #9ca3af;
+      --border: color-mix(in srgb, white 10%, transparent);
+      --surface-2: color-mix(in srgb, white 4%, transparent);
+      --success-foreground: #34d399;
+      --track-off: color-mix(in srgb, white 18%, transparent);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --background: #080b10;
+    --foreground: #e5e7eb;
+    --card: #080b10;
+    --muted-foreground: #9ca3af;
+    --border: color-mix(in srgb, white 10%, transparent);
+    --surface-2: color-mix(in srgb, white 4%, transparent);
+    --success-foreground: #34d399;
+    --track-off: color-mix(in srgb, white 18%, transparent);
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --surface-2: color-mix(in srgb, black 3%, transparent);
+    --success-foreground: #047857;
+    --track-off: color-mix(in srgb, black 14%, transparent);
+  }
+
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.55;
+    margin: 0;
+    padding: 3rem 1.25rem 4rem;
+  }
+  .frame { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 1rem; }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+  .eyebrow b { color: var(--foreground); font-weight: 600; }
+
+  .section {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--card);
+    padding: 1.25rem 1.35rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+  }
+  .section h2 { font-size: 15px; font-weight: 600; margin: 0; }
+  .section .sub { color: var(--muted-foreground); font-size: 13px; margin: 0.15rem 0 0; }
+
+  .toggle-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+  .toggle-row .label { font-size: 13.5px; font-weight: 500; }
+  .toggle-row .hint { color: var(--muted-foreground); font-size: 12.5px; margin-top: 2px; max-width: 42ch; }
+
+  .switch {
+    flex: none;
+    width: 40px; height: 22px;
+    border-radius: 999px;
+    border: none;
+    background: var(--track-off);
+    position: relative;
+    cursor: pointer;
+    transition: background 120ms ease;
+    margin-top: 2px;
+  }
+  .switch[aria-checked="true"] { background: var(--primary); }
+  .switch::after {
+    content: "";
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    background: var(--primary-foreground, #fff);
+    background: #fff;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+    transition: transform 120ms ease;
+  }
+  .switch[aria-checked="true"]::after { transform: translateX(18px); }
+  .switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  .status {
+    font-size: 12.5px;
+    border-left: 2px solid var(--success-foreground);
+    padding: 0.15rem 0 0.15rem 0.7rem;
+    color: var(--muted-foreground);
+  }
+  .status .state { color: var(--success-foreground); font-weight: 600; }
+  .status.off { border-left-color: var(--muted-foreground); }
+  .status.off .state { color: var(--foreground); }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; transition: opacity 150ms ease; }
+  @media (max-width: 540px) { .cols { grid-template-columns: 1fr; } }
+  .cols.dimmed { opacity: 0.45; }
+  .cols h3 {
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    margin: 0 0 0.45rem;
+  }
+  .cols ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; font-size: 13px; }
+  .cols li { padding-left: 1.05rem; position: relative; }
+  .cols li::before { position: absolute; left: 0; color: var(--muted-foreground); }
+  .collected li::before { content: "•"; }
+  .never li::before { content: "×"; }
+  .cols .note { color: var(--muted-foreground); font-size: 12px; margin-top: 0.5rem; }
+
+  .equiv { display: flex; flex-direction: column; gap: 0.45rem; }
+  .equiv h3 {
+    font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase;
+    font-weight: 600; color: var(--muted-foreground); margin: 0;
+  }
+  .equiv pre {
+    margin: 0;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius) - 2px);
+    padding: 0.65rem 0.8rem;
+    font-family: 'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+  .equiv pre .c { color: var(--muted-foreground); }
+  .equiv p { margin: 0; font-size: 12.5px; color: var(--muted-foreground); }
+
+  .foot { color: var(--muted-foreground); font-size: 12px; line-height: 1.6; }
+  .foot code { font-family: 'SF Mono', 'SFMono-Regular', Consolas, monospace; font-size: 11.5px; }
+</style>
+
+<div class="frame">
+  <p class="eyebrow">Mockup · PAN-2599 WI-5 — <b>Settings › Telemetry</b> (new section, sits after Experimental)</p>
+
+  <div class="section" role="group" aria-labelledby="telemetry-h">
+    <div>
+      <h2 id="telemetry-h">Telemetry</h2>
+      <p class="sub">Anonymous usage data helps prioritize what to build. It never includes your code, prompts, or project names.</p>
+    </div>
+
+    <div class="toggle-row">
+      <div>
+        <div class="label" id="tg-label">Share anonymous usage data</div>
+        <div class="hint">Counts and outcomes only — which features get used and where the pipeline stalls. Changes apply the next time the dashboard loads.</div>
+      </div>
+      <button type="button" class="switch" id="tg" role="switch" aria-checked="true" aria-labelledby="tg-label"></button>
+    </div>
+
+    <div class="status" id="status">
+      <span class="state">Telemetry on</span> · reporting as install <code style="font-family:'SF Mono',Consolas,monospace;font-size:11.5px;">3f9c…b21e</code> (a random ID — not you, not your machine)
+    </div>
+
+    <div class="cols" id="cols">
+      <div class="collected">
+        <h3>What's sent</h3>
+        <ul>
+          <li>Feature usage — tab views, agent spawns, merges, plan approvals</li>
+          <li><code style="font-family:'SF Mono',Consolas,monospace;font-size:12px;">pan</code> command names and success/failure</li>
+          <li>Pipeline stage outcomes, per harness and model</li>
+          <li>Crash reports (stack traces, paths stripped)</li>
+          <li>App version, OS, and a random install ID</li>
+        </ul>
+      </div>
+      <div class="never">
+        <h3>Never sent</h3>
+        <ul>
+          <li>Code, diffs, prompts, or agent transcripts</li>
+          <li>File paths and repository names</li>
+          <li>Issue titles and branch names</li>
+          <li>Anything from other tools' config or credentials</li>
+        </ul>
+        <p class="note">The full event list lives in <span style="font-family:'SF Mono',Consolas,monospace;font-size:11.5px;">docs/TELEMETRY.md</span> and is enforced by CI.</p>
+      </div>
+    </div>
+
+    <div class="equiv">
+      <h3>Also configurable outside the dashboard</h3>
+      <pre><span class="c"># ~/.overdeck/config.yaml</span>
+telemetry:
+  enabled: false</pre>
+      <pre><span class="c"># or per-shell — the environment variable always wins</span>
+OVERDECK_TELEMETRY=0</pre>
+      <p>When off, Overdeck makes zero requests to *.posthog.com — from the dashboard, the server, and the CLI.</p>
+    </div>
+  </div>
+
+  <p class="foot">Interaction notes: the switch writes <code>telemetry.enabled</code> via <code>PUT /api/settings</code>; the status line flips immediately, capture stops on next dashboard load (server and CLI read the flag per run). Off-state dims “What's sent” to reinforce that nothing leaves the machine.</p>
+</div>
+
+<script>
+  const tg = document.getElementById('tg');
+  const status = document.getElementById('status');
+  const cols = document.getElementById('cols');
+  const ON = '<span class="state">Telemetry on</span> · reporting as install <code style="font-family:\'SF Mono\',Consolas,monospace;font-size:11.5px;">3f9c…b21e</code> (a random ID — not you, not your machine)';
+  const OFF = '<span class="state">Telemetry off</span> · zero requests to *.posthog.com. Takes effect the next time the dashboard loads.';
+  tg.addEventListener('click', () => {
+    const on = tg.getAttribute('aria-checked') === 'true';
+    tg.setAttribute('aria-checked', String(!on));
+    status.classList.toggle('off', on);
+    status.innerHTML = on ? OFF : ON;
+    cols.classList.toggle('dimmed', on);
+  });
+</script>
