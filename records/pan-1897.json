@@ -436,17 +436,17 @@
     "recordedAt": "2026-07-17T06:23:54.484Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T06:35:16.500Z",
+  "updated": "2026-07-17T10:32:31.834Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-17T06:35:16.429Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-17T10:32:31.822Z",
     "reviewNotes": "Approved: Git-root-wide state-writer reconciliation is fixed; focused migration suites pass 34 tests.",
     "testNotes": "Reconciled from green GitHub Actions CI on fa43a499: guard (https://github.com/eltmon/overdeck/actions/runs/29559920222/job/87819982352)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -642,7 +642,7 @@
       },
       "costAtCloseOut": {
         "usd": 516.163371,
-        "pricingAsOf": "2026-07-17T06:35:16.473Z"
+        "pricingAsOf": "2026-07-17T10:32:31.830Z"
       }
     },
     "merges": [
