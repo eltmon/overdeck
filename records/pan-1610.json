@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T15:44:05.966Z",
+  "updated": "2026-07-17T15:59:55.595Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "docs-and-pointers": {
-        "writerId": "agent-pan-1610",
-        "agentId": "agent-pan-1610",
-        "pid": 2074543,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T15:44:05.966Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -210,6 +202,16 @@
         "itemId": "surface-parity-test",
         "outcome": "completed",
         "releasedAt": "2026-07-17T15:43:55.729Z"
+      },
+      {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 2074543,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T15:44:05.966Z",
+        "itemId": "docs-and-pointers",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T15:59:55.595Z"
       }
     ],
     "statusReasons": {
@@ -268,6 +270,9 @@
     "surface-parity-test.surface-parity-test.ac2": "completed",
     "surface-parity-test.surface-parity-test.ac3": "completed",
     "surface-parity-test.surface-parity-test.ac4": "completed",
-    "docs-and-pointers": "running"
+    "docs-and-pointers": "completed",
+    "docs-and-pointers.docs-and-pointers.ac1": "completed",
+    "docs-and-pointers.docs-and-pointers.ac2": "completed",
+    "docs-and-pointers.docs-and-pointers.ac3": "completed"
   }
 }
