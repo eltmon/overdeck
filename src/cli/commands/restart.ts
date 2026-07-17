@@ -22,7 +22,11 @@ import { execFileSync, spawn } from 'child_process';
 import { dirname, join, parse, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, mkdirSync } from 'fs';
-import { isWorkspaceRepoRoot } from '../../dashboard/server/identity.js';
+import {
+  isLinkedWorktreeRoot,
+  isWorkspaceRepoRoot,
+  primaryRootFromLinkedWorktree,
+} from '../../dashboard/server/identity.js';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
@@ -80,14 +84,22 @@ export function resolveGitRepoRoot(cwd: string): string | null {
   }
 }
 
-function refuseWorkspaceDashboardRestart(cwd: string): boolean {
-  const repoRoot = resolveGitRepoRoot(cwd);
-  if (!repoRoot || !isWorkspaceRepoRoot(repoRoot)) return false;
+export function refuseNonPrimaryDashboardCwd(cwd: string, verb: string): boolean {
+  if (existsSync('/.dockerenv')) return false;
 
-  const primaryRepoRoot = dirname(dirname(repoRoot));
+  const repoRoot = resolveGitRepoRoot(cwd);
+  if (!repoRoot) return false;
+
+  const isWorkspace = isWorkspaceRepoRoot(repoRoot);
+  if (!isWorkspace && !isLinkedWorktreeRoot(repoRoot)) return false;
+
+  const primaryRepoRoot = primaryRootFromLinkedWorktree(repoRoot) ??
+    (isWorkspace ? dirname(dirname(repoRoot)) : null);
+  const primaryGuidance = primaryRepoRoot
+    ? ` Run this command from the primary checkout at ${primaryRepoRoot}.`
+    : '';
   console.error(chalk.red(
-    `Refusing to restart the host dashboard from workspace checkout ${repoRoot}. ` +
-      `Run this command from the primary checkout at ${primaryRepoRoot}.`,
+    `Refusing to ${verb} the host dashboard from non-primary checkout ${repoRoot}.${primaryGuidance}`,
   ));
   process.exitCode = 2;
   return true;
@@ -256,7 +268,7 @@ export async function shouldRunManualSupervisorCycle(env: NodeJS.ProcessEnv = pr
 export async function restartCommand(options: RestartOptions): Promise<void> {
   const startedAt = Date.now();
   const scope = resolveScope(options);
-  if ((scope === 'dashboard' || scope === 'full') && refuseWorkspaceDashboardRestart(process.cwd())) {
+  if ((scope === 'dashboard' || scope === 'full') && refuseNonPrimaryDashboardCwd(process.cwd(), 'restart')) {
     return;
   }
   const config = readPlatformConfigSync();
