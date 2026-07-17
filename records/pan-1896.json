@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:19:02.859Z",
+  "updated": "2026-07-17T12:19:12.654Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -74,7 +74,7 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
+    "sequence": 7,
     "claims": {},
     "statusReasons": {
       "codex-mode-enum": {
@@ -96,6 +96,10 @@
       "codex-settings-ui": {
         "reason": "Cancelled because no new workspace-net mode is being introduced; existing Codex permission settings remain unchanged.",
         "updatedAt": "2026-07-17T12:19:02.859Z"
+      },
+      "codex-workagent-wire": {
+        "reason": "Cancelled because the new workspace-net mode is obsolete; work agents inherit native execpolicy rules centrally through initCodexHome instead.",
+        "updatedAt": "2026-07-17T12:19:12.654Z"
       }
     },
     "claimHistory": [
@@ -120,6 +124,7 @@
     "codex-permissions-doc.codex-permissions-doc.ac2": "completed",
     "codex-permissions-doc.codex-permissions-doc.ac3": "completed",
     "codex-sandbox-resolver": "cancelled",
-    "codex-settings-ui": "cancelled"
+    "codex-settings-ui": "cancelled",
+    "codex-workagent-wire": "cancelled"
   }
 }
