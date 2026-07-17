@@ -215,6 +215,26 @@ export const FlywheelSystemStatus = Schema.Struct({
   agentsCap: Schema.Number,
 })
 
+export interface FlywheelOrders {
+  bookId: string
+  bookName: string
+  landed: number
+  total: number
+  laneAInFlight: ReadonlyArray<string>
+  laneBInFlight?: string | undefined
+  drained: boolean
+}
+
+export const FlywheelOrders = Schema.Struct({
+  bookId: Schema.String,
+  bookName: Schema.String,
+  landed: Schema.Number,
+  total: Schema.Number,
+  laneAInFlight: Schema.Array(Schema.String),
+  laneBInFlight: Schema.optional(Schema.String),
+  drained: Schema.Boolean,
+})
+
 export interface FlywheelStatus {
   runId: FlywheelRunId
   startedAt: string
@@ -228,6 +248,7 @@ export interface FlywheelStatus {
   suggestions: ReadonlyArray<FlywheelSuggestion>
   system: FlywheelSystemStatus
   openQuestions: ReadonlyArray<string>
+  orders?: FlywheelOrders | undefined
   ticks: number
   lastTickAt: string
 }
@@ -247,6 +268,7 @@ export const FlywheelStatus = Schema.Struct({
   ),
   system: FlywheelSystemStatus,
   openQuestions: Schema.Array(Schema.String),
+  orders: Schema.optional(FlywheelOrders),
   ticks: Schema.Number,
   lastTickAt: Schema.String,
 })
