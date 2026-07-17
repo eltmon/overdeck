@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T11:02:46.510Z",
+  "updated": "2026-07-17T11:06:06.287Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T11:02:46.496Z",
-    "inspectNotes": "Inspecting item grouped-menu-component"
+    "updatedAt": "2026-07-17T11:06:05.914Z",
+    "inspectNotes": "AC3 violated: src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx:45-49 — title and aria-describedby are set on the outer wrapping <span> (a non-interactive element), while the actual role=\"menuitem\" node (Radix Primitive.Item, confirmed via node_modules/@radix-ui/react-menu — role:\"menuitem\" set directly on the item element) is the nested <Item disabled> with neither attribute. aria-describedby is not inherited by descendants; a screen reader focusing the real menuitem will not announce the disabled-reason text, even though the unit test only checks the wrapper's own attributes and so passes despite the broken association. Fix: pass title={reason} and aria-describedby={reasonId} as props to <Item> itself (ContextMenuItem/ContextMenuDestructiveItem already forward arbitrary props via {...props} onto Primitive.Item), not to the wrapping span. All other ACs (1, 2, 4, 5) verified structurally correct against the diff."
   },
   "closeOut": {
     "usage": {
@@ -35,11 +35,19 @@
             "cacheWrite": 184049
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 20,
+            "output": 12625,
+            "cacheRead": 1269543,
+            "cacheWrite": 124640
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1926911,
-            "output": 146708,
-            "cacheRead": 25862656,
+            "input": 1971349,
+            "output": 151369,
+            "cacheRead": 30208000,
             "cacheWrite": 0
           }
         }
@@ -51,16 +59,22 @@
           "cacheRead": 3847434,
           "cacheWrite": 184049
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 20,
+          "output": 12625,
+          "cacheRead": 1269543,
+          "cacheWrite": 124640
+        },
         "openai/gpt-5.6-sol": {
-          "input": 1926911,
-          "output": 146708,
-          "cacheRead": 25862656,
+          "input": 1971349,
+          "output": 151369,
+          "cacheRead": 30208000,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 35.525304,
-        "pricingAsOf": "2026-07-17T11:02:46.502Z"
+        "usd": 38.751795,
+        "pricingAsOf": "2026-07-17T11:06:06.171Z"
       }
     },
     "merges": [],
