@@ -5747,3 +5747,12 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **2829 still idle 125min** (cost frozen $23.0888, confirmed). **2377 still dead-inspection** (inspect_status=failed, same dead owner). No operator unblock on either.
 - **Net agent health: 1610 advancing (PR in review), 2445 done-but-stranded, 2829+2377 stuck.** 3 of 4 need operator action already surfaced.
 - **B11=PAN-2233 still NOT started** — TENET-10 execution-mode question, open since tick 9 (10 ticks).
+
+## Tick 20 — 2026-07-17 ~16:43 — 1610 PR#2851 in review; 2445 submitted (PR#2852) but re-idled at feedback on a 1-LINE lint fix
+- **Main GREEN** (b594707a5a). **PAN-1610 PR#2851 in active review** (review session spawned 12:36, 0 failing / 1 pending, verification passed, head d54c6beb). Final sequence item — merge when review+test pass at head. Not ready yet.
+- **PAN-2445 got SUBMITTED — the surface→operator-nudge→drive loop WORKS.** PR#2852 appeared (operator nudged it past the pan-done idle stall from tick 19). So the operator IS acting on surfaced idle agents. **BUT it re-idled AGAIN at the review-feedback loop:** verification FAILED, feedback delivered (`001-verification-gate-failed.md`), agent told to fix — and it's back at a bare `❯`, not acting. Cost frozen $24.78.
+- **The 2445 failure is REAL and ONE LINE:** overdeck-boundary lint — `src/lib/cloister/autonomous-plan-dispatch.ts:11` imports `isFlywheelAutoPickupBacklog` from the OLD `../database/app-settings.js` (panopticon.db path); must route through an overdeck door (`src/lib/overdeck/*`). A trivial fix the idle agent won't make. **I CANNOT fix it** (flywheel never edits/commits ANY file — Never list) and CANNOT nudge (forbidden). Clean proof of why PAN-2817 is a hard blocker: a one-line fix strands indefinitely because only the idle work agent can make it and the orchestrator has no lever.
+- **Pattern now fully mapped: gpt-5.6-sol idle-at-prompt hits at EVERY handoff** — mid-work (2445 tick17, 2829), at pan-done (2445 tick19, 1610 survived it), and at review-feedback (2445 now). PAN-2817 is the through-line and needs a mechanical redrive that fires at all three.
+- **2829 still idle 144min** (frozen $23.0888). **2377 still dead-inspection** (PAN-2848). No change.
+- **Loop that's working:** I surface the specific idle agent + exactly what it needs → operator nudges → I drive. 2445 needs ANOTHER nudge (fix the 1-line boundary import + resubmit). Surfaced precisely.
+- **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9.
