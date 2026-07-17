@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:12.069Z",
-  "updated": "2026-07-17T13:18:47.750Z",
+  "updated": "2026-07-17T13:22:46.236Z",
   "pipeline": {
     "issueId": "PAN-2665",
     "reviewStatus": "pending",
@@ -64,16 +64,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "lint-node-builder-tests": {
-        "writerId": "agent-pan-2665",
-        "agentId": "agent-pan-2665",
-        "pid": 618018,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:18:47.750Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2665",
@@ -96,6 +88,16 @@
         "outcome": "completed",
         "reason": "Added the Lint label, ListChecks icon, verification-gate purpose text, and rail rendering coverage.",
         "releasedAt": "2026-07-17T13:18:20.685Z"
+      },
+      {
+        "writerId": "agent-pan-2665",
+        "agentId": "agent-pan-2665",
+        "pid": 618018,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:18:47.750Z",
+        "itemId": "lint-node-builder-tests",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T13:22:46.236Z"
       }
     ],
     "statusReasons": {
@@ -111,6 +113,10 @@
     "lint-row-label-icon.lint-row-label-icon.ac2": "completed",
     "lint-row-label-icon.lint-row-label-icon.ac3": "completed",
     "lint-row-label-icon.lint-row-label-icon.ac4": "completed",
-    "lint-node-builder-tests": "running"
+    "lint-node-builder-tests": "completed",
+    "lint-node-builder-tests.lint-node-builder-tests.ac1": "completed",
+    "lint-node-builder-tests.lint-node-builder-tests.ac2": "completed",
+    "lint-node-builder-tests.lint-node-builder-tests.ac3": "completed",
+    "lint-node-builder-tests.lint-node-builder-tests.ac4": "completed"
   }
 }
