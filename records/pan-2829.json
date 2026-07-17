@@ -21,18 +21,18 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-17T14:23:23.315Z",
+  "updated": "2026-07-17T14:24:59.699Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T14:23:23.300Z",
-    "inspectNotes": "Inspecting item envelope-canonical"
+    "updatedAt": "2026-07-17T14:24:59.556Z",
+    "inspectNotes": "AC1-4 verified: serializeVBriefDocument always emits xBRIEFInfo (io.ts:200-206), tested against committed legacy-v05.vbrief.json fixture; readPlanSync/readPlan/readVBriefDocument/parsePanSpecDocumentFromString all normalize vBRIEFInfo->xBRIEFInfo before validating (normalizeVBriefEnvelope called first in each); missing-envelope error names both keys (io.ts:222-224, xbrief-index.ts:196-200, specs.ts:111-114); v0.8 round-trip test asserts structural equality post read+reserialize. Note (non-blocking, out of AC scope): src/dashboard/frontend/src/components/vbrief/VBriefHeader.tsx and types.ts still destructure/type doc.vBRIEFInfo as required — likely needs updating for the dashboard vBRIEF viewer, flagging for review convoy/compile gate."
   },
   "closeOut": {
     "usage": {
@@ -45,11 +45,19 @@
             "cacheWrite": 186787
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 8,
+            "output": 4338,
+            "cacheRead": 398060,
+            "cacheWrite": 105002
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2290932,
-            "output": 165646,
-            "cacheRead": 38524928,
+            "input": 2322362,
+            "output": 169753,
+            "cacheRead": 41340416,
             "cacheWrite": 0
           }
         }
@@ -61,16 +69,22 @@
           "cacheRead": 4046354,
           "cacheWrite": 186787
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 8,
+          "output": 4338,
+          "cacheRead": 398060,
+          "cacheWrite": 105002
+        },
         "openai/gpt-5.6-sol": {
-          "input": 2290932,
-          "output": 165646,
-          "cacheRead": 38524928,
+          "input": 2322362,
+          "output": 169753,
+          "cacheRead": 41340416,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 45.591153,
-        "pricingAsOf": "2026-07-17T14:23:23.305Z"
+        "usd": 47.664771,
+        "pricingAsOf": "2026-07-17T14:24:59.627Z"
       }
     },
     "merges": [],
