@@ -245,6 +245,46 @@ describe('initCodexHome', () => {
     expect(existsNode(join(codexDir, 'auth.json'))).toBe(false)
   })
 
+  it('symlinks rules/ to the global Codex execpolicy layer', () => {
+    const { lstatSync: lstatNode, realpathSync: realpathNode } = require('node:fs')
+    const globalRules = join(ctx.codexHome, 'rules')
+    mkdirSync(globalRules, { recursive: true })
+    writeFileSync(join(globalRules, 'default.rules'), 'prefix_rule(pattern=["gh", "issue", "view"], decision="allow")\n')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-rules')
+    initCodexHome(codexDir)
+
+    const seeded = join(codexDir, 'rules')
+    expect(lstatNode(seeded).isSymbolicLink()).toBe(true)
+    expect(realpathNode(seeded)).toBe(realpathNode(globalRules))
+  })
+
+  it('preserves an existing per-agent rules directory', () => {
+    const { lstatSync: lstatNode, readFileSync: readNode } = require('node:fs')
+    const globalRules = join(ctx.codexHome, 'rules')
+    mkdirSync(globalRules, { recursive: true })
+    writeFileSync(join(globalRules, 'default.rules'), 'prefix_rule(pattern=["gh"], decision="allow")\n')
+
+    const codexDir = join(ctx.agentsHome, 'agent-init-rules-existing')
+    const agentRules = join(codexDir, 'rules')
+    mkdirSync(agentRules, { recursive: true })
+    writeFileSync(join(agentRules, 'local.rules'), 'prefix_rule(pattern=["git", "status"], decision="allow")\n')
+
+    initCodexHome(codexDir)
+
+    expect(lstatNode(agentRules).isSymbolicLink()).toBe(false)
+    expect(readNode(join(agentRules, 'local.rules'), 'utf8')).toContain('git", "status')
+  })
+
+  it('leaves rules/ absent when the global Codex rule layer does not exist', () => {
+    const { existsSync: existsNode } = require('node:fs')
+    const codexDir = join(ctx.agentsHome, 'agent-init-rules-none')
+
+    initCodexHome(codexDir)
+
+    expect(existsNode(join(codexDir, 'rules'))).toBe(false)
+  })
+
   it('is idempotent — a second init leaves the existing symlink in place (PAN-2285)', () => {
     const { writeFileSync: writeNode, lstatSync: lstatNode, realpathSync: realpathNode } = require('node:fs')
     const globalAuth = join(ctx.codexHome, 'auth.json')
