@@ -33,6 +33,14 @@ To add or move an issue-view section without losing an existing surface:
 
 The no-loss tests are a surface lock. The root test fixes the historical inventory, requires unique names and valid owning files, and fails when an old surface disappears. The frontend render test requires every inventory entry to have a declared density and rejects hidden section markers. A refactor is complete only when each old action, status, route, view, and affordance still has a real home.
 
+## Issue action registry contract
+
+Every issue-action surface renders from the single executable registry in `src/dashboard/frontend/src/lib/issueActions.ts`. Surfaces declare only their presentation: `grouped-panel` for the cockpit popover, `grouped-context` for right-click menus, `primary-strip` for phase-primary buttons with grouped overflow, `overflow-only` where only the grouped menu is shown, and pinned slots for declared registry actions or React controls such as the drawer merge button. Action identity, availability, grouping, ordering, descriptions, confirmation, and invocation remain registry-owned.
+
+`src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx` is the cross-surface parity gate. It compares each rendered surface with an explicit registry-derived oracle, including legitimate rail and Zone B session actions and declared pinned controls, so a surface-local action, gating change, order drift, or missing extra fails the test.
+
+The PAN-2499 inventory records action-renderer relocations separately from each visible shell's stable `home`, so `IssueActionMegaMenu`, `FeatureContextMenu`, and `DrawerActionBar` retain their protected sections while their shared renderer ownership is explicit. No Mintlify surface documents action menus as of the 2026-07-15 verification; that omission is deliberate, so this developer contract is the documentation owner.
+
 ## Protected issue-row action menu
 
 `FeatureContextMenu (issue-row right-click)` is a protected rail inventory surface. `FeatureItem.tsx` renders it through the shared `GroupedIssueActionMenu`, which derives its semantic sections from the issue-action registry's `GROUP_ORDER`; changes must preserve its matching visible `data-section` marker and no-loss inventory entry.

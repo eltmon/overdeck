@@ -106,6 +106,7 @@
     <button class="theme-toggle" id="themeToggle" type="button">Toggle theme</button>
   </header>
   <p class="doc-sub">PAN-2661 · v2 (implementation-grade). The gating below is not an approximation: the eleven phases are the real <span class="mono">PipelinePhase</span> values, the top section is the real <span class="mono">PHASE_PRIMARY_KEYS</span> map, and every enable/disable decision runs the registry's own predicates (<span class="mono">canPlan</span>, <span class="mono">canRestartReview</span>, …) re-implemented verbatim against a representative issue state per phase. The spec appendix at the bottom is generated from the same data this menu renders — the mockup and the spec cannot drift.</p>
+  <p class="note"><strong>PAN-1610 follow-on:</strong> See <a href="issue-actions-one-registry-pan-1610.html">issue-actions-one-registry-pan-1610.html</a> for the one-registry, all-surfaces presentation contract.</p>
 
   <h2>Current — what ships today</h2>
   <div class="duo">
