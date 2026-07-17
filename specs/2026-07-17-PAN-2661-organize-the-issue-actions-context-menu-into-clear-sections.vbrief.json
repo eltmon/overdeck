@@ -4,17 +4,17 @@
     "created": "2026-07-17T10:10:56.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2661: Organize the issue actions context menu into clear sections",
-    "updated": "2026-07-17T10:30:32.639Z"
+    "updated": "2026-07-17T10:30:34.206Z"
   },
   "plan": {
     "id": "pan-2661",
     "title": "Organize the issue actions context menu into clear sections",
-    "status": "approved",
+    "status": "running",
     "uid": "73fd23a4-eef6-4f20-9e7b-2a680b1d393c",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-17T10:10:56.000Z",
-    "updated": "2026-07-17T10:30:32.639Z",
+    "updated": "2026-07-17T10:30:34.206Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2661",

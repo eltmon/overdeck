@@ -4,17 +4,17 @@
     "created": "2026-07-17T10:10:57Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2822: Issues pane: toggle to show/hide planned_backlog (spec-only) pipeline members",
-    "updated": "2026-07-17T10:30:04.975Z"
+    "updated": "2026-07-17T10:30:06.695Z"
   },
   "plan": {
     "id": "pan-2822",
     "title": "Issues pane: toggle to show/hide planned_backlog (spec-only) pipeline members",
-    "status": "approved",
+    "status": "running",
     "uid": "bfa8dddf-68e5-491e-9d7d-e6c3ef951bc1",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-17T10:10:57Z",
-    "updated": "2026-07-17T10:30:04.975Z",
+    "updated": "2026-07-17T10:30:06.695Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2822",
