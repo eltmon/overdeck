@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T01:18:32.447Z",
+  "updated": "2026-07-17T01:20:14.849Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "docs-db-schema-lifecycle": {
-        "writerId": "agent-pan-2807",
-        "agentId": "agent-pan-2807",
-        "pid": 1894109,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:18:32.447Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2807",
@@ -129,6 +121,17 @@
         "outcome": "completed",
         "reason": "Startup now parses the canonical init SQL plus explicit runtime top-up expectations, compares tables/indexes/columns through SQLite metadata reads, and emits one report-only [schema-audit] warning per missing artifact. Focused tests cover exact drift, ignored extras, query-only execution, startup warnings, and parser count; typecheck passes.",
         "releasedAt": "2026-07-17T01:18:26.192Z"
+      },
+      {
+        "writerId": "agent-pan-2807",
+        "agentId": "agent-pan-2807",
+        "pid": 1894109,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:18:32.447Z",
+        "itemId": "docs-db-schema-lifecycle",
+        "outcome": "completed",
+        "reason": "The schema notes now document the fresh-migration plus existing-database top-up rule, report-only startup audit, overdeck.db's lack of user_version, and the legacy ladder's stop-before-stamp failure policy. infra.ts now states the same runtime policy in its module header. Full lint passes.",
+        "releasedAt": "2026-07-17T01:20:14.849Z"
       }
     ],
     "statusReasons": {
@@ -151,6 +154,10 @@
       "overdeck-schema-audit": {
         "reason": "Startup now parses the canonical init SQL plus explicit runtime top-up expectations, compares tables/indexes/columns through SQLite metadata reads, and emits one report-only [schema-audit] warning per missing artifact. Focused tests cover exact drift, ignored extras, query-only execution, startup warnings, and parser count; typecheck passes.",
         "updatedAt": "2026-07-17T01:18:26.192Z"
+      },
+      "docs-db-schema-lifecycle": {
+        "reason": "The schema notes now document the fresh-migration plus existing-database top-up rule, report-only startup audit, overdeck.db's lack of user_version, and the legacy ladder's stop-before-stamp failure policy. infra.ts now states the same runtime policy in its module header. Full lint passes.",
+        "updatedAt": "2026-07-17T01:20:14.849Z"
       }
     }
   },
@@ -175,6 +182,9 @@
     "overdeck-schema-audit.overdeck-schema-audit.ac2": "completed",
     "overdeck-schema-audit.overdeck-schema-audit.ac3": "completed",
     "overdeck-schema-audit.overdeck-schema-audit.ac4": "completed",
-    "docs-db-schema-lifecycle": "running"
+    "docs-db-schema-lifecycle": "completed",
+    "docs-db-schema-lifecycle.docs-db-schema-lifecycle.ac1": "completed",
+    "docs-db-schema-lifecycle.docs-db-schema-lifecycle.ac2": "completed",
+    "docs-db-schema-lifecycle.docs-db-schema-lifecycle.ac3": "completed"
   }
 }
