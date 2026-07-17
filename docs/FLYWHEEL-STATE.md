@@ -5559,3 +5559,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Live build: 57222e4bcb, pid 3415248, health 200** — carries all night's merges + the substrate fixes + all 4 strikes. Main CI finishing (guard+clean-install green; test/lint/build in_progress).
 - Stale strike sessions (2794/2811/2819/2795) killed.
 - **RELEASE-READY pending final main CI green.** Operator cuts v0.45.21 (carries PAN-2772 convo-disconnect fix + PAN-2768 desktop Sync Now fix Drew is waiting on). I never tag. After the tag: new flywheel run, RUN-63 ends. Do NOT pick up PAN-2822. Display-only spec-lens issues (PAN-532/538/608/783/804) are NOT work.
+
+## Tick 89 — 2026-07-17 ~02:42 — RUN-63 RELEASE-READY (main green, drained, deployed)
+- **Main CI GREEN** on 57222e4bcb (code) AND e14bccdd18 (tip): test/build/lint/guard/clean-install all success.
+- **Pipeline DRAINED:** all 4 wind-down strikes (2794/2811/2819/2795) + PAN-1491 landed & closed-out. Live build 57222e4bcb (pid 3415248, health 200) carries the full night: 11 merges + PAN-2820 substrate fixes + all 4 strikes.
+- **RELEASE-READY for v0.45.21.** Operator cuts (I never tag). Carries PAN-2772 convo-disconnect fix + PAN-2768 desktop Sync Now fix (Drew waiting). After tag → new flywheel run, RUN-63 ends; first post-tag issue = PAN-2822 (do NOT pre-pickup). Display-only spec-lens issues (532/538/608/783/804) = NOT work.
+- Parked for operator: PR#2821 (PAN-2232 seam-privacy follow-up, CLEAN) awaits reset-vs-authorize decision — NOT release-blocking.
+- Night's totals: 11 pipeline merges + 4 strikes landed, 2 substrate deploys + 3 flywheel deploys, 18 close-outs (operator 11 + my 7), issues filed: 2809/2810/2813/2817.
