@@ -8,6 +8,7 @@ import {
   type VBriefItemMetadata,
   type VBriefSubItem,
 } from './types.js';
+import { compileGlob } from './dag.js';
 import { analyzeSwarmReadiness } from './swarm-readiness.js';
 
 export interface QualityIssue {
@@ -45,6 +46,9 @@ const FILES_SCOPE_CONFIDENCE_VALUES = new Set<FilesScopeConfidence>(['high', 'me
 const ITEM_READINESS_VALUES = new Set<ItemReadiness>(['ready', 'sequential', 'needs_refinement']);
 const HEAVY_DIFFICULTIES = new Set<VBriefDifficulty>(['complex', 'expert']);
 const PARALLEL_SAFE_REASON_FIELDS = ['parallelSafeReason', 'parallel_safe_reason', 'readinessReason', 'readiness_reason'];
+const FILE_SIZE_BASELINE_PATH = 'scripts/file-size-baseline.txt';
+const FILE_SIZE_RECONCILIATION_PATTERN = /\b(?:drop(?:ped|ping)?|lower(?:ed|ing)?|reconcil(?:e|ed|es|ing|iation)|remov(?:e|ed|es|ing)|updat(?:e|ed|es|ing))\b/i;
+const FILE_SIZE_LINT_COMMAND_PATTERN = /(?:\b(?:bun|npm|pnpm|yarn)\s+(?:run\s+)?lint(?::file-size)?(?=$|[\s;&|])|scripts\/lint-file-size\.sh)/i;
 
 function issue(itemId: string | null, rule: string, message: string): QualityIssue {
   return { itemId, rule, message, severity: 'error' };
@@ -267,6 +271,66 @@ function lintDocsCoverage(doc: VBriefDocument): QualityIssue[] {
   )];
 }
 
+function itemSearchText(item: VBriefItem): string {
+  return [
+    item.title,
+    item.narrative?.Action,
+    ...(item.metadata?.expected_outputs ?? []),
+    ...acceptanceCriteria(item).map(ac => ac.title),
+  ]
+    .filter((value): value is string => typeof value === 'string')
+    .join('\n');
+}
+
+function scopeIncludesPath(item: VBriefItem, filePath: string): boolean {
+  return (item.metadata?.files_scope ?? []).some(scope => compileGlob(scope).regex.test(filePath));
+}
+
+function requiresFileSizeLint(item: VBriefItem): boolean {
+  const commands = item.metadata?.verify_commands ?? [];
+  if (commands.some(command => typeof command === 'string' && FILE_SIZE_LINT_COMMAND_PATTERN.test(command))) return true;
+  return acceptanceCriteria(item).some(ac => FILE_SIZE_LINT_COMMAND_PATTERN.test(ac.title));
+}
+
+function lintDeferredFileSizeRatchet(doc: VBriefDocument): QualityIssue[] {
+  const activeItems = doc.plan.items.filter(item => item.status !== 'cancelled');
+  const readiness = analyzeSwarmReadiness(doc);
+  const issues: QualityIssue[] = [];
+  const seen = new Set<string>();
+
+  for (const reconciliation of activeItems) {
+    if (!scopeIncludesPath(reconciliation, FILE_SIZE_BASELINE_PATH)) continue;
+
+    const reconciliationText = itemSearchText(reconciliation);
+    if (!reconciliationText.includes(FILE_SIZE_BASELINE_PATH) || !FILE_SIZE_RECONCILIATION_PATTERN.test(reconciliationText)) continue;
+
+    const reconciledSourceScopes = (reconciliation.metadata?.files_scope ?? [])
+      .filter(scope => scope.startsWith('src/') && reconciliationText.includes(scope));
+    if (reconciledSourceScopes.length === 0) continue;
+
+    for (const candidate of activeItems) {
+      if (candidate.id === reconciliation.id || scopeIncludesPath(candidate, FILE_SIZE_BASELINE_PATH) || !requiresFileSizeLint(candidate)) continue;
+
+      const sharedFiles = readiness.overlapMatrix[candidate.id]?.[reconciliation.id] ?? [];
+      const deferredFile = sharedFiles.find(filePath =>
+        reconciledSourceScopes.some(scope => compileGlob(scope).regex.test(filePath)),
+      );
+      if (!deferredFile) continue;
+
+      const key = `${candidate.id}\0${deferredFile}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      issues.push(issue(
+        candidate.id,
+        'deferred-file-size-ratchet',
+        `Item ${candidate.id} requires file-size-backed lint after changing baselined file ${deferredFile}, but defers ${FILE_SIZE_BASELINE_PATH} reconciliation to item ${reconciliation.id}. Include the baseline in ${candidate.id} metadata.files_scope and reconcile it in the same commit, or use an intermediate verification command that excludes the file-size ratchet. For an active plan, return the issue to planning, preserve stable item IDs, apply one of these repairs, and re-finalize before rerunning inspection.`,
+      ));
+    }
+  }
+
+  return issues;
+}
+
 function orderedPairKey(left: string, right: string): string {
   return [left, right].sort().join('\0');
 }
@@ -344,6 +408,7 @@ export function lintPlanQuality(doc: VBriefDocument, options: QualityLintOptions
     ...lintDocumentReferences(doc),
     ...lintDocsCoverage(doc),
     ...lintTraceCoverage(doc, options.prdText),
+    ...lintDeferredFileSizeRatchet(doc),
     ...lintOverlapAudit(doc, options),
   ];
 }
