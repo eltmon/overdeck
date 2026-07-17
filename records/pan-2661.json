@@ -79,20 +79,23 @@
     "recordedAt": "2026-07-17T12:01:04.835Z"
   },
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T12:17:16.138Z",
+  "updated": "2026-07-17T12:20:59.456Z",
   "pipeline": {
     "issueId": "PAN-2661",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-17T12:17:14.667Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-17T12:20:59.389Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2661-review",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "AC3 fix verified: GroupedIssueActionMenu.tsx:49 now passes aria-describedby directly to <Item>, which forwards it via {...props} onto the real role=menuitem Radix node (confirmed against @radix-ui/react-menu source), so the disabled reason is now correctly associated with the focusable menuitem for AT. Test updated to assert on the menuitem element itself, not just the wrapper. All 5 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2832",
+    "reviewedAtCommit": "29493c7c9d9b39978e62923b5c170db00287a4cf",
     "lastVerifiedCommit": "29493c7c9d9b39978e62923b5c170db00287a4cf",
     "reviewRequestedAt": "2026-07-17T12:16:39.113Z",
     "reviewSpawnedAt": "2026-07-17T12:17:14.666Z"
@@ -110,9 +113,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2564745,
-            "output": 36488,
-            "cacheRead": 4559872,
+            "input": 3060097,
+            "output": 44030,
+            "cacheRead": 5106688,
             "cacheWrite": 0
           }
         },
@@ -141,9 +144,9 @@
           "cacheWrite": 184049
         },
         "openai/gpt-5.6-sol": {
-          "input": 7104715,
-          "output": 337307,
-          "cacheRead": 68499968,
+          "input": 7600067,
+          "output": 344849,
+          "cacheRead": 69046784,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -154,8 +157,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 89.30335,
-        "pricingAsOf": "2026-07-17T12:17:14.813Z"
+        "usd": 92.27977800000001,
+        "pricingAsOf": "2026-07-17T12:20:59.406Z"
       }
     },
     "merges": [
