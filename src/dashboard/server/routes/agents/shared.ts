@@ -557,7 +557,7 @@ export function hasActiveAgentGateOrRetry(
 export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
   const warnings: SpawnGuardrailAdvisory[] = [];
   const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
-  const workAgentCount = health.summary.workAgentCount;
+  const workAgentCount = health.admission.admittedWorkAgentCount;
   const leakedSpecialists = health.leakedSpecialists;
   const resourceConfig = getResourceConfig();
   const hardWorkAgentLimit = resolveAgentCountEnv('PAN_AGENT_BLOCK_COUNT', resourceConfig.agentBlockCount);

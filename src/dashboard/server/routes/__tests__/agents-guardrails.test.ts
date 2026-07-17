@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { evaluateAgentStartGate, evaluateSpawnGuardrails, hasActiveAgentGateOrRetry } from '../agents.js';
-import { readGlobalResourceConfig } from '../../services/system-health-service.js';
+import {
+  countAdmittedWorkAgents,
+  readGlobalResourceConfig,
+} from '../../services/system-health-service.js';
 import type { SystemHealthSnapshot } from '../../services/system-health-service.js';
 
 const GIB = 1024 ** 3;
@@ -18,6 +21,9 @@ function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {})
   const base: SystemHealthSnapshot = {
     severity: 'normal',
     updatedAt: '2026-04-27T00:00:00.000Z',
+    admission: {
+      admittedWorkAgentCount: 2,
+    },
     summary: {
       cpuPercent: 12.5,
       loadAverage1m: 1.2,
@@ -59,6 +65,10 @@ function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {})
   return {
     ...base,
     ...overrides,
+    admission: {
+      ...base.admission,
+      ...overrides.admission,
+    },
     summary: {
       ...base.summary,
       ...overrides.summary,
@@ -150,6 +160,34 @@ describe('hasActiveAgentGateOrRetry', () => {
   });
 });
 
+describe('countAdmittedWorkAgents', () => {
+  const now = Date.parse('2026-07-16T12:00:00.000Z');
+
+  it('excludes errored, stopped, unknown, and stale-starting work agents', () => {
+    expect(countAdmittedWorkAgents([
+      { role: 'work', status: 'error', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'stopped', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'unknown', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'starting', startedAt: '2026-07-16T11:55:00.000Z', tmuxActive: false },
+      { role: 'work', status: 'starting', startedAt: 'not-a-date', tmuxActive: false },
+    ], now)).toBe(0);
+  });
+
+  it('counts live work agents and fresh starts without counting other roles', () => {
+    expect(countAdmittedWorkAgents([
+      { role: 'work', status: 'running', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'starting', startedAt: '2026-07-16T11:55:01.000Z', tmuxActive: false },
+      { role: 'work', status: 'starting', startedAt: '2026-07-16T10:00:00.000Z', tmuxActive: true },
+      { role: 'work', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: false },
+      { role: 'plan', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'review', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'test', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'ship', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+      { role: 'conversation', status: 'running', startedAt: '2026-07-16T11:59:00.000Z', tmuxActive: true },
+    ], now)).toBe(3);
+  });
+});
+
 describe('evaluateSpawnGuardrails', () => {
   afterEach(async () => {
     vi.unstubAllEnvs();
@@ -178,14 +216,35 @@ describe('evaluateSpawnGuardrails', () => {
     );
   });
 
+  it('ignores the broad compatibility count when no work agents are admitted', async () => {
+    vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
+    vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
+    await readGlobalResourceConfig();
+
+    const decision = evaluateSpawnGuardrails(createHealthSnapshot({
+      admission: {
+        admittedWorkAgentCount: 0,
+      },
+      summary: {
+        workAgentCount: 99,
+      },
+    }));
+
+    expect(decision.blocked).toBe(false);
+    expect(decision.requiresAcknowledgement).toBe(false);
+    expect(decision.warnings).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: 'agent_capacity' })]),
+    );
+  });
+
   it('returns acknowledgement-required warnings when work agent count is high but below the hard limit', async () => {
     vi.stubEnv('PAN_AGENT_WARN_COUNT', '5');
     vi.stubEnv('PAN_AGENT_BLOCK_COUNT', '6');
     await readGlobalResourceConfig();
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
-      summary: {
-        workAgentCount: 5,
+      admission: {
+        admittedWorkAgentCount: 5,
       },
     }));
 
@@ -233,8 +292,10 @@ describe('evaluateSpawnGuardrails', () => {
 
     const decision = evaluateSpawnGuardrails(createHealthSnapshot({
       severity: 'critical',
+      admission: {
+        admittedWorkAgentCount: 6,
+      },
       summary: {
-        workAgentCount: 6,
         leakedSpecialistCount: 4,
       },
       leakedSpecialists: [

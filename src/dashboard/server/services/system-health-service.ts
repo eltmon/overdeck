@@ -72,6 +72,13 @@ export interface HealthAgentProcess {
   currentIssue?: string;
 }
 
+export interface AgentAdmissionCandidate {
+  role?: string;
+  status: AgentState['status'];
+  startedAt?: string;
+  tmuxActive: boolean;
+}
+
 export interface HealthLeakedSpecialist {
   name: string;
   currentIssue: string;
@@ -108,6 +115,9 @@ export interface SmeeRelayHealth {
 interface CollectedSystemHealthSnapshot {
   severity: SystemHealthSeverity;
   updatedAt: string;
+  admission: {
+    admittedWorkAgentCount: number;
+  };
   summary: {
     cpuPercent: number;
     loadAverage1m: number;
@@ -211,6 +221,26 @@ function bytesToGb(bytes: number): number {
 function toPercent(part: number, total: number): number {
   if (total <= 0) return 0;
   return Math.round((part / total) * 1000) / 10;
+}
+
+const AGENT_STARTUP_GRACE_MS = 5 * 60 * 1000;
+
+export function countAdmittedWorkAgents(
+  agents: readonly AgentAdmissionCandidate[],
+  nowMs = Date.now(),
+): number {
+  return agents.filter((agent) => {
+    if (agent.role !== 'work') return false;
+    if (agent.status !== 'running' && agent.status !== 'starting') return false;
+    if (agent.tmuxActive) return true;
+    if (agent.status !== 'starting' || !agent.startedAt) return false;
+
+    const startedAtMs = Date.parse(agent.startedAt);
+    const ageMs = nowMs - startedAtMs;
+    return Number.isFinite(startedAtMs)
+      && ageMs >= 0
+      && ageMs < AGENT_STARTUP_GRACE_MS;
+  }).length;
 }
 
 export function classifyAgentKind(
@@ -536,12 +566,16 @@ function collectSmeeRelayHealth(): SmeeRelayHealth {
   }
 }
 
-async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
-  const agents = await Effect.runPromise(listRunningAgents());
-  const activeAgents = agents.filter((agent) => agent.status !== 'stopped');
+async function collectAgentProcesses(): Promise<{
+  agents: HealthAgentProcess[];
+  admittedWorkAgentCount: number;
+}> {
+  const registeredAgents = await Effect.runPromise(listRunningAgents());
+  const admittedWorkAgentCount = countAdmittedWorkAgents(registeredAgents, Date.now());
+  const activeAgents = registeredAgents.filter((agent) => agent.status !== 'stopped');
   const processTable = await readProcessTable().catch(() => new Map<number, ProcessRow>());
 
-  return Promise.all(
+  const agents = await Promise.all(
     activeAgents.map(async (agent) => {
       const runtimeState = await Effect.runPromise(getAgentRuntimeState(agent.id)).catch(() => null);
       // PAN-977 round-12 high-2: panePid cache field was removed from
@@ -565,6 +599,8 @@ async function collectAgentProcesses(): Promise<HealthAgentProcess[]> {
       } satisfies HealthAgentProcess;
     }),
   );
+
+  return { agents, admittedWorkAgentCount };
 }
 
 function buildTopConsumers(
@@ -655,6 +691,9 @@ function createMeasuringSnapshot(): CollectedSystemHealthSnapshot {
   return {
     severity: 'normal',
     updatedAt: new Date().toISOString(),
+    admission: {
+      admittedWorkAgentCount: 0,
+    },
     summary: {
       cpuPercent: 0,
       loadAverage1m: 0,
@@ -689,7 +728,7 @@ function createMeasuringSnapshot(): CollectedSystemHealthSnapshot {
 
 async function collectSystemHealth(): Promise<CollectedSystemHealthSnapshot> {
   await ensureResourceConfigLoaded();
-  const [memory, loadAverage1m, cpuPercent, agents, containers] = await Promise.all([
+  const [memory, loadAverage1m, cpuPercent, agentProcesses, containers] = await Promise.all([
     readProcMemory(),
     readLoadAverage(),
     readCpuPercent(),
@@ -697,6 +736,7 @@ async function collectSystemHealth(): Promise<CollectedSystemHealthSnapshot> {
     Promise.resolve(getDockerStatsCollector().getStats()),
   ]);
 
+  const agents = agentProcesses.agents;
   const thresholds = cachedSystemHealthConfig!.thresholds;
   const smeeRelay = collectSmeeRelayHealth();
   const coreCount = Math.max(cpus().length, 1);
@@ -726,6 +766,9 @@ async function collectSystemHealth(): Promise<CollectedSystemHealthSnapshot> {
   return {
     severity: evaluation.severity,
     updatedAt: new Date().toISOString(),
+    admission: {
+      admittedWorkAgentCount: agentProcesses.admittedWorkAgentCount,
+    },
     summary: {
       cpuPercent,
       loadAverage1m,
