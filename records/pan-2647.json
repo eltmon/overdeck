@@ -180,17 +180,17 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T09:28:57.898Z",
+  "updated": "2026-07-17T09:28:58.504Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T09:28:57.866Z",
+    "updatedAt": "2026-07-17T09:28:58.470Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
@@ -227,9 +227,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 28674006,
-            "output": 1462681,
-            "cacheRead": 268278784,
+            "input": 28675888,
+            "output": 1462843,
+            "cacheRead": 268460032,
             "cacheWrite": 0
           }
         }
@@ -242,9 +242,9 @@
           "cacheWrite": 143876
         },
         "openai/gpt-5.6-sol": {
-          "input": 35957967,
-          "output": 1569237,
-          "cacheRead": 277383680,
+          "input": 35959849,
+          "output": 1569399,
+          "cacheRead": 277564928,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -255,8 +255,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 371.686335,
-        "pricingAsOf": "2026-07-17T09:28:57.892Z"
+        "usd": 371.791229,
+        "pricingAsOf": "2026-07-17T09:28:58.492Z"
       }
     },
     "merges": [
