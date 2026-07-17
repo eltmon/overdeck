@@ -86,11 +86,16 @@
       "timestamp": "2026-07-17T15:12:50.627Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T15:23:50.081Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
     }
   ],
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T15:12:53.334Z",
+  "updated": "2026-07-17T15:23:50.082Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -99,7 +104,7 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T15:12:46.545Z",
+    "updatedAt": "2026-07-17T15:23:47.511Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
     "strikeReadyHead": "c6f25b78322ce7fe16f3337e7214e0a342223501",
@@ -152,7 +157,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.578889,
-        "pricingAsOf": "2026-07-17T15:12:46.548Z"
+        "pricingAsOf": "2026-07-17T15:23:47.512Z"
       }
     },
     "merges": [],
