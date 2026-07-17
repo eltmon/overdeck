@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T16:02:00.079Z",
+  "updated": "2026-07-17T16:18:02.299Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "pending",
@@ -94,16 +94,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "wire-reactive-gate": {
-        "writerId": "agent-pan-2445",
-        "agentId": "agent-pan-2445",
-        "pid": 2384473,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T16:02:00.079Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2445",
@@ -126,6 +118,16 @@
         "outcome": "completed",
         "reason": "Added optional scalar roles.plan.autonomousModel support with no default, fail-loud workhorse validation, whole-object merge preservation, and focused round-trip/default/error tests; scoped tests, lint, and typecheck pass.",
         "releasedAt": "2026-07-17T16:01:39.617Z"
+      },
+      {
+        "writerId": "agent-pan-2445",
+        "agentId": "agent-pan-2445",
+        "pid": 2384473,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T16:02:00.079Z",
+        "itemId": "wire-reactive-gate",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T16:18:02.299Z"
       }
     ],
     "statusReasons": {
@@ -150,6 +152,10 @@
     "config-autonomous-model.config-autonomous-model.ac1": "completed",
     "config-autonomous-model.config-autonomous-model.ac2": "completed",
     "config-autonomous-model.config-autonomous-model.ac3": "completed",
-    "wire-reactive-gate": "running"
+    "wire-reactive-gate": "completed",
+    "wire-reactive-gate.wire-reactive-gate.ac1": "completed",
+    "wire-reactive-gate.wire-reactive-gate.ac2": "completed",
+    "wire-reactive-gate.wire-reactive-gate.ac3": "completed",
+    "wire-reactive-gate.wire-reactive-gate.ac4": "completed"
   }
 }
