@@ -34,7 +34,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'StartAgentCta', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/StartAgentCta.tsx' },
 
   { section: 'Header bar', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
-  { section: 'Stale-review warning', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
+  { section: 'Stale-review warning', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx' },
   { section: 'StatusNarrative', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
   { section: 'Pipeline Band', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
   { section: 'AgentsLane', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },
@@ -51,8 +51,8 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'Code tab', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/ChangedFilesView.tsx' },
   { section: 'PRD / Timeline / Discussion tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/ActivityTab.tsx' },
   { section: 'Costs / Artifacts / Ship tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/CostsTab.tsx' },
-  { section: 'Conversation / Files / Terminal tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx' },
-  { section: 'TasksRail / TasksTab', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/TasksRail.tsx' },
+  { section: 'Conversation / Files / Terminal tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
+  { section: 'TasksRail / TasksTab', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
   { section: 'Awareness rail', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
 
   { section: 'Filter bar', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
