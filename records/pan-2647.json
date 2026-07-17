@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T07:40:21.886Z",
+  "updated": "2026-07-17T07:58:32.172Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 37,
-    "claims": {
-      "docs-semantics": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 3994123,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T07:40:21.886Z"
-      }
-    },
+    "sequence": 38,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -278,6 +270,17 @@
         "outcome": "completed",
         "reason": "Verified the V2 health UI across healthy, unavailable, zero-agent, wedged-agent, themed, narrow-viewport, cleanup-action, and throwaway Node 22 boot scenarios.",
         "releasedAt": "2026-07-17T07:40:05.433Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 3994123,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T07:40:21.886Z",
+        "itemId": "docs-semantics",
+        "outcome": "completed",
+        "reason": "Documented health domains, pressure signals, lifecycle semantics, configuration normalization, retained routes, and CLI distinctions; declared grep and npm run lint gates pass; commit 7d93447ebb pushed.",
+        "releasedAt": "2026-07-17T07:58:32.172Z"
       }
     ],
     "statusReasons": {
@@ -296,6 +299,10 @@
       "playwright-boot": {
         "reason": "Verified the V2 health UI across healthy, unavailable, zero-agent, wedged-agent, themed, narrow-viewport, cleanup-action, and throwaway Node 22 boot scenarios.",
         "updatedAt": "2026-07-17T07:40:05.433Z"
+      },
+      "docs-semantics": {
+        "reason": "Documented health domains, pressure signals, lifecycle semantics, configuration normalization, retained routes, and CLI distinctions; declared grep and npm run lint gates pass; commit 7d93447ebb pushed.",
+        "updatedAt": "2026-07-17T07:58:32.172Z"
       }
     }
   },
@@ -386,6 +393,9 @@
     "playwright-boot.playwright-boot.ac3": "completed",
     "playwright-boot.playwright-boot.ac4": "completed",
     "playwright-boot.playwright-boot.ac5": "completed",
-    "docs-semantics": "running"
+    "docs-semantics": "completed",
+    "docs-semantics.docs-semantics.ac1": "completed",
+    "docs-semantics.docs-semantics.ac2": "completed",
+    "docs-semantics.docs-semantics.ac3": "completed"
   }
 }
