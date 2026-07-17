@@ -2,7 +2,7 @@
   "issueId": "PAN-2822",
   "schemaVersion": 2,
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T10:02:22.893Z",
+  "updated": "2026-07-17T10:02:24.341Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2822: Issues pane: toggle to show/hide planned_backlog (spec-only) pipeline members",
       "timestamp": "2026-07-17T10:02:22.893Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
