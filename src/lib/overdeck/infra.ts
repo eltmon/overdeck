@@ -24,6 +24,41 @@ import type { ProjectConfig } from '../projects.js';
 import { packageRoot, getOverdeckHome } from '../paths.js';
 import { sessionExists as tmuxSessionExists, killSession as tmuxKillSession, getAgentSessions } from '../tmux.js';
 import { getOverdeckDatabasePath, OVERDECK_MIGRATION_PATH } from './paths.js';
+import {
+  auditOverdeckSchemaSync,
+  type SchemaTopUpExpectations,
+} from './schema-audit.js';
+
+export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
+  columns: [
+    { table: 'discovered_sessions', column: 'harness' },
+    { table: 'review_status', column: 'release_status' },
+    { table: 'review_status', column: 'release_notes' },
+    { table: 'review_status', column: 'inspect_owner_session' },
+    { table: 'review_status', column: 'strike_ready_head' },
+    { table: 'review_status', column: 'strike_ready_at' },
+    { table: 'review_status', column: 'strike_landing_state' },
+    { table: 'review_status', column: 'strike_recovery_count' },
+    { table: 'review_status', column: 'strike_landing_attempts' },
+    { table: 'agents', column: 'yielded_by_scheduler' },
+    { table: 'agents', column: 'review_discovery_pending' },
+    { table: 'agents', column: 'review_context_manifest_path' },
+    { table: 'agents', column: 'review_discovery_ready_at' },
+    { table: 'agents', column: 'review_convoy_forked_at' },
+    { table: 'agents', column: 'review_fork_cache_checked' },
+    { table: 'agents', column: 'review_forked_from_parent' },
+    { table: 'agents', column: 'yielded_at' },
+    { table: 'agents', column: 'last_yield_resume_at' },
+  ],
+  indexes: [
+    'cost_session_id_idx',
+    'idx_cost_agent_id',
+    'idx_cost_issue_upper',
+    'release_sets_project_idx',
+    'release_set_components_issue_component_idx',
+    'release_set_components_issue_order_idx',
+  ],
+};
 
 export const overdeckEvents = sqliteTable('events', {
   sequence: integer('sequence').primaryKey({ autoIncrement: true }),
@@ -153,6 +188,19 @@ function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
   db.exec('CREATE INDEX IF NOT EXISTS \`release_set_components_issue_order_idx\` ON \`release_set_components\` (\`issue_id\`,\`release_order\`,\`component_key\`)');
 }
 
+function warnSchemaDriftSync(db: SqliteDatabase): void {
+  const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
+  for (const table of report.missingTables) {
+    console.warn(`[schema-audit] missing table: ${table}`);
+  }
+  for (const index of report.missingIndexes) {
+    console.warn(`[schema-audit] missing index: ${index}`);
+  }
+  for (const { table, column } of report.missingColumns) {
+    console.warn(`[schema-audit] missing column: ${table}.${column}`);
+  }
+}
+
 export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): SqliteDatabase {
   if (overdeckDbSync?.path === dbPath) {
     return overdeckDbSync.db;
@@ -174,6 +222,7 @@ export function getOverdeckDatabaseSync(dbPath = getOverdeckDatabasePath()): Sql
   db.pragma('synchronous = NORMAL');
   runOverdeckMigrationSync(db);
   ensureRuntimeIndexesSync(db);
+  warnSchemaDriftSync(db);
   overdeckDbSync = { path: dbPath, db };
   return db;
 }
