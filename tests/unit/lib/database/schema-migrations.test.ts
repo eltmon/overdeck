@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { openDatabase, type SqliteDatabase } from '../../../../src/lib/database/driver.js';
 import { SCHEMA_VERSION, initSchema, runMigrations } from '../../../../src/lib/database/schema.js';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
@@ -14,8 +14,37 @@ describe('schema migrations', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     db.close();
     rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  it('rethrows unexpected DDL errors without advancing user_version', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    initSchema(db);
+    db.pragma('user_version = 58');
+    db.exec(`
+      ALTER TABLE agents RENAME TO agents_base;
+      CREATE VIEW agents AS SELECT * FROM agents_base;
+    `);
+
+    expect(() => runMigrations(db)).toThrow(/view/i);
+    expect(db.pragma('user_version', { simple: true })).toBe(58);
+
+    const logged = errorSpy.mock.calls.flat().join(' ');
+    expect(logged).toContain('[schema] migration to v59 failed');
+    expect(logged).toContain('ALTER TABLE agents ADD COLUMN yielded_by_scheduler INTEGER');
+    expect(logged).toMatch(/view/i);
+  });
+
+  it('tolerates duplicate columns and advances user_version after the ladder completes', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    initSchema(db);
+    db.pragma('user_version = 58');
+
+    expect(() => runMigrations(db)).not.toThrow();
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+    expect(errorSpy).not.toHaveBeenCalled();
   });
 
   it('preserves user_version when the database is newer than this build', () => {
@@ -28,28 +57,8 @@ describe('schema migrations', () => {
   });
 
   it('repairs stale session_file paths when the corrected transcript exists', () => {
+    initSchema(db);
     db.pragma('user_version = 15');
-    db.exec(`
-      CREATE TABLE conversations (
-        id               INTEGER PRIMARY KEY AUTOINCREMENT,
-        name             TEXT NOT NULL UNIQUE,
-        tmux_session     TEXT NOT NULL,
-        status           TEXT NOT NULL DEFAULT 'active',
-        cwd              TEXT NOT NULL,
-        issue_id         TEXT,
-        created_at       TEXT NOT NULL,
-        ended_at         TEXT,
-        last_attached_at TEXT,
-        session_file     TEXT,
-        title            TEXT,
-        title_source     TEXT,
-        title_seed       TEXT,
-        total_cost       REAL DEFAULT 0,
-        archived_at      TEXT,
-        model            TEXT,
-        effort           TEXT
-      );
-    `);
 
     const cwd = '/Users/edward.becker/Projects/overdeck';
     const base = join(tempRoot, '.claude', 'projects');
@@ -298,16 +307,9 @@ describe('schema migrations', () => {
   });
 
   it('v52 → v53: adds conflict_resolution_dispatched_at idempotently', () => {
+    initSchema(db);
     db.pragma('user_version = 52');
-    db.exec(`
-      CREATE TABLE review_status (
-        issue_id TEXT PRIMARY KEY,
-        review_status TEXT NOT NULL DEFAULT 'pending',
-        test_status TEXT NOT NULL DEFAULT 'pending',
-        updated_at TEXT NOT NULL,
-        ready_for_merge INTEGER NOT NULL DEFAULT 0
-      );
-    `);
+    db.exec('ALTER TABLE review_status DROP COLUMN conflict_resolution_dispatched_at');
 
     const colsBefore = db.pragma('table_info(review_status)') as Array<{ name: string }>;
     expect(colsBefore.map(c => c.name)).not.toContain('conflict_resolution_dispatched_at');
@@ -580,18 +582,8 @@ describe('schema migrations', () => {
   });
 
   it('v54 → v55: re-running migrations preserves existing agents rows', () => {
+    initSchema(db);
     db.pragma('user_version = 54');
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS agents (
-        id TEXT PRIMARY KEY,
-        issue_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        status TEXT NOT NULL,
-        workspace TEXT NOT NULL,
-        channels_enabled INTEGER,
-        updated_at TEXT NOT NULL
-      );
-    `);
     db.prepare(
       `INSERT INTO agents (id, issue_id, role, status, workspace, channels_enabled, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
