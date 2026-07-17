@@ -8,7 +8,11 @@ import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-loc
 import { readPlatformConfigSync, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
-import { resolveBundledServerPath, spawnDashboardDetached } from './restart.js';
+import {
+  refuseNonPrimaryDashboardCwd,
+  resolveBundledServerPath,
+  spawnDashboardDetached,
+} from './restart.js';
 
 export interface ReloadOptions {
   skipBuild?: boolean;
@@ -191,6 +195,8 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     process.exitCode = 2;
     return;
   }
+
+  if (refuseNonPrimaryDashboardCwd(process.cwd(), 'reload')) return;
 
   const restartInitiator = process.env.OVERDECK_AGENT_ID;
   if (restartInitiator) {
