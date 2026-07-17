@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T02:18:13.401Z",
+  "updated": "2026-07-17T02:20:00.440Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:18:13.379Z",
-    "inspectNotes": "Inspecting item agent-health-classify"
+    "updatedAt": "2026-07-17T02:20:00.392Z",
+    "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found."
   },
   "closeOut": {
     "usage": {
@@ -37,17 +37,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 18,
-            "output": 9217,
-            "cacheRead": 1135945,
-            "cacheWrite": 118691
+            "input": 24,
+            "output": 17347,
+            "cacheRead": 1424330,
+            "cacheWrite": 237566
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4975509,
-            "output": 497393,
-            "cacheRead": 64958464,
+            "input": 4981741,
+            "output": 497711,
+            "cacheRead": 65409024,
             "cacheWrite": 0
           }
         }
@@ -60,21 +60,21 @@
           "cacheWrite": 143876
         },
         "anthropic/claude-sonnet-5": {
-          "input": 18,
-          "output": 9217,
-          "cacheRead": 1135945,
-          "cacheWrite": 118691
+          "input": 24,
+          "output": 17347,
+          "cacheRead": 1424330,
+          "cacheWrite": 237566
         },
         "openai/gpt-5.6-sol": {
-          "input": 4975509,
-          "output": 497393,
-          "cacheRead": 64958464,
+          "input": 4981741,
+          "output": 497711,
+          "cacheRead": 65409024,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 77.931201,
-        "pricingAsOf": "2026-07-17T02:18:13.386Z"
+        "usd": 78.633358,
+        "pricingAsOf": "2026-07-17T02:20:00.418Z"
       }
     },
     "merges": [],
