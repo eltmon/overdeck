@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:19:12.654Z",
+  "updated": "2026-07-17T12:19:14.941Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -74,7 +74,7 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
+    "sequence": 8,
     "claims": {},
     "statusReasons": {
       "codex-mode-enum": {
@@ -100,6 +100,10 @@
       "codex-workagent-wire": {
         "reason": "Cancelled because the new workspace-net mode is obsolete; work agents inherit native execpolicy rules centrally through initCodexHome instead.",
         "updatedAt": "2026-07-17T12:19:12.654Z"
+      },
+      "codex-conversation-wire": {
+        "reason": "Cancelled because the new workspace-net mode is obsolete; conversations inherit native execpolicy rules centrally through initCodexHome instead.",
+        "updatedAt": "2026-07-17T12:19:14.940Z"
       }
     },
     "claimHistory": [
@@ -125,6 +129,7 @@
     "codex-permissions-doc.codex-permissions-doc.ac3": "completed",
     "codex-sandbox-resolver": "cancelled",
     "codex-settings-ui": "cancelled",
-    "codex-workagent-wire": "cancelled"
+    "codex-workagent-wire": "cancelled",
+    "codex-conversation-wire": "cancelled"
   }
 }
