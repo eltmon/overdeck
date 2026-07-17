@@ -5680,3 +5680,12 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **`strike-pan-2840` is NOT mine — leave it alone.** `flywheelRunId: None` ⇒ operator-started (PAN-2840, "fix(state): task mutation stays locally terminal after overdeck-state ..."). Same posture as `strike-pan-1896`. **Check `flywheelRunId` before touching any strike session** — absent means operator-owned and exempt.
 - **B11=PAN-2233 still NOT started** — the TENET-10 execution-mode question (supervised `pan handoff` vs autonomous pickup) is with the operator since tick 9. A8=PAN-2297 prereq satisfied; Lane B slot free; B12=PAN-2190 → B13=PAN-2189 strictly serial after.
 - Reminder for whoever picks this up: ordering is **merge → redeploy → close out** (close-out's DoD deploy row fails if the merge postdates the live build), and when PAN-2377 lands, **migrate** the manual order book into the new feature rather than recreating it.
+
+## Tick 12 — 2026-07-17 ~13:55 — PAN-2831 MERGED (6e1fdfeddb) + deployed; PAN-2665 in review
+- **PAN-2831 MERGED → 6e1fdfeddb** (PR#2841, numeric issue-id sort). Verified before merge: approved at exact head (b88dd681 == `reviewed_at_commit`), 0 failing / 0 pending after waiting out the `test` job, mergeState CLEAN, review+test+verification all passed, ready=1.
+- **Deployed 6e1fdfeddb** — pid **2637153**, health ok, buildCommit == HEAD.
+- **Close-out BLOCKED (correctly, not overridden)** on two live conditions: `dod:post-merge` (agent-pan-2831 still running, canonical state in_review) and `dod:main-verify` (main CI still running lint+test on 6e1fdfeddb). Deploy row ✓. Close it next tick once both settle — **do NOT `--accept` a genuinely in-flight check.**
+- **PAN-2665 close behind** — PR#2843, verification passed, review+test still running (head 1f1f55df == `reviewed_at_commit`). Merge next tick when green, then it needs its OWN redeploy before close-out (its merge will postdate build 6e1fdfeddb).
+- Main HEAD also picked up operator docs commit 1e8a7bc6c9 (issue-cockpit full-width conversation mockup) — docs-only, not intake.
+- **Still working:** 1610 (final sequence item), 2445 (A13), 2377, 2829. No PAN-2839 half-spawns recurred this tick.
+- **B11=PAN-2233 still NOT started** — TENET-10 execution-mode question open with the operator since tick 9 (A8 prereq satisfied, Lane B slot free).
