@@ -70,6 +70,7 @@ function InfoRow({
   return (
     <button
       type="button"
+      title={`${name} — ${status.label}`}
       className={`${styles.row} ${indent ? styles.child : ''} ${selected ? styles.sel : ''}`}
       onClick={onClick}
     >

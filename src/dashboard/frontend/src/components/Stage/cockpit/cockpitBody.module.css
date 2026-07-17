@@ -85,6 +85,15 @@
   .missionBody {
     grid-template-columns: minmax(210px, 264px) minmax(0, 1fr);
   }
+
+  .missionBody.spineCollapsed {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .spineCollapsed [data-section="Stale-review warning"],
+  .spineCollapsed [data-section="verification-gates"] {
+    display: none;
+  }
 }
 
 .tasksDrawerLayer {

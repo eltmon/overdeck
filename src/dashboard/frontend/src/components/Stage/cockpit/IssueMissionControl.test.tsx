@@ -8,6 +8,7 @@ let queryClient: QueryClient | undefined
 let unexpectedRequests: string[] = []
 
 beforeEach(() => {
+  window.localStorage.clear()
   unexpectedRequests = []
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input)
@@ -271,6 +272,42 @@ describe('IssueMissionControl', () => {
     const missionBody = container.querySelector('main')?.parentElement
     expect(missionBody?.children).toHaveLength(2)
     expect(screen.queryByTestId('tasks-rail')).toBeNull()
+  })
+
+  it('persists the collapsible agent spine and defaults to expanded without a saved choice', () => {
+    const firstView = renderMissionControl()
+    const firstBody = firstView.container.querySelector('[data-spine-collapsed]')
+    const collapse = screen.getByRole('button', { name: 'Collapse agent spine' })
+
+    expect(collapse).toHaveAttribute('aria-expanded', 'true')
+    expect(firstBody).toHaveAttribute('data-spine-collapsed', 'false')
+    expect(firstBody?.className).not.toContain('spineCollapsed')
+
+    fireEvent.click(collapse)
+
+    expect(screen.getByRole('button', { name: 'Expand agent spine' })).toHaveAttribute('aria-expanded', 'false')
+    expect(firstBody).toHaveAttribute('data-spine-collapsed', 'true')
+    expect(firstBody?.className).toContain('spineCollapsed')
+    expect(window.localStorage.getItem('overdeck.cockpit.spineCollapsed')).toBe('true')
+
+    firstView.unmount()
+    queryClient?.clear()
+    const restoredView = renderMissionControl()
+    const restoredBody = restoredView.container.querySelector('[data-spine-collapsed]')
+
+    expect(screen.getByRole('button', { name: 'Expand agent spine' })).toHaveAttribute('aria-expanded', 'false')
+    expect(restoredBody).toHaveAttribute('data-spine-collapsed', 'true')
+    expect(restoredBody?.className).toContain('spineCollapsed')
+
+    restoredView.unmount()
+    queryClient?.clear()
+    window.localStorage.removeItem('overdeck.cockpit.spineCollapsed')
+    const resetView = renderMissionControl()
+    const resetBody = resetView.container.querySelector('[data-spine-collapsed]')
+
+    expect(screen.getByRole('button', { name: 'Collapse agent spine' })).toHaveAttribute('aria-expanded', 'true')
+    expect(resetBody).toHaveAttribute('data-spine-collapsed', 'false')
+    expect(resetBody?.className).not.toContain('spineCollapsed')
   })
 
   it('opens task progress in a drawer and preserves every close and full-view path', async () => {

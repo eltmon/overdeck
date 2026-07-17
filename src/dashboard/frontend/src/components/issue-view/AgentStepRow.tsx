@@ -737,6 +737,7 @@ export function AgentStepRow({
     const cockpitButton = (
       <button
         type="button"
+        title={`${sessionLabel} — ${displayStatus}`}
         className={`${cockpitStyles.row} ${isSelected ? cockpitStyles.sel : ''}`}
         onClick={() => onClick?.()}
       >
