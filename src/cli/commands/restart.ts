@@ -19,7 +19,7 @@ import { Effect } from 'effect';
 
 import chalk from 'chalk';
 import { execFileSync, spawn } from 'child_process';
-import { dirname, join, parse, resolve } from 'path';
+import { dirname, join, parse, resolve, sep } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, mkdirSync } from 'fs';
 import {
@@ -119,6 +119,14 @@ type DashboardBundleCandidate = {
 function dashboardBundleCandidates(): DashboardBundleCandidate[] {
   const currentDir = dirname(fileURLToPath(import.meta.url));
   return [
+    {
+      // Code-split CLI chunk living directly in dist/ (tsdown chunk layout can
+      // place this module at dist/<chunk>.js — PAN-2820: all relative-parent
+      // candidates missed and pan restart stopped the server then failed to
+      // respawn it).
+      path: join(currentDir, 'dashboard', 'server.js'),
+      preferred: currentDir.endsWith(sep + 'dist'),
+    },
     {
       path: join(currentDir, '..', 'dashboard', 'server.js'),
       preferred: currentDir.endsWith(join('dist', 'cli')),
