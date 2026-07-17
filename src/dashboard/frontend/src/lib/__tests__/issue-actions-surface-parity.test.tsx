@@ -387,7 +387,10 @@ function observeSurface(surface: Surface): SurfaceExpectation {
     const enabled = testId.match(/^issue-action-(.+)$/);
     const key = disabled?.[1] ?? enabled?.[1];
     if (!key) continue;
-    const value = disabled ? false : !(element instanceof HTMLButtonElement && element.disabled);
+    const renderedDisabled = (element instanceof HTMLButtonElement && element.disabled)
+      || element.getAttribute('aria-disabled') === 'true'
+      || element.hasAttribute('data-disabled');
+    const value = disabled ? false : !renderedDisabled;
     const id = issueId(key);
     if (id in actions && actions[id] !== value) throw new Error(`inconsistent gating for ${id}`);
     actions[id] = value;

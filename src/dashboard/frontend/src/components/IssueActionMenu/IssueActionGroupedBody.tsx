@@ -101,7 +101,12 @@ function ActionRow({
         aria-describedby={reasonId}
         data-testid={`issue-action-disabled-${view.action.key}`}
       >
-        <Item disabled aria-describedby={reasonId} className="w-full opacity-50">
+        <Item
+          disabled
+          aria-describedby={reasonId}
+          className="w-full opacity-50"
+          data-testid={`issue-action-${view.action.key}`}
+        >
           <ActionContent view={view} explain={explain} />
         </Item>
         <span id={reasonId} className="sr-only">{reason}</span>
