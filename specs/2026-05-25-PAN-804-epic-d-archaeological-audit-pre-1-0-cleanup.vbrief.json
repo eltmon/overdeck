@@ -4,17 +4,17 @@
     "created": "2026-05-25T18:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-804: Epic D: Archaeological audit & pre-1.0 cleanup",
-    "updated": "2026-05-25T17:53:20.523Z"
+    "updated": "2026-07-17T10:57:10.479Z"
   },
   "plan": {
     "id": "pan-804",
     "title": "Epic D: Archaeological audit & pre-1.0 cleanup",
-    "status": "proposed",
+    "status": "cancelled",
     "uid": "7d8b9e3a-4f2c-4d1e-9b6a-3c8e5f7a2d4b",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-25T18:00:00.000Z",
-    "updated": "2026-05-25T17:53:20.523Z",
+    "updated": "2026-07-17T10:57:10.479Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/804",
@@ -778,5 +778,5 @@
       "canonicalFilename": "2026-05-25-PAN-804-epic-d-archaeological-audit-pre-1-0-cleanup.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "cancelled"
 }
