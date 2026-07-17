@@ -103,17 +103,17 @@
     "recordedAt": "2026-07-17T15:57:29.020Z"
   },
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T17:05:50.168Z",
+  "updated": "2026-07-17T17:21:11.529Z",
   "pipeline": {
     "issueId": "PAN-2842",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T17:05:50.128Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-17T17:21:11.491Z",
+    "reviewNotes": "Collapsed mode still hides StackDrawer, and the no-loss audit misses class-based CSS hiding",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2849",
     "lastVerifiedCommit": "bdae748757af0c1eb9451b3eab9d54664985cd02",
     "reviewRequestedAt": "2026-07-17T17:04:11.799Z",
@@ -132,9 +132,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1352138,
-            "output": 40053,
-            "cacheRead": 6461440,
+            "input": 3092006,
+            "output": 86894,
+            "cacheRead": 12407808,
             "cacheWrite": 0
           }
         },
@@ -155,15 +155,15 @@
           "cacheWrite": 133090
         },
         "openai/gpt-5.6-sol": {
-          "input": 8835815,
-          "output": 550257,
-          "cacheRead": 103612928,
+          "input": 10575683,
+          "output": 597098,
+          "cacheRead": 109559296,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 117.29678200000001,
-        "pricingAsOf": "2026-07-17T17:05:50.141Z"
+        "usd": 130.374536,
+        "pricingAsOf": "2026-07-17T17:21:11.513Z"
       }
     },
     "merges": [
