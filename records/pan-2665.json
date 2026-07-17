@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:12.069Z",
-  "updated": "2026-07-17T13:22:46.236Z",
+  "updated": "2026-07-17T13:23:24.357Z",
   "pipeline": {
     "issueId": "PAN-2665",
     "reviewStatus": "pending",
@@ -64,8 +64,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "lint-node-docs": {
+        "writerId": "agent-pan-2665",
+        "agentId": "agent-pan-2665",
+        "pid": 836638,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:23:24.357Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2665",
@@ -117,6 +125,7 @@
     "lint-node-builder-tests.lint-node-builder-tests.ac1": "completed",
     "lint-node-builder-tests.lint-node-builder-tests.ac2": "completed",
     "lint-node-builder-tests.lint-node-builder-tests.ac3": "completed",
-    "lint-node-builder-tests.lint-node-builder-tests.ac4": "completed"
+    "lint-node-builder-tests.lint-node-builder-tests.ac4": "completed",
+    "lint-node-docs": "running"
   }
 }
