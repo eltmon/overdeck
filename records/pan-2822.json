@@ -60,16 +60,16 @@
     "recordedAt": "2026-07-17T11:06:22.432Z"
   },
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T11:14:43.481Z",
+  "updated": "2026-07-17T11:23:23.852Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-17T11:14:43.416Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-17T11:23:23.797Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2822-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -162,7 +162,7 @@
       },
       "costAtCloseOut": {
         "usd": 42.350703,
-        "pricingAsOf": "2026-07-17T11:14:43.435Z"
+        "pricingAsOf": "2026-07-17T11:23:23.848Z"
       }
     },
     "merges": [
