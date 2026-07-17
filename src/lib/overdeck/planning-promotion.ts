@@ -297,7 +297,9 @@ export async function completePlanningAutoSpawn(options: {
 
   const dashboardOrigin = options.dashboardOrigin ?? getInternalDashboardOrigin();
   const internalToken = getInternalTokenSync();
-  const internalTokenHeaders = internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {};
+  const internalTokenHeaders: Record<string, string> = internalToken
+    ? { [INTERNAL_TOKEN_HEADER]: internalToken }
+    : {};
   emitCompletePlanningPhase(options.issueId, 'autoSpawn', 'start', 'posting work-agent spawn request', { dashboardOrigin });
   try {
     const response = await (options.fetchImpl ?? fetch)(new URL('/api/agents', dashboardOrigin), {
