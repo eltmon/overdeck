@@ -31,6 +31,7 @@ const REQUIRED_SURFACES = [
   'Remove action',
   'Leaked-focus supersession',
   'Transition event',
+  'Stale-build chip',
   'GET /api/system/health',
   'GET /api/godview/system-health',
   'GET /api/health/agents',
@@ -112,6 +113,7 @@ describe('system health no-loss audit', () => {
     const compatibilityRoutes = [
       'GET /api/system/health',
       'GET /api/godview/system-health',
+      'GET /api/deploy/staleness',
       'GET /api/health/agents',
     ] as const;
 
@@ -158,6 +160,19 @@ describe('system health no-loss audit', () => {
         `Missing legacy system-health summary field: ${field}`,
       ).toContain(`${field}:`);
     }
+  });
+
+  it('keeps the stale-build indicator on its deployment-domain read door', () => {
+    const chipSource = source('src/dashboard/frontend/src/components/StaleBuildChip.tsx');
+    expect(chipSource).toContain('useDeployStaleness');
+    expect(chipSource).not.toContain('useSystemHealth');
+
+    const hookSource = source('src/dashboard/frontend/src/hooks/useDeployStaleness.ts');
+    expect(hookSource).toContain("fetch('/api/deploy/staleness')");
+    expect(hookSource).toContain('DeployStalenessSnapshotSchema');
+
+    const healthContractSource = source('packages/contracts/src/system-health.ts');
+    expect(healthContractSource).not.toContain('deployStaleness');
   });
 
   it('keeps Resources projections and pan doctor in their distinct V2 homes', () => {

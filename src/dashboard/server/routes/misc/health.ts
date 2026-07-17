@@ -27,7 +27,10 @@ import { getOverdeckHome } from '../../../../lib/paths.js';
 import { listSessionNames } from '../../../../lib/tmux.js';
 import { checkAgentHealth } from '../../../lib/health-filtering.js';
 import { ReadModelService } from '../../read-model.js';
-import { getAcceptedSystemHealthSnapshot } from '../../services/system-health-service.js';
+import {
+  getAcceptedSystemHealthSnapshot,
+  getDeployStaleness,
+} from '../../services/system-health-service.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 
@@ -99,6 +102,12 @@ const getGodviewSystemHealthRoute = HttpRouter.add(
   httpHandler(buildGodviewSystemHealthResponse({
     snapshot: Effect.promise(() => getAcceptedSystemHealthSnapshot()),
   })),
+);
+
+const getDeployStalenessRoute = HttpRouter.add(
+  'GET',
+  '/api/deploy/staleness',
+  Effect.promise(async () => jsonResponse(await getDeployStaleness())),
 );
 
 // ─── Route: GET /api/health/agents ───────────────────────────────────────────
@@ -366,6 +375,7 @@ const postHealthAgentPingRoute = HttpRouter.add(
 export const healthRouteLayer = Layer.mergeAll(
   getSystemHealthRoute,
   getGodviewSystemHealthRoute,
+  getDeployStalenessRoute,
   getHealthAgentsRoute,
   postHealthAgentPingRoute,
 );

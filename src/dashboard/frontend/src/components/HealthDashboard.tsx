@@ -25,7 +25,7 @@ import { useSystemHealth } from '../hooks/useSystemHealth';
 import { DeaconStatus } from './CommandDeck/DeaconStatus';
 import { TldrServiceStatus } from './TldrServiceStatus';
 
-async function fetchHealth(): Promise<AgentHealthSnapshot[]> {
+async function fetchHealth(): Promise<readonly AgentHealthSnapshot[]> {
   const res = await fetch('/api/health/agents');
   if (!res.ok) throw new Error('Failed to fetch health');
   const payload: unknown = await res.json();
