@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:08:02.793Z",
+  "updated": "2026-07-17T13:32:27.267Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "pending",
@@ -64,16 +64,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "server-callsites-numeric-sort": {
-        "writerId": "agent-pan-2831",
-        "agentId": "agent-pan-2831",
-        "pid": 4162246,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:08:02.793Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2831",
@@ -107,6 +99,16 @@
         "outcome": "completed",
         "reason": "Applied compareIssueIds to frontend merge policy, search tiebreaks, and Home workspace cards",
         "releasedAt": "2026-07-17T13:07:55.177Z"
+      },
+      {
+        "writerId": "agent-pan-2831",
+        "agentId": "agent-pan-2831",
+        "pid": 4162246,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:08:02.793Z",
+        "itemId": "server-callsites-numeric-sort",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T13:32:27.267Z"
       }
     ],
     "statusReasons": {
@@ -138,6 +140,9 @@
     "frontend-callsites-numeric-sort.frontend-callsites-numeric-sort.ac1": "completed",
     "frontend-callsites-numeric-sort.frontend-callsites-numeric-sort.ac2": "completed",
     "frontend-callsites-numeric-sort.frontend-callsites-numeric-sort.ac3": "completed",
-    "server-callsites-numeric-sort": "running"
+    "server-callsites-numeric-sort": "completed",
+    "server-callsites-numeric-sort.server-callsites-numeric-sort.ac1": "completed",
+    "server-callsites-numeric-sort.server-callsites-numeric-sort.ac2": "completed",
+    "server-callsites-numeric-sort.server-callsites-numeric-sort.ac3": "completed"
   }
 }
