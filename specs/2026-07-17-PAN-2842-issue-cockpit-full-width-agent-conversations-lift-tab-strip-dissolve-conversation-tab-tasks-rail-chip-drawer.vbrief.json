@@ -4,17 +4,17 @@
     "created": "2026-07-17T13:47:16.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2842: Issue cockpit: full-width agent conversations — lift tab strip, dissolve Conversation tab, Tasks rail → chip + drawer",
-    "updated": "2026-07-17T13:50:11.045Z"
+    "updated": "2026-07-17T13:50:17.211Z"
   },
   "plan": {
     "id": "pan-2842",
     "title": "Issue cockpit: full-width agent conversations — lift tab strip, dissolve Conversation tab, Tasks rail → chip + drawer",
-    "status": "proposed",
+    "status": "running",
     "uid": "386c446a-d1e1-4016-9a21-206f5ef4e3f8",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-17T13:47:16.000Z",
-    "updated": "2026-07-17T13:50:11.045Z",
+    "updated": "2026-07-17T13:50:17.211Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2842",
@@ -560,5 +560,5 @@
       "canonicalFilename": "2026-07-17-PAN-2842-issue-cockpit-full-width-agent-conversations-lift-tab-strip-dissolve-conversation-tab-tasks-rail-chip-drawer.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
