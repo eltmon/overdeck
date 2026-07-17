@@ -90,7 +90,7 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:40:09.427Z",
+  "updated": "2026-07-17T16:41:05.905Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -100,12 +100,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:40:09.389Z",
+    "updatedAt": "2026-07-17T16:41:05.868Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-1610-review",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
-    "reviewRequestedAt": "2026-07-17T16:40:09.022Z",
+    "reviewRequestedAt": "2026-07-17T16:41:05.476Z",
     "reviewSpawnedAt": "2026-07-17T16:36:24.952Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -193,8 +193,8 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2995349,
-            "output": 54898,
+            "input": 3739631,
+            "output": 63889,
             "cacheRead": 7439872,
             "cacheWrite": 0
           }
@@ -230,8 +230,8 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 10988887,
-          "output": 586257,
+          "input": 11733169,
+          "output": 595248,
           "cacheRead": 127020544,
           "cacheWrite": 0
         },
@@ -243,8 +243,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 148.616547,
-        "pricingAsOf": "2026-07-17T16:40:09.392Z"
+        "usd": 152.607687,
+        "pricingAsOf": "2026-07-17T16:41:05.872Z"
       }
     },
     "merges": [
