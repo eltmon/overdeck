@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T13:15:02.671Z",
+  "updated": "2026-07-17T13:35:05.654Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -45,16 +45,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "extract-grouped-body": {
-        "writerId": "agent-pan-1610",
-        "agentId": "agent-pan-1610",
-        "pid": 365862,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:15:02.670Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -66,18 +58,37 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-1610 dead)",
         "releasedAt": "2026-07-17T12:52:37.888Z"
+      },
+      {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 365862,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:15:02.670Z",
+        "itemId": "extract-grouped-body",
+        "outcome": "completed",
+        "reason": "Extracted the complete grouped issue-action body behind host-neutral menu primitives, preserved the thin Radix rail host and session extras, and added passing non-Radix host coverage.",
+        "releasedAt": "2026-07-17T13:35:05.654Z"
       }
     ],
     "statusReasons": {
       "catalog-merge-vbrief": {
         "reason": "stale claim released (agent-pan-1610 dead)",
         "updatedAt": "2026-07-17T12:52:37.888Z"
+      },
+      "extract-grouped-body": {
+        "reason": "Extracted the complete grouped issue-action body behind host-neutral menu primitives, preserved the thin Radix rail host and session extras, and added passing non-Radix host coverage.",
+        "updatedAt": "2026-07-17T13:35:05.654Z"
       }
     }
   },
   "statusOverrides": {
     "catalog-merge-vbrief": "pending",
-    "extract-grouped-body": "running"
+    "extract-grouped-body": "completed",
+    "extract-grouped-body.extract-grouped-body.ac1": "completed",
+    "extract-grouped-body.extract-grouped-body.ac2": "completed",
+    "extract-grouped-body.extract-grouped-body.ac3": "completed",
+    "extract-grouped-body.extract-grouped-body.ac4": "completed"
   },
   "sessionHistory": [
     {
