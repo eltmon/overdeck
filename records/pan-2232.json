@@ -32,9 +32,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-17T03:18:43.447Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-17T03:36Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-17T03:36:37.005Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-17T03:36:36Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2232\n\n# Review Synthesis — PAN-2232 — 2026-07-17\n\n## Verdict: CHANGES REQUESTED — extracted seam modules export three symbols that were private in the original module\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2232/.pan/review/agent-pan-2232-review-5a29ce43/context.json`\n- Branch: `feature/pan-2232`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2232`\n- HEAD reviewed: `5a29ce43f3924b1a4b912453bfc76dd7a1e60358`\n- Cycle number: 2\n- Prior cycle SHA: `63c9b47412ae942ecb534a5993144c23557bf7b5`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2232/.pan/review/agent-pan-2232-review-5a29ce43/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2232/.pan/review/agent-pan-2232-review-5a29ce43/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2232/.pan/review/agent-pan-2232-review-5a29ce43/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-2232/.pan/review/agent-pan-2232-review-5a29ce43/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] New seam exports broaden previously private symbol visibility — `src/lib/cloister/specialists-spawn.ts:133`, `src/lib/cloister/specialists-registry.ts:13`, `src/lib/cloister/specialists-registry.ts:19`\n\nThe manifest explicitly requires pure moves with no visibility changes. The original monolith kept `readRecordedClaudeSessionId`, `SPECIALISTS_DIR`, and `SpecialistLifecycleState` module-private, while the committed extraction exports them from the new seam modules. Omitting them from the `specialists.ts` compatibility facade does not preserve the former visibility because callers can deep-import the seam modules directly. This finding is inside the PR scope and therefore blocks approval.\n\nRequired correction: keep these declarations private to their owning seams, or restructure seam ownership so cross-file sharing does not export symbols that were private in the original module.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- Security found no new attacker path, authorization boundary, secret-handling flow, unsafe deserialization, or dependency introduced by the extraction.\n- Correctness found no behavioral regression in the compatibility facade, import graph, registry behavior, lifecycle transitions, status resolution, or feedback ordering.\n- Performance found no additional blocking I/O, invocation frequency, timer growth, listener growth, or computational-complexity regression.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-2232/.pan/review/agent-pan-2232-review-5a29ce43/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2232 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -64,7 +77,7 @@
     "recordedAt": "2026-07-17T02:59:42.835Z"
   },
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T03:36:36.360Z",
+  "updated": "2026-07-17T03:36:37.005Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "blocked",
