@@ -148,16 +148,16 @@
     "recordedAt": "2026-07-17T15:57:29.020Z"
   },
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T19:45:34.567Z",
+  "updated": "2026-07-17T19:45:37.062Z",
   "pipeline": {
     "issueId": "PAN-2842",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T19:45:34.554Z",
+    "updatedAt": "2026-07-17T19:45:37.045Z",
     "reviewNotes": "Agent re-review request (3/25): Rebased onto origin/main and resolved the conflict while preserving PAN-1610's shared issue-action registry and PAN-2842's cockpit redesign. Build, typecheck, lint, focused tests, no-loss audit, and full test suite pass.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2849",
     "lastVerifiedCommit": "f4f316934a84d9e5ebe947ce0e40c88c26d005d0",
@@ -185,10 +185,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1004,
-            "output": 18305,
-            "cacheRead": 5795943,
-            "cacheWrite": 188627
+            "input": 1006,
+            "output": 18581,
+            "cacheRead": 5984570,
+            "cacheWrite": 188772
           }
         },
         "work": {
@@ -214,15 +214,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1004,
-          "output": 18305,
-          "cacheRead": 5795943,
-          "cacheWrite": 188627
+          "input": 1006,
+          "output": 18581,
+          "cacheRead": 5984570,
+          "cacheWrite": 188772
         }
       },
       "costAtCloseOut": {
-        "usd": 179.245462,
-        "pricingAsOf": "2026-07-17T19:45:34.560Z"
+        "usd": 179.286314,
+        "pricingAsOf": "2026-07-17T19:45:37.058Z"
       }
     },
     "merges": [
