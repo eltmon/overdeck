@@ -116,6 +116,43 @@ describe('resources spawn gate payload', () => {
     });
   });
 
+  it('does not expose an open spawn gate from stale compatibility evidence', async () => {
+    const compatibility = compatibilityHealthFixture();
+    compatibility.freshness = {
+      status: 'stale',
+      observedAt: '2026-07-17T04:01:00.000Z',
+      reason: {
+        code: 'host.sampler.collection_failed',
+        domain: 'host',
+        severity: 'critical',
+        message: 'System health collection failed.',
+      },
+    };
+    setSpawnGateHealthEvidenceReaderForTests(async () => ({
+      accepted: acceptedHealthFixture(),
+      compatibility,
+    }));
+
+    const response = await Effect.runPromise(getResourcesEffect());
+    const body = await readJsonBody(response);
+
+    expect(body.spawnGate).toMatchObject({
+      state: 'unavailable',
+      reason: 'System health evidence is stale: System health collection failed.',
+      reasons: [{
+        code: 'admission.snapshot.stale',
+        domain: 'admission',
+        severity: 'critical',
+      }],
+      warnings: [{
+        code: 'health_snapshot_unavailable',
+        severity: 'critical',
+      }],
+      pressure: 0,
+      stale: true,
+    });
+  });
+
   it('does not let accepted display state disable a blocking enforcement decision', () => {
     const result = mapSpawnGateDecision(decision({
       blocked: true,
@@ -245,6 +282,10 @@ function decision(overrides: Partial<SpawnGuardrailDecision>): SpawnGuardrailDec
       },
       reasons: [],
       leakedSpecialists: [],
+      freshness: {
+        status: 'fresh',
+        observedAt: '2026-07-17T04:00:00.000Z',
+      },
     },
     ...overrides,
   };
@@ -324,10 +365,10 @@ function compatibilityHealthFixture(): CompatibilitySystemHealthSnapshot {
       status: 'not_configured',
       message: 'not configured',
     },
+    deployStaleness: null,
     freshness: {
-      stale: false,
-      sampledAtMs: Date.parse('2026-07-17T04:00:00.000Z'),
-      ageMs: 0,
+      status: 'fresh',
+      observedAt: '2026-07-17T04:00:00.000Z',
     },
     transitionVersion: 1,
   };

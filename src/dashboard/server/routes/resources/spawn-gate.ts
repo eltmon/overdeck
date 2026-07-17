@@ -38,6 +38,23 @@ export function mapSpawnGateDecision(
   decision: SpawnGuardrailDecision,
   accepted?: AcceptedSystemHealthSnapshot,
 ): SpawnGatePayload {
+  if (decision.health.freshness.status !== 'fresh') {
+    const reason: HealthReason = decision.health.freshness.status === 'stale'
+      ? {
+          code: 'admission.snapshot.stale',
+          domain: 'admission',
+          severity: 'critical',
+          message: decision.error ?? `Spawn gate health is stale: ${decision.health.freshness.reason.message}`,
+        }
+      : {
+          code: 'admission.snapshot.measuring',
+          domain: 'admission',
+          severity: 'info',
+          message: decision.error ?? 'Spawn gate health is still measuring.',
+        };
+    return unavailableSpawnGate(accepted ?? null, reason, decision.warnings);
+  }
+
   const admission = accepted?.admission;
   const state = admission
     ? strongestAdmissionState(
@@ -122,15 +139,19 @@ export function resetSpawnGateHealthEvidenceReaderForTests(): void {
 
 function unavailableSpawnGate(
   accepted: AcceptedSystemHealthSnapshot | null,
+  unavailableReason?: HealthReason,
+  warnings: SpawnGuardrailDecision['warnings'] = [],
 ): SpawnGatePayload {
-  const reasons = accepted?.admission.reasons.length
-    ? [...accepted.admission.reasons]
-    : [{
-        code: 'admission.snapshot.unavailable',
-        domain: 'admission' as const,
-        severity: 'critical' as const,
-        message: 'Spawn gate health is unavailable.',
-      }];
+  const reasons = unavailableReason
+    ? [unavailableReason]
+    : accepted?.admission.reasons.length
+      ? [...accepted.admission.reasons]
+      : [{
+          code: 'admission.snapshot.unavailable',
+          domain: 'admission' as const,
+          severity: 'critical' as const,
+          message: 'Spawn gate health is unavailable.',
+        }];
 
   return {
     state: 'unavailable',
@@ -138,7 +159,7 @@ function unavailableSpawnGate(
     reasons,
     admittedWorkAgentCount:
       accepted?.admission.admittedWorkAgentCount ?? null,
-    warnings: [],
+    warnings,
     pressure: 0,
     stale: true,
   };

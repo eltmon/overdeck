@@ -470,7 +470,7 @@ async function getGitStatusAsync(workspacePath: string): Promise<{ branch: strin
 
 interface SpawnGuardrailAdvisory {
   severity: 'warning' | 'critical';
-  code: 'memory_pressure' | 'agent_capacity' | 'leaked_specialists';
+  code: 'memory_pressure' | 'agent_capacity' | 'leaked_specialists' | 'health_snapshot_unavailable';
   message: string;
 }
 
@@ -481,7 +481,7 @@ export interface SpawnGuardrailDecision {
   error?: string;
   hint?: string;
   warnings: SpawnGuardrailAdvisory[];
-  health: Pick<SystemHealthSnapshot, 'severity' | 'summary' | 'reasons' | 'leakedSpecialists'>;
+  health: Pick<SystemHealthSnapshot, 'severity' | 'summary' | 'reasons' | 'leakedSpecialists' | 'freshness'>;
 }
 
 function formatLeakedSpecialistSummary(leaked: HealthLeakedSpecialist[]): string {
@@ -556,6 +556,32 @@ export function hasActiveAgentGateOrRetry(
 
 export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuardrailDecision {
   const warnings: SpawnGuardrailAdvisory[] = [];
+  if (health.freshness.status !== 'fresh') {
+    const message = health.freshness.status === 'stale'
+      ? `System health evidence is stale: ${health.freshness.reason.message}`
+      : 'System health is still measuring; fresh admission evidence is not available yet.';
+    warnings.push({
+      severity: 'critical',
+      code: 'health_snapshot_unavailable',
+      message,
+    });
+    return {
+      blocked: true,
+      requiresAcknowledgement: false,
+      status: 503,
+      error: message,
+      hint: 'Wait for a fresh system health assessment before starting this agent.',
+      warnings,
+      health: {
+        severity: health.severity,
+        summary: health.summary,
+        reasons: health.reasons,
+        leakedSpecialists: health.leakedSpecialists,
+        freshness: health.freshness,
+      },
+    };
+  }
+
   const availableGb = Math.round((health.summary.availableMemoryBytes / (1024 ** 3)) * 10) / 10;
   const workAgentCount = health.admission.admittedWorkAgentCount;
   const leakedSpecialists = health.leakedSpecialists;
@@ -620,6 +646,7 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
         summary: health.summary,
         reasons: health.reasons,
         leakedSpecialists: health.leakedSpecialists,
+        freshness: health.freshness,
       },
     };
   }
@@ -635,6 +662,7 @@ export function evaluateSpawnGuardrails(health: SystemHealthSnapshot): SpawnGuar
       summary: health.summary,
       reasons: health.reasons,
       leakedSpecialists: health.leakedSpecialists,
+      freshness: health.freshness,
     },
   };
 }

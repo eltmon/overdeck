@@ -20,6 +20,7 @@ type DeepPartial<T> = {
 function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {}): SystemHealthSnapshot {
   const base: SystemHealthSnapshot = {
     severity: 'normal',
+    state: 'healthy',
     updatedAt: '2026-04-27T00:00:00.000Z',
     admission: {
       admittedWorkAgentCount: 2,
@@ -57,9 +58,22 @@ function createHealthSnapshot(overrides: DeepPartial<SystemHealthSnapshot> = {})
       overcommitCriticalPercent: 200,
     },
     reasons: [],
+    structuredReasons: [],
     agents: [],
     leakedSpecialists: [],
     topConsumers: [],
+    smeeRelay: {
+      configured: false,
+      running: false,
+      status: 'not_configured',
+      message: 'not configured',
+    },
+    deployStaleness: null,
+    freshness: {
+      status: 'fresh',
+      observedAt: '2026-04-27T00:00:00.000Z',
+    },
+    transitionVersion: 1,
   };
 
   return {
@@ -192,6 +206,38 @@ describe('evaluateSpawnGuardrails', () => {
   afterEach(async () => {
     vi.unstubAllEnvs();
     await readGlobalResourceConfig();
+  });
+
+  it('fails closed when the retained health assessment is stale', () => {
+    const decision = evaluateSpawnGuardrails(createHealthSnapshot({
+      freshness: {
+        status: 'stale',
+        observedAt: '2026-04-27T00:01:00.000Z',
+        reason: {
+          code: 'host.sampler.collection_failed',
+          domain: 'host',
+          severity: 'critical',
+          message: 'System health collection failed.',
+        },
+      },
+    }));
+
+    expect(decision).toMatchObject({
+      blocked: true,
+      requiresAcknowledgement: false,
+      status: 503,
+      error: 'System health evidence is stale: System health collection failed.',
+      hint: 'Wait for a fresh system health assessment before starting this agent.',
+      warnings: [{
+        severity: 'critical',
+        code: 'health_snapshot_unavailable',
+      }],
+      health: {
+        freshness: {
+          status: 'stale',
+        },
+      },
+    });
   });
 
   it('does not block exactly at the memory threshold boundary', async () => {

@@ -161,6 +161,7 @@ function acceptedHealthFixture(): AcceptedSystemHealthSnapshot {
 function healthFixture(): SystemHealthSnapshot {
   return {
     severity: 'normal',
+    state: 'healthy',
     updatedAt: '2026-07-07T12:00:00.000Z',
     summary: {
       cpuPercent: 0,
@@ -195,6 +196,7 @@ function healthFixture(): SystemHealthSnapshot {
       overcommitCriticalPercent: 95,
     },
     reasons: [],
+    structuredReasons: [],
     admission: { admittedWorkAgentCount: 0 },
     agents: [],
     leakedSpecialists: [],
@@ -205,6 +207,12 @@ function healthFixture(): SystemHealthSnapshot {
       status: 'not_configured',
       message: 'not configured',
     },
+    deployStaleness: null,
+    freshness: {
+      status: 'fresh',
+      observedAt: '2026-07-07T12:00:00.000Z',
+    },
+    transitionVersion: 1,
   };
 }
 
