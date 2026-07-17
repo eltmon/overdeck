@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T02:17:50.931Z",
+  "updated": "2026-07-17T02:18:13.401Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:07:14.172Z",
-    "inspectNotes": "AC1-4 verified: decode preserves all fields (test), unknown enums map to explicit unavailable/other/unknown without throwing (test), legacy projector covers all 20 existing summary fields + smeeRelay + new committed diagnostics with exact field-set pin, index.ts exports wired. Confirmed SchemaGetter/decodeTo/Literals/NullOr are real effect@4.0.0-beta.73 APIs; own test suite (5 tests) passes."
+    "updatedAt": "2026-07-17T02:18:13.379Z",
+    "inspectNotes": "Inspecting item agent-health-classify"
   },
   "closeOut": {
     "usage": {
@@ -37,17 +37,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 16,
-            "output": 7862,
-            "cacheRead": 989137,
-            "cacheWrite": 118359
+            "input": 18,
+            "output": 9217,
+            "cacheRead": 1135945,
+            "cacheWrite": 118691
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2337143,
-            "output": 212215,
-            "cacheRead": 21151744,
+            "input": 4975509,
+            "output": 497393,
+            "cacheRead": 64958464,
             "cacheWrite": 0
           }
         }
@@ -60,28 +60,28 @@
           "cacheWrite": 143876
         },
         "anthropic/claude-sonnet-5": {
-          "input": 16,
-          "output": 7862,
-          "cacheRead": 989137,
-          "cacheWrite": 118359
+          "input": 18,
+          "output": 9217,
+          "cacheRead": 1135945,
+          "cacheWrite": 118691
         },
         "openai/gpt-5.6-sol": {
-          "input": 2337143,
-          "output": 212215,
-          "cacheRead": 21151744,
+          "input": 4975509,
+          "output": 497393,
+          "cacheRead": 64958464,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 34.236925,
-        "pricingAsOf": "2026-07-17T01:07:14.217Z"
+        "usd": 77.931201,
+        "pricingAsOf": "2026-07-17T02:18:13.386Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
