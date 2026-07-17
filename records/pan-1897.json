@@ -361,18 +361,17 @@
     "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T03:08:46.007Z",
+  "updated": "2026-07-17T03:24:30.225Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T03:08:45.990Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-1897-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-17T03:24:30.191Z",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "27818d81646215bcd5abbea44df22d789776c4b9",
@@ -523,9 +522,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 25213376,
-            "output": 921078,
-            "cacheRead": 180073472,
+            "input": 25547966,
+            "output": 957714,
+            "cacheRead": 189015040,
             "cacheWrite": 0
           }
         }
@@ -538,9 +537,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 45226101,
-          "output": 1341810,
-          "cacheRead": 239928064,
+          "input": 45560691,
+          "output": 1378446,
+          "cacheRead": 248869632,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -563,8 +562,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 383.414309,
-        "pricingAsOf": "2026-07-17T03:08:46.003Z"
+        "usd": 390.657123,
+        "pricingAsOf": "2026-07-17T03:24:30.221Z"
       }
     },
     "merges": [
