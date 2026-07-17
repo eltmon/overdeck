@@ -5781,3 +5781,11 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **NEW lesson: cost/diff GREW while branch HEAD stayed put ⇒ agent worked but didn't commit.** So "branch HEAD unchanged" alone is ambiguous — pair it with `git status` (uncommitted changes = fix done but stranded) vs a truly clean tree (no work done). Tick 22 I read HEAD-unchanged as "no fix"; today the cost delta revealed a fix WAS made, just uncommitted.
 - **2829 still frozen** $23.0888. **2377 dead-inspection.** No change.
 - **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9.
+
+## Tick 24 — 2026-07-17 ~17:57 — tail jammed: 1610 fix still uncommitted (loss-risk), 2829/2377 unchanged
+- **Main GREEN** (5631c97a91). Nothing merge-ready. **Run has landed + closed out 5 issues** (2822/2661/2831/2665/2445) + fixed 2 substrate bugs (2825/2833) + filed 5 root-caused ones (2817/2839/2846/2848 + 2824/2828). Productive ~8h run; the TAIL is jammed on idle-at-prompt (PAN-2817) + dead-inspection (PAN-2848).
+- **PAN-1610 (FINAL item): fix STILL uncommitted after 2 ticks.** Cost crept $52.99→$55.40 (+55 lines) so it's SLOWLY working, still 8 M files, HEAD unchanged d54c6beb, 0 committed. No operator commit-nudge landed. **UNCOMMITTED WORK IS LOSS-PRONE and it's been sitting ~35min** — a deacon janitor or worktree op could lose the 8-file parity fix. Re-flagged as time-sensitive. I cannot commit (Never-list) or nudge.
+- **2829 still frozen** $23.0888 (~215min idle). **2377 still `inspect_status: failed`** (dead owner, PAN-2848). No change on either.
+- **Honest state: the run's remaining throughput is gated on operator nudges (1610 commit, 2829) + the PAN-2817/2848 substrate fixes**, both of which are deacon/pipeline machinery (TENET-10 → supervised handoff, not autonomous). I've EXHAUSTED sanctioned levers on all three stuck agents and surfaced precisely — this is a correctly-surfaced blocker, not an idle tick.
+- **No new bugs, no re-files** (all root causes already filed). Keeping the surface current rather than repeating.
+- **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9 (15 ticks).
