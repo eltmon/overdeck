@@ -145,17 +145,17 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T19:07:07.277Z",
+  "updated": "2026-07-17T19:07:10.571Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T19:07:07.263Z",
+    "updatedAt": "2026-07-17T19:07:10.554Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
@@ -266,9 +266,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 12552035,
-            "output": 651933,
-            "cacheRead": 157394944,
+            "input": 12562486,
+            "output": 654206,
+            "cacheRead": 158086656,
             "cacheWrite": 0
           }
         }
@@ -287,9 +287,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 20033577,
-          "output": 851594,
-          "cacheRead": 180252160,
+          "input": 20044028,
+          "output": 853867,
+          "cacheRead": 180943872,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -300,8 +300,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 228.415915,
-        "pricingAsOf": "2026-07-17T19:07:07.270Z"
+        "usd": 228.882216,
+        "pricingAsOf": "2026-07-17T19:07:10.567Z"
       }
     },
     "merges": [
