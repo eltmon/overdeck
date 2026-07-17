@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T01:56:09.831Z",
+  "updated": "2026-07-17T01:56:18.021Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T18:22:52.225Z",
-    "inspectNotes": "AC1/AC2 satisfied (7 functions moved verbatim, 2 exported ones re-exported, only specialists.ts+specialists-spawn.ts touched, typecheck/build/full vitest all green). AC3 fails: npm run lint exits 1 — scripts/file-size-baseline.txt:22 still says '1749 src/lib/cloister/specialists.ts' but the file is now 1581 lines post-extraction, tripping the stale-baseline guard in scripts/lint-file-size.sh. Fix: run 'bash scripts/lint-file-size.sh --update' and commit the updated scripts/file-size-baseline.txt alongside this seam.",
+    "updatedAt": "2026-07-17T01:56:17.999Z",
+    "inspectNotes": "Inspecting item wi-1-spawn",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -51,9 +51,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1346566,
-            "output": 63135,
-            "cacheRead": 17352192,
+            "input": 5629125,
+            "output": 303080,
+            "cacheRead": 70422016,
             "cacheWrite": 0
           }
         }
@@ -72,22 +72,22 @@
           "cacheWrite": 118307
         },
         "openai/gpt-5.6-sol": {
-          "input": 1346566,
-          "output": 63135,
-          "cacheRead": 17352192,
+          "input": 5629125,
+          "output": 303080,
+          "cacheRead": 70422016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 26.949416,
-        "pricingAsOf": "2026-07-16T18:22:52.362Z"
+        "usd": 82.095473,
+        "pricingAsOf": "2026-07-17T01:56:18.007Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 3,
     "claims": {},
