@@ -79,6 +79,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text'); } catch { /* already exists or table absent */ }
   ensureReleaseSetTablesSync(db);
   db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
+  db.exec('CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
+  db.exec('CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init
   // migration only runs on a fresh DB, so existing overdeck.db files need these
   // columns added idempotently here.

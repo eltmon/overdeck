@@ -124,6 +124,8 @@ CREATE INDEX `cost_issue_idx` ON `cost_events` (`issue_id`);--> statement-breakp
 CREATE INDEX `cost_ts_idx` ON `cost_events` (`ts`);--> statement-breakpoint
 CREATE INDEX `cost_session_id_idx` ON `cost_events` (`session_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `cost_request_id_idx` ON `cost_events` (`request_id`) WHERE request_id IS NOT NULL;--> statement-breakpoint
+CREATE INDEX `idx_cost_agent_id` ON `cost_events` (`agent_id`,`ts`);--> statement-breakpoint
+CREATE INDEX `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`));--> statement-breakpoint
 CREATE TABLE `events` (
 	`sequence` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`type` text NOT NULL,
