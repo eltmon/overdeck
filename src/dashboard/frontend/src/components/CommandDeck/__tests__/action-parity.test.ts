@@ -5,7 +5,7 @@ import { ISSUE_ACTIONS, type IssueActionKey } from '../../../lib/issueActions';
 const issueActionKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
 
 const legacyIssueActionMap: Record<string, IssueActionKey | null> = {
-  'Review & Test': 'reviewTest',
+  'Review & Test': 'requestReview',
   Recover: 'recoverReview',
   'Stop agent': 'stopAgent',
   'Start agent': 'startAgent',

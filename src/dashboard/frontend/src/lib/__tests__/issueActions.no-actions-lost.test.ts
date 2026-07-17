@@ -17,7 +17,7 @@ const registryByKey = new Map(ISSUE_ACTIONS.map((action) => [action.key, action]
 
 const legacyCommandDeckIssueActions = [
   { legacyKey: 'merge', registryKey: null, surfaceText: 'Merge', note: 'Human-only MergeButton remains outside ISSUE_ACTIONS per Decision D6.' },
-  { legacyKey: 'reviewTest', registryKey: 'reviewTest', surfaceText: 'Review & Test' },
+  { legacyKey: 'reviewTest', registryKey: 'requestReview', surfaceText: 'Review & Test' },
   { legacyKey: 'recover', registryKey: 'recoverReview', surfaceText: 'Recover' },
   { legacyKey: 'stopAgent', registryKey: 'stopAgent', surfaceText: 'Stop Agent' },
   { legacyKey: 'startAgent', registryKey: 'startAgent', surfaceText: 'Start Agent' },
@@ -60,7 +60,7 @@ const badgeBarActions = [
 
 const statusFlowActions = [
   { surfaceText: 'MERGE', registryKey: null, note: 'Human-only MergeButton remains outside ISSUE_ACTIONS per Decision D6.' },
-  { surfaceText: 'Review & Test', registryKey: 'reviewTest' },
+  { surfaceText: 'Review & Test', registryKey: 'requestReview' },
   { surfaceText: 'Recover', registryKey: 'recoverReview' },
   { surfaceText: 'Stop Agent', registryKey: 'stopAgent' },
   { surfaceText: 'Start Agent', registryKey: 'startAgent' },

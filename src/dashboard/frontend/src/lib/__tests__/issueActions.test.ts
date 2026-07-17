@@ -55,7 +55,6 @@ const preservedActionKeys: readonly IssueActionKey[] = [
   'completeWorkReset',
   'restartFromPlan',
   'restartAgent',
-  'reviewTest',
 ];
 
 const baseState: IssueActionState = {
@@ -150,7 +149,6 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('completeWorkReset').kind).toBe('destructive');
     expect(action('completeWorkReset').group).toBe('danger');
     expect(action('completeWorkReset').endpoint).toBe('/api/agents/:agentId/restart-fresh');
-    expect(action('reviewTest').panVerb).toBe('review request');
   });
 
   it('aligns PRD action kinds for lifecycle and navigation actions', () => {

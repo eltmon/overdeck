@@ -112,9 +112,9 @@ export function ReviewVerificationCard({ issueId }: { issueId: string }) {
       : undefined
 
   const gates = deriveGates(data)
-  const reviewTest = actions.all.find((v) => v.action.key === 'reviewTest')
   const restartReview = actions.all.find((v) => v.action.key === 'restartReview')
-  const actionButtons = [reviewTest, restartReview].filter(
+  const recoverReview = actions.all.find((v) => v.action.key === 'recoverReview')
+  const actionButtons = [restartReview, recoverReview].filter(
     (v): v is IssueActionView => !!v && v.enabled,
   )
 

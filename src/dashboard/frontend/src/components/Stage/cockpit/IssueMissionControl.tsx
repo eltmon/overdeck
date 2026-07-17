@@ -99,7 +99,6 @@ const GROUP_LABELS: Record<IssueActionGroup, string> = {
   artifacts: 'Artifacts',
   navigation: 'Navigation',
   danger: 'Danger',
-  preserved: 'Preserved',
 }
 
 const GROUP_ORDER: IssueActionGroup[] = [
@@ -111,7 +110,6 @@ const GROUP_ORDER: IssueActionGroup[] = [
   'artifacts',
   'navigation',
   'danger',
-  'preserved',
 ]
 
 // Explicit, literal Tailwind classes — interpolated utilities get purged.
