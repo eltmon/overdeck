@@ -5475,3 +5475,9 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - New session env still has CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000 — operator's "wedge resolved" was NOT an env change. Watching behavior, not assuming.
 - Resumed coordinator sits idle at prompt post-compact (83k ctx, out=51). Nudged via pan tell: resume convoy, synthesize from existing sub-review files (correctness/performance/security.md exist from earlier run) + fresh requirements pass. Next tick: check for synthesis; if still idle → rotate session.id (backup, not delete) for a genuinely fresh spawn and file the tooling-gap issue.
 - Rest of set: 1897 work fixing, 2232/2252/2647/2807 work agents running, 1491 fresh review dispatched.
+
+## Tick 76 — 2026-07-16 ~21:17 — PAN-2811 strike LANDED + DEPLOYED
+- **Landed a1426db49f051d90a8b027f426edb1fce408f4fb** (merge --no-ff of origin/strike/pan-2811 @ 97b7290cd9, operator-directed recovery path). Fix: replaces in-process strike-merge trigger registration (broken across tsdown dual-module/deacon fork boundary — PAN-2806 family) with authenticated internal HTTP route /api/internal/strikes/:id/merge. Deacon can now invoke dashboard-parent strike merges across the fork.
+- Gates verified by me on the merged tree: typecheck (no new), lint, 21/21 tests in the 3 touched suites, production build. (Strike itself reported 9,564 tests green; main CI validates full matrix post-push.)
+- **Deployed:** server pid 1850998 @ 21:17:05 owns :3011, health 200. Primary FF'd clean (checked porcelain first).
+- Watch main CI on a1426db49f; if red, investigate before anything else lands.
