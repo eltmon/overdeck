@@ -74,15 +74,7 @@
       "timestamp": "2026-07-17T18:50:55.626Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T18:50:55Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1610\n\nBlocking: forbidden merge/viewVbrief IssueActionKey identities remain and the six-surface parity gate substitutes four real integrations.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1610 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -148,17 +140,17 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T19:05:43.136Z",
+  "updated": "2026-07-17T19:05:43.765Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T19:05:43.095Z",
+    "updatedAt": "2026-07-17T19:05:43.622Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -167,7 +159,7 @@
     "reviewedAtCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
     "reviewRequestedAt": "2026-07-17T19:05:42.715Z",
-    "reviewSpawnedAt": "2026-07-17T18:49:42.903Z",
+    "reviewSpawnedAt": "2026-07-17T19:05:43.621Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -305,7 +297,7 @@
       },
       "costAtCloseOut": {
         "usd": 222.921004,
-        "pricingAsOf": "2026-07-17T19:05:43.098Z"
+        "pricingAsOf": "2026-07-17T19:05:43.701Z"
       }
     },
     "merges": [
