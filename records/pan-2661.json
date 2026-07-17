@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T10:36:24.869Z",
+  "updated": "2026-07-17T10:39:48.019Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "registry-group-exports": {
-        "writerId": "agent-pan-2661",
-        "agentId": "agent-pan-2661",
-        "pid": 1451832,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:36:24.869Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2661",
@@ -73,6 +65,16 @@
         "itemId": "retire-reviewtest",
         "outcome": "completed",
         "releasedAt": "2026-07-17T10:36:15.855Z"
+      },
+      {
+        "writerId": "agent-pan-2661",
+        "agentId": "agent-pan-2661",
+        "pid": 1451832,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:36:24.869Z",
+        "itemId": "registry-group-exports",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T10:39:48.018Z"
       }
     ]
   },
@@ -82,6 +84,8 @@
     "retire-reviewtest.retire-reviewtest.ac2": "completed",
     "retire-reviewtest.retire-reviewtest.ac3": "completed",
     "retire-reviewtest.retire-reviewtest.ac4": "completed",
-    "registry-group-exports": "running"
+    "registry-group-exports": "completed",
+    "registry-group-exports.registry-group-exports.ac1": "completed",
+    "registry-group-exports.registry-group-exports.ac2": "completed"
   }
 }
