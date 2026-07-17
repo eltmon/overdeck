@@ -138,7 +138,7 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T18:49:35.601Z",
+  "updated": "2026-07-17T18:49:42.292Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -148,14 +148,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T18:49:35.180Z",
+    "updatedAt": "2026-07-17T18:49:42.258Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "reviewedAtCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
-    "reviewRequestedAt": "2026-07-17T18:26:37.872Z",
+    "reviewRequestedAt": "2026-07-17T18:49:41.925Z",
     "reviewSpawnedAt": "2026-07-17T18:26:41.515Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -243,9 +243,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6589268,
-            "output": 174362,
-            "cacheRead": 20483584,
+            "input": 6594028,
+            "output": 174856,
+            "cacheRead": 20764160,
             "cacheWrite": 0
           }
         },
@@ -280,9 +280,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 18526219,
-          "output": 810635,
-          "cacheRead": 172092928,
+          "input": 18530979,
+          "output": 811129,
+          "cacheRead": 172373504,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -293,8 +293,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 215.570739,
-        "pricingAsOf": "2026-07-17T18:49:35.188Z"
+        "usd": 215.749647,
+        "pricingAsOf": "2026-07-17T18:49:42.260Z"
       }
     },
     "merges": [
