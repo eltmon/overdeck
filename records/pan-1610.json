@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T15:20:09.239Z",
+  "updated": "2026-07-17T15:43:55.729Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "surface-parity-test": {
-        "writerId": "agent-pan-1610",
-        "agentId": "agent-pan-1610",
-        "pid": 1333822,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T15:20:09.239Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -200,6 +192,16 @@
         "itemId": "migrate-zoneb-strip",
         "outcome": "completed",
         "releasedAt": "2026-07-17T15:19:57.755Z"
+      },
+      {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 1333822,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T15:20:09.239Z",
+        "itemId": "surface-parity-test",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T15:43:55.729Z"
       }
     ],
     "statusReasons": {
@@ -253,6 +255,10 @@
     "migrate-zoneb-strip.migrate-zoneb-strip.ac1": "completed",
     "migrate-zoneb-strip.migrate-zoneb-strip.ac2": "completed",
     "migrate-zoneb-strip.migrate-zoneb-strip.ac3": "completed",
-    "surface-parity-test": "running"
+    "surface-parity-test": "completed",
+    "surface-parity-test.surface-parity-test.ac1": "completed",
+    "surface-parity-test.surface-parity-test.ac2": "completed",
+    "surface-parity-test.surface-parity-test.ac3": "completed",
+    "surface-parity-test.surface-parity-test.ac4": "completed"
   }
 }
