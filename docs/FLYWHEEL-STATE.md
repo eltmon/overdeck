@@ -5488,3 +5488,8 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - 1966 work agent fresh-started (was ANOTHER stuck yield: "making room for review of PAN-1491") + told the precise fix. **Yield self-clear bug now 2x reproduced (2232, 1966) → filed PAN-2813** (backstop-as-symptom, not driven).
 - 1491 review coordinator nudged the same way (was idle since 00:53); expect synthesis next tick.
 - Session landings: 6 merges + 2811 strike. Deploys: 2 (a9e301526b, a1426db49f). Close-outs: 14 done (11 operator + 3 evidence-verified accepts).
+
+## Tick 78 — 2026-07-16 ~21:40 — 1491 APPROVED + PR#2814 opened at reviewed head
+- **1491 nudge worked too** (playbook 2/2): fresh synthesis 21:32 = APPROVED @1196ce67. Old PR#1636 closed 06-19 → opened **PR#2814**, pushed branch so PR head == reviewed head 1196ce67. Merge when CI green.
+- 1897 work agent idle-at-prompt 6h ($82, tree clean+pushed) → nudged to verify fixes complete + pan done so review re-runs.
+- Work fleet: 1966 active (9min), 2252 active, 2232/2647/2807 quiet 46-70min (watch; nudge next tick if still silent).
