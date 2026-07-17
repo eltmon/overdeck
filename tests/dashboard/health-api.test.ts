@@ -1,233 +1,174 @@
-/**
- * Integration tests for the dashboard agent-health resolver adapter.
- */
-
 import { Effect } from 'effect';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
-import type { AgentRuntimeSnapshot } from '@overdeck/contracts';
+import { describe, expect, it } from 'vitest';
 
-const { activeSessions } = vi.hoisted(() => ({
-  activeSessions: new Set<string>(),
-}));
+import { buildHealthAgentsResponse } from '../../src/dashboard/server/routes/misc/health.js';
 
-vi.mock('../../src/lib/tmux.js', () => ({
-  sessionExists: (name: string) => Effect.succeed(activeSessions.has(name)),
-  sessionExistsSync: (name: string) => Effect.succeed(activeSessions.has(name)),
-  capturePane: vi.fn(() => Effect.succeed('')),
-  getTmuxConfigMode: vi.fn(() => 'inherit-user'),
-  getManagedTmuxSocketName: vi.fn(() => 'overdeck'),
-  getManagedTmuxConfigPath: vi.fn(() => '/tmp/overdeck.tmux.conf'),
-  getTmuxBaseArgs: vi.fn(() => []),
-  buildTmuxArgs: vi.fn((args: string[]) => args),
-  getTmuxCommand: vi.fn((args: string[]) => ({ command: 'tmux', args })),
-  buildTmuxCommandString: vi.fn((args: string[]) => ['tmux', ...args].join(' ')),
-}));
+const NOW = Date.parse('2026-07-16T12:00:00.000Z');
 
-import { setAgentRuntimeMirror } from '../../src/lib/agent-runtime-mirror.js';
-import { determineHealthStatus } from '../../src/dashboard/lib/health-filtering.js';
+type ResponseBody = Record<string, unknown> | Array<Record<string, unknown>>;
 
-const NOW = new Date('2026-07-16T12:00:00.000Z');
-const runDetermineHealthStatus = (...args: Parameters<typeof determineHealthStatus>) =>
-  Effect.runPromise(determineHealthStatus(...args));
-
-let testDir: string;
-
-beforeEach(async () => {
-  vi.useFakeTimers();
-  vi.setSystemTime(NOW);
-  activeSessions.clear();
-  await Effect.runPromise(setAgentRuntimeMirror({}));
-  testDir = mkdtempSync(join(tmpdir(), 'health-api-test-'));
-  mkdirSync(join(testDir, '.overdeck', 'agents'), { recursive: true });
-});
-
-afterEach(async () => {
-  activeSessions.clear();
-  await Effect.runPromise(setAgentRuntimeMirror({}));
-  rmSync(testDir, { recursive: true, force: true });
-  vi.useRealTimers();
-});
-
-function createAgent(
-  name: string,
-  status?: string,
-  lastActivity = NOW.toISOString(),
-): string {
-  const agentDir = join(testDir, '.overdeck', 'agents', name);
-  mkdirSync(agentDir, { recursive: true });
-
-  if (status !== undefined) {
-    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
-      id: name,
-      issueId: 'PAN-2647',
-      role: 'work',
-      status,
-      startedAt: new Date(NOW.getTime() - 10 * 60 * 1000).toISOString(),
-      lastActivity,
-      kickoffDelivered: true,
-    }, null, 2));
-  }
-
-  return agentDir;
+async function runResponse(
+  effect: ReturnType<typeof buildHealthAgentsResponse>,
+): Promise<{ status: number; body: ResponseBody }> {
+  const response = await Effect.runPromise(effect);
+  const raw = response.body as { body: Uint8Array } | null;
+  const text = raw?.body ? new TextDecoder().decode(raw.body) : '{}';
+  return { status: response.status, body: JSON.parse(text) as ResponseBody };
 }
 
-async function setRuntime(
-  agentId: string,
-  activity: AgentRuntimeSnapshot['activity'],
-  lastActivity: string,
-  contextSaturatedAt?: string,
-): Promise<void> {
-  await Effect.runPromise(setAgentRuntimeMirror({
-    [agentId]: {
-      id: agentId as AgentRuntimeSnapshot['id'],
-      activity,
-      lastActivity,
-      ...(contextSaturatedAt ? { contextSaturatedAt } : {}),
-      updatedAtSequence: 1 as AgentRuntimeSnapshot['updatedAtSequence'],
-    },
-  }));
+function agent(
+  id: string,
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id,
+    issueId: 'PAN-2647',
+    role: 'work',
+    status: 'running',
+    startedAt: '2026-07-16T11:50:00.000Z',
+    lastActivity: '2026-07-16T11:59:00.000Z',
+    ...overrides,
+  };
 }
 
-function createTmuxSession(name: string): void {
-  activeSessions.add(name);
+function snapshot(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    agents: [],
+    agentRuntimeById: {},
+    reviewStatuses: [],
+    ...overrides,
+  };
 }
 
-describe('health-api agent classification adapter', () => {
-  it.each(['stopped', 'completed'])(
-    'shows intentionally inactive %s agents as idle',
-    async (status) => {
-      const agentDir = createAgent(`agent-${status}`, status);
-      await expect(runDetermineHealthStatus(
-        `agent-${status}`,
-        join(agentDir, 'state.json'),
-        activeSessions,
-      )).resolves.toEqual({ status: 'idle' });
-    },
-  );
+describe('GET /api/health/agents response', () => {
+  it('keeps healthy agents visible when another canonical entry is malformed', async () => {
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.succeed(snapshot({
+        agents: [
+          agent('agent-healthy'),
+          agent('agent-corrupt', { status: 'not-a-real-status' }),
+        ],
+      })),
+      sessionNames: Effect.succeed(['agent-healthy']),
+      readObservations: async () => ({}),
+      nowMs: NOW,
+    }));
 
-  it('shows missing state as unavailable instead of omitting the agent', async () => {
-    const agentDir = createAgent('agent-no-state');
-    await expect(runDetermineHealthStatus(
-      'agent-no-state',
-      join(agentDir, 'state.json'),
-      activeSessions,
-    )).resolves.toEqual({
+    expect(status).toBe(200);
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'agent-healthy', status: 'healthy' }),
+      expect.objectContaining({
+        id: 'agent-corrupt',
+        status: 'unavailable',
+        reasons: [expect.objectContaining({
+          code: 'agent.persisted_state.unavailable',
+        })],
+      }),
+    ]));
+  });
+
+  it('returns structured unavailable evidence with a non-2xx status on whole-read failure', async () => {
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.fail(new Error('resolver offline')),
+      sessionNames: Effect.succeed([]),
+      nowMs: NOW,
+    }));
+
+    expect(status).toBe(503);
+    expect(body).toEqual({
       status: 'unavailable',
-      reason: 'Agent state file is missing.',
+      reasons: [{
+        code: 'agent.health_snapshot.unavailable',
+        domain: 'agent',
+        severity: 'critical',
+        message: 'The canonical agent health snapshot could not be loaded.',
+      }],
     });
   });
 
-  it('does not declare a starting agent dead inside the five-minute grace', async () => {
-    const name = 'agent-starting';
-    const agentDir = createAgent(name, 'starting');
-    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
-      id: name,
-      role: 'work',
-      status: 'starting',
-      startedAt: new Date(NOW.getTime() - 4 * 60 * 1000).toISOString(),
+  it('returns real activity, preserves zero context, and never fabricates lastPing', async () => {
+    const lastActivityAt = '2026-07-16T11:59:30.000Z';
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.succeed(snapshot({
+        agents: [agent('agent-zero-context')],
+        agentRuntimeById: {
+          'agent-zero-context': {
+            id: 'agent-zero-context',
+            activity: 'working',
+            lastActivity: lastActivityAt,
+            updatedAtSequence: 1,
+          },
+        },
+      })),
+      sessionNames: Effect.succeed(['agent-zero-context']),
+      readObservations: async () => ({ contextPercent: 0 }),
+      nowMs: NOW,
     }));
 
-    await expect(runDetermineHealthStatus(
-      name,
-      join(agentDir, 'state.json'),
-      activeSessions,
-    )).resolves.toEqual({ status: 'healthy' });
+    expect(status).toBe(200);
+    expect(Array.isArray(body)).toBe(true);
+    const [health] = body as Array<Record<string, unknown>>;
+    expect(health).toMatchObject({
+      id: 'agent-zero-context',
+      status: 'healthy',
+      lastActivityAt,
+      contextPercent: 0,
+    });
+    expect(health).not.toHaveProperty('lastPing');
   });
 
-  it('declares running agents dead when tmux is missing after startup grace', async () => {
-    const name = 'agent-crashed';
-    const agentDir = createAgent(name, 'running');
-    const result = await runDetermineHealthStatus(
-      name,
-      join(agentDir, 'state.json'),
-      activeSessions,
-    );
+  it('keeps terminal specialists warm and human-blocked work agents waiting', async () => {
+    const oldActivity = '2026-07-16T10:00:00.000Z';
+    const { status, body } = await runResponse(buildHealthAgentsResponse({
+      snapshot: Effect.succeed(snapshot({
+        agents: [
+          agent('agent-pan-2647-review', {
+            role: 'review',
+            lastActivity: oldActivity,
+          }),
+          agent('agent-pan-2647', { lastActivity: oldActivity }),
+        ],
+        agentRuntimeById: {
+          'agent-pan-2647-review': {
+            id: 'agent-pan-2647-review',
+            activity: 'working',
+            lastActivity: oldActivity,
+            updatedAtSequence: 2,
+          },
+          'agent-pan-2647': {
+            id: 'agent-pan-2647',
+            activity: 'waiting',
+            lastActivity: oldActivity,
+            updatedAtSequence: 3,
+          },
+        },
+        reviewStatuses: [{
+          issueId: 'PAN-2647',
+          reviewStatus: 'passed',
+        }],
+      })),
+      sessionNames: Effect.succeed([
+        'agent-pan-2647-review',
+        'agent-pan-2647',
+      ]),
+      readObservations: async () => ({}),
+      nowMs: NOW,
+    }));
 
-    expect(result.status).toBe('dead');
-    expect(result.reason).toContain('tmux session is missing');
-  });
-
-  it('shows a live running agent as healthy', async () => {
-    const name = 'agent-healthy-test';
-    const agentDir = createAgent(name, 'running');
-    createTmuxSession(name);
-
-    await expect(runDetermineHealthStatus(
-      name,
-      join(agentDir, 'state.json'),
-      activeSessions,
-    )).resolves.toEqual({ status: 'healthy' });
-  });
-
-  it('uses the canonical runtime mirror for context saturation', async () => {
-    const name = 'agent-wedged-test';
-    const agentDir = createAgent(name, 'running');
-    createTmuxSession(name);
-    await setRuntime(
-      name,
-      'working',
-      NOW.toISOString(),
-      '2026-07-16T11:55:00.000Z',
-    );
-
-    const result = await runDetermineHealthStatus(
-      name,
-      join(agentDir, 'state.json'),
-      activeSessions,
-    );
-    expect(result.status).toBe('wedged');
-    expect(result.reason).toContain('Context window exhausted');
-  });
-
-  it.each([
-    [15, 'warning'],
-    [30, 'stalled'],
-  ] as const)(
-    'classifies active runtime inactivity at %i minutes as %s',
-    async (minutes, expected) => {
-      const name = `agent-${expected}-test`;
-      const activity = new Date(NOW.getTime() - minutes * 60 * 1000).toISOString();
-      const agentDir = createAgent(name, 'running', activity);
-      createTmuxSession(name);
-      await setRuntime(name, 'working', activity);
-
-      const result = await runDetermineHealthStatus(
-        name,
-        join(agentDir, 'state.json'),
-        activeSessions,
-      );
-      expect(result.status).toBe(expected);
-      expect(result.reason).toContain(`${minutes} minutes`);
-    },
-  );
-
-  it('does not turn waiting runtime inactivity into a stall', async () => {
-    const name = 'agent-waiting-test';
-    const activity = new Date(NOW.getTime() - 40 * 60 * 1000).toISOString();
-    const agentDir = createAgent(name, 'running', activity);
-    createTmuxSession(name);
-    await setRuntime(name, 'waiting', activity);
-
-    await expect(runDetermineHealthStatus(
-      name,
-      join(agentDir, 'state.json'),
-      activeSessions,
-    )).resolves.toMatchObject({ status: 'waiting' });
-  });
-
-  it('shows corrupted state as unavailable with the resolver error', async () => {
-    const agentDir = createAgent('agent-corrupted-state');
-    writeFileSync(join(agentDir, 'state.json'), 'not valid json{{{');
-
-    const result = await runDetermineHealthStatus(
-      'agent-corrupted-state',
-      join(agentDir, 'state.json'),
-      activeSessions,
-    );
-    expect(result.status).toBe('unavailable');
-    expect(result.reason).toContain('Agent state could not be read');
+    expect(status).toBe(200);
+    expect(body).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: 'agent-pan-2647-review',
+        status: 'idle',
+        lifecycle: 'warm',
+      }),
+      expect.objectContaining({
+        id: 'agent-pan-2647',
+        status: 'waiting',
+        reasons: [expect.objectContaining({
+          code: 'agent.runtime.waiting_on_human',
+        })],
+      }),
+    ]));
   });
 });
