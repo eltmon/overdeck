@@ -567,7 +567,7 @@ When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm 
 
 ## vBRIEF Plans & Lifecycle
 
-Overdeck uses **vBRIEF v0.5** for machine-readable work plans. Key references:
+Overdeck emits **xBRIEF v0.8** for machine-readable work plans (readers accept v0.5–v0.8; see `docs/VBRIEF.md`). Key references:
 
 - **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from vBRIEF at v0.7.0; spec now v0.8)
 - **Our fork:** [github.com/eltmon/xBRIEF](https://github.com/eltmon/xBRIEF)

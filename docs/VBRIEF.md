@@ -22,11 +22,11 @@ The canonical xBRIEF specification is maintained at **[github.com/deftai/xBRIEF]
 
 Overdeck emits xBRIEF v0.8 files with metadata extensions for issue tracking and difficulty estimation. Readers remain compatible with v0.5 through v0.8 documents. We also maintain a [fork of the spec](https://github.com/eltmon/xBRIEF) and have an open [extension proposal](https://github.com/deftai/xBRIEF/issues/40), superseding the original #1 proposal with draft PR deftai/xBRIEF#41.
 
-## v0.6 Compatibility
+## Version Compatibility
 
-Overdeck emits `"version": "0.6"` for new vBRIEF documents. Readers accept both `"0.5"` and `"0.6"` documents.
+Overdeck emits `"version": "0.8"` for new documents (see the emission rules above). Readers accept every version from `"0.5"` through `"0.8"`.
 
-v0.6 uses nested `items` for acceptance-criterion child items. Legacy v0.5 `subItems` are still read as an alias, and readers prefer `items` when both fields are present.
+v0.6+ uses nested `items` for acceptance-criterion child items. Legacy v0.5 `subItems` are still read as an alias, and readers prefer `items` when both fields are present.
 
 The item status enum includes `failed` in addition to `draft`, `proposed`, `approved`, `pending`, `running`, `completed`, `blocked`, and `cancelled`.
 
@@ -289,7 +289,7 @@ Every vBRIEF has exactly two top-level keys per the vBRIEF spec:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `vBRIEFInfo.version` | YES | Emit `"0.6"`; readers accept `"0.5"` and `"0.6"` |
+| `vBRIEFInfo.version` | YES | Emit `"0.8"` (written as `xBRIEFInfo` on disk for v0.7+); readers accept `"0.5"` through `"0.8"` |
 | `vBRIEFInfo.created` | YES | ISO 8601 timestamp — when the document was created |
 | `vBRIEFInfo.updated` | NO | ISO 8601 timestamp — updated automatically on every write |
 | `vBRIEFInfo.author` | NO | Tool identifier, e.g. `"overdeck/0.6.0"` |
