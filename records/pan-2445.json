@@ -61,17 +61,17 @@
     "recordedAt": "2026-07-17T16:48:19.602Z"
   },
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T17:10:31.799Z",
+  "updated": "2026-07-17T17:21:31.588Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-17T17:10:31.743Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-17T17:21:31.572Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2445-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -125,9 +125,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2358110,
-            "output": 71759,
-            "cacheRead": 9345024,
+            "input": 2517002,
+            "output": 75926,
+            "cacheRead": 9411072,
             "cacheWrite": 0
           }
         },
@@ -156,9 +156,9 @@
           "cacheWrite": 175687
         },
         "openai/gpt-5.6-sol": {
-          "input": 5116098,
-          "output": 190332,
-          "cacheRead": 42452480,
+          "input": 5274990,
+          "output": 194499,
+          "cacheRead": 42518528,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -169,8 +169,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 63.405803,
-        "pricingAsOf": "2026-07-17T17:10:31.759Z"
+        "usd": 64.358297,
+        "pricingAsOf": "2026-07-17T17:21:31.577Z"
       }
     },
     "merges": [
