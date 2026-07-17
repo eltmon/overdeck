@@ -143,7 +143,7 @@
     "recordedAt": "2026-07-17T15:57:29.020Z"
   },
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T19:43:12.784Z",
+  "updated": "2026-07-17T19:43:18.760Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "pending",
@@ -152,12 +152,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T19:43:12.754Z",
+    "updatedAt": "2026-07-17T19:43:18.723Z",
     "reviewNotes": "Agent re-review request (3/25): Rebased onto origin/main and resolved the conflict while preserving PAN-1610's shared issue-action registry and PAN-2842's cockpit redesign. Build, typecheck, lint, focused tests, no-loss audit, and full test suite pass.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2849",
     "lastVerifiedCommit": "36d992290cb259130ea08afbd5c4fe56691a6683",
-    "reviewRequestedAt": "2026-07-17T19:26:10.230Z",
+    "reviewRequestedAt": "2026-07-17T19:43:18.387Z",
     "reviewSpawnedAt": "2026-07-17T19:43:10.541Z"
   },
   "closeOut": {
@@ -189,9 +189,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 9655616,
-            "output": 631642,
-            "cacheRead": 124308480,
+            "input": 9656740,
+            "output": 631864,
+            "cacheRead": 124479488,
             "cacheWrite": 0
           }
         }
@@ -204,9 +204,9 @@
           "cacheWrite": 133090
         },
         "openai/gpt-5.6-sol": {
-          "input": 14929392,
-          "output": 819931,
-          "cacheRead": 145013760,
+          "input": 14930516,
+          "output": 820153,
+          "cacheRead": 145184768,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -217,8 +217,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 178.003594,
-        "pricingAsOf": "2026-07-17T19:43:12.772Z"
+        "usd": 178.101378,
+        "pricingAsOf": "2026-07-17T19:43:18.726Z"
       }
     },
     "merges": [
