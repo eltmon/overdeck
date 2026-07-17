@@ -748,17 +748,17 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-17T02:59:22.261Z",
+  "updated": "2026-07-17T02:59:52.926Z",
   "pipeline": {
     "issueId": "PAN-1966",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-17T02:59:22.187Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-17T02:59:52.848Z",
     "reviewNotes": "Agent re-review request (1/25): Addressed feedback: project-qualified post-UAT membership requests",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -797,9 +797,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 31315241,
-            "output": 619172,
-            "cacheRead": 81074688,
+            "input": 31318812,
+            "output": 620673,
+            "cacheRead": 81169408,
             "cacheWrite": 0
           }
         },
@@ -860,9 +860,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 278868543,
-          "output": 1252490,
-          "cacheRead": 373432064,
+          "input": 278872114,
+          "output": 1253991,
+          "cacheRead": 373526784,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -879,8 +879,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 466.230734,
-        "pricingAsOf": "2026-07-17T02:59:22.206Z"
+        "usd": 466.340979,
+        "pricingAsOf": "2026-07-17T02:59:52.896Z"
       }
     },
     "merges": [
