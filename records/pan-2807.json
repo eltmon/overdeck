@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T00:59:05.271Z",
+  "updated": "2026-07-17T01:10:10.192Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "narrow-ladder-error-swallowing": {
-        "writerId": "agent-pan-2807",
-        "agentId": "agent-pan-2807",
-        "pid": 1200621,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T00:59:05.271Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2807",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Added runSchemaTopUp classification, converted runtime top-ups, verified real duplicate/missing/unexpected SQLite behavior through tests and the built CLI, and passed typecheck.",
         "releasedAt": "2026-07-17T00:58:45.070Z"
+      },
+      {
+        "writerId": "agent-pan-2807",
+        "agentId": "agent-pan-2807",
+        "pid": 1200621,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T00:59:05.271Z",
+        "itemId": "narrow-ladder-error-swallowing",
+        "outcome": "completed",
+        "reason": "Migration DDL now tolerates only duplicate/already-existing artifacts, logs and rethrows unexpected SQLite errors before user_version advances, with real-driver failure and duplicate-column coverage. Typecheck and 22 focused migration tests pass.",
+        "releasedAt": "2026-07-17T01:10:10.192Z"
       }
     ],
     "statusReasons": {
@@ -106,6 +109,10 @@
       "narrow-topup-error-swallowing": {
         "reason": "Added runSchemaTopUp classification, converted runtime top-ups, verified real duplicate/missing/unexpected SQLite behavior through tests and the built CLI, and passed typecheck.",
         "updatedAt": "2026-07-17T00:58:45.070Z"
+      },
+      "narrow-ladder-error-swallowing": {
+        "reason": "Migration DDL now tolerates only duplicate/already-existing artifacts, logs and rethrows unexpected SQLite errors before user_version advances, with real-driver failure and duplicate-column coverage. Typecheck and 22 focused migration tests pass.",
+        "updatedAt": "2026-07-17T01:10:10.192Z"
       }
     }
   },
@@ -118,6 +125,9 @@
     "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac1": "completed",
     "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac2": "completed",
     "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac3": "completed",
-    "narrow-ladder-error-swallowing": "running"
+    "narrow-ladder-error-swallowing": "completed",
+    "narrow-ladder-error-swallowing.narrow-ladder-error-swallowing.ac1": "completed",
+    "narrow-ladder-error-swallowing.narrow-ladder-error-swallowing.ac2": "completed",
+    "narrow-ladder-error-swallowing.narrow-ladder-error-swallowing.ac3": "completed"
   }
 }
