@@ -5548,3 +5548,14 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Live server: pid 2652139, primary, build abe1de3bbb, resume=ON, supervisor watchdog active, health 200.** Verified abe1de3bbb includes all 11 of my merges (spot-checked f01c4ca636/2232, 47a49023e9/2807) + substrate fixes. **DoD deploy row now SATISFIED** for the whole night's merges.
 - resume=ON (was off in brief) → deacon auto-re-drives stopped agents; my manual re-drive burden drops.
 - My lane stays: land remaining live merges. In flight: 1897 (work↔review cycle on 3 real findings), 2647 (fresh-started, opening PR), 2821 (2232 follow-up, CLEAN, awaits operator reset-vs-authorize decision). Close-outs = operator's. Do NOT re-drive PAN-2255/PAN-2633.
+
+## Tick 88 — 2026-07-17 ~02:23 — RUN-63 WIND-DOWN: all 4 strikes + 1491 LANDED & CLOSED
+- Operator wind-down list COMPLETE:
+  - **PAN-1491** — close-out done (normal pipeline, merged 9e783f4fdf).
+  - **PAN-2794** — content on main (c11346c335, earlier session); closed with strike accepts.
+  - **PAN-2811** — content on main (a1426db49f, tick 76); closed with strike accepts.
+  - **PAN-2819** — LANDED this tick (6b13620403, "detach re-review verification continuation") via strike-recovery path (gates: typecheck/lint/64 tests/build green), deployed, closed.
+  - **PAN-2795** — MERGED PR#2815 → 57222e4bcb (ratchet-vs-clean-tree-lint contract; 7 files, +87/+139 tests, full CI green), deployed, closed.
+- **Live build: 57222e4bcb, pid 3415248, health 200** — carries all night's merges + the substrate fixes + all 4 strikes. Main CI finishing (guard+clean-install green; test/lint/build in_progress).
+- Stale strike sessions (2794/2811/2819/2795) killed.
+- **RELEASE-READY pending final main CI green.** Operator cuts v0.45.21 (carries PAN-2772 convo-disconnect fix + PAN-2768 desktop Sync Now fix Drew is waiting on). I never tag. After the tag: new flywheel run, RUN-63 ends. Do NOT pick up PAN-2822. Display-only spec-lens issues (PAN-532/538/608/783/804) are NOT work.
