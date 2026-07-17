@@ -5528,3 +5528,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Session: **11 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966, 2807, 2232) + 2811 strike + 2 deploys + 14 close-outs + 4 issues filed (2809/2810/2813/2817).
 - Remaining live: 1897 (review synthesizing @27818d81 — convoy has had 1h+, check for re-idle next tick), 2647 (pre-PR, working).
 - Close-out owed: 1491, 2252, 1966, 2807, 2232 + final deploy batch. Plan: when 1897/2647 resolve OR next hour turns, deploy once and close all.
+
+## Tick 85 — 2026-07-17 ~00:29 — dashboard restored; PAN-2232 re-review reconciled
+- **Dashboard HEALTHY** (pid 1574207, primary cwd, :3011, HTTP 200 stable sub-ms). It recovered on its own (came up 00:28) after the earlier SIGTERM-without-restart gap + my failed rescue attempts. Non-listening host orphan pid 1598266 left alone (collateral-kill lesson). Deacon status ok.
+- **PAN-2232 reconciled (operator thought it needed re-review; I'd recorded it MERGED):** BOTH true. PR#2818 squash-merged the decompose refactor to main (f01c4ca636 — verified: split files ON main, specialists.ts=85-line stub). THEN the work agent added follow-up fix f0c03042df ("preserve specialist seam privacy", 5 cloister files) — NOT on main. Issue still OPEN.
+- The scary "full refactor as net diff" was the **squash-merge 3-dot ancestor fallacy**, not a lost merge. Verified refactor on main directly.
+- 2232 verification failed on sync-target-branch (branch re-merge conflicts because refactor is on both sides). Agent ran `git merge origin/main` (MERGE_HEAD=d0f6f449f3), resolved ALL conflicts, staged everything (14 files = main's newer schema-audit content coming in, verified identical to origin/main — NOT off-task). Just never committed/pushed/resubmitted before idling with dashboard down.
+- **Flywheel commit guard blocks me from finishing the merge commit** (same as tick 67). Nudged agent-pan-2232 (alive, idle 91min) with exact 3 steps: git commit --no-edit / push / pan review request. If it stays wedged (PAN-2817 idle bug), next tick: pan start --fresh to get a live claude-code session to finish + resubmit.
