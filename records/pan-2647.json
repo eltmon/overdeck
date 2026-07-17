@@ -183,18 +183,17 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T09:13:54.011Z",
+  "updated": "2026-07-17T09:25:15.698Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T09:13:53.385Z",
-    "reviewNotes": "Resources can combine spawn admission and display evidence from different accepted health generations, violating atomic assessment semantics.",
+    "updatedAt": "2026-07-17T09:25:15.664Z",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
     "lastVerifiedCommit": "1504807ef76b8807a6bbe9ee16c2a6d17d6db08a",
@@ -214,9 +213,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7234466,
-            "output": 93951,
-            "cacheRead": 8454144,
+            "input": 7283961,
+            "output": 106556,
+            "cacheRead": 9104896,
             "cacheWrite": 0
           }
         },
@@ -230,9 +229,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 27985476,
-            "output": 1434344,
-            "cacheRead": 259251712,
+            "input": 28400892,
+            "output": 1459373,
+            "cacheRead": 267155456,
             "cacheWrite": 0
           }
         }
@@ -245,9 +244,9 @@
           "cacheWrite": 143876
         },
         "openai/gpt-5.6-sol": {
-          "input": 35219942,
-          "output": 1528295,
-          "cacheRead": 267705856,
+          "input": 35684853,
+          "output": 1565929,
+          "cacheRead": 276260352,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -258,8 +257,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 361.929038,
-        "pricingAsOf": "2026-07-17T09:13:53.404Z"
+        "usd": 369.659861,
+        "pricingAsOf": "2026-07-17T09:25:15.694Z"
       }
     },
     "merges": [
