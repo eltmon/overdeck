@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T04:28:03.106Z",
+  "updated": "2026-07-17T04:28:28.383Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 26,
-    "claims": {},
+    "sequence": 27,
+    "claims": {
+      "frontend-hook": {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 1575454,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T04:28:28.383Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -286,6 +294,7 @@
     "resources-projectors": "completed",
     "resources-projectors.resources-projectors.ac1": "completed",
     "resources-projectors.resources-projectors.ac2": "completed",
-    "resources-projectors.resources-projectors.ac3": "completed"
+    "resources-projectors.resources-projectors.ac3": "completed",
+    "frontend-hook": "running"
   }
 }
