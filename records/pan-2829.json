@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-17T13:09:24.955Z",
+  "updated": "2026-07-17T13:43:03.814Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -64,18 +64,32 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "module-move": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2829",
         "agentId": "agent-pan-2829",
         "pid": 29188,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:09:24.955Z"
+        "claimedAt": "2026-07-17T13:09:24.955Z",
+        "itemId": "module-move",
+        "outcome": "completed",
+        "reason": "Moved src/lib/vbrief to src/lib/xbrief, renamed xbrief-index, and updated repository imports without behavior changes",
+        "releasedAt": "2026-07-17T13:43:03.813Z"
+      }
+    ],
+    "statusReasons": {
+      "module-move": {
+        "reason": "Moved src/lib/vbrief to src/lib/xbrief, renamed xbrief-index, and updated repository imports without behavior changes",
+        "updatedAt": "2026-07-17T13:43:03.813Z"
       }
     }
   },
   "statusOverrides": {
-    "module-move": "running"
+    "module-move": "completed",
+    "module-move.module-move.ac1": "completed",
+    "module-move.module-move.ac2": "completed",
+    "module-move.module-move.ac3": "completed"
   }
 }
