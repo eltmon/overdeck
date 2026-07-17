@@ -150,23 +150,23 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T08:45:15.908Z",
+  "updated": "2026-07-17T08:45:28.301Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T08:45:15.868Z",
+    "updatedAt": "2026-07-17T08:45:28.181Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2647-review",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
     "lastVerifiedCommit": "2c1047edc38433aa6ff58d44d069ea637dade3fb",
     "reviewRequestedAt": "2026-07-17T08:45:15.471Z",
-    "reviewSpawnedAt": "2026-07-17T08:30:18.158Z"
+    "reviewSpawnedAt": "2026-07-17T08:45:28.180Z"
   },
   "closeOut": {
     "usage": {
@@ -226,7 +226,7 @@
       },
       "costAtCloseOut": {
         "usd": 329.643179,
-        "pricingAsOf": "2026-07-17T08:45:15.874Z"
+        "pricingAsOf": "2026-07-17T08:45:28.261Z"
       }
     },
     "merges": [
