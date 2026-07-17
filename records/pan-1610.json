@@ -52,6 +52,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-17T17:54:39.786Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-17T18:10:38.806Z"
     }
   ],
   "feedback": [],
@@ -120,17 +125,18 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T18:10:37.757Z",
+  "updated": "2026-07-17T18:10:39.175Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T18:10:37.638Z",
+    "updatedAt": "2026-07-17T18:10:39.102Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-1610-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
@@ -273,7 +279,7 @@
       },
       "costAtCloseOut": {
         "usd": 192.882569,
-        "pricingAsOf": "2026-07-17T18:10:37.718Z"
+        "pricingAsOf": "2026-07-17T18:10:39.136Z"
       }
     },
     "merges": [
