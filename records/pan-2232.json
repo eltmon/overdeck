@@ -77,18 +77,19 @@
     "recordedAt": "2026-07-17T02:59:42.835Z"
   },
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T04:29:39.715Z",
+  "updated": "2026-07-17T04:29:40.175Z",
   "pipeline": {
     "issueId": "PAN-2232",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "testing",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T04:29:39.684Z",
+    "updatedAt": "2026-07-17T04:29:40.100Z",
     "reviewNotes": "Requirements blocker: extracted seam modules export three symbols that were private in the original module",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/specialists-project-meta.ts\n  - src/lib/cloister/specialists-registry.ts\n  - src/lib/cloister/specialists-spawn.ts\n  - src/lib/cloister/specialists-status.ts\n  - src/lib/cloister/specialists.ts",
     "inspectNotes": "All 7 functions moved byte-for-byte verbatim (verified via body-diff); only specialists.ts/specialists-spawn.ts touched; buildSpecialistBaseCommand + buildSpecialistCavemanExports re-exported, both existing test importers (specialist-resolve-harness.test.ts, specialists-caveman.test.ts) pass 13/13; resolveWorkspaceGitInfo/buildProviderExportLines/buildTmuxEnvFlags were pre-existing dead code before this move, unaffected.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2818",
     "lastVerifiedCommit": "5a29ce43f3924b1a4b912453bfc76dd7a1e60358",
@@ -222,7 +223,7 @@
       },
       "costAtCloseOut": {
         "usd": 176.276421,
-        "pricingAsOf": "2026-07-17T04:29:39.704Z"
+        "pricingAsOf": "2026-07-17T04:29:40.130Z"
       }
     },
     "merges": [
