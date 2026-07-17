@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T10:46:02.865Z",
+  "updated": "2026-07-17T10:47:51.213Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "wipe-body-unification": {
-        "writerId": "agent-pan-2661",
-        "agentId": "agent-pan-2661",
-        "pid": 1920243,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:46:02.865Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2661",
@@ -93,6 +85,16 @@
         "itemId": "registry-descriptions",
         "outcome": "completed",
         "releasedAt": "2026-07-17T10:45:42.918Z"
+      },
+      {
+        "writerId": "agent-pan-2661",
+        "agentId": "agent-pan-2661",
+        "pid": 1920243,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:46:02.865Z",
+        "itemId": "wipe-body-unification",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T10:47:51.212Z"
       }
     ]
   },
@@ -108,6 +110,8 @@
     "registry-descriptions": "completed",
     "registry-descriptions.registry-descriptions.ac1": "completed",
     "registry-descriptions.registry-descriptions.ac2": "completed",
-    "wipe-body-unification": "running"
+    "wipe-body-unification": "completed",
+    "wipe-body-unification.wipe-body-unification.ac1": "completed",
+    "wipe-body-unification.wipe-body-unification.ac2": "completed"
   }
 }
