@@ -11,12 +11,12 @@ export { buildSpecialistBaseCommand, buildSpecialistCavemanExports } from './spe
 export {
   REVIEWER_ROLES,
   getAllSpecialists,
+  ensureProjectSpecialistDir,
+  getProjectSpecialistDir,
   getReviewerSessionName,
   getSpecialistMetadata,
-  getSpecialistState,
   getTmuxSessionName,
   initSpecialistsDirectory,
-  isInitialized,
   isProjectSpecialistActivelyRunning,
   loadRegistry,
   makeSpecialistRegistryKey,
@@ -51,10 +51,8 @@ export {
 export {
   disableSpecialist,
   enableSpecialist,
-  ensureProjectSpecialistDir,
   getAllProjectSpecialistStatuses,
   getEnabledSpecialists,
-  getProjectSpecialistDir,
   getProjectSpecialistMetadata,
   getRunMetadata,
   incrementProjectRunCount,
@@ -72,8 +70,10 @@ export {
   countContextTokens,
   findSessionFile,
   getAllSpecialistStatus,
+  getSpecialistState,
   getSpecialistStatus,
   initializeEnabledSpecialists,
+  isInitialized,
   isRunning,
 } from './specialists-status.js';
 

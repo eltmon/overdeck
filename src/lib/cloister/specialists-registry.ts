@@ -4,19 +4,18 @@
  * Manages specialist metadata, registry persistence, and session naming.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { createHash } from 'crypto';
 import { OVERDECK_HOME } from '../paths.js';
-import { readRecordedClaudeSessionId } from './specialists-spawn.js';
 
-export const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
+const SPECIALISTS_DIR = join(OVERDECK_HOME, 'specialists');
 const REGISTRY_FILE = join(SPECIALISTS_DIR, 'registry.json');
 
 const SPECIALIST_AGENT_NAMES = ['merge-agent', 'review-agent', 'test-agent', 'inspect-agent', 'uat-agent'] as const;
 export type SpecialistAgentName = typeof SPECIALIST_AGENT_NAMES[number];
 
-export type SpecialistLifecycleState = 'sleeping' | 'active' | 'uninitialized';
+type SpecialistLifecycleState = 'sleeping' | 'active' | 'uninitialized';
 
 export interface LegacySpecialistDefinition {
   name: SpecialistAgentName;
@@ -34,6 +33,29 @@ export interface LegacySpecialistRuntimeStatus extends LegacySpecialistDefinitio
   isRunning: boolean;
   tmuxSession?: string;
   currentIssue?: string; // Issue ID currently being worked on
+}
+
+/**
+ * Get the directory for a project's specialist
+ */
+export function getProjectSpecialistDir(projectKey: string, specialistType: SpecialistAgentName): string {
+  return join(SPECIALISTS_DIR, projectKey, specialistType);
+}
+
+/**
+ * Ensure per-project specialist directory structure exists
+ */
+export function ensureProjectSpecialistDir(projectKey: string, specialistType: SpecialistAgentName): void {
+  const specialistDir = getProjectSpecialistDir(projectKey, specialistType);
+  const runsDir = join(specialistDir, 'runs');
+  const contextDir = join(specialistDir, 'context');
+
+  if (!existsSync(runsDir)) {
+    mkdirSync(runsDir, { recursive: true });
+  }
+  if (!existsSync(contextDir)) {
+    mkdirSync(contextDir, { recursive: true });
+  }
 }
 
 /**
@@ -306,29 +328,6 @@ export function updateSpecialistMetadata(
 export function getAllSpecialists(): LegacySpecialistDefinition[] {
   const registry = loadRegistry();
   return registry.specialists ?? [];
-}
-
-/**
- * Check if a legacy specialist has a recorded Claude session.
- *
- * @param name - Specialist name
- * @returns True if the specialist has a recorded session id in its agent directory
- */
-export function isInitialized(name: SpecialistAgentName): boolean {
-  return readRecordedClaudeSessionId(getTmuxSessionName(name)) !== null;
-}
-
-/**
- * Get the state of a specialist from recorded agent metadata.
- *
- * Note: This only checks whether a recorded Claude session exists, not if it's actually running.
- * Use getSpecialistStatus() for runtime state.
- *
- * @param name - Specialist name
- * @returns Specialist state
- */
-export function getSpecialistState(name: SpecialistAgentName): Exclude<SpecialistLifecycleState, 'active'> {
-  return isInitialized(name) ? 'sleeping' : 'uninitialized';
 }
 
 /**

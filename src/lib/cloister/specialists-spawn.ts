@@ -2,12 +2,11 @@
  * Cloister specialist spawn command and environment helpers.
  */
 
-import { readFileSync, existsSync, readdirSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
-import { AGENTS_DIR } from '../paths.js';
 import { readCavemanVariant } from '../caveman/workspace.js';
 import { resolveHarness } from '../harness-resolve.js';
 
@@ -128,17 +127,6 @@ export async function buildSpecialistBaseCommand(
       ? specialistType.slice(0, -'-agent'.length)
       : specialistType}-agent`;
   return getAgentRuntimeBaseCommand(model, sessionName, agentDefinition, harness);
-}
-
-export function readRecordedClaudeSessionId(tmuxSession: string): string | null {
-  const sessionFile = join(AGENTS_DIR, tmuxSession, 'session.id');
-  if (!existsSync(sessionFile)) return null;
-  try {
-    const sessionId = readFileSync(sessionFile, 'utf-8').trim();
-    return sessionId || null;
-  } catch {
-    return null;
-  }
 }
 
 /**
