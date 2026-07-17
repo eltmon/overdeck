@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T01:57:40.910Z",
+  "updated": "2026-07-17T01:57:43.288Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -89,8 +89,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "wi-2-registry": {
+        "writerId": "agent-pan-2232",
+        "agentId": "agent-pan-2232",
+        "pid": 2806769,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:57:43.288Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2232",
@@ -115,6 +123,6 @@
     "wi-1-spawn.wi-1-spawn.ac1": "completed",
     "wi-1-spawn.wi-1-spawn.ac2": "completed",
     "wi-1-spawn.wi-1-spawn.ac3": "completed",
-    "wi-2-registry": "pending"
+    "wi-2-registry": "running"
   }
 }
