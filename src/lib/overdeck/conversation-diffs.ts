@@ -129,6 +129,24 @@ async function diffFilesSinceBase(
   return diffs;
 }
 
+async function diffPatchForFiles(
+  repoRoot: string,
+  createdAt: string,
+  filePaths: string[],
+): Promise<string> {
+  const baseCommit = await Effect.runPromise(findCommitAtTime(repoRoot, createdAt));
+  if (!baseCommit) {
+    return Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
+  }
+
+  const quotedPaths = filePaths.map(p => JSON.stringify(p)).join(' ');
+  const { stdout } = await promisify(exec)(
+    `git diff --patch --minimal --no-color ${baseCommit} -- ${quotedPaths}`,
+    { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
+  );
+  return stdout;
+}
+
 export async function getConversationDiffs(
   name: string,
   deps: ConversationDiffDependencies,
@@ -211,33 +229,37 @@ export async function getConversationDiffFull(
     if (!conv) return result({ error: 'Conversation not found' }, 404);
 
     const cwd = conv.cwd;
-    const isInRepo = existsSync(join(cwd, '.git'));
+    const cwdRepoRoot = existsSync(join(cwd, '.git')) ? cwd : null;
+    const patches: string[] = [];
 
-    if (isInRepo) {
-      const baseCommit = await Effect.runPromise(findCommitAtTime(cwd, conv.createdAt));
-      if (!baseCommit) return result({ diff: '' });
-      const diff = await Effect.runPromise(diffPatchSinceCommit(cwd, baseCommit));
-      return result({ diff });
+    if (cwdRepoRoot) {
+      const baseCommit = await Effect.runPromise(findCommitAtTime(cwdRepoRoot, conv.createdAt));
+      if (baseCommit) {
+        const patch = await Effect.runPromise(diffPatchSinceCommit(cwdRepoRoot, baseCommit));
+        if (patch) patches.push(patch);
+      }
     }
 
     const sessionFile = await deps.resolveSessionFile(conv);
-    if (!sessionFile || !existsSync(sessionFile)) return result({ diff: '' });
+    if (!sessionFile || !existsSync(sessionFile)) return result({ diff: patches.join('\n') });
 
     const parsed = await deps.getCachedMessages(sessionFile, false);
     const { fileEditsByAssistantId } = parsed;
-    if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) return result({ diff: '' });
+    if (!fileEditsByAssistantId || fileEditsByAssistantId.size === 0) {
+      return result({ diff: patches.join('\n') });
+    }
 
     const repoRootCache = new Map<string, string | null>();
     const allEdits = [...fileEditsByAssistantId.values()].flat();
     const filesByRepo = await groupFilesByRepo(allEdits, repoRootCache);
 
-    const patches: string[] = [];
     for (const [repoRoot, filePaths] of filesByRepo) {
+      if (repoRoot === cwdRepoRoot) continue;
       try {
-        const patch = await Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
+        const patch = await diffPatchForFiles(repoRoot, conv.createdAt, filePaths);
         if (patch) patches.push(patch);
       } catch {
-        // file may have been committed
+        // file may have been committed or repo unavailable
       }
     }
 
@@ -260,45 +282,32 @@ export async function getConversationDiffTurn(
     if (!conv) return result({ error: 'Conversation not found' }, 404);
 
     const cwd = conv.cwd;
-    const isInRepo = existsSync(join(cwd, '.git'));
+    const cwdRepoRoot = existsSync(join(cwd, '.git')) ? cwd : null;
+    const patches: string[] = [];
 
-    if (isInRepo) {
-      const baseCommit = await Effect.runPromise(findCommitAtTime(cwd, conv.createdAt));
+    if (cwdRepoRoot) {
+      const baseCommit = await Effect.runPromise(findCommitAtTime(cwdRepoRoot, conv.createdAt));
       if (baseCommit) {
-        const diff = await Effect.runPromise(diffPatchSinceCommit(cwd, baseCommit, fileFilter));
-        return result({ turnId, diff });
+        const patch = await Effect.runPromise(diffPatchSinceCommit(cwdRepoRoot, baseCommit, fileFilter));
+        if (patch) patches.push(patch);
       }
     }
 
     const assistantId = turnId.startsWith('conv-turn-') ? turnId.slice('conv-turn-'.length) : turnId;
     const sessionFile = await deps.resolveSessionFile(conv);
-    if (!sessionFile || !existsSync(sessionFile)) return result({ diff: '' });
+    if (!sessionFile || !existsSync(sessionFile)) return result({ turnId, diff: patches.join('\n') });
 
     const parsed = await deps.getCachedMessages(sessionFile, false);
     const edits = parsed.fileEditsByAssistantId?.get(assistantId);
-    if (!edits || edits.length === 0) return result({ diff: '' });
+    if (!edits || edits.length === 0) return result({ turnId, diff: patches.join('\n') });
 
     const repoRootCache = new Map<string, string | null>();
     const filesByRepo = await groupFilesByRepo(edits, repoRootCache, fileFilter);
 
-    const baseCommitByRepo = new Map<string, string | null>();
-    const patches: string[] = [];
     for (const [repoRoot, filePaths] of filesByRepo) {
+      if (repoRoot === cwdRepoRoot) continue;
       try {
-        if (!baseCommitByRepo.has(repoRoot)) {
-          baseCommitByRepo.set(repoRoot, await Effect.runPromise(findCommitAtTime(repoRoot, conv.createdAt)));
-        }
-        const baseCommit = baseCommitByRepo.get(repoRoot) ?? null;
-        let patch: string;
-        if (baseCommit) {
-          const { stdout } = await promisify(exec)(
-            `git diff --patch --minimal --no-color ${baseCommit} -- ${filePaths.map(p => JSON.stringify(p)).join(' ')}`,
-            { cwd: repoRoot, encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 },
-          );
-          patch = stdout;
-        } else {
-          patch = await Effect.runPromise(diffPatchFilesAgainstHead(repoRoot, filePaths));
-        }
+        const patch = await diffPatchForFiles(repoRoot, conv.createdAt, filePaths);
         if (patch) patches.push(patch);
       } catch {
         // file may have been committed or repo unavailable
