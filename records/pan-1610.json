@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T14:59:02.388Z",
+  "updated": "2026-07-17T14:59:13.322Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 16,
-    "claims": {},
+    "sequence": 17,
+    "claims": {
+      "migrate-zoneb-strip": {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 3347646,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T14:59:13.322Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -230,6 +238,7 @@
     "register-rail-extras": "completed",
     "register-rail-extras.register-rail-extras.ac1": "completed",
     "register-rail-extras.register-rail-extras.ac2": "completed",
-    "register-rail-extras.register-rail-extras.ac3": "completed"
+    "register-rail-extras.register-rail-extras.ac3": "completed",
+    "migrate-zoneb-strip": "running"
   }
 }
