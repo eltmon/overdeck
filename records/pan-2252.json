@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-17T01:22:29.077Z"
   },
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T01:26:27.625Z",
+  "updated": "2026-07-17T01:27:30.535Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
@@ -54,12 +54,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:26:27.589Z",
+    "updatedAt": "2026-07-17T01:27:30.499Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-2252-review",
     "inspectNotes": "isLinkedWorktreeRoot/primaryRootFromLinkedWorktree correctly detect .git-as-file vs directory/absent (identity.ts:29-47); new check in shouldRefuseHostDashboardPort (identity.ts:87) placed after the pre-existing runningInContainer early-return (line 82-84), so container exemption is preserved; purely additive OR-branch only fires when .git is a file, so pre-existing tests using nonexistent repoRoots are unaffected. All 4 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2812",
     "lastVerifiedCommit": "d9f551ef5cdbe3ae0ddb8068d77feccba232cfcd",
-    "reviewRequestedAt": "2026-07-17T01:26:27.082Z",
+    "reviewRequestedAt": "2026-07-17T01:27:30.000Z",
     "reviewSpawnedAt": "2026-07-17T01:22:35.348Z",
     "strikeRecoveryCount": 0
   },
@@ -84,9 +84,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 511899,
-            "output": 9722,
-            "cacheRead": 1554432,
+            "input": 804409,
+            "output": 10718,
+            "cacheRead": 1825792,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1311718,
+            "output": 16833,
+            "cacheRead": 2280960,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 962263,
+            "output": 10836,
+            "cacheRead": 1682432,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 794319,
+            "output": 10574,
+            "cacheRead": 1642496,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 1313704,
+            "output": 13709,
+            "cacheRead": 1642496,
             "cacheWrite": 0
           }
         },
@@ -121,9 +153,9 @@
           "cacheWrite": 176879
         },
         "openai/gpt-5.6-sol": {
-          "input": 1873144,
-          "output": 96421,
-          "cacheRead": 34090496,
+          "input": 6547658,
+          "output": 149369,
+          "cacheRead": 41610240,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -134,8 +166,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 39.449219,
-        "pricingAsOf": "2026-07-17T01:26:27.591Z"
+        "usd": 68.170101,
+        "pricingAsOf": "2026-07-17T01:27:30.503Z"
       }
     },
     "merges": [
