@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { useAlert, useConfirm } from '../DialogProvider';
 import {
@@ -314,8 +315,11 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       if (!response.ok) throw new Error(await responseError(response, `Failed to run ${action.label}`));
       return response.json().catch(() => ({ success: true }));
     },
-    onSuccess: async () => {
+    onSuccess: async (_data, { action }) => {
       await refreshDashboardState(queryClient);
+      if (action.key === 'unpause') {
+        toast.success(`${issueId} unpaused — deacon resumes it on the next patrol`);
+      }
     },
     onError: (error: Error) => {
       alert({ message: error.message, variant: 'error' });

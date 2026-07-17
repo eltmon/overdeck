@@ -1,5 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef, type MouseEvent as ReactMouseEvent } from 'react';
-import { toast } from 'sonner';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ExternalLink, User, Play, Eye, DollarSign, ChevronDown, ChevronRight, Sparkles, FileText, List, ScrollText } from 'lucide-react';
 import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
@@ -612,28 +611,11 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
   const pausedAgent = [...issueWorkAgents, ...(planningAgent ? [planningAgent] : [])]
     .find((a) => (a as { paused?: boolean }).paused === true);
   const pausedReason = pausedAgent ? (pausedAgent as { pausedReason?: string }).pausedReason : undefined;
-  const handleUnpause = useCallback(async (event: ReactMouseEvent) => {
-    event.stopPropagation();
-    if (!pausedAgent) return;
-    try {
-      const res = await fetch(`/api/agents/${pausedAgent.id}/unpause`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const data = await res.json().catch(() => ({})) as { error?: string };
-      if (!res.ok) throw new Error(data.error || 'Failed to unpause agent');
-      toast.success(`${issue.identifier} unpaused — deacon resumes it on the next patrol`);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to unpause agent');
-    }
-  }, [pausedAgent, issue.identifier]);
 
   // Surface the troubled gate on the card — troubled agents were quarantined
   // by the deacon after repeated resume/crash failures and stay down until an
   // operator investigates and runs `pan untroubled`. Deliberately no one-click
-  // clear here (unlike Unpause): clearing without investigation just re-enters
-  // the crash loop.
+  // clear here: clearing without investigation just re-enters the crash loop.
   const troubledAgent = [...issueWorkAgents, ...(planningAgent ? [planningAgent] : [])]
     .find((a) => (a as { troubled?: boolean }).troubled === true);
   const troubledFailures = troubledAgent
@@ -732,24 +714,13 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               </span>
             )}
             {pausedAgent && (
-              <>
-                <span
-                  data-testid={`card-paused-${issue.identifier}`}
-                  className="inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium badge-border-warning badge-bg-warning text-warning-foreground"
-                  title={pausedReason ? `Paused: ${pausedReason}` : 'Agent is paused'}
-                >
-                  ⏸ Paused
-                </span>
-                <button
-                  type="button"
-                  data-testid={`card-unpause-${issue.identifier}`}
-                  onClick={handleUnpause}
-                  className="inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium badge-border-warning badge-bg-warning text-warning-foreground hover:bg-warning/20"
-                  title={pausedReason ? `Unpause — paused: ${pausedReason}` : 'Unpause this agent'}
-                >
-                  ▶ Unpause
-                </button>
-              </>
+              <span
+                data-testid={`card-paused-${issue.identifier}`}
+                className="inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-medium badge-border-warning badge-bg-warning text-warning-foreground"
+                title={pausedReason ? `Paused: ${pausedReason}` : 'Agent is paused'}
+              >
+                ⏸ Paused
+              </span>
             )}
             {cardVerbBadge}
           </span>
