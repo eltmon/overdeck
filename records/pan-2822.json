@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T10:38:12.415Z",
+  "updated": "2026-07-17T10:43:30.401Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "pref-store-and-filter": {
-        "writerId": "agent-pan-2822",
-        "agentId": "agent-pan-2822",
-        "pid": 1617850,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:38:12.415Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2822",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Added the derived specOnlyPlanned resource DTO field using the shared resolver reason constant, covered spec-only, branch-backed, and in-flight cases, and verified typecheck plus the focused resource-discovery suite.",
         "releasedAt": "2026-07-17T10:37:59.391Z"
+      },
+      {
+        "writerId": "agent-pan-2822",
+        "agentId": "agent-pan-2822",
+        "pid": 1617850,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:38:12.415Z",
+        "itemId": "pref-store-and-filter",
+        "outcome": "completed",
+        "reason": "Added the persisted local visibility store, optional frontend discriminator, stable-reference filter helper, and focused default/persistence/failure/filter tests; typecheck and focused frontend tests pass in pushed commit de008cbd7f.",
+        "releasedAt": "2026-07-17T10:43:30.401Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "dto-spec-only-flag": {
         "reason": "Added the derived specOnlyPlanned resource DTO field using the shared resolver reason constant, covered spec-only, branch-backed, and in-flight cases, and verified typecheck plus the focused resource-discovery suite.",
         "updatedAt": "2026-07-17T10:37:59.391Z"
+      },
+      "pref-store-and-filter": {
+        "reason": "Added the persisted local visibility store, optional frontend discriminator, stable-reference filter helper, and focused default/persistence/failure/filter tests; typecheck and focused frontend tests pass in pushed commit de008cbd7f.",
+        "updatedAt": "2026-07-17T10:43:30.401Z"
       }
     }
   },
@@ -107,6 +114,10 @@
     "dto-spec-only-flag.dto-spec-only-flag.ac1": "completed",
     "dto-spec-only-flag.dto-spec-only-flag.ac2": "completed",
     "dto-spec-only-flag.dto-spec-only-flag.ac3": "completed",
-    "pref-store-and-filter": "running"
+    "pref-store-and-filter": "completed",
+    "pref-store-and-filter.pref-store-and-filter.ac1": "completed",
+    "pref-store-and-filter.pref-store-and-filter.ac2": "completed",
+    "pref-store-and-filter.pref-store-and-filter.ac3": "completed",
+    "pref-store-and-filter.pref-store-and-filter.ac4": "completed"
   }
 }
