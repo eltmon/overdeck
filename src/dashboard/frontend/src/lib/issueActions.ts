@@ -145,10 +145,16 @@ export type NonIssueActionKey =
   | 'deepWipe'
   | 'stopSession'
   | 'viewTerminal'
+  | 'pauseSession'
+  | 'resumeSession'
+  | 'restartSession'
+  | 'replaySession'
   | 'viewState'
   | 'viewVbrief'
   | 'copySessionId'
-  | 'copyTmuxCommand';
+  | 'copyTmuxCommand'
+  | 'exportSessionMetadata'
+  | 'exportRoundHistory';
 
 export interface NonIssueActionContext {
   projectName?: string;
@@ -159,6 +165,7 @@ export interface NonIssueActionContext {
   sessionPresence?: string;
   tmuxSession?: string | null;
   hasJsonl?: boolean;
+  roundCount?: number;
   onCopyProjectName?: (projectName: string) => void | Promise<void>;
   onViewContainerLogs?: (containerName: string) => void | Promise<void>;
   onInspectContainer?: (containerName: string) => void | Promise<void>;
@@ -170,10 +177,16 @@ export interface NonIssueActionContext {
   onDeepWipe?: (issueId: string) => void | Promise<void>;
   onStopSession?: (sessionId: string) => void | Promise<void>;
   onViewTerminal?: (sessionId: string) => void | Promise<void>;
+  onPauseSession?: (sessionId: string) => void | Promise<void>;
+  onResumeSession?: (sessionId: string) => void | Promise<void>;
+  onRestartSession?: (sessionId: string) => void | Promise<void>;
+  onReplaySession?: (sessionId: string) => void | Promise<void>;
   onViewState?: (sessionId: string) => void | Promise<void>;
   onViewVbrief?: (issueId: string) => void | Promise<void>;
   onCopySessionId?: (sessionId: string) => void | Promise<void>;
   onCopyTmuxCommand?: (tmuxSession: string) => void | Promise<void>;
+  onExportSessionMetadata?: (sessionId: string) => void | Promise<void>;
+  onExportRoundHistory?: (sessionId: string) => void | Promise<void>;
 }
 
 export interface NonIssueActionConfirmSpec {
@@ -309,8 +322,8 @@ export const PROJECT_TREE_CONTEXT_ACTIONS: NonIssueActionEntry[] = [
 export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
   {
     key: 'stopSession',
-    label: 'Stop session',
-    description: 'Stop the focused session while preserving its work and state.',
+    label: 'Stop',
+    description: 'Stop session',
     scope: 'session',
     ownerSurface: 'ZoneBActionStrip',
     enabledWhen: canStopSession,
@@ -325,8 +338,8 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
   },
   {
     key: 'viewTerminal',
-    label: 'View terminal',
-    description: 'Open the focused session terminal.',
+    label: 'Terminal',
+    description: 'View terminal',
     scope: 'session',
     ownerSurface: 'ZoneBActionStrip',
     enabledWhen: (context) => hasText(context.sessionId) && hasText(context.tmuxSession) && !!context.onViewTerminal,
@@ -335,9 +348,69 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
     confirm: null,
   },
   {
+    key: 'pauseSession',
+    label: 'Pause',
+    description: 'Pause session',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => context.sessionPresence === 'active' && hasText(context.sessionId) && !!context.onPauseSession,
+    invoke: (context) => context.sessionId && context.onPauseSession?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'resumeSession',
+    label: 'Resume',
+    description: 'Resume session',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => context.sessionPresence === 'suspended' && hasText(context.sessionId) && !!context.onResumeSession,
+    invoke: (context) => context.sessionId && context.onResumeSession?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'restartSession',
+    label: 'Restart',
+    description: 'Stop the focused session and start a new work agent.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.sessionId) && !!context.onRestartSession,
+    invoke: (context) => context.sessionId && context.onRestartSession?.(context.sessionId),
+    kind: 'dialog',
+    confirm: {
+      title: 'Restart Agent',
+      message: (context) => `Stop ${context.sessionId ?? ''} and start a new work agent?`,
+      confirmLabel: 'Restart',
+      variant: 'destructive',
+    },
+  },
+  {
+    key: 'replaySession',
+    label: 'Replay',
+    description: 'Replay the focused session in the terminal.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.sessionId) && !!context.onReplaySession,
+    invoke: (context) => context.sessionId && context.onReplaySession?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'openStateDir',
+    label: 'Open State Dir',
+    description: 'Copy the focused session state directory path.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.sessionId) && !!context.onOpenStateDir,
+    invoke: (context) => context.sessionId && context.onOpenStateDir?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
     key: 'viewState',
     label: 'View State.md',
-    description: 'Open the focused session state file.',
+    description: 'Copy the focused session state directory path.',
     scope: 'session',
     ownerSurface: 'ZoneBActionStrip',
     enabledWhen: (context) => hasText(context.sessionId) && !!context.onViewState,
@@ -348,7 +421,7 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
   {
     key: 'viewVbrief',
     label: 'View vBRIEF',
-    description: 'Open the focused issue vBRIEF plan.',
+    description: 'Copy the focused issue vBRIEF path.',
     scope: 'session',
     ownerSurface: 'ZoneBActionStrip',
     enabledWhen: (context) => hasText(context.issueId) && !!context.onViewVbrief,
@@ -377,6 +450,55 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
     invoke: (context) => context.tmuxSession && context.onCopyTmuxCommand?.(context.tmuxSession),
     kind: 'safe',
     confirm: null,
+  },
+  {
+    key: 'viewJsonl',
+    label: 'View JSONL',
+    description: 'Open the focused session JSONL transcript.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => context.hasJsonl === true && hasText(context.sessionId) && !!context.onViewJsonl,
+    invoke: (context) => context.sessionId && context.onViewJsonl?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'exportSessionMetadata',
+    label: 'Export session metadata',
+    description: 'Download the focused session metadata as JSON.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => context.hasJsonl === true && hasText(context.sessionId) && !!context.onExportSessionMetadata,
+    invoke: (context) => context.sessionId && context.onExportSessionMetadata?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'exportRoundHistory',
+    label: 'Export round history JSON',
+    description: 'Download the focused session round history as JSON.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => (context.roundCount ?? 0) > 0 && hasText(context.sessionId) && !!context.onExportRoundHistory,
+    invoke: (context) => context.sessionId && context.onExportRoundHistory?.(context.sessionId),
+    kind: 'safe',
+    confirm: null,
+  },
+  {
+    key: 'deepWipe',
+    label: 'Deep Wipe',
+    description: 'Destroy the issue workspace, agent state, and git branches.',
+    scope: 'session',
+    ownerSurface: 'ZoneBActionStrip',
+    enabledWhen: (context) => hasText(context.issueId) && !!context.onDeepWipe,
+    invoke: (context) => context.issueId && context.onDeepWipe?.(context.issueId),
+    kind: 'destructive',
+    confirm: {
+      title: 'Deep Wipe',
+      message: (context) => `Deep wipe will destroy all data for ${context.issueId ?? 'this issue'} including workspace, state, and git branches. This cannot be undone.`,
+      confirmLabel: 'Deep Wipe',
+      variant: 'destructive',
+    },
   },
 ];
 

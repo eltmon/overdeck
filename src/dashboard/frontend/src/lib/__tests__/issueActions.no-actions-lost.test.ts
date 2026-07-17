@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DialogProvider } from '../../components/DialogProvider';
 import { ZoneBActionStrip } from '../../components/CommandDeck/ZoneBActionStrip';
@@ -10,6 +10,7 @@ import {
   PROJECT_TREE_CONTEXT_ACTIONS,
   ZONE_B_SESSION_ACTIONS,
   type IssueActionKey,
+  type NonIssueActionKey,
 } from '../issueActions';
 
 const registryKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
@@ -72,8 +73,31 @@ const statusFlowActions = [
 
 const projectTreeUtilityActions = PROJECT_TREE_CONTEXT_ACTIONS;
 const zoneBSessionActions = ZONE_B_SESSION_ACTIONS;
+const expectedZoneBActionKeys = [
+  'stopSession',
+  'viewTerminal',
+  'pauseSession',
+  'resumeSession',
+  'restartSession',
+  'replaySession',
+  'openStateDir',
+  'viewState',
+  'viewVbrief',
+  'copySessionId',
+  'copyTmuxCommand',
+  'viewJsonl',
+  'exportSessionMetadata',
+  'exportRoundHistory',
+  'deepWipe',
+] as const satisfies readonly NonIssueActionKey[];
 
-function renderZoneBActionStrip() {
+function renderZoneBActionStrip({
+  presence = 'active',
+  onViewTerminal = () => undefined,
+}: {
+  presence?: string;
+  onViewTerminal?: () => void;
+} = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(createElement(
     QueryClientProvider,
@@ -83,11 +107,11 @@ function renderZoneBActionStrip() {
       null,
       createElement(ZoneBActionStrip, {
         issueId: 'PAN-1331',
-        onViewTerminal: () => undefined,
+        onViewTerminal,
         session: {
           sessionId: 'agent-pan-1331',
           type: 'work',
-          presence: 'active',
+          presence,
           tmuxSession: 'agent-pan-1331',
           hasJsonl: true,
           roundMetadata: { roundCount: 1 },
@@ -96,6 +120,10 @@ function renderZoneBActionStrip() {
     ),
   ));
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function renderMenuLabels(entries: typeof legacyCommandDeckIssueActions) {
   const menu = document.createElement('div');
@@ -164,20 +192,113 @@ describe('issueActions no-actions-lost audit', () => {
     }
   });
 
-  it('renders Zone B session-scoped actions from their real surface', () => {
-    renderZoneBActionStrip();
-
-    expect(screen.getByTitle('Stop session')).toBeInTheDocument();
-    expect(screen.getByTitle('View terminal')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('zone-b-overflow'));
-    for (const action of zoneBSessionActions.filter((entry) => !['stopSession', 'viewTerminal'].includes(entry.key))) {
-      expect(screen.getByText(action.label), action.key).toBeInTheDocument();
-    }
+  it('keeps every Zone B action in the executable non-issue registry', () => {
+    expect(zoneBSessionActions.map((action) => action.key)).toEqual(expectedZoneBActionKeys);
     for (const action of zoneBSessionActions) {
       expect(action.scope, action.label).toBe('session');
       expect(action.ownerSurface, action.label).toBe('ZoneBActionStrip');
-      expect(registryKeys.has(action.key as IssueActionKey), action.label).toBe(false);
+      expect(typeof action.enabledWhen, action.label).toBe('function');
+      expect(typeof action.invoke, action.label).toBe('function');
+      expect(ISSUE_ACTIONS, action.label).not.toContain(action);
     }
+  });
+
+  it('renders every available Zone B action from its executable contract entry', () => {
+    const { container } = renderZoneBActionStrip();
+
+    fireEvent.click(screen.getByTestId('zone-b-overflow'));
+    const renderedKeys = Array.from(container.querySelectorAll('[data-action-key]'))
+      .map((element) => element.getAttribute('data-action-key'));
+    const enabledKeys = expectedZoneBActionKeys.filter((key) => key !== 'resumeSession');
+    expect(renderedKeys).toHaveLength(enabledKeys.length);
+    expect(renderedKeys).toEqual(expect.arrayContaining(enabledKeys));
+    for (const key of renderedKeys) {
+      const action = zoneBSessionActions.find((entry) => entry.key === key);
+      expect(action, key ?? '').toBeDefined();
+      expect(container.querySelector(`[data-action-key="${key}"]`), key ?? '').toHaveTextContent(action?.label ?? '');
+    }
+  });
+
+  it('uses the Zone B contract stop confirmation before invoking the existing endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderZoneBActionStrip();
+
+    fireEvent.click(screen.getByTestId('zone-b-stop-session'));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText('Stop Session')).toBeInTheDocument();
+    expect(within(dialog).getByText('Stop session agent-pan-1331?')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Stop' }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/agents/agent-pan-1331',
+        { method: 'DELETE' },
+      );
+    });
+  });
+
+  it('preserves terminal, pause, and resume invocation behavior through the Zone B contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    });
+    const onViewTerminal = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const active = renderZoneBActionStrip({ onViewTerminal });
+
+    fireEvent.click(screen.getByTestId('zone-b-view-terminal'));
+    expect(onViewTerminal).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByTestId('zone-b-pause'));
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/agents/agent-pan-1331/suspend',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+
+    active.unmount();
+    fetchMock.mockClear();
+    renderZoneBActionStrip({ presence: 'suspended' });
+    fireEvent.click(screen.getByTestId('zone-b-resume'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        '/api/agents/agent-pan-1331/resume',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ message: 'Resumed from dashboard' }),
+        }),
+      );
+    });
+  });
+
+  it('requires the Zone B contract confirmation before deep wipe invocation', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    renderZoneBActionStrip();
+
+    fireEvent.click(screen.getByTestId('zone-b-overflow'));
+    fireEvent.click(screen.getByText('Deep Wipe'));
+
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByRole('heading', { name: 'Deep Wipe' })).toBeInTheDocument();
+    expect(within(dialog).getByText(
+      'Deep wipe will destroy all data for PAN-1331 including workspace, state, and git branches. This cannot be undone.',
+    )).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('has menu-renderable labels for every registry-covered legacy issue action', () => {
