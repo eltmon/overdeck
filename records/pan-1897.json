@@ -421,7 +421,7 @@
     "recordedAt": "2026-07-17T05:45:07.089Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T06:23:21.568Z",
+  "updated": "2026-07-17T06:23:36.104Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "pending",
@@ -431,12 +431,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T06:23:21.543Z",
+    "updatedAt": "2026-07-17T06:23:36.050Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "d1fe4426c3c18aa7fc6c32b3102330757d71c2f3",
-    "reviewRequestedAt": "2026-07-17T05:45:37.346Z",
+    "reviewRequestedAt": "2026-07-17T06:23:35.706Z",
     "reviewSpawnedAt": "2026-07-17T06:08:02.082Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -624,7 +624,7 @@
       },
       "costAtCloseOut": {
         "usd": 504.108041,
-        "pricingAsOf": "2026-07-17T06:23:21.550Z"
+        "pricingAsOf": "2026-07-17T06:23:36.054Z"
       }
     },
     "merges": [
