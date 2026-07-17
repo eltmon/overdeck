@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T02:43:19.304Z",
+  "updated": "2026-07-17T02:53:09.820Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "admitted-count": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 3868290,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T02:43:19.303Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -185,6 +177,16 @@
         "itemId": "health-agents-route",
         "outcome": "completed",
         "releasedAt": "2026-07-17T02:43:08.282Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 3868290,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T02:43:19.303Z",
+        "itemId": "admitted-count",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T02:53:09.820Z"
       }
     ],
     "statusReasons": {
@@ -237,6 +239,10 @@
     "health-agents-route.health-agents-route.ac2": "completed",
     "health-agents-route.health-agents-route.ac3": "completed",
     "health-agents-route.health-agents-route.ac4": "completed",
-    "admitted-count": "running"
+    "admitted-count": "completed",
+    "admitted-count.admitted-count.ac1": "completed",
+    "admitted-count.admitted-count.ac2": "completed",
+    "admitted-count.admitted-count.ac3": "completed",
+    "admitted-count.admitted-count.ac4": "completed"
   }
 }
