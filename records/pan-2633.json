@@ -66,17 +66,16 @@
     "recordedAt": "2026-07-16T17:53:59.399Z"
   },
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-17T05:21:21.862Z",
+  "updated": "2026-07-17T06:21:52.662Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T05:21:21.844Z",
+    "updatedAt": "2026-07-17T06:21:52.648Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Bead reducer-liveness-gate ack: commit df35ff8b merges 438a42c8f7, which adds shouldForceReemitPendingInput to the enrichment poller (agent-enrichment-service.ts) — the convergence-guarantee bead, separate from this ones scope. No changes to event-reducers.ts or its tests; reducer behavior verified against AC1-4 remains unaffected and still holds.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2793",
@@ -114,7 +113,9 @@
       ],
       "recordedAt": "2026-07-16T17:53:59.399Z"
     },
-    "strikeRecoveryCount": 0
+    "strikeRecoveryCount": 0,
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T06:21:52.648Z"
   },
   "closeOut": {
     "usage": {
@@ -264,7 +265,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2793"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T06:21:52.661Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at fea5026986e058f9ca463b6e8f3a9dee8f0b0831",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2793 MERGED at 2026-07-16T18:11:45Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T18:11:45Z",
+          "mergeCommit": "d4c372a71e9280371764681080681d9522eb39bb"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on d4c372a71e9280371764681080681d9522eb39bb",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T05:24:06.000Z, dist built 2026-07-17T05:23:47.539Z, merge 2026-07-16T18:11:45.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 11 agent state directories; No strike branch strike/pan-2633 found; Pruned 53 checkpoint ref(s) for agent-pan-2633, planning-pan-2633, strike-pan-2633; No specialist registry entries for PAN-2633"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
