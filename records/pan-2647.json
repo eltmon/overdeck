@@ -42,6 +42,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-17T09:29:29.682Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-17T09:33:58.050Z"
     }
   ],
   "feedback": [],
@@ -185,23 +190,23 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T09:33:56.296Z",
+  "updated": "2026-07-17T09:33:58.050Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T09:33:56.278Z",
+    "updatedAt": "2026-07-17T09:33:56.808Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
     "lastVerifiedCommit": "da442fa034d4933b9c707d1c79fa9f9814ad1f5d",
     "reviewRequestedAt": "2026-07-17T09:29:27.083Z",
-    "reviewSpawnedAt": "2026-07-17T09:29:28.249Z"
+    "reviewSpawnedAt": "2026-07-17T09:33:56.807Z"
   },
   "closeOut": {
     "usage": {
@@ -261,7 +266,7 @@
       },
       "costAtCloseOut": {
         "usd": 375.818938,
-        "pricingAsOf": "2026-07-17T09:33:56.293Z"
+        "pricingAsOf": "2026-07-17T09:33:56.840Z"
       }
     },
     "merges": [
