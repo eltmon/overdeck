@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T00:57:55.118Z",
+  "updated": "2026-07-17T00:58:10.594Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
@@ -84,8 +84,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "cli-guard-non-primary": {
+        "writerId": "agent-pan-2252",
+        "agentId": "agent-pan-2252",
+        "pid": 1169278,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T00:58:10.594Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2252",
@@ -122,6 +130,7 @@
     "linked-worktree-detection.linked-worktree-detection.ac1": "completed",
     "linked-worktree-detection.linked-worktree-detection.ac2": "completed",
     "linked-worktree-detection.linked-worktree-detection.ac3": "completed",
-    "linked-worktree-detection.linked-worktree-detection.ac4": "completed"
+    "linked-worktree-detection.linked-worktree-detection.ac4": "completed",
+    "cli-guard-non-primary": "running"
   }
 }
