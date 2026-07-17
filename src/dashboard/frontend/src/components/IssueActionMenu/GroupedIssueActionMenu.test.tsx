@@ -1,10 +1,18 @@
+import type { ReactNode } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GROUP_LABELS, GROUP_ORDER, ISSUE_ACTIONS, type IssueActionKey, type PipelinePhase } from '../../lib/issueActions';
+import { GROUP_LABELS, ISSUE_ACTIONS, type IssueActionKey, type PipelinePhase } from '../../lib/issueActions';
 import { ContextMenuRoot, ContextMenuTrigger } from '../shared/ContextMenu';
 import { GroupedIssueActionMenu, type IssueActionSessionExtra } from './GroupedIssueActionMenu';
+import {
+  IssueActionGroupedBody,
+  type IssueActionMenuItemPrimitiveProps,
+  type IssueActionMenuPrimitives,
+} from './IssueActionGroupedBody';
 import type { IssueActionView } from './useIssueActions';
+
+const NON_DANGER_GROUPS = ['planning', 'work', 'review', 'agent', 'workspace', 'artifacts', 'navigation'] as const;
 
 const invokes = new Map<IssueActionKey, ReturnType<typeof vi.fn>>();
 
@@ -23,6 +31,27 @@ function actionViews(enabledKeys: IssueActionKey[], actionKeys?: IssueActionKey[
     };
   });
 }
+
+function PlainMenuItem({
+  children,
+  onActivate,
+  preventClose: _preventClose,
+  role = 'menuitem',
+  ...props
+}: IssueActionMenuItemPrimitiveProps) {
+  return (
+    <button type="button" role={role} onClick={onActivate} {...props}>
+      {children}
+    </button>
+  );
+}
+
+const plainMenuPrimitives: IssueActionMenuPrimitives = {
+  Item: PlainMenuItem,
+  DestructiveItem: PlainMenuItem,
+  Label: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  Separator: () => <hr />,
+};
 
 function renderMenu({
   phase,
@@ -82,7 +111,7 @@ describe('GroupedIssueActionMenu', () => {
 
     const sectionLabels = [
       screen.getByText('For this phase'),
-      ...GROUP_ORDER.filter((group) => group !== 'danger').map((group) => {
+      ...NON_DANGER_GROUPS.map((group) => {
         const section = menu.querySelector(`[data-issue-action-section="${group}"]`);
         expect(section).not.toBeNull();
         return within(section as HTMLElement).getByText(GROUP_LABELS[group]);
@@ -95,6 +124,41 @@ describe('GroupedIssueActionMenu', () => {
     expect(screen.queryByText('Wipe')).not.toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Danger (1 available)' })).toHaveAttribute('aria-expanded', 'false');
     expect(menu).toHaveClass('max-h-[70vh]', 'overflow-y-auto');
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
+    expect(sessionExtra).toHaveBeenCalledOnce();
+  });
+
+  it('renders the complete grouped body inside a plain non-Radix menu host', () => {
+    const sessionExtra = vi.fn();
+    const all = actionViews(['plan', 'wipe'], ['plan', 'tell', 'wipe']);
+    const plan = all.find((view) => view.action.key === 'plan');
+    expect(plan).toBeDefined();
+
+    const { container } = render(
+      <div role="menu" data-testid="plain-menu-host">
+        <IssueActionGroupedBody
+          actions={{ all, primary: [plan!], phase: 'QUEUED_FOR_PLAN' }}
+          primitives={plainMenuPrimitives}
+          sessionExtras={[{ key: 'state', label: 'Open State Dir', onSelect: sessionExtra }]}
+        />
+      </div>,
+    );
+
+    expect(screen.getByTestId('plain-menu-host')).toBeInTheDocument();
+    for (const section of ['phase', 'planning', 'agent', 'session']) {
+      expect(container.querySelector(`[data-issue-action-section="${section}"]`)).toBeInTheDocument();
+    }
+    expect(container.querySelector('[data-issue-action-section="danger"]')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger (1 available)' }));
+    expect(container.querySelector('[data-issue-action-section="danger"]')).toBeInTheDocument();
+    expect(screen.getByTestId('issue-action-wipe')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('issue-action-explain-toggle'));
+    expect(localStorage.getItem('overdeck.issueActions.explain')).toBe('true');
+    expect(screen.getAllByTestId(/^issue-action-description-/)).toHaveLength(4);
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
     expect(sessionExtra).toHaveBeenCalledOnce();
