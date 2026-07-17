@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T00:58:10.594Z",
+  "updated": "2026-07-17T00:58:22.423Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T00:57:55.096Z",
-    "inspectNotes": "Inspecting item linked-worktree-detection",
+    "updatedAt": "2026-07-17T00:58:22.370Z",
+    "inspectNotes": "isLinkedWorktreeRoot/primaryRootFromLinkedWorktree correctly detect .git-as-file vs directory/absent (identity.ts:29-47); new check in shouldRefuseHostDashboardPort (identity.ts:87) placed after the pre-existing runningInContainer early-return (line 82-84), so container exemption is preserved; purely additive OR-branch only fires when .git is a file, so pre-existing tests using nonexistent repoRoots are unaffected. All 4 ACs satisfied.",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -44,11 +44,19 @@
             "cacheWrite": 176879
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 101,
+            "cacheRead": 28449,
+            "cacheWrite": 92605
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 918157,
-            "output": 25410,
-            "cacheRead": 9512960,
+            "input": 929919,
+            "output": 26092,
+            "cacheRead": 10230784,
             "cacheWrite": 0
           }
         }
@@ -66,16 +74,22 @@
           "cacheRead": 5096819,
           "cacheWrite": 176879
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 101,
+          "cacheRead": 28449,
+          "cacheWrite": 92605
+        },
         "openai/gpt-5.6-sol": {
-          "input": 918157,
-          "output": 25410,
-          "cacheRead": 9512960,
+          "input": 929919,
+          "output": 26092,
+          "cacheRead": 10230784,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.961348,
-        "pricingAsOf": "2026-07-17T00:57:55.103Z"
+        "usd": 20.637746,
+        "pricingAsOf": "2026-07-17T00:58:22.408Z"
       }
     },
     "merges": [],
