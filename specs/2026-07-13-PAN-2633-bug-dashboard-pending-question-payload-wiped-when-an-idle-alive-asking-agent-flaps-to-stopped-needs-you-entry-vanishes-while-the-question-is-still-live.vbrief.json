@@ -4,17 +4,17 @@
     "created": "2026-07-13T09:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2633: bug(dashboard): pending-question payload wiped when an idle-alive asking agent flaps to 'stopped' — needs-you entry vanishes while the question is still live",
-    "updated": "2026-07-16T17:41:29.569Z"
+    "updated": "2026-07-17T06:21:43.248Z"
   },
   "plan": {
     "id": "pan-2633",
     "title": "bug(dashboard): pending-question payload wiped when an idle-alive asking agent flaps to 'stopped' — needs-you entry vanishes while the question is still live",
-    "status": "running",
+    "status": "completed",
     "uid": "3ae61340-244c-4591-99c2-cc3335074695",
     "author": "agent:claude-fable-5",
-    "sequence": 8,
+    "sequence": 9,
     "created": "2026-07-13T09:05:00.000Z",
-    "updated": "2026-07-16T17:41:29.569Z",
+    "updated": "2026-07-17T06:21:43.248Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2633",
@@ -345,5 +345,5 @@
       "canonicalFilename": "2026-07-13-PAN-2633-bug-dashboard-pending-question-payload-wiped-when-an-idle-alive-asking-agent-flaps-to-stopped-needs-you-entry-vanishes-while-the-question-is-still-live.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
