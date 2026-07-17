@@ -61,40 +61,55 @@ function runOverdeckMigrationSync(db: SqliteDatabase): void {
 }
 
 /**
+ * Run one idempotent schema top-up without hiding unexpected SQLite failures.
+ * Missing tables are tolerated because partially initialized cache databases may
+ * not contain every optional runtime table yet.
+ */
+export function runSchemaTopUp(db: SqliteDatabase, statement: string): void {
+  try {
+    db.exec(statement);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/duplicate column name|already exists|no such table/i.test(message)) return;
+    console.error(`[schema] top-up failed: ${statement}\n${message}`);
+  }
+}
+
+/**
  * Idempotent schema top-ups for databases created before a field/index existed
  * in the init migration. The init migration only runs on a fresh database.
  * PAN-2220: the conversation ledger-cost query joins cost_events on session_id;
  * without this index SQLite builds an automatic index on every query (~76ms → 7ms).
  */
 function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
-  try { db.exec('ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text'); } catch { /* already exists or table absent */ }
-  try { db.exec("UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL"); } catch { /* table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_status` text'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `release_notes` text'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text'); } catch { /* already exists or table absent */ }
+  runSchemaTopUp(db, 'ALTER TABLE `discovered_sessions` ADD COLUMN `harness` text');
+  runSchemaTopUp(db, "UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_status` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_notes` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_state` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
   ensureReleaseSetTablesSync(db);
-  db.exec('CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
-  db.exec('CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
-  db.exec('CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
+  runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
   // PAN-2507: preemptive-scheduler yield attribution on agents. The init
   // migration only runs on a fresh DB, so existing overdeck.db files need these
   // columns added idempotently here.
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer'); } catch { /* already exists or table absent */ }
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer');
   // PAN-2585: PAN-1862 discovery-fork state — was state.json-only (write-only under
   // the DB-first reader), which blinded the discovery-ready signal and its backstop.
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `yielded_at` integer'); } catch { /* already exists or table absent */ }
-  try { db.exec('ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer'); } catch { /* already exists or table absent */ }
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
 }
 
 /**
