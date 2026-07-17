@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T00:52:34.702Z",
+  "updated": "2026-07-17T00:58:45.070Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "narrow-topup-error-swallowing": {
-        "writerId": "agent-pan-2807",
-        "agentId": "agent-pan-2807",
-        "pid": 1055660,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T00:52:34.701Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2807",
@@ -85,6 +77,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2807 dead)",
         "releasedAt": "2026-07-17T00:36:22.350Z"
+      },
+      {
+        "writerId": "agent-pan-2807",
+        "agentId": "agent-pan-2807",
+        "pid": 1055660,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T00:52:34.701Z",
+        "itemId": "narrow-topup-error-swallowing",
+        "outcome": "completed",
+        "reason": "Added runSchemaTopUp classification, converted runtime top-ups, verified real duplicate/missing/unexpected SQLite behavior through tests and the built CLI, and passed typecheck.",
+        "releasedAt": "2026-07-17T00:58:45.070Z"
       }
     ],
     "statusReasons": {
@@ -93,8 +96,8 @@
         "updatedAt": "2026-07-17T00:32:28.180Z"
       },
       "narrow-topup-error-swallowing": {
-        "reason": "stale claim released (agent-pan-2807 dead)",
-        "updatedAt": "2026-07-17T00:36:22.350Z"
+        "reason": "Added runSchemaTopUp classification, converted runtime top-ups, verified real duplicate/missing/unexpected SQLite behavior through tests and the built CLI, and passed typecheck.",
+        "updatedAt": "2026-07-17T00:58:45.070Z"
       }
     }
   },
@@ -103,6 +106,9 @@
     "add-cost-event-indexes.add-cost-event-indexes.ac1": "completed",
     "add-cost-event-indexes.add-cost-event-indexes.ac2": "completed",
     "add-cost-event-indexes.add-cost-event-indexes.ac3": "completed",
-    "narrow-topup-error-swallowing": "running"
+    "narrow-topup-error-swallowing": "completed",
+    "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac1": "completed",
+    "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac2": "completed",
+    "narrow-topup-error-swallowing.narrow-topup-error-swallowing.ac3": "completed"
   }
 }
