@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T01:57:26.918Z",
+  "updated": "2026-07-17T01:57:40.910Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -89,7 +89,7 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
+    "sequence": 4,
     "claims": {},
     "claimHistory": [
       {
@@ -115,6 +115,6 @@
     "wi-1-spawn.wi-1-spawn.ac1": "completed",
     "wi-1-spawn.wi-1-spawn.ac2": "completed",
     "wi-1-spawn.wi-1-spawn.ac3": "completed",
-    "wi-2-registry": "blocked"
+    "wi-2-registry": "pending"
   }
 }
