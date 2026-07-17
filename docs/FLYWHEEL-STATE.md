@@ -5825,3 +5825,15 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Remaining tail: PAN-2829 idle-frozen (~270min, PAN-2817), PAN-2377 dead-inspection (PAN-2848).** Order book: A13 done; B11/B12/B13 await the operator's TENET-10 answer.
 - **KEY LESSON of the 1610 saga (ticks 21-28): a large review-fix can look stuck for many ticks. The discriminators that resolved it: cost+diff CLIMBING across ticks = working (not idle); reviewed_at_commit must equal the code you ship (never merge a flaky pass on pre-fix code); commit lands → HEAD moves → re-review at new head → merge. Patience + strict head-verification beat both premature-merge and false-nudge.**
 - **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9.
+
+## Tick 29 — 2026-07-17 ~19:36 — PAN-1610 CLOSED OUT — MISSION COMPLETE; run at quiescence (all remaining work operator-gated)
+- **PAN-1610 CLOSED OUT.** main-verify passed (0f6eab3172 green on main); post-merge was the PAN-2846 dead-but-paused case (tmux NO session, state.json {status:running, paused:true}) → verified dead via the tmux oracle → `--accept-post-merge` with evidence.
+- **★★ RUN-65 HEADLINE MISSION COMPLETE: the operator sequence 2822 → 2661 → 1610 is fully MERGED + DEPLOYED + CLOSED OUT.** Plus A13=PAN-2445 (order-book Lane A) and 2 operator-started (2831, 2665). **6 issues fully closed out this run.**
+- **Run is now at QUIESCENCE — nothing left to autonomously drive.** Verified there is no remaining autonomous work:
+  - Released order-book set is EXACTLY A13 (done) + B11/B12/B13. B11/B12/B13 all carry needs-handoff + hit TENET-10 → cannot autonomous-start; await the operator's execution-mode answer (open since tick 9).
+  - PAN-2829 (idle-frozen ~290min, PAN-2817) + PAN-2377 (dead-inspection, PAN-2848): no sanctioned lever; operator nudge or the substrate fix.
+  - PAN-2817/2848 fixes are pipeline machinery (TENET-10) → can't autonomous-start; planning offered, not yet authorized.
+  - No operator authorization landed this tick (no new 2817 planning session, no B11-B13 sessions, 2829 still frozen, last 2817 comment is mine).
+- **This is mission-complete quiescence, NOT context-pressure wind-down** (context is fine). Keep ticking to watch for operator unblocks; do NOT manufacture work or expand scope past the released set (directive: "ONLY named book items + operator-started").
+- **Standing operator asks (all surfaced, unchanged):** (1) B11 TENET-10 execution-mode answer; (2) authorize `pan plan PAN-2817 --auto` and/or nudge 2829; (3) PAN-2377 dead-inspection fix or swarm re-enable; (4) PR#2821 (PAN-2232) reset-vs-authorize (carried from RUN-63).
+- **Run totals so far:** 6 merged+closed (2822/2661/2831/2665/2445/1610), 2 substrate fixes landed (2825/2833), 6 substrate bugs filed (2817/2824/2828/2839/2846/2848), ~7 flywheel deploys.
