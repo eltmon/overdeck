@@ -401,18 +401,19 @@
     "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T05:15:49.793Z",
+  "updated": "2026-07-17T05:19:49.551Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "failed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T05:15:49.761Z",
+    "updatedAt": "2026-07-17T05:19:48.132Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-1897-review already running. Use 'pan tell' to message it.",
+    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "f388395039506627228eab2b4f522a36475508e6",
@@ -563,9 +564,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 27892980,
-            "output": 1075560,
-            "cacheRead": 218808320,
+            "input": 27901216,
+            "output": 1076632,
+            "cacheRead": 219695616,
             "cacheWrite": 0
           }
         }
@@ -578,9 +579,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 52526605,
-          "output": 1688437,
-          "cacheRead": 295876864,
+          "input": 52534841,
+          "output": 1689509,
+          "cacheRead": 296764160,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -603,8 +604,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 458.290039,
-        "pricingAsOf": "2026-07-17T05:15:49.783Z"
+        "usd": 458.807027,
+        "pricingAsOf": "2026-07-17T05:19:49.163Z"
       }
     },
     "merges": [
