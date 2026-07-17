@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T01:03:46.003Z",
+  "updated": "2026-07-17T01:05:15.562Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
@@ -98,16 +98,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "guard-pan-reload-cwd": {
-        "writerId": "agent-pan-2252",
-        "agentId": "agent-pan-2252",
-        "pid": 1464741,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:03:46.003Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2252",
@@ -152,6 +144,17 @@
         "outcome": "completed",
         "reason": "pan up now invokes the shared non-primary checkout guard as the first action statement, before config reads, dev-supervisor checks, tmux, Traefik, host-tool, or server side effects; typecheck and lint pass.",
         "releasedAt": "2026-07-17T01:03:28.599Z"
+      },
+      {
+        "writerId": "agent-pan-2252",
+        "agentId": "agent-pan-2252",
+        "pid": 1464741,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:03:46.003Z",
+        "itemId": "guard-pan-reload-cwd",
+        "outcome": "completed",
+        "reason": "pan reload now runs the shared non-primary checkout guard immediately after option validation and before agent restart gating, restart-lock acquisition, builds, worktrees, or dashboard mutation; typecheck passes.",
+        "releasedAt": "2026-07-17T01:05:15.562Z"
       }
     ],
     "statusReasons": {
@@ -166,6 +169,10 @@
       "guard-pan-up-cwd": {
         "reason": "pan up now invokes the shared non-primary checkout guard as the first action statement, before config reads, dev-supervisor checks, tmux, Traefik, host-tool, or server side effects; typecheck and lint pass.",
         "updatedAt": "2026-07-17T01:03:28.599Z"
+      },
+      "guard-pan-reload-cwd": {
+        "reason": "pan reload now runs the shared non-primary checkout guard immediately after option validation and before agent restart gating, restart-lock acquisition, builds, worktrees, or dashboard mutation; typecheck passes.",
+        "updatedAt": "2026-07-17T01:05:15.562Z"
       }
     }
   },
@@ -183,6 +190,8 @@
     "guard-pan-up-cwd": "completed",
     "guard-pan-up-cwd.guard-pan-up-cwd.ac1": "completed",
     "guard-pan-up-cwd.guard-pan-up-cwd.ac2": "completed",
-    "guard-pan-reload-cwd": "running"
+    "guard-pan-reload-cwd": "completed",
+    "guard-pan-reload-cwd.guard-pan-reload-cwd.ac1": "completed",
+    "guard-pan-reload-cwd.guard-pan-reload-cwd.ac2": "completed"
   }
 }
