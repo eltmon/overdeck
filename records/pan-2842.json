@@ -52,9 +52,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-17T17:05:46.017Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-17T17:21Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-17T17:21:12.146Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-17T17:21:12Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2842\n\nCollapsed mode still hides StackDrawer, and the no-loss audit misses class-based CSS hiding\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2842 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx",
@@ -103,7 +116,7 @@
     "recordedAt": "2026-07-17T15:57:29.020Z"
   },
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T17:21:11.529Z",
+  "updated": "2026-07-17T17:21:12.147Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "blocked",
