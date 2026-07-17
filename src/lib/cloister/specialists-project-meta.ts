@@ -20,7 +20,7 @@ import {
   type ProjectSpecialistMetadata,
   type SpecialistAgentName,
 } from './specialists-registry.js';
-import { isRunning } from './specialists.js';
+import { isRunning } from './specialists-status.js';
 
 /**
  * ===========================================================================
