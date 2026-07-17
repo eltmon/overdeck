@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T00:51:45.686Z",
+  "updated": "2026-07-17T01:04:39.512Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "contract-v2": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 1015071,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T00:51:45.685Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -74,16 +66,31 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2647 dead)",
         "releasedAt": "2026-07-17T00:36:22.350Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 1015071,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T00:51:45.685Z",
+        "itemId": "contract-v2",
+        "outcome": "completed",
+        "reason": "Added the runtime-validated V2 health contract, tolerant enum decoding, exact legacy projector coverage, package export, and focused tests; build, tests, typecheck, and lint pass.",
+        "releasedAt": "2026-07-17T01:04:39.512Z"
       }
     ],
     "statusReasons": {
       "contract-v2": {
-        "reason": "stale claim released (agent-pan-2647 dead)",
-        "updatedAt": "2026-07-17T00:36:22.350Z"
+        "reason": "Added the runtime-validated V2 health contract, tolerant enum decoding, exact legacy projector coverage, package export, and focused tests; build, tests, typecheck, and lint pass.",
+        "updatedAt": "2026-07-17T01:04:39.512Z"
       }
     }
   },
   "statusOverrides": {
-    "contract-v2": "running"
+    "contract-v2": "completed",
+    "contract-v2.contract-v2.ac1": "completed",
+    "contract-v2.contract-v2.ac2": "completed",
+    "contract-v2.contract-v2.ac3": "completed",
+    "contract-v2.contract-v2.ac4": "completed"
   }
 }
