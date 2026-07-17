@@ -5452,3 +5452,8 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Actual live pipeline re-driven this tick:** 1966 review restarted (wedge fix in effect); 2252/2647/2807 work agents STARTED (were completely dead — no agents at all); **2232 was scheduler-yielded "making room for review of PAN-1987" and NEVER self-cleared** (1987 merged 3h ago) — unpaused + resumed. Yield self-clear failure = real bug to file if reproduced.
 - 1897: work agent actively fixing CHANGES REQUESTED ($71 spent, 74k ctx, alive). 1491: PR#1636 CLOSED but branch has 42 commits incl. "address review findings" — needs disposition (re-open PR or operator call).
 - Live set now: 1491, 1897, 1966, 2232, 2252, 2647, 2807 (+806 HELD).
+
+## Tick 72b — 2026-07-16 ~20:32 — DEPLOY EXECUTED (operator go-ahead)
+- **Deployed dist@a9e301526b** via `pan restart --dashboard --resume --health-timeout 120000`. New server: pid 467521, Node 22, started 20:31:08, owns :3011, /api/health 200 (<1ms). Every merge today (1987, 2772, 2760, 2619, 2773, 2045 + operator's 14-issue close-out set) is now IN the live build → DoD deploy row passes.
+- Killed 5 orphaned host server.js processes (no listen sockets; reconnect-storm class, PAN-2318 playbook). Two remaining server.js pids are workspace devcontainer peers (cwd=/workspaces/overdeck, no host listeners) — left alone per single-deacon rule.
+- Operator now runs the 14 close-outs. My focus stays: live merges on the real set (1491, 1897, 1966, 2232, 2252, 2647, 2807).
