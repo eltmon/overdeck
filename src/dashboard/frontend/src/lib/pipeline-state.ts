@@ -125,7 +125,7 @@ export function isPipelineReady(issue: Pick<Issue, 'labels' | 'stateType'>): boo
 }
 
 export function getPipelineIssuePhase(
-  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels'>,
+  issue: Pick<Issue, 'state' | 'status' | 'stateType' | 'hasPlan' | 'planningComplete' | 'mergeStatus' | 'labels' | 'pipelineMembership'>,
   reviewStatus?: PipelineStateLike | null,
   agent?: Pick<Agent, 'role' | 'status' | 'hasPendingQuestion' | 'pendingQuestionCount' | 'pendingQuestionPrompt'> | null,
 ): PipelineIssuePhase {
