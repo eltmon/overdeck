@@ -16,10 +16,8 @@ const execFileAsync = promisify(execFile);
 const KB = 1024;
 
 export const LINUX_MEMORY_PRESSURE_DEFAULTS = Object.freeze({
-  someWarningAvg10: 0.1,
-  someCriticalAvg10: 1,
-  fullWarningAvg10: 0.01,
-  fullCriticalAvg10: 0.1,
+  someWarningAvg10: 5,
+  fullCriticalAvg10: 1,
   swapActivityWarningBytesPerMinute: 64 * 1024 ** 2,
   swapActivityCriticalBytesPerMinute: 256 * 1024 ** 2,
 });
