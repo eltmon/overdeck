@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T01:36:55.537Z",
+  "updated": "2026-07-17T01:44:39.299Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "evaluate-pure": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 2312442,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:36:55.537Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -145,6 +137,16 @@
         "itemId": "collector-darwin",
         "outcome": "completed",
         "releasedAt": "2026-07-17T01:36:47.760Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2312442,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:36:55.537Z",
+        "itemId": "evaluate-pure",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T01:44:39.299Z"
       }
     ],
     "statusReasons": {
@@ -175,6 +177,10 @@
     "collector-darwin.collector-darwin.ac2": "completed",
     "collector-darwin.collector-darwin.ac3": "completed",
     "collector-darwin.collector-darwin.ac4": "completed",
-    "evaluate-pure": "running"
+    "evaluate-pure": "completed",
+    "evaluate-pure.evaluate-pure.ac1": "completed",
+    "evaluate-pure.evaluate-pure.ac2": "completed",
+    "evaluate-pure.evaluate-pure.ac3": "completed",
+    "evaluate-pure.evaluate-pure.ac4": "completed"
   }
 }
