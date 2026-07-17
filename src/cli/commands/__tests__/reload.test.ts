@@ -10,7 +10,9 @@ const mocks = vi.hoisted(() => ({
   restartDashboard: vi.fn(),
   stopDashboard: vi.fn(),
   writeRestartStatus: vi.fn(),
+  refuseNonPrimaryDashboardCwd: vi.fn(),
   resolveBundledServerPath: vi.fn(),
+  resolvePrimaryDashboardIdentity: vi.fn(),
   spawnDashboardDetached: vi.fn(),
   exec: vi.fn(),
   spawn: vi.fn(),
@@ -60,7 +62,9 @@ vi.mock('../../../lib/restart-status.js', () => ({
 }));
 
 vi.mock('../restart.js', () => ({
+  refuseNonPrimaryDashboardCwd: mocks.refuseNonPrimaryDashboardCwd,
   resolveBundledServerPath: mocks.resolveBundledServerPath,
+  resolvePrimaryDashboardIdentity: mocks.resolvePrimaryDashboardIdentity,
   spawnDashboardDetached: mocks.spawnDashboardDetached,
 }));
 
@@ -143,7 +147,9 @@ describe('reloadCommand', () => {
     });
     mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));
     mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
+    mocks.refuseNonPrimaryDashboardCwd.mockReturnValue(false);
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
+    mocks.resolvePrimaryDashboardIdentity.mockReturnValue({ repoRoot: '/repo', mode: 'primary' });
     mocks.readDevSupervisorMarker.mockReturnValue(null);
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
     mocks.agentRestartBlockReason.mockResolvedValue(null);
