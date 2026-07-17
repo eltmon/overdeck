@@ -5,6 +5,27 @@ Companion to `docs/overdeck-db-erd.excalidraw`. Source of truth:
 `src/lib/overdeck/*.ts` Drizzle definitions). Generated alongside
 `docs/overdeck-db-erd.mmd` (Mermaid `erDiagram`, the reviewable intermediate).
 
+## Schema changes
+
+Every new `overdeck.db` column or index must land in both
+`drizzle/overdeck/0000_overdeck_init.sql`, for fresh databases, and the
+`ensureRuntimeIndexesSync` top-ups in `src/lib/overdeck/infra.ts`, for existing
+databases. The init migration never runs again after the `agents` table exists,
+so changing only the migration leaves existing installations behind. Runtime
+top-ups silence duplicate DDL, log missing-table and other unexpected failures,
+and continue so later top-ups and startup can still complete.
+
+Startup runs the report-only audit in `src/lib/overdeck/schema-audit.ts` after
+the top-ups. It reads SQLite schema metadata, never mutates the database, and
+writes one `[schema-audit]` warning for each missing expected table, index, or
+column; extra artifacts are allowed because other modules add their own tables.
+
+`overdeck.db` uses this init-plus-top-up model and does not use
+`PRAGMA user_version`. The legacy `panopticon.db` migration ladder in
+`src/lib/database/schema.ts` has different semantics: duplicate DDL is
+idempotent, but any unexpected migration error is logged and rethrown before
+`user_version` can advance past the failed step.
+
 ## Rendered counts
 
 | Thing | Count |
