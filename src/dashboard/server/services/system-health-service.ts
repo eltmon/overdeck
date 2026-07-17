@@ -6,10 +6,8 @@ import { promisify } from 'node:util';
 import {
   projectLegacySystemHealthSummary,
   type AgentHealthSnapshot,
-  type AgentRuntimeSnapshot,
   type HealthReason,
   type HealthState,
-  type ServiceHealthSnapshot,
   type SpecialistLifecycle,
   type SystemHealthSnapshot as SharedSystemHealthSnapshot,
 } from '@overdeck/contracts';
@@ -19,16 +17,12 @@ import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
 
 import { getRuntimeSnapshot } from '../../../lib/agent-runtime-mirror.js';
 import { listRunningAgents, getAgentRuntimeState, type AgentState } from '../../../lib/agents.js';
-import {
-  classifyAgentHealth,
-  type AgentHealthRuntimeState,
-} from '../../../lib/agents/health.js';
+import { classifyAgentHealth } from '../../../lib/agents/health.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { isSmeeConfiguredSync, isSmeeProcessRunningSync } from '../../../lib/smee.js';
 import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import {
-  classifyAdvancingSessionLifecycle,
   readReviewStatusMap,
   type WarmIdleStatusShape,
 } from '../../../lib/cloister/review-status-source.js';
@@ -47,19 +41,27 @@ import {
   type RawHealthAssessment,
   type SystemHealthSampler,
 } from '../../../lib/system-health/sampler.js';
-import type { HostMetricSample, HostMetricSignal } from '../../../lib/system-health/types.js';
+import type { HostMetricSample } from '../../../lib/system-health/types.js';
 import {
   computeBuildStaleness,
   type BuildStaleness,
 } from '../../../lib/deploy/staleness.js';
 import { initEventStore } from '../event-store.js';
 import { getDashboardIdentity } from '../identity.js';
+import {
+  acceptedReasons,
+  agentLifecycle,
+  hostMetrics,
+  overallHealthState,
+  runtimeHealthState,
+  serviceHealth,
+  stateToLegacySeverity,
+  type SystemHealthSeverity,
+} from './system-health-v2.js';
 
 const execAsync = promisify(exec);
 const KB = 1024;
 const GIB = 1024 ** 3;
-
-type SystemHealthSeverity = 'normal' | 'warning' | 'critical';
 
 export interface ProcMemorySnapshot {
   memTotal: number;
@@ -591,53 +593,6 @@ function reviewStatusMap(): ReadonlyMap<string, WarmIdleStatusShape> {
   return new Map(Object.entries(readReviewStatusMap() ?? {}));
 }
 
-function runtimeHealthState(
-  runtime: AgentRuntimeSnapshot | null,
-): AgentHealthRuntimeState | null {
-  if (!runtime) return null;
-  switch (runtime.activity) {
-    case 'working':
-    case 'thinking':
-      return {
-        state: 'active',
-        lastActivity: runtime.lastActivity,
-        contextSaturatedAt: runtime.contextSaturatedAt,
-      };
-    case 'waiting':
-      return {
-        state: 'waiting-on-human',
-        lastActivity: runtime.lastActivity,
-        contextSaturatedAt: runtime.contextSaturatedAt,
-      };
-    case 'idle':
-      return {
-        state: 'idle',
-        lastActivity: runtime.lastActivity,
-        contextSaturatedAt: runtime.contextSaturatedAt,
-      };
-    case 'stopped':
-      return {
-        state: 'stopped',
-        lastActivity: runtime.lastActivity,
-        contextSaturatedAt: runtime.contextSaturatedAt,
-      };
-  }
-}
-
-function agentLifecycle(
-  role: string | undefined,
-  issueId: string,
-  tmuxActive: boolean,
-  statuses: ReadonlyMap<string, WarmIdleStatusShape>,
-): SpecialistLifecycle {
-  if (role !== 'review' && role !== 'test' && role !== 'ship') return 'unknown';
-  return classifyAdvancingSessionLifecycle(
-    role,
-    statuses.get(issueId.toUpperCase()),
-    tmuxActive,
-  );
-}
-
 async function collectAgentProcesses(): Promise<{
   agents: HealthAgentProcess[];
   healthAgents: AgentHealthSnapshot[];
@@ -781,121 +736,6 @@ function buildTopConsumers(
 
   return [...agentConsumers, ...containerConsumers]
     .sort((a, b) => b.memoryBytes - a.memoryBytes);
-}
-
-function stateToLegacySeverity(state: HealthState): SystemHealthSeverity {
-  return state === 'critical' ? 'critical' : state === 'warning' ? 'warning' : 'normal';
-}
-
-function signalValue(signal: HostMetricSignal<number>): number | null {
-  return signal.status === 'available' ? signal.value : null;
-}
-
-function hostMetrics(sample: HostMetricSample): SharedSystemHealthSnapshot['host']['metrics'] {
-  return {
-    cpuPercent: signalValue(sample.cpuPercent),
-    loadAverage1m: signalValue(sample.loadAverage1m),
-    loadPerCore1m: signalValue(sample.loadPerCore1m),
-    totalMemoryBytes: signalValue(sample.totalMemoryBytes),
-    usedMemoryBytes: signalValue(sample.usedMemoryBytes),
-    availableMemoryBytes: signalValue(sample.availableMemoryBytes),
-    memoryUsedPercent: signalValue(sample.memoryUsedPercent),
-    memoryPressureSomeAvg10: signalValue(sample.memoryPressureSomeAvg10),
-    memoryPressureFullAvg10: signalValue(sample.memoryPressureFullAvg10),
-    memoryPressureFreePercent: signalValue(sample.memoryPressureFreePercent),
-    swapTotalBytes: signalValue(sample.swapTotalBytes),
-    swapUsedBytes: signalValue(sample.swapUsedBytes),
-    swapUsedPercent: signalValue(sample.swapUsedPercent),
-    swapActivityBytesPerMinute: signalValue(sample.swapActivityBytesPerMinute),
-    committedMemoryBytes: signalValue(sample.committedMemoryBytes),
-    commitLimitBytes: signalValue(sample.commitLimitBytes),
-    virtualCommitmentPercent: signalValue(sample.virtualCommitmentPercent),
-  };
-}
-
-function serviceHealth(smeeRelay: SmeeRelayHealth): ServiceHealthSnapshot[] {
-  if (smeeRelay.status === 'running') {
-    return [{
-      id: 'smee-relay',
-      label: 'Webhook relay',
-      required: false,
-      status: 'running',
-      message: smeeRelay.message,
-      reasons: [],
-    }];
-  }
-  if (smeeRelay.status === 'not_configured') {
-    return [{
-      id: 'smee-relay',
-      label: 'Webhook relay',
-      required: false,
-      status: 'not_configured',
-      message: smeeRelay.message,
-      reasons: [],
-    }];
-  }
-
-  const unavailable = smeeRelay.status === 'unknown';
-  return [{
-    id: 'smee-relay',
-    label: 'Webhook relay',
-    required: false,
-    status: unavailable ? 'unavailable' : 'stopped',
-    message: smeeRelay.message,
-    reasons: [{
-      code: unavailable
-        ? 'service.smee_relay.unavailable'
-        : 'service.smee_relay.stopped',
-      domain: 'service',
-      severity: unavailable ? 'info' : 'warning',
-      message: smeeRelay.message,
-    }],
-  }];
-}
-
-function overallHealthState(
-  hostState: HealthState,
-  agents: readonly AgentHealthSnapshot[],
-  services: readonly ServiceHealthSnapshot[],
-): HealthState {
-  if (hostState === 'critical'
-    || agents.some((agent) => agent.status === 'dead' || agent.status === 'wedged')) {
-    return 'critical';
-  }
-  if (hostState === 'warning'
-    || agents.some((agent) => agent.status === 'warning' || agent.status === 'stalled')
-    || services.some((service) => service.status === 'degraded' || service.status === 'stopped')) {
-    return 'warning';
-  }
-  if (hostState === 'measuring') return 'measuring';
-  if (hostState === 'unavailable'
-    || agents.some((agent) => agent.status === 'unavailable')
-    || services.some((service) => service.status === 'unavailable')) {
-    return 'unavailable';
-  }
-  return 'healthy';
-}
-
-function acceptedReasons(
-  state: HealthState,
-  hostReasons: readonly HealthReason[],
-  agents: readonly AgentHealthSnapshot[],
-  services: readonly ServiceHealthSnapshot[],
-): HealthReason[] {
-  const reasons = [
-    ...hostReasons,
-    ...agents.flatMap((agent) => agent.reasons),
-    ...services.flatMap((service) => service.reasons),
-  ];
-  if (state === 'measuring' && reasons.length === 0) {
-    return [{
-      code: 'host.sampler.measuring',
-      domain: 'host',
-      severity: 'info',
-      message: 'System health is collecting the initial three samples.',
-    }];
-  }
-  return reasons;
 }
 
 function createMeasuringSnapshot(): CollectedSystemHealthBundle {
