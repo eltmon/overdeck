@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { cwd } from 'node:process';
 import { relative, resolve, sep } from 'node:path';
 
@@ -24,6 +24,28 @@ export function getDashboardIdentity(): DashboardIdentity {
 
 export function isWorkspaceRepoRoot(repoRoot: string): boolean {
   return /(^|\/)workspaces\/feature-[^/]+$/i.test(repoRoot.replaceAll('\\', '/'));
+}
+
+export function isLinkedWorktreeRoot(repoRoot: string): boolean {
+  try {
+    return statSync(resolve(repoRoot, '.git')).isFile();
+  } catch {
+    return false;
+  }
+}
+
+export function primaryRootFromLinkedWorktree(repoRoot: string): string | null {
+  try {
+    const match = readFileSync(resolve(repoRoot, '.git'), 'utf-8').match(/^gitdir:\s*(.+)$/m);
+    const gitDir = match?.[1]?.trim().replaceAll('\\', '/');
+    if (!gitDir) return null;
+
+    const worktreeMarker = '/.git/worktrees/';
+    const markerIndex = gitDir.indexOf(worktreeMarker);
+    return markerIndex === -1 ? null : gitDir.slice(0, markerIndex);
+  } catch {
+    return null;
+  }
 }
 
 function isSameOrInside(parent: string, candidate: string): boolean {
@@ -62,6 +84,7 @@ export function shouldRefuseHostDashboardPort(input: {
   }
   if (input.mode === 'peer') return true;
 
+  if (isLinkedWorktreeRoot(repoRoot)) return true;
   if (isWorkspaceRepoRoot(repoRoot)) return true;
 
   const workspacesDir = resolve(repoRoot, '..');
