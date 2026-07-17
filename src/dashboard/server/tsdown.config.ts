@@ -30,9 +30,9 @@ function configYamlSingleChunkAssertion() {
   };
 }
 
-function strikeLandingSingleChunkAssertion() {
+function strikeLandingDeaconChunkAssertion() {
   return {
-    name: 'strike-landing-single-chunk-assertion',
+    name: 'strike-landing-deacon-chunk-assertion',
     writeBundle(
       _outputOptions: unknown,
       bundle: Record<string, { type: string; fileName: string; modules?: Record<string, unknown> }>,
@@ -45,10 +45,12 @@ function strikeLandingSingleChunkAssertion() {
         });
       });
 
-      if (chunks.length !== 1) {
+      const fileName = chunks[0]?.fileName;
+      if (chunks.length !== 1 || !(fileName === 'deacon.js' || fileName?.startsWith('deacon-'))) {
         const chunkList = chunks.map((chunk) => chunk.fileName).join(', ') || '(none)';
         throw new Error(
-          `Expected src/lib/cloister/deacon-strike-landing.ts in exactly one dashboard chunk, found ${chunks.length}: ${chunkList}`,
+          'Expected src/lib/cloister/deacon-strike-landing.ts only in the forked deacon.js entry; '
+          + `found ${chunks.length} chunk(s): ${chunkList}`,
         );
       }
     },
@@ -96,7 +98,7 @@ export default defineConfig(async () => {
         ],
       },
     },
-    plugins: [configYamlSingleChunkAssertion(), strikeLandingSingleChunkAssertion()],
+    plugins: [configYamlSingleChunkAssertion(), strikeLandingDeaconChunkAssertion()],
     deps: {
       alwaysBundle: [/^@overdeck\//],
       neverBundle: [

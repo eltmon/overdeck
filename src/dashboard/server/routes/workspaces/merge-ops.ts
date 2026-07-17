@@ -20,7 +20,6 @@ import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { registerStrikeMergeTrigger, registerStrikeOwnershipProbe } from '../../../../lib/cloister/deacon-strike-landing.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
@@ -37,10 +36,12 @@ import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { setMergeQueueTriggerHandler } from '../../services/merge-queue-service.js';
 import { httpHandler } from '../http-handler.js';
+import { validateInternalEventsHeaders } from '../internal-events.js';
+import type { HeaderMap } from '../origin-validation.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
-import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
+import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, parseStrikeMergeRequest, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -1231,7 +1232,40 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   }
 }
 
-setMergeQueueTriggerHandler(triggerMerge); registerStrikeMergeTrigger(triggerMerge); registerStrikeOwnershipProbe(issueId => (getPendingOperation(issueId)?.type === 'merge' && getPendingOperation(issueId)?.status === 'running') || getAllActiveQueues().some(queue => queue.current === issueId.toUpperCase() || queue.queue.includes(issueId.toUpperCase())));
+setMergeQueueTriggerHandler(triggerMerge);
+
+const postInternalStrikeMergeRoute = HttpRouter.add(
+  'POST',
+  '/api/internal/strikes/:issueId/merge',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = validateInternalEventsHeaders(request.headers as HeaderMap);
+    if (!auth.ok) return jsonResponse({ success: false, error: auth.error }, { status: auth.status });
+
+    const params = yield* HttpRouter.params;
+    const issueId = params['issueId'] ?? '';
+    if (!parseIssueIdSync(issueId) || !/^[A-Z]+-\d+$/i.test(issueId)) {
+      return jsonResponse({ success: false, error: 'Invalid issue ID' }, { status: 400 });
+    }
+
+    const text = yield* request.text;
+    let raw: unknown;
+    try {
+      raw = text ? JSON.parse(text) : null;
+    } catch {
+      return jsonResponse({ success: false, error: 'Invalid JSON' }, { status: 400 });
+    }
+    const strikeRequest = parseStrikeMergeRequest(raw);
+    if (!strikeRequest) {
+      return jsonResponse({ success: false, error: 'Invalid strike merge request' }, { status: 400 });
+    }
+
+    const result = yield* Effect.promise(() => triggerMerge(issueId, strikeRequest));
+    const { statusCode, ...body } = result;
+    return jsonResponse(body, { status: statusCode });
+  })),
+);
+
 // ─── Route: POST /api/issues/:issueId/merge ───────────────────────────────
 const postWorkspaceMergeRoute = HttpRouter.add(
   'POST',
@@ -1929,6 +1963,7 @@ export const mergeOpsRouteLayer = Layer.mergeAll(
   postForgeMergeRoute,
   postWorkspaceApproveRoute,
   getMergeQueueRoute,
+  postInternalStrikeMergeRoute,
   postInternalPipelineNotifyRoute,
 );
 
