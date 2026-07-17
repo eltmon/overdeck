@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T10:43:39.855Z",
+  "updated": "2026-07-17T10:48:39.123Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "issues-pane-toggle": {
-        "writerId": "agent-pan-2822",
-        "agentId": "agent-pan-2822",
-        "pid": 1875739,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:43:39.855Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2822",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Added the persisted local visibility store, optional frontend discriminator, stable-reference filter helper, and focused default/persistence/failure/filter tests; typecheck and focused frontend tests pass in pushed commit de008cbd7f.",
         "releasedAt": "2026-07-17T10:43:30.401Z"
+      },
+      {
+        "writerId": "agent-pan-2822",
+        "agentId": "agent-pan-2822",
+        "pid": 1875739,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:43:39.855Z",
+        "itemId": "issues-pane-toggle",
+        "outcome": "completed",
+        "reason": "Extracted the Issues filter row, added the persisted Planned toggle, filtered the Issues tree/count and ProjectHome input while preserving unfiltered issue resolution, and added interaction coverage. Typecheck, 19 CommandDeck tests, and the 1537-line file-size ratchet pass in pushed commit 1a6ae9f4f3.",
+        "releasedAt": "2026-07-17T10:48:39.123Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "pref-store-and-filter": {
         "reason": "Added the persisted local visibility store, optional frontend discriminator, stable-reference filter helper, and focused default/persistence/failure/filter tests; typecheck and focused frontend tests pass in pushed commit de008cbd7f.",
         "updatedAt": "2026-07-17T10:43:30.401Z"
+      },
+      "issues-pane-toggle": {
+        "reason": "Extracted the Issues filter row, added the persisted Planned toggle, filtered the Issues tree/count and ProjectHome input while preserving unfiltered issue resolution, and added interaction coverage. Typecheck, 19 CommandDeck tests, and the 1537-line file-size ratchet pass in pushed commit 1a6ae9f4f3.",
+        "updatedAt": "2026-07-17T10:48:39.123Z"
       }
     }
   },
@@ -127,6 +134,11 @@
     "pref-store-and-filter.pref-store-and-filter.ac2": "completed",
     "pref-store-and-filter.pref-store-and-filter.ac3": "completed",
     "pref-store-and-filter.pref-store-and-filter.ac4": "completed",
-    "issues-pane-toggle": "running"
+    "issues-pane-toggle": "completed",
+    "issues-pane-toggle.issues-pane-toggle.ac1": "completed",
+    "issues-pane-toggle.issues-pane-toggle.ac2": "completed",
+    "issues-pane-toggle.issues-pane-toggle.ac3": "completed",
+    "issues-pane-toggle.issues-pane-toggle.ac4": "completed",
+    "issues-pane-toggle.issues-pane-toggle.ac5": "completed"
   }
 }
