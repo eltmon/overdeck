@@ -148,17 +148,17 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T19:04:43.106Z",
+  "updated": "2026-07-17T19:04:43.543Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T19:04:43.084Z",
+    "updatedAt": "2026-07-17T19:04:43.514Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -305,7 +305,7 @@
       },
       "costAtCloseOut": {
         "usd": 222.221175,
-        "pricingAsOf": "2026-07-17T19:04:43.101Z"
+        "pricingAsOf": "2026-07-17T19:04:43.532Z"
       }
     },
     "merges": [
