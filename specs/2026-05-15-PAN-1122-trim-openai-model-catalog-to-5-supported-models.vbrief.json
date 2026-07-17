@@ -4,17 +4,17 @@
     "created": "2026-05-15T05:40:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-1122: Trim OpenAI model catalog to 5 supported models",
-    "updated": "2026-05-15T05:38:59.140Z"
+    "updated": "2026-07-17T10:57:39.079Z"
   },
   "plan": {
     "id": "pan-1122",
     "title": "Trim OpenAI model catalog to 5 supported models",
-    "status": "proposed",
+    "status": "cancelled",
     "uid": "29d41cbb-7a62-4e17-873d-4ffb4db4ad35",
     "author": "agent:claude-opus-4-7",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-05-15T05:40:00.000Z",
-    "updated": "2026-05-21T01:02:47.479Z",
+    "updated": "2026-07-17T10:57:39.079Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/1122",
@@ -309,5 +309,5 @@
       "canonicalFilename": "2026-05-15-PAN-1122-trim-openai-model-catalog-to-5-supported-models.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "cancelled"
 }
