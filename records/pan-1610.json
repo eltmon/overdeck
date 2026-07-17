@@ -80,18 +80,19 @@
     "recordedAt": "2026-07-17T16:23:03.495Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:23:06.816Z",
+  "updated": "2026-07-17T16:27:26.204Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:23:06.238Z",
+    "updatedAt": "2026-07-17T16:27:26.067Z",
     "reviewNotes": "Verification failed at frontend-typecheck",
+    "verificationNotes": "Verification FAILED at test (28411ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1610\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1610/src/dashboard/frontend\n\n ❯ src/components/Agents/FleetAgentsView.test.tsx (21 tests | 1 failed) 707ms\n     × opens an agent-scoped action menu from the fleet card overflow trigger 32ms\n ❯ src/components/Pipeline/PipelineView.test.tsx (24 tests | 1 failed) 1885ms\n     × opens the same Pipeline row action menu on right-click 65ms\n\n Test Files  2 failed | 27 passed (29)\n      Tests  2 failed | 560 passed (562)\n   Start at  12:27:16\n   Duration  6.50s (transform 29.37s, setup 8.25s, import 53.76s, tests 16.31s, environment 15.12s)\n\n\n Test Files  1 passed (1)\n      Tests  6 passed (6)\n   Start at  12:27:25\n   Duration  158ms (transform 5ms, setup 22ms, import 6ms, tests 7ms, environment 0ms)\n\n\n--- stderr ---\n\n⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯\n\n FAIL  src/components/Agents/FleetAgentsView.test.tsx > FleetAgentsView > opens an agent-scoped action menu from the fleet card overflow trigger\nTestingLibraryElementError: Unable to find an element by: [data-testid=\"issue-action-unpause\"]\n\nIgnored nodes: comments, script, style\n\u001b[36m<div\u001b[39m\n  \u001b[33mclass\u001b[39m=\u001b[32m\"absolute right-0 top-full z-50 mt-1 max-h-[70vh] w-[320px] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg\"\u001b[39m\n  \u001b[33mdata-testid\u001b[39m=\u001b[32m\"issue-action-overflow-menu\"\u001b[39m\n  \u001b[33mrole\u001b[39m=\u001b[32m\"menu\"\u001b[39m\n\u001b[36m>\u001b[39m\n  \u001b[36m<div\u001b[39m\n    \u001b[33mclass\u001b[39m=\u001b[32m\"px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground\"\u001b[39m\n  \u001b[36m>\u001b[39m\n    \u001b[36m<span\u001b[39m\n      \u001b[33mclass\u001b[39m=\u001b[32m\"flex items-center gap-2\"\u001b[39m\n    \u001b[36m>\u001b[39m\n      \u001b[36m<span>\u001b[39m\n        \u001b[0mIssue actions\u001b[0m\n      \u001b[36m</span>\u001b[39m\n      \u001b[36m<span\u001b[39m\n        \u001b[33mclass\u001b[39m=\u001b[32m\"inline-f\n…(19625 chars elided)…\nr gap-1.5\"\u001b[39m\n          \u001b[36m>\u001b[39m\n            \u001b[36m<span>\u001b[39m\n              \u001b[0mDone planning\u001b[0m\n            \u001b[36m</span>\u001b[39m\n          \u001b[36m</span>\u001b[39m\n        \u001b[36m</span>\u001b[39m...\n ❯ Object.getElementError ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/config.js:37:19\n ❯ ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:76:38\n ❯ ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:52:17\n ❯ ../../../node_modules/.bun/@testing-library+dom@10.4.1/node_modules/@testing-library/dom/dist/query-helpers.js:95:19\n ❯ src/components/Pipeline/PipelineView.test.tsx:319:25\n    317|\n    318|     const menu = screen.getByTestId('issue-action-overflow-menu');\n    319|     expect(within(menu).getByTestId('issue-action-startAgent')).toHave…\n       |                         ^\n    320|   });\n    321|\n\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\n\n",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "reviewRequestedAt": "2026-07-17T16:13:33.284Z",
@@ -182,9 +183,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 861868,
-            "output": 18747,
-            "cacheRead": 3936256,
+            "input": 1194016,
+            "output": 22077,
+            "cacheRead": 4068352,
             "cacheWrite": 0
           }
         },
@@ -198,9 +199,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7124233,
-            "output": 500593,
-            "cacheRead": 109406208,
+            "input": 7142572,
+            "output": 502471,
+            "cacheRead": 111364608,
             "cacheWrite": 0
           }
         }
@@ -219,9 +220,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 7986101,
-          "output": 519340,
-          "cacheRead": 113342464,
+          "input": 8336588,
+          "output": 524548,
+          "cacheRead": 115432960,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -232,8 +233,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 124.756067,
-        "pricingAsOf": "2026-07-17T16:23:06.263Z"
+        "usd": 127.70999,
+        "pricingAsOf": "2026-07-17T16:27:26.145Z"
       }
     },
     "merges": [
