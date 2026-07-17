@@ -281,7 +281,23 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
-      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts"
+      "src/cli/commands/__tests__/start-policy-overrides.test.ts",
+      "src/cli/commands/admin/state-migrate.ts",
+      "src/cli/commands/start-policy-overrides.ts",
+      "src/lib/__tests__/state-auto-migrate.test.ts",
+      "src/lib/cloister/sync-main-git.ts",
+      "src/lib/cloister/work-agent-prompt.ts",
+      "src/lib/git-utils.ts",
+      "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "src/lib/pan-dir/__tests__/auto-commit.test.ts",
+      "src/lib/pan-dir/auto-commit.ts",
+      "src/lib/state-auto-migrate.ts",
+      "src/lib/state-home.ts",
+      "src/lib/state-migration-manifest.ts",
+      "tests/cloister/sync-main.test.ts",
+      "tests/unit/cli/state-migrate-cancellation.test.ts",
+      "tests/unit/lib/git-utils-process-probes.test.ts",
+      "tests/unit/lib/git-utils.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -295,19 +311,35 @@
     ],
     "actualChangedFiles": [
       "scripts/file-size-baseline.txt",
+      "src/cli/commands/__tests__/start-policy-overrides.test.ts",
+      "src/cli/commands/admin/state-migrate.ts",
+      "src/cli/commands/start-policy-overrides.ts",
       "src/cli/commands/start-prep-progress.ts",
       "src/cli/commands/start.ts",
+      "src/lib/__tests__/state-auto-migrate.test.ts",
       "src/lib/cloister/merge-agent.ts",
+      "src/lib/cloister/sync-main-git.ts",
+      "src/lib/cloister/work-agent-prompt.ts",
+      "src/lib/git-utils.ts",
       "src/lib/overdeck/__tests__/conversation-forks-enter-nudge.test.ts",
+      "src/lib/pan-dir/__tests__/auto-commit.test.ts",
+      "src/lib/pan-dir/auto-commit.ts",
+      "src/lib/state-auto-migrate.ts",
+      "src/lib/state-home.ts",
+      "src/lib/state-migration-manifest.ts",
       "sync-sources/skills/pan-start/SKILL.md",
+      "tests/cloister/sync-main.test.ts",
       "tests/unit/cli/start-prep-progress.test.ts",
       "tests/unit/cli/start-prep-wiring.test.ts",
-      "tests/unit/lib/cloister/sync-main-timeouts.test.ts"
+      "tests/unit/cli/state-migrate-cancellation.test.ts",
+      "tests/unit/lib/cloister/sync-main-timeouts.test.ts",
+      "tests/unit/lib/git-utils-process-probes.test.ts",
+      "tests/unit/lib/git-utils.test.ts"
     ],
-    "recordedAt": "2026-07-16T19:36:56.017Z"
+    "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T02:45:44.787Z",
+  "updated": "2026-07-17T02:45:52.908Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "blocked",
