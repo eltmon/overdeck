@@ -4,6 +4,7 @@
  * workspace) read this via the same react-query key `command-deck-projects`,
  * so the network request is deduped and both surfaces agree on the list.
  */
+import { compareIssueIds } from '@overdeck/contracts';
 import type { ProjectFeature } from './ProjectTree/ProjectNode';
 
 /** Sentinel deck key for the "No project" bucket — conversations/terminals not
@@ -64,7 +65,7 @@ export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
   return [...grouped.values()]
     .map((project) => ({
       ...project,
-      features: [...project.features].sort((a, b) => a.issueId.localeCompare(b.issueId)),
+      features: [...project.features].sort((a, b) => compareIssueIds(a.issueId, b.issueId)),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
