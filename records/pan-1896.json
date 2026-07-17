@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:18:43.932Z",
+  "updated": "2026-07-17T12:18:46.242Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -74,16 +74,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "codex-permissions-doc": {
-        "writerId": "strike-pan-1896",
-        "agentId": "strike-pan-1896",
-        "pid": 3641081,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T12:18:43.932Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "statusReasons": {
       "codex-mode-enum": {
         "reason": "Cancelled after current Codex 0.144.4 investigation: native per-command execpolicy rules make a new workspace-net permission mode unnecessary.",
@@ -94,14 +86,30 @@
         "updatedAt": "2026-07-17T12:18:24.686Z"
       },
       "codex-permissions-doc": {
-        "reason": "Documentation implementation is present on the verified strike branch.",
-        "updatedAt": "2026-07-17T12:18:43.932Z"
+        "reason": "Documented managed CODEX_HOME rule sharing, narrow execpolicy examples, host-access tradeoffs, and why broad git push or workspace networking remain prompt-gated.",
+        "updatedAt": "2026-07-17T12:18:46.242Z"
       }
-    }
+    },
+    "claimHistory": [
+      {
+        "writerId": "strike-pan-1896",
+        "agentId": "strike-pan-1896",
+        "pid": 3641081,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T12:18:43.932Z",
+        "itemId": "codex-permissions-doc",
+        "outcome": "completed",
+        "reason": "Documented managed CODEX_HOME rule sharing, narrow execpolicy examples, host-access tradeoffs, and why broad git push or workspace networking remain prompt-gated.",
+        "releasedAt": "2026-07-17T12:18:46.242Z"
+      }
+    ]
   },
   "statusOverrides": {
     "codex-mode-enum": "cancelled",
     "codex-init-network": "cancelled",
-    "codex-permissions-doc": "running"
+    "codex-permissions-doc": "completed",
+    "codex-permissions-doc.codex-permissions-doc.ac1": "completed",
+    "codex-permissions-doc.codex-permissions-doc.ac2": "completed",
+    "codex-permissions-doc.codex-permissions-doc.ac3": "completed"
   }
 }
