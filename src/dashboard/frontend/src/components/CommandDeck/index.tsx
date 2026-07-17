@@ -10,7 +10,7 @@ import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
-import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
 import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
@@ -32,6 +32,8 @@ import type { ProjectSessionTree, SessionTreeDelta } from '@overdeck/contracts';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
 import { fetchRegisteredProjects, findRegisteredProject, isKnownProject, ProjectRegistryErrorState, UnknownProjectState } from './UnknownProjectState';
+import { IssuesPaneFilterRow } from './IssuesPaneFilterRow';
+import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
 
 async function fetchConversations(): Promise<Conversation[]> {
   const res = await fetchWithTimeout('/api/conversations');
@@ -211,6 +213,7 @@ export function CommandDeck({
   const sectionDragStartSplit = useRef(50);
   const sectionContainerRef = useRef<HTMLDivElement>(null);
   const [treeFilter, setTreeFilter] = useState<TreeSessionFilter>('all');
+  const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
 
@@ -1208,6 +1211,10 @@ export function CommandDeck({
     if (!selectedProject) return null;
     return projectsWithSessions.find(p => p.name === selectedProject) ?? null;
   }, [projectsWithSessions, selectedProject]);
+  const visibleFeatures = useMemo(
+    () => filterSpecOnlyPlanned(selectedProjectData?.features ?? [], showPlannedBacklog),
+    [selectedProjectData, showPlannedBacklog],
+  );
 
   const selectedRegisteredProject = useMemo(
     () => findRegisteredProject(registeredProjects, selectedProject),
@@ -1343,21 +1350,14 @@ export function CommandDeck({
             <div className={styles.sectionHeader} onClick={toggleProjectsCollapsed}>
               {projectsCollapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
               <span className={styles.sectionTitle}>Issues</span>
-              <span className={styles.segmentCount}>{selectedProjectData?.features.length ?? 0}</span>
+              <span className={styles.segmentCount}>{visibleFeatures.length}</span>
             </div>
             {!projectsCollapsed && (
               <div className={styles.sectionBody}>
-                <div className={styles.treeFilterRow}>
-                  {(['all', 'alive', 'failed'] as TreeSessionFilter[]).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setTreeFilter(f)}
-                      className={`${styles.treeFilterButton} ${treeFilter === f ? styles.treeFilterButtonActive : ''}`}
-                    >
-                      {f === 'all' ? 'All' : f === 'alive' ? 'Alive' : 'Failed'}
-                    </button>
-                  ))}
-                </div>
+                <IssuesPaneFilterRow
+                  filter={treeFilter}
+                  onFilterChange={setTreeFilter}
+                />
                 {!selectedProject ? (
                   <div className={styles.emptyProject}>Select a project to see its issues</div>
                 ) : isLoading && !selectedProjectData ? (
@@ -1370,7 +1370,7 @@ export function CommandDeck({
                   <ProjectNode
                     key={selectedProjectData.path} projectKey={selectedProjectData.key}
                     name={selectedProjectData.name}
-                    features={selectedProjectData.features}
+                    features={visibleFeatures}
                     selectedFeature={selectedFeature}
                     onSelectFeature={handleSelectFeature}
                     onSelectProject={handleSelectProject}
@@ -1449,7 +1449,7 @@ export function CommandDeck({
                   projectKey={selectedRegisteredProject?.key}
                   conversations={projectConvs}
                   onCreateConversation={createDeckConversation}
-                  features={selectedProjectData?.features}
+                  features={visibleFeatures}
                   issueCosts={issueCosts}
                   issueCostDetails={issueCostDetails}
                   onSelectFeature={(feature) => handleSelectFeature(feature.issueId)}
