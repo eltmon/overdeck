@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-17T13:08:30.384Z",
+  "updated": "2026-07-17T13:09:24.955Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -62,5 +62,20 @@
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
-  "workModel": "gpt-5.6-sol"
+  "workModel": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "module-move": {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 29188,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:09:24.955Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "module-move": "running"
+  }
 }
