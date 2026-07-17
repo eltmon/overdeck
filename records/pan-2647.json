@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T01:25:27.329Z",
+  "updated": "2026-07-17T01:32:17.161Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "collector-linux": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 2061191,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:25:27.329Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -125,6 +117,16 @@
         "itemId": "config-resolve",
         "outcome": "completed",
         "releasedAt": "2026-07-17T01:25:09.006Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2061191,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:25:27.329Z",
+        "itemId": "collector-linux",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T01:32:17.161Z"
       }
     ],
     "statusReasons": {
@@ -144,6 +146,11 @@
     "config-resolve.config-resolve.ac1": "completed",
     "config-resolve.config-resolve.ac2": "completed",
     "config-resolve.config-resolve.ac3": "completed",
-    "collector-linux": "running"
+    "collector-linux": "completed",
+    "collector-linux.collector-linux.ac1": "completed",
+    "collector-linux.collector-linux.ac2": "completed",
+    "collector-linux.collector-linux.ac3": "completed",
+    "collector-linux.collector-linux.ac4": "completed",
+    "collector-linux.collector-linux.ac5": "completed"
   }
 }
