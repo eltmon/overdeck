@@ -27,6 +27,16 @@
       "reason": "feedback",
       "note": "[2026-07-17T02:27Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-17T02:27:47.101Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-17T02:43:33.385Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-17T02:43:33.469Z"
     }
   ],
   "feedback": [],
@@ -65,16 +75,17 @@
     "recordedAt": "2026-07-17T02:12:22.787Z"
   },
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T02:43:32.428Z",
+  "updated": "2026-07-17T02:43:33.626Z",
   "pipeline": {
     "issueId": "PAN-2807",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:43:32.366Z",
+    "updatedAt": "2026-07-17T02:43:33.619Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-2807-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2816",
     "lastVerifiedCommit": "5ca6f844b9c45397ba0a8bb808ea607c723f3a61",
     "reviewRequestedAt": "2026-07-17T02:43:29.121Z",
@@ -190,7 +201,7 @@
       },
       "costAtCloseOut": {
         "usd": 95.193659,
-        "pricingAsOf": "2026-07-17T02:43:32.403Z"
+        "pricingAsOf": "2026-07-17T02:43:33.622Z"
       }
     },
     "merges": [
