@@ -64,15 +64,7 @@
       "timestamp": "2026-07-17T18:49:35.601Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T18:49:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1610\n\nBlocking: forbidden merge/viewVbrief IssueActionKey identities remain and the six-surface parity gate substitutes four real integrations.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1610 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -138,17 +130,17 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T18:49:42.292Z",
+  "updated": "2026-07-17T18:49:43.019Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T18:49:42.258Z",
+    "updatedAt": "2026-07-17T18:49:42.904Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
@@ -156,7 +148,7 @@
     "reviewedAtCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
     "reviewRequestedAt": "2026-07-17T18:49:41.925Z",
-    "reviewSpawnedAt": "2026-07-17T18:26:41.515Z",
+    "reviewSpawnedAt": "2026-07-17T18:49:42.903Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -294,7 +286,7 @@
       },
       "costAtCloseOut": {
         "usd": 215.749647,
-        "pricingAsOf": "2026-07-17T18:49:42.260Z"
+        "pricingAsOf": "2026-07-17T18:49:42.975Z"
       }
     },
     "merges": [
