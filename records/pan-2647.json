@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T03:03:33.631Z",
+  "updated": "2026-07-17T03:11:36.062Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "specialist-lifecycle": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 4145540,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T02:53:26.169Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -195,6 +187,16 @@
         "itemId": "admitted-count",
         "outcome": "completed",
         "releasedAt": "2026-07-17T02:53:09.820Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 4145540,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T02:53:26.169Z",
+        "itemId": "specialist-lifecycle",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T03:11:36.062Z"
       }
     ],
     "statusReasons": {
@@ -252,6 +254,9 @@
     "admitted-count.admitted-count.ac2": "completed",
     "admitted-count.admitted-count.ac3": "completed",
     "admitted-count.admitted-count.ac4": "completed",
-    "specialist-lifecycle": "running"
+    "specialist-lifecycle": "completed",
+    "specialist-lifecycle.specialist-lifecycle.ac1": "completed",
+    "specialist-lifecycle.specialist-lifecycle.ac2": "completed",
+    "specialist-lifecycle.specialist-lifecycle.ac3": "completed"
   }
 }
