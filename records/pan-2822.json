@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T11:06:14.860Z",
+  "updated": "2026-07-17T11:06:22.434Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -179,5 +179,44 @@
     "docs-display-toggle": "completed",
     "docs-display-toggle.docs-display-toggle.ac1": "completed",
     "docs-display-toggle.docs-display-toggle.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
+      "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
+      "src/dashboard/frontend/src/pages/HomePage.test.tsx",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "src/lib/pipeline-membership.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+      "tests/unit/lib/pipeline-membership-audit.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
+      "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
+      "src/dashboard/frontend/src/pages/HomePage.test.tsx",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "src/lib/pipeline-membership.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+      "tests/unit/lib/pipeline-membership-audit.test.ts"
+    ],
+    "recordedAt": "2026-07-17T11:06:22.432Z"
   }
 }
