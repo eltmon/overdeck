@@ -5660,3 +5660,16 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Lane B slot is FREE** (no Lane B item in flight) — B11 can start the moment the execution-mode question resolves.
 - **Fleet: 6 planning sessions live** — 1610 (re-plan), 2445 (A13), plus operator-started 2377, 2665, 2829, 2831. All in planning. Cap 20, min 2 — healthy saturation.
 - **PAN-2661 close-out still owed** — blocked ONLY on `dod:main-verify`; main CI in_progress on c95b980d0d AND 6096890afe. Not overridden. Close it the moment CI is green.
+
+## Tick 10 — 2026-07-17 ~13:15 — PAN-2661 CLOSED OUT (items 1+2 COMPLETE); PAN-2825 half-worked → filed PAN-2839
+- **Main GREEN** on c95b980d0d, 6096890afe, 27c74e7297. **PAN-2661 CLOSED OUT — all 8 DoD rows green.** ITEMS 1 AND 2 OF THE OPERATOR SEQUENCE ARE FULLY COMPLETE (2822 + 2661 both merged → deployed → closed out).
+- **PAN-2825 fix VERDICT: half-worked. The 401 is gone; a 500 was hiding behind it.**
+  - ✅ **Token fix works** — no autoSpawn event reports 401/unauthorized anymore.
+  - ✅ **Silent-failure fix works** — terminal phase now correctly emits **`failure`** (was `success` while `workAgentSpawned:false`). The failure is LOUD now, which is exactly how I caught the next one.
+  - ❌ **Handoff still unreliable** — every autoSpawn now returns **httpStatus 500**, nondeterministically: PAN-2377/2829/2831 got working agents ANYWAY; **PAN-2445/2665 were left with an agent row whose tmux session was DEAD**. Filed **https://github.com/eltmon/overdeck/issues/2839**.
+- **The 500's error field is workspace-prep STDOUT, and prep SUCCEEDS** (state-reconcile → sync-main clean merge → workspace found). Two tells: **`- Preparing workspace for <id>...` is emitted TWICE per single request** in every captured 500 → duplicate/concurrent prep (compare `createInFlightGuard()` in `src/lib/cloister/in-flight-guard.ts`, which exists for exactly this double-fire class); and the real thrown error is never surfaced — the 500 body is captured stdout, so the actual exception is invisible.
+- **Half-spawn is a trap: `pan start` REFUSES it.** A stranded agent (row exists, session dead) makes `pan start` say *"has a resumable Claude session — use pan resume"*. **`pan resume` is on doctrine's forbidden list** → the sanctioned recovery is **`pan start <id> --fresh`** (non-destructive, drops the dead session). That unstuck 2445 + 2665.
+- **PAN-1610 re-plan CONFIRMED CORRECT** (the tick-8 call was right): new workspace **contains c95b980d0d**, `GroupedIssueActionMenu` present (2 files), and the spec was **rewritten today 09:14** (44KB; filename keeps its old 2026-06-04 date — **judge specs by mtime/content, NOT the filename date**). Started via `pan start PAN-1610 --force` (cleared the [replan] pause).
+- **USEFUL: `pan start`'s prep DOES `sync-main` into the workspace** (`[prep] Syncing latest main into workspace...`). So a stale worktree self-heals on start — the tick-8 workspace staleness would have resolved itself; the SPEC staleness was the part that genuinely needed the re-plan.
+- **Fleet: 6 work agents live** — 1610 (final sequence item), 2445 (A13), 2377, 2665, 2829, 2831. Cap 20.
+- **B11=PAN-2233 still NOT started** — TENET-10/needs-handoff execution-mode question is with the operator (see tick 9). A8 prereq satisfied; Lane B slot free.
