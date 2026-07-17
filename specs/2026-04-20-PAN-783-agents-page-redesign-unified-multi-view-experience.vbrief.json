@@ -3,17 +3,18 @@
     "version": "0.5",
     "created": "2026-04-20T00:00:00.000Z",
     "author": "panopticon-cli/0.0.0",
-    "description": "Plan for PAN-783: Agents Page Redesign — Unified Multi-View Experience"
+    "description": "Plan for PAN-783: Agents Page Redesign — Unified Multi-View Experience",
+    "updated": "2026-07-17T10:57:06.500Z"
   },
   "plan": {
     "id": "pan-783",
     "title": "Agents Page Redesign — Unified Multi-View Experience",
-    "status": "approved",
+    "status": "cancelled",
     "uid": "55b53b25-fdca-4ac2-b3d7-467b34f770e7",
     "author": "agent:K2.6-code-preview",
-    "sequence": 1,
+    "sequence": 2,
     "created": "2026-04-20T00:00:00.000Z",
-    "updated": "2026-04-20T00:00:00.000Z",
+    "updated": "2026-07-17T10:57:06.500Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/783",
@@ -1451,5 +1452,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "cancelled"
 }
