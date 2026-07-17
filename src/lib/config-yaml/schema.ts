@@ -365,6 +365,8 @@ export type FlywheelScope = 'pan-only' | 'all-tracked-projects';
 
 export interface RoleConfig {
   model: RoleModelRef;
+  /** Explicit scalar staffing model for autonomous planning dispatch. */
+  autonomousModel?: RoleModelRef;
   harness?: 'claude-code' | 'ohmypi' | 'codex';
   effort?: RoleEffort;
   mode?: ReviewMode;
