@@ -48,6 +48,7 @@ describe('flywheel substrate bugs db', () => {
       'filed_by',
       'discovered_in_issue_id',
       'severity',
+      'affected_criteria',
       'status',
       'fix_merged_at',
       'fix_commit_sha',
@@ -80,6 +81,7 @@ describe('flywheel substrate bugs db', () => {
       runId: 'RUN-1',
       filedBy: 'agent',
       discoveredInIssueId: 'PAN-1',
+      affectedCriteria: [1, 4],
       updatedAt: '2026-05-01T00:00:00.000Z',
     });
 
@@ -89,6 +91,7 @@ describe('flywheel substrate bugs db', () => {
       filedBy: 'agent',
       discoveredInIssueId: 'PAN-1',
       severity: 'P2',
+      affectedCriteria: [1, 4],
       status: 'open',
     });
 

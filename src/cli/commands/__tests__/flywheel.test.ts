@@ -123,6 +123,15 @@ const mergeBackendMocks = vi.hoisted(() => ({
 
 vi.mock('../../../lib/github-app.js', () => mergeBackendMocks);
 
+const substrateBugWeightsMocks = vi.hoisted(() => ({
+  listSubstrateBugWeights: vi.fn(async () => []),
+}));
+
+vi.mock('../../../lib/overdeck/substrate-bug-weights-service.js', () => substrateBugWeightsMocks);
+
+import {
+  flywheelWeightsCommand,
+} from '../flywheel-surfaces.js';
 import {
   emitStatusCommand,
   flywheelAbortCommand,
@@ -855,5 +864,116 @@ describe('flywheel CLI commands', () => {
     expect(flywheelLifecycleMocks.stoppedAgents).toEqual([]);
     expect(logSpy).toHaveBeenCalledWith('No flywheel run is active and nothing is left to report.');
     expect(process.exitCode).toBeUndefined();
+  });
+});
+
+describe('flywheelWeightsCommand', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockReset();
+  });
+
+  it('prints an aligned table ordered by weight desc', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-HEAVY',
+        severity: 'P0',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 4.8,
+        weightReason: 'Criterion 1 is red',
+      },
+      {
+        issueId: 'PAN-LIGHT',
+        severity: 'P2',
+        filedBy: 'operator',
+        affectedCriteria: [3],
+        weight: 1.2,
+        weightReason: 'Criterion 3 is green',
+      },
+    ]);
+
+    await flywheelWeightsCommand();
+
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('30d');
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-HEAVY'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-LIGHT'));
+    const calls = logSpy.mock.calls.map((c) => c[0] as string);
+    const heavyIndex = calls.findIndex((c) => c.includes('PAN-HEAVY'));
+    const lightIndex = calls.findIndex((c) => c.includes('PAN-LIGHT'));
+    expect(heavyIndex).toBeLessThan(lightIndex);
+  });
+
+  it('emits JSON with --json', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-1',
+        severity: 'P1',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 2.5,
+        weightReason: 'Criterion 1 is yellow',
+      },
+    ]);
+
+    await flywheelWeightsCommand({ json: true });
+
+    expect(logSpy).toHaveBeenCalledWith(
+      JSON.stringify(
+        [
+          {
+            issueId: 'PAN-1',
+            severity: 'P1',
+            filedBy: 'agent',
+            affectedCriteria: [1],
+            weight: 2.5,
+            weightReason: 'Criterion 1 is yellow',
+          },
+        ],
+        null,
+        2,
+      ),
+    );
+  });
+
+  it('filters to --issue case-insensitively', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([
+      {
+        issueId: 'PAN-TARGET',
+        severity: 'P1',
+        filedBy: 'agent',
+        affectedCriteria: [1],
+        weight: 2.5,
+        weightReason: 'Criterion 1 is yellow',
+      },
+      {
+        issueId: 'PAN-OTHER',
+        severity: 'P2',
+        filedBy: 'agent',
+        affectedCriteria: [2],
+        weight: 1.5,
+        weightReason: 'Criterion 2 is green',
+      },
+    ]);
+
+    await flywheelWeightsCommand({ issue: 'pan-target' });
+
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('PAN-TARGET'));
+    const calls = logSpy.mock.calls.map((c) => c[0] as string);
+    expect(calls.some((c) => c.includes('PAN-OTHER'))).toBe(false);
+  });
+
+  it('passes --window through to the service', async () => {
+    substrateBugWeightsMocks.listSubstrateBugWeights.mockResolvedValue([]);
+
+    await flywheelWeightsCommand({ window: '7d' });
+
+    expect(substrateBugWeightsMocks.listSubstrateBugWeights).toHaveBeenCalledWith('7d');
   });
 });
