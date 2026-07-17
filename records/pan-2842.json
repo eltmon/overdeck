@@ -2,7 +2,7 @@
   "issueId": "PAN-2842",
   "schemaVersion": 2,
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T13:45:00.461Z",
+  "updated": "2026-07-17T13:45:02.400Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2842: Issue cockpit: full-width agent conversations — lift tab strip, dissolve Conversation tab, Tasks rail → chip + drawer",
       "timestamp": "2026-07-17T13:45:00.461Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
