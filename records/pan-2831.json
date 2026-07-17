@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:02:08.539Z",
+  "updated": "2026-07-17T13:04:14.089Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "pending",
@@ -64,16 +64,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "issues-pane-numeric-sort": {
-        "writerId": "agent-pan-2831",
-        "agentId": "agent-pan-2831",
-        "pid": 4051084,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:02:08.539Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2831",
@@ -85,12 +77,27 @@
         "outcome": "completed",
         "reason": "Added and tested the shared numeric issue-id comparator in @overdeck/contracts",
         "releasedAt": "2026-07-17T13:01:54.018Z"
+      },
+      {
+        "writerId": "agent-pan-2831",
+        "agentId": "agent-pan-2831",
+        "pid": 4051084,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:02:08.539Z",
+        "itemId": "issues-pane-numeric-sort",
+        "outcome": "completed",
+        "reason": "Used the shared comparator in groupProjects and added numeric-order and project-order tests",
+        "releasedAt": "2026-07-17T13:04:14.089Z"
       }
     ],
     "statusReasons": {
       "add-issue-comparator": {
         "reason": "Added and tested the shared numeric issue-id comparator in @overdeck/contracts",
         "updatedAt": "2026-07-17T13:01:54.018Z"
+      },
+      "issues-pane-numeric-sort": {
+        "reason": "Used the shared comparator in groupProjects and added numeric-order and project-order tests",
+        "updatedAt": "2026-07-17T13:04:14.089Z"
       }
     }
   },
@@ -100,6 +107,9 @@
     "add-issue-comparator.add-issue-comparator.ac2": "completed",
     "add-issue-comparator.add-issue-comparator.ac3": "completed",
     "add-issue-comparator.add-issue-comparator.ac4": "completed",
-    "issues-pane-numeric-sort": "running"
+    "issues-pane-numeric-sort": "completed",
+    "issues-pane-numeric-sort.issues-pane-numeric-sort.ac1": "completed",
+    "issues-pane-numeric-sort.issues-pane-numeric-sort.ac2": "completed",
+    "issues-pane-numeric-sort.issues-pane-numeric-sort.ac3": "completed"
   }
 }
