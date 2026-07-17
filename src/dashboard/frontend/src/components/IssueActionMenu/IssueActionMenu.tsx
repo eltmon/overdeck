@@ -350,9 +350,13 @@ export function IssueActionMenu({
   const actions = useIssueActions(issueId);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreOverflowFocus = () => overflowTriggerRef.current?.focus();
-  const pinSet = useMemo(
-    () => new Set<string>([...pinRight, ...pinned.map((component) => component.key)]),
-    [pinRight, pinned],
+  const componentPinSet = useMemo(
+    () => new Set<string>(pinned.map((component) => component.key)),
+    [pinned],
+  );
+  const requestedPinSet = useMemo(
+    () => new Set<string>([...pinRight, ...componentPinSet]),
+    [pinRight, componentPinSet],
   );
   const inScope = (view: IssueActionView) => !agentScopeOnly || AGENT_SCOPE_ACTION_KEYS.has(view.action.key);
   const scopedAll = actions.all.filter(inScope);
@@ -362,10 +366,13 @@ export function IssueActionMenu({
   const registryPins = pinRight
     .map((key) => scopedAll.find((view) => view.action.key === key && view.enabled))
     .filter((view): view is IssueActionView => !!view);
-  const primary = scopedPrimary.filter((view) => !pinSet.has(view.action.key));
+  const enabledRegistryPinSet = new Set(registryPins.map((view) => view.action.key));
+  const excludedFromOverflow = (view: IssueActionView) =>
+    enabledRegistryPinSet.has(view.action.key) || componentPinSet.has(view.action.key);
+  const primary = scopedPrimary.filter((view) => !requestedPinSet.has(view.action.key));
   const primaryStripOverflow = [...scopedSecondary, ...scopedOverflow]
-    .filter((view) => !pinSet.has(view.action.key));
-  const overflowOnly = scopedAll.filter((view) => !pinSet.has(view.action.key));
+    .filter((view) => !excludedFromOverflow(view));
+  const overflowOnly = scopedAll.filter((view) => !excludedFromOverflow(view));
   const overflowActions = {
     all: mode === 'overflow-only' ? overflowOnly : primaryStripOverflow,
     primary: [],

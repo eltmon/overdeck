@@ -1,10 +1,13 @@
+import { existsSync } from 'node:fs';
+import { isAbsolute, resolve } from 'node:path';
 import { createElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import { DialogProvider } from '../../components/DialogProvider';
 import { ZoneBActionStrip } from '../../components/CommandDeck/ZoneBActionStrip';
+import { ISSUE_VIEW_INVENTORY } from '../../components/issue-view/inventory';
 import {
   ISSUE_ACTIONS,
   PROJECT_TREE_CONTEXT_ACTIONS,
@@ -15,6 +18,7 @@ import {
 
 const registryKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
 const registryByKey = new Map(ISSUE_ACTIONS.map((action) => [action.key, action]));
+const repositoryRoot = resolve(import.meta.dirname, '../../../../../..');
 
 const legacyCommandDeckIssueActions = [
   { legacyKey: 'merge', registryKey: null, surfaceText: 'Merge', note: 'Human-only MergeButton remains outside ISSUE_ACTIONS per Decision D6.' },
@@ -77,12 +81,12 @@ const expectedZoneBActionKeys = [
   'stopSession',
   'viewTerminal',
   'pauseSession',
-  'resumeSession',
+  'resumeFocusedSession',
   'restartSession',
   'replaySession',
   'openStateDir',
   'viewState',
-  'viewVbrief',
+  'viewFocusedVbrief',
   'copySessionId',
   'copyTmuxCommand',
   'viewJsonl',
@@ -141,6 +145,13 @@ function renderMenuLabels(entries: typeof legacyCommandDeckIssueActions) {
 }
 
 describe('issueActions no-actions-lost audit', () => {
+  it('keeps human-only and session-only identities outside IssueActionKey', () => {
+    expectTypeOf<Extract<IssueActionKey, 'merge' | 'viewVbrief'>>()
+      .toEqualTypeOf<never>();
+    expect([...registryKeys]).not.toContain('merge');
+    expect([...registryKeys]).not.toContain('viewVbrief');
+  });
+
   it('maps every pre-reconciliation issue-scoped Command Deck action to the registry or a documented human-only exclusion', () => {
     for (const entry of legacyCommandDeckIssueActions) {
       if (entry.registryKey === null) {
@@ -148,6 +159,20 @@ describe('issueActions no-actions-lost audit', () => {
       } else {
         expect(registryKeys.has(entry.registryKey), entry.legacyKey).toBe(true);
       }
+    }
+  });
+
+  it('keeps declared action relocation homes repository-relative and resolvable', () => {
+    expect(ISSUE_VIEW_INVENTORY.some((entry) => !entry.actionRelocation)).toBe(true);
+
+    for (const entry of ISSUE_VIEW_INVENTORY) {
+      const relocation = entry.actionRelocation;
+      if (!relocation) continue;
+
+      const resolvedHome = resolve(repositoryRoot, relocation.home);
+      expect(isAbsolute(relocation.home), entry.section).toBe(false);
+      expect(resolvedHome.startsWith(`${repositoryRoot}/`), entry.section).toBe(true);
+      expect(existsSync(resolvedHome), entry.section).toBe(true);
     }
   });
 
@@ -199,7 +224,7 @@ describe('issueActions no-actions-lost audit', () => {
       expect(action.ownerSurface, action.label).toBe('ZoneBActionStrip');
       expect(typeof action.enabledWhen, action.label).toBe('function');
       expect(typeof action.invoke, action.label).toBe('function');
-      expect(ISSUE_ACTIONS, action.label).not.toContain(action);
+      expect(registryKeys.has(action.key as IssueActionKey), action.label).toBe(false);
     }
   });
 
@@ -209,7 +234,9 @@ describe('issueActions no-actions-lost audit', () => {
     fireEvent.click(screen.getByTestId('zone-b-overflow'));
     const renderedKeys = Array.from(container.querySelectorAll('[data-action-key]'))
       .map((element) => element.getAttribute('data-action-key'));
-    const enabledKeys = expectedZoneBActionKeys.filter((key) => key !== 'resumeSession');
+    const enabledKeys = expectedZoneBActionKeys.filter(
+      (key) => key !== 'resumeFocusedSession' && key !== 'viewJsonl',
+    );
     expect(renderedKeys).toHaveLength(enabledKeys.length);
     expect(renderedKeys).toEqual(expect.arrayContaining(enabledKeys));
     for (const key of renderedKeys) {

@@ -163,6 +163,39 @@ describe('ISSUE_ACTIONS', () => {
     expect(onViewTerminal).toHaveBeenCalledWith('agent-pan-1610');
   });
 
+  it('enables restart only for focused work sessions', () => {
+    const restartSession = ZONE_B_SESSION_ACTIONS.find((entry) => entry.key === 'restartSession');
+    if (!restartSession) throw new Error('Missing restartSession action');
+
+    expect(restartSession.enabledWhen({
+      sessionId: 'agent-pan-1610',
+      sessionType: 'work',
+      onRestartSession: vi.fn(),
+    })).toBe(true);
+    expect(restartSession.enabledWhen({
+      sessionId: 'planning-pan-1610',
+      sessionType: 'planning',
+      onRestartSession: vi.fn(),
+    })).toBe(false);
+  });
+
+  it('exports focused-session metadata without requiring a JSONL transcript', async () => {
+    const onExportSessionMetadata = vi.fn();
+    const exportMetadata = ZONE_B_SESSION_ACTIONS.find(
+      (entry) => entry.key === 'exportSessionMetadata',
+    );
+    if (!exportMetadata) throw new Error('Missing exportSessionMetadata action');
+    const context = {
+      sessionId: 'agent-pan-1610',
+      hasJsonl: false,
+      onExportSessionMetadata,
+    };
+
+    expect(exportMetadata.enabledWhen(context)).toBe(true);
+    await exportMetadata.invoke(context);
+    expect(onExportSessionMetadata).toHaveBeenCalledWith('agent-pan-1610');
+  });
+
   it('derives confirmation copy for destructive non-issue actions from invocation context', () => {
     const stopSession = ZONE_B_SESSION_ACTIONS.find((entry) => entry.key === 'stopSession');
     const deepWipe = PROJECT_TREE_CONTEXT_ACTIONS.find((entry) => entry.key === 'deepWipe');

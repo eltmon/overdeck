@@ -43,12 +43,12 @@ const zoneBSessionActionKeys = [
   'stopSession',
   'viewTerminal',
   'pauseSession',
-  'resumeSession',
+  'resumeFocusedSession',
   'restartSession',
   'replaySession',
   'openStateDir',
   'viewState',
-  'viewVbrief',
+  'viewFocusedVbrief',
   'copySessionId',
   'copyTmuxCommand',
   'viewJsonl',
@@ -74,7 +74,7 @@ describe('Command Deck action parity', () => {
     for (const action of ZONE_B_SESSION_ACTIONS) {
       expect(action.ownerSurface, action.key).toBe('ZoneBActionStrip');
       expect(action.scope, action.key).toBe('session');
-      expect(ISSUE_ACTIONS, action.key).not.toContain(action);
+      expect(issueActionKeys.has(action.key as IssueActionKey), action.key).toBe(false);
     }
   });
 });

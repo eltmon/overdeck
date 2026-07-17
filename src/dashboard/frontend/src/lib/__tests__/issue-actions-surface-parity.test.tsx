@@ -1,13 +1,19 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ZoneBActionStrip } from '../../components/CommandDeck/ZoneBActionStrip';
 import { DialogProvider } from '../../components/DialogProvider';
-import { ContextMenuRoot, ContextMenuTrigger } from '../../components/shared/ContextMenu';
+import DrawerActionBar from '../../components/drawer/DrawerActionBar';
 import { GroupedIssueActionMenu } from '../../components/IssueActionMenu/GroupedIssueActionMenu';
-import { IssueActionMenu } from '../../components/IssueActionMenu/IssueActionMenu';
 import type { IssueActionView, UseIssueActionsResult } from '../../components/IssueActionMenu/useIssueActions';
+import { IssueCard } from '../../components/KanbanBoard/cards/KanbanCards';
+import { PipelineView } from '../../components/Pipeline/PipelineView';
+import { ContextMenuRoot, ContextMenuTrigger } from '../../components/shared/ContextMenu';
+import { IssueMissionControl } from '../../components/Stage/cockpit/IssueMissionControl';
+import { useDashboardStore } from '../store';
+import type { Agent, Issue } from '../../types';
 import {
   GROUP_ORDER,
   ISSUE_ACTIONS,
@@ -23,6 +29,17 @@ import {
 } from '../issueActions';
 
 const hookState = vi.hoisted(() => ({ current: null as unknown }));
+const drawerDataState = vi.hoisted(() => ({ current: null as unknown }));
+const cockpitQueryMocks = vi.hoisted(() => ({
+  activity: { data: { sections: [] } },
+  checks: { isLoading: false, data: { summary: { total: 0, passed: 0 }, checkRuns: [] } },
+  planning: { data: { prd: '', state: '' }, isLoading: false },
+  pr: { data: {} },
+  review: { data: undefined },
+  costs: { data: { totalCost: 0, totalTokens: 0, byModel: {}, sessions: [] } },
+  workspace: { data: null, isLoading: false },
+  shipLog: { data: null, isLoading: false },
+}));
 
 vi.mock('../../components/IssueActionMenu/useIssueActions', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -31,6 +48,47 @@ vi.mock('../../components/IssueActionMenu/useIssueActions', async (importOrigina
     useIssueActions: () => hookState.current,
   };
 });
+
+vi.mock('../../components/drawer/useDrawerData', () => ({
+  useDrawerData: () => drawerDataState.current,
+}));
+
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/queries', () => ({
+  useActivityQuery: () => cockpitQueryMocks.activity,
+  useIssueCheckRunsQuery: () => cockpitQueryMocks.checks,
+  usePlanningQuery: () => cockpitQueryMocks.planning,
+  usePrQuery: () => cockpitQueryMocks.pr,
+  useReviewStatusQuery: () => cockpitQueryMocks.review,
+  useIssueCostsQuery: () => cockpitQueryMocks.costs,
+  useWorkspaceQuery: () => cockpitQueryMocks.workspace,
+  useShipLogQuery: () => cockpitQueryMocks.shipLog,
+}));
+
+vi.mock('../../components/MergeButton', () => ({
+  MergeButton: () => <button type="button">Merge</button>,
+}));
+
+vi.mock('../../components/AutoMergeToggle', () => ({
+  AutoMergeToggle: () => <span>Auto merge</span>,
+}));
+
+vi.mock('../../components/drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts</div> }));
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity</div> }));
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div>Costs</div> }));
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/DiscussionsTab', () => ({ DiscussionsTab: () => <div>Discussions</div> }));
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/MarkdownTab', () => ({ MarkdownTab: () => <div>Markdown</div> }));
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({ TasksTab: () => <div>Tasks</div> }));
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/VBriefTab', () => ({ VBriefTab: () => <div>vBRIEF</div> }));
+vi.mock('../../components/CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
+  statusColor: () => ({ bg: 'transparent', fg: 'currentColor', label: 'pass' }),
+}));
+vi.mock('../../components/CommandDeck/SessionView/SessionPanel', () => ({ SessionPanel: () => <div>Session</div> }));
+vi.mock('../../components/Stage/cockpit/AgentsLane', () => ({ AgentsLane: () => <div>Agents</div> }));
+vi.mock('../../components/Stage/cockpit/ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }));
+vi.mock('../../components/Stage/cockpit/IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker</div> }));
+vi.mock('../../components/Stage/cockpit/PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }));
+vi.mock('../../components/Stage/cockpit/StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>History</div> }));
+vi.mock('../../components/Stage/cockpit/TasksRail', () => ({ TasksRail: () => <div>Task rail</div> }));
 
 type Surface = 'cockpit' | 'rail' | 'board' | 'drawer' | 'pipeline' | 'zone-b';
 type FixtureName = 'unplanned' | 'planned' | 'working' | 'paused' | 'ready_to_merge' | 'merged';
@@ -208,6 +266,7 @@ function surfaceContexts(sessionPresence: StateFixture['sessionPresence']): Surf
     zoneB: {
       sessionId: 'agent-pan-1610',
       issueId: 'PAN-1610',
+      sessionType: 'work',
       sessionPresence,
       tmuxSession: 'agent-pan-1610',
       hasJsonl: true,
@@ -219,7 +278,6 @@ function surfaceContexts(sessionPresence: StateFixture['sessionPresence']): Surf
       onRestartSession: noop,
       onReplaySession: noop,
       onOpenStateDir: noop,
-      onViewJsonl: noop,
       onViewState: noop,
       onViewVbrief: noop,
       onCopySessionId: noop,
@@ -251,13 +309,13 @@ export function expectedActions(
   }
 
   const layout = layoutForState(registry.issue, state);
-  const pinKeys = surface === 'drawer' ? new Set(['viewPr']) : new Set<string>();
-  const grouped = surface === 'rail' || surface === 'pipeline'
+  const enabledPinKeys = surface === 'drawer'
+    ? new Set(layout.all.filter((view) => view.action.key === 'viewPr' && view.enabled).map((view) => view.action.key))
+    : new Set<string>();
+  const grouped = surface === 'cockpit' || surface === 'rail' || surface === 'pipeline'
     ? layout.all
-    : [...layout.secondary, ...layout.overflow].filter((view) => !pinKeys.has(view.action.key));
-  const rendered = surface === 'drawer'
-    ? layout.all.filter((view) => view.action.key !== 'viewPr' || view.enabled)
-    : layout.all;
+    : [...layout.secondary, ...layout.overflow].filter((view) => !enabledPinKeys.has(view.action.key));
+  const rendered = layout.all;
   const railExtras = surface === 'rail'
     ? registry.rail
       .filter((action) => action.ownerSurface === 'FeatureItem' && action.scope === 'session-artifact')
@@ -266,7 +324,10 @@ export function expectedActions(
   const normalGroups = GROUP_ORDER
     .filter((group) => group !== 'danger')
     .filter((group) => grouped.some((view) => view.action.group === group));
-  const phaseSection = surface === 'rail' && layout.primary.some((view) => view.enabled) ? ['phase'] : [];
+  const phaseSection = (surface === 'cockpit' || surface === 'rail')
+    && layout.primary.some((view) => view.enabled)
+    ? ['phase']
+    : [];
   const sessionSection = railExtras.length > 0 ? ['session'] : [];
   const groupOrder = [...phaseSection, ...normalGroups, ...sessionSection, 'danger'];
   const actions = Object.fromEntries([
@@ -299,9 +360,88 @@ function useActionsResult(state: IssueActionState): UseIssueActionsResult {
   };
 }
 
+function issueFixture(fixture: StateFixture): Issue {
+  return {
+    id: 'issue-pan-1610',
+    identifier: 'PAN-1610',
+    title: 'Issue actions parity',
+    status: fixture.state.issueCanonicalState === 'todo' ? 'Todo' : 'In Progress',
+    state: fixture.state.issueCanonicalState,
+    priority: 2,
+    labels: fixture.name === 'unplanned' ? ['ready'] : [],
+    url: 'https://github.com/eltmon/overdeck/issues/1610',
+    createdAt: '2026-07-17T00:00:00.000Z',
+    updatedAt: '2026-07-17T00:00:00.000Z',
+    project: { id: 'overdeck', name: 'Overdeck', color: '#ffffff' },
+    hasPlan: fixture.state.hasPlan,
+    hasTasks: fixture.state.hasTasks,
+    workspacePath: fixture.state.workspace.path,
+    pipelineMembership: {
+      inPipeline: true,
+      bucket: 'in_flight',
+      labelDrift: null,
+    },
+  };
+}
+
+function agentFixture(fixture: StateFixture): Agent | undefined {
+  if (!fixture.state.agent) return undefined;
+  return {
+    id: 'agent-pan-1610',
+    issueId: 'PAN-1610',
+    runtime: 'claude-code',
+    model: 'claude-opus-4-8',
+    role: fixture.state.agent.role ?? 'work',
+    status: fixture.state.agent.status ?? 'stopped',
+    startedAt: '2026-07-17T00:00:00.000Z',
+    consecutiveFailures: 0,
+    killCount: 0,
+    paused: fixture.state.agent.paused,
+    troubled: fixture.state.agent.troubled,
+  };
+}
+
+const queryClients: QueryClient[] = [];
+
+function renderWithProviders(ui: ReactNode) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity, gcTime: 0 },
+      mutations: { retry: false },
+    },
+  });
+  queryClients.push(queryClient);
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <DialogProvider>{ui}</DialogProvider>
+    </QueryClientProvider>,
+  );
+}
+
+function prepareStore(fixture: StateFixture) {
+  const issue = issueFixture(fixture);
+  const agent = agentFixture(fixture);
+  useDashboardStore.setState({
+    drawer: { issueId: null, tab: 'overview' },
+    issuesRaw: [issue],
+    agentsById: agent ? { [agent.id]: agent } : {},
+    reviewStatusByIssueId: fixture.state.reviewStatus
+      ? {
+          'PAN-1610': {
+            issueId: 'PAN-1610',
+            updatedAt: '2026-07-17T00:00:00.000Z',
+            ...fixture.state.reviewStatus,
+          },
+        }
+      : {},
+  } as Parameters<typeof useDashboardStore.setState>[0]);
+  return { issue, agent };
+}
+
 function renderSurface(surface: Surface, fixture: StateFixture, context: SurfaceContext) {
   const actions = useActionsResult(fixture.state);
   hookState.current = actions;
+  const { issue, agent } = prepareStore(fixture);
 
   if (surface === 'rail') {
     const nonIssueActions = PROJECT_TREE_CONTEXT_ACTIONS
@@ -316,40 +456,78 @@ function renderSurface(surface: Surface, fixture: StateFixture, context: Surface
     );
     fireEvent.contextMenu(screen.getByText('Open rail actions'));
   } else if (surface === 'zone-b') {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    });
-    render(
-      <QueryClientProvider client={queryClient}>
-        <DialogProvider>
-          <ZoneBActionStrip
-            issueId="PAN-1610"
-            onViewTerminal={noop}
-            session={{
-              sessionId: 'agent-pan-1610',
-              type: 'work',
-              presence: fixture.sessionPresence,
-              tmuxSession: 'agent-pan-1610',
-              hasJsonl: true,
-              roundMetadata: { roundCount: 2 },
-            } as any}
-          />
-        </DialogProvider>
-      </QueryClientProvider>,
-    );
-    fireEvent.click(screen.getByTestId('zone-b-overflow'));
-  } else {
-    const drawerProps = surface === 'drawer'
-      ? { pinRight: ['viewPr'] as const, pinned: [{ key: 'merge', render: <button type="button">Merge</button> }] }
-      : {};
-    render(
-      <IssueActionMenu
+    renderWithProviders(
+      <ZoneBActionStrip
         issueId="PAN-1610"
-        mode={surface === 'pipeline' ? 'overflow-only' : 'primary-strip'}
-        {...drawerProps}
+        onViewTerminal={noop}
+        session={{
+          sessionId: 'agent-pan-1610',
+          type: 'work',
+          presence: fixture.sessionPresence,
+          tmuxSession: 'agent-pan-1610',
+          hasJsonl: true,
+          roundMetadata: { roundCount: 2 },
+        } as any}
       />,
     );
+    fireEvent.click(screen.getByTestId('zone-b-overflow'));
+  } else if (surface === 'cockpit') {
+    renderWithProviders(
+      <IssueMissionControl
+        issueId="PAN-1610"
+        title="Issue actions parity"
+        branch="feature/pan-1610"
+        launcher={<div>Launcher</div>}
+        agentDock={<div>Agent dock</div>}
+        actionDock={<div>Action dock</div>}
+        timeline={<div>Timeline</div>}
+        onOpenPane={noop}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Issue actions' }));
+  } else if (surface === 'board') {
+    renderWithProviders(
+      <IssueCard
+        issue={issue}
+        workAgent={agent?.role === 'work' ? agent : undefined}
+        planningAgent={agent?.role === 'plan' ? agent : undefined}
+        specialists={agent && agent.role !== 'work' && agent.role !== 'plan' ? [agent] : []}
+        isSelected={false}
+        onSelect={noop}
+        onPlan={noop}
+        planningState={{
+          hasPlan: fixture.state.hasPlan,
+          hasTasks: fixture.state.hasTasks,
+        }}
+        workspace={{
+          exists: fixture.state.workspace.exists,
+          issueId: 'PAN-1610',
+          path: fixture.state.workspace.path,
+        }}
+      />,
+    );
+    fireEvent.contextMenu(screen.getByTestId('issue-card-PAN-1610'));
+  } else if (surface === 'drawer') {
+    drawerDataState.current = {
+      issue,
+      agents: agent ? [agent] : [],
+      reviewStatus: fixture.state.reviewStatus,
+      tasks: [],
+      reviewSpecialists: [],
+      verificationGates: [],
+      phaseTimeline: [],
+      activityRail: [],
+      activityFull: [],
+    };
+    renderWithProviders(<DrawerActionBar />);
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+  } else {
+    const { container } = renderWithProviders(<PipelineView />);
+    const row = container.querySelector(
+      '[data-component="issue-row"][data-issue-id="PAN-1610"]',
+    );
+    if (!(row instanceof HTMLElement)) throw new Error('Missing production pipeline issue row');
+    fireEvent.contextMenu(row);
   }
 
   if (surface !== 'zone-b') {
@@ -438,10 +616,30 @@ const CASES = STATE_FIXTURES.flatMap((fixture) => SURFACES.map((surface) => ({ f
 
 beforeEach(() => {
   localStorage.clear();
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    if (method !== 'GET') throw new Error(`Unexpected mutation request: ${method} ${url}`);
+    if (url.startsWith('/api/costs/stream')) {
+      return Response.json({ events: [], byIssue: {}, count: 0 });
+    }
+    if (url === '/api/issues/resource-allocated') return Response.json([]);
+    if (url.startsWith('/api/session-trees')) return Response.json({ trees: [] });
+    if (url.endsWith('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf-token' });
+    if (url === '/api/settings') return Response.json({ tts: { mutedIssues: [] } });
+    if (url === '/api/settings/available-models') return Response.json({});
+    if (url === '/api/settings/openrouter/models') return Response.json({ models: [], favorites: [] });
+    if (url === '/api/settings/claude-auth') return Response.json({ authenticated: false });
+    if (url.startsWith('/api/settings/harness-policy')) return Response.json({ decisions: {} });
+    return Response.json({});
+  }));
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await Promise.all(queryClients.map((client) => client.cancelQueries()));
   cleanup();
+  for (const client of queryClients.splice(0)) client.clear();
+  vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
 

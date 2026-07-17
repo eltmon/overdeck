@@ -1,3 +1,4 @@
+import type { SessionNode } from '@overdeck/contracts';
 import type { WorkspaceInfo } from './workspace-types';
 import type { Agent, WorkAgentLifecycle } from '../types';
 import { isReviewPipelineStuck } from './pipeline-state';
@@ -45,11 +46,9 @@ export type IssueActionKey =
   | 'open'
   | 'resetIssue'
   | 'resetToPlanned'
-  | 'merge'
   | 'viewPr'
   | 'cancel'
   | 'tasks'
-  | 'viewVbrief'
   | 'inference'
   | 'discussions'
   | 'transcripts'
@@ -146,11 +145,11 @@ export type NonIssueActionKey =
   | 'stopSession'
   | 'viewTerminal'
   | 'pauseSession'
-  | 'resumeSession'
+  | 'resumeFocusedSession'
   | 'restartSession'
   | 'replaySession'
   | 'viewState'
-  | 'viewVbrief'
+  | 'viewFocusedVbrief'
   | 'copySessionId'
   | 'copyTmuxCommand'
   | 'exportSessionMetadata'
@@ -162,6 +161,7 @@ export interface NonIssueActionContext {
   containerStatus?: 'running' | 'stopped' | 'unhealthy' | 'restarting';
   sessionId?: string;
   issueId?: string;
+  sessionType?: SessionNode['type'];
   sessionPresence?: string;
   tmuxSession?: string | null;
   hasJsonl?: boolean;
@@ -365,7 +365,7 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
     confirm: null,
   },
   {
-    key: 'resumeSession',
+    key: 'resumeFocusedSession',
     label: 'Resume',
     description: 'Resume session',
     scope: 'session',
@@ -381,7 +381,7 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
     description: 'Stop the focused session and start a new work agent.',
     scope: 'session',
     ownerSurface: 'ZoneBActionStrip',
-    enabledWhen: (context) => hasText(context.sessionId) && !!context.onRestartSession,
+    enabledWhen: (context) => context.sessionType === 'work' && hasText(context.sessionId) && !!context.onRestartSession,
     invoke: (context) => invokeWithText(context.sessionId, context.onRestartSession),
     kind: 'dialog',
     confirm: {
@@ -425,7 +425,7 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
     confirm: null,
   },
   {
-    key: 'viewVbrief',
+    key: 'viewFocusedVbrief',
     label: 'View vBRIEF',
     description: 'Copy the focused issue vBRIEF path.',
     scope: 'session',
@@ -474,7 +474,7 @@ export const ZONE_B_SESSION_ACTIONS: NonIssueActionEntry[] = [
     description: 'Download the focused session metadata as JSON.',
     scope: 'session',
     ownerSurface: 'ZoneBActionStrip',
-    enabledWhen: (context) => context.hasJsonl === true && hasText(context.sessionId) && !!context.onExportSessionMetadata,
+    enabledWhen: (context) => hasText(context.sessionId) && !!context.onExportSessionMetadata,
     invoke: (context) => invokeWithText(context.sessionId, context.onExportSessionMetadata),
     kind: 'safe',
     confirm: null,

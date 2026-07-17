@@ -35,7 +35,7 @@ interface ZoneBActionStripProps {
 
 const INLINE_ACTION_KEYS = new Set<NonIssueActionKey>([
   'pauseSession',
-  'resumeSession',
+  'resumeFocusedSession',
   'stopSession',
   'viewTerminal',
 ]);
@@ -157,13 +157,6 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     setOverflowOpen(false);
   }, [session.sessionId]);
 
-  const handleViewJsonl = useCallback(() => {
-    // The conversation panel already shows the JSONL transcript;
-    // this action is a no-op placeholder that can be wired to a
-    // raw-JSONL viewer if one is added later.
-    setOverflowOpen(false);
-  }, []);
-
   const handleDeepWipe = useCallback(async (targetIssueId: string) => {
     try {
       const res = await fetch(`/api/issues/${targetIssueId}/deep-wipe`, {
@@ -173,8 +166,8 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
       });
       if (!res.ok) throw new Error('Failed to deep wipe');
       await refreshDashboardState(queryClient);
-    } catch {
-      // silently ignore — user can retry
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to deep wipe');
     }
   }, [queryClient]);
 
@@ -244,6 +237,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
   const actionContext = {
     sessionId: session.sessionId,
     issueId,
+    sessionType: session.type,
     sessionPresence: session.presence,
     tmuxSession: session.tmuxSession,
     hasJsonl: session.hasJsonl,
@@ -255,7 +249,6 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     onRestartSession: handleRestart,
     onReplaySession: onViewTerminal ? handleReplay : undefined,
     onOpenStateDir: handleOpenStateDir,
-    onViewJsonl: handleViewJsonl,
     onViewState: handleViewState,
     onViewVbrief: handleViewVbrief,
     onCopySessionId: handleCopySessionId,
@@ -269,7 +262,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     .filter((action) => action.enabledWhen(actionContext));
   const actionByKey = new Map(availableActions.map((action) => [action.key, action]));
   const pauseAction = actionByKey.get('pauseSession');
-  const resumeAction = actionByKey.get('resumeSession');
+  const resumeAction = actionByKey.get('resumeFocusedSession');
   const stopAction = actionByKey.get('stopSession');
   const terminalAction = actionByKey.get('viewTerminal');
   const overflowActions = availableActions.filter((action) => !INLINE_ACTION_KEYS.has(action.key));
@@ -288,7 +281,7 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
     await action.invoke(actionContext);
   };
 
-  if (!stopAction && !terminalAction && !pauseAction && !resumeAction) return null;
+  if (availableActions.length === 0) return null;
 
   return (
     <div style={{ display: 'flex', gap: 6, marginLeft: 8 }}>
@@ -357,49 +350,51 @@ export function ZoneBActionStrip({ session, issueId, onViewTerminal }: ZoneBActi
       )}
 
       {/* Overflow menu */}
-      <div style={{ position: 'relative' }} ref={overflowRef}>
-        <button
-          data-testid="zone-b-overflow"
-          onClick={() => setOverflowOpen((o) => !o)}
-          className="flex items-center gap-1 px-1 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
-          title="More actions"
-        >
-          <MoreHorizontal className="w-3 h-3" />
-        </button>
-        {overflowOpen && (
-          <div
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: '100%',
-              marginTop: 4,
-              zIndex: 1000,
-              background: 'var(--card)',
-              border: '1px solid var(--border)',
-              borderRadius: 6,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-              padding: '4px 0',
-              minWidth: 160,
-              fontSize: 12,
-            }}
+      {overflowActions.length > 0 ? (
+        <div style={{ position: 'relative' }} ref={overflowRef}>
+          <button
+            data-testid="zone-b-overflow"
+            onClick={() => setOverflowOpen((o) => !o)}
+            className="flex items-center gap-1 px-1 py-1 text-xs text-muted-foreground rounded hover:text-foreground hover:bg-accent"
+            title="More actions"
           >
-            {overflowActions.map((action) => (
-              <Fragment key={action.key}>
-                {action.key === 'deepWipe' ? <MenuDivider /> : null}
-                <OverflowItem
-                  actionKey={action.key}
-                  label={action.label}
-                  icon={<ZoneBActionIcon actionKey={action.key} />}
-                  variant={action.kind === 'destructive' ? 'danger' : 'default'}
-                  onClick={() => {
-                    void invokeAction(action).finally(() => setOverflowOpen(false));
-                  }}
-                />
-              </Fragment>
-            ))}
-          </div>
-        )}
-      </div>
+            <MoreHorizontal className="w-3 h-3" />
+          </button>
+          {overflowOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                right: 0,
+                top: '100%',
+                marginTop: 4,
+                zIndex: 1000,
+                background: 'var(--card)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                padding: '4px 0',
+                minWidth: 160,
+                fontSize: 12,
+              }}
+            >
+              {overflowActions.map((action) => (
+                <Fragment key={action.key}>
+                  {action.key === 'deepWipe' ? <MenuDivider /> : null}
+                  <OverflowItem
+                    actionKey={action.key}
+                    label={action.label}
+                    icon={<ZoneBActionIcon actionKey={action.key} />}
+                    variant={action.kind === 'destructive' ? 'danger' : 'default'}
+                    onClick={() => {
+                      void invokeAction(action).finally(() => setOverflowOpen(false));
+                    }}
+                  />
+                </Fragment>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -414,7 +409,7 @@ function ZoneBActionIcon({ actionKey }: { actionKey: NonIssueActionKey }) {
     case 'viewState':
     case 'viewJsonl':
       return <FileText className="w-3 h-3" />;
-    case 'viewVbrief':
+    case 'viewFocusedVbrief':
       return <BookText className="w-3 h-3" />;
     case 'copySessionId':
       return <Copy className="w-3 h-3" />;

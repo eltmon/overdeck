@@ -203,6 +203,24 @@ describe('IssueActionMenu', () => {
     expect(within(overflow).queryByText('Pinned tasks')).not.toBeInTheDocument();
   });
 
+  it('keeps a disabled requested registry pin in grouped overflow', () => {
+    renderMenu(
+      <IssueActionMenu
+        issueId="PAN-1"
+        mode="primary-strip"
+        pinRight={['viewPr']}
+      />,
+    );
+
+    expect(screen.queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-pin-spacer')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    const overflow = screen.getByTestId('issue-action-overflow-menu');
+    expect(within(overflow).getByTestId('issue-action-disabled-viewPr')).toBeInTheDocument();
+    expect(within(overflow).getByTestId('issue-action-viewPr')).toBeDisabled();
+  });
+
   it('renders only registry-backed action rows in grouped overflow', () => {
     renderMenu(
       <IssueActionMenu

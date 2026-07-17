@@ -118,7 +118,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       primary: all.slice(0, 2),
       secondary: all.slice(2, 4),
       overflow: all.slice(4),
-      phase: 'work',
+      phase: 'WORK_RUNNING',
       state: { hasPlan: true, hasBeads: true },
       activeDialog: null,
     }
