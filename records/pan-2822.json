@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T10:31:51.372Z",
+  "updated": "2026-07-17T10:35:18.138Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "spec-lens-reason-const": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2822",
         "agentId": "agent-pan-2822",
         "pid": 1266511,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:31:51.372Z"
+        "claimedAt": "2026-07-17T10:31:51.372Z",
+        "itemId": "spec-lens-reason-const",
+        "outcome": "completed",
+        "reason": "Exported the byte-identical spec-lens planned_backlog reason constant, added coupling tests for spec-only and branch-backed cases, and verified typecheck plus the focused audit suite.",
+        "releasedAt": "2026-07-17T10:35:18.138Z"
+      }
+    ],
+    "statusReasons": {
+      "spec-lens-reason-const": {
+        "reason": "Exported the byte-identical spec-lens planned_backlog reason constant, added coupling tests for spec-only and branch-backed cases, and verified typecheck plus the focused audit suite.",
+        "updatedAt": "2026-07-17T10:35:18.138Z"
       }
     }
   },
   "statusOverrides": {
-    "spec-lens-reason-const": "running"
+    "spec-lens-reason-const": "completed",
+    "spec-lens-reason-const.spec-lens-reason-const.ac1": "completed",
+    "spec-lens-reason-const.spec-lens-reason-const.ac2": "completed",
+    "spec-lens-reason-const.spec-lens-reason-const.ac3": "completed"
   }
 }
