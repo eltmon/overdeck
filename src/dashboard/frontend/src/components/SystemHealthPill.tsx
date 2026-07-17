@@ -245,6 +245,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
+      if (document.querySelector('[role="alertdialog"]')) return;
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
         closePopover();
       }
