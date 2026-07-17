@@ -20,7 +20,6 @@ import { basename, dirname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
-import { registerStrikeMergeTrigger, registerStrikeOwnershipProbe } from '../../../../lib/cloister/deacon-strike-landing.js';
 import { syncMainIntoWorkspace } from '../../../../lib/cloister/merge-agent.js';
 import { MainDivergedError, gitPush } from '../../../../lib/git/operations.js';
 import { listGitOperationsSync } from '../../../../lib/git-activity.js';
@@ -40,7 +39,8 @@ import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
-import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest } from './merge-strike.js';
+import { internalStrikeMergeRoute } from './internal-strike-merge.js';
+import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -301,22 +301,6 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 );
 
 // ─── Shared triggerMerge logic ────────────────────────────────────────────────
-
-export interface TriggerMergeResult {
-  success: boolean;
-  statusCode: number;
-  error?: string;
-  message?: string;
-  reviewStatus?: string;
-  testStatus?: string;
-  mergeStatus?: string;
-  prUrl?: string;
-  remote?: boolean;
-  repos?: Array<{ repo: string; success: boolean; message: string; testsStatus?: string }>;
-  testsStatus?: string;
-  note?: string;
-  mergeResult?: unknown;
-}
 
 // Per-project merge queue backed by SQLite (PAN-632).
 // Replaces the in-memory _mergeQueues Map — survives server restarts.
@@ -1231,7 +1215,10 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   }
 }
 
-setMergeQueueTriggerHandler(triggerMerge); registerStrikeMergeTrigger(triggerMerge); registerStrikeOwnershipProbe(issueId => (getPendingOperation(issueId)?.type === 'merge' && getPendingOperation(issueId)?.status === 'running') || getAllActiveQueues().some(queue => queue.current === issueId.toUpperCase() || queue.queue.includes(issueId.toUpperCase())));
+setMergeQueueTriggerHandler(triggerMerge);
+
+const postInternalStrikeMergeRoute = internalStrikeMergeRoute(triggerMerge);
+
 // ─── Route: POST /api/issues/:issueId/merge ───────────────────────────────
 const postWorkspaceMergeRoute = HttpRouter.add(
   'POST',
@@ -1929,6 +1916,7 @@ export const mergeOpsRouteLayer = Layer.mergeAll(
   postForgeMergeRoute,
   postWorkspaceApproveRoute,
   getMergeQueueRoute,
+  postInternalStrikeMergeRoute,
   postInternalPipelineNotifyRoute,
 );
 
