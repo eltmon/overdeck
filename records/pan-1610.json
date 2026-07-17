@@ -120,17 +120,17 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T17:54:39.786Z",
+  "updated": "2026-07-17T18:10:32.928Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T17:54:38.380Z",
+    "updatedAt": "2026-07-17T18:10:32.900Z",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
@@ -238,9 +238,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 10597688,
-            "output": 598548,
-            "cacheRead": 140013568,
+            "input": 10799165,
+            "output": 606363,
+            "cacheRead": 142107648,
             "cacheWrite": 0
           }
         }
@@ -259,9 +259,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 15932226,
-          "output": 732191,
-          "cacheRead": 152785408,
+          "input": 16133703,
+          "output": 740006,
+          "cacheRead": 154879488,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -272,8 +272,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 190.593694,
-        "pricingAsOf": "2026-07-17T17:54:38.447Z"
+        "usd": 192.882569,
+        "pricingAsOf": "2026-07-17T18:10:32.905Z"
       }
     },
     "merges": [
