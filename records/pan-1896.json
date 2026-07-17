@@ -1,9 +1,16 @@
 {
   "issueId": "PAN-1896",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "timestamp": "2026-07-17T12:22:56.232Z",
+      "reason": "start",
+      "agentModel": "gpt-5.6-sol"
+    }
+  ],
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:22:57.971Z",
+  "updated": "2026-07-17T12:25:49.586Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -12,13 +19,13 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T12:22:53.728Z",
+    "updatedAt": "2026-07-17T12:25:49.567Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
-    "strikeReadyHead": "dea3c2074b865303484eaad5a5b9d288299393df",
-    "strikeReadyAt": "2026-07-17T12:12:20.525Z",
-    "strikeLandingState": "recovering",
-    "strikeRecoveryCount": 1,
+    "strikeReadyHead": "c6f25b78322ce7fe16f3337e7214e0a342223501",
+    "strikeReadyAt": "2026-07-17T12:25:49.567Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-17T12:17:23.332Z",
@@ -42,9 +49,9 @@
         },
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 1751650,
-            "output": 112203,
-            "cacheRead": 22005248,
+            "input": 1761258,
+            "output": 113906,
+            "cacheRead": 22801408,
             "cacheWrite": 0
           }
         }
@@ -57,15 +64,15 @@
           "cacheWrite": 315565
         },
         "openai/gpt-5.6-sol": {
-          "input": 1751650,
-          "output": 112203,
-          "cacheRead": 22005248,
+          "input": 1761258,
+          "output": 113906,
+          "cacheRead": 22801408,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.081679,
-        "pricingAsOf": "2026-07-17T12:22:53.731Z"
+        "usd": 32.578889,
+        "pricingAsOf": "2026-07-17T12:25:49.580Z"
       }
     },
     "merges": [],
@@ -132,12 +139,5 @@
     "codex-workagent-wire": "cancelled",
     "codex-conversation-wire": "cancelled"
   },
-  "sessionHistory": [
-    {
-      "timestamp": "2026-07-17T12:22:56.232Z",
-      "reason": "start",
-      "agentModel": "gpt-5.6-sol"
-    }
-  ],
   "workModel": "gpt-5.6-sol"
 }
