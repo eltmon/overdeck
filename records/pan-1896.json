@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:18:24.686Z",
+  "updated": "2026-07-17T12:18:43.932Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -74,8 +74,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "codex-permissions-doc": {
+        "writerId": "strike-pan-1896",
+        "agentId": "strike-pan-1896",
+        "pid": 3641081,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T12:18:43.932Z"
+      }
+    },
     "statusReasons": {
       "codex-mode-enum": {
         "reason": "Cancelled after current Codex 0.144.4 investigation: native per-command execpolicy rules make a new workspace-net permission mode unnecessary.",
@@ -84,11 +92,16 @@
       "codex-init-network": {
         "reason": "Cancelled after live app-server reproduction: linking the user's native execpolicy rules removes repeated prompts without enabling workspace-wide sandbox networking.",
         "updatedAt": "2026-07-17T12:18:24.686Z"
+      },
+      "codex-permissions-doc": {
+        "reason": "Documentation implementation is present on the verified strike branch.",
+        "updatedAt": "2026-07-17T12:18:43.932Z"
       }
     }
   },
   "statusOverrides": {
     "codex-mode-enum": "cancelled",
-    "codex-init-network": "cancelled"
+    "codex-init-network": "cancelled",
+    "codex-permissions-doc": "running"
   }
 }
