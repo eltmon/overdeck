@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T01:14:26.414Z",
+  "updated": "2026-07-17T01:18:26.192Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "overdeck-schema-audit": {
-        "writerId": "agent-pan-2807",
-        "agentId": "agent-pan-2807",
-        "pid": 1782019,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:14:26.414Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2807",
@@ -118,6 +110,17 @@
         "outcome": "completed",
         "reason": "The in-memory SQLite adapter now proves user_version 61 round-trips through both scalar and row-set pragma APIs. Focused driver suite passes all 10 tests.",
         "releasedAt": "2026-07-17T01:12:03.793Z"
+      },
+      {
+        "writerId": "agent-pan-2807",
+        "agentId": "agent-pan-2807",
+        "pid": 1782019,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:14:26.414Z",
+        "itemId": "overdeck-schema-audit",
+        "outcome": "completed",
+        "reason": "Startup now parses the canonical init SQL plus explicit runtime top-up expectations, compares tables/indexes/columns through SQLite metadata reads, and emits one report-only [schema-audit] warning per missing artifact. Focused tests cover exact drift, ignored extras, query-only execution, startup warnings, and parser count; typecheck passes.",
+        "releasedAt": "2026-07-17T01:18:26.192Z"
       }
     ],
     "statusReasons": {
@@ -136,6 +139,10 @@
       "pragma-user-version-driver-test": {
         "reason": "The in-memory SQLite adapter now proves user_version 61 round-trips through both scalar and row-set pragma APIs. Focused driver suite passes all 10 tests.",
         "updatedAt": "2026-07-17T01:12:03.793Z"
+      },
+      "overdeck-schema-audit": {
+        "reason": "Startup now parses the canonical init SQL plus explicit runtime top-up expectations, compares tables/indexes/columns through SQLite metadata reads, and emits one report-only [schema-audit] warning per missing artifact. Focused tests cover exact drift, ignored extras, query-only execution, startup warnings, and parser count; typecheck passes.",
+        "updatedAt": "2026-07-17T01:18:26.192Z"
       }
     }
   },
@@ -155,6 +162,10 @@
     "pragma-user-version-driver-test": "completed",
     "pragma-user-version-driver-test.pragma-user-version-driver-test.ac1": "completed",
     "pragma-user-version-driver-test.pragma-user-version-driver-test.ac2": "completed",
-    "overdeck-schema-audit": "running"
+    "overdeck-schema-audit": "completed",
+    "overdeck-schema-audit.overdeck-schema-audit.ac1": "completed",
+    "overdeck-schema-audit.overdeck-schema-audit.ac2": "completed",
+    "overdeck-schema-audit.overdeck-schema-audit.ac3": "completed",
+    "overdeck-schema-audit.overdeck-schema-audit.ac4": "completed"
   }
 }
