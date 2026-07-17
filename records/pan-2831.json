@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:00:49.298Z",
+  "updated": "2026-07-17T13:01:54.018Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "pending",
@@ -64,18 +64,33 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "add-issue-comparator": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2831",
         "agentId": "agent-pan-2831",
         "pid": 4035625,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:00:49.298Z"
+        "claimedAt": "2026-07-17T13:00:49.298Z",
+        "itemId": "add-issue-comparator",
+        "outcome": "completed",
+        "reason": "Added and tested the shared numeric issue-id comparator in @overdeck/contracts",
+        "releasedAt": "2026-07-17T13:01:54.018Z"
+      }
+    ],
+    "statusReasons": {
+      "add-issue-comparator": {
+        "reason": "Added and tested the shared numeric issue-id comparator in @overdeck/contracts",
+        "updatedAt": "2026-07-17T13:01:54.018Z"
       }
     }
   },
   "statusOverrides": {
-    "add-issue-comparator": "running"
+    "add-issue-comparator": "completed",
+    "add-issue-comparator.add-issue-comparator.ac1": "completed",
+    "add-issue-comparator.add-issue-comparator.ac2": "completed",
+    "add-issue-comparator.add-issue-comparator.ac3": "completed",
+    "add-issue-comparator.add-issue-comparator.ac4": "completed"
   }
 }
