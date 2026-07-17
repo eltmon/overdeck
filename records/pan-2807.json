@@ -63,17 +63,16 @@
     "recordedAt": "2026-07-17T02:12:22.787Z"
   },
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T02:19:21.153Z",
+  "updated": "2026-07-17T02:27:36.407Z",
   "pipeline": {
     "issueId": "PAN-2807",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:19:20.573Z",
-    "reviewNotes": "Unexpected schema failures are still silently swallowed in migration ladder and runtime top-ups",
+    "updatedAt": "2026-07-17T02:27:36.345Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2816",
     "lastVerifiedCommit": "5ca6f844b9c45397ba0a8bb808ea607c723f3a61",
     "reviewRequestedAt": "2026-07-17T02:12:25.580Z",
@@ -111,24 +110,6 @@
         "tests/unit/lib/database/schema-migrations.test.ts"
       ],
       "recordedAt": "2026-07-17T02:12:22.787Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "5ca6f844b9c45397ba0a8bb808ea607c723f3a61"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "5ca6f844b9c45397ba0a8bb808ea607c723f3a61"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "5ca6f844b9c45397ba0a8bb808ea607c723f3a61"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "5ca6f844b9c45397ba0a8bb808ea607c723f3a61"
-      }
     }
   },
   "closeOut": {
@@ -144,9 +125,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 498018,
-            "output": 18065,
-            "cacheRead": 5084672,
+            "input": 502468,
+            "output": 18557,
+            "cacheRead": 5477888,
             "cacheWrite": 0
           }
         },
@@ -184,9 +165,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3351110,
-            "output": 246061,
-            "cacheRead": 51768320,
+            "input": 3596244,
+            "output": 278426,
+            "cacheRead": 58594304,
             "cacheWrite": 0
           }
         }
@@ -199,15 +180,15 @@
           "cacheWrite": 211131
         },
         "openai/gpt-5.6-sol": {
-          "input": 5948936,
-          "output": 325680,
-          "cacheRead": 70555648,
+          "input": 6198520,
+          "output": 358537,
+          "cacheRead": 77774848,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 86.497847,
-        "pricingAsOf": "2026-07-17T02:19:20.585Z"
+        "usd": 92.341077,
+        "pricingAsOf": "2026-07-17T02:27:36.393Z"
       }
     },
     "merges": [
