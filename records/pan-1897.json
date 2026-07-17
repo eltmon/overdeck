@@ -289,17 +289,17 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T01:58:41.198Z",
+  "updated": "2026-07-17T02:14:30.508Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:50:51.255Z",
+    "updatedAt": "2026-07-17T02:14:30.471Z",
     "reviewNotes": "[correctness] The spawn budget cannot terminate or bound `spawnAgent` — `src/cli/commands/start.ts:1221`",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
@@ -343,9 +343,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1422278,
-            "output": 46355,
-            "cacheRead": 8673792,
+            "input": 6615990,
+            "output": 149395,
+            "cacheRead": 21698048,
             "cacheWrite": 0
           }
         },
@@ -391,9 +391,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 23207539,
-            "output": 773704,
-            "cacheRead": 163109888,
+            "input": 23974024,
+            "output": 778150,
+            "cacheRead": 163308032,
             "cacheWrite": 0
           }
         }
@@ -406,9 +406,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 32677227,
-          "output": 961238,
-          "cacheRead": 191136512,
+          "input": 38637424,
+          "output": 1068724,
+          "cacheRead": 204358912,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -431,8 +431,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 284.857003,
-        "pricingAsOf": "2026-07-17T01:50:51.393Z"
+        "usd": 324.493768,
+        "pricingAsOf": "2026-07-17T02:14:30.500Z"
       }
     },
     "merges": [
