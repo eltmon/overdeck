@@ -1,7 +1,7 @@
 export {
   GroupedIssueActionMenu,
   type GroupedIssueActionMenuProps,
-  type IssueActionSessionExtra,
+  type NonIssueActionInvocation,
 } from './GroupedIssueActionMenu';
 export {
   IssueActionGroupedBody,

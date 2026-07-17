@@ -424,6 +424,8 @@ describe('FeatureItem', () => {
 
     openFeatureContextMenu();
     expect(screen.getByText('This session')).toBeInTheDocument();
+    expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
+    expect(screen.getByTestId('non-issue-action-viewJsonl')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
     expect(onOpenStateDir).toHaveBeenCalledWith('agent-pan-821');
 
@@ -432,7 +434,7 @@ describe('FeatureItem', () => {
     expect(onViewJsonl).toHaveBeenCalledWith('agent-pan-821');
 
     view.unmount();
-    renderFeature(
+    const noJsonlView = renderFeature(
       <FeatureItem
         feature={makeFeature({ sessions: [makeSession({ hasJsonl: false })] })}
         title="Test Feature"
@@ -443,8 +445,26 @@ describe('FeatureItem', () => {
       />,
     );
     openFeatureContextMenu();
+    expect(screen.getByTestId('non-issue-action-openStateDir')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Open State Dir' })).toBeInTheDocument();
+    expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', { name: 'View JSONL' })).not.toBeInTheDocument();
+
+    noJsonlView.unmount();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [] })}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+      />,
+    );
+    openFeatureContextMenu();
+    expect(screen.queryByText('This session')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('non-issue-action-openStateDir')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('non-issue-action-viewJsonl')).not.toBeInTheDocument();
   });
 
   it('renders a muted untitled placeholder when title is empty', () => {

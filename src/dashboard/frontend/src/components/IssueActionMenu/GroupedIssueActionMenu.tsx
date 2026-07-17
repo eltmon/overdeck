@@ -10,10 +10,10 @@ import {
   type IssueActionGroupedBodyProps,
   type IssueActionMenuItemPrimitiveProps,
   type IssueActionMenuPrimitives,
-  type IssueActionSessionExtra,
+  type NonIssueActionInvocation,
 } from './IssueActionGroupedBody';
 
-export type { IssueActionSessionExtra } from './IssueActionGroupedBody';
+export type { NonIssueActionInvocation } from './IssueActionGroupedBody';
 
 export type GroupedIssueActionMenuProps = Omit<IssueActionGroupedBodyProps, 'primitives'> & {
   'data-section'?: string;
@@ -60,7 +60,7 @@ const contextMenuPrimitives: IssueActionMenuPrimitives = {
 
 export function GroupedIssueActionMenu({
   actions,
-  sessionExtras,
+  nonIssueActions,
   defaultExplain,
   'data-section': dataSection,
 }: GroupedIssueActionMenuProps) {
@@ -69,7 +69,7 @@ export function GroupedIssueActionMenu({
       <IssueActionGroupedBody
         actions={actions}
         primitives={contextMenuPrimitives}
-        sessionExtras={sessionExtras}
+        nonIssueActions={nonIssueActions}
         defaultExplain={defaultExplain}
       />
     </ContextMenuContent>

@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
-  ChevronRight, ChevronDown, FolderOpen, FileText, GitBranch,
+  ChevronRight, ChevronDown, FolderOpen, GitBranch,
   BookText, Bug, Container, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
@@ -18,8 +18,8 @@ import {
   GroupedIssueActionMenu,
   IssueActionDialogHost,
   useIssueActions,
-  type IssueActionSessionExtra,
 } from '../../IssueActionMenu';
+import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
@@ -664,29 +664,20 @@ function FeatureContextMenu({
   onViewJsonl,
 }: FeatureContextMenuProps) {
   const issueActions = useIssueActions(feature.issueId);
-  const sessionExtras: IssueActionSessionExtra[] = [];
-
-  if (workSessionId && onOpenStateDir) {
-    sessionExtras.push({
-      key: 'open-state-dir',
-      label: 'Open State Dir',
-      icon: <FolderOpen size={12} />,
-      onSelect: () => onOpenStateDir(workSessionId),
-    });
-  }
-
-  if (hasJsonl && workSessionId && onViewJsonl) {
-    sessionExtras.push({
-      key: 'view-jsonl',
-      label: 'View JSONL',
-      icon: <FileText size={12} />,
-      onSelect: () => onViewJsonl(workSessionId),
-    });
-  }
+  const actionContext = {
+    sessionId: workSessionId ?? undefined,
+    hasJsonl,
+    onOpenStateDir,
+    onViewJsonl,
+  } satisfies NonIssueActionContext;
+  const nonIssueActions = PROJECT_TREE_CONTEXT_ACTIONS
+    .filter((action) => action.ownerSurface === 'FeatureItem' && action.scope === 'session-artifact')
+    .filter((action) => action.enabledWhen(actionContext))
+    .map((action) => ({ action, context: actionContext }));
 
   return (
     <>
-      <GroupedIssueActionMenu actions={issueActions} sessionExtras={sessionExtras} data-section="FeatureContextMenu (issue-row right-click)" />
+      <GroupedIssueActionMenu actions={issueActions} nonIssueActions={nonIssueActions} data-section="FeatureContextMenu (issue-row right-click)" />
       <IssueActionDialogHost issueId={feature.issueId} actions={issueActions} />
     </>
   );

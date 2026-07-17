@@ -1,17 +1,20 @@
 import { useId, useState, type AriaRole, type ComponentType, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 
-import { GROUP_LABELS, GROUP_ORDER, type PipelinePhase } from '../../lib/issueActions';
+import {
+  GROUP_LABELS,
+  GROUP_ORDER,
+  type NonIssueActionContext,
+  type NonIssueActionEntry,
+  type PipelinePhase,
+} from '../../lib/issueActions';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
 
 const EXPLAIN_PREFERENCE_KEY = 'overdeck.issueActions.explain';
 
-export type IssueActionSessionExtra = {
-  key: string;
-  label: string;
-  icon?: ReactNode;
-  onSelect: () => void;
-  destructive?: boolean;
+export type NonIssueActionInvocation = {
+  action: NonIssueActionEntry;
+  context: NonIssueActionContext;
 };
 
 export type IssueActionMenuItemPrimitiveProps = {
@@ -39,7 +42,7 @@ export type IssueActionMenuPrimitives = {
 export type IssueActionGroupedBodyProps = {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   primitives: IssueActionMenuPrimitives;
-  sessionExtras?: IssueActionSessionExtra[];
+  nonIssueActions?: NonIssueActionInvocation[];
   defaultExplain?: boolean;
 };
 
@@ -117,18 +120,22 @@ function ActionRow({
   );
 }
 
-function SessionExtraRow({
-  extra,
+function NonIssueActionRow({
+  invocation,
   primitives,
 }: {
-  extra: IssueActionSessionExtra;
+  invocation: NonIssueActionInvocation;
   primitives: IssueActionMenuPrimitives;
 }) {
-  const Item = extra.destructive ? primitives.DestructiveItem : primitives.Item;
+  const { action, context } = invocation;
+  const Item = action.kind === 'destructive' ? primitives.DestructiveItem : primitives.Item;
   return (
-    <Item onActivate={extra.onSelect}>
-      {extra.icon ? <span className="mr-2 inline-flex shrink-0">{extra.icon}</span> : null}
-      {extra.label}
+    <Item
+      title={action.description}
+      data-testid={`non-issue-action-${action.key}`}
+      onActivate={() => { void action.invoke(context); }}
+    >
+      {action.label}
     </Item>
   );
 }
@@ -136,7 +143,7 @@ function SessionExtraRow({
 export function IssueActionGroupedBody({
   actions,
   primitives,
-  sessionExtras = [],
+  nonIssueActions = [],
   defaultExplain = false,
 }: IssueActionGroupedBodyProps) {
   const { Item, Label, Separator } = primitives;
@@ -196,11 +203,15 @@ export function IssueActionGroupedBody({
         );
       })}
 
-      {sessionExtras.length > 0 ? (
+      {nonIssueActions.length > 0 ? (
         <div data-issue-action-section="session">
           <Label>This session</Label>
-          {sessionExtras.map((extra) => (
-            <SessionExtraRow key={extra.key} extra={extra} primitives={primitives} />
+          {nonIssueActions.map((invocation) => (
+            <NonIssueActionRow
+              key={invocation.action.key}
+              invocation={invocation}
+              primitives={primitives}
+            />
           ))}
         </div>
       ) : null}

@@ -2,9 +2,15 @@ import type { ReactNode } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { GROUP_LABELS, ISSUE_ACTIONS, type IssueActionKey, type PipelinePhase } from '../../lib/issueActions';
+import {
+  GROUP_LABELS,
+  ISSUE_ACTIONS,
+  PROJECT_TREE_CONTEXT_ACTIONS,
+  type IssueActionKey,
+  type PipelinePhase,
+} from '../../lib/issueActions';
 import { ContextMenuRoot, ContextMenuTrigger } from '../shared/ContextMenu';
-import { GroupedIssueActionMenu, type IssueActionSessionExtra } from './GroupedIssueActionMenu';
+import { GroupedIssueActionMenu, type NonIssueActionInvocation } from './GroupedIssueActionMenu';
 import {
   IssueActionGroupedBody,
   type IssueActionMenuItemPrimitiveProps,
@@ -30,6 +36,15 @@ function actionViews(enabledKeys: IssueActionKey[], actionKeys?: IssueActionKey[
       invoke,
     };
   });
+}
+
+function sessionArtifactInvocation(onOpenStateDir: () => void): NonIssueActionInvocation {
+  const action = PROJECT_TREE_CONTEXT_ACTIONS.find((entry) => entry.key === 'openStateDir');
+  if (!action) throw new Error('Missing openStateDir action');
+  return {
+    action,
+    context: { sessionId: 'agent-pan-1610', onOpenStateDir },
+  };
 }
 
 function PlainMenuItem({
@@ -58,13 +73,13 @@ function renderMenu({
   primaryKeys,
   enabledKeys,
   actionKeys,
-  sessionExtras = [],
+  nonIssueActions = [],
 }: {
   phase: PipelinePhase;
   primaryKeys: IssueActionKey[];
   enabledKeys: IssueActionKey[];
   actionKeys?: IssueActionKey[];
-  sessionExtras?: IssueActionSessionExtra[];
+  nonIssueActions?: NonIssueActionInvocation[];
 }) {
   const all = actionViews(enabledKeys, actionKeys);
   const byKey = new Map(all.map((view) => [view.action.key, view]));
@@ -73,7 +88,7 @@ function renderMenu({
   render(
     <ContextMenuRoot>
       <ContextMenuTrigger>Open menu</ContextMenuTrigger>
-      <GroupedIssueActionMenu actions={{ all, primary, phase }} sessionExtras={sessionExtras} />
+      <GroupedIssueActionMenu actions={{ all, primary, phase }} nonIssueActions={nonIssueActions} />
     </ContextMenuRoot>,
   );
   fireEvent.contextMenu(screen.getByText('Open menu'));
@@ -101,7 +116,7 @@ describe('GroupedIssueActionMenu', () => {
       phase: 'WORK_RUNNING',
       primaryKeys: ['tell', 'doneWork'],
       enabledKeys: ['tell', 'doneWork', 'purgeReview', 'wipe'],
-      sessionExtras: [{ key: 'state', label: 'Open State Dir', onSelect: sessionExtra }],
+      nonIssueActions: [sessionArtifactInvocation(sessionExtra)],
     });
 
     expect(screen.getByText('Work running')).toBeInTheDocument();
@@ -140,7 +155,7 @@ describe('GroupedIssueActionMenu', () => {
         <IssueActionGroupedBody
           actions={{ all, primary: [plan!], phase: 'QUEUED_FOR_PLAN' }}
           primitives={plainMenuPrimitives}
-          sessionExtras={[{ key: 'state', label: 'Open State Dir', onSelect: sessionExtra }]}
+          nonIssueActions={[sessionArtifactInvocation(sessionExtra)]}
         />
       </div>,
     );
