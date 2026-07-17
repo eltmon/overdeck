@@ -12,6 +12,12 @@ export interface WorkspaceInfo {
 
 export interface VerificationRunnerOptions {
   syncTargetBranch?: boolean;
+  /** Strike workspaces have no vBRIEF; configured code quality gates still apply. */
+  requirePlanCompletion?: boolean;
   /** PAN-2487: receives human-readable gate progress lines (ship-log mirror). */
   onGateLog?: (line: string) => void;
+}
+
+export function requiresPlanCompletion(options: VerificationRunnerOptions): boolean {
+  return options.requirePlanCompletion !== false;
 }

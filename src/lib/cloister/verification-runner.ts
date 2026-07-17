@@ -20,10 +20,11 @@ import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
 import { isVerificationWorkerActive, runSupervisedVerification } from './verification-worker-supervisor.js';
-import type {
-  VerificationRunnerOptions,
-  VerificationRunnerOutcome,
-  WorkspaceInfo,
+import {
+  requiresPlanCompletion,
+  type VerificationRunnerOptions,
+  type VerificationRunnerOutcome,
+  type WorkspaceInfo,
 } from './verification-types.js';
 import { readReviewStatusMap } from './review-status-source.js';
 import { writeFeedbackFile } from './feedback-writer.js';
@@ -652,12 +653,18 @@ async function runVerificationForIssuePromise(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
+    // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates).
+    // Strike workspaces deliberately have no plan, so their merge path disables these
+    // plan-derived checks while retaining every configured code quality gate above.
+    const checkPlanCompletion = requiresPlanCompletion(options);
+    if (!checkPlanCompletion) {
+      console.log(`[${logPrefix}] Skipping vBRIEF completion checks for ${issueId}; verification request has no plan requirement`);
+    }
     // Wrap in try-catch to detect merge conflict markers in plan.vbrief.json and send
     // actionable feedback rather than falling through to a generic infrastructure error.
-    let acStatus: ReturnType<typeof getVBriefACStatusSync>;
+    let acStatus: ReturnType<typeof getVBriefACStatusSync> = null;
     try {
-      acStatus = getVBriefACStatusSync(workspacePath);
+      if (checkPlanCompletion) acStatus = getVBriefACStatusSync(workspacePath);
     } catch (vbriefErr: any) {
       if (vbriefErr instanceof VBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
@@ -744,7 +751,9 @@ async function runVerificationForIssuePromise(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    const taskBlockers = await checkIncompletePlanItemsPromise(workspacePath, issueId);
+    const taskBlockers = checkPlanCompletion
+      ? await checkIncompletePlanItemsPromise(workspacePath, issueId)
+      : [];
     if (taskBlockers.length > 0) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = 'incomplete-plan-items';

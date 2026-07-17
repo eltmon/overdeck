@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { activeStrikeMerge, mergeCompletionStatus, normalMergeEligibility, parseStrikeMergeRequest, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
+import { activeStrikeMerge, mergeCompletionStatus, normalMergeEligibility, parseStrikeMergeRequest, postRebaseVerificationOptions, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
 import type { ReviewStatus } from '../../../../../src/lib/review-status.js';
+import { requiresPlanCompletion } from '../../../../../src/lib/cloister/verification-types.js';
 
 const markerHead = 'a'.repeat(40);
 const projectPath = '/repo';
@@ -40,6 +41,23 @@ describe('strike merge-door eligibility', () => {
   it('clears a queued strike marker at canonical merge completion', () => {
     expect(mergeCompletionStatus(request)).toEqual({ strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
     expect(mergeCompletionStatus({ kind: 'normal' })).toEqual({});
+  });
+
+  it('runs strike quality gates without requiring a vBRIEF checklist', () => {
+    const strikeOptions = postRebaseVerificationOptions(request);
+    const normalOptions = postRebaseVerificationOptions({ kind: 'normal' });
+
+    expect(strikeOptions).toEqual({
+      syncTargetBranch: false,
+      requirePlanCompletion: false,
+    });
+    expect(normalOptions).toEqual({
+      syncTargetBranch: false,
+      requirePlanCompletion: true,
+    });
+    expect(requiresPlanCompletion(strikeOptions)).toBe(false);
+    expect(requiresPlanCompletion(normalOptions)).toBe(true);
+    expect(requiresPlanCompletion({})).toBe(true);
   });
 
   it('rejects duplicate active strike pipelines at the merge door', () => {

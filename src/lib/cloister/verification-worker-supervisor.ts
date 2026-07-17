@@ -77,7 +77,7 @@ export async function runSupervisedVerification(
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
   logPrefix: string,
-  options: { syncTargetBranch?: boolean } = {},
+  options: { syncTargetBranch?: boolean; requirePlanCompletion?: boolean } = {},
 ): Promise<VerificationRunnerOutcome> {
   const existing = readVerificationWorkerState(issueId);
   if (existing && existing.workspacePath === workspacePath && isProcessAlive(existing.pid) && !existsSync(existing.resultPath)) {

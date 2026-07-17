@@ -40,6 +40,16 @@ export function parseStrikeMergeRequest(raw: unknown): StrikeMergeRequest | null
 export function mergeCompletionStatus(request: TriggerMergeRequest): Pick<ReviewStatus, 'strikeLandingState' | 'strikeReadyHead' | 'strikeReadyAt'> | Record<string, never> {
   return request.kind === 'strike' ? { strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined } : {};
 }
+
+export function postRebaseVerificationOptions(request: TriggerMergeRequest): {
+  syncTargetBranch: false;
+  requirePlanCompletion: boolean;
+} {
+  return {
+    syncTargetBranch: false,
+    requirePlanCompletion: request.kind !== 'strike',
+  };
+}
 export function activeStrikeMerge(currentMerge: string | null, pendingOperation?: { type: string; status: string } | null): boolean {
   return currentMerge !== null || (pendingOperation?.type === 'merge' && pendingOperation.status === 'running');
 }
