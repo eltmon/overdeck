@@ -29,15 +29,7 @@
       "timestamp": "2026-07-17T16:11:10.708Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T16:11:10Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2842\n\nFR-7 no-loss audit accepts non-cockpit markers and collapsed mode hides required warning surfaces\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2842 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx",
@@ -86,7 +78,7 @@
     "recordedAt": "2026-07-17T15:57:29.020Z"
   },
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T16:27:04.644Z",
+  "updated": "2026-07-17T16:27:05.644Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "pending",
