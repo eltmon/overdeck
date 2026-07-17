@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:05:56.879Z",
+  "updated": "2026-07-17T13:07:55.177Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "pending",
@@ -64,16 +64,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "frontend-callsites-numeric-sort": {
-        "writerId": "agent-pan-2831",
-        "agentId": "agent-pan-2831",
-        "pid": 4090752,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:05:56.879Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2831",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Used the shared comparator in groupProjects and added numeric-order and project-order tests",
         "releasedAt": "2026-07-17T13:04:14.089Z"
+      },
+      {
+        "writerId": "agent-pan-2831",
+        "agentId": "agent-pan-2831",
+        "pid": 4090752,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:05:56.879Z",
+        "itemId": "frontend-callsites-numeric-sort",
+        "outcome": "completed",
+        "reason": "Applied compareIssueIds to frontend merge policy, search tiebreaks, and Home workspace cards",
+        "releasedAt": "2026-07-17T13:07:55.177Z"
       }
     ],
     "statusReasons": {
@@ -106,6 +109,10 @@
       "issues-pane-numeric-sort": {
         "reason": "Used the shared comparator in groupProjects and added numeric-order and project-order tests",
         "updatedAt": "2026-07-17T13:04:14.089Z"
+      },
+      "frontend-callsites-numeric-sort": {
+        "reason": "Applied compareIssueIds to frontend merge policy, search tiebreaks, and Home workspace cards",
+        "updatedAt": "2026-07-17T13:07:55.177Z"
       }
     }
   },
@@ -119,6 +126,9 @@
     "issues-pane-numeric-sort.issues-pane-numeric-sort.ac1": "completed",
     "issues-pane-numeric-sort.issues-pane-numeric-sort.ac2": "completed",
     "issues-pane-numeric-sort.issues-pane-numeric-sort.ac3": "completed",
-    "frontend-callsites-numeric-sort": "running"
+    "frontend-callsites-numeric-sort": "completed",
+    "frontend-callsites-numeric-sort.frontend-callsites-numeric-sort.ac1": "completed",
+    "frontend-callsites-numeric-sort.frontend-callsites-numeric-sort.ac2": "completed",
+    "frontend-callsites-numeric-sort.frontend-callsites-numeric-sort.ac3": "completed"
   }
 }
