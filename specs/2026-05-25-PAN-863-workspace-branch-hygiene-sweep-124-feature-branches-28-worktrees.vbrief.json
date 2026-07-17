@@ -4,17 +4,17 @@
     "created": "2026-05-25T08:45:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-863: Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees)",
-    "updated": "2026-05-25T08:40:27.406Z"
+    "updated": "2026-07-17T11:01:52.169Z"
   },
   "plan": {
     "id": "pan-863",
     "title": "Workspace + branch hygiene sweep (124 feature/* branches, 28 worktrees)",
-    "status": "proposed",
+    "status": "cancelled",
     "uid": "da3a8383-eada-419b-a5b2-84d0275f3c6c",
     "author": "agent:claude-opus-4-7",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-05-25T08:45:00.000Z",
-    "updated": "2026-05-25T08:40:27.406Z",
+    "updated": "2026-07-17T11:01:52.169Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/863",
@@ -897,5 +897,5 @@
       "canonicalFilename": "2026-05-25-PAN-863-workspace-branch-hygiene-sweep-124-feature-branches-28-worktrees.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "cancelled"
 }
