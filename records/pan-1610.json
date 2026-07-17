@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T12:49:43.864Z",
+  "updated": "2026-07-17T12:50:07.047Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -43,5 +43,20 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "catalog-merge-vbrief": {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 3899216,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T12:50:07.047Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "catalog-merge-vbrief": "running"
+  }
 }
