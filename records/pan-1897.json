@@ -356,7 +356,7 @@
     "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T03:05:28.609Z",
+  "updated": "2026-07-17T03:06:29.734Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "pending",
@@ -366,12 +366,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T03:05:28.556Z",
+    "updatedAt": "2026-07-17T03:06:29.689Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-1897-review",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "27818d81646215bcd5abbea44df22d789776c4b9",
-    "reviewRequestedAt": "2026-07-17T03:05:28.200Z",
+    "reviewRequestedAt": "2026-07-17T03:06:29.329Z",
     "reviewSpawnedAt": "2026-07-17T02:45:54.729Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -470,9 +470,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 11507833,
-            "output": 277063,
-            "cacheRead": 40363520,
+            "input": 11965315,
+            "output": 279553,
+            "cacheRead": 40501760,
             "cacheWrite": 0
           }
         },
@@ -533,9 +533,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 44768619,
-          "output": 1339320,
-          "cacheRead": 239789824,
+          "input": 45226101,
+          "output": 1341810,
+          "cacheRead": 239928064,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -558,8 +558,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 380.983079,
-        "pricingAsOf": "2026-07-17T03:05:28.562Z"
+        "usd": 383.414309,
+        "pricingAsOf": "2026-07-17T03:06:29.695Z"
       }
     },
     "merges": [
