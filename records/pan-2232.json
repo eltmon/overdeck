@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T02:49:58.092Z",
+  "updated": "2026-07-17T02:59:16.731Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -89,16 +89,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "wi-7-reconcile": {
-        "writerId": "agent-pan-2232",
-        "agentId": "agent-pan-2232",
-        "pid": 4032531,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T02:49:58.092Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2232",
@@ -159,6 +151,16 @@
         "itemId": "wi-6-feedback",
         "outcome": "completed",
         "releasedAt": "2026-07-17T02:49:55.436Z"
+      },
+      {
+        "writerId": "agent-pan-2232",
+        "agentId": "agent-pan-2232",
+        "pid": 4032531,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T02:49:58.092Z",
+        "itemId": "wi-7-reconcile",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T02:59:16.731Z"
       }
     ],
     "statusReasons": {
@@ -193,6 +195,10 @@
     "wi-6-feedback.wi-6-feedback.ac1": "completed",
     "wi-6-feedback.wi-6-feedback.ac2": "completed",
     "wi-6-feedback.wi-6-feedback.ac3": "completed",
-    "wi-7-reconcile": "running"
+    "wi-7-reconcile": "completed",
+    "wi-7-reconcile.wi-7-reconcile.ac1": "completed",
+    "wi-7-reconcile.wi-7-reconcile.ac2": "completed",
+    "wi-7-reconcile.wi-7-reconcile.ac3": "completed",
+    "wi-7-reconcile.wi-7-reconcile.ac4": "completed"
   }
 }
