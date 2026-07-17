@@ -21,14 +21,18 @@ import {
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { MergeButton } from '../../MergeButton'
 import { IssueActionDialogHost } from '../../IssueActionMenu/IssueActionMenu'
-import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
+import {
+  IssueActionGroupedBody,
+  type IssueActionMenuItemPrimitiveProps,
+  type IssueActionMenuPrimitives,
+} from '../../IssueActionMenu/IssueActionGroupedBody'
+import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { IssueView } from '../../issue-view/IssueView'
 import { type ProjectFeature } from '../../CommandDeck/ProjectTree/ProjectNode'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
-import { GROUP_LABELS, GROUP_ORDER, ISSUE_ACTIONS } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
 import { TasksRail } from './TasksRail'
@@ -177,10 +181,62 @@ function MergeCta({ issueId, rs }: { issueId: string; rs: ReviewStatusData | und
   )
 }
 
+function createMegaMenuItem(onClose: () => void, destructive: boolean) {
+  return function MegaMenuItem({
+    children,
+    className = '',
+    disabled,
+    role = 'menuitem',
+    onActivate,
+    preventClose,
+    ...props
+  }: IssueActionMenuItemPrimitiveProps) {
+    const colorClass = destructive
+      ? 'text-destructive-foreground hover:bg-destructive/10'
+      : 'text-foreground hover:bg-accent'
+
+    return (
+      <button
+        {...props}
+        type="button"
+        role={role}
+        disabled={disabled}
+        className={`flex w-full items-center rounded-[8px] px-2 py-1.5 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${colorClass} ${className}`}
+        onClick={() => {
+          onActivate?.()
+          if (!preventClose) onClose()
+        }}
+      >
+        {children}
+      </button>
+    )
+  }
+}
+
+function MegaMenuLabel({ children }: { children: ReactNode }) {
+  return (
+    <h4 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      {children}
+    </h4>
+  )
+}
+
+function MegaMenuSeparator() {
+  return <div className="col-span-full my-1 h-px bg-border" />
+}
+
+function megaMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
+  return {
+    Item: createMegaMenuItem(onClose, false),
+    DestructiveItem: createMegaMenuItem(onClose, true),
+    Label: MegaMenuLabel,
+    Separator: MegaMenuSeparator,
+  }
+}
+
 function IssueActionMegaMenu({ issueId }: { issueId: string }) {
   const [open, setOpen] = useState(false)
   const actions = useIssueActions(issueId)
-  const actionsByKey = useMemo(() => new Map(actions.all.map((view) => [view.action.key, view])), [actions.all])
 
   useEffect(() => {
     if (!open) return
@@ -190,15 +246,6 @@ function IssueActionMegaMenu({ issueId }: { issueId: string }) {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [open])
-
-  const groups = useMemo(() => {
-    return GROUP_ORDER.map((group) => ({
-      group,
-      views: ISSUE_ACTIONS.filter((action) => action.group === group)
-        .map((action) => actionsByKey.get(action.key))
-        .filter((view): view is IssueActionView => Boolean(view)),
-    })).filter((entry) => entry.views.length > 0)
-  }, [actionsByKey])
 
   return (
     <div className="relative">
@@ -214,35 +261,14 @@ function IssueActionMegaMenu({ issueId }: { issueId: string }) {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-2 grid w-[min(560px,calc(100vw-48px))] grid-cols-1 gap-x-5 gap-y-2 rounded-[18px] border border-border bg-popover p-3 shadow-xl md:grid-cols-2">
-            {groups.map(({ group, views }) => (
-              <div key={group} className="min-w-0">
-                <h4 className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {GROUP_LABELS[group]}
-                </h4>
-                <div className="flex flex-col gap-1">
-                  {views.map((view) => (
-                    <button
-                      key={view.action.key}
-                      type="button"
-                      disabled={!view.enabled || view.isPending}
-                      title={view.enabled ? view.action.description : view.disabledReason ?? view.action.label}
-                      onClick={() => {
-                        view.invoke()
-                        if (view.action.kind !== 'dialog') setOpen(false)
-                      }}
-                      className={`rounded-[8px] px-2 py-1.5 text-left text-[12px] transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
-                        view.action.kind === 'destructive' || view.action.group === 'danger'
-                          ? 'text-destructive-foreground hover:bg-destructive/10'
-                          : 'text-foreground hover:bg-accent'
-                      }`}
-                    >
-                      {view.isPending ? `${view.action.label}…` : view.action.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div
+            role="menu"
+            className="absolute right-0 top-full z-50 mt-2 grid w-[min(560px,calc(100vw-48px))] grid-cols-1 gap-x-5 gap-y-2 rounded-[18px] border border-border bg-popover p-3 shadow-xl md:grid-cols-2"
+          >
+            <IssueActionGroupedBody
+              actions={actions}
+              primitives={megaMenuPrimitives(() => setOpen(false))}
+            />
           </div>
         </>
       )}

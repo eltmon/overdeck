@@ -118,6 +118,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       primary: all.slice(0, 2),
       secondary: all.slice(2, 4),
       overflow: all.slice(4),
+      phase: 'work',
       state: { hasPlan: true, hasBeads: true },
       activeDialog: null,
     }
@@ -260,17 +261,24 @@ describe('IssueMissionControl', () => {
     expect(screen.queryByTestId('issue-tree-context-panel')).toBeNull()
   })
 
-  it('groups all issue actions in the mega-menu', () => {
-    renderMissionControl()
+  it('renders shared grouped issue actions with collapsed Danger disclosure', () => {
+    const { container } = renderMissionControl()
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue actions' }))
 
-    expect(screen.getByText('Planning')).toBeTruthy()
-    expect(screen.getAllByText('Work').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Agent').length).toBeGreaterThan(0)
-    expect(screen.getByText('Danger')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Plan' })).toHaveAttribute('title', 'Plan this issue.')
-    expect(screen.getByRole('button', { name: 'Wipe' })).toHaveAttribute('title', 'Wipe is unavailable.')
+    expect(container.querySelector('[data-issue-action-section="planning"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-issue-action-section="work"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-issue-action-section="agent"]')).toBeInTheDocument()
+    for (const planAction of screen.getAllByRole('menuitem', { name: 'Plan' })) {
+      expect(planAction).toHaveAttribute('title', 'Plan this issue.')
+    }
+    expect(screen.queryByRole('menuitem', { name: 'Wipe' })).toBeNull()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Danger (0 available)' }))
+
+    expect(container.querySelector('[data-issue-action-section="danger"]')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Wipe' })).toBeDisabled()
+    expect(screen.getByTestId('issue-action-disabled-wipe')).toHaveAttribute('title', 'Wipe is unavailable.')
   })
 
   it('shows first-class CI checks from the Code tab', () => {
