@@ -394,17 +394,17 @@
     "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T04:34:16.565Z",
+  "updated": "2026-07-17T04:40:16.981Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T04:34:15.658Z",
+    "updatedAt": "2026-07-17T04:40:16.951Z",
     "reviewNotes": "State migration copies symbolic links outside the manifest, so cleanup can finalize broken canonical links without failing no-loss verification",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-baseline.txt",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
@@ -509,9 +509,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 14429913,
-            "output": 408626,
-            "cacheRead": 50802176,
+            "input": 14486480,
+            "output": 415996,
+            "cacheRead": 51406848,
             "cacheWrite": 0
           }
         },
@@ -557,9 +557,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 26766328,
-            "output": 993064,
-            "cacheRead": 205468672,
+            "input": 26893590,
+            "output": 994322,
+            "cacheRead": 206109696,
             "cacheWrite": 0
           }
         }
@@ -572,9 +572,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 49243651,
-          "output": 1542869,
-          "cacheRead": 275623680,
+          "input": 49427480,
+          "output": 1551497,
+          "cacheRead": 276869376,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -597,8 +597,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 427.381637,
-        "pricingAsOf": "2026-07-17T04:34:15.678Z"
+        "usd": 429.18247,
+        "pricingAsOf": "2026-07-17T04:40:16.972Z"
       }
     },
     "merges": [
