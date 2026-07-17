@@ -17,11 +17,45 @@
       "timestamp": "2026-07-17T12:59:57.261Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-17T13:41:06.302Z",
+      "reason": "end",
+      "note": "Added a shared numeric-aware issue ID comparator, applied it across frontend and server issue lists while preserving primary ordering, and passed typecheck, lint, and the full test suite."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/issue-sort.test.ts",
+      "packages/contracts/src/issue-sort.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/MergePolicySection.tsx",
+      "src/dashboard/frontend/src/hooks/useSearch.ts",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/dashboard/server/services/resource-discovery.ts"
+    ],
+    "actualChangedFiles": [
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/issue-sort.test.ts",
+      "packages/contracts/src/issue-sort.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/MergePolicySection.tsx",
+      "src/dashboard/frontend/src/hooks/useSearch.ts",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/dashboard/server/services/resource-discovery.ts"
+    ],
+    "recordedAt": "2026-07-17T13:41:02.914Z"
+  },
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:41:02.915Z",
+  "updated": "2026-07-17T13:41:06.578Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "pending",
@@ -30,7 +64,38 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T12:59:59.795Z"
+    "updatedAt": "2026-07-17T13:41:06.446Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2841",
+    "reviewRequestedAt": "2026-07-17T13:41:06.329Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "packages/contracts/src/index.ts",
+        "packages/contracts/src/issue-sort.test.ts",
+        "packages/contracts/src/issue-sort.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+        "src/dashboard/frontend/src/components/MergePolicySection.tsx",
+        "src/dashboard/frontend/src/hooks/useSearch.ts",
+        "src/dashboard/frontend/src/pages/HomePage.tsx",
+        "src/dashboard/server/routes/projects.ts",
+        "src/dashboard/server/services/resource-discovery.ts"
+      ],
+      "actualChangedFiles": [
+        "packages/contracts/src/index.ts",
+        "packages/contracts/src/issue-sort.test.ts",
+        "packages/contracts/src/issue-sort.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+        "src/dashboard/frontend/src/components/MergePolicySection.tsx",
+        "src/dashboard/frontend/src/hooks/useSearch.ts",
+        "src/dashboard/frontend/src/pages/HomePage.tsx",
+        "src/dashboard/server/routes/projects.ts",
+        "src/dashboard/server/services/resource-discovery.ts"
+      ],
+      "recordedAt": "2026-07-17T13:41:02.914Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -42,6 +107,14 @@
             "cacheRead": 2748654,
             "cacheWrite": 126703
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 1046354,
+            "output": 50579,
+            "cacheRead": 17954816,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -50,14 +123,22 @@
           "output": 24558,
           "cacheRead": 2748654,
           "cacheWrite": 126703
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1046354,
+          "output": 50579,
+          "cacheRead": 17954816,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 5.563126,
-        "pricingAsOf": "2026-07-17T12:59:59.804Z"
+        "usd": 21.289674,
+        "pricingAsOf": "2026-07-17T13:41:06.568Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2841"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -144,34 +225,5 @@
     "server-callsites-numeric-sort.server-callsites-numeric-sort.ac1": "completed",
     "server-callsites-numeric-sort.server-callsites-numeric-sort.ac2": "completed",
     "server-callsites-numeric-sort.server-callsites-numeric-sort.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "packages/contracts/src/index.ts",
-      "packages/contracts/src/issue-sort.test.ts",
-      "packages/contracts/src/issue-sort.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/frontend/src/components/MergePolicySection.tsx",
-      "src/dashboard/frontend/src/hooks/useSearch.ts",
-      "src/dashboard/frontend/src/pages/HomePage.tsx",
-      "src/dashboard/server/routes/projects.ts",
-      "src/dashboard/server/services/resource-discovery.ts"
-    ],
-    "actualChangedFiles": [
-      "packages/contracts/src/index.ts",
-      "packages/contracts/src/issue-sort.test.ts",
-      "packages/contracts/src/issue-sort.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/frontend/src/components/MergePolicySection.tsx",
-      "src/dashboard/frontend/src/hooks/useSearch.ts",
-      "src/dashboard/frontend/src/pages/HomePage.tsx",
-      "src/dashboard/server/routes/projects.ts",
-      "src/dashboard/server/services/resource-discovery.ts"
-    ],
-    "recordedAt": "2026-07-17T13:41:02.914Z"
   }
 }
