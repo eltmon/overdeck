@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -8,10 +8,28 @@ import {
   ISSUE_VIEW_INVENTORY,
   SECTION_INVENTORY,
 } from '../../../../src/dashboard/frontend/src/components/issue-view/inventory';
+import { DENSITY_SECTIONS } from '../../../../src/dashboard/frontend/src/components/issue-view/densitySections';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // tests/unit/dashboard/frontend/ → repo root (four directories up).
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
+const COMPONENTS_ROOT = path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components');
+
+function collectTsxFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) return collectTsxFiles(entryPath);
+    return entry.isFile() && entry.name.endsWith('.tsx') ? [entryPath] : [];
+  });
+}
+
+const COCKPIT_SOURCE_TAGS = collectTsxFiles(COMPONENTS_ROOT).flatMap((file) => {
+  const source = readFileSync(file, 'utf8');
+  return [...source.matchAll(/<[^>]*data-section="[^"]+"[^>]*>/gs)].map((match) => ({
+    file: path.relative(REPO_ROOT, file),
+    tag: match[0],
+  }));
+});
 
 /**
  * FR-0 surface-lock (PAN-2499): the complete no-loss checklist from
@@ -112,6 +130,39 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     expect(byView('cockpit')).toBe(21);
     expect(byView('rail')).toBe(15);
     expect(ISSUE_VIEW_INVENTORY.length).toBe(53);
+  });
+
+  it('keeps every cockpit density section unchanged and backed by a real visible marker', () => {
+    expect(DENSITY_SECTIONS.cockpit).toEqual(EXPECTED_COCKPIT_SECTIONS);
+
+    const missingOrHidden = DENSITY_SECTIONS.cockpit.flatMap((section) => {
+      const matching = COCKPIT_SOURCE_TAGS.filter(({ tag }) => tag.includes(`data-section="${section}"`));
+      const visible = matching.filter(({ tag }) => !/\bhidden(?:\s|=|>|"|')/.test(tag));
+      return visible.length > 0
+        ? []
+        : [`${section} → ${matching.length === 0 ? 'no marker' : `hidden marker(s): ${matching.map(({ file }) => file).join(', ')}`}`];
+    });
+
+    expect(
+      missingOrHidden,
+      `cockpit section(s) without a real visible data-section home: ${missingOrHidden.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('records the physical homes of the cockpit sections moved by PAN-2842', () => {
+    const homes = new Map(
+      ISSUE_VIEW_INVENTORY
+        .filter((entry) => entry.view === 'cockpit')
+        .map((entry) => [entry.section, entry.home]),
+    );
+    const missionControl = 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx';
+
+    expect(homes.get('Detail Tabs')).toBe(missionControl);
+    expect(homes.get('Conversation / Files / Terminal tabs')).toBe(missionControl);
+    expect(homes.get('TasksRail / TasksTab')).toBe(missionControl);
+    expect(homes.get('Stale-review warning')).toBe(
+      'src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx',
+    );
   });
 
   it('has no duplicate section names within a density', () => {
