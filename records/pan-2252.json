@@ -82,45 +82,22 @@
     "recordedAt": "2026-07-17T01:22:29.077Z"
   },
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T01:33:52.144Z",
+  "updated": "2026-07-17T01:36:28.003Z",
   "pipeline": {
     "issueId": "PAN-2252",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:33:51.513Z",
-    "reviewNotes": "[correctness] The host-port override still permits linked worktrees — `src/dashboard/server/identity.ts:87`",
+    "updatedAt": "2026-07-17T01:36:27.965Z",
     "inspectNotes": "isLinkedWorktreeRoot/primaryRootFromLinkedWorktree correctly detect .git-as-file vs directory/absent (identity.ts:29-47); new check in shouldRefuseHostDashboardPort (identity.ts:87) placed after the pre-existing runningInContainer early-return (line 82-84), so container exemption is preserved; purely additive OR-branch only fires when .git is a file, so pre-existing tests using nonexistent repoRoots are unaffected. All 4 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2812",
     "lastVerifiedCommit": "d9f551ef5cdbe3ae0ddb8068d77feccba232cfcd",
     "reviewRequestedAt": "2026-07-17T01:28:45.537Z",
     "reviewSpawnedAt": "2026-07-17T01:33:32.092Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2252/.pan/review/agent-pan-2252-review-d9f551ef/security.md",
-        "atCommit": "d9f551ef5cdbe3ae0ddb8068d77feccba232cfcd"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2252/.pan/review/agent-pan-2252-review-d9f551ef/correctness.md",
-        "atCommit": "d9f551ef5cdbe3ae0ddb8068d77feccba232cfcd"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2252/.pan/review/agent-pan-2252-review-d9f551ef/performance.md",
-        "atCommit": "d9f551ef5cdbe3ae0ddb8068d77feccba232cfcd"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2252/.pan/review/agent-pan-2252-review-d9f551ef/requirements.md",
-        "atCommit": "d9f551ef5cdbe3ae0ddb8068d77feccba232cfcd"
-      }
-    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -192,9 +169,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1690175,
-            "output": 92535,
-            "cacheRead": 34194944,
+            "input": 1759901,
+            "output": 104747,
+            "cacheRead": 37337600,
             "cacheWrite": 0
           }
         }
@@ -213,9 +190,9 @@
           "cacheWrite": 176879
         },
         "openai/gpt-5.6-sol": {
-          "input": 7646675,
-          "output": 173877,
-          "cacheRead": 46482944,
+          "input": 7716401,
+          "output": 186089,
+          "cacheRead": 49625600,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -226,8 +203,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 76.836778,
-        "pricingAsOf": "2026-07-17T01:33:51.516Z"
+        "usd": 79.123096,
+        "pricingAsOf": "2026-07-17T01:36:27.994Z"
       }
     },
     "merges": [
