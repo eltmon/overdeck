@@ -327,9 +327,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-17T04:50:50.304Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-17T04:54Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-17T04:54:33.534Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-17T04:54:33Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1897\n\n# Review Synthesis — PAN-1897 — Cycle 6\n\n## Verdict: CHANGES REQUESTED — three convoy reviewers failed before producing reports, and performance found two current-cycle reconciliation paths that remain unbounded\n\n## Review Context\n\n- Reviewed HEAD: `df7a0e998a0d54f18b9dd7388e41a2f1196f60d0`\n- Merge base: `7c46c64e02ec390213ed08a9c1be402b90df0678`\n- Review cycle: 6\n- Previous cycle SHA: `4ad533fd2324319dfb8547f956f0cdd047716a96`\n- PR commits: 15; proportionality threshold: 45 blockers, so no truncation applies.\n\n## Convoy Status\n\n| Sub-role | Terminal signal | Output | Verdict |\n| --- | --- | --- | --- |\n| security | failed: reviewer session ended before writing a report | none | blocked |\n| correctness | failed: reviewer session ended before writing a report | none | blocked |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-df7a0e99/performance.md` | blocked |\n| requirements | failed: reviewer session ended before writing a report | none | blocked |\n\n## Blocking Findings\n\n### [security] Reviewer infrastructure failure\n\nThe security reviewer session ended before writing a report. A missing security report is a blocking review-infrastructure failure because the changed migration and process-control code did not receive the required security evaluation.\n\n### [correctness] Reviewer infrastructure failure\n\nThe correctness reviewer session ended before writing a report. A missing correctness report is a blocking review-infrastructure failure because correctness coverage cannot be inferred from another sub-role's report.\n\n### [requirements] Reviewer infrastructure failure\n\nThe requirements reviewer session ended before writing a report. A missing requirements report is a blocking review-infrastructure failure because the review cannot establish whether the implementation satisfies the in-PR requirements and non-goals.\n\n### [performance] State reconciliation can wait forever behind an uncancellable state-writer flush — `src/cli/commands/admin/state-migrate.ts:240`\n\n`migrateProjectState()` now accepts the current-cycle preparation signal, but it awaits `flushAutoCommits(repo)` before checking that signal. The state-writer serializer and its Git operations expose neither cancellation nor explicit subprocess deadlines, so a hung active flush or an earlier hung serialized task prevents reconciliation from quiescing after the 60-second cancellation trigger. This finding is in the PR diff and in the current cycle diff, so it is promotable.\n\n### [performance] Recursive synchronous migration copies prevent the deadline timer from firing — `src/cli/commands/admin/state-migrate.ts:148`\n\nThe current cycle added abort checks around `copyLegacyState()`, but each recursive `cpSync()` and the synchronous manifest walk block Node's event loop. During a large or slow copy, the preparation timeout and 15-second heartbeat cannot run, so cancellation is not triggered at the configured deadline. This finding is in the PR diff and in the current cycle diff, so it is promotable.\n\n## Non-blocking Findings\n\n### [performance] Spawn deadline still waits forever on a non-cancellable production operation — `src/cli/commands/start.ts:1221`\n\n`start.ts` still discards the spawn preparation callback's `AbortSignal`, and `spawnAgent()` remains non-cancellable. The previous cycle already raised this exact behavior, while the current-cycle `start.ts` diff only wires cancellation into state reconciliation and does not change the cited spawn path. Under the cycle-6 convergence gate this is **previously reviewed, not promotable** in the current cycle; it remains unresolved and advisory for this synthesis rather than becoming a new blocker.\n\n### [performance] Migration durability-boundary timing\n\nAfter legacy cleanup starts, migration intentionally defers cancellation until cleanup, marker creation, and the atomic push settle. Individual Git commands are capped at 30 seconds, but several serial commands can make reconciliation return minutes after its nominal 60-second budget. Operator-facing documentation should describe that budget as a cancellation trigger rather than a strict return deadline across the durability boundary.\n\n## Clean Sub-roles\n\nNone. Security, correctness, and requirements did not produce usable reports, while performance produced blocking findings.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1897/.pan/review/agent-pan-1897-review-df7a0e99/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1897 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -391,7 +404,7 @@
     "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T04:54:32.654Z",
+  "updated": "2026-07-17T04:54:33.534Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "blocked",
