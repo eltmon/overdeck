@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T15:58:29.781Z",
+  "updated": "2026-07-17T16:01:39.617Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "pending",
@@ -94,16 +94,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "config-autonomous-model": {
-        "writerId": "agent-pan-2445",
-        "agentId": "agent-pan-2445",
-        "pid": 2286018,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T15:58:29.781Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2445",
@@ -115,12 +107,27 @@
         "outcome": "completed",
         "reason": "Added a pure autonomous planning dispatch policy with fail-closed pickup posture, explicit staffing resolution, and a 14-case unit matrix; scoped tests, lint, and typecheck pass.",
         "releasedAt": "2026-07-17T15:52:13.127Z"
+      },
+      {
+        "writerId": "agent-pan-2445",
+        "agentId": "agent-pan-2445",
+        "pid": 2286018,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T15:58:29.781Z",
+        "itemId": "config-autonomous-model",
+        "outcome": "completed",
+        "reason": "Added optional scalar roles.plan.autonomousModel support with no default, fail-loud workhorse validation, whole-object merge preservation, and focused round-trip/default/error tests; scoped tests, lint, and typecheck pass.",
+        "releasedAt": "2026-07-17T16:01:39.617Z"
       }
     ],
     "statusReasons": {
       "gate-module": {
         "reason": "Added a pure autonomous planning dispatch policy with fail-closed pickup posture, explicit staffing resolution, and a 14-case unit matrix; scoped tests, lint, and typecheck pass.",
         "updatedAt": "2026-07-17T15:52:13.127Z"
+      },
+      "config-autonomous-model": {
+        "reason": "Added optional scalar roles.plan.autonomousModel support with no default, fail-loud workhorse validation, whole-object merge preservation, and focused round-trip/default/error tests; scoped tests, lint, and typecheck pass.",
+        "updatedAt": "2026-07-17T16:01:39.617Z"
       }
     }
   },
@@ -131,6 +138,9 @@
     "gate-module.gate-module.ac3": "completed",
     "gate-module.gate-module.ac4": "completed",
     "gate-module.gate-module.ac5": "completed",
-    "config-autonomous-model": "running"
+    "config-autonomous-model": "completed",
+    "config-autonomous-model.config-autonomous-model.ac1": "completed",
+    "config-autonomous-model.config-autonomous-model.ac2": "completed",
+    "config-autonomous-model.config-autonomous-model.ac3": "completed"
   }
 }
