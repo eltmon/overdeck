@@ -366,7 +366,7 @@
     "recordedAt": "2026-07-17T02:45:52.906Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T03:24:39.158Z",
+  "updated": "2026-07-17T03:33:56.831Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "reviewing",
@@ -667,5 +667,5 @@
     "docs-pan-start-prep.docs-pan-start-prep.ac1": "completed",
     "docs-pan-start-prep.docs-pan-start-prep.ac2": "completed"
   },
-  "reviewMode": "full"
+  "reviewMode": "quick"
 }
