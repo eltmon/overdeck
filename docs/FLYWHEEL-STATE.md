@@ -5510,3 +5510,21 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - 1897 pushed perf fixes (head 27818d81, review synthesizing on it). 2807 opened PR#2816 (CLEAN, review running). 1966 review coordinator idled AGAIN before synthesis (3rd time) → re-nudged. 2232/2647 re-idled → re-nudged.
 - **Idle-at-prompt is systemic** (6+ gpt-5.6-sol agents tonight; nudge works but they re-idle) → filed the mechanical redrive-gap issue (see title above). Root-cause of the idling itself flagged as separate investigation.
 - Merge queue: 1966 (CLEAN, awaiting synthesis), 2807 PR#2816 (CLEAN, review running), 1897 (review on 27818d81), 2232/2647 (pre-PR).
+
+## Tick 82 — 2026-07-16 ~23:00 — PAN-1966 MERGED (9 total)
+- **PAN-1966 MERGED → 44567f2560** via PR#2790: APPROVED @exact fix head 33680748 (all 4 sub-reviews, 0 blocking — membership ?project= fix passed), all CI green incl. overdeck/review, CLEAN. The 2nd nudge got the coordinator to finish (synthesis 22:59).
+- Session: **9 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966) + 2811 strike + 2 deploys + 14 close-outs + PAN-2809/2810/2813/2817 filed.
+- In flight: 1897 CLEAN @27818d81 (review convoy active on it, 13min), 2807 PR#2816 head 61c7a4f4 past its CHANGES REQUESTED@5ca6f844 (work agent addressing), 2232/2647 pre-PR.
+- Close-out owed: 1491, 2252, 1966 (+ deploy batch when 1897/2807 land or the hour turns).
+
+## Tick 83 — 2026-07-16 ~23:15 — PAN-2807 MERGED (10 total)
+- **PAN-2807 MERGED → 47a49023e9** via PR#2816: FRESH APPROVED @bf5fd0c2==head (23:09), all CI green after poll, CLEAN. The silent-migration defect fix (PAN-2318 family) is on main.
+- Session: **10 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966, 2807) + 2811 strike + 2 deploys + 14 close-outs.
+- In flight: 1897 (review synthesizing @27818d81), 2232 PR#2818 CLEAN (review synthesizing @head), 2647 pre-PR.
+- Close-out owed: 1491, 2252, 1966, 2807. Deploy batch after 1897/2232 resolve or the set drains.
+
+## Tick 84 — 2026-07-16 ~23:25 — PAN-2232 MERGED (11 total) — the long-blocked one lands
+- **PAN-2232 MERGED → f01c4ca636** via PR#2818: FRESH APPROVED @5a29ce43==head (23:18), CI green, CLEAN. This is the issue that spent the week blocked behind the 2794→2802→2806 strike-landing chain and a stuck scheduler yield — now done.
+- Session: **11 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966, 2807, 2232) + 2811 strike + 2 deploys + 14 close-outs + 4 issues filed (2809/2810/2813/2817).
+- Remaining live: 1897 (review synthesizing @27818d81 — convoy has had 1h+, check for re-idle next tick), 2647 (pre-PR, working).
+- Close-out owed: 1491, 2252, 1966, 2807, 2232 + final deploy batch. Plan: when 1897/2647 resolve OR next hour turns, deploy once and close all.
