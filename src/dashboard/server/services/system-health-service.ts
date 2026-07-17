@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { cpus, freemem, loadavg, totalmem, platform } from 'node:os';
 import { promisify } from 'node:util';
 
-import type { DashboardSnapshot } from '@overdeck/contracts';
+import type { DashboardSnapshot, HealthReason, HealthState } from '@overdeck/contracts';
 
 import { Effect } from 'effect';
 import { layer as nodeServicesLayer } from '@effect/platform-node/NodeServices';
@@ -20,6 +20,12 @@ import {
   type EffectiveSystemHealthConfig,
   type SystemHealthThresholds,
 } from '../../../lib/system-health/config.js';
+import {
+  createSystemHealthSampler,
+  type AssessmentFreshness,
+  type RawHealthAssessment,
+  type SystemHealthSampler,
+} from '../../../lib/system-health/sampler.js';
 import {
   computeBuildStaleness,
   type BuildStaleness,
@@ -99,7 +105,7 @@ export interface SmeeRelayHealth {
   message: string;
 }
 
-export interface SystemHealthSnapshot {
+interface CollectedSystemHealthSnapshot {
   severity: SystemHealthSeverity;
   updatedAt: string;
   summary: {
@@ -133,16 +139,18 @@ export interface SystemHealthSnapshot {
   deployStaleness: BuildStaleness | null;
 }
 
+export interface SystemHealthSnapshot extends CollectedSystemHealthSnapshot {
+  state: HealthState;
+  structuredReasons: HealthReason[];
+  freshness: AssessmentFreshness;
+  transitionVersion: number;
+}
+
 let dockerStatsCollector: DockerStatsCollector | null = null;
 let previousCpuSample: CpuSample | null = null;
 let previousCpuSampleAt = 0;
-let cachedHealth: SystemHealthSnapshot | null = null;
-let cacheExpiresAt = 0;
-let inflightRefresh: Promise<SystemHealthSnapshot> | null = null;
-let previousSeverity: SystemHealthSeverity | null = null;
-let candidateSeverity: SystemHealthSeverity | null = null;
-let candidateCount = 0;
-const HYSTERESIS_POLLS = 3;
+let latestDashboardSnapshot: DashboardSnapshot | undefined;
+let systemHealthSampler: SystemHealthSampler<CollectedSystemHealthSnapshot> | null = null;
 let eventStorePromise: ReturnType<typeof initEventStore> | null = null;
 let cachedSystemHealthConfig: EffectiveSystemHealthConfig | null = null;
 let resourceConfigLoadedAt = 0;
@@ -618,7 +626,68 @@ function buildTopConsumers(
     .slice(0, 10);
 }
 
-async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<SystemHealthSnapshot> {
+function legacySeverityToState(severity: SystemHealthSeverity): HealthState {
+  return severity === 'normal' ? 'healthy' : severity;
+}
+
+function stateToLegacySeverity(state: HealthState): SystemHealthSeverity {
+  return state === 'critical' ? 'critical' : state === 'warning' ? 'warning' : 'normal';
+}
+
+function structuredLegacyReasons(
+  severity: SystemHealthSeverity,
+  reasons: string[],
+): HealthReason[] {
+  return reasons.map((message, index) => ({
+    code: `legacy.system_health.${severity}.${index + 1}`,
+    domain: 'host',
+    severity: severity === 'normal' ? 'info' : severity,
+    message,
+  }));
+}
+
+function createMeasuringSnapshot(): CollectedSystemHealthSnapshot {
+  cachedSystemHealthConfig ??= resolveSystemHealthConfig();
+  const totalMemoryBytes = totalmem();
+  const availableMemoryBytes = freemem();
+  const usedMemoryBytes = Math.max(totalMemoryBytes - availableMemoryBytes, 0);
+
+  return {
+    severity: 'normal',
+    updatedAt: new Date().toISOString(),
+    summary: {
+      cpuPercent: 0,
+      loadAverage1m: 0,
+      loadPerCore1m: 0,
+      totalMemoryBytes,
+      usedMemoryBytes,
+      availableMemoryBytes,
+      memoryUsedPercent: toPercent(usedMemoryBytes, totalMemoryBytes),
+      swapTotalBytes: 0,
+      swapUsedBytes: 0,
+      swapUsedPercent: 0,
+      overcommitPercent: 0,
+      agentCount: 0,
+      workAgentCount: 0,
+      planningAgentCount: 0,
+      specialistSessionCount: 0,
+      leakedSpecialistCount: 0,
+      containerCount: 0,
+      containerMemoryBytes: 0,
+      overdeckMemoryBytes: 0,
+      overdeckMemoryPercent: 0,
+    },
+    thresholds: cachedSystemHealthConfig.thresholds,
+    reasons: [],
+    agents: [],
+    leakedSpecialists: [],
+    topConsumers: [],
+    smeeRelay: collectSmeeRelayHealth(),
+    deployStaleness: null,
+  };
+}
+
+async function collectSystemHealth(): Promise<CollectedSystemHealthSnapshot> {
   await ensureResourceConfigLoaded();
   const [memory, loadAverage1m, cpuPercent, agents, containers] = await Promise.all([
     readProcMemory(),
@@ -635,7 +704,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   const usedMemoryBytes = Math.max(memory.memTotal - memory.memAvailable, 0);
   const swapUsedBytes = Math.max(memory.swapTotal - memory.swapFree, 0);
   const overcommitPercent = toPercent(memory.committedAs, memory.memTotal);
-  const leakedSpecialists = buildLeakedSpecialists(snapshot, agents);
+  const leakedSpecialists = buildLeakedSpecialists(latestDashboardSnapshot, agents);
   const evaluation = evaluateSeverity(thresholds, {
     availableMemoryBytes: memory.memAvailable,
     swapUsedPercent: toPercent(swapUsedBytes, memory.swapTotal),
@@ -652,34 +721,10 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
   const swapUsedPercent = toPercent(swapUsedBytes, memory.swapTotal);
   const overdeckMemoryBytes = agents.reduce((sum, agent) => sum + agent.memoryBytes, 0) + containerMemoryBytes;
   const overdeckMemoryPercent = toPercent(overdeckMemoryBytes, memory.memTotal);
-
   const sortedAgents = [...agents].sort((a, b) => b.memoryBytes - a.memoryBytes);
-  const deployStaleness = await getDeployStaleness();
 
-  // Hysteresis: require HYSTERESIS_POLLS consecutive polls at a new severity
-  // before actually transitioning. Prevents flapping when metrics hover near thresholds.
-  let effectiveSeverity: SystemHealthSeverity;
-  if (previousSeverity == null) {
-    effectiveSeverity = evaluation.severity;
-  } else if (evaluation.severity === previousSeverity) {
-    candidateSeverity = null;
-    candidateCount = 0;
-    effectiveSeverity = previousSeverity;
-  } else if (evaluation.severity === candidateSeverity) {
-    candidateCount++;
-    effectiveSeverity = candidateCount >= HYSTERESIS_POLLS ? evaluation.severity : previousSeverity;
-    if (effectiveSeverity !== previousSeverity) {
-      candidateSeverity = null;
-      candidateCount = 0;
-    }
-  } else {
-    candidateSeverity = evaluation.severity;
-    candidateCount = 1;
-    effectiveSeverity = previousSeverity;
-  }
-
-  const result: SystemHealthSnapshot = {
-    severity: effectiveSeverity,
+  return {
+    severity: evaluation.severity,
     updatedAt: new Date().toISOString(),
     summary: {
       cpuPercent,
@@ -709,43 +754,77 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     leakedSpecialists,
     topConsumers: buildTopConsumers(sortedAgents, containers, leakedSpecialists),
     smeeRelay,
-    deployStaleness,
+    deployStaleness: await getDeployStaleness(),
   };
+}
 
-  if (previousSeverity && previousSeverity !== result.severity) {
-    try {
-      const store = eventStorePromise ??= initEventStore();
-      await (await store).appendAsync({
-        type: 'system.health_severity_changed',
-        timestamp: result.updatedAt,
-        payload: {
-          previousSeverity,
-          severity: result.severity,
-          reasons: result.reasons,
-          leakedSpecialistCount: leakedSpecialists.length,
-        },
-      } as never);
-    } catch (err) {
-      console.error('[system-health] Failed to append severity transition event:', err);
-    }
+async function collectRawSystemHealth(): Promise<RawHealthAssessment<CollectedSystemHealthSnapshot>> {
+  const snapshot = await collectSystemHealth();
+  return {
+    status: 'valid',
+    assessment: {
+      state: legacySeverityToState(snapshot.severity),
+      reasons: structuredLegacyReasons(snapshot.severity, snapshot.reasons),
+      metrics: snapshot,
+      sampledAt: snapshot.updatedAt,
+    },
+  };
+}
+
+async function publishSystemHealthTransition(
+  transition: {
+    version: number;
+    previousState: HealthState;
+    state: HealthState;
+    reasonCodes: string[];
+    acceptedAt: string;
+  },
+): Promise<void> {
+  const accepted = systemHealthSampler?.getSnapshot();
+  try {
+    const store = eventStorePromise ??= initEventStore();
+    await (await store).appendAsync({
+      type: 'system.health_severity_changed',
+      timestamp: transition.acceptedAt,
+      payload: {
+        version: 2,
+        transitionVersion: transition.version,
+        previousSeverity: stateToLegacySeverity(transition.previousState),
+        severity: stateToLegacySeverity(transition.state),
+        previousState: transition.previousState,
+        state: transition.state,
+        reasons: transition.reasonCodes,
+        reasonCodes: transition.reasonCodes,
+        leakedSpecialistCount: accepted?.metrics.leakedSpecialists.length ?? 0,
+      },
+    } as never);
+  } catch (err) {
+    console.error('[system-health] Failed to append accepted transition event:', err);
   }
+}
 
-  previousSeverity = result.severity;
-  cachedHealth = result;
-  cacheExpiresAt = Date.now() + getHealthPollTtlMs();
-  return result;
+function getSystemHealthSampler(): SystemHealthSampler<CollectedSystemHealthSnapshot> {
+  if (!systemHealthSampler) {
+    const config = cachedSystemHealthConfig ?? resolveSystemHealthConfig();
+    cachedSystemHealthConfig = config;
+    systemHealthSampler = createSystemHealthSampler({
+      collect: collectRawSystemHealth,
+      measuringMetrics: createMeasuringSnapshot,
+      pollIntervalMs: config.pollSeconds * 1000,
+      onTransition: publishSystemHealthTransition,
+    });
+  }
+  return systemHealthSampler;
 }
 
 export async function getSystemHealthSnapshot(snapshot?: DashboardSnapshot): Promise<SystemHealthSnapshot> {
-  if (cachedHealth && Date.now() < cacheExpiresAt) {
-    return cachedHealth;
-  }
-
-  if (!inflightRefresh) {
-    inflightRefresh = refreshSystemHealth(snapshot).finally(() => {
-      inflightRefresh = null;
-    });
-  }
-
-  return inflightRefresh;
+  latestDashboardSnapshot = snapshot ?? latestDashboardSnapshot;
+  const accepted = getSystemHealthSampler().getSnapshot();
+  return {
+    ...accepted.metrics,
+    state: accepted.state,
+    structuredReasons: accepted.reasons,
+    freshness: accepted.freshness,
+    transitionVersion: accepted.transitionVersion,
+  };
 }

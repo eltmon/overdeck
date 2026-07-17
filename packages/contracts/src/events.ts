@@ -22,6 +22,7 @@ import {
   RagDecision,
   ResetMarker,
 } from "./memory"
+import { HealthState } from "./system-health"
 
 // ─── System Events ────────────────────────────────────────────────────────────
 
@@ -749,6 +750,11 @@ export const SystemHealthSeverityChangedEvent = Schema.Struct({
     severity: Schema.String,
     reasons: Schema.Array(Schema.String),
     leakedSpecialistCount: Schema.Number,
+    version: Schema.optional(Schema.Literal(2)),
+    transitionVersion: Schema.optional(Schema.Number),
+    previousState: Schema.optional(HealthState),
+    state: Schema.optional(HealthState),
+    reasonCodes: Schema.optional(Schema.Array(Schema.String)),
   }),
 })
 export type SystemHealthSeverityChangedEvent = typeof SystemHealthSeverityChangedEvent.Type
