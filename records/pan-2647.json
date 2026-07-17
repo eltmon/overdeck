@@ -150,19 +150,20 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T08:30:18.278Z",
+  "updated": "2026-07-17T08:33:40.047Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T08:30:18.159Z",
+    "updatedAt": "2026-07-17T08:33:40.031Z",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
+    "lastVerifiedCommit": "2c1047edc38433aa6ff58d44d069ea637dade3fb",
     "reviewRequestedAt": "2026-07-17T08:30:16.993Z",
     "reviewSpawnedAt": "2026-07-17T08:30:18.158Z"
   },
@@ -175,6 +176,14 @@
             "output": 38691,
             "cacheRead": 1299838,
             "cacheWrite": 143876
+          }
+        },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 869529,
+            "output": 14968,
+            "cacheRead": 2082304,
+            "cacheWrite": 0
           }
         },
         "review.supervisor": {
@@ -201,22 +210,22 @@
           "cacheRead": 1299838,
           "cacheWrite": 143876
         },
+        "openai/gpt-5.6-sol": {
+          "input": 28566080,
+          "output": 1442856,
+          "cacheRead": 257980416,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 26,
           "output": 17965,
           "cacheRead": 1571654,
           "cacheWrite": 238802
-        },
-        "openai/gpt-5.6-sol": {
-          "input": 27696551,
-          "output": 1427888,
-          "cacheRead": 255898112,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 315.396001,
-        "pricingAsOf": "2026-07-17T08:30:18.237Z"
+        "usd": 321.233838,
+        "pricingAsOf": "2026-07-17T08:33:40.039Z"
       }
     },
     "merges": [
