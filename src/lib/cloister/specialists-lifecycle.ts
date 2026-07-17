@@ -17,7 +17,7 @@ import {
   setCurrentRun,
   updateRunMetadata,
   updateRunStatus,
-} from './specialists.js';
+} from './specialists-project-meta.js';
 
 /**
  * ===========================================================================
