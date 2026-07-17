@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T15:19:57.755Z",
+  "updated": "2026-07-17T15:20:09.239Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "surface-parity-test": {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 1333822,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T15:20:09.239Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -244,6 +252,7 @@
     "migrate-zoneb-strip": "completed",
     "migrate-zoneb-strip.migrate-zoneb-strip.ac1": "completed",
     "migrate-zoneb-strip.migrate-zoneb-strip.ac2": "completed",
-    "migrate-zoneb-strip.migrate-zoneb-strip.ac3": "completed"
+    "migrate-zoneb-strip.migrate-zoneb-strip.ac3": "completed",
+    "surface-parity-test": "running"
   }
 }
