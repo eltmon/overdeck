@@ -1,4 +1,4 @@
-import { jsonResponse, jsonStringResponse } from "../http-helpers.js";
+import { jsonResponse } from "../http-helpers.js";
 import { httpHandler } from './http-handler.js';
 /**
  * Issues route module — Effect HttpRouter.Layer (PAN-428 B6)
@@ -37,8 +37,9 @@ import { createInFlightGuard } from '../../../lib/cloister/in-flight-guard.js';
 
 import { Duration, Effect, Layer, Option, Stream } from 'effect';
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
+import type { IssuePipelineMembership } from '@overdeck/contracts';
 
-import { extractTeamPrefix, findProjectByTeamSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { extractTeamPrefix, findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
 import { isPlanningComplete, readPlanSync } from '../../../lib/vbrief/io.js';
@@ -67,6 +68,7 @@ import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
+import { getPipelineMembershipResultsForProjects, getPipelineMembershipSnapshotsForProjects, getProjectPipelineMembership, summarizePipelineMembership, unavailablePipelineMembership } from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -221,7 +223,38 @@ const getIssuesRoute = HttpRouter.add(
     const includeCompleted = searchParams.get('includeCompleted') === 'true';
 
     const issueDataService = getIssueDataService();
-    return jsonStringResponse(issueDataService.getIssuesJson({ cycle, includeCompleted }));
+    const issues = issueDataService.getIssues({ cycle, includeCompleted });
+    const projects = new Map<string, NonNullable<ReturnType<typeof getProjectSync>>>();
+    const projectPathByIssue = new Map<string, string>();
+    for (const issue of issues) {
+      const resolved = resolveProjectFromIssueSync(issue.identifier, issue.labels);
+      if (!resolved) continue;
+      const project = getProjectSync(resolved.projectKey);
+      if (project) {
+        projects.set(resolved.projectKey, project);
+        projectPathByIssue.set(issue.identifier.toUpperCase(), project.path);
+      }
+    }
+    const membershipByIssue = new Map<string, IssuePipelineMembership>();
+    const results = getPipelineMembershipSnapshotsForProjects([...projects.values()]);
+    const successfulPaths = new Set<string>();
+    const failedPaths = new Set<string>();
+    for (const result of results) {
+      if (result.error || !result.project.github_repo) failedPaths.add(result.project.path);
+      else successfulPaths.add(result.project.path);
+      for (const membership of result.memberships ?? []) {
+        membershipByIssue.set(membership.issueId.toUpperCase(), summarizePipelineMembership(membership));
+      }
+    }
+    return jsonResponse(issues.map((issue) => ({
+      ...issue,
+      pipelineMembership: membershipByIssue.get(issue.identifier.toUpperCase())
+        ?? (failedPaths.has(projectPathByIssue.get(issue.identifier.toUpperCase()) ?? '')
+          ? unavailablePipelineMembership()
+          : successfulPaths.has(projectPathByIssue.get(issue.identifier.toUpperCase()) ?? '')
+            ? { available: true, inPipeline: false, bucket: 'clean_terminal' as const, labelDrift: null }
+            : unavailablePipelineMembership()),
+    })));
   })),
 );
 
@@ -867,6 +900,19 @@ const getResourceAllocatedIssuesRoute = HttpRouter.add(
   })),
 );
 
+const getPipelineMembershipRoute = HttpRouter.add(
+  'GET',
+  '/api/pipeline/membership',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project');
+    if (!projectKey) return jsonResponse({ error: 'project query parameter is required' }, { status: 400 });
+    const project = getProjectSync(projectKey);
+    if (!project) return jsonResponse({ error: `Project not found: ${projectKey}` }, { status: 404 });
+    return jsonResponse(yield* Effect.promise(() => getProjectPipelineMembership(project)));
+  })),
+);
+
 const getIssueResourceDetailsRoute = HttpRouter.add(
   'GET',
   '/api/issues/:id/resource-details',
@@ -906,6 +952,7 @@ export const issuesRouteLayer = Layer.mergeAll(
   postIssueGenerateTasksRoute,
   getIssueCostsRoute,
   getResourceAllocatedIssuesRoute,
+  getPipelineMembershipRoute,
   getIssueResourceDetailsRoute,
   getIssuePrRoute,
   getIssuePrDiffRoute,

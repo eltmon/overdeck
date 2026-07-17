@@ -49,7 +49,7 @@ afterEach(() => {
   }
 });
 
-import { runMigrations } from '../../../../src/lib/database/schema.js';
+import { initSchema, runMigrations } from '../../../../src/lib/database/schema.js';
 import {
   handleAgentStoppedEvent,
   handleAgentHeartbeatDeadEvent,
@@ -57,14 +57,9 @@ import {
 
 describe('v54 → v55 migration safety net', () => {
   it('snapshots panopticon.db before altering agents data', () => {
+    initSchema(testDb);
+    testDb.exec('DROP TABLE agents');
     testDb.pragma('user_version = 54');
-    testDb.exec(`
-      CREATE TABLE review_status (
-        issue_id TEXT PRIMARY KEY,
-        review_status TEXT NOT NULL DEFAULT 'pending',
-        updated_at TEXT NOT NULL
-      );
-    `);
 
     const snapshotPath = join(tmpHome, 'panopticon.db.v54-backfill-snapshot');
     expect(existsSync(snapshotPath)).toBe(false);

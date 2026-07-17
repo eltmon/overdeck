@@ -1,6 +1,9 @@
 import chalk from 'chalk';
 import { listRunningAgentsSync } from '../../lib/agents.js';
+import { gatherProjectLensSignalsForProjects } from '../../lib/pipeline-membership-gather.js';
+import { resolvePipelineMembership, type PipelineMembership } from '../../lib/pipeline-membership.js';
 import { getAllReviewStatusesFromDb } from '../../lib/overdeck/review-status-sync.js';
+import { listProjectsSync } from '../../lib/projects.js';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { AGENTS_DIR } from '../../lib/paths.js';
@@ -20,15 +23,26 @@ function blockerKind(status: ReviewStatus): string | null {
   return null;
 }
 
+async function loadPipelineMembership(): Promise<PipelineMembership[]> {
+  const projects = listProjectsSync().filter(({ config }) => config.github_repo);
+  const results = await gatherProjectLensSignalsForProjects(projects.map(({ config }) => config));
+  const failed = results.find((result) => result.error);
+  if (failed) throw failed.error;
+  return results.flatMap((result) => result.signals ?? [])
+    .map(resolvePipelineMembership).filter((membership) => membership.inPipeline);
+}
+
 export async function pendingCommand(options: { ready?: boolean; blocked?: boolean } = {}): Promise<void> {
   const allStatuses = getAllReviewStatusesFromDb();
+  const memberships = await loadPipelineMembership();
+  const memberIds = new Set(memberships.map((membership) => membership.issueId.toUpperCase()));
 
   if (options.ready) {
     // Mergeable work regardless of origin — review+test green, not merged.
     // Used by the flywheel tick to adopt externally-completed issues into
     // the merge queue (PAN-1735).
     const ready = Object.values(allStatuses).filter(
-      s => s.readyForMerge && s.mergeStatus !== 'merged'
+      s => memberIds.has(s.issueId.toUpperCase()) && s.readyForMerge && s.mergeStatus !== 'merged'
     );
     if (ready.length === 0) {
       console.log(chalk.dim('No issues are ready for merge.'));
@@ -44,6 +58,7 @@ export async function pendingCommand(options: { ready?: boolean; blocked?: boole
 
   if (options.blocked) {
     const blocked = Object.values(allStatuses)
+      .filter(status => memberIds.has(status.issueId.toUpperCase()))
       .map(status => ({ status, kind: blockerKind(status) }))
       .filter((entry): entry is { status: ReviewStatus; kind: string } => entry.kind !== null);
     if (blocked.length === 0) {
@@ -59,12 +74,22 @@ export async function pendingCommand(options: { ready?: boolean; blocked?: boole
   }
 
   const pending = Object.values(allStatuses).filter(
-    s => s.reviewStatus === 'pending' && s.reviewRequestedAt != null,
+    s => memberIds.has(s.issueId.toUpperCase()) && s.reviewStatus === 'pending' && s.reviewRequestedAt != null,
   );
+
+  const visibleMemberships = pending.length === 0
+    ? memberships
+    : memberships.filter(({ bucket }) => bucket === 'zombie_pr' || bucket === 'post_merge_limbo');
+  if (visibleMemberships.length > 0) {
+    console.log(chalk.bold(pending.length === 0 ? '\nPipeline Membership\n' : '\nPipeline Drift\n'));
+  }
+  for (const membership of visibleMemberships) {
+    console.log(`${chalk.cyan(membership.issueId)}  ${membership.bucket}  ${chalk.dim(membership.reasons.join('; '))}`);
+  }
+  if (visibleMemberships.length > 0) console.log('');
 
   if (pending.length === 0) {
     console.log(chalk.dim('No pending reviews.'));
-    console.log(chalk.dim('Agents will appear here when they complete work.'));
     return;
   }
 

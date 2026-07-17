@@ -1,3 +1,5 @@
+import type { IssuePipelineMembership } from '@overdeck/contracts';
+
 export interface LinearProject {
   id: string;
   name: string;
@@ -46,6 +48,7 @@ export interface Issue {
   planningComplete?: boolean;
   workspacePath?: string;
   taskCounts?: { completed: number; total: number } | null;
+  pipelineMembership?: IssuePipelineMembership;
 }
 
 export interface GitStatus {

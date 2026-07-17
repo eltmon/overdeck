@@ -42,6 +42,7 @@ const EXPECTED_ISSUES_ROUTES = [
   'GET /api/issues/:id/ship-log',
   'GET /api/issues/resource-allocated',
   'GET /api/issues/:id/resource-details',
+  'GET /api/pipeline/membership',
 ] as const;
 
 function enumerateIssuesRoutes(): Set<string> {
@@ -57,7 +58,7 @@ function enumerateIssuesRoutes(): Set<string> {
 }
 
 describe('PAN-2148 issues route no-loss audit', () => {
-  it('keeps all 32 issuesRouteLayer method/path registrations', () => {
+  it('keeps all 33 issuesRouteLayer method/path registrations', () => {
     const liveRoutes = enumerateIssuesRoutes();
     const expectedRoutes = new Set(EXPECTED_ISSUES_ROUTES);
 
@@ -76,6 +77,6 @@ describe('PAN-2148 issues route no-loss audit', () => {
       ...unexpected.map((route) => `  unexpected: ${route}`),
     ].join('\n')).toEqual([]);
 
-    expect(liveRoutes.size).toBe(32);
+    expect(liveRoutes.size).toBe(33);
   });
 });

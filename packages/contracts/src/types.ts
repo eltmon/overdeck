@@ -5,6 +5,21 @@ import { Schema } from "effect"
 export const IssueId = Schema.String
 export type IssueId = typeof IssueId.Type
 
+export type PipelineBucket =
+  | "in_flight"
+  | "zombie_pr"
+  | "post_merge_limbo"
+  | "planned_backlog"
+  | "clean_terminal"
+
+/** Server-computed pipeline membership attached to dashboard issue DTOs. */
+export interface IssuePipelineMembership {
+  available?: boolean
+  inPipeline: boolean
+  bucket: PipelineBucket
+  labelDrift: "stale_present" | "stale_absent" | null
+}
+
 export const AgentId = Schema.String
 export type AgentId = typeof AgentId.Type
 
