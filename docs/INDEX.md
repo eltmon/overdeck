@@ -35,6 +35,7 @@
 | [SKILLS-CONVENTION.md](./SKILLS-CONVENTION.md) | How Overdeck's `pan-*` skills relate to the `pan` CLI binary, the four skill shapes, and the linter that keeps them in sync |
 | [configuration/harnesses.mdx](../configuration/harnesses.mdx) | Operational guide for the two supported coding-agent harnesses (`claude-code`, `pi`): install, picker locations, ToS rules, troubleshooting. *Published — `docs/HARNESSES.md` is now a redirect stub.* |
 | [reference/harness-landscape.mdx](../reference/harness-landscape.mdx) | Planning survey of 13 coding-agent harnesses — extensibility mechanisms, skill/AGENTS.md/MCP support, headless interfaces, and harness-adoption implications |
+| [OKF-LANDSCAPE.md](./OKF-LANDSCAPE.md) | Research survey of the Open Knowledge Format ecosystem — how Overdeck stores its knowledge bundle vs in-repo/sibling-repo/submodule patterns in the wild, branch-based storage analogues to `overdeck-state`, upstream spec proposals, and the inkeep open-knowledge viewer plan (PAN-2066) |
 | [reference/template-conversations.mdx](../reference/template-conversations.mdx) | Proposal: loading curated skill bundles into a single conversation without touching the global `pan sync` skill set |
 | [REPO-ARTIFACTS.md](./REPO-ARTIFACTS.md) | What lives in a project's repo: `.pan/`, skills hierarchy, `vbrief/` lifecycle dirs, PRD vs vBRIEF, multi-tool sync |
 | [VISION.md](./VISION.md) | Product vision and deployment model roadmap (local → shared → SaaS) |
