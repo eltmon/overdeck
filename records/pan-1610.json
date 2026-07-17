@@ -90,7 +90,7 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:42:40.794Z",
+  "updated": "2026-07-17T16:43:03.378Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -100,12 +100,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:42:40.738Z",
+    "updatedAt": "2026-07-17T16:43:03.349Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-1610-review",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
-    "reviewRequestedAt": "2026-07-17T16:42:10.534Z",
+    "reviewRequestedAt": "2026-07-17T16:43:00.984Z",
     "reviewSpawnedAt": "2026-07-17T16:36:24.952Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -193,9 +193,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4131641,
-            "output": 111883,
-            "cacheRead": 9670144,
+            "input": 4185478,
+            "output": 115061,
+            "cacheRead": 10419200,
             "cacheWrite": 0
           }
         },
@@ -230,9 +230,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 12125179,
-          "output": 643242,
-          "cacheRead": 129250816,
+          "input": 12179016,
+          "output": 646420,
+          "cacheRead": 129999872,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -243,8 +243,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 157.122693,
-        "pricingAsOf": "2026-07-17T16:42:40.788Z"
+        "usd": 157.861746,
+        "pricingAsOf": "2026-07-17T16:43:03.351Z"
       }
     },
     "merges": [
