@@ -14,10 +14,10 @@ import {
   getResourcesEffect,
   resetCurrentDockerStatsReaderForTests,
   resetResourceStackReviewStatusReaderForTests,
-  resetSpawnGateHealthSnapshotReadersForTests,
+  resetSpawnGateHealthEvidenceReaderForTests,
   setCurrentDockerStatsReaderForTests,
   setResourceStackReviewStatusReaderForTests,
-  setSpawnGateHealthSnapshotReadersForTests,
+  setSpawnGateHealthEvidenceReaderForTests,
   type ResourceStack,
   type StackContainerResource,
 } from '../../../../src/dashboard/server/routes/resources.js';
@@ -27,7 +27,7 @@ import type { SystemHealthSnapshot } from '../../../../src/dashboard/server/serv
 afterEach(() => {
   resetCurrentDockerStatsReaderForTests();
   resetResourceStackReviewStatusReaderForTests();
-  resetSpawnGateHealthSnapshotReadersForTests();
+  resetSpawnGateHealthEvidenceReaderForTests();
   vi.restoreAllMocks();
 });
 
@@ -104,10 +104,10 @@ describe('resources stack payload', () => {
 });
 
 async function getResourcesJson(): Promise<Record<string, any>> {
-  setSpawnGateHealthSnapshotReadersForTests({
-    accepted: async () => acceptedHealthFixture(),
-    compatibility: async () => healthFixture(),
-  });
+  setSpawnGateHealthEvidenceReaderForTests(async () => ({
+    accepted: acceptedHealthFixture(),
+    compatibility: healthFixture(),
+  }));
   const response = await Effect.runPromise(getResourcesEffect());
   const raw = response.body as { body: Uint8Array } | null;
   const text = raw?.body ? new TextDecoder().decode(raw.body) : '{}';

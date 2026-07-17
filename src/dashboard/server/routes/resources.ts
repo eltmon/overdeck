@@ -116,8 +116,8 @@ export {
   getResourcesHealthEvidenceEffect,
   getSpawnGatePayloadEffect,
   mapSpawnGateDecision,
-  resetSpawnGateHealthSnapshotReadersForTests,
-  setSpawnGateHealthSnapshotReadersForTests,
+  resetSpawnGateHealthEvidenceReaderForTests,
+  setSpawnGateHealthEvidenceReaderForTests,
   type SpawnGatePayload,
   type SpawnGateState,
 } from './resources/spawn-gate.js';

@@ -5,8 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   getResourcesEffect,
   mapSpawnGateDecision,
-  resetSpawnGateHealthSnapshotReadersForTests,
-  setSpawnGateHealthSnapshotReadersForTests,
+  resetSpawnGateHealthEvidenceReaderForTests,
+  setSpawnGateHealthEvidenceReaderForTests,
 } from '../../../../src/dashboard/server/routes/resources.js';
 import { spawnGuardrailResourcesHint } from '../../../../src/dashboard/server/routes/agents/spawn.js';
 import type { SpawnGuardrailDecision } from '../../../../src/dashboard/server/routes/agents/shared.js';
@@ -15,7 +15,7 @@ import type { SystemHealthSnapshot as CompatibilitySystemHealthSnapshot } from '
 const GIB = 1024 ** 3;
 
 afterEach(() => {
-  resetSpawnGateHealthSnapshotReadersForTests();
+  resetSpawnGateHealthEvidenceReaderForTests();
 });
 
 describe('resources spawn gate payload', () => {
@@ -58,7 +58,7 @@ describe('resources spawn gate payload', () => {
     });
   });
 
-  it('projects the same accepted host and admission evidence in GET /api/resources', async () => {
+  it('projects display and admission evidence from one atomic health assessment', async () => {
     const accepted = acceptedHealthFixture({
       host: {
         state: 'healthy',
@@ -86,14 +86,19 @@ describe('resources spawn gate payload', () => {
         }],
       },
     });
-    setSpawnGateHealthSnapshotReadersForTests({
-      accepted: async () => accepted,
-      compatibility: async () => compatibilityHealthFixture(),
+    let evidenceReads = 0;
+    setSpawnGateHealthEvidenceReaderForTests(async () => {
+      evidenceReads++;
+      return {
+        accepted,
+        compatibility: compatibilityHealthFixture(),
+      };
     });
 
     const response = await Effect.runPromise(getResourcesEffect());
     const body = await readJsonBody(response);
 
+    expect(evidenceReads).toBe(1);
     expect(body.hostVitals).toMatchObject({
       cpu: { percent: 42.4, load: [1.1, null, null] },
       mem: {
@@ -142,10 +147,10 @@ describe('resources spawn gate payload', () => {
   it('continues enforcing canonical memory limits with structured reasons', async () => {
     const compatibility = compatibilityHealthFixture();
     compatibility.summary.availableMemoryBytes = GIB;
-    setSpawnGateHealthSnapshotReadersForTests({
-      accepted: async () => acceptedHealthFixture(),
-      compatibility: async () => compatibility,
-    });
+    setSpawnGateHealthEvidenceReaderForTests(async () => ({
+      accepted: acceptedHealthFixture(),
+      compatibility,
+    }));
 
     const response = await Effect.runPromise(getResourcesEffect());
     const body = await readJsonBody(response);
@@ -165,11 +170,8 @@ describe('resources spawn gate payload', () => {
   });
 
   it('returns explicit unavailable admission evidence when accepted health cannot be read', async () => {
-    setSpawnGateHealthSnapshotReadersForTests({
-      accepted: async () => {
-        throw new Error('accepted snapshot unavailable');
-      },
-      compatibility: async () => compatibilityHealthFixture(),
+    setSpawnGateHealthEvidenceReaderForTests(async () => {
+      throw new Error('health evidence unavailable');
     });
 
     const response = await Effect.runPromise(getResourcesEffect());

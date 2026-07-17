@@ -189,6 +189,11 @@ interface CollectedSystemHealthBundle {
   compatibility: CollectedSystemHealthSnapshot;
 }
 
+export interface SystemHealthEvidenceSnapshot {
+  accepted: SharedSystemHealthSnapshot;
+  compatibility: SystemHealthSnapshot;
+}
+
 let dockerStatsCollector: DockerStatsCollector | null = null;
 let previousCpuSample: CpuSample | null = null;
 let previousCpuSampleAt = 0;
@@ -956,17 +961,24 @@ function getSystemHealthSampler(): SystemHealthSampler<CollectedSystemHealthBund
   return systemHealthSampler;
 }
 
+export async function getSystemHealthEvidenceSnapshot(): Promise<SystemHealthEvidenceSnapshot> {
+  const assessment = getSystemHealthSampler().getSnapshot();
+  return {
+    accepted: assessment.metrics.accepted,
+    compatibility: {
+      ...assessment.metrics.compatibility,
+      state: assessment.state,
+      structuredReasons: assessment.reasons,
+      freshness: assessment.freshness,
+      transitionVersion: assessment.transitionVersion,
+    },
+  };
+}
+
 export async function getAcceptedSystemHealthSnapshot(): Promise<SharedSystemHealthSnapshot> {
-  return getSystemHealthSampler().getSnapshot().metrics.accepted;
+  return (await getSystemHealthEvidenceSnapshot()).accepted;
 }
 
 export async function getSystemHealthSnapshot(): Promise<SystemHealthSnapshot> {
-  const accepted = getSystemHealthSampler().getSnapshot();
-  return {
-    ...accepted.metrics.compatibility,
-    state: accepted.state,
-    structuredReasons: accepted.reasons,
-    freshness: accepted.freshness,
-    transitionVersion: accepted.transitionVersion,
-  };
+  return (await getSystemHealthEvidenceSnapshot()).compatibility;
 }

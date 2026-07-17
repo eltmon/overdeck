@@ -5,9 +5,8 @@ import type {
 import { Effect } from 'effect';
 
 import {
-  getAcceptedSystemHealthSnapshot,
-  getSystemHealthSnapshot,
-  type SystemHealthSnapshot as CompatibilitySystemHealthSnapshot,
+  getSystemHealthEvidenceSnapshot,
+  type SystemHealthEvidenceSnapshot,
 } from '../../services/system-health-service.js';
 import {
   evaluateSpawnGuardrails,
@@ -31,12 +30,9 @@ interface ResourcesHealthEvidence {
   decision: SpawnGuardrailDecision | null;
 }
 
-let readAcceptedSystemHealthSnapshot:
-  () => Promise<AcceptedSystemHealthSnapshot> =
-    () => getAcceptedSystemHealthSnapshot();
-let readCompatibilitySystemHealthSnapshot:
-  () => Promise<CompatibilitySystemHealthSnapshot> =
-    () => getSystemHealthSnapshot();
+let readSystemHealthEvidenceSnapshot:
+  () => Promise<SystemHealthEvidenceSnapshot> =
+    () => getSystemHealthEvidenceSnapshot();
 
 export function mapSpawnGateDecision(
   decision: SpawnGuardrailDecision,
@@ -85,23 +81,16 @@ export function mapSpawnGateDecision(
 
 export function getResourcesHealthEvidenceEffect():
   Effect.Effect<ResourcesHealthEvidence, never, never> {
-  return Effect.all({
-    accepted: Effect.tryPromise({
-      try: () => readAcceptedSystemHealthSnapshot(),
-      catch: (error) => error,
-    }).pipe(
-      Effect.map((snapshot) => snapshot as AcceptedSystemHealthSnapshot | null),
-      Effect.catch(() => Effect.succeed(null)),
-    ),
-    decision: Effect.tryPromise({
-      try: () => readCompatibilitySystemHealthSnapshot(),
-      catch: (error) => error,
-    }).pipe(
-      Effect.map(evaluateSpawnGuardrails),
-      Effect.map((decision) => decision as SpawnGuardrailDecision | null),
-      Effect.catch(() => Effect.succeed(null)),
-    ),
-  });
+  return Effect.tryPromise({
+    try: () => readSystemHealthEvidenceSnapshot(),
+    catch: (error) => error,
+  }).pipe(
+    Effect.map(({ accepted, compatibility }) => ({
+      accepted,
+      decision: evaluateSpawnGuardrails(compatibility),
+    })),
+    Effect.catch(() => Effect.succeed({ accepted: null, decision: null })),
+  );
 }
 
 export function getSpawnGatePayloadEffect(
@@ -121,17 +110,14 @@ export function getSpawnGatePayloadEffect(
   );
 }
 
-export function setSpawnGateHealthSnapshotReadersForTests(readers: {
-  accepted: () => Promise<AcceptedSystemHealthSnapshot>;
-  compatibility: () => Promise<CompatibilitySystemHealthSnapshot>;
-}): void {
-  readAcceptedSystemHealthSnapshot = readers.accepted;
-  readCompatibilitySystemHealthSnapshot = readers.compatibility;
+export function setSpawnGateHealthEvidenceReaderForTests(
+  reader: () => Promise<SystemHealthEvidenceSnapshot>,
+): void {
+  readSystemHealthEvidenceSnapshot = reader;
 }
 
-export function resetSpawnGateHealthSnapshotReadersForTests(): void {
-  readAcceptedSystemHealthSnapshot = () => getAcceptedSystemHealthSnapshot();
-  readCompatibilitySystemHealthSnapshot = () => getSystemHealthSnapshot();
+export function resetSpawnGateHealthEvidenceReaderForTests(): void {
+  readSystemHealthEvidenceSnapshot = () => getSystemHealthEvidenceSnapshot();
 }
 
 function unavailableSpawnGate(

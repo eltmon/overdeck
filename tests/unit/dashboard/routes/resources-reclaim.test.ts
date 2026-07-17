@@ -9,14 +9,14 @@ import {
   resetCurrentDockerStatsReaderForTests,
   resetReclaimForTests,
   resetResourceStackReviewStatusReaderForTests,
-  resetSpawnGateHealthSnapshotReadersForTests,
+  resetSpawnGateHealthEvidenceReaderForTests,
   setCurrentDockerStatsReaderForTests,
   setReclaimIssueClosedReaderForTests,
   setReclaimProjectRootForTests,
   setReclaimVenvCandidatesForTests,
   setReclaimVenvDeleteForTests,
   setResourceStackReviewStatusReaderForTests,
-  setSpawnGateHealthSnapshotReadersForTests,
+  setSpawnGateHealthEvidenceReaderForTests,
   type ResourceStack,
 } from '../../../../src/dashboard/server/routes/resources.js';
 import type { ReviewStatus } from '../../../../src/lib/review-status.js';
@@ -25,7 +25,7 @@ import type { SystemHealthSnapshot } from '../../../../src/dashboard/server/serv
 afterEach(() => {
   resetCurrentDockerStatsReaderForTests();
   resetResourceStackReviewStatusReaderForTests();
-  resetSpawnGateHealthSnapshotReadersForTests();
+  resetSpawnGateHealthEvidenceReaderForTests();
   resetReclaimForTests();
 });
 
@@ -33,10 +33,10 @@ describe('resources reclaim payload', () => {
   it('returns a RAM and disk reclaim candidate for a merged stack with no live agent', async () => {
     setMergedReviewStatus();
     setCurrentDockerStatsReaderForTests(() => [container('api', { memoryUsage: 2 * 1024 ** 3 })]);
-    setSpawnGateHealthSnapshotReadersForTests({
-      accepted: async () => acceptedHealthFixture(),
-      compatibility: async () => healthFixture(),
-    });
+    setSpawnGateHealthEvidenceReaderForTests(async () => ({
+      accepted: acceptedHealthFixture(),
+      compatibility: healthFixture(),
+    }));
 
     const body = await getResourcesJson();
 
@@ -78,10 +78,10 @@ describe('resources reclaim payload', () => {
   it('returns reclaim totals and mirrors disk total into hostVitals.disk.reclaimableBytes', async () => {
     setMergedReviewStatus();
     setCurrentDockerStatsReaderForTests(() => [container('api', { memoryUsage: 1 })]);
-    setSpawnGateHealthSnapshotReadersForTests({
-      accepted: async () => acceptedHealthFixture(),
-      compatibility: async () => healthFixture(),
-    });
+    setSpawnGateHealthEvidenceReaderForTests(async () => ({
+      accepted: acceptedHealthFixture(),
+      compatibility: healthFixture(),
+    }));
 
     const body = await getResourcesJson();
 
