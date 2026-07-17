@@ -5764,3 +5764,11 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **2829 still idle** (frozen $23.0888, ~160min). **2377 dead-inspection** (PAN-2848). No change.
 - **Run scorecard:** 4 closed out (2822/2661/2831/2665). In flight: 2445 advancing (review), 1610 blocked-idle (needs nudge, final item), 2829 idle (needs nudge), 2377 dead (needs 2848 fix or swarm re-enable). The whole tail is gated on PAN-2817 nudges + PAN-2848.
 - **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9 (12 ticks).
+
+## Tick 22 — 2026-07-17 ~17:19 — PAN-2445 (A13) MERGED e6b34cb812 + deployed; 1610 re-review is on UNCHANGED code
+- **PAN-2445 (A13, first order-book Lane A item) MERGED → e6b34cb812** (PR#2852). Verified: CLEAN, approved at exact head (b3ef1608==reviewed_at_commit), 0 fail/0 pending, review+test passed, ready=1. Deployed (pid 4061590, buildCommit e6b34cb812). **5th issue landed this run** (after 2822/2661/2831/2665).
+- **PAN-2445 close-out blocked on LIVE conditions (correct):** main-verify (CI running on e6b34cb812) + post-merge. **Checked tmux per PAN-2846: agent-pan-2445 session is ALIVE** — so post-merge's "running agents: agent-pan-2445" is TRUE, NOT the dead-but-running PAN-2846 case. Do NOT --accept it; it's legitimately running. Closes next tick once CI green + post-merge pauses it.
+- **PAN-1610 (FINAL item) re-review is a FALSE SIGNAL — code is UNCHANGED.** rev flipped blocked→reviewing, BUT: branch HEAD still d54c6beb (== PR head), ZERO commits since, 0 unpushed, no agent activity in >4000 events. So the review re-dispatched on the SAME code without the agent fixing the parity finding → it will re-CHANGES-REQUEST on the identical finding. **A re-review is NOT progress when no fix was committed.** 1610 is still idle-at-prompt; the nudge must make it FIX (read feedback → edit code → commit → re-request), not merely re-request review.
+- **LESSON: rev=reviewing does NOT mean progress. Cross-check the branch HEAD moved (new commit addressing the finding) — an unchanged HEAD under a fresh review = wasted cycle on an idle agent.**
+- **2829 still frozen** $23.0888 (~180min). **2377 dead-inspection** (PAN-2848). No change.
+- **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9.
