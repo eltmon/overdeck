@@ -1,8 +1,9 @@
 import { execFile, type ChildProcess, type ExecFileException } from 'node:child_process';
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { cp, readdir } from 'node:fs/promises';
+import { copyFileSync, createReadStream, createWriteStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { chmod, lstat, mkdir, readlink, readdir, rename, rm, symlink, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { pipeline } from 'node:stream/promises';
 import { Command } from 'commander';
 import { Effect } from 'effect';
 
@@ -137,21 +138,86 @@ async function createOrphanStateCommit(
   }
 }
 
+type CopyFileOperation = (
+  source: string,
+  destination: string,
+  signal?: AbortSignal,
+) => Promise<void>;
+
+let copySequence = 0;
+
+async function copyFileAbortable(
+  source: string,
+  destination: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  signal?.throwIfAborted();
+  const stat = await lstat(source);
+  const temporary = join(
+    dirname(destination),
+    `.overdeck-migrate-${process.pid}-${copySequence++}`,
+  );
+  await mkdir(dirname(destination), { recursive: true });
+  try {
+    await pipeline(
+      createReadStream(source, { signal }),
+      createWriteStream(temporary, { mode: stat.mode & 0o777 }),
+      { signal },
+    );
+    signal?.throwIfAborted();
+    await chmod(temporary, stat.mode & 0o777);
+    await utimes(temporary, stat.atime, stat.mtime);
+    signal?.throwIfAborted();
+    await rename(temporary, destination);
+  } catch (error) {
+    if (signal?.aborted) throw signal.reason;
+    throw error;
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
+async function copySymlinkAbortable(
+  source: string,
+  destination: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  signal?.throwIfAborted();
+  const temporary = join(
+    dirname(destination),
+    `.overdeck-migrate-${process.pid}-${copySequence++}`,
+  );
+  await mkdir(dirname(destination), { recursive: true });
+  try {
+    await symlink(await readlink(source), temporary);
+    signal?.throwIfAborted();
+    await rename(temporary, destination);
+  } finally {
+    await rm(temporary, { force: true });
+  }
+}
+
 async function copyLegacyState(
   sourceRoot: string,
   stateRoot: string,
   signal?: AbortSignal,
-  copyPath: typeof cp = cp,
+  copyFile: CopyFileOperation = copyFileAbortable,
 ): Promise<StateMigrationManifestEntry[]> {
   const manifest: StateMigrationManifestEntry[] = [];
   const visit = async (sourceDir: string, destinationDir: string): Promise<void> => {
+    await mkdir(destinationDir, { recursive: true });
     for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
       signal?.throwIfAborted();
       const sourceEntry = join(sourceDir, entry.name);
       const destinationEntry = join(destinationDir, entry.name);
-      if (entry.isDirectory()) await visit(sourceEntry, destinationEntry);
-      else if (entry.isFile()) {
+      if (entry.isDirectory()) {
+        await visit(sourceEntry, destinationEntry);
+      } else if (entry.isFile()) {
+        await copyFile(sourceEntry, destinationEntry, signal);
+        signal?.throwIfAborted();
         manifest.push(await manifestEntry(sourceEntry, destinationEntry, signal));
+      } else if (entry.isSymbolicLink()) {
+        await copySymlinkAbortable(sourceEntry, destinationEntry, signal);
       }
     }
   };
@@ -160,13 +226,7 @@ async function copyLegacyState(
     signal?.throwIfAborted();
     const source = join(sourceRoot, '.pan', sourcePath);
     if (!existsSync(source)) continue;
-    const destination = join(stateRoot, sourcePath);
-    await copyPath(source, destination, {
-      recursive: true,
-      preserveTimestamps: true,
-    });
-    signal?.throwIfAborted();
-    await visit(source, destination);
+    await visit(source, join(stateRoot, sourcePath));
   }
   return manifest;
 }
@@ -403,7 +463,7 @@ export async function migrateProjectState(
   }
 }
 
-export const __testInternals = { copyLegacyState, git };
+export const __testInternals = { copyFileAbortable, copyLegacyState, git };
 
 export function registerStateMigrationCommand(admin: Command): void {
   admin.command('state')
