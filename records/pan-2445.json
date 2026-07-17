@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T15:44:37.149Z",
+  "updated": "2026-07-17T15:52:13.127Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "pending",
@@ -64,18 +64,34 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "gate-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2445",
         "agentId": "agent-pan-2445",
         "pid": 2086205,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T15:44:37.149Z"
+        "claimedAt": "2026-07-17T15:44:37.149Z",
+        "itemId": "gate-module",
+        "outcome": "completed",
+        "reason": "Added a pure autonomous planning dispatch policy with fail-closed pickup posture, explicit staffing resolution, and a 14-case unit matrix; scoped tests, lint, and typecheck pass.",
+        "releasedAt": "2026-07-17T15:52:13.127Z"
+      }
+    ],
+    "statusReasons": {
+      "gate-module": {
+        "reason": "Added a pure autonomous planning dispatch policy with fail-closed pickup posture, explicit staffing resolution, and a 14-case unit matrix; scoped tests, lint, and typecheck pass.",
+        "updatedAt": "2026-07-17T15:52:13.127Z"
       }
     }
   },
   "statusOverrides": {
-    "gate-module": "running"
+    "gate-module": "completed",
+    "gate-module.gate-module.ac1": "completed",
+    "gate-module.gate-module.ac2": "completed",
+    "gate-module.gate-module.ac3": "completed",
+    "gate-module.gate-module.ac4": "completed",
+    "gate-module.gate-module.ac5": "completed"
   }
 }
