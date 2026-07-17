@@ -436,17 +436,16 @@
     "recordedAt": "2026-07-17T06:23:54.484Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T10:34:09.912Z",
+  "updated": "2026-07-17T11:24:09.124Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T10:32:45.343Z",
+    "updatedAt": "2026-07-17T11:24:09.100Z",
     "reviewNotes": "Approved: Git-root-wide state-writer reconciliation is fixed; focused migration suites pass 34 tests.",
     "testNotes": "Reconciled from green GitHub Actions CI on fa43a499: guard (https://github.com/eltmon/overdeck/actions/runs/29559920222/job/87819982352)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -516,7 +515,9 @@
       ],
       "recordedAt": "2026-07-17T02:45:52.906Z"
     },
-    "strikeRecoveryCount": 0
+    "strikeRecoveryCount": 0,
+    "closedOut": true,
+    "closedOutAt": "2026-07-17T11:24:09.100Z"
   },
   "closeOut": {
     "usage": {
@@ -648,7 +649,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2803"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-17T11:24:09.123Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at d1fe4426c3c18aa7fc6c32b3102330757d71c2f3",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2803 MERGED at 2026-07-17T10:32:14Z",
+          "status": "pass",
+          "mergedAt": "2026-07-17T10:32:14Z",
+          "mergeCommit": "47d28c25b1e7122664b3525c61f47c828950555d"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 47d28c25b1e7122664b3525c61f47c828950555d",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-17T11:21:48.000Z, dist built 2026-07-17T11:21:27.591Z, merge 2026-07-17T10:32:14.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Removed workspace directory after worktree removal failed; Removed 5 agent state directories; No strike branch strike/pan-1897 found; Pruned 614 checkpoint ref(s) for agent-pan-1897, planning-pan-1897, strike-pan-1897; No specialist registry entries for PAN-1897"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
