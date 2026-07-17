@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  GROUP_LABELS,
+  GROUP_ORDER,
   ISSUE_ACTIONS,
   deriveIssueActionPhase,
   getEnabledActions,
@@ -97,6 +99,24 @@ describe('ISSUE_ACTIONS', () => {
     for (const key of prdActionKeys) expect(registered.has(key), key).toBe(true);
     for (const key of preservedActionKeys) expect(registered.has(key), key).toBe(true);
     expect(registered.size).toBe(ISSUE_ACTIONS.length);
+  });
+
+  it('exports every action group once in the cockpit order', () => {
+    expect(GROUP_ORDER).toEqual([
+      'planning',
+      'work',
+      'review',
+      'agent',
+      'workspace',
+      'artifacts',
+      'navigation',
+      'danger',
+    ]);
+    expect(new Set(GROUP_ORDER).size).toBe(GROUP_ORDER.length);
+    expect(Object.keys(GROUP_LABELS)).toEqual(GROUP_ORDER);
+    for (const action of ISSUE_ACTIONS) {
+      expect(GROUP_ORDER, action.key).toContain(action.group);
+    }
   });
 
   it('fully describes every registry entry', () => {

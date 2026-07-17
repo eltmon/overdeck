@@ -28,7 +28,7 @@ import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
-import { ISSUE_ACTIONS, type IssueActionGroup } from '../../../lib/issueActions'
+import { GROUP_LABELS, GROUP_ORDER, ISSUE_ACTIONS } from '../../../lib/issueActions'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { AgentsLane } from './AgentsLane'
 import { TasksRail } from './TasksRail'
@@ -88,28 +88,6 @@ const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'conversation', label: 'Conversation' },
   { id: 'files', label: 'Files' },
   { id: 'terminal', label: 'Terminal' },
-]
-
-const GROUP_LABELS: Record<IssueActionGroup, string> = {
-  planning: 'Planning',
-  work: 'Work',
-  review: 'Review & Test',
-  agent: 'Agent',
-  workspace: 'Workspace',
-  artifacts: 'Artifacts',
-  navigation: 'Navigation',
-  danger: 'Danger',
-}
-
-const GROUP_ORDER: IssueActionGroup[] = [
-  'planning',
-  'work',
-  'review',
-  'agent',
-  'workspace',
-  'artifacts',
-  'navigation',
-  'danger',
 ]
 
 // Explicit, literal Tailwind classes — interpolated utilities get purged.

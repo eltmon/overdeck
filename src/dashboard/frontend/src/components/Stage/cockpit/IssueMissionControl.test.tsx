@@ -86,6 +86,17 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 }))
 
 vi.mock('../../../lib/issueActions', () => ({
+  GROUP_LABELS: {
+    planning: 'Planning',
+    work: 'Work',
+    review: 'Review & Test',
+    agent: 'Agent',
+    workspace: 'Workspace',
+    artifacts: 'Artifacts',
+    navigation: 'Navigation',
+    danger: 'Danger',
+  },
+  GROUP_ORDER: ['planning', 'work', 'review', 'agent', 'workspace', 'artifacts', 'navigation', 'danger'],
   ISSUE_ACTIONS: [
     { key: 'plan', label: 'Plan', group: 'planning', kind: 'dialog' },
     { key: 'startAgent', label: 'Start agent', group: 'work', kind: 'dialog' },

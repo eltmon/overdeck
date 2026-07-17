@@ -73,6 +73,28 @@ export type IssueActionGroup =
   | 'danger'
   | 'navigation';
 
+export const GROUP_LABELS: Record<IssueActionGroup, string> = {
+  planning: 'Planning',
+  work: 'Work',
+  review: 'Review & Test',
+  agent: 'Agent',
+  workspace: 'Workspace',
+  artifacts: 'Artifacts',
+  navigation: 'Navigation',
+  danger: 'Danger',
+};
+
+export const GROUP_ORDER: IssueActionGroup[] = [
+  'planning',
+  'work',
+  'review',
+  'agent',
+  'workspace',
+  'artifacts',
+  'navigation',
+  'danger',
+];
+
 export interface IssueActionState {
   reviewStatus?: PipelineReviewStatus | null;
   agent?: Pick<Agent, 'status' | 'role' | 'agentPhase' | 'git' | 'paused' | 'troubled'> | null;
