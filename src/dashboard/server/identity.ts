@@ -53,6 +53,11 @@ function isSameOrInside(parent: string, candidate: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !rel.startsWith(sep));
 }
 
+export function isNonPrimaryCheckoutRoot(repoRoot: string): boolean {
+  const resolvedRoot = resolve(repoRoot);
+  return isLinkedWorktreeRoot(resolvedRoot) || isWorkspaceRepoRoot(resolvedRoot);
+}
+
 export function readHostDashboardApiPort(defaultPort = 3011): number {
   if (!existsSync(CONFIG_FILE)) return defaultPort;
   try {
@@ -83,9 +88,7 @@ export function shouldRefuseHostDashboardPort(input: {
     return false;
   }
   if (input.mode === 'peer') return true;
-
-  if (isLinkedWorktreeRoot(repoRoot)) return true;
-  if (isWorkspaceRepoRoot(repoRoot)) return true;
+  if (isNonPrimaryCheckoutRoot(repoRoot)) return true;
 
   const workspacesDir = resolve(repoRoot, '..');
   return workspacesDir.endsWith(`${sep}workspaces`) && isSameOrInside(workspacesDir, repoRoot);

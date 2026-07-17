@@ -23,7 +23,7 @@ import { dirname, join, parse, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { existsSync, mkdirSync } from 'fs';
 import {
-  isLinkedWorktreeRoot,
+  isNonPrimaryCheckoutRoot,
   isWorkspaceRepoRoot,
   primaryRootFromLinkedWorktree,
 } from '../../dashboard/server/identity.js';
@@ -91,7 +91,7 @@ export function refuseNonPrimaryDashboardCwd(cwd: string, verb: string): boolean
   if (!repoRoot) return false;
 
   const isWorkspace = isWorkspaceRepoRoot(repoRoot);
-  if (!isWorkspace && !isLinkedWorktreeRoot(repoRoot)) return false;
+  if (!isNonPrimaryCheckoutRoot(repoRoot)) return false;
 
   const primaryRepoRoot = primaryRootFromLinkedWorktree(repoRoot) ??
     (isWorkspace ? dirname(dirname(repoRoot)) : null);
