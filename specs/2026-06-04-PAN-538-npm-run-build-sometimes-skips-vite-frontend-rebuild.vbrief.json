@@ -4,17 +4,17 @@
     "created": "2026-06-04T06:15:00.000Z",
     "author": "panopticon-cli/0.0.0",
     "description": "Plan for PAN-538: npm run build sometimes skips Vite frontend rebuild",
-    "updated": "2026-06-04T06:16:49.667Z"
+    "updated": "2026-07-17T11:51:34.049Z"
   },
   "plan": {
     "id": "pan-538",
     "title": "npm run build sometimes skips Vite frontend rebuild",
-    "status": "proposed",
+    "status": "cancelled",
     "uid": "7c1e9a42-3b6d-4f08-9a2e-5d7c1b4f8e30",
     "author": "agent:claude-opus-4-8",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-06-04T06:15:00.000Z",
-    "updated": "2026-06-04T06:16:49.667Z",
+    "updated": "2026-07-17T11:51:34.049Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/panopticon-cli/issues/538",
@@ -222,5 +222,5 @@
       "canonicalFilename": "2026-06-04-PAN-538-npm-run-build-sometimes-skips-vite-frontend-rebuild.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "cancelled"
 }
