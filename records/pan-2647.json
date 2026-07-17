@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T01:50:34.157Z",
+  "updated": "2026-07-17T01:59:37.581Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "sampler-hysteresis": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 2529776,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:44:50.846Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -155,6 +147,16 @@
         "itemId": "evaluate-pure",
         "outcome": "completed",
         "releasedAt": "2026-07-17T01:44:39.299Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2529776,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:44:50.846Z",
+        "itemId": "sampler-hysteresis",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T01:59:37.581Z"
       }
     ],
     "statusReasons": {
@@ -190,6 +192,11 @@
     "evaluate-pure.evaluate-pure.ac2": "completed",
     "evaluate-pure.evaluate-pure.ac3": "completed",
     "evaluate-pure.evaluate-pure.ac4": "completed",
-    "sampler-hysteresis": "running"
+    "sampler-hysteresis": "completed",
+    "sampler-hysteresis.sampler-hysteresis.ac1": "completed",
+    "sampler-hysteresis.sampler-hysteresis.ac2": "completed",
+    "sampler-hysteresis.sampler-hysteresis.ac3": "completed",
+    "sampler-hysteresis.sampler-hysteresis.ac4": "completed",
+    "sampler-hysteresis.sampler-hysteresis.ac5": "completed"
   }
 }
