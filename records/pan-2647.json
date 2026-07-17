@@ -210,20 +210,23 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T10:01:17.203Z",
+  "updated": "2026-07-17T10:04:09.560Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-17T10:01:17.165Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-17T10:04:09.502Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
+    "reviewedAtCommit": "fcc6eda95eeee01ae138d704dea48b97bad4c4ea",
     "lastVerifiedCommit": "fcc6eda95eeee01ae138d704dea48b97bad4c4ea",
     "reviewRequestedAt": "2026-07-17T09:57:16.838Z",
     "reviewSpawnedAt": "2026-07-17T10:01:10.450Z"
@@ -241,9 +244,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10688412,
-            "output": 161799,
-            "cacheRead": 16534016,
+            "input": 10990692,
+            "output": 168244,
+            "cacheRead": 16644096,
             "cacheWrite": 0
           }
         },
@@ -272,9 +275,9 @@
           "cacheWrite": 143876
         },
         "openai/gpt-5.6-sol": {
-          "input": 39679956,
-          "output": 1675079,
-          "cacheRead": 298209280,
+          "input": 39982236,
+          "output": 1681524,
+          "cacheRead": 298319360,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -285,8 +288,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 403.88434,
-        "pricingAsOf": "2026-07-17T10:01:17.192Z"
+        "usd": 405.64413,
+        "pricingAsOf": "2026-07-17T10:04:09.521Z"
       }
     },
     "merges": [
