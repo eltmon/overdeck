@@ -8,6 +8,7 @@ import { Effect } from 'effect';
 
 import { getAgentState, type AgentState } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
+import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
@@ -234,6 +235,7 @@ function internalDashboardOrigin(): string {
 
 function classifySpawnSkip(status: number, body: Record<string, unknown>): string {
   const error = typeof body['error'] === 'string' ? body['error'] : '';
+  if (status === 401 || status === 403) return 'unauthorized';
   if (body['stackHealth'] || /workspace docker stack/i.test(error)) return 'stack-unhealthy';
   if (body['paused'] === true) return 'paused';
   if (body['troubled'] === true) return 'troubled';
@@ -244,11 +246,13 @@ function classifySpawnSkip(status: number, body: Record<string, unknown>): strin
 }
 
 export async function spawnWorkAgentThroughAgentsEndpoint(issueId: string, dashboardOrigin = internalDashboardOrigin()): Promise<SpawnWorkAgentResult> {
+  const internalToken = getInternalTokenSync();
   const response = await fetch(new URL('/api/agents', dashboardOrigin), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       origin: dashboardOrigin,
+      ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
     },
     body: JSON.stringify({ issueId, role: 'work' }),
   });
@@ -287,11 +291,16 @@ export async function triggerRebuildAndStart(
   issueId: string,
   dashboardOrigin = internalDashboardOrigin(),
 ): Promise<RebuildAndStartResult> {
+  const internalToken = getInternalTokenSync();
   const response = await fetch(
     new URL(`/api/workspaces/${encodeURIComponent(issueId)}/rebuild-and-start`, dashboardOrigin),
     {
       method: 'POST',
-      headers: { 'content-type': 'application/json', origin: dashboardOrigin },
+      headers: {
+        'content-type': 'application/json',
+        origin: dashboardOrigin,
+        ...(internalToken ? { [INTERNAL_TOKEN_HEADER]: internalToken } : {}),
+      },
     },
   );
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;
