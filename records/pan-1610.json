@@ -72,10 +72,10 @@
       "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
       "src/dashboard/frontend/src/lib/issueActions.ts"
     ],
-    "recordedAt": "2026-07-17T16:13:30.540Z"
+    "recordedAt": "2026-07-17T16:23:03.495Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:22:56.108Z",
+  "updated": "2026-07-17T16:23:03.497Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "failed",
