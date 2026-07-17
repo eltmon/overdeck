@@ -1,3 +1,5 @@
+import { Effect } from 'effect';
+import { getAgentState } from '../agents.js';
 import {
   LEGACY_PARKED_LABELS,
   OBJECTION_LABEL,
@@ -5,7 +7,8 @@ import {
   RELEASED_LABEL,
   VETOED_LABEL,
 } from '../backlog/pickup.js';
-import { derefWorkhorse, type NormalizedConfig } from '../config-yaml.js';
+import { derefWorkhorse, loadConfigSync, type NormalizedConfig } from '../config-yaml.js';
+import { isFlywheelAutoPickupBacklog } from '../database/app-settings.js';
 
 export interface AutonomousPlanDispatchInput {
   autoPickupBacklog: boolean;
@@ -32,6 +35,52 @@ export type AutonomousPlanDispatchDecision =
         | 'no-autonomous-model';
       reason: string;
     };
+
+export async function gatherAutonomousPlanDispatchInput(
+  issueId: string,
+): Promise<AutonomousPlanDispatchInput> {
+  const normalizedIssueId = issueId.trim().toUpperCase();
+  const issueLower = normalizedIssueId.toLowerCase();
+  let labels: readonly string[] | null = null;
+
+  try {
+    // Keep this lazy require aligned with buildClassifyLookups: a static import
+    // creates a lib → dashboard layering edge.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
+    const issue = (getSharedIssueService().getIssues() as Array<Record<string, unknown>>)
+      .find((candidate) => (
+        typeof candidate['identifier'] === 'string'
+        && candidate['identifier'].toUpperCase() === normalizedIssueId
+      ));
+    if (issue) {
+      const rawLabels = Array.isArray(issue['labels']) ? issue['labels'] as unknown[] : [];
+      labels = rawLabels
+        .map((label) => (
+          typeof label === 'string' ? label : ((label as { name?: string })?.name ?? '')
+        ))
+        .filter((label): label is string => Boolean(label));
+    }
+  } catch {
+    // The scheduler cannot prove blocker labels are absent without the issue service.
+  }
+
+  const currentState = await Effect.runPromise(getAgentState(`agent-${issueLower}-plan`));
+  const legacyState = currentState?.model
+    ? null
+    : await Effect.runPromise(getAgentState(`planning-${issueLower}`));
+  const config = loadConfigSync().config;
+
+  return {
+    autoPickupBacklog: isFlywheelAutoPickupBacklog(),
+    labels,
+    recordedModel: currentState?.model ?? legacyState?.model,
+    autonomousModel: typeof config.roles?.plan?.autonomousModel === 'string'
+      ? config.roles.plan.autonomousModel
+      : undefined,
+    workhorses: config.workhorses,
+  };
+}
 
 export function decideAutonomousPlanDispatch(
   input: AutonomousPlanDispatchInput,

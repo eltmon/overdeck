@@ -1,6 +1,35 @@
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const autonomousPlanMock = vi.hoisted(() => ({
+  autoPickupBacklog: false,
+  labels: ['released'] as readonly string[] | null,
+  recordedModel: undefined as string | undefined,
+  autonomousModel: 'workhorse:cheap' as string | undefined,
+}));
+
+vi.mock('../autonomous-plan-dispatch.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../autonomous-plan-dispatch.js')>();
+  return {
+    ...actual,
+    gatherAutonomousPlanDispatchInput: vi.fn(async () => ({
+      autoPickupBacklog: autonomousPlanMock.autoPickupBacklog,
+      labels: autonomousPlanMock.labels,
+      recordedModel: autonomousPlanMock.recordedModel,
+      autonomousModel: autonomousPlanMock.autonomousModel,
+      workhorses: {
+        expensive: 'claude-opus-4-8',
+        mid: 'claude-sonnet-5',
+        cheap: 'claude-haiku-4-5',
+      },
+    })),
+  };
+});
+
+vi.mock('../dead-end-trip.js', () => ({
+  recordDeadEndNeedsYou: vi.fn(async () => undefined),
+}));
+
 vi.mock('../../agents.js', async () => {
   const { Effect } = await import('effect');
   const effectMock = (initial?: unknown) => {
@@ -205,8 +234,10 @@ vi.mock('../../tmux.js', async () => {
   };
 });
 
+import { emitActivityEntrySync } from '../../activity-logger.js';
 import { listRunningAgentsSync, listRunningAgents, spawnRun, getAgentState, getAgentStateSync, resumeAgent } from '../../agents.js';
 import { sessionExists, killSession, sessionExistsSync } from '../../tmux.js';
+import { recordDeadEndNeedsYou } from '../dead-end-trip.js';
 import { spawnReviewRoleForIssue } from '../review-agent.js';
 import { dispatchTestAgentAndNotify } from '../test-agent-queue.js';
 import { isIssueClosed } from '../issue-closed.js';
@@ -233,6 +264,10 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
     vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
+    autonomousPlanMock.autoPickupBacklog = false;
+    autonomousPlanMock.labels = ['released'];
+    autonomousPlanMock.recordedModel = undefined;
+    autonomousPlanMock.autonomousModel = 'workhorse:cheap';
     mockHeadSha = 'newhead1';
   });
 
@@ -250,6 +285,63 @@ describe('reactive Cloister scheduler', () => {
     expect(stateToRole('shipping')).toBeNull();
     expect(stateToRole('closed')).toBeNull();
     expect(stateToRole('canceled')).toBeNull();
+  });
+
+  it('refuses autonomous planning without release and records a warning needs-you trip', async () => {
+    autonomousPlanMock.labels = [];
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    const refusalText = 'Autonomous planning dispatch was refused because the issue is not released';
+    expect(spawnRun).not.toHaveBeenCalled();
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining(refusalText));
+    expect(emitActivityEntrySync).toHaveBeenCalledWith({
+      source: 'cloister',
+      level: 'warn',
+      message: expect.stringContaining(refusalText),
+      issueId: 'PAN-503',
+    });
+    expect(recordDeadEndNeedsYou).toHaveBeenCalledWith(
+      'PAN-503',
+      'autonomous-plan-dispatch',
+      'in_planning',
+      expect.stringContaining(refusalText),
+    );
+
+    logSpy.mockRestore();
+  });
+
+  it('passes the concrete configured autonomous planning model to spawnRun', async () => {
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
+      prompt: expect.stringContaining('PLAN TASK for PAN-503'),
+      model: 'claude-haiku-4-5',
+    });
+  });
+
+  it('prefers the recorded planning model over roles.plan.autonomousModel', async () => {
+    autonomousPlanMock.recordedModel = 'gpt-5.5';
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_planning'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'plan', {
+      prompt: expect.stringContaining('PLAN TASK for PAN-503'),
+      model: 'gpt-5.5',
+    });
+  });
+
+  it('keeps work-role dispatch unchanged and does not apply autonomous planning staffing', async () => {
+    autonomousPlanMock.labels = [];
+    autonomousPlanMock.autonomousModel = undefined;
+
+    await Effect.runPromise(onIssueStateChange('PAN-503', 'in_progress'));
+
+    expect(spawnRun).toHaveBeenCalledWith('PAN-503', 'work', {
+      prompt: expect.stringContaining('WORK TASK for PAN-503'),
+    });
+    expect(recordDeadEndNeedsYou).not.toHaveBeenCalled();
   });
 
   it('starts the review role for an issue state transition via the wrapper', async () => {
