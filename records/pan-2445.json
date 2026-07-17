@@ -48,10 +48,10 @@
       "src/lib/config-yaml/roles.ts",
       "src/lib/config-yaml/schema.ts"
     ],
-    "recordedAt": "2026-07-17T16:41:08.418Z"
+    "recordedAt": "2026-07-17T16:48:19.602Z"
   },
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T16:48:13.462Z",
+  "updated": "2026-07-17T16:48:19.602Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "failed",
