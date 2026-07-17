@@ -5816,3 +5816,12 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
   - **PAN-2377: dead-inspection** (PAN-2848).
 - **RULE reaffirmed: ready=1 + reviewed_at_commit excluding an in-progress fix = HOLD.** And review flakiness (blocked↔passed on identical code) means a single "passed" is not a merge trigger — confirm it's stable + at the intended head.
 - **PAN-2817 plan offer + B11 TENET-10 still open with the operator.** Only 2829 (idle) + 2377 (dead) genuinely need the substrate fix/nudge now; 1610 is self-progressing.
+
+## Tick 28 — 2026-07-17 ~19:18 — PAN-1610 MERGED 0f6eab3172 + deployed — OPERATOR SEQUENCE 2822→2661→1610 COMPLETE
+- **PAN-1610 (FINAL sequence item) MERGED → 0f6eab3172** (PR#2851). The wait paid off: 1610 finished the parity fix, committed **441b24456f** ("address issue action review findings"), merged main in (4cbd1b2d1d), and re-review PASSED at that head. Verified before merge: PR head == branch HEAD == reviewed_at_commit == **4cbd1b2d1d** (the FIX is in the PR, NOT the stale d54c6beb), 0 failing / 0 pending, mergeState CLEAN, ready=1. **The merge-HOLD (ticks 26-27) was vindicated end to end — d54c6beb (pre-fix, flaky pass) was never merged; the real fix was.**
+- **Deployed 0f6eab3172** — pid **1945300**, health ok, buildCommit == HEAD.
+- **★ THE ENTIRE OPERATOR SEQUENCE IS COMPLETE: 2822 → 2661 → 1610, all merged + deployed.** 2822 + 2661 closed out; 1610 close-out blocked only on LIVE main-verify (CI running on 0f6eab3172) + post-merge — legitimate, closes next tick (verify tmux per PAN-2846 before any --accept).
+- **Run tally: 6 issues merged this run** (2822, 2661, 2831, 2665, 2445, 1610) — the full operator sequence + A13 order-book item + 2 operator-started. 2 substrate fixes landed (2825, 2833), 5 filed (2817/2839/2846/2848/2824/2828).
+- **Remaining tail: PAN-2829 idle-frozen (~270min, PAN-2817), PAN-2377 dead-inspection (PAN-2848).** Order book: A13 done; B11/B12/B13 await the operator's TENET-10 answer.
+- **KEY LESSON of the 1610 saga (ticks 21-28): a large review-fix can look stuck for many ticks. The discriminators that resolved it: cost+diff CLIMBING across ticks = working (not idle); reviewed_at_commit must equal the code you ship (never merge a flaky pass on pre-fix code); commit lands → HEAD moves → re-review at new head → merge. Patience + strict head-verification beat both premature-merge and false-nudge.**
+- **B11=PAN-2233 still NOT started** — TENET-10 answer open since tick 9.
