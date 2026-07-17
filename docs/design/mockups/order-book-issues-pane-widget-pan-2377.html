@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Issues pane — order-book chips (PAN-2377)</title>
+</head>
+<body>
+<style>
+  :root {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af; --faint: #6b7280;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --info: #3b82f6; --info-foreground: #60a5fa; --shadow-card: none;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light; --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280; --faint: #9ca3af;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c; --warning-foreground: #b45309;
+    --success-foreground: #047857; --info-foreground: #1d4ed8;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground); color-scheme: var(--pan-scheme);
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; font-weight: 500; font-size: 13.5px; line-height: 1.55; }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+  .page { max-width: 880px; margin: 0 auto; padding: 34px 24px 90px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 22px; max-width: 76ch; }
+  .toolbtns { display: flex; gap: 8px; }
+  button.tool { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  button.tool.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; height: 18px; padding: 0 6px; border-radius: 3px; font-size: 10px; letter-spacing: .03em;
+    border: 1px solid var(--border); color: var(--muted-foreground); background: var(--muted); flex: 0 0 auto; }
+  .badge.amber { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .badge.blue  { background: color-mix(in srgb, var(--info) 8%, transparent); border-color: color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-foreground); }
+  .badge.green { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); color: var(--success-foreground); }
+
+  /* the book chip — the one new per-row element */
+  .bookchip { display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 6px; border-radius: 3px; font-size: 10px; cursor: default; flex: 0 0 auto;
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); color: var(--foreground); }
+  .bookchip .g { font-size: 9px; color: var(--muted-foreground); font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; }
+
+  .app { border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
+  .appbar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .appbar b { font-weight: 500; font-size: 13.5px; }
+  .appbar .filters { display: flex; gap: 5px; }
+  .appbar .filters span { font-size: 11px; color: var(--faint); border: 1px solid var(--border); border-radius: 5px; padding: 1px 8px; }
+  .appbar .filters span.on { color: var(--foreground); background: var(--muted); }
+  .spacer { flex: 1; }
+  .posturechip { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 9px; border-radius: 4px; font-size: 11px; cursor: pointer; user-select: none;
+    background: color-mix(in srgb, var(--warning) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .posturechip .n { color: var(--warning-foreground); }
+  .posturechip.open { background: var(--muted); border-color: var(--border); color: var(--muted-foreground); }
+  .posturechip.open .n { color: var(--foreground); }
+
+  .group { padding: 4px 0 2px; }
+  .ghead { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); padding: 7px 14px 3px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 12.5px; border-top: 1px solid var(--border); }
+  .row:hover { background: var(--muted); }
+  .row .pri { width: 2px; align-self: stretch; border-radius: 1px; background: transparent; flex: 0 0 auto; margin: 1px 0; }
+  .row .pri.p1 { background: color-mix(in srgb, var(--destructive) 55%, transparent); }
+  .row .id { width: 74px; flex: 0 0 auto; font-size: 11.5px; color: var(--muted-foreground); }
+  .row .t { flex: 1; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .phase { font-size: 11px; color: var(--muted-foreground); flex: 0 0 auto; width: 104px; text-align: right; }
+  .row .phase.machine { color: var(--info-foreground); }
+  .row .phase.human { color: var(--warning-foreground); }
+
+  /* chip tooltip */
+  .tip { position: absolute; z-index: 6; display: none; width: 268px; background: var(--card-2); border: 1px solid var(--input); border-radius: 8px; padding: 9px 11px; font-size: 11.5px; color: var(--muted-foreground); box-shadow: var(--shadow-card); }
+  .tip b { color: var(--foreground); font-weight: 500; }
+  .tip .l { display: flex; gap: 7px; padding: 1.5px 0; }
+  .tip .k { color: var(--faint); width: 62px; flex: 0 0 auto; }
+  .tip .act { margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--border); color: var(--muted-foreground); }
+
+  /* annotations */
+  .ann { display: none; margin: 22px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 76ch; }
+  body.annotate .ann { display: grid; gap: 8px; }
+  .ann li { padding-left: 24px; position: relative; }
+  .ann li::before { content: attr(data-n); position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); color: var(--foreground); }
+  .ann strong { color: var(--foreground); font-weight: 500; }
+  .marker { display: none; position: absolute; width: 16px; height: 16px; border-radius: 3px; font-size: 10px; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); color: var(--foreground); z-index: 2; }
+  body.annotate .marker { display: inline-flex; }
+  .rel { position: relative; }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Issues pane — order-book chips &amp; posture indicator</h1>
+    <div class="toolbtns">
+      <button class="tool" id="annToggle" type="button">Annotations</button>
+      <button class="tool" id="themeToggle" type="button">Toggle theme</button>
+    </div>
+  </header>
+  <p class="doc-sub">PAN-2377 · the smallest surface: the Issues pane learns just two things — a per-issue position chip for order-book members, and one header indicator of pickup posture. Hover a chip for the detail popover; click the header posture chip to demo DRAIN ⇄ OPEN.</p>
+
+  <div class="app">
+    <div class="appbar rel">
+      <span class="marker" style="top:8px;right:120px">1</span>
+      <b>Issues</b>
+      <span class="filters"><span class="on">Open</span><span>In pipeline</span><span>Mine</span></span>
+      <span class="spacer"></span>
+      <span class="posturechip" id="posture" onclick="flip()" title="Order-book pickup posture — click to demo">◼ book: DRAIN · <span class="n mono" style="font-size:10.5px">4</span>&nbsp;held</span>
+    </div>
+
+    <div class="group">
+      <div class="ghead">In pipeline</div>
+      <div class="row rel" style="border-top:0">
+        <span class="pri"></span>
+        <span class="id mono">PAN-2820</span>
+        <span class="t">Dashboard boot survives project whose pipeline lens cannot be gathered</span>
+        <span class="badge green">verifying on main</span>
+        <span class="phase">close-out next</span>
+      </div>
+      <div class="row rel">
+        <span class="marker" style="top:6px;right:230px">2</span>
+        <span class="pri"></span>
+        <span class="id mono">PAN-2821</span>
+        <span class="t">PAN-2232 follow-up PR — operator decision needed</span>
+        <span class="phase human">needs you</span>
+      </div>
+    </div>
+
+    <div class="group">
+      <div class="ghead">Open</div>
+      <div class="row rel">
+        <span class="marker" style="top:6px;right:196px">3</span>
+        <span class="pri p1"></span>
+        <span class="id mono">PAN-2445</span>
+        <span class="t">Autonomous-dispatch hardening — spawns respect pickup posture</span>
+        <span class="bookchip" data-tip="a13">A13 <span class="g">· book</span></span>
+        <span class="phase">held</span>
+      </div>
+      <div class="row rel">
+        <span class="pri"></span>
+        <span class="id mono">PAN-2233</span>
+        <span class="t">Decompose cloister/merge-agent.ts</span>
+        <span class="bookchip" data-tip="b11" id="b11chip">B11 <span class="g">· book</span></span>
+        <span class="phase" id="b11phase">held</span>
+      </div>
+      <div class="row rel">
+        <span class="pri"></span>
+        <span class="id mono">PAN-2190</span>
+        <span class="t">Decompose routes/workspaces/merge-ops.ts</span>
+        <span class="bookchip" data-tip="b12">B12 <span class="g">· book</span></span>
+        <span class="phase">held</span>
+      </div>
+      <div class="row rel">
+        <span class="pri"></span>
+        <span class="id mono">PAN-2189</span>
+        <span class="t">Decompose deacon.ts</span>
+        <span class="bookchip" data-tip="b13">B13 <span class="g">· book</span></span>
+        <span class="phase">held</span>
+      </div>
+      <div class="row rel">
+        <span class="marker" style="top:6px;right:196px">4</span>
+        <span class="pri"></span>
+        <span class="id mono">PAN-2567</span>
+        <span class="t">Reviewed+green PR never merges under main churn</span>
+        <span class="phase">backlog #1</span>
+      </div>
+      <div class="row">
+        <span class="pri"></span>
+        <span class="id mono">PAN-2593</span>
+        <span class="t">Server children inherit bare PATH — gates run under Node 18</span>
+        <span class="phase">backlog #2</span>
+      </div>
+      <div class="row">
+        <span class="pri"></span>
+        <span class="id mono">PAN-2331</span>
+        <span class="t">Codex rate-limit modal stalls autonomous agents</span>
+        <span class="phase">backlog #8</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- chip tooltips -->
+  <div class="tip" id="tip"></div>
+
+  <ul class="ann">
+    <li data-n="1"><strong>One header chip carries the whole posture story.</strong> Amber on DRAIN because a human is holding the gate — the pane-level answer to "why is nothing starting?". It shows the held count so the cost of the hold is visible, and clicking it (in the real UI) jumps to the Order Book page. On OPEN it goes neutral: an open gate is the rest state and must not glow.</li>
+    <li data-n="2"><strong>Non-member rows change not at all.</strong> The widget adds zero noise to issues outside the book — no empty placeholder column, no "not in book" state. Color restraint holds: rows keep at most one colored signal, and the book chip is indigo-tinted taxonomy (membership), not a status color.</li>
+    <li data-n="3"><strong>The chip is the position, in mono.</strong> "B11 · book" is a technical identifier (SF Mono per the type canon) — position is what the operator actually recognizes from the master plan, so it leads. The hover popover explains lane semantics, status, and blockers for newcomers, and offers Release / open-book actions without leaving the pane.</li>
+    <li data-n="4"><strong>Backlog rank and book position are visibly different vocabularies.</strong> Sequencer rank renders as muted text in the phase column ("backlog #1"), never as a chip — only operator-curated membership earns the chip, so the eye can't conflate model opinion with operator intent.</li>
+  </ul>
+</div>
+
+<script>
+  document.getElementById('themeToggle').onclick = () => {
+    const r = document.documentElement;
+    r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light';
+  };
+  document.getElementById('annToggle').onclick = (e) => {
+    document.body.classList.toggle('annotate');
+    e.target.classList.toggle('on');
+  };
+
+  const TIPS = {
+    a13: '<b>Order book · A13</b> — Lane A (parallel-safe; overlaps freely).<div style="margin-top:5px"></div><div class="l"><span class="k">Status</span><span>Held — releases when posture opens</span></div><div class="l"><span class="k">Prereqs</span><span>none · PRD current</span></div><div class="act">Release item · Open order book →</div>',
+    b11: '<b>Order book · B11</b> — Lane B (strictly serial; one in flight).<div style="margin-top:5px"></div><div class="l"><span class="k">Status</span><span>Held — next pick for the B slot</span></div><div class="l"><span class="k">Prereqs</span><span>A8 ✓ landed · re-verify PRD at pickup</span></div><div class="act">Release item · Open order book →</div>',
+    b12: '<b>Order book · B12</b> — Lane B (strictly serial).<div style="margin-top:5px"></div><div class="l"><span class="k">Status</span><span>Held — queues behind B11 + green main</span></div><div class="act">Open order book →</div>',
+    b13: '<b>Order book · B13</b> — Lane B (strictly serial).<div style="margin-top:5px"></div><div class="l"><span class="k">Status</span><span>Held — PRD deliberately unwritten until B12 lands</span></div><div class="act">Open order book →</div>',
+  };
+  const tip = document.getElementById('tip');
+  document.querySelectorAll('.bookchip').forEach(ch => {
+    ch.addEventListener('mouseenter', () => {
+      tip.innerHTML = TIPS[ch.dataset.tip] || '';
+      const r = ch.getBoundingClientRect();
+      tip.style.display = 'block';
+      tip.style.left = Math.min(r.left + scrollX, innerWidth - 290) + 'px';
+      tip.style.top = (r.bottom + scrollY + 5) + 'px';
+    });
+    ch.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+  });
+
+  let drain = true;
+  function flip() {
+    drain = !drain;
+    const p = document.getElementById('posture');
+    const b11p = document.getElementById('b11phase');
+    if (drain) {
+      p.classList.remove('open');
+      p.innerHTML = '◼ book: DRAIN · <span class="n mono" style="font-size:10.5px">4</span>&nbsp;held';
+      b11p.textContent = 'held'; b11p.className = 'phase';
+      TIPS.b11 = TIPS.b11.replace('Picked up by RUN-63 — planning', 'Held — next pick for the B slot');
+    } else {
+      p.classList.add('open');
+      p.innerHTML = '▸ book: OPEN · <span class="n mono" style="font-size:10.5px">2</span>&nbsp;held';
+      b11p.textContent = '● planning'; b11p.className = 'phase machine';
+    }
+  }
+</script>
+</body>
+</html>

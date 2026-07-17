@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Backlog sequencer — Order Book overlay (PAN-2377)</title>
+</head>
+<body>
+<style>
+  :root {
+    --pan-scheme: dark; --background: #080b10; --foreground: #e5e7eb; --card: #0c1018; --card-2: #10151f;
+    --primary: oklch(0.588 0.217 264); --muted: color-mix(in srgb, white 4%, transparent); --muted-foreground: #9ca3af; --faint: #6b7280;
+    --border: color-mix(in srgb, white 6%, transparent); --input: color-mix(in srgb, white 8%, transparent);
+    --destructive: #f87171; --destructive-foreground: #fca5a5;
+    --warning: #f59e0b; --warning-foreground: #fbbf24;
+    --success: #10b981; --success-foreground: #34d399;
+    --info: #3b82f6; --info-foreground: #60a5fa; --shadow-card: none;
+  }
+  :root[data-theme="light"] {
+    --pan-scheme: light; --background: #ffffff; --foreground: #1f2937; --card: #ffffff; --card-2: #f7f7f8;
+    --primary: oklch(0.488 0.217 264); --muted: color-mix(in srgb, black 4%, transparent); --muted-foreground: #6b7280; --faint: #9ca3af;
+    --border: color-mix(in srgb, black 8%, transparent); --input: color-mix(in srgb, black 10%, transparent);
+    --destructive: #ef4444; --destructive-foreground: #b91c1c; --warning-foreground: #b45309;
+    --success-foreground: #047857; --info-foreground: #1d4ed8;
+    --shadow-card: 0 1px 3px rgba(0,0,0,.07), 0 4px 14px rgba(0,0,0,.05);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground); color-scheme: var(--pan-scheme);
+    font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif; font-weight: 500; font-size: 13.5px; line-height: 1.55; }
+  .mono { font-family: "SF Mono", ui-monospace, Menlo, monospace; }
+  .page { max-width: 1020px; margin: 0 auto; padding: 34px 24px 90px; }
+  header.doc { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+  h1 { font-size: 20px; font-weight: 500; margin: 0; letter-spacing: -0.01em; }
+  .doc-sub { color: var(--muted-foreground); font-size: 13px; margin: 0 0 22px; max-width: 76ch; }
+  .toolbtns { display: flex; gap: 8px; }
+  button.tool { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+  button.tool.on { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+
+  .badge { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 7px; border-radius: 3px; font-size: 10.5px; letter-spacing: .03em;
+    border: 1px solid var(--border); color: var(--muted-foreground); background: var(--muted); }
+  .badge.amber { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .badge.indigo{ background: color-mix(in srgb, var(--primary) 8%, transparent); border-color: color-mix(in srgb, var(--primary) 32%, transparent); color: var(--foreground); }
+
+  .app { border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow-card); overflow: hidden; }
+  .appbar { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .crumb { color: var(--faint); font-size: 12px; }
+  .crumb b { color: var(--foreground); font-weight: 500; font-size: 14px; }
+  .spacer { flex: 1; }
+  .stat { font-size: 11.5px; color: var(--muted-foreground); }
+  .stat .mono { color: var(--foreground); font-size: 11px; }
+
+  /* pinned special-orders band */
+  .band { border-bottom: 1px solid var(--border); background: var(--card-2); padding: 10px 16px 12px;
+    border-left: 2px solid color-mix(in srgb, var(--primary) 55%, transparent); }
+  .bandhead { display: flex; align-items: baseline; gap: 9px; margin-bottom: 4px; }
+  .bandhead h2 { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin: 0; }
+  .bandhead .sub { font-size: 11.5px; color: var(--faint); }
+  .bandhead a { margin-left: auto; color: var(--muted-foreground); font-size: 11.5px; text-decoration: none; border-bottom: 1px solid var(--border); }
+  .sorow { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 12.5px; border-top: 1px solid var(--border); }
+  .sorow:first-of-type { border-top: 0; }
+  .sorow .pos { width: 34px; flex: 0 0 auto; font-size: 11px; color: var(--foreground); }
+  .sorow .id { width: 76px; flex: 0 0 auto; font-size: 11.5px; color: var(--foreground); }
+  .sorow .t { flex: 1; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sorow .lane { font-size: 10.5px; color: var(--faint); }
+  .sorow .rm { color: var(--faint); cursor: pointer; font-size: 11px; padding: 0 3px; }
+  .sorow .rm:hover { color: var(--destructive-foreground); }
+
+  /* ranked list */
+  .listwrap { padding: 6px 0 8px; }
+  .listhead { display: flex; align-items: baseline; gap: 9px; padding: 8px 16px 5px; }
+  .listhead h2 { font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); margin: 0; }
+  .listhead .sub { font-size: 11.5px; color: var(--faint); }
+  .row { display: flex; align-items: center; gap: 9px; padding: 6px 16px; font-size: 12.5px; border-top: 1px solid var(--border); }
+  .row .rank { width: 34px; flex: 0 0 auto; font-size: 11px; color: var(--faint); }
+  .row .id { width: 76px; flex: 0 0 auto; font-size: 11.5px; color: var(--muted-foreground); }
+  .row .t { flex: 1; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .why { font-size: 10.5px; color: var(--faint); flex: 0 0 auto; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row .promote { flex: 0 0 auto; visibility: hidden; background: none; border: 1px solid var(--input); border-radius: 6px; color: var(--muted-foreground); font: inherit; font-size: 11px; padding: 2px 9px; cursor: pointer; }
+  .row:hover { background: var(--muted); }
+  .row:hover .promote { visibility: visible; }
+  .row .promote:hover { color: var(--foreground); border-color: color-mix(in srgb, var(--primary) 45%, transparent); }
+  .row.inbook .id, .row.inbook .t { color: var(--faint); }
+  .row.inbook .t { text-decoration: none; }
+  .ellip { padding: 8px 16px 10px; font-size: 11.5px; color: var(--faint); font-style: italic; border-top: 1px solid var(--border); }
+
+  /* lane-pick popover (demo) */
+  .pop { position: absolute; z-index: 5; background: var(--card-2); border: 1px solid var(--input); border-radius: 8px; padding: 5px; box-shadow: var(--shadow-card); display: none; width: 240px; }
+  .pop .pi { padding: 5px 9px; border-radius: 5px; font-size: 12px; color: var(--muted-foreground); cursor: pointer; }
+  .pop .pi:hover { background: var(--muted); color: var(--foreground); }
+  .pop .pi small { display: block; font-size: 10.5px; color: var(--faint); }
+
+  /* annotations */
+  .ann { display: none; margin: 22px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--muted-foreground); max-width: 76ch; }
+  body.annotate .ann { display: grid; gap: 8px; }
+  .ann li { padding-left: 24px; position: relative; }
+  .ann li::before { content: attr(data-n); position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 3px; font-size: 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 32%, transparent); color: var(--foreground); }
+  .ann strong { color: var(--foreground); font-weight: 500; }
+  .marker { display: none; position: absolute; width: 16px; height: 16px; border-radius: 3px; font-size: 10px; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--primary) 12%, var(--card)); border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); color: var(--foreground); z-index: 2; }
+  body.annotate .marker { display: inline-flex; }
+  .rel { position: relative; }
+</style>
+
+<div class="page">
+  <header class="doc">
+    <h1>Backlog sequencer — special orders overlay</h1>
+    <div class="toolbtns">
+      <button class="tool" id="annToggle" type="button">Annotations</button>
+      <button class="tool" id="themeToggle" type="button">Toggle theme</button>
+    </div>
+  </header>
+  <p class="doc-sub">PAN-2377 · how the operator's order book coexists with the auto-ranked sequence. Two orderings, one page: the book is a pinned band above the model ranking — never interleaved, never re-ranked by the model. Hover a backlog row to promote it into the book (demo: click “＋ Order book”, pick a lane).</p>
+
+  <div class="app">
+    <div class="appbar">
+      <span class="crumb">Backlog / <b>Sequenced</b></span>
+      <span class="badge">630 open · ranked by model</span>
+      <span class="spacer"></span>
+      <span class="stat">last re-rank <span class="mono">07-16 22:10</span> · <span class="mono">sequence.md</span></span>
+      <span class="badge amber" title="Order-book pickup posture — mirrored here so promotion isn't mistaken for dispatch">book: ◼ DRAIN</span>
+    </div>
+
+    <!-- pinned special orders -->
+    <div class="band rel" id="band">
+      <span class="marker" style="top:8px;left:-2px">1</span>
+      <div class="bandhead">
+        <h2>Special orders — operator order book</h2>
+        <span class="sub">picked first, in the operator's order · 4 held</span>
+        <a href="#">open order book →</a>
+      </div>
+      <div id="sorows">
+        <div class="sorow"><span class="pos mono">A13</span><span class="id mono">PAN-2445</span><span class="t">Autonomous-dispatch hardening — spawns respect pickup posture</span><span class="lane">Lane A · parallel</span><span class="badge">held</span><span class="rm" title="Remove from book">✕</span></div>
+        <div class="sorow"><span class="pos mono">B11</span><span class="id mono">PAN-2233</span><span class="t">Decompose cloister/merge-agent.ts</span><span class="lane">Lane B · serial</span><span class="badge">held</span><span class="rm">✕</span></div>
+        <div class="sorow"><span class="pos mono">B12</span><span class="id mono">PAN-2190</span><span class="t">Decompose routes/workspaces/merge-ops.ts</span><span class="lane">Lane B · serial</span><span class="badge">held</span><span class="rm">✕</span></div>
+        <div class="sorow"><span class="pos mono">B13</span><span class="id mono">PAN-2189</span><span class="t">Decompose deacon.ts — PRD after B12</span><span class="lane">Lane B · serial</span><span class="badge">held</span><span class="rm">✕</span></div>
+      </div>
+    </div>
+
+    <!-- model-ranked sequence -->
+    <div class="listwrap rel">
+      <span class="marker" style="top:8px;left:2px">2</span>
+      <div class="listhead">
+        <h2>Model ranking</h2>
+        <span class="sub">auto-ranked · picked only when the book is drained and <span class="mono" style="font-size:10.5px">auto_pickup_backlog</span> is on (currently OFF)</span>
+      </div>
+      <div id="ranked">
+        <div class="row rel"><span class="marker" style="top:6px;right:130px">3</span><span class="rank mono">#1</span><span class="id mono">PAN-2567</span><span class="t">Reviewed+green PR never merges under main churn</span><span class="why">merge-loss · recurs weekly</span><button class="promote" onclick="openPop(this,'PAN-2567')">＋ Order book</button></div>
+        <div class="row"><span class="rank mono">#2</span><span class="id mono">PAN-2593</span><span class="t">Server children inherit bare PATH — gates run under Node 18</span><span class="why">gate false-fails</span><button class="promote" onclick="openPop(this,'PAN-2593')">＋ Order book</button></div>
+        <div class="row"><span class="rank mono">#3</span><span class="id mono">PAN-2569</span><span class="t">Planning finalizes but work agent never auto-spawns</span><span class="why">silent pipeline stall</span><button class="promote" onclick="openPop(this,'PAN-2569')">＋ Order book</button></div>
+        <div class="row"><span class="rank mono">#4</span><span class="id mono">PAN-2379</span><span class="t">Verify-gate dependency install warn-only → false failures</span><span class="why">verification trust</span><button class="promote" onclick="openPop(this,'PAN-2379')">＋ Order book</button></div>
+        <div class="row inbook rel"><span class="marker" style="top:6px;right:130px">4</span><span class="rank mono">#5</span><span class="id mono">PAN-2233</span><span class="t">Decompose cloister/merge-agent.ts</span><span class="badge indigo" title="Already in the order book at B11 — the book position wins">in book · B11</span></div>
+        <div class="row"><span class="rank mono">#6</span><span class="id mono">PAN-2259</span><span class="t">Something burns the full 5k/hr GitHub GraphQL quota</span><span class="why">API starvation</span><button class="promote" onclick="openPop(this,'PAN-2259')">＋ Order book</button></div>
+        <div class="row"><span class="rank mono">#7</span><span class="id mono">PAN-2337</span><span class="t">In-place build under live dashboard breaks PTY spawns</span><span class="why">operator footgun</span><button class="promote" onclick="openPop(this,'PAN-2337')">＋ Order book</button></div>
+        <div class="row"><span class="rank mono">#8</span><span class="id mono">PAN-2331</span><span class="t">Codex rate-limit modal stalls autonomous agents</span><span class="why">agent wedge</span><button class="promote" onclick="openPop(this,'PAN-2331')">＋ Order book</button></div>
+      </div>
+      <div class="ellip">… 622 more, model-ranked. Rank explanations come from the sequencer’s rationale column.</div>
+    </div>
+  </div>
+
+  <!-- lane-pick popover -->
+  <div class="pop" id="pop">
+    <div class="pi" onclick="promote('A')">Add to Lane A — parallel<small>safe to overlap with anything in flight</small></div>
+    <div class="pi" onclick="promote('B')">Add to Lane B — strictly serial<small>cloister-adjacent · queues behind B13</small></div>
+  </div>
+
+  <ul class="ann">
+    <li data-n="1"><strong>Pinned band, not interleaved rows.</strong> The order book keeps its own ordering (A13, B11 → B13) inside a visually distinct band — indigo left edge, raised surface — above the ranking. Mixing the two lists would launder operator intent into model output; the band makes “operator-curated” legible as a different kind of ordering, with its own positions instead of ranks.</li>
+    <li data-n="2"><strong>The ranking states its own reach.</strong> Its header says when the model list is actually consulted: only after the book drains, and only if <span class="mono">auto_pickup_backlog</span> is on. The DRAIN badge in the app bar mirrors the book posture so promotion is never mistaken for dispatch — adding to the book releases an item to the gate, the posture decides pickup.</li>
+    <li data-n="3"><strong>Promotion is a hover affordance with a lane decision.</strong> “＋ Order book” asks exactly one question — Lane A or Lane B — because lane choice is the one judgment the operator must make (cloister-adjacent or not). The row then moves into the band; the model ranking below never reorders in response.</li>
+    <li data-n="4"><strong>Book members appearing in the ranking are de-emphasized, not hidden.</strong> PAN-2233 still shows at its model rank (#5) but muted with an “in book · B11” badge — the operator sees the model agreed with them without double-counting the item. Hiding it would make the ranking look wrong; coloring it would double-signal.</li>
+  </ul>
+</div>
+
+<script>
+  document.getElementById('themeToggle').onclick = () => {
+    const r = document.documentElement;
+    r.dataset.theme = r.dataset.theme === 'light' ? 'dark' : 'light';
+  };
+  document.getElementById('annToggle').onclick = (e) => {
+    document.body.classList.toggle('annotate');
+    e.target.classList.toggle('on');
+  };
+
+  let pendingRow = null, pendingId = null;
+  const pop = document.getElementById('pop');
+  function openPop(btn, id) {
+    pendingRow = btn.closest('.row'); pendingId = id;
+    const r = btn.getBoundingClientRect();
+    pop.style.display = 'block';
+    pop.style.left = Math.min(r.left + scrollX, innerWidth - 260) + 'px';
+    pop.style.top = (r.bottom + scrollY + 4) + 'px';
+  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.pop') && !e.target.closest('.promote')) pop.style.display = 'none';
+  });
+  let extraA = 0, extraB = 0;
+  function promote(lane) {
+    pop.style.display = 'none';
+    if (!pendingRow) return;
+    const id = pendingId, title = pendingRow.querySelector('.t').textContent;
+    const pos = lane === 'A' ? 'A' + (14 + extraA++) : 'B' + (14 + extraB++);
+    const el = document.createElement('div');
+    el.className = 'sorow';
+    el.innerHTML = '<span class="pos mono">' + pos + '</span><span class="id mono">' + id + '</span>' +
+      '<span class="t">' + title + '</span><span class="lane">Lane ' + lane + (lane === 'A' ? ' · parallel' : ' · serial') + '</span>' +
+      '<span class="badge">held</span><span class="rm" title="Remove from book">✕</span>';
+    document.getElementById('sorows').appendChild(el);
+    // de-emphasize the ranked row
+    pendingRow.classList.add('inbook');
+    pendingRow.querySelector('.promote').replaceWith(Object.assign(document.createElement('span'), { className: 'badge indigo', textContent: 'in book · ' + pos }));
+    const why = pendingRow.querySelector('.why'); if (why) why.remove();
+    document.querySelector('.bandhead .sub').textContent = 'picked first, in the operator’s order · ' + document.querySelectorAll('#sorows .sorow').length + ' held';
+    pendingRow = null;
+  }
+</script>
+</body>
+</html>
