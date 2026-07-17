@@ -150,6 +150,13 @@ export function resolveBundledServerPath(): string {
     ?? candidates[0].path;
 }
 
+export function resolvePrimaryDashboardIdentity(): { repoRoot: string; mode: 'primary' } {
+  return {
+    repoRoot: resolve(resolveBundledServerPath(), '..', '..', '..'),
+    mode: 'primary',
+  };
+}
+
 function searchedBundlePaths(): string[] {
   return uniqueBundleCandidates().map(candidate => candidate.path);
 }
@@ -179,15 +186,17 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
     PORT: String(config.dashboardApiPort),
     OVERDECK_MODE: 'production',
   };
+  const identity = resolvePrimaryDashboardIdentity();
 
   // PAN-2804: a plain detached spawn stays in the INVOKER's cgroup — a
   // watchdog-spawned dashboard dies when overdeck-supervisor.service restarts,
   // and a conversation/flywheel-spawned one dies with that tmux pane's scope.
   // Run the server in its own transient systemd unit (same isolation the
   // shared tmux server gets, PAN-1798) so its lifecycle belongs to nobody.
-  if (spawnDashboardSystemdUnit(serverPath, fullEnv)) return;
+  if (spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot)) return;
 
   const child = spawn(resolveNode22(), [serverPath], {
+    cwd: identity.repoRoot,
     detached: true,
     stdio: openDashboardLogStdio(),
     env: fullEnv,
@@ -202,7 +211,11 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: BootGateOp
 /** Valid systemd --setenv names; skips exported bash functions etc. */
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
-function spawnDashboardSystemdUnit(serverPath: string, fullEnv: Record<string, string | undefined>): boolean {
+function spawnDashboardSystemdUnit(
+  serverPath: string,
+  fullEnv: Record<string, string | undefined>,
+  repoRoot: string,
+): boolean {
   if (process.platform !== 'linux') return false;
   try {
     mkdirSync(dirname(DASHBOARD_LOG_FILE), { recursive: true });
@@ -219,7 +232,7 @@ function spawnDashboardSystemdUnit(serverPath: string, fullEnv: Record<string, s
         `--property=StandardOutput=append:${DASHBOARD_LOG_FILE}`,
         `--property=StandardError=append:${DASHBOARD_LOG_FILE}`,
         // /api/health identity derives repoRoot from the server's cwd; keep it.
-        `--property=WorkingDirectory=${process.cwd()}`,
+        `--property=WorkingDirectory=${repoRoot}`,
         ...setenvArgs,
         resolveNode22(), serverPath,
       ],
@@ -334,7 +347,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
 
         await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
-          expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+          expectedIdentity: resolvePrimaryDashboardIdentity(),
         }));
         await recordRestartStatus(startedAt, true);
         console.log(chalk.green('✓ Dashboard restarted and healthy'));
@@ -451,7 +464,7 @@ async function runFullRestart(
   spawnDashboardDetached(config, opts.bootGateOptions);
   await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
     timeoutMs: opts.healthTimeoutMs,
-    expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+    expectedIdentity: resolvePrimaryDashboardIdentity(),
   }));
 
   try {

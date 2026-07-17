@@ -655,7 +655,7 @@ program
   .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
   .option('--no-open', 'Do not open the dashboard app/browser after startup')
   .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.')
-  .action(async (options) => { if ((await import('./commands/restart.js')).refuseNonPrimaryDashboardCwd(process.cwd(), 'start')) return;
+  .action(async (options) => { const restartModule = await import('./commands/restart.js'); if (restartModule.refuseNonPrimaryDashboardCwd(process.cwd(), 'start')) return;
     const noResume = isNoResumeCliOptionEnabled(options);
     const bootGates = resolveBootGates(options);
     const { spawn, execSync, exec } = await import('child_process');
@@ -1010,7 +1010,7 @@ program
       // Run in background
       const { openDashboardLogStdio } = await import('../lib/platform-lifecycle.js');
       const child = spawn(node22, [bundledServer], {
-            detached: true,
+            detached: true, cwd: restartModule.resolvePrimaryDashboardIdentity().repoRoot,
             stdio: openDashboardLogStdio(),
             env: {
               ...dashboardBootEnv,
@@ -1050,7 +1050,7 @@ program
           traefikDomain,
           dashboardPort,
           dashboardApiPort,
-          expectedIdentity: { repoRoot: process.cwd(), mode: 'primary' },
+          expectedIdentity: restartModule.resolvePrimaryDashboardIdentity(),
         });
         readyUrl = resolved.readyUrl;
         apiUrl = resolved.apiUrl;
@@ -1081,7 +1081,7 @@ program
     } else {
       // Run in foreground
       const child = spawn(node22, [bundledServer], {
-            stdio: 'inherit',
+            stdio: 'inherit', cwd: restartModule.resolvePrimaryDashboardIdentity().repoRoot,
             env: {
               ...dashboardBootEnv,
               ...dashboardOriginEnv,
@@ -1105,7 +1105,7 @@ program
           traefikEnabled,
           traefikDomain,
           dashboardPort,
-          dashboardApiPort,
+          dashboardApiPort, expectedIdentity: restartModule.resolvePrimaryDashboardIdentity(),
         });
         readyUrl = resolved.readyUrl;
         apiUrl = resolved.apiUrl;

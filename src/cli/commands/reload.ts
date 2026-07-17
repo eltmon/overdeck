@@ -11,6 +11,7 @@ import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js'
 import {
   refuseNonPrimaryDashboardCwd,
   resolveBundledServerPath,
+  resolvePrimaryDashboardIdentity,
   spawnDashboardDetached,
 } from './restart.js';
 
@@ -289,7 +290,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
       healthTimeoutMs,
-      expectedIdentity: { repoRoot, mode: 'primary' },
+      expectedIdentity: resolvePrimaryDashboardIdentity(),
     }));
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));
