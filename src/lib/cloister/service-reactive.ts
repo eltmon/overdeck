@@ -7,6 +7,11 @@ import type { Role } from '../agents.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { sessionExists, killSession } from '../tmux.js';
+import {
+  decideAutonomousPlanDispatch,
+  gatherAutonomousPlanDispatchInput,
+} from './autonomous-plan-dispatch.js';
+import { recordDeadEndNeedsYou } from './dead-end-trip.js';
 import { isIssueClosed } from './issue-closed.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 
@@ -302,6 +307,32 @@ async function resolveWorkspaceForIssue(issueId: string): Promise<string | null>
     }
 
     const { spawnRun } = await import('../agents.js');
+    if (role === 'plan') {
+      const decision = decideAutonomousPlanDispatch(
+        await gatherAutonomousPlanDispatchInput(normalizedIssueId),
+      );
+      if (!decision.allow) {
+        const message = `${normalizedIssueId}: ${decision.reason}`;
+        console.log(`[cloister] ${message}`);
+        emitActivityEntrySync({ source: 'cloister', level: 'warn', message, issueId: normalizedIssueId });
+        await recordDeadEndNeedsYou(
+          normalizedIssueId,
+          'autonomous-plan-dispatch',
+          newState,
+          message,
+        );
+        return;
+      }
+      const run = await spawnRun(normalizedIssueId, 'plan', {
+        prompt: buildReactiveRolePrompt(normalizedIssueId, newState, 'plan'),
+        model: decision.model,
+      });
+      const message = `${normalizedIssueId}: ${role} role started from lifecycle state '${newState}' as ${run.id}`;
+      console.log(`[cloister] ${message}`);
+      emitActivityEntrySync({ source: 'cloister', level: 'info', message, issueId: normalizedIssueId });
+      return;
+    }
+
     const run = await spawnRun(normalizedIssueId, role, {
       prompt: buildReactiveRolePrompt(normalizedIssueId, newState, role),
     });

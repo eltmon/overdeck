@@ -131,6 +131,12 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 
 Cloister owns the singleton gate. Only one Flywheel run may be active for a Overdeck home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
 
+### Autonomous planning permission and staffing
+
+The reactive lifecycle scheduler treats permission and staffing as separate operator controls. With `flywheel.auto_pickup_backlog` off, an issue in stale `in_planning` state receives no autonomous planning spawn unless it has the case-insensitive `released` label; enabling auto-pickup grants that permission. Parked, vetoed, and objection labels still block dispatch, and unavailable tracker labels fail closed. A refusal emits a warning and a durable needs-you trip instead of silently starting work.
+
+After permission passes, the scheduler reuses a model recorded on the current or legacy planning agent, then tries the optional scalar `roles.plan.autonomousModel`. If neither resolves, it records a needs-you refusal; it never falls through to the ordinary `roles.plan.model`. The operator can authorize autonomous planning by fixing the labels or pickup posture and configure its staffing with `roles.plan.autonomousModel`, or bypass this autonomous path deliberately with `pan plan`.
+
 For local stack startup, Deacon/Cloister should be running before starting or resuming the Flywheel; see [`OVERDECK_DEV_SOP.md`](./OVERDECK_DEV_SOP.md#deacon-and-flywheel-startup-order).
 
 Run artifacts live under the Flywheel home:

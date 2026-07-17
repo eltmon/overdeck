@@ -40,6 +40,8 @@ These are the live, agent-spawning calls that drive plan/work/review/test/ship/f
 
 **Notes on pipeline costs:** Pipeline agents run inside Claude Code / Pi / Codex harnesses. Their spend is captured by the per-harness cost parsers (`src/lib/cost-parsers/*`) and recorded with the model id as the source, not a `background:` tag.
 
+Operator-initiated planning through `pan plan`, dashboard planning, or `pan start` auto-planning uses the ordinary `roles.plan.model` resolution above. A fresh autonomous planning dispatch from the reactive lifecycle scheduler uses a separate, fail-closed chain: the model recorded on the current plan agent, then the legacy planning agent, then the optional scalar `roles.plan.autonomousModel`. If none resolves, the scheduler refuses the spawn and records a needs-you trip; it never falls through to `roles.plan.model` or its `workhorse:expensive` default.
+
 ---
 
 ## B. Background / silent AI calls
