@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:17:32.599Z",
+  "updated": "2026-07-17T12:18:08.737Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -72,5 +72,18 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "gpt-5.6-sol",
+  "tasks": {
+    "sequence": 1,
+    "claims": {},
+    "statusReasons": {
+      "codex-mode-enum": {
+        "reason": "Cancelled after current Codex 0.144.4 investigation: native per-command execpolicy rules make a new workspace-net permission mode unnecessary.",
+        "updatedAt": "2026-07-17T12:18:08.736Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "codex-mode-enum": "cancelled"
+  }
 }
