@@ -275,6 +275,7 @@ export function IssueTreeLane({
         selectedSessionId={selectedSessionId}
         onSelectSession={onSelectSession}
         onOpenVerification={onOpenVerification}
+        onExpandSpine={onToggleSpine}
       />
     </aside>
   )
