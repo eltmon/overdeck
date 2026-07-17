@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T16:01:39.617Z",
+  "updated": "2026-07-17T16:02:00.079Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "pending",
@@ -94,8 +94,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "wire-reactive-gate": {
+        "writerId": "agent-pan-2445",
+        "agentId": "agent-pan-2445",
+        "pid": 2384473,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T16:02:00.079Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2445",
@@ -141,6 +149,7 @@
     "config-autonomous-model": "completed",
     "config-autonomous-model.config-autonomous-model.ac1": "completed",
     "config-autonomous-model.config-autonomous-model.ac2": "completed",
-    "config-autonomous-model.config-autonomous-model.ac3": "completed"
+    "config-autonomous-model.config-autonomous-model.ac3": "completed",
+    "wire-reactive-gate": "running"
   }
 }
