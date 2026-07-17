@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T14:19:12.802Z",
+  "updated": "2026-07-17T14:28:36.176Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "pending",
@@ -64,16 +64,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "dissolve-conversation-tab": {
-        "writerId": "agent-pan-2842",
-        "agentId": "agent-pan-2842",
-        "pid": 153993,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T14:19:12.801Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2842",
@@ -85,6 +77,16 @@
         "outcome": "completed",
         "reason": "Lifted the Detail Tabs into the full-width cockpit band, preserved all tab labels and badges, added active pill styling, and verified one-row horizontal overflow in an isolated browser plus 11 focused tests.",
         "releasedAt": "2026-07-17T14:18:48.241Z"
+      },
+      {
+        "writerId": "agent-pan-2842",
+        "agentId": "agent-pan-2842",
+        "pid": 153993,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T14:19:12.801Z",
+        "itemId": "dissolve-conversation-tab",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T14:28:36.176Z"
       }
     ],
     "statusReasons": {
@@ -100,6 +102,10 @@
     "lift-tab-band.lift-tab-band.ac2": "completed",
     "lift-tab-band.lift-tab-band.ac3": "completed",
     "lift-tab-band.lift-tab-band.ac4": "completed",
-    "dissolve-conversation-tab": "running"
+    "dissolve-conversation-tab": "completed",
+    "dissolve-conversation-tab.dissolve-conversation-tab.ac1": "completed",
+    "dissolve-conversation-tab.dissolve-conversation-tab.ac2": "completed",
+    "dissolve-conversation-tab.dissolve-conversation-tab.ac3": "completed",
+    "dissolve-conversation-tab.dissolve-conversation-tab.ac4": "completed"
   }
 }
