@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T01:22:20.710Z",
+  "updated": "2026-07-17T01:22:29.078Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
@@ -222,5 +222,38 @@
     "docs-identity-refusal.docs-identity-refusal.ac1": "completed",
     "docs-identity-refusal.docs-identity-refusal.ac2": "completed",
     "docs-identity-refusal.docs-identity-refusal.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/reload.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/lib/platform-lifecycle.test.ts"
+    ],
+    "declaredScope": [
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+      "src/cli/commands/reload.ts",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/identity.ts",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "sync-sources/skills/pan-up/SKILL.md",
+      "tests/unit/dashboard/identity.test.ts",
+      "tests/unit/lib/platform-lifecycle.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/cli/commands/__tests__/dashboard-cwd-guard.test.ts",
+      "src/cli/commands/__tests__/reload.test.ts",
+      "src/cli/commands/reload.ts",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/dashboard/server/identity.ts",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "sync-sources/skills/pan-up/SKILL.md",
+      "tests/unit/dashboard/identity.test.ts"
+    ],
+    "recordedAt": "2026-07-17T01:22:29.077Z"
   }
 }
