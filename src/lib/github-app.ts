@@ -17,6 +17,7 @@ import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
+import { withConcurrencyLimitPromise } from './concurrency.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -89,6 +90,10 @@ export interface GitHubIssueState {
 export interface GitHubOpenIssueLabels {
   number: number;
   labels: string[];
+}
+
+export interface GitHubIssueLabels extends GitHubOpenIssueLabels {
+  state: 'open' | 'closed';
 }
 
 export type GitHubCiCheckRunsVerdict = 'green' | 'pending' | 'red';
@@ -616,6 +621,35 @@ export async function listOpenIssuesWithLabelsPromise(
         .map((label) => typeof label === 'string' ? label : label.name)
         .filter((name): name is string => typeof name === 'string' && name.length > 0),
     }));
+}
+
+export async function listIssuesWithAnyLabelPromise(
+  owner: string,
+  repo: string,
+  labels: readonly string[],
+): Promise<GitHubIssueLabels[]> {
+  const byNumber = new Map<number, GitHubIssueLabels>();
+  const issueGroups = await withConcurrencyLimitPromise(labels.map((label) => async () =>
+    githubApiAllPages<{
+      number: number;
+      state: 'open' | 'closed';
+      pull_request?: unknown;
+      labels?: Array<string | { name?: string | null }>;
+    }>(`/repos/${owner}/${repo}/issues?state=all&labels=${encodeURIComponent(label)}`)
+  ), 3);
+  for (const issues of issueGroups) {
+    for (const issue of issues) {
+      if (issue.pull_request != null) continue;
+      byNumber.set(issue.number, {
+        number: issue.number,
+        state: issue.state,
+        labels: (issue.labels ?? [])
+          .map((value) => typeof value === 'string' ? value : value.name)
+          .filter((name): name is string => typeof name === 'string' && name.length > 0),
+      });
+    }
+  }
+  return [...byNumber.values()];
 }
 
 async function mergePullRequestWithAppPromise(

@@ -289,6 +289,14 @@ the bridge listens on `${OVERDECK_HOME}/sockets/agent-<id>.sock`, and
 config is actually wired; supervisor-only sessions must not receive this Enter
 keystroke.
 
+## Pipeline membership — the canonical resolver
+
+Pipeline membership is the durable exception queue defined in
+[`docs/PIPELINE-MEMBERSHIP.md`](docs/PIPELINE-MEMBERSHIP.md). Every surface must
+delegate to `resolvePipelineMembership()` in `src/lib/pipeline-membership.ts` or
+its API/DTO projection; no surface may independently derive membership from
+tracker state, workspaces, agents, tmux, or review-status rows.
+
 ## Decisions — the canonical operator-decision surface
 
 Everything that shows the operator a pending decision reads
