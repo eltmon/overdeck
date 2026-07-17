@@ -10,8 +10,47 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
+      "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
+      "src/dashboard/frontend/src/pages/HomePage.test.tsx",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "src/lib/pipeline-membership.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+      "tests/unit/lib/pipeline-membership-audit.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
+      "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
+      "src/dashboard/frontend/src/pages/HomePage.test.tsx",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "src/lib/pipeline-membership.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+      "tests/unit/lib/pipeline-membership-audit.test.ts"
+    ],
+    "recordedAt": "2026-07-17T11:06:22.432Z"
+  },
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T11:06:22.434Z",
+  "updated": "2026-07-17T11:06:25.323Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -20,7 +59,48 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T10:29:59.620Z"
+    "updatedAt": "2026-07-17T11:06:25.226Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2827",
+    "reviewRequestedAt": "2026-07-17T11:06:25.165Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/PIPELINE-MEMBERSHIP.md",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+        "src/dashboard/frontend/src/components/Sidebar.tsx",
+        "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
+        "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
+        "src/dashboard/frontend/src/pages/HomePage.test.tsx",
+        "src/dashboard/frontend/src/pages/HomePage.tsx",
+        "src/dashboard/server/services/resource-discovery.ts",
+        "src/lib/pipeline-membership.ts",
+        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+        "tests/unit/lib/pipeline-membership-audit.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/PIPELINE-MEMBERSHIP.md",
+        "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+        "src/dashboard/frontend/src/components/Sidebar.tsx",
+        "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
+        "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
+        "src/dashboard/frontend/src/pages/HomePage.test.tsx",
+        "src/dashboard/frontend/src/pages/HomePage.tsx",
+        "src/dashboard/server/services/resource-discovery.ts",
+        "src/lib/pipeline-membership.ts",
+        "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+        "tests/unit/lib/pipeline-membership-audit.test.ts"
+      ],
+      "recordedAt": "2026-07-17T11:06:22.432Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -32,6 +112,14 @@
             "cacheRead": 4984144,
             "cacheWrite": 190140
           }
+        },
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 1095399,
+            "output": 70755,
+            "cacheRead": 26445824,
+            "cacheWrite": 0
+          }
         }
       },
       "totals": {
@@ -40,14 +128,22 @@
           "output": 53467,
           "cacheRead": 4984144,
           "cacheWrite": 190140
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1095399,
+          "output": 70755,
+          "cacheRead": 26445824,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.03687,
-        "pricingAsOf": "2026-07-17T10:29:59.636Z"
+        "usd": 30.859427,
+        "pricingAsOf": "2026-07-17T11:06:25.297Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2827"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -179,44 +275,5 @@
     "docs-display-toggle": "completed",
     "docs-display-toggle.docs-display-toggle.ac1": "completed",
     "docs-display-toggle.docs-display-toggle.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/frontend/src/components/Sidebar.tsx",
-      "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
-      "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
-      "src/dashboard/frontend/src/pages/HomePage.test.tsx",
-      "src/dashboard/frontend/src/pages/HomePage.tsx",
-      "src/dashboard/server/services/resource-discovery.ts",
-      "src/lib/pipeline-membership.ts",
-      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
-      "tests/unit/lib/pipeline-membership-audit.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/dashboard/frontend/src/components/CommandDeck/CommandDeck.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/IssuesPaneFilterRow.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/frontend/src/components/Sidebar.tsx",
-      "src/dashboard/frontend/src/hooks/__tests__/usePlannedBacklogVisibility.test.ts",
-      "src/dashboard/frontend/src/hooks/usePlannedBacklogVisibility.ts",
-      "src/dashboard/frontend/src/pages/HomePage.test.tsx",
-      "src/dashboard/frontend/src/pages/HomePage.tsx",
-      "src/dashboard/server/services/resource-discovery.ts",
-      "src/lib/pipeline-membership.ts",
-      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
-      "tests/unit/lib/pipeline-membership-audit.test.ts"
-    ],
-    "recordedAt": "2026-07-17T11:06:22.432Z"
   }
 }
