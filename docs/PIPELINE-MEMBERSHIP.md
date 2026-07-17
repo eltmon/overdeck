@@ -27,6 +27,12 @@ Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness anno
 | `planned_backlog` | An open issue has an unmerged convention branch or durable vBRIEF but no open PR. |
 | `clean_terminal` | The issue is closed with no open PR, or it is open but has never started and has no durable plan. It is outside the pipeline. |
 
+### Display filtering (PAN-2822)
+
+The dashboard Issues pane has a display-only toggle for rows whose `planned_backlog` membership comes from the L6 durable-spec lens. The preference is visible by default and persists under the localStorage key `overdeck.ui.showPlannedBacklog`; disabling it hides only rows with the derived `specOnlyPlanned` DTO field set to `true`. Rows classified through the unmerged-branch or ready-label reasons remain visible.
+
+The toggle does not change `resolvePipelineMembership()` or any membership or resource API response. The server derives `specOnlyPlanned` from `PLANNED_BACKLOG_SPEC_ONLY_REASON`, and list surfaces apply the preference after receiving the unchanged resource data.
+
 `labelDrift` is `stale_present` when a phase label survives a terminal/closed lifecycle and `stale_absent` when an open PR has no phase label. It is `null` when the label agrees or no drift rule applies.
 
 ## Read doors
