@@ -187,6 +187,13 @@ function renderFeature(ui: ReactElement) {
   );
 }
 
+function openFeatureContextMenu() {
+  const featureRow = screen.getByText('Test Feature').closest('button');
+  expect(featureRow).not.toBeNull();
+  fireEvent.contextMenu(featureRow!);
+  return screen.getByRole('menu');
+}
+
 function stubWorkspace(workspace: Record<string, unknown>) {
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url === '/api/workspaces/PAN-821') {
@@ -361,6 +368,82 @@ describe('FeatureItem', () => {
     expect(screen.getAllByText('PAN-821')[0]).toBeInTheDocument();
     expect(screen.queryByTestId('chevron-right')).not.toBeInTheDocument();
     expect(screen.queryByTestId('chevron-down')).not.toBeInTheDocument();
+  });
+
+  it('renders the grouped issue menu and routes the single Wipe action through typed confirmation', async () => {
+    const onDeepWipe = vi.fn();
+    const windowConfirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature()}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onDeepWipe={onDeepWipe}
+      />,
+    );
+
+    const menu = openFeatureContextMenu();
+    expect(screen.getByText('Issue actions')).toBeInTheDocument();
+    expect(screen.getByText('Queued for plan')).toBeInTheDocument();
+    expect(screen.getByText('For this phase')).toBeInTheDocument();
+    for (const section of ['Planning', 'Work', 'Review & Test', 'Agent', 'Workspace', 'Artifacts', 'Navigation']) {
+      expect(within(menu).getByText(section)).toBeInTheDocument();
+    }
+
+    const danger = screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ });
+    expect(danger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('issue-action-wipe')).not.toBeInTheDocument();
+
+    fireEvent.click(danger);
+    expect(danger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByRole('menuitem', { name: 'Wipe' })).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Wipe' }));
+    expect(await screen.findByRole('alertdialog')).toBeInTheDocument();
+    expect(screen.getByLabelText('Confirmation text')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Wipe' })).toBeDisabled();
+    expect(windowConfirm).not.toHaveBeenCalled();
+    expect(onDeepWipe).not.toHaveBeenCalled();
+  });
+
+  it('renders session utilities under This session with their existing conditions', () => {
+    const onOpenStateDir = vi.fn();
+    const onViewJsonl = vi.fn();
+    const view = renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession({ hasJsonl: true })] })}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+      />,
+    );
+
+    openFeatureContextMenu();
+    expect(screen.getByText('This session')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open State Dir' }));
+    expect(onOpenStateDir).toHaveBeenCalledWith('agent-pan-821');
+
+    openFeatureContextMenu();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'View JSONL' }));
+    expect(onViewJsonl).toHaveBeenCalledWith('agent-pan-821');
+
+    view.unmount();
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ sessions: [makeSession({ hasJsonl: false })] })}
+        title="Test Feature"
+        isSelected={false}
+        onSelect={() => {}}
+        onOpenStateDir={onOpenStateDir}
+        onViewJsonl={onViewJsonl}
+      />,
+    );
+    openFeatureContextMenu();
+    expect(screen.getByRole('menuitem', { name: 'Open State Dir' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'View JSONL' })).not.toBeInTheDocument();
   });
 
   it('renders a muted untitled placeholder when title is empty', () => {

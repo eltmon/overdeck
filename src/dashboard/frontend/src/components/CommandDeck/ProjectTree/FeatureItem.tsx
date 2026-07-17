@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveFlash } from '../../../lib/useLiveFlash';
 import {
   Loader2, AlertTriangle, CheckCircle2, Circle, Eye, Layers, GitMerge,
-  ChevronRight, ChevronDown, FolderOpen, FileText, Trash2, GitBranch,
+  ChevronRight, ChevronDown, FolderOpen, FileText, GitBranch,
   BookText, Bug, Container, Radio, Workflow, MessageSquare,
 } from 'lucide-react';
 import type { SessionNode as SessionNodeType } from '@overdeck/contracts';
@@ -13,16 +13,13 @@ import { getUatStackSummary } from '../UatStackStatus';
 import { UatStackTreeGroup } from './UatStackTreeGroup';
 import { useWorkspaceQuery } from '../ZoneCOverviewTabs/queries';
 import { createUatActionHandler } from './uat-action-handlers';
+import { ContextMenuRoot, ContextMenuTrigger } from '../../shared/ContextMenu';
 import {
-  ContextMenuRoot,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuDestructiveItem,
-  ContextMenuSeparator,
-  ContextMenuLabel,
-} from '../../shared/ContextMenu';
-import { IssueActionDialogHost, useIssueActions, type IssueActionView } from '../../IssueActionMenu';
+  GroupedIssueActionMenu,
+  IssueActionDialogHost,
+  useIssueActions,
+  type IssueActionSessionExtra,
+} from '../../IssueActionMenu';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { MergeButton } from '../../MergeButton';
@@ -653,32 +650,10 @@ interface FeatureContextMenuProps {
   hasJsonl: boolean;
   onOpenStateDir?: (sessionId: string) => void;
   onViewJsonl?: (sessionId: string) => void;
-  onDeepWipe?: (issueId: string) => void;
   onStopSession?: (sessionId: string) => void;
   onResumeSession?: (sessionId: string) => void;
   onRestartSession?: (sessionId: string, issueId: string, sessionType?: string, role?: string, model?: string, harness?: Harness) => void;
   onOpenPlanDialog?: (issueId: string) => void;
-}
-
-function FeatureIssueActionItems({ views }: { views: IssueActionView[] }) {
-  return (
-    <>
-      {views.map((view) => {
-        const label = view.isPending ? `${view.action.label}…` : view.action.label;
-        const disabled = !view.enabled || view.isPending;
-        const props = {
-          key: view.action.key,
-          disabled,
-          onSelect: () => view.invoke(),
-        };
-
-        if (view.action.kind === 'destructive' || view.action.group === 'danger') {
-          return <ContextMenuDestructiveItem {...props}>{label}</ContextMenuDestructiveItem>;
-        }
-        return <ContextMenuItem {...props}>{label}</ContextMenuItem>;
-      })}
-    </>
-  );
 }
 
 function FeatureContextMenu({
@@ -687,55 +662,31 @@ function FeatureContextMenu({
   hasJsonl,
   onOpenStateDir,
   onViewJsonl,
-  onDeepWipe,
 }: FeatureContextMenuProps) {
   const issueActions = useIssueActions(feature.issueId);
-  const issueActionViews = useMemo(
-    () => [...issueActions.primary, ...issueActions.secondary, ...issueActions.overflow],
-    [issueActions.primary, issueActions.secondary, issueActions.overflow],
-  );
+  const sessionExtras: IssueActionSessionExtra[] = [];
 
-  const handleDeepWipe = useCallback(() => {
-    if (!onDeepWipe) return;
-    const confirmed = window.confirm(
-      `Deep wipe will destroy all data for ${feature.issueId} including workspace, state, and git branches. This cannot be undone.\n\nAre you absolutely sure?`,
-    );
-    if (confirmed) {
-      onDeepWipe(feature.issueId);
-    }
-  }, [feature.issueId, onDeepWipe]);
+  if (workSessionId && onOpenStateDir) {
+    sessionExtras.push({
+      key: 'open-state-dir',
+      label: 'Open State Dir',
+      icon: <FolderOpen size={12} />,
+      onSelect: () => onOpenStateDir(workSessionId),
+    });
+  }
 
-  const hasUtilityActions = (workSessionId && (onOpenStateDir || (hasJsonl && onViewJsonl))) || onDeepWipe;
+  if (hasJsonl && workSessionId && onViewJsonl) {
+    sessionExtras.push({
+      key: 'view-jsonl',
+      label: 'View JSONL',
+      icon: <FileText size={12} />,
+      onSelect: () => onViewJsonl(workSessionId),
+    });
+  }
 
   return (
     <>
-      <ContextMenuContent>
-        <ContextMenuLabel>Issue actions</ContextMenuLabel>
-        <FeatureIssueActionItems views={issueActionViews} />
-
-        {hasUtilityActions ? <ContextMenuSeparator /> : null}
-
-        {workSessionId && onOpenStateDir && (
-          <ContextMenuItem onSelect={() => onOpenStateDir(workSessionId)}>
-            <FolderOpen size={12} className="mr-2" />
-            Open State Dir
-          </ContextMenuItem>
-        )}
-
-        {hasJsonl && workSessionId && onViewJsonl && (
-          <ContextMenuItem onSelect={() => onViewJsonl(workSessionId)}>
-            <FileText size={12} className="mr-2" />
-            View JSONL
-          </ContextMenuItem>
-        )}
-
-        {onDeepWipe && (
-          <ContextMenuDestructiveItem onSelect={handleDeepWipe}>
-            <Trash2 size={12} className="mr-2" />
-            Deep Wipe
-          </ContextMenuDestructiveItem>
-        )}
-      </ContextMenuContent>
+      <GroupedIssueActionMenu actions={issueActions} sessionExtras={sessionExtras} />
       <IssueActionDialogHost issueId={feature.issueId} actions={issueActions} />
     </>
   );
@@ -1339,7 +1290,6 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
       hasJsonl={hasJsonl}
       onOpenStateDir={onOpenStateDir}
       onViewJsonl={onViewJsonl}
-      onDeepWipe={onDeepWipe}
       onStopSession={onStopSession}
       onResumeSession={onResumeSession}
       onRestartSession={onRestartSession}
