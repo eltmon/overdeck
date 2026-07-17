@@ -18,7 +18,7 @@ const REPO_ROOT = path.resolve(__dirname, '../../../..');
  * docs/design/mockups/three-issue-views-naming.html — every section the three
  * issue views render today, read straight from that mockup's "Complete
  * component inventory" refreshed after the Tasks migration and PAN-2696
- * (Console 17 + Cockpit 21 + Rail 14).
+ * (Console 17 + Cockpit 21 + Rail 15).
  *
  * These names are hardcoded INDEPENDENTLY of inventory.ts on purpose: the whole
  * point of the gate is that removing a manifest entry — silently dropping a
@@ -73,6 +73,7 @@ const EXPECTED_COCKPIT_SECTIONS = [
 const EXPECTED_RAIL_SECTIONS = [
   'Filter bar',
   'Feature (issue) row',
+  'FeatureContextMenu (issue-row right-click)',
   'Badges',
   'MergeButton',
   'Pipeline pips',
@@ -105,12 +106,12 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     ).toEqual([]);
   });
 
-  it('matches the current independent per-view counts: Console 17, Cockpit 21, Rail 14', () => {
+  it('matches the current independent per-view counts: Console 17, Cockpit 21, Rail 15', () => {
     const byView = (view: string) => ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === view).length;
     expect(byView('console')).toBe(17);
     expect(byView('cockpit')).toBe(21);
-    expect(byView('rail')).toBe(14);
-    expect(ISSUE_VIEW_INVENTORY.length).toBe(52);
+    expect(byView('rail')).toBe(15);
+    expect(ISSUE_VIEW_INVENTORY.length).toBe(53);
   });
 
   it('has no duplicate section names within a density', () => {

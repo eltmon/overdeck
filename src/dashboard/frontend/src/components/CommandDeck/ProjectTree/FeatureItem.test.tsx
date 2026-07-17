@@ -384,6 +384,7 @@ describe('FeatureItem', () => {
     );
 
     const menu = openFeatureContextMenu();
+    expect(menu).toHaveAttribute('data-section', 'FeatureContextMenu (issue-row right-click)');
     expect(screen.getByText('Issue actions')).toBeInTheDocument();
     expect(screen.getByText('Queued for plan')).toBeInTheDocument();
     expect(screen.getByText('For this phase')).toBeInTheDocument();

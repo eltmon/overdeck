@@ -25,6 +25,7 @@ export type GroupedIssueActionMenuProps = {
   actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
   sessionExtras?: IssueActionSessionExtra[];
   defaultExplain?: boolean;
+  'data-section'?: string;
 };
 
 function phaseLabel(phase: PipelinePhase) {
@@ -108,6 +109,7 @@ export function GroupedIssueActionMenu({
   actions,
   sessionExtras = [],
   defaultExplain = false,
+  'data-section': dataSection,
 }: GroupedIssueActionMenuProps) {
   const [dangerOpen, setDangerOpen] = useState(false);
   const [explain, setExplain] = useState(() => {
@@ -127,7 +129,7 @@ export function GroupedIssueActionMenu({
   };
 
   return (
-    <ContextMenuContent className="w-[320px] font-sans">
+    <ContextMenuContent className="w-[320px] font-sans" data-section={dataSection}>
       <ContextMenuLabel>
         <span className="flex items-center gap-2">
           <span>Issue actions</span>

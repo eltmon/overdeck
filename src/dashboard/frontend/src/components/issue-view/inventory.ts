@@ -57,6 +57,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
 
   { section: 'Filter bar', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
   { section: 'Feature (issue) row', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  { section: 'FeatureContextMenu (issue-row right-click)', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
   { section: 'Badges', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
   { section: 'MergeButton', view: 'rail', home: 'src/dashboard/frontend/src/components/MergeButton.tsx' },
   { section: 'Pipeline pips', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },

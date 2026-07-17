@@ -686,7 +686,7 @@ function FeatureContextMenu({
 
   return (
     <>
-      <GroupedIssueActionMenu actions={issueActions} sessionExtras={sessionExtras} />
+      <GroupedIssueActionMenu actions={issueActions} sessionExtras={sessionExtras} data-section="FeatureContextMenu (issue-row right-click)" />
       <IssueActionDialogHost issueId={feature.issueId} actions={issueActions} />
     </>
   );
