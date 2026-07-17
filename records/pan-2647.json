@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T01:32:17.161Z",
+  "updated": "2026-07-17T01:32:43.807Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "collector-darwin": {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2180364,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:32:43.806Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -151,6 +159,7 @@
     "collector-linux.collector-linux.ac2": "completed",
     "collector-linux.collector-linux.ac3": "completed",
     "collector-linux.collector-linux.ac4": "completed",
-    "collector-linux.collector-linux.ac5": "completed"
+    "collector-linux.collector-linux.ac5": "completed",
+    "collector-darwin": "running"
   }
 }
