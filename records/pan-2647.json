@@ -150,7 +150,7 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T08:29:24.611Z",
+  "updated": "2026-07-17T08:30:17.427Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -160,9 +160,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T08:29:24.581Z",
+    "updatedAt": "2026-07-17T08:30:17.387Z",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2823"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
+    "reviewRequestedAt": "2026-07-17T08:30:16.993Z"
   },
   "closeOut": {
     "usage": {
@@ -185,9 +186,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 27688976,
-            "output": 1425386,
-            "cacheRead": 255118848,
+            "input": 27696551,
+            "output": 1427888,
+            "cacheRead": 255898112,
             "cacheWrite": 0
           }
         }
@@ -206,15 +207,15 @@
           "cacheWrite": 238802
         },
         "openai/gpt-5.6-sol": {
-          "input": 27688976,
-          "output": 1425386,
-          "cacheRead": 255118848,
+          "input": 27696551,
+          "output": 1427888,
+          "cacheRead": 255898112,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 314.893434,
-        "pricingAsOf": "2026-07-17T08:29:24.600Z"
+        "usd": 315.396001,
+        "pricingAsOf": "2026-07-17T08:30:17.391Z"
       }
     },
     "merges": [
