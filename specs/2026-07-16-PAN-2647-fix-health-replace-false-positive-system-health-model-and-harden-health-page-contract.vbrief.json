@@ -4,17 +4,17 @@
     "created": "2026-07-16T20:43:04Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2647: fix(health): replace false-positive system health model and harden Health page contract",
-    "updated": "2026-07-16T20:48:43.086Z"
+    "updated": "2026-07-17T00:26:34.971Z"
   },
   "plan": {
     "id": "pan-2647",
     "title": "fix(health): replace false-positive system health model and harden Health page contract",
-    "status": "proposed",
+    "status": "approved",
     "uid": "1541cd11-79b2-4392-a24e-99307dcfada8",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-16T20:43:04Z",
-    "updated": "2026-07-16T20:48:43.086Z",
+    "updated": "2026-07-17T00:26:34.971Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2647",
@@ -1519,5 +1519,5 @@
       "canonicalFilename": "2026-07-16-PAN-2647-fix-health-replace-false-positive-system-health-model-and-harden-health-page-contract.vbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
