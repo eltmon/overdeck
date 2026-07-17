@@ -54,15 +54,7 @@
       "timestamp": "2026-07-17T09:41:37.594Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T09:41:37Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2647\n\nResources now reads one atomic health assessment, but still allows stale compatibility evidence to produce an open spawn gate.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2647 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/deploy.ts",
@@ -203,22 +195,22 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T09:49:16.906Z",
+  "updated": "2026-07-17T09:49:18.898Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T09:49:16.871Z",
+    "updatedAt": "2026-07-17T09:49:18.735Z",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
     "lastVerifiedCommit": "da442fa034d4933b9c707d1c79fa9f9814ad1f5d",
     "reviewRequestedAt": "2026-07-17T09:49:16.378Z",
-    "reviewSpawnedAt": "2026-07-17T09:33:56.807Z"
+    "reviewSpawnedAt": "2026-07-17T09:49:18.734Z"
   },
   "closeOut": {
     "usage": {
@@ -278,7 +270,7 @@
       },
       "costAtCloseOut": {
         "usd": 392.576869,
-        "pricingAsOf": "2026-07-17T09:49:16.874Z"
+        "pricingAsOf": "2026-07-17T09:49:18.804Z"
       }
     },
     "merges": [
