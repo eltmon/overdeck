@@ -4,17 +4,17 @@
     "created": "2026-07-16T04:11:41Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1966: Single authoritative pipeline-membership resolver — one function for \"what's in the pipeline\" (collapse the 5 divergent views)",
-    "updated": "2026-07-17T01:28:27.712Z"
+    "updated": "2026-07-17T01:28:29.866Z"
   },
   "plan": {
     "id": "pan-1966",
     "title": "Single authoritative pipeline-membership resolver — one function for \"what's in the pipeline\" (collapse the 5 divergent views)",
-    "status": "approved",
+    "status": "running",
     "uid": "6e96d8c4-8387-4a5b-be24-033484527a17",
     "author": "agent:claude-fable-5",
-    "sequence": 7,
+    "sequence": 8,
     "created": "2026-07-16T04:11:41Z",
-    "updated": "2026-07-17T01:28:27.712Z",
+    "updated": "2026-07-17T01:28:29.866Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1966",
