@@ -1,3 +1,9 @@
+/**
+ * Runtime infrastructure for the canonical overdeck.db cache.
+ * Schema top-ups tolerate idempotency errors, log unexpected failures without
+ * blocking boot, and getOverdeckDatabaseSync follows them with a report-only
+ * schema audit that warns about drift without mutating the database.
+ */
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { readFile } from 'node:fs/promises';
