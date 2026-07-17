@@ -36,7 +36,9 @@ const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer))
 );
 
+const DEFAULT_STATE_GIT_TIMEOUT_MS = 30_000;
 const DEFAULT_STATE_PUSH_TIMEOUT_MS = 30_000;
+const DEFAULT_STATE_FLUSH_TIMEOUT_MS = 60_000;
 
 function parsePositiveInteger(value: string | undefined, fallback: number): number {
   if (!value) return fallback;
@@ -102,7 +104,8 @@ export interface FlushResult {
 }
 
 const pending = new Map<string, QueuedCommit>();
-let serializer: Promise<unknown> = Promise.resolve();
+const active = new Map<string, Promise<FlushResult>>();
+const serializers = new Map<string, Promise<unknown>>();
 
 interface GitResult {
   stdout: string;
@@ -111,10 +114,10 @@ interface GitResult {
 }
 
 /** Run a git subcommand. Fails with GitError on non-zero exit. */
-function runGit(
+function runGitRaw(
   args: readonly string[],
   cwd: string,
-): Effect.Effect<GitResult, GitError> {
+): Effect.Effect<GitResult, unknown> {
   return Effect.gen(function* () {
     // HUSKY=0 disables client-side git hooks for the door's own commits.
     // A migrated state worktree shares `core.hooksPath` with the code repo's
@@ -158,10 +161,18 @@ function runGit(
   }).pipe(
     Effect.scoped,
     Effect.provide(spawnerLayer),
-    Effect.catchCause((cause) =>
-      Effect.fail(causeToGitError(cause, args)),
-    ),
   );
+}
+
+function runGit(
+  args: readonly string[],
+  cwd: string,
+): Effect.Effect<GitResult, GitError> {
+  const timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_GIT_TIMEOUT_MS,
+    DEFAULT_STATE_GIT_TIMEOUT_MS,
+  );
+  return runGitWithTimeout(args, cwd, timeoutMs);
 }
 
 function runGitWithTimeout(
@@ -169,7 +180,7 @@ function runGitWithTimeout(
   cwd: string,
   timeoutMs: number,
 ): Effect.Effect<GitResult, GitError> {
-  return runGit(args, cwd).pipe(
+  return runGitRaw(args, cwd).pipe(
     Effect.timeout(Duration.millis(timeoutMs)),
     Effect.catchCause((cause) =>
       Effect.fail(causeToGitError(cause, args)),
@@ -306,26 +317,75 @@ export function flushAutoCommits(
  */
 export function flushAllPendingAutoCommits(): Effect.Effect<FlushResult[], never> {
   return Effect.promise(() => {
-    const projectRoots = Array.from(pending.keys());
+    const projectRoots = [...new Set([...pending.keys(), ...active.keys()])];
     return Promise.all(projectRoots.map((projectRoot) => flushPromise(projectRoot)));
   });
 }
 
 function flushPromise(projectRoot: string): Promise<FlushResult> {
   const batch = pending.get(projectRoot);
-  if (!batch) return Promise.resolve({ committed: false, reason: 'no pending' });
+  if (!batch) {
+    return active.get(projectRoot)
+      ?? Promise.resolve({ committed: false, reason: 'no pending' });
+  }
   clearTimeout(batch.timer);
   return flushInner(projectRoot);
 }
 
 function flushInner(projectRoot: string): Promise<FlushResult> {
   const batch = pending.get(projectRoot);
-  if (!batch) return Promise.resolve({ committed: false, reason: 'no pending' });
+  if (!batch) {
+    return active.get(projectRoot)
+      ?? Promise.resolve({ committed: false, reason: 'no pending' });
+  }
   pending.delete(projectRoot);
 
-  const task = serializer.then(() => Effect.runPromise(doCommit(projectRoot, batch)));
-  serializer = task.catch(() => undefined);
+  const gitRoot = batch.repoRoot ?? projectRoot;
+  const prior = serializers.get(gitRoot) ?? Promise.resolve();
+  const task = prior.then(() => Effect.runPromise(doBoundedCommit(projectRoot, batch)));
+  active.set(projectRoot, task);
+
+  const tail = task.catch(() => undefined);
+  serializers.set(gitRoot, tail);
+  void task.then(
+    () => clearActiveFlush(projectRoot, gitRoot, task, tail),
+    () => clearActiveFlush(projectRoot, gitRoot, task, tail),
+  );
   return task;
+}
+
+function clearActiveFlush(
+  projectRoot: string,
+  gitRoot: string,
+  task: Promise<FlushResult>,
+  tail: Promise<unknown>,
+): void {
+  if (active.get(projectRoot) === task) active.delete(projectRoot);
+  if (serializers.get(gitRoot) === tail) serializers.delete(gitRoot);
+}
+
+function doBoundedCommit(
+  projectRoot: string,
+  batch: QueuedCommit,
+): Effect.Effect<FlushResult, never> {
+  return boundStateFlush(doCommit(projectRoot, batch));
+}
+
+function boundStateFlush(
+  operation: Effect.Effect<FlushResult, never>,
+  timeoutMs = parsePositiveInteger(
+    process.env.OVERDECK_STATE_FLUSH_TIMEOUT_MS,
+    DEFAULT_STATE_FLUSH_TIMEOUT_MS,
+  ),
+): Effect.Effect<FlushResult, never> {
+  return operation.pipe(
+    Effect.timeout(Duration.millis(timeoutMs)),
+    Effect.catchCause((cause) => {
+      const reason = `state writer timed out after ${timeoutMs / 1_000}s: ${String(Cause.squash(cause))}`;
+      console.warn(`[pan-dir/auto-commit] ${reason}`);
+      return Effect.succeed({ committed: false, errored: true, reason });
+    }),
+  );
 }
 
 function doCommit(
@@ -600,6 +660,8 @@ export function deriveProjectRoot(path: string): string | null {
   }
   return null;
 }
+
+export const __testInternals = { boundStateFlush };
 
 function relativizeToRoot(absOrRel: string, projectRoot: string): string {
   const rootPrefix = projectRoot.endsWith(sep) ? projectRoot : projectRoot + sep;

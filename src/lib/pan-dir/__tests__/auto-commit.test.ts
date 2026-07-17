@@ -5,7 +5,7 @@ import { chmodSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { vi } from 'vitest';
-import { deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
+import { __testInternals, deriveProjectRoot, flushAllPendingAutoCommits, flushAutoCommits, queueAutoCommit, reconcileStatePlaneDrift } from '../auto-commit.js';
 
 function exec(root: string, command: string): string {
   return execSync(command, { cwd: root, encoding: 'utf-8' }).trim();
@@ -68,6 +68,44 @@ describe('auto-commit', () => {
       expect(log).toContain('chore(state): update continue for PAN-1');
     }),
   );
+
+  it('bounds a stalled state-writer flush', async () => {
+    vi.useFakeTimers();
+    try {
+      const flush = Effect.runPromise(
+        __testInternals.boundStateFlush(Effect.never, 60_000),
+      );
+
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await expect(flush).resolves.toMatchObject({
+        committed: false,
+        errored: true,
+        reason: expect.stringContaining('state writer timed out after 60s'),
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('makes an active flush visible to concurrent durability waiters', async () => {
+    mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
+    const path = join(tmp, '.pan', 'continues', 'pan-active.vbrief.json');
+    writeFileSync(path, '{"issue":"PAN-ACTIVE"}');
+
+    queueAutoCommit({
+      projectRoot: tmp,
+      paths: [path],
+      subject: 'chore(state): active flush test',
+    });
+    const first = Effect.runPromise(flushAutoCommits(tmp));
+    const second = Effect.runPromise(flushAutoCommits(tmp));
+
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    expect(firstResult.committed).toBe(true);
+    expect(secondResult).toEqual(firstResult);
+  });
 
   it.effect('does not commit when on a non-main branch', () =>
     Effect.gen(function* () {

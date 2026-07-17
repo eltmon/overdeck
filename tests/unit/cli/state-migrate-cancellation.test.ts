@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { execFile } = vi.hoisted(() => ({ execFile: vi.fn() }));
@@ -55,5 +58,37 @@ describe('state migration Git command cancellation', () => {
     callback(null, '', '');
     await expect(command).rejects.toBe(reason);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('lets the reconciliation deadline fire while a legacy copy is active', async () => {
+    const sourceRoot = mkdtempSync(join(tmpdir(), 'pan-state-copy-source-'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'pan-state-copy-destination-'));
+    mkdirSync(join(sourceRoot, '.pan', 'records'), { recursive: true });
+    const controller = new AbortController();
+    const reason = new Error('state reconciliation timed out');
+    let finishCopy!: () => void;
+    const copyPath = vi.fn(() => new Promise<void>((resolve) => {
+      finishCopy = resolve;
+    }));
+
+    try {
+      const copy = __testInternals.copyLegacyState(
+        sourceRoot,
+        stateRoot,
+        controller.signal,
+        copyPath,
+      );
+      setTimeout(() => controller.abort(reason), 60_000);
+
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      expect(controller.signal.aborted).toBe(true);
+      finishCopy();
+      await expect(copy).rejects.toBe(reason);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      rmSync(sourceRoot, { recursive: true, force: true });
+      rmSync(stateRoot, { recursive: true, force: true });
+    }
   });
 });

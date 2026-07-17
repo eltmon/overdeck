@@ -1,5 +1,6 @@
 import { execFile, type ChildProcess, type ExecFileException } from 'node:child_process';
-import { copyFileSync, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { cp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { Command } from 'commander';
@@ -95,18 +96,20 @@ async function trackedManifest(
 ): Promise<StateMigrationManifestEntry[]> {
   const paths = (await git(repo, ['ls-tree', '-r', '--name-only', sourceSha, '--', '.pan'], signal))
     .split('\n').filter(Boolean);
-  return paths.flatMap((path) => {
+  const manifest: StateMigrationManifestEntry[] = [];
+  for (const path of paths) {
     signal?.throwIfAborted();
     const destination = destinationForTracked(path);
-    if (!destination) return [];
+    if (!destination) continue;
     const source = join(repo, path);
     const target = join(stateRoot, destination);
     if (!existsSync(target)) {
       mkdirSync(dirname(target), { recursive: true });
       copyFileSync(source, target);
     }
-    return [manifestEntry(source, target)];
-  });
+    manifest.push(await manifestEntry(source, target, signal));
+  }
+  return manifest;
 }
 
 async function createOrphanStateCommit(
@@ -134,31 +137,36 @@ async function createOrphanStateCommit(
   }
 }
 
-function copyLegacyState(
+async function copyLegacyState(
   sourceRoot: string,
   stateRoot: string,
   signal?: AbortSignal,
-): StateMigrationManifestEntry[] {
+  copyPath: typeof cp = cp,
+): Promise<StateMigrationManifestEntry[]> {
   const manifest: StateMigrationManifestEntry[] = [];
+  const visit = async (sourceDir: string, destinationDir: string): Promise<void> => {
+    for (const entry of await readdir(sourceDir, { withFileTypes: true })) {
+      signal?.throwIfAborted();
+      const sourceEntry = join(sourceDir, entry.name);
+      const destinationEntry = join(destinationDir, entry.name);
+      if (entry.isDirectory()) await visit(sourceEntry, destinationEntry);
+      else if (entry.isFile()) {
+        manifest.push(await manifestEntry(sourceEntry, destinationEntry, signal));
+      }
+    }
+  };
+
   for (const sourcePath of STATE_BRANCH_PATHS) {
     signal?.throwIfAborted();
     const source = join(sourceRoot, '.pan', sourcePath);
     if (!existsSync(source)) continue;
     const destination = join(stateRoot, sourcePath);
-    cpSync(source, destination, {
+    await copyPath(source, destination, {
       recursive: true,
       preserveTimestamps: true,
     });
-    const visit = (sourceDir: string, destinationDir: string): void => {
-      for (const entry of readdirSync(sourceDir, { withFileTypes: true })) {
-        signal?.throwIfAborted();
-        const sourceEntry = join(sourceDir, entry.name);
-        const destinationEntry = join(destinationDir, entry.name);
-        if (entry.isDirectory()) visit(sourceEntry, destinationEntry);
-        else if (entry.isFile()) manifest.push(manifestEntry(sourceEntry, destinationEntry));
-      }
-    };
-    visit(source, destination);
+    signal?.throwIfAborted();
+    await visit(source, destination);
   }
   return manifest;
 }
@@ -237,7 +245,10 @@ export async function migrateProjectState(
     // A queued state commit is already inside the canonical durability boundary.
     // Await it without interrupting the Effect, then honor cancellation before
     // starting migration work so the timeout cannot detach a live commit/push.
-    await Effect.runPromise(flushAutoCommits(repo));
+    const flush = await Effect.runPromise(flushAutoCommits(repo));
+    if (flush.errored) {
+      throw new Error(`State writer did not quiesce before migration: ${flush.reason ?? 'unknown error'}`);
+    }
     options.signal?.throwIfAborted();
     if (hasNonStateDirtyState(await git(repo, ['status', '--porcelain'], options.signal))) {
       throw new Error('Primary checkout is dirty outside legacy state paths; migration refused before mutation');
@@ -288,9 +299,9 @@ export async function migrateProjectState(
     const manifest = sourceIsHostRepo
       ? dedupeManifest([
           ...await trackedManifest(repo, sourceMainSha, stateRoot, options.signal),
-          ...copyLegacyState(legacyStateSource, stateRoot, options.signal),
+          ...await copyLegacyState(legacyStateSource, stateRoot, options.signal),
         ])
-      : copyLegacyState(legacyStateSource, stateRoot, options.signal);
+      : await copyLegacyState(legacyStateSource, stateRoot, options.signal);
     if (manifest.length > 0) {
       await git(stateRoot, ['add', '--all'], options.signal);
       if (await git(stateRoot, ['diff', '--cached', '--name-only'], options.signal)) {
@@ -316,12 +327,12 @@ export async function migrateProjectState(
         // collision worth refusing.
         const identical = readFileSync(join(legacyStateSource, path)).equals(readFileSync(destination));
         if (!identical) throw new Error(`Untracked-note destination collision: ${destination}`);
-        manifest.push(manifestEntry(join(legacyStateSource, path), destination));
+        manifest.push(await manifestEntry(join(legacyStateSource, path), destination));
         continue;
       }
       mkdirSync(dirname(destination), { recursive: true });
       copyFileSync(join(legacyStateSource, path), destination);
-      manifest.push(manifestEntry(join(legacyStateSource, path), destination));
+      manifest.push(await manifestEntry(join(legacyStateSource, path), destination));
     }
     if (untracked.length > 0) {
       await git(stateRoot, ['add', 'notes'], options.signal);
@@ -369,7 +380,7 @@ export async function migrateProjectState(
       }
     }
 
-    verifyStateMigrationManifest(manifest);
+    await verifyStateMigrationManifest(manifest);
     for (const entry of manifest) rmSync(entry.source, { force: true });
     if (!sourceIsHostRepo) {
       rmSync(join(legacyStateSource, '.pan'), { recursive: true, force: true });
@@ -392,7 +403,7 @@ export async function migrateProjectState(
   }
 }
 
-export const __testInternals = { git };
+export const __testInternals = { copyLegacyState, git };
 
 export function registerStateMigrationCommand(admin: Command): void {
   admin.command('state')
