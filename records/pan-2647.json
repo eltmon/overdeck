@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T05:19:08.234Z",
+  "updated": "2026-07-17T05:27:33.882Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 31,
-    "claims": {
-      "health-page-repair": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 2098098,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T05:04:27.851Z"
-      }
-    },
+    "sequence": 32,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -245,12 +237,27 @@
         "itemId": "pill-repair",
         "outcome": "completed",
         "releasedAt": "2026-07-17T05:04:15.796Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2098098,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T05:04:27.851Z",
+        "itemId": "health-page-repair",
+        "outcome": "completed",
+        "reason": "Health page now renders the canonical status vocabulary with unknown fallback, preserves host/Deacon/TLDR at zero agents, presents optional TLDR neutrally, distinguishes warm from orphaned sessions, and passes focused tests plus repository typecheck.",
+        "releasedAt": "2026-07-17T05:27:33.881Z"
       }
     ],
     "statusReasons": {
       "contract-v2": {
         "reason": "Added the runtime-validated V2 health contract, tolerant enum decoding, exact legacy projector coverage, package export, and focused tests; build, tests, typecheck, and lint pass.",
         "updatedAt": "2026-07-17T01:04:39.512Z"
+      },
+      "health-page-repair": {
+        "reason": "Health page now renders the canonical status vocabulary with unknown fallback, preserves host/Deacon/TLDR at zero agents, presents optional TLDR neutrally, distinguishes warm from orphaned sessions, and passes focused tests plus repository typecheck.",
+        "updatedAt": "2026-07-17T05:27:33.881Z"
       }
     }
   },
@@ -325,6 +332,11 @@
     "pill-repair.pill-repair.ac3": "completed",
     "pill-repair.pill-repair.ac4": "completed",
     "pill-repair.pill-repair.ac5": "completed",
-    "health-page-repair": "running"
+    "health-page-repair": "completed",
+    "health-page-repair.health-page-repair.ac1": "completed",
+    "health-page-repair.health-page-repair.ac2": "completed",
+    "health-page-repair.health-page-repair.ac3": "completed",
+    "health-page-repair.health-page-repair.ac4": "completed",
+    "health-page-repair.health-page-repair.ac5": "completed"
   }
 }
