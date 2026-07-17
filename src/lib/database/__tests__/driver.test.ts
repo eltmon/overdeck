@@ -58,9 +58,10 @@ describe('SQLite driver adapter', () => {
     try {
       db.exec('CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
       db.pragma('journal_mode = WAL');
-      db.pragma('user_version = 7');
+      db.pragma('user_version = 61');
 
-      expect(db.pragma('user_version', { simple: true })).toBe(7);
+      expect(db.pragma('user_version', { simple: true })).toBe(61);
+      expect(db.pragma('user_version')).toEqual([{ user_version: 61 }]);
       expect(db.pragma('table_info(items)')).toEqual([
         expect.objectContaining({ name: 'id' }),
         expect.objectContaining({ name: 'name' }),
