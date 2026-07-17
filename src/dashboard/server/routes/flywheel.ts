@@ -7,6 +7,7 @@ import { jsonResponse } from '../http-helpers.js';
 import { FlywheelRunId, FlywheelStats, FlywheelStatus, type FlywheelStats as FlywheelStatsPayload } from '@overdeck/contracts';
 import { emitActivityTtsSync } from '../../../lib/activity-logger.js';
 import { httpHandler } from './http-handler.js';
+import { getSubstrateBugWeightsRoute } from './flywheel-substrate-bug-weights.js';
 import { validateOrigin } from './origin-validation.js';
 import {
   getFlywheelRunDetail,
@@ -58,7 +59,6 @@ import {
   type ScheduleAutoMergeResult,
 } from '../../../lib/overdeck/merge-sync.js';
 import { getMergeBackendRoute } from './flywheel-merge-backend.js';
-
 const DEFAULT_BRIEF_PATH = 'docs/flywheel-brief.md';
 const FLYWHEEL_CONVERSATION_NAME = 'flywheel-orchestrator';
 const AUTO_MERGE_POLL_LIMIT = 100;
@@ -975,6 +975,7 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelConversationRoute,
   getFlywheelCurrentRoute,
   getFlywheelStatsRoute,
+  getSubstrateBugWeightsRoute,
   getFlywheelConfigRoute,
   postFlywheelConfigRoute,
   getPendingAutoMergeRoute,
@@ -1001,5 +1002,4 @@ export const flywheelRouteLayer = Layer.mergeAll(
   getFlywheelBriefRoute,
   postFlywheelBriefRoute,
 );
-
 export default flywheelRouteLayer;

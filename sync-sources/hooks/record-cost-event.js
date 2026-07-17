@@ -32301,6 +32301,9 @@ function ensureRuntimeIndexesSync(db) {
 		db.exec("ALTER TABLE `review_status` ADD COLUMN `release_notes` text");
 	} catch {}
 	ensureReleaseSetTablesSync(db);
+	try {
+		db.exec("ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text");
+	} catch {}
 	db.exec("CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)");
 	try {
 		db.exec("ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer");

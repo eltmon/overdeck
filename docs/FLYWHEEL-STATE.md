@@ -5469,3 +5469,33 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **MY ERROR, owned:** the 20:33 "orphan server.js" kill took down 2252/2647/2807's freshly-started stacks — the 3 killed pids' start times (20:26:05/28/52) match their stack spin-ups exactly; agents orphaned at 20:35. I checked listen sockets but NOT cwd/parentage before killing — the exact PAN-2792 lesson (pidsWithCwdUnder). RULE REINFORCED: before killing "orphan" processes, verify cwd + parent + age; a listen-socket check alone is insufficient. All 3 restarted --fresh and alive (only ~5min of session lost).
 - **PAN-1491 untangled:** workspace synthesis (14:42) said APPROVED @1196ce67, but LATER syntheses (16:27, 17:52) posted CHANGES REQUESTED to the CLOSED PR#1636 — both citing wedged reviewer sessions (wedge-era poisoned verdicts, not code findings). PR#1636 closed 06-19; branch has 42 commits, no open PR. Action: pan review restart PAN-1491 for a clean post-wedge-fix verdict on head 1196ce67 → if APPROVED, open NEW PR → CI → merge.
 - Live set: 1897 (work fixing), 1966 (review running), 1491 (review running), 2232 (work running), 2252/2647/2807 (work restarted).
+
+## Tick 75 — 2026-07-16 ~21:05 — 1966 review resume-loop diagnosed; nudged
+- **`pan review restart` cannot produce a fresh session for a wedged convoy:** it resumes via `~/.overdeck/agents/agent-pan-1966-review/session.id` + `sessions.json` even after tmux kill AND `pan kill` — always "resumed (session preserved)", bringing the thrash-poisoned context back. No --fresh flag exists on review restart (only --model/--role). TOOLING GAP to file if nudge fails.
+- New session env still has CLAUDE_CODE_AUTO_COMPACT_WINDOW=150000 — operator's "wedge resolved" was NOT an env change. Watching behavior, not assuming.
+- Resumed coordinator sits idle at prompt post-compact (83k ctx, out=51). Nudged via pan tell: resume convoy, synthesize from existing sub-review files (correctness/performance/security.md exist from earlier run) + fresh requirements pass. Next tick: check for synthesis; if still idle → rotate session.id (backup, not delete) for a genuinely fresh spawn and file the tooling-gap issue.
+- Rest of set: 1897 work fixing, 2232/2252/2647/2807 work agents running, 1491 fresh review dispatched.
+
+## Tick 76 — 2026-07-16 ~21:17 — PAN-2811 strike LANDED + DEPLOYED
+- **Landed a1426db49f051d90a8b027f426edb1fce408f4fb** (merge --no-ff of origin/strike/pan-2811 @ 97b7290cd9, operator-directed recovery path). Fix: replaces in-process strike-merge trigger registration (broken across tsdown dual-module/deacon fork boundary — PAN-2806 family) with authenticated internal HTTP route /api/internal/strikes/:id/merge. Deacon can now invoke dashboard-parent strike merges across the fork.
+- Gates verified by me on the merged tree: typecheck (no new), lint, 21/21 tests in the 3 touched suites, production build. (Strike itself reported 9,564 tests green; main CI validates full matrix post-push.)
+- **Deployed:** server pid 1850998 @ 21:17:05 owns :3011, health 200. Primary FF'd clean (checked porcelain first).
+- Watch main CI on a1426db49f; if red, investigate before anything else lands.
+
+## Tick 77 — 2026-07-16 ~21:30 — 2811 CI green; 1966 unstuck (nudge works); yield bug filed
+- **Main CI ALL GREEN on a1426db49f** (PAN-2811 landing verified).
+- **The pan-tell nudge UNSTICKS resume-idle review convoys:** 1966 coordinator wrote a fresh synthesis (21:17) after the nudge — verdict CHANGES REQUESTED, one real blocking finding (post-UAT flywheel nudge calls GET /api/pipeline/membership without required ?project= — route 400s; uat-promote-notify.ts:23 / issues.ts:908). Playbook for wedged convoys: pan tell the coordinator with run-dir + output-file instructions.
+- 1966 work agent fresh-started (was ANOTHER stuck yield: "making room for review of PAN-1491") + told the precise fix. **Yield self-clear bug now 2x reproduced (2232, 1966) → filed PAN-2813** (backstop-as-symptom, not driven).
+- 1491 review coordinator nudged the same way (was idle since 00:53); expect synthesis next tick.
+- Session landings: 6 merges + 2811 strike. Deploys: 2 (a9e301526b, a1426db49f). Close-outs: 14 done (11 operator + 3 evidence-verified accepts).
+
+## Tick 78 — 2026-07-16 ~21:40 — 1491 APPROVED + PR#2814 opened at reviewed head
+- **1491 nudge worked too** (playbook 2/2): fresh synthesis 21:32 = APPROVED @1196ce67. Old PR#1636 closed 06-19 → opened **PR#2814**, pushed branch so PR head == reviewed head 1196ce67. Merge when CI green.
+- 1897 work agent idle-at-prompt 6h ($82, tree clean+pushed) → nudged to verify fixes complete + pan done so review re-runs.
+- Work fleet: 1966 active (9min), 2252 active, 2232/2647/2807 quiet 46-70min (watch; nudge next tick if still silent).
+
+## Tick 79 — 2026-07-16 ~21:52 — PAN-1491 MERGED (7 total)
+- **PAN-1491 MERGED → 9e783f4fdf** via PR#2814: fresh APPROVED @1196ce67 (nudged convoy), all CI green, CLEAN. Session merges: 1987, 2772, 2760, 2619, 2773, 2045, 1491 = 7 (+2811 strike landing).
+- 1897: fixes were already pushed (tree clean, 0 ahead); missing piece was a review of current head df7a0e99 (old verdict was @4ad533fd) → review restarted. Note: restart again said "resumed (session preserved)" — if no synthesis by next tick, apply the pan-tell nudge (playbook 2/2 so far).
+- 2232/2647/2807 idle-at-prompt within ~1h of fresh start → nudged to resume autonomously + pan done when complete. PATTERN: gpt-5.6-sol claude-code sessions repeatedly go idle-at-prompt mid-task tonight; the pan-tell nudge reliably unsticks them. If this generalizes, the idle-detection/redrive gap is worth an issue.
+- 1491 close-out owed (merge → verify-on-main → deploy next batch → close). Deploy batching: 1491 + whatever else lands this hour.

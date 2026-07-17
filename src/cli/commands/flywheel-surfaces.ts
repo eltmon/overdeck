@@ -15,6 +15,7 @@ import {
 } from '../../lib/backlog/pickup.js';
 import { isFlywheelAutoPickupBacklog } from '../../lib/overdeck/control-settings.js';
 import { getMergeBlockersPayload } from '../../lib/cloister/merge-blockers.js';
+import { listSubstrateBugWeights, type WeightedSubstrateBug } from '../../lib/overdeck/substrate-bug-weights-service.js';
 import { isGitHubAppConfigured, listOpenIssuesWithLabels } from '../../lib/github-app.js';
 
 /**
@@ -131,6 +132,33 @@ export function flywheelMergeBlockersCommand(opts: { json?: boolean } = {}): voi
   }
 }
 
+/** `pan flywheel weights` — substrate bugs ranked by affected v1.0 criterion weight. */
+export async function flywheelWeightsCommand(opts: { issue?: string; window?: string; json?: boolean } = {}): Promise<void> {
+  const rows = await listSubstrateBugWeights(opts.window ?? '30d');
+  const targetIssue = opts.issue?.toUpperCase();
+  const filtered = targetIssue ? rows.filter((r) => r.issueId === targetIssue) : rows;
+
+  if (opts.json) {
+    console.log(JSON.stringify(filtered, null, 2));
+    return;
+  }
+
+  if (filtered.length === 0) {
+    console.log('No weighted substrate bugs in window.');
+    return;
+  }
+
+  const issueWidth = Math.max(...filtered.map((r) => r.issueId.length));
+  const severityWidth = Math.max(...filtered.map((r) => r.severity.length));
+  const weightWidth = Math.max(...filtered.map((r) => String(r.weight).length));
+
+  for (const r of filtered) {
+    console.log(
+      `${r.issueId.padEnd(issueWidth)}  ${r.severity.padEnd(severityWidth)}  ${String(r.weight).padStart(weightWidth)}  ${r.weightReason}`,
+    );
+  }
+}
+
 /**
  * Attaches the sandbox-safe surface subcommands onto the already-registered `flywheel` and
  * `backlog` commands. Kept here (not in flywheel.ts) so flywheel.ts stays under the file-size
@@ -143,6 +171,14 @@ export function registerFlywheelSurfaceCommands(program: Command): void {
     .description('PRs that passed review but cannot merge (GitHub-native reasons) — reads SQLite directly, no HTTP (sandbox-safe)')
     .option('--json', 'Output JSON')
     .action((o: { json?: boolean }) => flywheelMergeBlockersCommand(o));
+
+  flywheel
+    ?.command('weights')
+    .description('Weighted substrate bugs by affected v1.0 criterion — reads SQLite directly, no HTTP (sandbox-safe)')
+    .option('--issue <id>', 'Filter to a single issue')
+    .option('--window <dur>', 'Stats window like 30d, 7d (default 30d)')
+    .option('--json', 'Output JSON')
+    .action((o: { issue?: string; window?: string; json?: boolean }) => flywheelWeightsCommand(o));
 
   const backlog = program.commands.find((c) => c.name() === 'backlog');
   backlog

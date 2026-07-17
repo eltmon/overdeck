@@ -38,6 +38,7 @@ import {
 export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
   columns: [
     { table: 'discovered_sessions', column: 'harness' },
+    { table: 'flywheel_substrate_bugs', column: 'affected_criteria' },
     { table: 'review_status', column: 'release_status' },
     { table: 'review_status', column: 'release_notes' },
     { table: 'review_status', column: 'inspect_owner_session' },
@@ -134,6 +135,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_recovery_count` integer DEFAULT 0');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_landing_attempts` text');
   ensureReleaseSetTablesSync(db);
+  // PAN-1491: existing overdeck.db files created before substrate-bug weights need
+  // the new `affected_criteria` column added idempotently.
+  runSchemaTopUp(db, 'ALTER TABLE `flywheel_substrate_bugs` ADD COLUMN `affected_criteria` text');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `cost_session_id_idx` ON `cost_events` (`session_id`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_agent_id` ON `cost_events` (`agent_id`, `ts`)');
   runSchemaTopUp(db, 'CREATE INDEX IF NOT EXISTS `idx_cost_issue_upper` ON `cost_events` (UPPER(`issue_id`))');
