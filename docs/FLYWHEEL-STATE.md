@@ -5445,3 +5445,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **DoD DEPLOY OWED for 6 merges** (1987, 2772, 2760, 2619, 2773, 2045) — all landed after last deploy a081a9ce59. Live dashboard is STALE relative to them. Close-out can't fully pass (deploy row) until deployed.
 - **DEPLOY HELD ON PURPOSE:** restarting the live dashboard mid-operator-debug would disconnect their active session (convo-disconnect blast radius) and disrupt wedge debugging. Waiting for operator OK or a natural break. When cleared: git fetch, checked-clean FF-only, npm run build, pan restart --dashboard --resume --health-timeout 120000, then pan close each of the 6.
 - Session merge tally holds at 6.
+
+## Tick 72 — 2026-07-16 ~20:30 — operator re-focus; directive list reconciled as STALE; real live set re-driven
+- Operator: close-out backlog is THEIRS (14 issues + hands-off PAN-2255 parked/REVERTED + PAN-2633). Compact-window wedge RESOLVED — no longer a blocker. My job: live merges, report each.
+- **Directive "still-in-review" list reconciled at CODE level — ALL ALREADY DONE:** PAN-2167/2230/2374/2375/2420 merged+branch-cleaned+issue CLOSED; PAN-2203 (PR#2206, merged 07-01) and PAN-2257 (PR#2281, merged 07-03) squash-merged (my earlier "branch exists NOT merged" read was the squash-merge ancestor fallacy); MIN-860 backend MR !51 MERGED, no open MRs in either myn repo. These are stale dashboard review rows — same class as the stale paused labels the operator is sweeping. Nothing to drive there.
+- **Actual live pipeline re-driven this tick:** 1966 review restarted (wedge fix in effect); 2252/2647/2807 work agents STARTED (were completely dead — no agents at all); **2232 was scheduler-yielded "making room for review of PAN-1987" and NEVER self-cleared** (1987 merged 3h ago) — unpaused + resumed. Yield self-clear failure = real bug to file if reproduced.
+- 1897: work agent actively fixing CHANGES REQUESTED ($71 spent, 74k ctx, alive). 1491: PR#1636 CLOSED but branch has 42 commits incl. "address review findings" — needs disposition (re-open PR or operator call).
+- Live set now: 1491, 1897, 1966, 2232, 2252, 2647, 2807 (+806 HELD).
