@@ -30,6 +30,7 @@ import { getReleaseSetSync } from '../../../../lib/release-set.js';
 import { getCachedConflictGateMergeability } from '../../../../lib/cloister/conflict-gate.js';
 import { transitionIssueToInReview, spawnRun } from '../../../../lib/agents.js';
 import { runVerificationForIssue } from '../../../../lib/cloister/verification-runner.js';
+import { createRequestReviewPipeline } from '../../../../lib/cloister/request-review-pipeline.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import {
@@ -46,6 +47,7 @@ import {
 
 const execAsync = promisify(exec);
 const MAX_AUTO_REQUEUE = 25;
+const requestReviewPipeline = createRequestReviewPipeline();
 
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;
@@ -646,6 +648,27 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       );
     }
 
+    if (requestReviewPipeline.isInFlight(canonicalIssueId)) {
+      return jsonResponse({
+        success: true,
+        queued: true,
+        alreadyRunning: true,
+        message: `Verification already running for ${canonicalIssueId}; review will start automatically when it passes`,
+      }, { status: 202 });
+    }
+
+    const resolved = resolveProjectFromIssueSync(issueId);
+    if (!resolved) {
+      return jsonResponse(
+        {
+          success: false,
+          error: `No project configured for ${issueId}. Add it to projects.yaml.`,
+          autoRequeueCount: currentCount,
+        },
+        { status: 500 }
+      );
+    }
+
     transitionIssueToInReview(issueId, workspacePath).catch((err: unknown) => {
       console.warn(
         `[request-review] Could not transition ${issueId} to in_review: ${errorMessage(err)}`
@@ -657,135 +680,130 @@ const postWorkspaceRequestReviewRoute = HttpRouter.add(
       ? `Agent re-review request (${newCount}/${MAX_AUTO_REQUEUE}): ${message}`
       : undefined;
 
-    const reqVerifyOutcome = yield* runVerificationForIssue(
-      issueId,
-      workspacePath,
-      workspaceInfo,
-      'request-review'
-    );
-    if (reqVerifyOutcome.outcome === 'failed') {
-      return jsonResponse({
-        success: false,
-        verificationFailed: true,
-        failedCheck: reqVerifyOutcome.failedCheck,
-        message: `Verification failed at ${reqVerifyOutcome.failedCheck} — fix and resubmit`,
-        cycleCount: reqVerifyOutcome.cycleCount,
-        maxCycles: reqVerifyOutcome.maxCycles,
-      });
-    }
-    if (reqVerifyOutcome.outcome === 'error') {
-      return jsonResponse(
-        {
-          success: false,
-          error: `Verification infrastructure error: ${reqVerifyOutcome.message}`,
-          autoRequeueCount: currentCount,
-        },
-        { status: 500 }
-      );
-    }
-
-    // PAN-511: set metadata fields but keep reviewStatus='pending' until dispatch succeeds.
-    // reviewStatus is set to 'reviewing' only after specialist is dispatched or queued.
     setReviewStatus(issueId, {
       reviewStatus: 'pending',
       testStatus: 'pending',
-      autoRequeueCount: newCount,
+      verificationStatus: 'pending',
       reviewNotes,
     });
 
-    console.log(
-      `[request-review] Agent requested re-review for ${issueId} (${newCount}/${MAX_AUTO_REQUEUE})${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`
-    );
+    const started = requestReviewPipeline.start(canonicalIssueId, {
+      verify: () => Effect.runPromise(runVerificationForIssue(
+        issueId,
+        workspacePath,
+        workspaceInfo,
+        'request-review'
+      )),
+      onVerificationFailed: (outcome) => {
+        console.log(`[request-review] Verification failed for ${issueId} at ${outcome.failedCheck}`);
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          reviewNotes: `Verification failed at ${outcome.failedCheck} — fix and resubmit`,
+          autoRequeueCount: currentCount,
+        });
+      },
+      onVerificationError: (outcome) => {
+        console.error(`[request-review] Verification infrastructure error for ${issueId}: ${outcome.message}`);
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          reviewNotes: `Verification infrastructure error: ${outcome.message}`,
+          autoRequeueCount: currentCount,
+        });
+      },
+      pushBranch: async () => {
+        const pushCommand = `git push origin ${branchName}`;
+        if (workspaceInfo.isRemote && workspaceInfo.vmName) {
+          await execAsync(flyExecCmd(workspaceInfo.vmName, `cd ${workspacePath} && ${pushCommand}`), {
+            encoding: 'utf-8',
+          });
+        } else {
+          await execAsync(pushCommand, {
+            cwd: workspacePath,
+            encoding: 'utf-8',
+          });
+        }
+        console.log(`[request-review] Pushed verified branch ${branchName} for ${issueId}`);
+      },
+      dispatchReview: async () => {
+        // PAN-511: keep reviewStatus='pending' until dispatch succeeds. The review
+        // role flips it to 'reviewing' immediately before spawning.
+        setReviewStatus(issueId, {
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          reviewNotes,
+        });
 
-    try {
-      const resolved = resolveProjectFromIssueSync(issueId);
-
-      if (!resolved) {
-        return jsonResponse(
-          {
-            success: false,
-            error: `No project configured for ${issueId}. Add it to projects.yaml.`,
-            autoRequeueCount: newCount,
-          },
-          { status: 500 }
-        );
-      }
-
-      const result = yield* Effect.promise(async () => {
         const { spawnReviewRoleForIssue } = await import('../../../../lib/cloister/review-agent.js');
-        return (await Effect.runPromise(spawnReviewRoleForIssue({
+        const result = await Effect.runPromise(spawnReviewRoleForIssue({
           issueId,
           workspace: workspacePath,
           branch: branchName,
           force: true,
-        })));
-      });
+        }));
 
-      if (result.success) {
-        console.log(`[request-review] Review role spawned for ${issueId}`);
-        // spawnReviewRoleForIssue already flips reviewStatus to 'reviewing' (with
-        // reviewSpawnedAt) internally. PAN-2578: do not repeat a bare 'reviewing' write —
-        // it can clobber a fast agent's terminal verdict. Only record the requeue count.
-        setReviewStatus(issueId, { autoRequeueCount: newCount });
-        yield* Effect.promise(() => Effect.runPromise(eventStore.append({
-          type: 'pipeline.review-started',
-          timestamp: new Date().toISOString(),
-          payload: { issueId },
-        })));
-        return jsonResponse({
-          success: true,
-          queued: false,
-          message: `Review started (${newCount}/${MAX_AUTO_REQUEUE} auto-requeues used)`,
-          autoRequeueCount: newCount,
-          remainingRequeues: MAX_AUTO_REQUEUE - newCount,
-        });
-      } else if (result.gated) {
-        console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+        if (result.success) {
+          console.log(`[request-review] Review role spawned for ${issueId}`);
+          // PAN-2578: do not repeat a bare 'reviewing' write here — a fast review
+          // agent may already have recorded its terminal verdict.
+          setReviewStatus(issueId, { autoRequeueCount: newCount });
+          try {
+            await Effect.runPromise(eventStore.append({
+              type: 'pipeline.review-started',
+              timestamp: new Date().toISOString(),
+              payload: { issueId },
+            }));
+          } catch { /* non-fatal */ }
+          return;
+        }
+
+        if (result.gated) {
+          console.log(`[request-review] Review deferred for ${issueId}: ${result.message}`);
+          setReviewStatus(issueId, {
+            reviewStatus: 'pending',
+            reviewNotes: result.message,
+            autoRequeueCount: currentCount,
+          });
+          return;
+        }
+
+        const dispatchError = result.error || result.message || 'Failed to dispatch review';
+        console.warn(`[request-review] Dispatch failed for ${issueId}: ${dispatchError}`);
         setReviewStatus(issueId, {
           reviewStatus: 'pending',
-          reviewNotes: result.message,
+          reviewNotes: `Dispatch failed: ${dispatchError}`,
           autoRequeueCount: currentCount,
         });
-        return jsonResponse(
-          {
-            success: false,
-            gated: true,
-            message: result.message,
-            autoRequeueCount: currentCount,
-            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
-          },
-          { status: 409 }
-        );
-      } else {
-        console.warn(
-          `[request-review] Dispatch failed for ${issueId}: ${result.error}`
-        );
+      },
+      onError: (error) => {
+        const detail = errorMessage(error) || String(error);
+        console.error(`[request-review] Background pipeline failed for ${issueId}: ${detail}`);
         setReviewStatus(issueId, {
           reviewStatus: 'pending',
-          reviewNotes: `Dispatch failed: ${result.error || result.message}`,
+          reviewNotes: `Review pipeline error: ${detail}`,
           autoRequeueCount: currentCount,
         });
-        return jsonResponse(
-          {
-            success: false,
-            error: result.error || 'Failed to dispatch review',
-            autoRequeueCount: currentCount,
-            remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
-          },
-          { status: 500 }
-        );
-      }
-    } catch (error: unknown) {
-      console.error(`[request-review] Error:`, error);
-      setReviewStatus(issueId, {
-        reviewStatus: 'pending',
-        reviewNotes: `Dispatch error: ${errorMessage(error)}`,
-      });
-      return jsonResponse(
-        { success: false, error: errorMessage(error), autoRequeueCount: newCount },
-        { status: 500 }
-      );
+      },
+    });
+
+    if (!started) {
+      return jsonResponse({
+        success: true,
+        queued: true,
+        alreadyRunning: true,
+        message: `Verification already running for ${canonicalIssueId}; review will start automatically when it passes`,
+      }, { status: 202 });
     }
+
+    console.log(
+      `[request-review] Verification started for ${issueId}; review will dispatch after the verified branch is pushed${workspaceInfo.isRemote ? ` (remote: ${workspaceInfo.vmName})` : ''}`
+    );
+    return jsonResponse({
+      success: true,
+      queued: true,
+      message: `Verification started for ${canonicalIssueId}; review will start automatically when it passes`,
+      autoRequeueCount: currentCount,
+      remainingRequeues: MAX_AUTO_REQUEUE - currentCount,
+    }, { status: 202 });
   }))
 );
 

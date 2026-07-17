@@ -1029,7 +1029,7 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
   });
 
-  it('review-pipeline.ts request-review route yields the verification Effect directly', async () => {
+  it('review-pipeline.ts request-review route starts guarded background verification', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1042,9 +1042,10 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(requestReviewMatch).not.toBeNull();
     const requestReviewBlock = requestReviewMatch![0];
 
-    expect(requestReviewBlock).toContain('yield* runVerificationForIssue(');
-    expect(requestReviewBlock).not.toContain('Effect.promise(() => runVerificationForIssue(');
-    expect(requestReviewBlock).not.toContain('Effect.promise(() => getWorkspaceGitInfo(');
+    expect(requestReviewBlock).toContain('requestReviewPipeline.isInFlight(canonicalIssueId)');
+    expect(requestReviewBlock).toContain('requestReviewPipeline.start(canonicalIssueId');
+    expect(requestReviewBlock).toContain('verify: () => Effect.runPromise(runVerificationForIssue(');
+    expect(requestReviewBlock).not.toContain('yield* runVerificationForIssue(');
   });
 
   it('specialists review restart route returns 409 for gated dispatches', async () => {
@@ -1067,7 +1068,7 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(restartBlock).toContain('{ status: 409 }');
   });
 
-  it('review-pipeline.ts review request routes treat gated dispatches as deferrals', async () => {
+  it('review-pipeline.ts review request route records gated background dispatches as deferrals', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const routeSrc = readFileSync(
@@ -1081,9 +1082,9 @@ describe('dispatch failure reviewStatus regression', () => {
     const requestReviewBlock = requestReviewMatch![0];
 
     expect(routeSrc).toContain('reviewResult.gated');
+    expect(requestReviewBlock).toContain('if (result.gated)');
     expect(requestReviewBlock).toContain('Review deferred for');
-    expect(requestReviewBlock).toContain('gated: true');
-    expect(requestReviewBlock).toContain('{ status: 409 }');
+    expect(requestReviewBlock).toContain("reviewStatus: 'pending'");
     expect(requestReviewBlock).toContain('reviewNotes: result.message');
   });
 
