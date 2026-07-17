@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T13:58:23.369Z",
+  "updated": "2026-07-17T13:58:35.120Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "session-action-contract": {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 3076083,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:58:35.119Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -160,6 +168,7 @@
     "primary-strip-mode.primary-strip-mode.ac1": "completed",
     "primary-strip-mode.primary-strip-mode.ac2": "completed",
     "primary-strip-mode.primary-strip-mode.ac3": "completed",
-    "primary-strip-mode.primary-strip-mode.ac4": "completed"
+    "primary-strip-mode.primary-strip-mode.ac4": "completed",
+    "session-action-contract": "running"
   }
 }
