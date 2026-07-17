@@ -282,6 +282,9 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
       }
     }
   }
+  if (roleConfig.autonomousModel !== undefined && typeof roleConfig.autonomousModel !== 'string') {
+    throw new Error(`config.yaml: roles.${role}.autonomousModel must be a scalar model reference`);
+  }
   if (roleConfig.harness !== undefined && roleConfig.harness !== 'claude-code' && roleConfig.harness !== 'ohmypi' && roleConfig.harness !== 'codex') {
     throw new Error(`config.yaml: roles.${role}.harness must be claude-code, ohmypi, or codex`);
   }
@@ -325,6 +328,9 @@ export function validateRoleModelRefs(config: NormalizedConfig): void {
 
   for (const [role, roleConfig] of Object.entries(config.roles ?? {}) as Array<[Role, RoleConfig]>) {
     validateRoleFields(role, roleConfig);
+    if (typeof roleConfig.autonomousModel === 'string') {
+      derefWorkhorse(roleConfig.autonomousModel, config, `roles.${role}.autonomousModel`);
+    }
     if (Array.isArray(roleConfig.model)) {
       // Validate each distribution entry's model ref is resolvable.
       for (let i = 0; i < roleConfig.model.length; i++) {
