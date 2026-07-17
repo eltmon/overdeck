@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:18:46.242Z",
+  "updated": "2026-07-17T12:18:59.425Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -74,7 +74,7 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
+    "sequence": 5,
     "claims": {},
     "statusReasons": {
       "codex-mode-enum": {
@@ -88,6 +88,10 @@
       "codex-permissions-doc": {
         "reason": "Documented managed CODEX_HOME rule sharing, narrow execpolicy examples, host-access tradeoffs, and why broad git push or workspace networking remain prompt-gated.",
         "updatedAt": "2026-07-17T12:18:46.242Z"
+      },
+      "codex-sandbox-resolver": {
+        "reason": "Cancelled after current Codex investigation: native execpolicy rules provide command-scoped authorization, so the proposed workspace-net resolver mapping is obsolete.",
+        "updatedAt": "2026-07-17T12:18:59.425Z"
       }
     },
     "claimHistory": [
@@ -110,6 +114,7 @@
     "codex-permissions-doc": "completed",
     "codex-permissions-doc.codex-permissions-doc.ac1": "completed",
     "codex-permissions-doc.codex-permissions-doc.ac2": "completed",
-    "codex-permissions-doc.codex-permissions-doc.ac3": "completed"
+    "codex-permissions-doc.codex-permissions-doc.ac3": "completed",
+    "codex-sandbox-resolver": "cancelled"
   }
 }
