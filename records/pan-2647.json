@@ -155,18 +155,18 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T08:45:29.646Z",
+  "updated": "2026-07-17T08:58:05.670Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T08:45:28.181Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2647-review",
+    "updatedAt": "2026-07-17T08:58:05.639Z",
+    "reviewNotes": "Warning health is announced as Healthy, violating the required distinct accessible state presentation.",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
     "lastVerifiedCommit": "2c1047edc38433aa6ff58d44d069ea637dade3fb",
@@ -186,9 +186,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2280500,
-            "output": 29517,
-            "cacheRead": 3918336,
+            "input": 4780263,
+            "output": 57605,
+            "cacheRead": 6983680,
             "cacheWrite": 0
           }
         },
@@ -217,9 +217,9 @@
           "cacheWrite": 143876
         },
         "openai/gpt-5.6-sol": {
-          "input": 29977051,
-          "output": 1457405,
-          "cacheRead": 259816448,
+          "input": 32476814,
+          "output": 1485493,
+          "cacheRead": 262881792,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -230,8 +230,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 329.643179,
-        "pricingAsOf": "2026-07-17T08:45:28.261Z"
+        "usd": 344.517306,
+        "pricingAsOf": "2026-07-17T08:58:05.657Z"
       }
     },
     "merges": [
