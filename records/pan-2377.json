@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-17T13:22:50.191Z",
+  "updated": "2026-07-17T13:45:04.740Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -94,16 +94,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "orders-domain-lib": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 813848,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:22:50.191Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -115,12 +107,27 @@
         "outcome": "completed",
         "reason": "Added and tested OrderBook contracts and the FlywheelStatus orders projection",
         "releasedAt": "2026-07-17T13:15:02.987Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 813848,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:22:50.191Z",
+        "itemId": "orders-domain-lib",
+        "outcome": "completed",
+        "reason": "Implemented order-book parse, state-worktree I/O, canonical resolver and writer doors, queue persistence, progress/drain calculation, start validation, and Git-backed tests; focused tests, typecheck, and lint pass.",
+        "releasedAt": "2026-07-17T13:45:04.739Z"
       }
     ],
     "statusReasons": {
       "contracts-orders": {
         "reason": "Added and tested OrderBook contracts and the FlywheelStatus orders projection",
         "updatedAt": "2026-07-17T13:15:02.987Z"
+      },
+      "orders-domain-lib": {
+        "reason": "Implemented order-book parse, state-worktree I/O, canonical resolver and writer doors, queue persistence, progress/drain calculation, start validation, and Git-backed tests; focused tests, typecheck, and lint pass.",
+        "updatedAt": "2026-07-17T13:45:04.739Z"
       }
     }
   },
@@ -129,6 +136,11 @@
     "contracts-orders.contracts-orders.ac1": "completed",
     "contracts-orders.contracts-orders.ac2": "completed",
     "contracts-orders.contracts-orders.ac3": "completed",
-    "orders-domain-lib": "running"
+    "orders-domain-lib": "completed",
+    "orders-domain-lib.orders-domain-lib.ac1": "completed",
+    "orders-domain-lib.orders-domain-lib.ac2": "completed",
+    "orders-domain-lib.orders-domain-lib.ac3": "completed",
+    "orders-domain-lib.orders-domain-lib.ac4": "completed",
+    "orders-domain-lib.orders-domain-lib.ac5": "completed"
   }
 }
