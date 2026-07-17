@@ -5709,3 +5709,10 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **Re-check when fixing 2846:** PAN-2665's post-merge row passed cleanly minutes earlier — verify whether its agent was paused at all. If not, "paused ⇒ never reconciles" fully explains both observations and my earlier "race" reading was a coincidence.
 - **Still working:** 1610 (final sequence item), 2445 (A13), 2377, 2829 — all review/test `pending`, no PRs yet.
 - **B11=PAN-2233 still NOT started** — TENET-10 execution-mode question open with the operator since tick 9.
+
+## Tick 15 — 2026-07-17 ~15:06 — 4 workers healthy with large diffs; nothing to drive
+- **Main GREEN** (3efe2b7ba4). Live build e58a106ec7. 4 issues closed out this run (2822, 2661, 2831, 2665).
+- **All 4 work agents progressing with substantial diffs** (read via pane, not liveness): 1610 `+1422/-584` (final sequence item; review-supervisor at inspect), 2377 `+1316/-2` (order-book-as-feature; review-supervisor spawned), 2829 `+384/-140` (compacting), 2445 working `gate-module` item. All review/test/verification `pending`, no PRs yet — these are LARGE features (shared action registry, order-book-as-feature), so long build-out before a PR is expected, not a stall. **Nothing to drive.** No PAN-2839 half-spawns recurred (4 clean ticks now).
+- **Three operator-started sessions confirmed and left alone** (`flywheelRunId: None`): agent-pan-2842 (PAN-2842, work — `status:starting` but tmux session EXISTS, so transient not a stuck half-spawn), strike-pan-2844 (PAN-2844), plus the earlier strike-pan-1896 / strike-pan-2840. **`status:starting` is NOT automatically a PAN-2839 half-spawn — verify the tmux session first; if it exists, it's just mid-boot.**
+- **B11=PAN-2233 still NOT started** — TENET-10 execution-mode question with the operator since tick 9 (6 ticks). A8 prereq satisfied, Lane B slot free.
+- No new substrate bugs this tick. Open substrate: 2846 (permanent close-out block, root-caused), 2839 (autoSpawn 500), 2828 (strike ancestry), 2824 (lens caller).
