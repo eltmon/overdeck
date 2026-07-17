@@ -4,17 +4,17 @@
     "created": "2026-07-13T00:04:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2232: refactor(cloister): decompose specialists.ts (1,749 lines) into focused modules",
-    "updated": "2026-07-17T01:55:45.684Z"
+    "updated": "2026-07-17T04:40:44.345Z"
   },
   "plan": {
     "id": "pan-2232",
     "title": "refactor(cloister): decompose specialists.ts (1,749 lines) into focused modules",
-    "status": "proposed",
+    "status": "approved",
     "uid": "6db149d8-388c-439f-8559-2b4f5bc1b0ab",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-13T00:04:52Z",
-    "updated": "2026-07-17T01:55:45.684Z",
+    "updated": "2026-07-17T04:40:44.345Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2232",
@@ -595,5 +595,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
