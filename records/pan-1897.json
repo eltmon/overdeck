@@ -294,23 +294,41 @@
     "recordedAt": "2026-07-16T19:36:56.017Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T02:14:39.110Z",
+  "updated": "2026-07-17T02:20:03.826Z",
   "pipeline": {
     "issueId": "PAN-1897",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T02:14:37.843Z",
-    "reviewNotes": "[correctness] The spawn budget cannot terminate or bound `spawnAgent` — `src/cli/commands/start.ts:1221`",
+    "updatedAt": "2026-07-17T02:20:03.794Z",
+    "reviewNotes": "Three convoy reviewers failed before producing reports; performance also found two current-cycle unbounded reconciliation paths.",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
     "lastVerifiedCommit": "4ad533fd2324319dfb8547f956f0cdd047716a96",
     "reviewRequestedAt": "2026-07-17T02:14:32.072Z",
     "reviewSpawnedAt": "2026-07-17T02:14:37.841Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "df7a0e998a0d54f18b9dd7388e41a2f1196f60d0"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -348,9 +366,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6615990,
-            "output": 149395,
-            "cacheRead": 21698048,
+            "input": 7272400,
+            "output": 159821,
+            "cacheRead": 24170496,
             "cacheWrite": 0
           }
         },
@@ -411,9 +429,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 38637424,
-          "output": 1068724,
-          "cacheRead": 204358912,
+          "input": 39293834,
+          "output": 1079150,
+          "cacheRead": 206831360,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -436,8 +454,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 324.493768,
-        "pricingAsOf": "2026-07-17T02:14:37.892Z"
+        "usd": 329.324822,
+        "pricingAsOf": "2026-07-17T02:20:03.816Z"
       }
     },
     "merges": [
