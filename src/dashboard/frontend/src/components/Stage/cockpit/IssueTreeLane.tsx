@@ -234,19 +234,37 @@ export function IssueTreeLane({
         </button>
       </div>
       {staleReviewers.length > 0 ? (
-        <div data-section="Stale-review warning" className="mb-2 rounded-[var(--radius-sm)] border border-amber-500/40 bg-amber-500/10 px-2.5 py-2 text-[11px]" role="alert">
-          <div className="font-semibold text-amber-600 dark:text-amber-400">⚠ Stale review state</div>
-          <div className="mt-0.5 text-muted-foreground">
-            {staleReviewers.length} leftover review agent{staleReviewers.length === 1 ? '' : 's'} from a previous
-            cycle (extended-review sub-reviewers). A fresh review can&rsquo;t run cleanly until they&rsquo;re cleared.
-          </div>
-          <button
-            type="button"
-            className="mt-1.5 rounded-[var(--radius-sm)] border border-destructive/50 px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
-            onClick={() => actions.all.find((view) => view.action.key === 'purgeReview')?.invoke()}
-          >
-            Complete review reset
-          </button>
+        <div
+          data-section="Stale-review warning"
+          className={`mb-2 rounded-[var(--radius-sm)] border border-amber-500/40 bg-amber-500/10 text-[11px] ${spineCollapsed ? 'grid place-items-center p-1' : 'px-2.5 py-2'}`}
+          role="alert"
+        >
+          {spineCollapsed ? (
+            <button
+              type="button"
+              className="grid h-7 w-7 place-items-center rounded-[var(--radius-sm)] text-amber-600 hover:bg-amber-500/15 dark:text-amber-400"
+              aria-label={`Stale review state: ${staleReviewers.length} leftover review agent${staleReviewers.length === 1 ? '' : 's'}. Expand agent spine for details and reset.`}
+              title="Stale review state — expand agent spine for details and reset"
+              onClick={onToggleSpine}
+            >
+              <span aria-hidden="true">⚠</span>
+            </button>
+          ) : (
+            <>
+              <div className="font-semibold text-amber-600 dark:text-amber-400">⚠ Stale review state</div>
+              <div className="mt-0.5 text-muted-foreground">
+                {staleReviewers.length} leftover review agent{staleReviewers.length === 1 ? '' : 's'} from a previous
+                cycle (extended-review sub-reviewers). A fresh review can&rsquo;t run cleanly until they&rsquo;re cleared.
+              </div>
+              <button
+                type="button"
+                className="mt-1.5 rounded-[var(--radius-sm)] border border-destructive/50 px-2 py-1 text-[11px] font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                onClick={() => actions.all.find((view) => view.action.key === 'purgeReview')?.invoke()}
+              >
+                Complete review reset
+              </button>
+            </>
+          )}
         </div>
       ) : null}
       <AgentsLane

@@ -13,22 +13,41 @@ import { DENSITY_SECTIONS } from '../../../../src/dashboard/frontend/src/compone
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // tests/unit/dashboard/frontend/ → repo root (four directories up).
 const REPO_ROOT = path.resolve(__dirname, '../../../..');
-const COMPONENTS_ROOT = path.resolve(REPO_ROOT, 'src/dashboard/frontend/src/components');
+const COCKPIT_COMPONENTS_ROOT = path.resolve(
+  REPO_ROOT,
+  'src/dashboard/frontend/src/components/Stage/cockpit',
+);
 
-function collectTsxFiles(directory: string): string[] {
+function collectFiles(directory: string, extension: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const entryPath = path.join(directory, entry.name);
-    if (entry.isDirectory()) return collectTsxFiles(entryPath);
-    return entry.isFile() && entry.name.endsWith('.tsx') ? [entryPath] : [];
+    if (entry.isDirectory()) return collectFiles(entryPath, extension);
+    return entry.isFile() && entry.name.endsWith(extension) ? [entryPath] : [];
   });
 }
 
-const COCKPIT_SOURCE_TAGS = collectTsxFiles(COMPONENTS_ROOT).flatMap((file) => {
+const COCKPIT_SOURCE_TAGS = collectFiles(COCKPIT_COMPONENTS_ROOT, '.tsx')
+  .filter((file) => !file.endsWith('.test.tsx'))
+  .flatMap((file) => {
+    const source = readFileSync(file, 'utf8');
+    return [...source.matchAll(/<[^>]*data-section="[^"]+"[^>]*>/gs)].map((match) => ({
+      file: path.relative(REPO_ROOT, file),
+      tag: match[0],
+    }));
+  });
+
+const HIDDEN_COCKPIT_SECTION_RULES = collectFiles(COCKPIT_COMPONENTS_ROOT, '.css').flatMap((file) => {
   const source = readFileSync(file, 'utf8');
-  return [...source.matchAll(/<[^>]*data-section="[^"]+"[^>]*>/gs)].map((match) => ({
-    file: path.relative(REPO_ROOT, file),
-    tag: match[0],
-  }));
+  return [...source.matchAll(/([^{}]+)\{([^{}]*)\}/gs)].flatMap((match) => {
+    const selector = match[1].trim();
+    const declarations = match[2];
+    if (!/\bdisplay\s*:\s*none\b/.test(declarations)) return [];
+    return selector
+      .split(',')
+      .map((candidate) => candidate.trim())
+      .filter((candidate) => /\[data-section="[^"]+"\]\s*$/.test(candidate))
+      .map((candidate) => ({ file: path.relative(REPO_ROOT, file), selector: candidate }));
+  });
 });
 
 /**
@@ -145,7 +164,16 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
 
     expect(
       missingOrHidden,
-      `cockpit section(s) without a real visible data-section home: ${missingOrHidden.join(', ')}`,
+      `cockpit section(s) without a real visible cockpit data-section home: ${missingOrHidden.join(', ')}`,
+    ).toEqual([]);
+  });
+
+  it('does not hide cockpit section markers directly in collapsed-mode CSS', () => {
+    expect(
+      HIDDEN_COCKPIT_SECTION_RULES,
+      `cockpit CSS hides required section marker(s): ${HIDDEN_COCKPIT_SECTION_RULES
+        .map(({ file, selector }) => `${selector} in ${file}`)
+        .join(', ')}`,
     ).toEqual([]);
   });
 
