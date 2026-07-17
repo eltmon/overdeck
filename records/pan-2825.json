@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T10:29:34.113Z",
-  "updated": "2026-07-17T11:07:14.032Z",
+  "updated": "2026-07-17T11:07:14.941Z",
   "pipeline": {
     "issueId": "PAN-2825",
     "reviewStatus": "pending",
@@ -11,13 +11,21 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T11:07:13.989Z",
+    "updatedAt": "2026-07-17T11:07:14.924Z",
     "mergeNotes": "Work agent strike-pan-2825 stopped before completing the rebase onto main",
     "strikeReadyHead": "1e3e8459f7fccd6b113e94681a8a679fef40e349",
     "strikeReadyAt": "2026-07-17T11:03:01.426Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-17T11:07:14.921Z",
+        "strikeHead": "1e3e8459f7fccd6b113e94681a8a679fef40e349",
+        "mainHead": "55acad7b52dc139f044a15a8d5f56915e9cc6b0f",
+        "outcome": "failed",
+        "detail": "Work agent strike-pan-2825 stopped before completing the rebase onto main"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -41,7 +49,7 @@
       },
       "costAtCloseOut": {
         "usd": 14.893558,
-        "pricingAsOf": "2026-07-17T11:07:14.027Z"
+        "pricingAsOf": "2026-07-17T11:07:14.932Z"
       }
     },
     "merges": [],
