@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T01:59:51.944Z",
+  "updated": "2026-07-17T02:17:50.931Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "agent-health-classify": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 2865825,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:59:51.944Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -165,6 +157,16 @@
         "itemId": "sampler-hysteresis",
         "outcome": "completed",
         "releasedAt": "2026-07-17T01:59:37.581Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2865825,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:59:51.944Z",
+        "itemId": "agent-health-classify",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T02:17:50.930Z"
       }
     ],
     "statusReasons": {
@@ -206,6 +208,11 @@
     "sampler-hysteresis.sampler-hysteresis.ac3": "completed",
     "sampler-hysteresis.sampler-hysteresis.ac4": "completed",
     "sampler-hysteresis.sampler-hysteresis.ac5": "completed",
-    "agent-health-classify": "running"
+    "agent-health-classify": "completed",
+    "agent-health-classify.agent-health-classify.ac1": "completed",
+    "agent-health-classify.agent-health-classify.ac2": "completed",
+    "agent-health-classify.agent-health-classify.ac3": "completed",
+    "agent-health-classify.agent-health-classify.ac4": "completed",
+    "agent-health-classify.agent-health-classify.ac5": "completed"
   }
 }
