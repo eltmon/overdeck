@@ -156,4 +156,112 @@ describe('state migration Git command cancellation', () => {
       rmSync(stateRoot, { recursive: true, force: true });
     }
   });
+
+  it('passes the reconciliation signal through tracked-manifest copies', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'pan-state-tracked-source-'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'pan-state-tracked-destination-'));
+    const source = join(repo, '.pan', 'records', 'large.bin');
+    mkdirSync(join(repo, '.pan', 'records'), { recursive: true });
+    writeFileSync(source, 'tracked');
+    const controller = new AbortController();
+    const reason = new Error('state reconciliation timed out');
+    let markCopyStarted!: () => void;
+    const copyStarted = new Promise<void>((resolve) => { markCopyStarted = resolve; });
+    const copyFile = vi.fn((
+      _source: string,
+      _destination: string,
+      signal?: AbortSignal,
+    ) => new Promise<void>((_resolve, reject) => {
+      markCopyStarted();
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+
+    try {
+      const copy = __testInternals.trackedManifest(
+        repo,
+        'source-sha',
+        stateRoot,
+        controller.signal,
+        copyFile,
+      );
+      await Promise.resolve();
+      callback(null, '.pan/records/large.bin\n', '');
+      await copyStarted;
+      const rejection = expect(copy).rejects.toBe(reason);
+
+      controller.abort(reason);
+
+      await rejection;
+      expect(copyFile).toHaveBeenCalledWith(
+        source,
+        join(stateRoot, 'records', 'large.bin'),
+        controller.signal,
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+      rmSync(stateRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('passes the reconciliation signal through untracked-note copies', async () => {
+    const sourceRoot = mkdtempSync(join(tmpdir(), 'pan-state-note-source-'));
+    const stateRoot = mkdtempSync(join(tmpdir(), 'pan-state-note-destination-'));
+    const source = join(sourceRoot, '.pan', 'operator-note.md');
+    mkdirSync(join(sourceRoot, '.pan'), { recursive: true });
+    writeFileSync(source, 'operator note');
+    const controller = new AbortController();
+    const reason = new Error('state reconciliation timed out');
+    let markCopyStarted!: () => void;
+    const copyStarted = new Promise<void>((resolve) => { markCopyStarted = resolve; });
+    const copyFile = vi.fn((
+      _source: string,
+      _destination: string,
+      signal?: AbortSignal,
+    ) => new Promise<void>((_resolve, reject) => {
+      markCopyStarted();
+      signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+    }));
+
+    try {
+      const copy = __testInternals.preserveUntrackedNotes(
+        sourceRoot,
+        stateRoot,
+        ['.pan/operator-note.md'],
+        controller.signal,
+        copyFile,
+      );
+      await copyStarted;
+      const rejection = expect(copy).rejects.toBe(reason);
+
+      controller.abort(reason);
+
+      await rejection;
+      expect(copyFile).toHaveBeenCalledWith(
+        source,
+        join(stateRoot, 'notes', 'operator-note.md'),
+        controller.signal,
+      );
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      rmSync(sourceRoot, { recursive: true, force: true });
+      rmSync(stateRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('detects untracked-note collisions with asynchronous streaming hashes', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'pan-state-note-collision-'));
+    const source = join(root, 'source.md');
+    const destination = join(root, 'destination.md');
+    writeFileSync(source, 'same');
+    writeFileSync(destination, 'same');
+
+    try {
+      await expect(__testInternals.filesEqualAbortable(source, destination)).resolves.toBe(true);
+      writeFileSync(destination, 'different');
+      await expect(__testInternals.filesEqualAbortable(source, destination)).resolves.toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });

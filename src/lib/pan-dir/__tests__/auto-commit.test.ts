@@ -107,6 +107,72 @@ describe('auto-commit', () => {
     expect(secondResult).toEqual(firstResult);
   });
 
+  it('cancels and settles active and serializer-blocked flushes for one Git root', async () => {
+    vi.useFakeTimers();
+    try {
+      let firstStarted = false;
+      let secondStarted = false;
+      let markFirstStarted!: () => void;
+      const firstStartedPromise = new Promise<void>((resolve) => { markFirstStarted = resolve; });
+      let finishFirstFinalizer!: () => void;
+      const firstFinalizer = new Promise<void>((resolve) => { finishFirstFinalizer = resolve; });
+      const firstOperation = Effect.scoped(Effect.gen(function* () {
+        yield* Effect.acquireRelease(
+          Effect.sync(() => {
+            firstStarted = true;
+            markFirstStarted();
+          }),
+          () => Effect.promise(() => firstFinalizer),
+        );
+        return yield* Effect.never;
+      }));
+      const secondOperation = Effect.sync(() => {
+        secondStarted = true;
+        return { committed: false };
+      });
+      const gitRoot = join(tmp, 'shared-state-root');
+      const first = __testInternals.startSerializedFlush(
+        `${tmp}-first`,
+        gitRoot,
+        firstOperation,
+      );
+      const second = __testInternals.startSerializedFlush(
+        `${tmp}-second`,
+        gitRoot,
+        secondOperation,
+      );
+      void first.promise.catch(() => undefined);
+      void second.promise.catch(() => undefined);
+      await firstStartedPromise;
+      expect(firstStarted).toBe(true);
+      expect(secondStarted).toBe(false);
+
+      const controller = new AbortController();
+      const reason = new Error('state reconciliation timed out');
+      let waiterSettled = false;
+      const waiter = __testInternals.waitForFlush(second, controller.signal);
+      const rejection = expect(waiter).rejects.toBe(reason);
+      void waiter.then(
+        () => { waiterSettled = true; },
+        () => { waiterSettled = true; },
+      );
+
+      controller.abort(reason);
+      await vi.advanceTimersByTimeAsync(0);
+
+      expect(waiterSettled).toBe(false);
+      expect(secondStarted).toBe(false);
+      finishFirstFinalizer();
+      await vi.advanceTimersByTimeAsync(0);
+      await rejection;
+      expect(waiterSettled).toBe(true);
+      expect(secondStarted).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.effect('does not commit when on a non-main branch', () =>
     Effect.gen(function* () {
       execSync('git checkout -q -b feature/foo', { cwd: tmp });

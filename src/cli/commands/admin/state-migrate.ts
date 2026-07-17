@@ -1,5 +1,5 @@
 import { execFile, type ChildProcess, type ExecFileException } from 'node:child_process';
-import { copyFileSync, createReadStream, createWriteStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { chmod, lstat, mkdir, readdir, rename, rm, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -94,6 +94,7 @@ async function trackedManifest(
   sourceSha: string,
   stateRoot: string,
   signal?: AbortSignal,
+  copyFile: CopyFileOperation = copyFileAbortable,
 ): Promise<StateMigrationManifestEntry[]> {
   const paths = (await git(repo, ['ls-tree', '-r', '--name-only', sourceSha, '--', '.pan'], signal))
     .split('\n').filter(Boolean);
@@ -104,10 +105,7 @@ async function trackedManifest(
     if (!destination) continue;
     const source = join(repo, path);
     const target = join(stateRoot, destination);
-    if (!existsSync(target)) {
-      mkdirSync(dirname(target), { recursive: true });
-      copyFileSync(source, target);
-    }
+    if (!existsSync(target)) await copyFile(source, target, signal);
     manifest.push(await manifestEntry(source, target, signal));
   }
   return manifest;
@@ -175,6 +173,57 @@ async function copyFileAbortable(
   } finally {
     await rm(temporary, { force: true });
   }
+}
+
+async function filesEqualAbortable(
+  source: string,
+  destination: string,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  const [sourceEntry, destinationEntry] = await Promise.all([
+    manifestEntry(source, source, signal),
+    manifestEntry(destination, destination, signal),
+  ]);
+  return sourceEntry.size === destinationEntry.size
+    && sourceEntry.sha256 === destinationEntry.sha256;
+}
+
+async function preserveUntrackedNotes(
+  legacyStateSource: string,
+  stateRoot: string,
+  paths: readonly string[],
+  signal?: AbortSignal,
+  copyFile: CopyFileOperation = copyFileAbortable,
+): Promise<StateMigrationManifestEntry[]> {
+  const manifest: StateMigrationManifestEntry[] = [];
+  for (const path of paths) {
+    signal?.throwIfAborted();
+    const source = join(legacyStateSource, path);
+    let sourceStat;
+    try {
+      sourceStat = await lstat(source);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue;
+      throw error;
+    }
+    if (sourceStat.isSymbolicLink()) {
+      throw new Error(`Legacy state changed during migration: symbolic link appeared at ${source}`);
+    }
+    if (!sourceStat.isFile()) continue;
+
+    const destination = join(stateRoot, 'notes', path.slice('.pan/'.length));
+    if (existsSync(destination)) {
+      // A byte-identical destination is this migration's own interrupted prior
+      // copy. Stream both files so collision checks remain cancellable.
+      if (!await filesEqualAbortable(source, destination, signal)) {
+        throw new Error(`Untracked-note destination collision: ${destination}`);
+      }
+    } else {
+      await copyFile(source, destination, signal);
+    }
+    manifest.push(await manifestEntry(source, destination, signal));
+  }
+  return manifest;
 }
 
 async function assertNoLegacySymlinks(
@@ -318,10 +367,10 @@ export async function migrateProjectState(
   options.signal?.throwIfAborted();
   const release = acquireStateMigrationLock(projectKey);
   try {
-    // A queued state commit is already inside the canonical durability boundary.
-    // Await it without interrupting the Effect, then honor cancellation before
-    // starting migration work so the timeout cannot detach a live commit/push.
-    const flush = await Effect.runPromise(flushAutoCommits(repo));
+    // The reconciliation deadline owns the writer too: cancellation interrupts
+    // every active or queued flush for this Git root and waits for settlement, so
+    // migration can never proceed beside a detached commit or push.
+    const flush = await Effect.runPromise(flushAutoCommits(repo, options.signal));
     if (flush.errored) {
       throw new Error(`State writer did not quiesce before migration: ${flush.reason ?? 'unknown error'}`);
     }
@@ -397,23 +446,12 @@ export async function migrateProjectState(
           .filter((entry) => entry.isFile())
           .map((entry) => `.pan/${entry.name}`)
         : [];
-    for (const path of untracked) {
-      options.signal?.throwIfAborted();
-      if (!existsSync(join(legacyStateSource, path))) continue;
-      const destination = join(stateRoot, 'notes', path.slice('.pan/'.length));
-      if (existsSync(destination)) {
-        // A byte-identical destination is this migration's own interrupted
-        // prior copy — resume over it. Only differing content is a genuine
-        // collision worth refusing.
-        const identical = readFileSync(join(legacyStateSource, path)).equals(readFileSync(destination));
-        if (!identical) throw new Error(`Untracked-note destination collision: ${destination}`);
-        manifest.push(await manifestEntry(join(legacyStateSource, path), destination));
-        continue;
-      }
-      mkdirSync(dirname(destination), { recursive: true });
-      copyFileSync(join(legacyStateSource, path), destination);
-      manifest.push(await manifestEntry(join(legacyStateSource, path), destination));
-    }
+    manifest.push(...await preserveUntrackedNotes(
+      legacyStateSource,
+      stateRoot,
+      untracked,
+      options.signal,
+    ));
     if (untracked.length > 0) {
       await git(stateRoot, ['add', 'notes'], options.signal);
       // Resume tolerance: a prior interrupted attempt may have already
@@ -483,7 +521,14 @@ export async function migrateProjectState(
   }
 }
 
-export const __testInternals = { copyFileAbortable, copyLegacyState, git };
+export const __testInternals = {
+  copyFileAbortable,
+  copyLegacyState,
+  filesEqualAbortable,
+  git,
+  preserveUntrackedNotes,
+  trackedManifest,
+};
 
 export function registerStateMigrationCommand(admin: Command): void {
   admin.command('state')

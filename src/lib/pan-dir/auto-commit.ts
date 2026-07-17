@@ -103,8 +103,14 @@ export interface FlushResult {
   reason?: string;
 }
 
+interface ActiveFlush {
+  controller: AbortController;
+  gitRoot: string;
+  promise: Promise<FlushResult>;
+}
+
 const pending = new Map<string, QueuedCommit>();
-const active = new Map<string, Promise<FlushResult>>();
+const active = new Map<string, ActiveFlush>();
 const serializers = new Map<string, Promise<unknown>>();
 
 interface GitResult {
@@ -306,8 +312,9 @@ export function reconcileStatePlaneDrift(
  */
 export function flushAutoCommits(
   projectRoot: string,
+  signal?: AbortSignal,
 ): Effect.Effect<FlushResult, never> {
-  return Effect.promise(() => flushPromise(projectRoot));
+  return Effect.promise(() => flushPromise(projectRoot, signal));
 }
 
 /**
@@ -322,46 +329,113 @@ export function flushAllPendingAutoCommits(): Effect.Effect<FlushResult[], never
   });
 }
 
-function flushPromise(projectRoot: string): Promise<FlushResult> {
+function flushPromise(
+  projectRoot: string,
+  signal?: AbortSignal,
+): Promise<FlushResult> {
   const batch = pending.get(projectRoot);
-  if (!batch) {
-    return active.get(projectRoot)
-      ?? Promise.resolve({ committed: false, reason: 'no pending' });
+  const activeFlush = batch
+    ? (clearTimeout(batch.timer), flushInner(projectRoot))
+    : active.get(projectRoot);
+  if (!activeFlush) {
+    signal?.throwIfAborted();
+    return Promise.resolve({ committed: false, reason: 'no pending' });
   }
-  clearTimeout(batch.timer);
-  return flushInner(projectRoot);
+  return waitForFlush(activeFlush, signal);
 }
 
-function flushInner(projectRoot: string): Promise<FlushResult> {
+function flushInner(projectRoot: string): ActiveFlush | undefined {
   const batch = pending.get(projectRoot);
-  if (!batch) {
-    return active.get(projectRoot)
-      ?? Promise.resolve({ committed: false, reason: 'no pending' });
-  }
+  if (!batch) return active.get(projectRoot);
   pending.delete(projectRoot);
 
   const gitRoot = batch.repoRoot ?? projectRoot;
-  const prior = serializers.get(gitRoot) ?? Promise.resolve();
-  const task = prior.then(() => Effect.runPromise(doBoundedCommit(projectRoot, batch)));
-  active.set(projectRoot, task);
-
-  const tail = task.catch(() => undefined);
-  serializers.set(gitRoot, tail);
-  void task.then(
-    () => clearActiveFlush(projectRoot, gitRoot, task, tail),
-    () => clearActiveFlush(projectRoot, gitRoot, task, tail),
+  return startSerializedFlush(
+    projectRoot,
+    gitRoot,
+    doBoundedCommit(projectRoot, batch),
   );
-  return task;
+}
+
+function startSerializedFlush(
+  projectRoot: string,
+  gitRoot: string,
+  operation: Effect.Effect<FlushResult, never>,
+): ActiveFlush {
+  const prior = serializers.get(gitRoot) ?? Promise.resolve();
+  const controller = new AbortController();
+  const promise = prior.then(() => {
+    controller.signal.throwIfAborted();
+    return Effect.runPromise(operation, { signal: controller.signal });
+  });
+  const activeFlush = { controller, gitRoot, promise };
+  active.set(projectRoot, activeFlush);
+
+  const tail = promise.catch(() => undefined);
+  serializers.set(gitRoot, tail);
+  void promise.then(
+    () => clearActiveFlush(projectRoot, activeFlush, tail),
+    () => clearActiveFlush(projectRoot, activeFlush, tail),
+  );
+  return activeFlush;
+}
+
+async function waitForFlush(
+  activeFlush: ActiveFlush,
+  signal?: AbortSignal,
+): Promise<FlushResult> {
+  if (!signal) return activeFlush.promise;
+  if (signal.aborted) {
+    await abortAndSettleGitRoot(activeFlush.gitRoot, signal.reason);
+    throw signal.reason;
+  }
+
+  return new Promise((resolve, reject) => {
+    let completed = false;
+    const onAbort = () => {
+      if (completed) return;
+      completed = true;
+      signal.removeEventListener('abort', onAbort);
+      void abortAndSettleGitRoot(activeFlush.gitRoot, signal.reason).then(
+        () => reject(signal.reason),
+        reject,
+      );
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    void activeFlush.promise.then(
+      (result) => {
+        if (completed) return;
+        completed = true;
+        signal.removeEventListener('abort', onAbort);
+        resolve(result);
+      },
+      (error) => {
+        if (completed) return;
+        completed = true;
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      },
+    );
+    if (signal.aborted) onAbort();
+  });
+}
+
+async function abortAndSettleGitRoot(
+  gitRoot: string,
+  reason: unknown,
+): Promise<void> {
+  const matching = [...active.values()].filter((flush) => flush.gitRoot === gitRoot);
+  for (const flush of matching) flush.controller.abort(reason);
+  await Promise.allSettled(matching.map((flush) => flush.promise));
 }
 
 function clearActiveFlush(
   projectRoot: string,
-  gitRoot: string,
-  task: Promise<FlushResult>,
+  activeFlush: ActiveFlush,
   tail: Promise<unknown>,
 ): void {
-  if (active.get(projectRoot) === task) active.delete(projectRoot);
-  if (serializers.get(gitRoot) === tail) serializers.delete(gitRoot);
+  if (active.get(projectRoot) === activeFlush) active.delete(projectRoot);
+  if (serializers.get(activeFlush.gitRoot) === tail) serializers.delete(activeFlush.gitRoot);
 }
 
 function doBoundedCommit(
@@ -661,7 +735,11 @@ export function deriveProjectRoot(path: string): string | null {
   return null;
 }
 
-export const __testInternals = { boundStateFlush };
+export const __testInternals = {
+  boundStateFlush,
+  startSerializedFlush,
+  waitForFlush,
+};
 
 function relativizeToRoot(absOrRel: string, projectRoot: string): string {
   const rootPrefix = projectRoot.endsWith(sep) ? projectRoot : projectRoot + sep;
