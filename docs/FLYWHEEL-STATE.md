@@ -5522,3 +5522,9 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Session: **10 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966, 2807) + 2811 strike + 2 deploys + 14 close-outs.
 - In flight: 1897 (review synthesizing @27818d81), 2232 PR#2818 CLEAN (review synthesizing @head), 2647 pre-PR.
 - Close-out owed: 1491, 2252, 1966, 2807. Deploy batch after 1897/2232 resolve or the set drains.
+
+## Tick 84 — 2026-07-16 ~23:25 — PAN-2232 MERGED (11 total) — the long-blocked one lands
+- **PAN-2232 MERGED → f01c4ca636** via PR#2818: FRESH APPROVED @5a29ce43==head (23:18), CI green, CLEAN. This is the issue that spent the week blocked behind the 2794→2802→2806 strike-landing chain and a stuck scheduler yield — now done.
+- Session: **11 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966, 2807, 2232) + 2811 strike + 2 deploys + 14 close-outs + 4 issues filed (2809/2810/2813/2817).
+- Remaining live: 1897 (review synthesizing @27818d81 — convoy has had 1h+, check for re-idle next tick), 2647 (pre-PR, working).
+- Close-out owed: 1491, 2252, 1966, 2807, 2232 + final deploy batch. Plan: when 1897/2647 resolve OR next hour turns, deploy once and close all.
