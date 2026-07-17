@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GROUP_LABELS, GROUP_ORDER, ISSUE_ACTIONS, type IssueActionKey, type PipelinePhase } from '../../lib/issueActions';
 import { ContextMenuRoot, ContextMenuTrigger } from '../shared/ContextMenu';
@@ -57,6 +57,10 @@ function expectInDocumentOrder(elements: HTMLElement[]) {
   }
 }
 
+beforeEach(() => {
+  localStorage.clear();
+});
+
 afterEach(() => {
   invokes.clear();
 });
@@ -111,7 +115,7 @@ describe('GroupedIssueActionMenu', () => {
     expectInDocumentOrder([recoverRows[0], tellRows[0]]);
 
     fireEvent.keyDown(menu, { key: 'ArrowDown' });
-    expect(recoverRows[0]).toHaveFocus();
+    expect(recoverRows[0].closest('[role="menuitem"]')).toHaveFocus();
   });
 
   it('keeps disabled actions visible with their reason and never invokes them', () => {
@@ -155,6 +159,57 @@ describe('GroupedIssueActionMenu', () => {
     expect(document.querySelector('[data-issue-action-section="work"]')).not.toBeInTheDocument();
     expect(document.querySelector('[data-issue-action-section="agent"]')).toBeInTheDocument();
     expect(screen.queryByText('This session')).not.toBeInTheDocument();
+  });
+
+  it('starts with explanations off and keeps the footer toggle visible', () => {
+    renderMenu({
+      phase: 'WORK_RUNNING',
+      primaryKeys: [],
+      enabledKeys: ['plan', 'watchPlanning'],
+      actionKeys: ['plan', 'watchPlanning'],
+    });
+
+    expect(screen.getByTestId('issue-action-explain-toggle')).toHaveTextContent('Explain actions');
+    expect(screen.getByTestId('issue-action-explain-toggle')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByTestId('issue-action-description-plan')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-verb-plan')).not.toBeInTheDocument();
+  });
+
+  it('renders every description and available pan verb after toggling and persists the preference', () => {
+    renderMenu({
+      phase: 'WORK_RUNNING',
+      primaryKeys: [],
+      enabledKeys: ISSUE_ACTIONS.map((action) => action.key),
+    });
+
+    fireEvent.click(screen.getByTestId('issue-action-explain-toggle'));
+    fireEvent.click(screen.getByRole('menuitem', { name: `Danger (${ISSUE_ACTIONS.filter((action) => action.group === 'danger').length} available)` }));
+
+    expect(localStorage.getItem('overdeck.issueActions.explain')).toBe('true');
+    expect(screen.getByTestId('issue-action-explain-toggle')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getAllByTestId(/^issue-action-description-/)).toHaveLength(ISSUE_ACTIONS.length);
+    expect(screen.getAllByTestId(/^issue-action-verb-/)).toHaveLength(
+      ISSUE_ACTIONS.filter((action) => action.panVerb !== null).length,
+    );
+    expect(screen.getByTestId('issue-action-verb-plan')).toHaveTextContent('pan plan');
+    expect(screen.queryByTestId('issue-action-verb-watchPlanning')).not.toBeInTheDocument();
+  });
+
+  it('starts with explanations on when the stored preference is true', () => {
+    localStorage.setItem('overdeck.issueActions.explain', 'true');
+
+    renderMenu({
+      phase: 'WORK_RUNNING',
+      primaryKeys: [],
+      enabledKeys: ['plan'],
+      actionKeys: ['plan'],
+    });
+
+    expect(screen.getByTestId('issue-action-explain-toggle')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('issue-action-description-plan')).toHaveTextContent(
+      ISSUE_ACTIONS.find((action) => action.key === 'plan')?.description ?? '',
+    );
+    expect(screen.getByTestId('issue-action-verb-plan')).toHaveTextContent('pan plan');
   });
 
   it('toggles Danger with pointer, Enter, and Space and keeps destructive styling in both locations', () => {
