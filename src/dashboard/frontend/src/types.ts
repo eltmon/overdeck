@@ -1,3 +1,9 @@
+export type {
+  AgentHealthSnapshot as AgentHealth,
+  SystemHealthConsumer,
+  SystemHealthSnapshot,
+} from '@overdeck/contracts';
+
 export interface LinearProject {
   id: string;
   name: string;
@@ -167,16 +173,6 @@ export interface AgentResourceStats {
   burnUsdPerHour: number;
   hypotheticalUsdPerHour?: number;
   totalUsd: number;
-}
-
-export interface AgentHealth {
-  agentId: string;
-  status: 'healthy' | 'warning' | 'stuck' | 'stalled' | 'dead';
-  reason?: string;
-  lastPing?: string;
-  consecutiveFailures: number;
-  killCount: number;
-  contextPercent?: number | null;
 }
 
 export interface Skill {
@@ -463,100 +459,6 @@ export interface HostProcessResource {
   peakMemoryBytes: number;
   note?: string;
   retainedUntil?: string;
-}
-
-export interface SystemHealthAgentProcess {
-  id: string;
-  issueId: string;
-  kind: 'work' | 'planning' | 'specialist' | 'other';
-  status: string;
-  tmuxActive: boolean;
-  memoryBytes: number;
-  memoryGb: number;
-  currentIssue?: string;
-}
-
-export interface SystemHealthLeakedSpecialist {
-  name: string;
-  currentIssue: string;
-  reason: string;
-}
-
-export interface SystemHealthConsumer {
-  id: string;
-  label: string;
-  type: 'agent' | 'specialist' | 'container';
-  memoryBytes: number;
-  memoryGb: number;
-  cpuPercent?: number;
-  issueId?: string;
-  currentIssue?: string;
-  leaked?: boolean;
-  killTarget?: {
-    kind: 'agent' | 'specialist' | 'container';
-    agentId?: string;
-    containerId?: string;
-    projectKey?: string;
-    issueId?: string;
-    specialistType?: string;
-  };
-}
-
-export interface SystemHealthSnapshot {
-  severity: 'normal' | 'warning' | 'critical';
-  updatedAt: string;
-  summary: {
-    cpuPercent: number;
-    loadAverage1m: number;
-    loadPerCore1m: number;
-    totalMemoryBytes: number;
-    usedMemoryBytes: number;
-    availableMemoryBytes: number;
-    memoryUsedPercent: number;
-    swapTotalBytes: number;
-    swapUsedBytes: number;
-    swapUsedPercent: number;
-    overcommitPercent: number;
-    agentCount: number;
-    workAgentCount: number;
-    planningAgentCount: number;
-    specialistSessionCount: number;
-    leakedSpecialistCount: number;
-    containerCount: number;
-    containerMemoryBytes: number;
-    overdeckMemoryBytes: number;
-    overdeckMemoryPercent: number;
-  };
-  thresholds: {
-    memoryAvailableWarningBytes: number;
-    memoryAvailableCriticalBytes: number;
-    swapUsedWarningPercent: number;
-    swapUsedCriticalPercent: number;
-    cpuLoadWarningPerCore: number;
-    cpuLoadCriticalPerCore: number;
-    overcommitWarningPercent: number;
-    overcommitCriticalPercent: number;
-  };
-  reasons: string[];
-  agents: SystemHealthAgentProcess[];
-  leakedSpecialists: SystemHealthLeakedSpecialist[];
-  topConsumers: SystemHealthConsumer[];
-  smeeRelay: {
-    configured: boolean;
-    running: boolean;
-    status: 'not_configured' | 'running' | 'stopped' | 'unknown';
-    message: string;
-  };
-  deployStaleness: {
-    status: 'fresh' | 'stale' | 'unknown';
-    buildCommit: string | null;
-    originMainSha: string | null;
-    behindTotal: number | null;
-    behindBuildInputs: number | null;
-    originMainLastCommitAt: number | null;
-    computedAt: number;
-    reason?: string;
-  } | null;
 }
 
 export interface StartAgentGuardrailWarning {
