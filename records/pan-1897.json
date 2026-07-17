@@ -406,21 +406,21 @@
     "recordedAt": "2026-07-17T05:45:07.089Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T05:45:41.325Z",
+  "updated": "2026-07-17T05:53:07.281Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T05:45:39.769Z",
+    "updatedAt": "2026-07-17T05:53:07.258Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-1897-review already running. Use 'pan tell' to message it.",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
-    "lastVerifiedCommit": "f388395039506627228eab2b4f522a36475508e6",
+    "lastVerifiedCommit": "d1fe4426c3c18aa7fc6c32b3102330757d71c2f3",
     "reviewRequestedAt": "2026-07-17T05:45:37.346Z",
     "reviewSpawnedAt": "2026-07-17T05:45:39.769Z",
     "scopeDrift": {
@@ -520,9 +520,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 16586215,
-            "output": 471698,
-            "cacheRead": 57715712,
+            "input": 17978122,
+            "output": 539988,
+            "cacheRead": 62878208,
             "cacheWrite": 0
           }
         },
@@ -568,9 +568,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 28916432,
-            "output": 1146421,
-            "cacheRead": 236080640,
+            "input": 28948903,
+            "output": 1150708,
+            "cacheRead": 238564352,
             "cacheWrite": 0
           }
         }
@@ -583,9 +583,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53550057,
-          "output": 1759298,
-          "cacheRead": 313149184,
+          "input": 54974435,
+          "output": 1831875,
+          "cacheRead": 320795392,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -608,8 +608,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 474.169289,
-        "pricingAsOf": "2026-07-17T05:45:39.856Z"
+        "usd": 487.291593,
+        "pricingAsOf": "2026-07-17T05:53:07.266Z"
       }
     },
     "merges": [
