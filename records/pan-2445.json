@@ -51,7 +51,7 @@
     "recordedAt": "2026-07-17T16:48:19.602Z"
   },
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T16:48:21.693Z",
+  "updated": "2026-07-17T16:49:01.842Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "pending",
@@ -61,11 +61,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:48:21.664Z",
+    "updatedAt": "2026-07-17T16:49:01.804Z",
     "reviewNotes": "Verification failed at lint",
     "inspectNotes": "All 5 ACs verified against diff: not-released/parked/vetoed/objection/labels-unavailable precedence matches code order (labels-unavailable checked first, then parked>vetoed>objection>not-released); recordedModel short-circuits before derefWorkhorse (proven via invalid workhorse:missing test); workhorse:cheap dereferences to claude-haiku-4-5 via config-yaml.js barrel -> roles.ts derefWorkhorse; no-autonomous-model covers both absent and unresolvable autonomousModel. Label constants confirmed lowercase in backlog/pickup.ts so case-insensitive matching is correct. Pure module, no I/O.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2852",
-    "reviewRequestedAt": "2026-07-17T16:41:11.158Z",
+    "reviewRequestedAt": "2026-07-17T16:49:01.423Z",
     "reviewSpawnedAt": "2026-07-17T16:41:12.025Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -127,9 +127,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2726812,
-            "output": 113657,
-            "cacheRead": 30838272,
+            "input": 2736181,
+            "output": 114447,
+            "cacheRead": 31554560,
             "cacheWrite": 0
           }
         }
@@ -142,9 +142,9 @@
           "cacheWrite": 175687
         },
         "openai/gpt-5.6-sol": {
-          "input": 3928796,
-          "output": 146049,
-          "cacheRead": 35773440,
+          "input": 3938165,
+          "output": 146839,
+          "cacheRead": 36489728,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -155,8 +155,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 52.801283,
-        "pricingAsOf": "2026-07-17T16:48:21.681Z"
+        "usd": 53.229972000000004,
+        "pricingAsOf": "2026-07-17T16:49:01.806Z"
       }
     },
     "merges": [
