@@ -51,17 +51,17 @@
     "recordedAt": "2026-07-17T16:48:19.602Z"
   },
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T16:48:20.410Z",
+  "updated": "2026-07-17T16:48:21.693Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:48:20.385Z",
+    "updatedAt": "2026-07-17T16:48:21.664Z",
     "reviewNotes": "Verification failed at lint",
     "inspectNotes": "All 5 ACs verified against diff: not-released/parked/vetoed/objection/labels-unavailable precedence matches code order (labels-unavailable checked first, then parked>vetoed>objection>not-released); recordedModel short-circuits before derefWorkhorse (proven via invalid workhorse:missing test); workhorse:cheap dereferences to claude-haiku-4-5 via config-yaml.js barrel -> roles.ts derefWorkhorse; no-autonomous-model covers both absent and unresolvable autonomousModel. Label constants confirmed lowercase in backlog/pickup.ts so case-insensitive matching is correct. Pure module, no I/O.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2852",
@@ -156,7 +156,7 @@
       },
       "costAtCloseOut": {
         "usd": 52.801283,
-        "pricingAsOf": "2026-07-17T16:48:20.406Z"
+        "pricingAsOf": "2026-07-17T16:48:21.681Z"
       }
     },
     "merges": [
