@@ -5493,3 +5493,9 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **1491 nudge worked too** (playbook 2/2): fresh synthesis 21:32 = APPROVED @1196ce67. Old PR#1636 closed 06-19 → opened **PR#2814**, pushed branch so PR head == reviewed head 1196ce67. Merge when CI green.
 - 1897 work agent idle-at-prompt 6h ($82, tree clean+pushed) → nudged to verify fixes complete + pan done so review re-runs.
 - Work fleet: 1966 active (9min), 2252 active, 2232/2647/2807 quiet 46-70min (watch; nudge next tick if still silent).
+
+## Tick 79 — 2026-07-16 ~21:52 — PAN-1491 MERGED (7 total)
+- **PAN-1491 MERGED → 9e783f4fdf** via PR#2814: fresh APPROVED @1196ce67 (nudged convoy), all CI green, CLEAN. Session merges: 1987, 2772, 2760, 2619, 2773, 2045, 1491 = 7 (+2811 strike landing).
+- 1897: fixes were already pushed (tree clean, 0 ahead); missing piece was a review of current head df7a0e99 (old verdict was @4ad533fd) → review restarted. Note: restart again said "resumed (session preserved)" — if no synthesis by next tick, apply the pan-tell nudge (playbook 2/2 so far).
+- 2232/2647/2807 idle-at-prompt within ~1h of fresh start → nudged to resume autonomously + pan done when complete. PATTERN: gpt-5.6-sol claude-code sessions repeatedly go idle-at-prompt mid-task tonight; the pan-tell nudge reliably unsticks them. If this generalizes, the idle-detection/redrive gap is worth an issue.
+- 1491 close-out owed (merge → verify-on-main → deploy next batch → close). Deploy batching: 1491 + whatever else lands this hour.
