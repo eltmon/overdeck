@@ -1,0 +1,599 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-13T00:04:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2232: refactor(cloister): decompose specialists.ts (1,749 lines) into focused modules",
+    "updated": "2026-07-17T01:55:45.684Z"
+  },
+  "plan": {
+    "id": "pan-2232",
+    "title": "refactor(cloister): decompose specialists.ts (1,749 lines) into focused modules",
+    "status": "proposed",
+    "uid": "6db149d8-388c-439f-8559-2b4f5bc1b0ab",
+    "author": "agent:claude-fable-5",
+    "sequence": 3,
+    "created": "2026-07-13T00:04:52Z",
+    "updated": "2026-07-17T01:55:45.684Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2232",
+        "label": "PAN-2232",
+        "type": "issue"
+      },
+      {
+        "uri": "drafts/PAN-2232.md",
+        "label": "PRD (overdeck-state)",
+        "type": "spec"
+      },
+      {
+        "uri": "docs/codebase-health/refactor-case-study.md",
+        "label": "B3 barrel-decomposition pattern",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "refactor",
+      "cloister",
+      "codebase-health",
+      "tenet-10"
+    ],
+    "metadata": {
+      "docsJustification": "This behavior-preserving internal module decomposition changes no documented command, configuration, API, workflow, or operator-facing surface; existing imports remain compatible through re-exports.",
+      "canonicalFilename": "2026-07-17-PAN-2232-refactor-cloister-decompose-specialists-ts-1-749-lines-into-focused-modules.vbrief.json"
+    },
+    "narratives": {
+      "Problem": "src/lib/cloister/specialists.ts is 1,749 lines holding six unrelated concerns (spawn/env building, specialist registry + session naming, grace periods + terminate/complete, per-project run metadata, runtime status, feedback delivery). It is baselined pipeline machinery in the quietly-regrowing cloister subtree; a change to any concern risks the others. Import surface is wide (deacon.ts, lifecycle teardown, three dashboard route modules, CLI specialists commands, 18 test files).",
+      "Proposal": "Behavior-preserving barrel decomposition per the locked PRD (drafts/PAN-2232.md on overdeck-state, verified against HEAD 1df0c8ec5b with zero structure drift): move every function verbatim into six seam modules (specialists-spawn.ts, specialists-registry.ts, specialists-lifecycle.ts, specialists-project-meta.ts, specialists-status.ts, specialists-feedback.ts), each well under 1,000 lines; specialists.ts becomes a ~100-line re-export barrel so zero importers change. One seam per commit, full suite per seam (TENET-10), then a reconciliation step lowers the file-size baseline via scripts/lint-file-size.sh --update and runs scripts/lint-circular-deps.sh --update. The file is 100% module-level free functions (no class), so every seam is a pure move + re-export — no host-object delegation.",
+      "NonGoals": "- Any behavior change, rename, signature change, or visibility change (D1: pure moves only)\n- Any registry schema change\n- Retiring legacy specialist concepts (LegacySpecialistDefinition stays as-is)\n- cloister/service.ts (PAN-2149, already landed), cloister/merge-agent.ts (PAN-2233), merge-ops.ts (PAN-2190), deacon.ts (PAN-2189)\n- Adding any continue.json/state.json write (file is not a whitelisted state writer in lint-state-writes)\n- Raising or adding file-size/circular-dep baseline entries manually (only --update lowering, audited)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the PRD's locked decisions D1-D5 verbatim (pure moves only; six named seam modules; loadRegistry/saveRegistry/migrateRegistryIfNeeded move together; private helpers move with their primary callers; bundler-cycle tolerance via npm run build per seam).",
+        "rationale": "The PRD is a finalized implementation brief verified against the codebase; re-verification at HEAD 1df0c8ec5b shows zero structure drift (still 1,749 lines, identical function list and order), no test source-introspects the file, PAN-2149 has landed, and both ratchet guards are live with --update support."
+      },
+      {
+        "summary": "requiresInspection: true only on the first seam (wi-1-spawn), foundationFor wi-2..wi-6.",
+        "rationale": "The first seam crystallizes the move + barrel re-export shape that the five remaining seams replicate mechanically; a wrong shape there (logic edits, changed export style, broken barrel) would infect every subsequent seam. The rest are mechanically identical operations whose correctness is independently obvious at typecheck/build/suite."
+      },
+      {
+        "summary": "Serial blocks-chain wi-1 through wi-7; readiness sequential for wi-2..wi-7.",
+        "rationale": "The PRD and TENET-10 mandate one seam per commit in listed order with the full suite between seams; parallel dispatch of moves in one file would conflict trivially."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi-1-spawn",
+        "title": "Extract specialists-spawn.ts (spawn-command and env building seam)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T00:04:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2232",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi-2-registry",
+            "wi-3-lifecycle",
+            "wi-4-project-meta",
+            "wi-5-status",
+            "wi-6-feedback"
+          ],
+          "files_scope": [
+            "src/lib/cloister/specialists.ts",
+            "src/lib/cloister/specialists-spawn.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the listed non-ratchet lint chain completes without errors",
+            "build completes without errors",
+            "vitest run exits with 0 failed tests"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/specialists-spawn.ts and move these functions verbatim from specialists.ts (with the imports they need): roleForSpecialistModel, resolveWorkspaceGitInfo, buildProviderExportLines, buildTmuxEnvFlags, buildSpecialistBaseCommand, readRecordedClaudeSessionId, buildSpecialistCavemanExports. In specialists.ts, replace the moved code with `export { … } from './specialists-spawn.js'` re-exports for the previously exported symbols (buildSpecialistBaseCommand, buildSpecialistCavemanExports); private helpers (roleForSpecialistModel, resolveWorkspaceGitInfo, buildProviderExportLines, buildTmuxEnvFlags, readRecordedClaudeSessionId) move without re-export unless another seam still calls them — if so, export from the new module and import in specialists.ts per PRD D4. No logic edits, no renames, no signature changes (PRD D1). Commit as `refactor(cloister): extract specialists spawn seam (pan-2232)`. This seam sets the move + barrel pattern the remaining five seams replicate."
+        },
+        "items": [
+          {
+            "id": "wi-1-spawn.ac1",
+            "title": "src/lib/cloister/specialists-spawn.ts exists and contains the seven listed functions moved verbatim; specialists.ts re-exports the exported ones so every existing importer of cloister/specialists.js resolves unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-spawn.ac2",
+            "title": "The seam commit diff shows a pure move + re-export: it preserves every moved function body byte-for-byte (whitespace/imports aside) and touches no file outside src/lib/cloister/specialists.ts and specialists-spawn.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-1-spawn.ac3",
+            "title": "npm run typecheck, the listed non-ratchet lint chain, and npm run build complete without errors and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-2-registry",
+        "title": "Extract specialists-registry.ts (registry, types, and session-naming seam)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T00:04:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/specialists.ts",
+            "src/lib/cloister/specialists-registry.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the listed non-ratchet lint chain completes without errors",
+            "build completes without errors",
+            "vitest run exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/specialists-registry.ts and move verbatim: SPECIALIST_AGENT_NAMES + SpecialistAgentName, LegacySpecialistDefinition, LegacySpecialistRuntimeStatus, ResolutionStep, ProjectSpecialistMetadata, isProjectSpecialistActivelyRunning, SpecialistRegistry, initSpecialistsDirectory, migrateRegistryIfNeeded, loadRegistry, saveRegistry, deterministicUUID, getSpecialistMetadata, updateSpecialistMetadata, getAllSpecialists, isInitialized, getSpecialistState, getTmuxSessionName, ReviewerRole + REVIEWER_ROLES, getReviewerSessionName, parseReviewerSessionName, makeSpecialistRegistryKey, pruneSpecialistRegistryEntriesForIssue, parseSpecialistRegistryKey, recordWake. loadRegistry/saveRegistry/migrateRegistryIfNeeded MUST land together in this one module (PRD D3 — single reader/writer pair). This seam is the type home: a type used across seams stays here and is imported by the others. specialists.ts re-exports all previously exported symbols. Commit as `refactor(cloister): extract specialists registry seam (pan-2232)`."
+        },
+        "items": [
+          {
+            "id": "wi-2-registry.ac1",
+            "title": "src/lib/cloister/specialists-registry.ts exists and contains the listed types and functions moved verbatim, with loadRegistry, saveRegistry, and migrateRegistryIfNeeded all resident in this single module; specialists.ts re-exports them so importers resolve unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-registry.ac2",
+            "title": "The seam commit diff shows a pure move + re-export and touches no file outside src/lib/cloister/specialists.ts and specialists-registry.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-2-registry.ac3",
+            "title": "npm run typecheck, the listed non-ratchet lint chain, and npm run build complete without errors and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-3-lifecycle",
+        "title": "Extract specialists-lifecycle.ts (grace periods, completion, termination seam)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T00:04:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/specialists.ts",
+            "src/lib/cloister/specialists-lifecycle.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the listed non-ratchet lint chain completes without errors",
+            "build completes without errors",
+            "vitest run exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/specialists-lifecycle.ts and move verbatim: GracePeriodState, TaskContext, startGracePeriod, pauseGracePeriod, resumeGracePeriod, exitGracePeriod, getGracePeriodState, findActiveRegistryKey, signalSpecialistCompletion, terminateSpecialist, scheduleLogCleanup (private helper moves with its only caller, PRD D4). specialists.ts re-exports the exported symbols. This is live deacon-reachable pipeline machinery (completion signaling, grace periods): pure move only, async-only primitives preserved, no execSync introduced. Commit as `refactor(cloister): extract specialists lifecycle seam (pan-2232)`."
+        },
+        "items": [
+          {
+            "id": "wi-3-lifecycle.ac1",
+            "title": "src/lib/cloister/specialists-lifecycle.ts exists and contains the listed grace-period/completion/termination symbols moved verbatim; specialists.ts re-exports them so importers resolve unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-lifecycle.ac2",
+            "title": "The seam commit diff shows a pure move + re-export and touches no file outside src/lib/cloister/specialists.ts and specialists-lifecycle.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-3-lifecycle.ac3",
+            "title": "npm run typecheck, the listed non-ratchet lint chain, and npm run build complete without errors and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-4-project-meta",
+        "title": "Extract specialists-project-meta.ts (per-project run metadata seam)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T00:04:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/specialists.ts",
+            "src/lib/cloister/specialists-project-meta.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the listed non-ratchet lint chain completes without errors",
+            "build completes without errors",
+            "vitest run exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/specialists-project-meta.ts and move verbatim: getProjectSpecialistDir, ensureProjectSpecialistDir, getRunMetadata, updateRunMetadata, getProjectSpecialistMetadata, updateProjectSpecialistMetadata, incrementProjectRunCount, setCurrentRun, updateRunStatus, listProjectsWithSpecialists, listSpecialistsForProject, getAllProjectSpecialistStatuses, updateContextTokens, enableSpecialist, disableSpecialist, isEnabled, getEnabledSpecialists. specialists.ts re-exports them. Types these functions use that live in the registry seam are imported from './specialists-registry.js'. Commit as `refactor(cloister): extract specialists project-meta seam (pan-2232)`."
+        },
+        "items": [
+          {
+            "id": "wi-4-project-meta.ac1",
+            "title": "src/lib/cloister/specialists-project-meta.ts exists and contains the seventeen listed functions moved verbatim; specialists.ts re-exports them so importers resolve unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-project-meta.ac2",
+            "title": "The seam commit diff shows a pure move + re-export and touches no file outside src/lib/cloister/specialists.ts and specialists-project-meta.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-4-project-meta.ac3",
+            "title": "npm run typecheck, the listed non-ratchet lint chain, and npm run build complete without errors and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-5-status",
+        "title": "Extract specialists-status.ts (runtime status seam)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T00:04:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/specialists.ts",
+            "src/lib/cloister/specialists-status.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the listed non-ratchet lint chain completes without errors",
+            "build completes without errors",
+            "vitest run exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/specialists-status.ts and move verbatim: findSessionFile, countContextTokens, isRunning, getSpecialistStatus, getAllSpecialistStatus, initializeEnabledSpecialists. specialists.ts re-exports them. Registry/lifecycle symbols these functions call are imported from their seam modules. Commit as `refactor(cloister): extract specialists status seam (pan-2232)`."
+        },
+        "items": [
+          {
+            "id": "wi-5-status.ac1",
+            "title": "src/lib/cloister/specialists-status.ts exists and contains the six listed functions moved verbatim; specialists.ts re-exports them so importers resolve unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-status.ac2",
+            "title": "The seam commit diff shows a pure move + re-export and touches no file outside src/lib/cloister/specialists.ts and specialists-status.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-5-status.ac3",
+            "title": "npm run typecheck, the listed non-ratchet lint chain, and npm run build complete without errors and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-6-feedback",
+        "title": "Extract specialists-feedback.ts (feedback delivery seam)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T00:04:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-2232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/specialists.ts",
+            "src/lib/cloister/specialists-feedback.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:overdeck-boundaries && npm run lint:skills && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:ratchet-audit && npm run lint:quarantine-audit",
+            "npm run build",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the listed non-ratchet lint chain completes without errors",
+            "build completes without errors",
+            "vitest run exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/specialists-feedback.ts and move verbatim: SpecialistFeedback, sendFeedbackToAgent, formatFeedbackForAgent (private helper moves with its only caller, PRD D4), getPendingFeedback, getFeedbackStats. specialists.ts re-exports the exported symbols. After this seam, specialists.ts should be approximately a 100-line barrel of re-exports. Commit as `refactor(cloister): extract specialists feedback seam (pan-2232)`."
+        },
+        "items": [
+          {
+            "id": "wi-6-feedback.ac1",
+            "title": "src/lib/cloister/specialists-feedback.ts exists and contains the listed feedback symbols moved verbatim; specialists.ts re-exports them so importers resolve unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-feedback.ac2",
+            "title": "After this seam, specialists.ts contains only re-export statements (≈100 lines) and the seam commit diff shows changes to no file outside src/lib/cloister/specialists.ts and specialists-feedback.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-6-feedback.ac3",
+            "title": "npm run typecheck, the listed non-ratchet lint chain, and npm run build complete without errors and npx vitest run --configLoader runner exits with 0 failed tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi-7-reconcile",
+        "title": "Reconciliation: lower ratchet baselines and verify end-state invariants",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-13T00:04:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-2232",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/file-size-baseline.txt",
+            "scripts/circular-deps-baseline.txt",
+            "src/lib/cloister/specialists.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-file-size.sh",
+            "bash scripts/lint-circular-deps.sh",
+            "wc -l src/lib/cloister/specialists.ts src/lib/cloister/specialists-spawn.ts src/lib/cloister/specialists-registry.ts src/lib/cloister/specialists-lifecycle.ts src/lib/cloister/specialists-project-meta.ts src/lib/cloister/specialists-status.ts src/lib/cloister/specialists-feedback.ts",
+            "git diff main --stat",
+            "npx vitest run --configLoader runner"
+          ],
+          "expected_outputs": [
+            "lint-file-size.sh exits 0 with the specialists.ts baseline entry lowered (never raised)",
+            "lint-circular-deps.sh exits 0 with no new cycle lines added",
+            "wc -l reports all seven files under 1,000 lines",
+            "git diff main --stat lists only src/lib/cloister/specialists*.ts, the baseline files, and (if applicable) eslint-any-allowlist.json",
+            "vitest run exits with 0 failed tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Run `bash scripts/lint-file-size.sh --update` to lower the specialists.ts baseline entry (line 22 of scripts/file-size-baseline.txt, currently 1749) — --update only lowers, never raises. Run `bash scripts/lint-circular-deps.sh --update` and audit any changed lines against this issue; a runtime ESM cycle error means stop and report (PRD D5). Confirm `git grep -rn \"cloister/specialists.js\" src/ tests/` callers still build, `grep -rln \"cloister/specialists.ts\" tests/` is still empty, and `git diff main --stat` touches only src/lib/cloister/specialists*.ts plus the baseline/allowlist files. Run the full suite one final time. Commit as `refactor(cloister): extract specialists reconciliation (pan-2232)`."
+        },
+        "items": [
+          {
+            "id": "wi-7-reconcile.ac1",
+            "title": "scripts/file-size-baseline.txt contains a lowered (or removed, if under the 1,000 ceiling) entry for src/lib/cloister/specialists.ts produced by lint-file-size.sh --update, and bash scripts/lint-file-size.sh exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-reconcile.ac2",
+            "title": "wc -l reports specialists.ts and all six seam modules each under 1,000 lines, and bash scripts/lint-circular-deps.sh exits 0 with no new cycle entries added to its baseline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-reconcile.ac3",
+            "title": "git diff main --stat shows changes only under src/lib/cloister/specialists*.ts, scripts/file-size-baseline.txt, scripts/circular-deps-baseline.txt (if updated), and eslint-any-allowlist.json (if a moved any required it), and preserves every importer in src/ and tests/ unedited",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi-7-reconcile.ac4",
+            "title": "npx vitest run --configLoader runner exits with 0 failed tests, and the guard suites tests/unit/lib/cloister/in-flight-guard.test.ts and tests/unit/lib/cloister/deacon-review-synthesis.test.ts remain green within that run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi-1-spawn",
+        "to": "wi-2-registry",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-2-registry",
+        "to": "wi-3-lifecycle",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-3-lifecycle",
+        "to": "wi-4-project-meta",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-4-project-meta",
+        "to": "wi-5-status",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-5-status",
+        "to": "wi-6-feedback",
+        "type": "blocks"
+      },
+      {
+        "from": "wi-6-feedback",
+        "to": "wi-7-reconcile",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
