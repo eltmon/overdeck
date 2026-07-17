@@ -20,3 +20,43 @@ export function taskStatusBucket(status: string | undefined): TaskStatusBucket {
       return 'upcoming'
   }
 }
+
+export interface TaskStatusRollup<T> {
+  done: number
+  working: number
+  upcoming: number
+  total: number
+  percentDone: number
+  percentWorking: number
+  doneTasks: T[]
+  workingTasks: T[]
+  upcomingTasks: T[]
+}
+
+export function taskStatusRollup<T extends { status?: string }>(tasks: readonly T[]): TaskStatusRollup<T> {
+  const doneTasks: T[] = []
+  const workingTasks: T[] = []
+  const upcomingTasks: T[] = []
+
+  for (const task of tasks) {
+    const bucket = taskStatusBucket(task.status)
+    if (bucket === 'done') doneTasks.push(task)
+    else if (bucket === 'working') workingTasks.push(task)
+    else upcomingTasks.push(task)
+  }
+
+  const done = doneTasks.length
+  const working = workingTasks.length
+  const total = tasks.length
+  return {
+    done,
+    working,
+    upcoming: upcomingTasks.length,
+    total,
+    percentDone: total ? Math.round((done / total) * 100) : 0,
+    percentWorking: total ? Math.round((working / total) * 100) : 0,
+    doneTasks,
+    workingTasks,
+    upcomingTasks,
+  }
+}
