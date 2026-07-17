@@ -218,7 +218,7 @@ describe('SystemHealthPill', () => {
   it.each([
     ['healthy', 'Healthy · 41 GB available', 'healthy'],
     ['measuring', 'Measuring system health…', 'measuring'],
-    ['warning', 'Healthy · spawn headroom tight', 'warning'],
+    ['warning', 'Warning · spawn headroom tight', 'warning'],
     ['critical', 'Critical · memory pressure detected', 'critical'],
     ['unavailable', 'Health unavailable · Retry', 'unavailable'],
   ] as const)('renders distinct %s copy and icon', (state, copy, icon) => {

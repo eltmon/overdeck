@@ -127,7 +127,7 @@ function healthCopy(data: SystemHealthSnapshot, reasons: readonly HealthReason[]
         ? 'Healthy'
         : `Healthy · ${formatBytes(data.admission.availableMemoryBytes)} available`;
     case 'warning':
-      return `Healthy · ${reasonLabel(data, reasons) ?? 'attention required'}`;
+      return `Warning · ${reasonLabel(data, reasons) ?? 'attention required'}`;
     case 'critical':
       return `Critical · ${reasonLabel(data, reasons) ?? 'action required'}`;
     case 'unavailable':
