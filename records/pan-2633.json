@@ -66,7 +66,7 @@
     "recordedAt": "2026-07-16T17:53:59.399Z"
   },
   "created": "2026-07-13T08:48:04.494Z",
-  "updated": "2026-07-17T04:19:18.790Z",
+  "updated": "2026-07-17T05:21:21.862Z",
   "pipeline": {
     "issueId": "PAN-2633",
     "reviewStatus": "passed",
@@ -76,7 +76,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T04:19:18.697Z",
+    "updatedAt": "2026-07-17T05:21:21.844Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "inspectNotes": "Bead reducer-liveness-gate ack: commit df35ff8b merges 438a42c8f7, which adds shouldForceReemitPendingInput to the enrichment poller (agent-enrichment-service.ts) — the convergence-guarantee bead, separate from this ones scope. No changes to event-reducers.ts or its tests; reducer behavior verified against AC1-4 remains unaffected and still holds.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2793",
@@ -258,7 +258,7 @@
       },
       "costAtCloseOut": {
         "usd": 61.96014,
-        "pricingAsOf": "2026-07-17T04:19:18.781Z"
+        "pricingAsOf": "2026-07-17T05:21:21.854Z"
       }
     },
     "merges": [
