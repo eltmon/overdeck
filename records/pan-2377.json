@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-17T13:21:54.234Z",
+  "updated": "2026-07-17T13:22:50.191Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -94,8 +94,16 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "orders-domain-lib": {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 813848,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:22:50.191Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -120,6 +128,7 @@
     "contracts-orders": "completed",
     "contracts-orders.contracts-orders.ac1": "completed",
     "contracts-orders.contracts-orders.ac2": "completed",
-    "contracts-orders.contracts-orders.ac3": "completed"
+    "contracts-orders.contracts-orders.ac3": "completed",
+    "orders-domain-lib": "running"
   }
 }
