@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T14:21:02.603Z",
+  "updated": "2026-07-17T14:22:43.322Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -97,16 +97,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "session-action-contract": {
-        "writerId": "agent-pan-1610",
-        "agentId": "agent-pan-1610",
-        "pid": 3076083,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:58:35.119Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -140,6 +132,16 @@
         "outcome": "completed",
         "reason": "Implemented primary-strip and overflow-only grouped action menus with labelled overflow counts, registry and typed component pins, updated consumers, and passing targeted frontend tests, typecheck, and lint.",
         "releasedAt": "2026-07-17T13:58:23.369Z"
+      },
+      {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 3076083,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:58:35.119Z",
+        "itemId": "session-action-contract",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T14:22:43.321Z"
       }
     ],
     "statusReasons": {
@@ -169,6 +171,9 @@
     "primary-strip-mode.primary-strip-mode.ac2": "completed",
     "primary-strip-mode.primary-strip-mode.ac3": "completed",
     "primary-strip-mode.primary-strip-mode.ac4": "completed",
-    "session-action-contract": "running"
+    "session-action-contract": "completed",
+    "session-action-contract.session-action-contract.ac1": "completed",
+    "session-action-contract.session-action-contract.ac2": "completed",
+    "session-action-contract.session-action-contract.ac3": "completed"
   }
 }
