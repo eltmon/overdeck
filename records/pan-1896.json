@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T12:18:59.425Z",
+  "updated": "2026-07-17T12:19:02.859Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -74,7 +74,7 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
+    "sequence": 6,
     "claims": {},
     "statusReasons": {
       "codex-mode-enum": {
@@ -92,6 +92,10 @@
       "codex-sandbox-resolver": {
         "reason": "Cancelled after current Codex investigation: native execpolicy rules provide command-scoped authorization, so the proposed workspace-net resolver mapping is obsolete.",
         "updatedAt": "2026-07-17T12:18:59.425Z"
+      },
+      "codex-settings-ui": {
+        "reason": "Cancelled because no new workspace-net mode is being introduced; existing Codex permission settings remain unchanged.",
+        "updatedAt": "2026-07-17T12:19:02.859Z"
       }
     },
     "claimHistory": [
@@ -115,6 +119,7 @@
     "codex-permissions-doc.codex-permissions-doc.ac1": "completed",
     "codex-permissions-doc.codex-permissions-doc.ac2": "completed",
     "codex-permissions-doc.codex-permissions-doc.ac3": "completed",
-    "codex-sandbox-resolver": "cancelled"
+    "codex-sandbox-resolver": "cancelled",
+    "codex-settings-ui": "cancelled"
   }
 }
