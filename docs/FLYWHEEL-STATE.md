@@ -5505,3 +5505,8 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Session: 8 merges (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252) + 2811 strike landing + 2 deploys + 14 close-outs.
 - In flight: 1897 review @correct head (synthesizing), 1966 CI+review on fix head 33680748, 2232/2647/2807 working (no PR yet).
 - Close-out owed on 1491 + 2252 (+ next deploy batch).
+
+## Tick 81 — 2026-07-16 ~22:50 — idle-redrive gap filed (https://github.com/eltmon/overdeck/issues/2817)
+- 1897 pushed perf fixes (head 27818d81, review synthesizing on it). 2807 opened PR#2816 (CLEAN, review running). 1966 review coordinator idled AGAIN before synthesis (3rd time) → re-nudged. 2232/2647 re-idled → re-nudged.
+- **Idle-at-prompt is systemic** (6+ gpt-5.6-sol agents tonight; nudge works but they re-idle) → filed the mechanical redrive-gap issue (see title above). Root-cause of the idling itself flagged as separate investigation.
+- Merge queue: 1966 (CLEAN, awaiting synthesis), 2807 PR#2816 (CLEAN, review running), 1897 (review on 27818d81), 2232/2647 (pre-PR).
