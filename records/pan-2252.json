@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-17T01:22:29.077Z"
   },
   "created": "2026-07-03T07:33:18.171Z",
-  "updated": "2026-07-17T01:22:32.516Z",
+  "updated": "2026-07-17T01:22:33.510Z",
   "pipeline": {
     "issueId": "PAN-2252",
     "reviewStatus": "pending",
@@ -54,7 +54,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:22:32.482Z",
+    "updatedAt": "2026-07-17T01:22:33.487Z",
     "inspectNotes": "isLinkedWorktreeRoot/primaryRootFromLinkedWorktree correctly detect .git-as-file vs directory/absent (identity.ts:29-47); new check in shouldRefuseHostDashboardPort (identity.ts:87) placed after the pre-existing runningInContainer early-return (line 82-84), so container exemption is preserved; purely additive OR-branch only fires when .git is a file, so pre-existing tests using nonexistent repoRoots are unaffected. All 4 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2812",
     "strikeRecoveryCount": 0
@@ -123,7 +123,7 @@
       },
       "costAtCloseOut": {
         "usd": 35.562386,
-        "pricingAsOf": "2026-07-17T01:22:32.508Z"
+        "pricingAsOf": "2026-07-17T01:22:33.504Z"
       }
     },
     "merges": [
