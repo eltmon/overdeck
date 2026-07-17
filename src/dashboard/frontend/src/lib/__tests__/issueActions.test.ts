@@ -122,6 +122,7 @@ describe('ISSUE_ACTIONS', () => {
   it('fully describes every registry entry', () => {
     for (const action of ISSUE_ACTIONS) {
       expect(action.label.trim(), action.key).not.toBe('');
+      expect(action.description.trim(), action.key).not.toBe('');
       expect(action, action.key).toHaveProperty('panVerb');
       expect(action, action.key).toHaveProperty('endpoint');
       expect(typeof action.enabledWhen, action.key).toBe('function');

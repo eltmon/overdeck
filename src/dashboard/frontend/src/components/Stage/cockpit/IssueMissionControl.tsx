@@ -226,7 +226,7 @@ function IssueActionMegaMenu({ issueId }: { issueId: string }) {
                       key={view.action.key}
                       type="button"
                       disabled={!view.enabled || view.isPending}
-                      title={view.disabledReason ?? view.action.label}
+                      title={view.enabled ? view.action.description : view.disabledReason ?? view.action.label}
                       onClick={() => {
                         view.invoke()
                         if (view.action.kind !== 'dialog') setOpen(false)
