@@ -4,17 +4,17 @@
     "created": "2026-07-16T18:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2252: Dashboard port has no identity check — workspace peer server squatted :3011 for 6 minutes and passed all health checks",
-    "updated": "2026-07-17T00:26:13.932Z"
+    "updated": "2026-07-17T00:50:40.574Z"
   },
   "plan": {
     "id": "pan-2252",
     "title": "Dashboard port has no identity check — workspace peer server squatted :3011 for 6 minutes and passed all health checks",
-    "status": "running",
+    "status": "approved",
     "uid": "bdca96dc-98c1-456d-89fa-78be91601175",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-16T18:05:00.000Z",
-    "updated": "2026-07-17T00:26:13.932Z",
+    "updated": "2026-07-17T00:50:40.574Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2252",
