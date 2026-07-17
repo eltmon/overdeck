@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T13:17:40.687Z",
-  "updated": "2026-07-17T15:58:31.045Z",
+  "updated": "2026-07-17T16:09:28.584Z",
   "pipeline": {
     "issueId": "PAN-2840",
     "reviewStatus": "pending",
@@ -12,7 +12,7 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T15:58:31.034Z",
+    "updatedAt": "2026-07-17T16:09:28.550Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
     "strikeReadyHead": "bd510dd6a581d6f9a2eceaa290283fa8880c7766",
@@ -51,7 +51,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.223564,
-        "pricingAsOf": "2026-07-17T15:58:31.037Z"
+        "pricingAsOf": "2026-07-17T16:09:28.555Z"
       }
     },
     "merges": [],
