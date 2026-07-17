@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T00:32:51.629Z",
+  "updated": "2026-07-17T00:36:25.934Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "narrow-topup-error-swallowing": {
-        "writerId": "agent-pan-2807",
-        "agentId": "agent-pan-2807",
-        "pid": 509202,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T00:32:51.629Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2807",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Added fresh-schema and runtime top-up indexes for cost-event agent/time and case-insensitive issue lookups, with regression and query-plan coverage.",
         "releasedAt": "2026-07-17T00:32:28.180Z"
+      },
+      {
+        "writerId": "agent-pan-2807",
+        "agentId": "agent-pan-2807",
+        "pid": 509202,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T00:32:51.629Z",
+        "itemId": "narrow-topup-error-swallowing",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2807 dead)",
+        "releasedAt": "2026-07-17T00:36:22.350Z"
       }
     ],
     "statusReasons": {
       "add-cost-event-indexes": {
         "reason": "Added fresh-schema and runtime top-up indexes for cost-event agent/time and case-insensitive issue lookups, with regression and query-plan coverage.",
         "updatedAt": "2026-07-17T00:32:28.180Z"
+      },
+      "narrow-topup-error-swallowing": {
+        "reason": "stale claim released (agent-pan-2807 dead)",
+        "updatedAt": "2026-07-17T00:36:22.350Z"
       }
     }
   },
@@ -88,6 +95,6 @@
     "add-cost-event-indexes.add-cost-event-indexes.ac1": "completed",
     "add-cost-event-indexes.add-cost-event-indexes.ac2": "completed",
     "add-cost-event-indexes.add-cost-event-indexes.ac3": "completed",
-    "narrow-topup-error-swallowing": "running"
+    "narrow-topup-error-swallowing": "pending"
   }
 }
