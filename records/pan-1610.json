@@ -34,15 +34,7 @@
       "timestamp": "2026-07-17T16:57:52.751Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T16:57:52Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1610\n\nIssue/session action identities overlap and the required six-surface parity gate skips four real integrations\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1610 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -108,22 +100,22 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T17:07:07.007Z",
+  "updated": "2026-07-17T17:07:10.569Z",
   "pipeline": {
     "issueId": "PAN-1610",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T17:07:06.974Z",
+    "updatedAt": "2026-07-17T17:07:10.550Z",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
     "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
     "reviewRequestedAt": "2026-07-17T17:07:06.626Z",
-    "reviewSpawnedAt": "2026-07-17T16:51:46.459Z",
+    "reviewSpawnedAt": "2026-07-17T17:07:10.550Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-baseline.txt",
@@ -261,7 +253,7 @@
       },
       "costAtCloseOut": {
         "usd": 168.504664,
-        "pricingAsOf": "2026-07-17T17:07:06.977Z"
+        "pricingAsOf": "2026-07-17T17:07:10.561Z"
       }
     },
     "merges": [
