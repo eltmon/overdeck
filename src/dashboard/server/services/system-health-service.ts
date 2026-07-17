@@ -1,7 +1,6 @@
 import { exec } from 'node:child_process';
-import { access, readFile } from 'node:fs/promises';
-import { cpus, freemem, loadavg, totalmem, homedir, platform } from 'node:os';
-import { join } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { cpus, freemem, loadavg, totalmem, platform } from 'node:os';
 import { promisify } from 'node:util';
 
 import type { DashboardSnapshot } from '@overdeck/contracts';
@@ -16,6 +15,12 @@ import { listPaneValues } from '../../../lib/tmux.js';
 import { DockerStatsCollector, type ContainerStats } from '../../../lib/docker-stats.js';
 import { getBuildInfo } from '../../../lib/deploy/build-info.js';
 import {
+  SYSTEM_HEALTH_DEFAULTS,
+  resolveSystemHealthConfig,
+  type EffectiveSystemHealthConfig,
+  type SystemHealthThresholds,
+} from '../../../lib/system-health/config.js';
+import {
   computeBuildStaleness,
   type BuildStaleness,
 } from '../../../lib/deploy/staleness.js';
@@ -23,29 +28,10 @@ import { initEventStore } from '../event-store.js';
 import { getDashboardIdentity } from '../identity.js';
 
 const execAsync = promisify(exec);
-const DEFAULT_HEALTH_POLL_SECONDS = 15;
-const DEFAULT_RESOURCE_CONFIG = {
-  memoryWarnGb: 4,
-  memoryBlockGb: 2,
-  agentWarnCount: 8,
-  agentBlockCount: 10,
-};
 const KB = 1024;
 const GIB = 1024 ** 3;
-const GLOBAL_CONFIG_PATH = join(homedir(), '.overdeck', 'config.yaml');
 
 type SystemHealthSeverity = 'normal' | 'warning' | 'critical';
-
-interface SystemHealthThresholds {
-  memoryAvailableWarningBytes: number;
-  memoryAvailableCriticalBytes: number;
-  swapUsedWarningPercent: number;
-  swapUsedCriticalPercent: number;
-  cpuLoadWarningPerCore: number;
-  cpuLoadCriticalPerCore: number;
-  overcommitWarningPercent: number;
-  overcommitCriticalPercent: number;
-}
 
 export interface ProcMemorySnapshot {
   memTotal: number;
@@ -158,8 +144,7 @@ let candidateSeverity: SystemHealthSeverity | null = null;
 let candidateCount = 0;
 const HYSTERESIS_POLLS = 3;
 let eventStorePromise: ReturnType<typeof initEventStore> | null = null;
-let cachedResourceConfig = DEFAULT_RESOURCE_CONFIG;
-let cachedPollSeconds = DEFAULT_HEALTH_POLL_SECONDS;
+let cachedSystemHealthConfig: EffectiveSystemHealthConfig | null = null;
 let resourceConfigLoadedAt = 0;
 let resourceConfigInflight: Promise<void> | null = null;
 let cachedDeployStaleness: BuildStaleness | null = null;
@@ -240,45 +225,14 @@ export function classifyAgentKind(
   return 'other';
 }
 
-function resolveFiniteNumber(value: string | undefined, fallback: number): number {
-  if (value == null || value.trim() === '') return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
 export async function readGlobalResourceConfig(): Promise<void> {
-  let next = DEFAULT_RESOURCE_CONFIG;
-  try {
-    await access(GLOBAL_CONFIG_PATH);
-    const raw = await readFile(GLOBAL_CONFIG_PATH, 'utf-8');
-    const memoryWarnMatch = raw.match(/^\s*memory_warn_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const memoryBlockMatch = raw.match(/^\s*memory_block_gb:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const agentWarnMatch = raw.match(/^\s*agent_warn_count:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const agentBlockMatch = raw.match(/^\s*agent_block_count:\s*(\d+(?:\.\d+)?)\s*$/m);
-    const pollSecondsMatch = raw.match(/^\s*poll_seconds:\s*(\d+(?:\.\d+)?)\s*$/m);
-
-    next = {
-      memoryWarnGb: resolveFiniteNumber(memoryWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryWarnGb),
-      memoryBlockGb: resolveFiniteNumber(memoryBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.memoryBlockGb),
-      agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(agentWarnMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentWarnCount))),
-      agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(agentBlockMatch?.[1], DEFAULT_RESOURCE_CONFIG.agentBlockCount))),
-    };
-    cachedPollSeconds = Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_HEALTH_POLL_SECONDS'], resolveFiniteNumber(pollSecondsMatch?.[1], DEFAULT_HEALTH_POLL_SECONDS))));
-  } catch {
-    cachedPollSeconds = Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_HEALTH_POLL_SECONDS'], DEFAULT_HEALTH_POLL_SECONDS)));
-  }
-
-  cachedResourceConfig = {
-    memoryWarnGb: resolveFiniteNumber(process.env['PAN_MEMORY_WARN_GB'], next.memoryWarnGb),
-    memoryBlockGb: resolveFiniteNumber(process.env['PAN_MEMORY_BLOCK_GB'], next.memoryBlockGb),
-    agentWarnCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_WARN_COUNT'], next.agentWarnCount))),
-    agentBlockCount: Math.max(1, Math.floor(resolveFiniteNumber(process.env['PAN_AGENT_BLOCK_COUNT'], next.agentBlockCount))),
-  };
+  cachedSystemHealthConfig = resolveSystemHealthConfig();
   resourceConfigLoadedAt = Date.now();
 }
 
 async function ensureResourceConfigLoaded(): Promise<void> {
-  const ttl = Math.max(5_000, cachedPollSeconds * 1000);
+  const pollSeconds = cachedSystemHealthConfig?.pollSeconds ?? SYSTEM_HEALTH_DEFAULTS.pollSeconds;
+  const ttl = Math.max(5_000, pollSeconds * 1000);
   if (resourceConfigLoadedAt > 0 && Date.now() - resourceConfigLoadedAt < ttl) return;
   if (!resourceConfigInflight) {
     resourceConfigInflight = readGlobalResourceConfig().finally(() => {
@@ -289,25 +243,15 @@ async function ensureResourceConfigLoaded(): Promise<void> {
 }
 
 export function getResourceConfig() {
-  return cachedResourceConfig;
+  cachedSystemHealthConfig ??= resolveSystemHealthConfig();
+  return cachedSystemHealthConfig.resources;
 }
 
 function getHealthPollTtlMs(): number {
-  return Math.max(1, cachedPollSeconds) * 1000;
-}
-
-function defaultThresholds(): SystemHealthThresholds {
-  const resources = getResourceConfig();
-  return {
-    memoryAvailableWarningBytes: resources.memoryWarnGb * GIB,
-    memoryAvailableCriticalBytes: resources.memoryBlockGb * GIB,
-    swapUsedWarningPercent: Number(process.env['PAN_HEALTH_SWAP_WARN_PERCENT'] ?? 20),
-    swapUsedCriticalPercent: Number(process.env['PAN_HEALTH_SWAP_CRITICAL_PERCENT'] ?? 50),
-    cpuLoadWarningPerCore: Number(process.env['PAN_HEALTH_LOAD_WARN_PER_CORE'] ?? 1),
-    cpuLoadCriticalPerCore: Number(process.env['PAN_HEALTH_LOAD_CRITICAL_PER_CORE'] ?? 1.5),
-    overcommitWarningPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_WARN_PERCENT'] ?? 150),
-    overcommitCriticalPercent: Number(process.env['PAN_HEALTH_OVERCOMMIT_CRITICAL_PERCENT'] ?? 200),
-  };
+  return Math.max(
+    1,
+    cachedSystemHealthConfig?.pollSeconds ?? SYSTEM_HEALTH_DEFAULTS.pollSeconds,
+  ) * 1000;
 }
 
 async function readProcMemoryLinux(): Promise<ProcMemorySnapshot> {
@@ -684,7 +628,7 @@ async function refreshSystemHealth(snapshot?: DashboardSnapshot): Promise<System
     Promise.resolve(getDockerStatsCollector().getStats()),
   ]);
 
-  const thresholds = defaultThresholds();
+  const thresholds = cachedSystemHealthConfig!.thresholds;
   const smeeRelay = collectSmeeRelayHealth();
   const coreCount = Math.max(cpus().length, 1);
   const loadPerCore1m = Math.round((loadAverage1m / coreCount) * 100) / 100;
