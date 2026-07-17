@@ -552,7 +552,7 @@
     "recordedAt": "2026-07-16T17:17:23.591Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-17T00:52:59.515Z",
+  "updated": "2026-07-17T01:32:37.425Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "passed",
@@ -562,7 +562,9 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T20:28:38.229Z",
+    "updatedAt": "2026-07-17T01:32:37.392Z",
+    "reviewNotes": "Current-head review approved: all four dimensions complete; no blockers remain after scope, convergence, proportionality, and requirements gates.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "mergeNotes": "PR #1636 was closed without merging — reopen the PR or reset review state to re-queue this issue",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "reviewedAtCommit": "1196ce677a11fcfea11d410ad3e6269fb4d8948f",
@@ -655,9 +657,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8943385,
-            "output": 239414,
-            "cacheRead": 38056960,
+            "input": 12124351,
+            "output": 267016,
+            "cacheRead": 40962048,
             "cacheWrite": 0
           }
         },
@@ -730,9 +732,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 68283564,
-          "output": 653231,
-          "cacheRead": 152643584,
+          "input": 71464530,
+          "output": 680833,
+          "cacheRead": 155548672,
           "cacheWrite": 0
         },
         "anthropic/claude-fable-5": {
@@ -797,8 +799,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 333.296906,
-        "pricingAsOf": "2026-07-16T20:28:38.273Z"
+        "usd": 351.48234,
+        "pricingAsOf": "2026-07-17T01:32:37.419Z"
       }
     },
     "merges": [
