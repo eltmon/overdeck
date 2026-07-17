@@ -14,6 +14,7 @@ import {
   Lock,
   Gauge,
   ClipboardList,
+  ListChecks,
   Layers,
   Archive,
   Loader2,
@@ -97,6 +98,7 @@ export interface AgentStepRowProps {
 
 const TYPE_ICON: Record<string, LucideIcon> = {
   work: Code2,
+  lint: ListChecks,
   knowledge: BookOpenCheck,
   strike: Zap,
   planning: Compass,
@@ -153,6 +155,7 @@ function deriveSessionLabel(session: SessionNodeType): string {
     case 'review': return 'Review';
     case 'reviewer': return session.role ? capitalize(session.role) : 'Reviewer';
     case 'work': return 'Work';
+    case 'lint': return 'Lint';
     case 'knowledge': return 'Knowledge';
     case 'strike': return 'Strike';
     case 'planning': return 'Planning';
@@ -327,6 +330,7 @@ function describeSessionPurpose(session: SessionNodeType): string {
 
   switch (session.type) {
     case 'work': return 'Implementation agent for this issue.';
+    case 'lint': return 'Quality-gate run (install/typecheck/lint/test) that gates review dispatch.';
     case 'knowledge': return 'Knowledge agent maintaining the OKF bundle for this issue.';
     case 'strike': return 'Drop-in implement-and-merge agent for this issue.';
     case 'planning': return 'Planning and context-building session for this issue.';

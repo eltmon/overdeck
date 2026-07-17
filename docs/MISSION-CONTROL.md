@@ -53,6 +53,19 @@ three layers, in order:
    `?issue=` deep-link without a project name, it resolves the project from the
    resource-allocated list and still attempts the session-trees + activity lookup.
 
+### Lint node (PAN-2665)
+
+The `/api/session-trees` response synthesizes a `type: 'lint'` `SessionNode`,
+ordered between Work and Review, from
+`<workspace>/.overdeck/verification-latest.json`. The verification runner at
+`src/lib/cloister/verification-runner.ts` writes the artifact through
+`src/lib/cloister/verification-artifact.ts`, and
+`src/dashboard/server/routes/command-deck-lint-node.ts` builds the node. The
+node has no agent process, tmux session, or JSONL transcript backing it.
+
+Clicking the Lint node opens `VerificationGatesPanel`, which renders the gate
+table and any failing-gate output captured in the artifact.
+
 The phase banner's "writing code" headline is driven by a live work section
 (`type === 'work' && status === 'running'`) from the activity feed, not by the
 presence of a plan or review row.
