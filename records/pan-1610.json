@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T12:51:45.207Z",
+  "updated": "2026-07-17T12:52:37.890Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -45,19 +45,30 @@
   "harness": "claude-code",
   "model": "claude-fable-5",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "catalog-merge-vbrief": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-1610",
         "agentId": "agent-pan-1610",
         "pid": 3899216,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T12:50:07.047Z"
+        "claimedAt": "2026-07-17T12:50:07.047Z",
+        "itemId": "catalog-merge-vbrief",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-1610 dead)",
+        "releasedAt": "2026-07-17T12:52:37.888Z"
+      }
+    ],
+    "statusReasons": {
+      "catalog-merge-vbrief": {
+        "reason": "stale claim released (agent-pan-1610 dead)",
+        "updatedAt": "2026-07-17T12:52:37.888Z"
       }
     }
   },
   "statusOverrides": {
-    "catalog-merge-vbrief": "running"
+    "catalog-merge-vbrief": "pending"
   },
   "sessionHistory": [
     {
