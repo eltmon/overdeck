@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:02:22.893Z",
-  "updated": "2026-07-17T10:48:46.682Z",
+  "updated": "2026-07-17T10:54:14.323Z",
   "pipeline": {
     "issueId": "PAN-2822",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "sidebar-rail-counts": {
-        "writerId": "agent-pan-2822",
-        "agentId": "agent-pan-2822",
-        "pid": 2024686,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:48:46.682Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2822",
@@ -107,6 +99,16 @@
         "outcome": "completed",
         "reason": "Extracted the Issues filter row, added the persisted Planned toggle, filtered the Issues tree/count and ProjectHome input while preserving unfiltered issue resolution, and added interaction coverage. Typecheck, 19 CommandDeck tests, and the 1537-line file-size ratchet pass in pushed commit 1a6ae9f4f3.",
         "releasedAt": "2026-07-17T10:48:39.123Z"
+      },
+      {
+        "writerId": "agent-pan-2822",
+        "agentId": "agent-pan-2822",
+        "pid": 2024686,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:48:46.682Z",
+        "itemId": "sidebar-rail-counts",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T10:54:14.323Z"
       }
     ],
     "statusReasons": {
@@ -148,6 +150,8 @@
     "issues-pane-toggle.issues-pane-toggle.ac3": "completed",
     "issues-pane-toggle.issues-pane-toggle.ac4": "completed",
     "issues-pane-toggle.issues-pane-toggle.ac5": "completed",
-    "sidebar-rail-counts": "running"
+    "sidebar-rail-counts": "completed",
+    "sidebar-rail-counts.sidebar-rail-counts.ac1": "completed",
+    "sidebar-rail-counts.sidebar-rail-counts.ac2": "completed"
   }
 }
