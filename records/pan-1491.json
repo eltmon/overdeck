@@ -552,19 +552,20 @@
     "recordedAt": "2026-07-16T17:17:23.591Z"
   },
   "created": "2026-07-11T09:48:27.729Z",
-  "updated": "2026-07-17T01:50:46.842Z",
+  "updated": "2026-07-17T01:50:50.529Z",
   "pipeline": {
     "issueId": "PAN-1491",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
-    "mergeStatus": "pending",
-    "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-17T01:50:46.826Z",
+    "mergeStatus": "failed",
+    "releaseStatus": "skipped",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-17T01:50:50.498Z",
     "reviewNotes": "Current-head review approved: all four dimensions complete; no blockers remain after scope, convergence, proportionality, and requirements gates.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "mergeNotes": "PR #1636 was closed without merging — reopen the PR or reset review state to re-queue this issue",
     "prUrl": "https://github.com/eltmon/overdeck/pull/1636",
     "reviewedAtCommit": "1196ce677a11fcfea11d410ad3e6269fb4d8948f",
     "lastVerifiedCommit": "1196ce677a11fcfea11d410ad3e6269fb4d8948f",
@@ -799,7 +800,7 @@
       },
       "costAtCloseOut": {
         "usd": 352.237782,
-        "pricingAsOf": "2026-07-17T01:50:46.837Z"
+        "pricingAsOf": "2026-07-17T01:50:50.504Z"
       }
     },
     "merges": [
