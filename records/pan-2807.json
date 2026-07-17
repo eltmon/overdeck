@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T00:27:28.613Z",
+  "updated": "2026-07-17T00:32:28.180Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "add-cost-event-indexes": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-2807",
         "agentId": "agent-pan-2807",
         "pid": 370570,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T00:27:28.613Z"
+        "claimedAt": "2026-07-17T00:27:28.613Z",
+        "itemId": "add-cost-event-indexes",
+        "outcome": "completed",
+        "reason": "Added fresh-schema and runtime top-up indexes for cost-event agent/time and case-insensitive issue lookups, with regression and query-plan coverage.",
+        "releasedAt": "2026-07-17T00:32:28.180Z"
+      }
+    ],
+    "statusReasons": {
+      "add-cost-event-indexes": {
+        "reason": "Added fresh-schema and runtime top-up indexes for cost-event agent/time and case-insensitive issue lookups, with regression and query-plan coverage.",
+        "updatedAt": "2026-07-17T00:32:28.180Z"
       }
     }
   },
   "statusOverrides": {
-    "add-cost-event-indexes": "running"
+    "add-cost-event-indexes": "completed",
+    "add-cost-event-indexes.add-cost-event-indexes.ac1": "completed",
+    "add-cost-event-indexes.add-cost-event-indexes.ac2": "completed",
+    "add-cost-event-indexes.add-cost-event-indexes.ac3": "completed"
   }
 }
