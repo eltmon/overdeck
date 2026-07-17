@@ -10,8 +10,72 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/IssueStatusBand.tsx",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "docs/design/mockups/issue-actions-grouped-pan-2661.html",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
+      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+      "src/dashboard/frontend/src/lib/issueActions.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "docs/design/mockups/issue-actions-grouped-pan-2661.html",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+      "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+      "src/dashboard/frontend/src/components/Stage/IssueStatusBand.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+      "src/dashboard/frontend/src/lib/issueActions.ts"
+    ],
+    "recordedAt": "2026-07-17T16:13:30.540Z"
+  },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:13:30.541Z",
+  "updated": "2026-07-17T16:13:33.413Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -21,8 +85,74 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T14:23:58.634Z",
-    "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive."
+    "updatedAt": "2026-07-17T16:13:33.345Z",
+    "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
+    "reviewRequestedAt": "2026-07-17T16:13:33.284Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+        "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueStatusBand.tsx",
+        "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/ISSUE-VIEW.md",
+        "docs/design/mockups/issue-actions-grouped-pan-2661.html",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
+        "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+        "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
+        "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+        "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+        "src/dashboard/frontend/src/lib/issueActions.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/ISSUE-VIEW.md",
+        "docs/design/mockups/issue-actions-grouped-pan-2661.html",
+        "scripts/file-size-baseline.txt",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
+        "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+        "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+        "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+        "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+        "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+        "src/dashboard/frontend/src/components/Stage/IssueStatusBand.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+        "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+        "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
+        "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+        "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+        "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+        "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+        "src/dashboard/frontend/src/lib/issueActions.ts"
+      ],
+      "recordedAt": "2026-07-17T16:13:30.540Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -45,17 +175,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 10,
-            "output": 7177,
-            "cacheRead": 400337,
-            "cacheWrite": 192986
+            "input": 12,
+            "output": 7918,
+            "cacheRead": 521766,
+            "cacheWrite": 195440
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2812017,
-            "output": 205623,
-            "cacheRead": 35911168,
+            "input": 6735514,
+            "output": 483198,
+            "cacheRead": 103269376,
             "cacheWrite": 0
           }
         }
@@ -74,28 +204,30 @@
           "cacheWrite": 180202
         },
         "anthropic/claude-sonnet-5": {
-          "input": 10,
-          "output": 7177,
-          "cacheRead": 400337,
-          "cacheWrite": 192986
+          "input": 12,
+          "output": 7918,
+          "cacheRead": 521766,
+          "cacheWrite": 195440
         },
         "openai/gpt-5.6-sol": {
-          "input": 2812017,
-          "output": 205623,
-          "cacheRead": 35911168,
+          "input": 6735514,
+          "output": 483198,
+          "cacheRead": 103269376,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 50.720654,
-        "pricingAsOf": "2026-07-17T14:23:58.703Z"
+        "usd": 112.382328,
+        "pricingAsOf": "2026-07-17T16:13:33.396Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2851"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 22,
     "claims": {},
@@ -274,69 +406,5 @@
     "docs-and-pointers.docs-and-pointers.ac1": "completed",
     "docs-and-pointers.docs-and-pointers.ac2": "completed",
     "docs-and-pointers.docs-and-pointers.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
-      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/IssueStatusBand.tsx",
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/ISSUE-VIEW.md",
-      "docs/design/mockups/issue-actions-grouped-pan-2661.html",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
-      "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
-      "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
-      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
-      "src/dashboard/frontend/src/lib/issueActions.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/ISSUE-VIEW.md",
-      "docs/design/mockups/issue-actions-grouped-pan-2661.html",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ZoneBActionStrip.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
-      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
-      "src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
-      "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
-      "src/dashboard/frontend/src/components/Stage/IssueStatusBand.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
-      "src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx",
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
-      "src/dashboard/frontend/src/lib/issueActions.ts"
-    ],
-    "recordedAt": "2026-07-17T16:13:30.540Z"
   }
 }
