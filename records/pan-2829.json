@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-17T14:24:59.699Z",
+  "updated": "2026-07-17T14:28:12.857Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -94,16 +94,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "envelope-canonical": {
-        "writerId": "agent-pan-2829",
-        "agentId": "agent-pan-2829",
-        "pid": 1703051,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T13:43:38.090Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -115,6 +107,16 @@
         "outcome": "completed",
         "reason": "Moved src/lib/vbrief to src/lib/xbrief, renamed xbrief-index, and updated repository imports without behavior changes",
         "releasedAt": "2026-07-17T13:43:03.813Z"
+      },
+      {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 1703051,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:43:38.090Z",
+        "itemId": "envelope-canonical",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T14:28:12.857Z"
       }
     ],
     "statusReasons": {
@@ -129,6 +131,10 @@
     "module-move.module-move.ac1": "completed",
     "module-move.module-move.ac2": "completed",
     "module-move.module-move.ac3": "completed",
-    "envelope-canonical": "running"
+    "envelope-canonical": "completed",
+    "envelope-canonical.envelope-canonical.ac1": "completed",
+    "envelope-canonical.envelope-canonical.ac2": "completed",
+    "envelope-canonical.envelope-canonical.ac3": "completed",
+    "envelope-canonical.envelope-canonical.ac4": "completed"
   }
 }
