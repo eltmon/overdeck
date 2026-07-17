@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T13:36:34.471Z",
+  "updated": "2026-07-17T13:39:17.564Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -97,8 +97,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "primary-strip-mode": {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 1501923,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:39:17.564Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -131,6 +139,10 @@
       "extract-grouped-body": {
         "reason": "Extracted the complete grouped issue-action body behind host-neutral menu primitives, preserved the thin Radix rail host and session extras, and added passing non-Radix host coverage.",
         "updatedAt": "2026-07-17T13:35:05.654Z"
+      },
+      "primary-strip-mode": {
+        "reason": "Implement the next ready grouped-overflow foundation item after extract-grouped-body passed fast inspection.",
+        "updatedAt": "2026-07-17T13:39:17.564Z"
       }
     }
   },
@@ -140,6 +152,7 @@
     "extract-grouped-body.extract-grouped-body.ac1": "completed",
     "extract-grouped-body.extract-grouped-body.ac2": "completed",
     "extract-grouped-body.extract-grouped-body.ac3": "completed",
-    "extract-grouped-body.extract-grouped-body.ac4": "completed"
+    "extract-grouped-body.extract-grouped-body.ac4": "completed",
+    "primary-strip-mode": "running"
   }
 }
