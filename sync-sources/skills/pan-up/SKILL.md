@@ -67,6 +67,18 @@ pan up --no-resume
 pan up --no-open
 ```
 
+## Identity guard
+
+`pan up` refuses to run when the current directory is inside a non-primary
+checkout: either a workspace worktree or any linked Git worktree, including a
+handoff worktree. It exits with code 2 and names the primary checkout where the
+command must run.
+
+After startup, the health gate verifies both `repoRoot` and `mode` from
+`GET /api/health`. If another server holds the port, the command reports
+`port held by non-primary server (cwd=…, mode=…)`; a 200 response from the wrong
+server is a failure, not a successful start.
+
 ## Desktop App
 
 `pan up` opens the Overdeck Electron desktop app if it is installed in one of
