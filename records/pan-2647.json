@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T01:32:43.807Z",
+  "updated": "2026-07-17T01:36:47.761Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "collector-darwin": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 2180364,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T01:32:43.806Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -135,6 +127,16 @@
         "itemId": "collector-linux",
         "outcome": "completed",
         "releasedAt": "2026-07-17T01:32:17.161Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2180364,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:32:43.806Z",
+        "itemId": "collector-darwin",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T01:36:47.760Z"
       }
     ],
     "statusReasons": {
@@ -160,6 +162,10 @@
     "collector-linux.collector-linux.ac3": "completed",
     "collector-linux.collector-linux.ac4": "completed",
     "collector-linux.collector-linux.ac5": "completed",
-    "collector-darwin": "running"
+    "collector-darwin": "completed",
+    "collector-darwin.collector-darwin.ac1": "completed",
+    "collector-darwin.collector-darwin.ac2": "completed",
+    "collector-darwin.collector-darwin.ac3": "completed",
+    "collector-darwin.collector-darwin.ac4": "completed"
   }
 }
