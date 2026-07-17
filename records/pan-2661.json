@@ -79,7 +79,7 @@
     "recordedAt": "2026-07-17T12:01:04.835Z"
   },
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T12:49:42.896Z",
+  "updated": "2026-07-17T12:50:01.867Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "passed",
@@ -87,9 +87,9 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T12:49:42.886Z",
+    "updatedAt": "2026-07-17T12:50:01.836Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -160,7 +160,7 @@
       },
       "costAtCloseOut": {
         "usd": 92.746248,
-        "pricingAsOf": "2026-07-17T12:49:42.892Z"
+        "pricingAsOf": "2026-07-17T12:50:01.840Z"
       }
     },
     "merges": [
@@ -169,7 +169,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-fable-5",
   "tasks": {
     "sequence": 18,
     "claims": {},
