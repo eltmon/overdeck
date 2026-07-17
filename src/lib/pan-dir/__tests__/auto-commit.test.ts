@@ -107,6 +107,37 @@ describe('auto-commit', () => {
     expect(secondResult).toEqual(firstResult);
   });
 
+  it.effect('flushes every project root targeting the requested Git root', () =>
+    Effect.gen(function* () {
+      mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+      const firstPath = join(tmp, '.pan', 'records', 'pan-shared-first.json');
+      const secondPath = join(tmp, '.pan', 'records', 'pan-shared-second.json');
+      writeFileSync(firstPath, '{"writer":"first"}');
+      writeFileSync(secondPath, '{"writer":"second"}');
+
+      queueAutoCommit({
+        projectRoot: `${tmp}-logical-first`,
+        repoRoot: tmp,
+        paths: [firstPath],
+        subject: 'chore(state): shared root first writer',
+      });
+      queueAutoCommit({
+        projectRoot: `${tmp}-logical-second`,
+        repoRoot: tmp,
+        paths: [secondPath],
+        subject: 'chore(state): shared root second writer',
+      });
+
+      const result = yield* flushAutoCommits(tmp);
+
+      expect(result.committed).toBe(true);
+      const log = execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' });
+      expect(log).toContain('chore(state): shared root first writer');
+      expect(log).toContain('chore(state): shared root second writer');
+      expect(log.split('\n').filter(Boolean).length).toBe(3);
+    }),
+  );
+
   it('cancels and settles active and serializer-blocked flushes for one Git root', async () => {
     vi.useFakeTimers();
     try {

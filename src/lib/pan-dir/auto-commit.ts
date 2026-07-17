@@ -307,8 +307,10 @@ export function reconcileStatePlaneDrift(
 }
 
 /**
- * Force a flush of any pending commits for `projectRoot`. Returns an Effect that
- * resolves after the commit attempt (success or no-op).
+ * Force a flush of every pending or active commit that targets the same Git
+ * checkout as `projectRoot`. Callers may pass either a logical project root or
+ * the effective Git root; the Effect resolves only after every matching writer
+ * has settled.
  */
 export function flushAutoCommits(
   projectRoot: string,
@@ -333,15 +335,26 @@ function flushPromise(
   projectRoot: string,
   signal?: AbortSignal,
 ): Promise<FlushResult> {
-  const batch = pending.get(projectRoot);
-  const activeFlush = batch
-    ? (clearTimeout(batch.timer), flushInner(projectRoot))
-    : active.get(projectRoot);
-  if (!activeFlush) {
+  const gitRoot = pending.get(projectRoot)?.repoRoot
+    ?? active.get(projectRoot)?.gitRoot
+    ?? projectRoot;
+  const matching = new Set<ActiveFlush>();
+
+  for (const [queuedProjectRoot, batch] of pending) {
+    if ((batch.repoRoot ?? queuedProjectRoot) !== gitRoot) continue;
+    clearTimeout(batch.timer);
+    const started = flushInner(queuedProjectRoot);
+    if (started) matching.add(started);
+  }
+  for (const activeFlush of active.values()) {
+    if (activeFlush.gitRoot === gitRoot) matching.add(activeFlush);
+  }
+
+  if (matching.size === 0) {
     signal?.throwIfAborted();
     return Promise.resolve({ committed: false, reason: 'no pending' });
   }
-  return waitForFlush(activeFlush, signal);
+  return waitForFlushes(gitRoot, [...matching], signal);
 }
 
 function flushInner(projectRoot: string): ActiveFlush | undefined {
@@ -380,13 +393,23 @@ function startSerializedFlush(
   return activeFlush;
 }
 
-async function waitForFlush(
+function waitForFlush(
   activeFlush: ActiveFlush,
   signal?: AbortSignal,
 ): Promise<FlushResult> {
-  if (!signal) return activeFlush.promise;
+  return waitForFlushes(activeFlush.gitRoot, [activeFlush], signal);
+}
+
+async function waitForFlushes(
+  gitRoot: string,
+  activeFlushes: readonly ActiveFlush[],
+  signal?: AbortSignal,
+): Promise<FlushResult> {
+  const completion = Promise.all(activeFlushes.map((flush) => flush.promise))
+    .then(combineFlushResults);
+  if (!signal) return completion;
   if (signal.aborted) {
-    await abortAndSettleGitRoot(activeFlush.gitRoot, signal.reason);
+    await abortAndSettleGitRoot(gitRoot, signal.reason);
     throw signal.reason;
   }
 
@@ -396,13 +419,13 @@ async function waitForFlush(
       if (completed) return;
       completed = true;
       signal.removeEventListener('abort', onAbort);
-      void abortAndSettleGitRoot(activeFlush.gitRoot, signal.reason).then(
+      void abortAndSettleGitRoot(gitRoot, signal.reason).then(
         () => reject(signal.reason),
         reject,
       );
     };
     signal.addEventListener('abort', onAbort, { once: true });
-    void activeFlush.promise.then(
+    void completion.then(
       (result) => {
         if (completed) return;
         completed = true;
@@ -418,6 +441,23 @@ async function waitForFlush(
     );
     if (signal.aborted) onAbort();
   });
+}
+
+function combineFlushResults(results: FlushResult[]): FlushResult {
+  if (results.length === 1) return results[0];
+
+  const combined: FlushResult = {
+    committed: results.some((result) => result.committed),
+  };
+  const committed = results.filter((result) => result.committed);
+  if (committed.some((result) => result.pushed === false)) combined.pushed = false;
+  else if (committed.length > 0 && committed.every((result) => result.pushed === true)) {
+    combined.pushed = true;
+  }
+  if (results.some((result) => result.errored)) combined.errored = true;
+  const reasons = results.flatMap((result) => result.reason ? [result.reason] : []);
+  if (reasons.length > 0) combined.reason = reasons.join('; ');
+  return combined;
 }
 
 async function abortAndSettleGitRoot(
