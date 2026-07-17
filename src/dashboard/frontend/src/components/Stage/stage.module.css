@@ -272,6 +272,12 @@
   outline: none;
 }
 
+.launchError {
+  margin-top: 6px;
+  color: var(--destructive);
+  font-size: 12px;
+}
+
 .dropdown {
   margin-top: 6px;
   border: 1px solid var(--border);

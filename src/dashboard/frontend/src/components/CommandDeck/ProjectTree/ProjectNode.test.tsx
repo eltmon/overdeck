@@ -196,7 +196,7 @@ describe('ProjectNode', () => {
     );
 
     const row = screen.getAllByRole('button', { name: /overdeck/i })[0];
-    expect(row).toHaveStyle({ background: 'var(--accent)' });
+    expect(row.style.background).toBe('var(--accent)');
 
     fireEvent.click(screen.getByRole('button', { name: /new conversation/i }));
 

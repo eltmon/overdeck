@@ -27,6 +27,17 @@ describe('schema migrations', () => {
     expect(db.pragma('user_version', { simple: true })).toBe(newerVersion);
   });
 
+  it('adds affected_criteria to a current-version database that predates the column', () => {
+    db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY)');
+    db.pragma(`user_version = ${SCHEMA_VERSION}`);
+
+    runMigrations(db);
+
+    const columns = db.prepare('PRAGMA table_info(flywheel_substrate_bugs)').all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toContain('affected_criteria');
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
   it('repairs stale session_file paths when the corrected transcript exists', () => {
     db.pragma('user_version = 15');
     db.exec(`

@@ -14,7 +14,7 @@ import { Effect, Layer, Context } from 'effect';
 import { loadOverdeckEnvSync } from '../../lib/env-loader.js';
 import {
   getDashboardIdentity,
-  isWorkspaceRepoRoot,
+  isNonPrimaryCheckoutRoot,
   readHostDashboardApiPort,
   shouldRefuseHostDashboardPort,
 } from './identity.js';
@@ -99,7 +99,7 @@ export const ServerConfigLayer = Layer.effect(
       console.error(`[overdeck] ${msg}`);
       throw new ServerConfigError('API_PORT', msg);
     }
-    const overrideAllowed = overrideRequested && !isWorkspaceRepoRoot(identity.repoRoot);
+    const overrideAllowed = overrideRequested && !isNonPrimaryCheckoutRoot(identity.repoRoot);
     if (
       shouldRefuseHostDashboardPort({
         repoRoot: identity.repoRoot,

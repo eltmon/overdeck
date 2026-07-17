@@ -81,6 +81,7 @@ Substrate bug issues filed during a Flywheel run carry a trailer block at the bo
 Flywheel-Run-Id: RUN-123
 Flywheel-Filed-By: agent
 Flywheel-Discovered-In: PAN-1487
+Flywheel-Affects-Criterion: 1,4
 ```
 
 `Flywheel-Run-Id` identifies the active Flywheel orchestrator run that exposed the bug. The hook only injects the block when the run id matches the canonical `RUN-<number>` form.
@@ -89,9 +90,31 @@ Flywheel-Discovered-In: PAN-1487
 
 `Flywheel-Discovered-In` names the pipeline issue whose run exposed the substrate bug. It is resolved from the filing agent's Overdeck state at `${OVERDECK_HOME}/agents/<agent-id>/state.json`; the line is omitted when no issue id is available.
 
-The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the trailer into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists.
+`Flywheel-Affects-Criterion` is an optional, author-supplied line naming the v1.0 readiness criterion (or criteria) the bug degrades. Use the criterion numbers from **Reading the Stats panel** above (1–7), comma-separated. Add this line when the affected criterion is known; omit it when the impact is unclear. The dashboard and `pan flywheel weights` use this line to compute a weight for the bug so the bottleneck criterion rises in the suggestion order.
 
-Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics.
+The `gh-issue-trailer-hook` Claude Code PreToolUse Bash hook injects the provenance lines (`Flywheel-Run-Id`, `Flywheel-Filed-By`, and `Flywheel-Discovered-In`) into `gh issue create` calls before later Bash filters run. It handles inline `--body`, `--body-file <path>`, and `--body-file -` stdin bodies, and it leaves commands unchanged when a `Flywheel-Run-Id:` line already exists. `Flywheel-Affects-Criterion` is semantic and must be supplied by the filer in the issue body; the hook does not derive it from environment variables.
+
+Telemetry consumes these trailers as the bridge between GitHub issues and local Flywheel stats. The substrate-bug poller reads candidate GitHub issues, parses the trailer block, stores each issue in the substrate-bug projection, and uses `Flywheel-Discovered-In` for substrate-attributable failure metrics. `Flywheel-Affects-Criterion` feeds the weight model described below.
+
+## Metric-aware prioritization
+
+Substrate bugs are not all equally urgent: a bug that degrades a v1.0 criterion currently in the red is a bigger blocker than one that touches a green criterion. The Flywheel ranks substrate-bug suggestions within the substrate-hardening tier using a numeric **weight** derived from the bug's declared affected criteria and the latest telemetry.
+
+A substrate bug declares affected criteria with the `Flywheel-Affects-Criterion: N[,M]` trailer line documented above, using the criterion numbers from **Reading the Stats panel** (1–7). Labels of the form `affects-criterion-N` are also accepted as a fallback.
+
+The weight formula is intentionally simple:
+
+- For each affected criterion, if the latest 30-day telemetry shows that criterion as **red** (failing its ready threshold), the bug gets a large status-driven bonus.
+- If the criterion is **yellow** (close to threshold), it gets a smaller bonus.
+- Green criteria contribute no bonus.
+- When telemetry is **insufficient** for a criterion, that criterion contributes zero.
+- Each criterion also contributes its normalized current-value distance from target, so a criterion farther from readiness ranks above a closer criterion with the same status.
+
+The result is a single number (`weight`) and a human-readable `weightReason` such as `Criterion 4 (MTTR) is red`. The orchestrator runs `pan flywheel weights --json` each tick, keeps operator-filed bugs first, and then orders each filing-source group by weight descending; equal weights use the oldest filing time first. Higher-weight bugs are surfaced first within their filing-source group, but weight **only re-orders within the tier** — it never overrides red-main/P0 work or filters or displaces operator-injected items.
+
+`pan flywheel weights [--window <dur>] [--issue <id>] [--json]` is the sandbox-safe CLI surface for the same data the dashboard uses. Without `--json` it prints a table; with `--json` it emits the full weighted rows. The dashboard renders the weight as a badge on each substrate-bug suggestion in the Status panel, alongside the `weightReason`, and sorts by operator precedence, then priority, then weight.
+
+The dashboard HTTP endpoint `GET /api/flywheel/substrate-bug-weights` requires dashboard authentication and accepts the same `?window=<dur>` duration grammar as the CLI. Omitted, malformed, or non-positive values fall back to `30d`; valid values longer than **365 days** are canonicalized to `365d` before entering the shared database-worker queue, while shorter values retain their normalized duration. The service independently enforces the same 365-day cap as defense in depth.
 
 ## Lifecycle
 

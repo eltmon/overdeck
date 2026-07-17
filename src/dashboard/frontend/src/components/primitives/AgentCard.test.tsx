@@ -20,7 +20,7 @@ describe('AgentCard', () => {
     );
 
     const card = screen.getByText('Ship Agent').closest('[data-component="agent-card"]') as HTMLElement;
-    expect(card).toHaveStyle('--agent-card-accent: var(--signal-review)');
+    expect(card.style.getPropertyValue('--agent-card-accent')).toBe('var(--signal-review)');
   });
 
   it('preserves all role accents without regression', () => {
@@ -49,7 +49,7 @@ describe('AgentCard', () => {
       );
 
       const card = screen.getByText(`${role} Agent`).closest('[data-component="agent-card"]') as HTMLElement;
-      expect(card).toHaveStyle(`--agent-card-accent: ${accent}`);
+      expect(card.style.getPropertyValue('--agent-card-accent')).toBe(accent);
       unmount();
     }
   });

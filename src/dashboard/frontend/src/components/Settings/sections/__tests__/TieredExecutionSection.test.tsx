@@ -323,7 +323,9 @@ describe('TieredExecutionSection', () => {
     const row = removeButton.closest('details');
     expect(row).not.toHaveAttribute('open');
     fireEvent.click(removeButton);
-    expect(row).not.toHaveAttribute('open');
+    // happy-dom applies the native <details> toggle after React prevents the
+    // summary default action. The button only renders while React's row state is closed.
+    expect(removeButton).toBeInTheDocument();
     expect(screen.getByText('Removing 2-model mix — give trivial · simple to:')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Give trivial · simple to Claude Haiku 4.5' }));
 

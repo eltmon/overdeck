@@ -6,8 +6,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { Effect } from 'effect';
 import { parse as parseYaml } from 'yaml';
 import { ServerConfig, ServerConfigLayer, ServerConfigError } from '../../../src/dashboard/server/config.js';
@@ -209,6 +210,21 @@ describe('ServerConfig', () => {
         await expect(getConfig()).resolves.toMatchObject({ port: 3011 });
       },
     );
+
+    it('refuses the primary-port escape hatch from a linked worktree', async () => {
+      const repoRoot = mkdtempSync(join(tmpdir(), 'pan-config-linked-worktree-'));
+      try {
+        writeFileSync(join(repoRoot, '.git'), 'gitdir: /primary/.git/worktrees/handoff\n');
+        identityMock.current = { repoRoot, mode: 'primary' };
+        process.env['OVERDECK_AGENT_ID'] = 'conv-20260709-6371';
+
+        await expect(getConfig()).rejects.toThrow(
+          `Refusing to bind host dashboard port 3011 from repoRoot=${repoRoot}`,
+        );
+      } finally {
+        rmSync(repoRoot, { recursive: true, force: true });
+      }
+    });
   });
 
   describe('optional API keys', () => {

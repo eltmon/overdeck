@@ -42,6 +42,18 @@ Each stage is health-gated: the command waits for `GET /api/health` (dashboard)
 or port binding (CLIProxy) to succeed before reporting `✓`, and exits non-zero
 with a `[stage] reason` message on timeout.
 
+## Identity guard
+
+When `pan restart` would restart the dashboard, it refuses to run from a
+non-primary checkout: either a workspace worktree or any linked Git worktree,
+including a handoff worktree. It exits with code 2 and names the primary
+checkout where the command must run.
+
+The post-boot health gate verifies both `repoRoot` and `mode` from
+`GET /api/health`. If another server holds the port, the command reports
+`port held by non-primary server (cwd=…, mode=…)`; a 200 response from the wrong
+server is a failure, not a successful restart.
+
 ## Important Notes
 
 - `pan restart` is idempotent: it stops the old listener(s), starts a new one,

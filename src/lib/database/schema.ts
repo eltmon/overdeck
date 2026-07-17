@@ -367,6 +367,7 @@ export function initSchema(db: SqliteDatabase): void {
       filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
       discovered_in_issue_id TEXT,
       severity               TEXT NOT NULL DEFAULT 'P2',
+      affected_criteria      TEXT,
       status                 TEXT NOT NULL DEFAULT 'open',
       fix_merged_at          TEXT,
       fix_commit_sha         TEXT,
@@ -772,6 +773,9 @@ export function initSchema(db: SqliteDatabase): void {
 export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   const currentVersion = db.pragma('user_version', { simple: true }) as number;
 
+  if (currentVersion === SCHEMA_VERSION) {
+    try { db.exec(`ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT`); } catch { /* already exists or table absent */ }
+  }
   if (currentVersion >= SCHEMA_VERSION) {
     return; // Already at or ahead of this build's schema version
   }
@@ -1454,6 +1458,7 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
         filed_by               TEXT NOT NULL CHECK (filed_by IN ('agent','operator')),
         discovered_in_issue_id TEXT,
         severity               TEXT NOT NULL DEFAULT 'P2',
+        affected_criteria      TEXT,
         status                 TEXT NOT NULL DEFAULT 'open',
         fix_merged_at          TEXT,
         fix_commit_sha         TEXT,
@@ -1735,6 +1740,11 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   if (currentVersion < 60) {
     try { db.exec(`ALTER TABLE review_status ADD COLUMN release_status TEXT`); } catch { /* already exists */ }
     try { db.exec(`ALTER TABLE review_status ADD COLUMN release_notes TEXT`); } catch { /* already exists */ }
+  }
+
+  // v60 -> v61: PAN-1491 store parsed affected v1.0 criteria on substrate bugs.
+  if (currentVersion < 61) {
+    try { db.exec(`ALTER TABLE flywheel_substrate_bugs ADD COLUMN affected_criteria TEXT`); } catch { /* already exists */ }
   }
 
   // After all migrations, set the version
