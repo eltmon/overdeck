@@ -5,7 +5,11 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { resolvePipelineMembership, type IssueLensSignals } from '../../../src/lib/pipeline-membership.js';
+import {
+  PLANNED_BACKLOG_SPEC_ONLY_REASON,
+  resolvePipelineMembership,
+  type IssueLensSignals,
+} from '../../../src/lib/pipeline-membership.js';
 
 const root = resolve(fileURLToPath(new URL('../../..', import.meta.url)));
 const CONSUMERS = [
@@ -67,5 +71,25 @@ describe('pipeline membership no-loss audit', () => {
     ],
   ] as const)('classifies %s as %s', (_name, input, expectedBucket) => {
     expect(resolvePipelineMembership(input).bucket).toBe(expectedBucket);
+  });
+
+  it('identifies the spec-only planned backlog reason', () => {
+    const membership = resolvePipelineMembership(signals({ hasVbriefSpec: true }));
+
+    expect(membership.bucket).toBe('planned_backlog');
+    expect(membership.reasons).toContain(PLANNED_BACKLOG_SPEC_ONLY_REASON);
+    expect(PLANNED_BACKLOG_SPEC_ONLY_REASON).toBe(
+      'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
+    );
+  });
+
+  it('does not identify branch-backed planned backlog as spec-only', () => {
+    const membership = resolvePipelineMembership(signals({
+      hasConventionBranch: true,
+      branchUnmerged: true,
+    }));
+
+    expect(membership.bucket).toBe('planned_backlog');
+    expect(membership.reasons).not.toContain(PLANNED_BACKLOG_SPEC_ONLY_REASON);
   });
 });

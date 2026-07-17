@@ -7,11 +7,12 @@ import {
   Hammer, Loader2, History, Mic, FileText, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { fetchProjects, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
 import { OverdeckMark } from './OverdeckMark';
 import { fetchConversations } from './CommandDeck/ConversationList';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
+import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore, selectIssues, selectAgents } from '../lib/store';
 import { getPipelineIssuePhase } from '../lib/pipeline-state';
 import { fetchExperimentalFeaturesEnabled, isExperimentalTab } from '../lib/experimentalFeatures';
@@ -164,6 +165,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     queryFn: fetchProjects,
     refetchInterval: 30000,
   });
+  const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
 
   // PAN-1561: the "No project" bucket appears once a conversation exists that
   // isn't under any registered project. These queries share keys with the
@@ -424,7 +426,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
               ) : (
                 projects.map((project) => {
                   const isActive = activeTab === 'command-deck' && selectedProject === project.name;
-                  const hasActivity = project.features.length > 0;
+                  const visibleFeatures = filterSpecOnlyPlanned(project.features, showPlannedBacklog);
+                  const hasActivity = visibleFeatures.length > 0;
                   return (
                     <button
                       key={project.path}
@@ -444,8 +447,8 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                         aria-hidden="true"
                       />
                       <span className="truncate">{project.name}</span>
-                      {project.features.length > 0 && (
-                        <span className="ml-auto text-[11px] text-muted-foreground">{project.features.length}</span>
+                      {visibleFeatures.length > 0 && (
+                        <span className="ml-auto text-[11px] text-muted-foreground">{visibleFeatures.length}</span>
                       )}
                     </button>
                   );

@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { CommandDeck } from './index';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { usePanesStore } from '../../lib/panesStore';
+import { usePlannedBacklogVisibility } from '../../hooks/usePlannedBacklogVisibility';
 
 vi.mock('./styles/command-deck.module.css', () => ({
   default: {
@@ -19,6 +20,9 @@ vi.mock('./styles/command-deck.module.css', () => ({
     segmentButton: 'segmentButton',
     segmentButtonActive: 'segmentButtonActive',
     segmentCount: 'segmentCount',
+    treeFilterRow: 'treeFilterRow',
+    treeFilterButton: 'treeFilterButton',
+    treeFilterButtonActive: 'treeFilterButtonActive',
     projectTree: 'projectTree',
     resizeHandle: 'resizeHandle',
     content: 'content',
@@ -432,6 +436,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     };
     useCommandDeckSelection.getState().clearAll();
     usePanesStore.setState({ panesByWorkspace: {}, activePaneByWorkspace: {} });
+    usePlannedBacklogVisibility.setState({ showPlannedBacklog: true });
     localStorage.clear();
   });
 
@@ -453,6 +458,66 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     const stage = screen.getByTestId('stage');
     expect(stage).toHaveAttribute('data-deck', 'test-project');
     expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
+  });
+
+  it('toggles spec-only planned issues across the tree, count, and project home', async () => {
+    resourceProjectsResponse = [
+      {
+        issueId: 'PAN-821',
+        title: 'Active feature',
+        projectName: 'test-project',
+        branch: 'feature/pan-821',
+        status: 'running',
+        stateLabel: 'In Progress',
+        agentStatus: 'active',
+        hasPlanning: true,
+        hasPrd: true,
+        hasState: true,
+        isShadow: false,
+      },
+      {
+        issueId: 'PAN-2822',
+        title: 'Spec-only planned feature',
+        projectName: 'test-project',
+        branch: 'feature/pan-2822',
+        status: 'idle',
+        stateLabel: 'Planned',
+        agentStatus: null,
+        hasPlanning: true,
+        hasPrd: true,
+        hasState: false,
+        isShadow: false,
+        specOnlyPlanned: true,
+      },
+    ];
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    expect(await screen.findByTestId('feature-PAN-821')).toBeInTheDocument();
+    expect(screen.getByTestId('feature-PAN-2822')).toBeInTheDocument();
+
+    const toggle = screen.getByTestId('planned-backlog-toggle');
+    const issuesHeader = screen.getByText('Issues').parentElement!;
+    expect(toggle).toHaveClass('treeFilterButtonActive');
+    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
+    const initialHomeFeatures = latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId);
+    expect(initialHomeFeatures).toHaveLength(2);
+    expect(initialHomeFeatures).toEqual(expect.arrayContaining(['PAN-821', 'PAN-2822']));
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(screen.queryByTestId('feature-PAN-2822')).not.toBeInTheDocument());
+    expect(screen.getByTestId('feature-PAN-821')).toBeInTheDocument();
+    expect(toggle).not.toHaveClass('treeFilterButtonActive');
+    expect(within(issuesHeader).getByText('1')).toBeInTheDocument();
+    expect(latestStageProps.renderHome({}).props.features.map((feature: any) => feature.issueId)).toEqual([
+      'PAN-821',
+    ]);
+
+    fireEvent.click(toggle);
+
+    expect(await screen.findByTestId('feature-PAN-2822')).toBeInTheDocument();
+    expect(toggle).toHaveClass('treeFilterButtonActive');
+    expect(within(issuesHeader).getByText('2')).toBeInTheDocument();
   });
 
   it('passes the immutable registration key to the project tree node', async () => {

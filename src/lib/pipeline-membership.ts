@@ -31,6 +31,8 @@ import type { PipelineBucket } from '@overdeck/contracts';
 
 export type { PipelineBucket } from '@overdeck/contracts';
 
+export const PLANNED_BACKLOG_SPEC_ONLY_REASON = 'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning';
+
 export interface IssueLensSignals {
   issueId: string;
   /** L3 — the GitHub issue state is open. */
@@ -145,7 +147,7 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
   if (s.hasVbriefSpec) {
     return result(
       'planned_backlog',
-      'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
+      PLANNED_BACKLOG_SPEC_ONLY_REASON,
     );
   }
   if (s.explicitlyReady) {

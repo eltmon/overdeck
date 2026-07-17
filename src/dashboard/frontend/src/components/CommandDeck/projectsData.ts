@@ -35,6 +35,14 @@ export interface ProjectData {
   features: ProjectFeature[];
 }
 
+export function filterSpecOnlyPlanned(
+  features: ProjectFeature[],
+  showPlannedBacklog: boolean,
+): ProjectFeature[] {
+  if (showPlannedBacklog) return features;
+  return features.filter((feature) => feature.specOnlyPlanned !== true);
+}
+
 export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
   const grouped = new Map<string, ProjectData>();
 

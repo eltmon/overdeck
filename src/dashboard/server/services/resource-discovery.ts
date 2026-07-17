@@ -15,7 +15,11 @@ import {
 } from '../../../lib/pan-dir/index.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { listProjectsSync, resolveProjectFromIssueSync, type ProjectConfig, type ResolvedProject } from '../../../lib/projects.js';
-import type { PipelineBucket, PipelineMembership } from '../../../lib/pipeline-membership.js';
+import {
+  PLANNED_BACKLOG_SPEC_ONLY_REASON,
+  type PipelineBucket,
+  type PipelineMembership,
+} from '../../../lib/pipeline-membership.js';
 import { listOpenPullRequestsSnapshot } from '../../../lib/pipeline-membership-gather.js';
 import { listSessionNames } from '../../../lib/tmux.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
@@ -99,6 +103,8 @@ export interface ResourceAllocatedIssue {
   resourceDetails: ResourceDetails;
   taskTotals: TaskTotals | null;
   pipelineBucket?: PipelineBucket;
+  /** PAN-2822: planned_backlog caused solely by the L6 spec lens — display surfaces may hide these. */
+  specOnlyPlanned?: boolean;
   /** Live resource residue attached to a resolver-rejected terminal issue. */
   resourceDrift?: boolean;
 }
@@ -794,6 +800,8 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
           resourceDetails: issue.resourceDetails,
           taskTotals: issue.taskTotals,
           pipelineBucket: membership.bucket,
+          specOnlyPlanned: membership.bucket === 'planned_backlog'
+            && membership.reasons.includes(PLANNED_BACKLOG_SPEC_ONLY_REASON),
           resourceDrift: !membership.inPipeline,
         } satisfies InternalDiscoveredIssue;
       });

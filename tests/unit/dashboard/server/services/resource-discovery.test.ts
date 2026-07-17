@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 
+import { PLANNED_BACKLOG_SPEC_ONLY_REASON } from '../../../../../src/lib/pipeline-membership.js';
+
 const mocks = vi.hoisted(() => ({
   execFile: vi.fn(),
   findSpecByIssue: vi.fn(),
@@ -92,12 +94,12 @@ import {
   sanitizeResourceAllocatedIssues,
 } from '../../../../../src/dashboard/server/services/resource-discovery.js';
 
-function membership(issueId: string, bucket = 'in_flight') {
+function membership(issueId: string, bucket = 'in_flight', reasons = ['test resolver verdict']) {
   return {
     issueId,
     inPipeline: true,
     bucket,
-    reasons: ['test resolver verdict'],
+    reasons,
     labelDrift: null,
     lenses: { L1_openPr: false, L2_unmergedBranch: true, L3_issueOpen: true, L4_phaseLabel: null },
   };
@@ -380,6 +382,39 @@ describe('resource-discovery terminal issue filtering', () => {
     expect(withOpenPr.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
     expect(withOpenPr[0]?.resourceSources).toContain('pr');
     expect(withOpenPr[0]?.pipelineBucket).toBe('zombie_pr');
+  });
+});
+
+describe('resource-discovery planned backlog annotation', () => {
+  it('marks only spec-lens planned backlog rows as spec-only planned', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-2822', title: 'Spec-only planned', state: 'open', rawTrackerState: 'OPEN' },
+      { identifier: 'PAN-2823', title: 'Branch-backed planned', state: 'open', rawTrackerState: 'OPEN' },
+      { identifier: 'PAN-2824', title: 'Active work', state: 'in_progress', rawTrackerState: 'In Progress' },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([
+      'agent-pan-2822',
+      'agent-pan-2823',
+      'agent-pan-2824',
+    ]));
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([
+      membership('PAN-2822', 'planned_backlog', [PLANNED_BACKLOG_SPEC_ONLY_REASON]),
+      membership('PAN-2823', 'planned_backlog', [
+        'open issue with an unmerged feature branch but no PR — needs a PR or disposition',
+      ]),
+      membership('PAN-2824', 'in_flight', ['open issue with an open PR — active work']),
+    ]);
+
+    const discovered = await discoverResourceAllocatedIssues();
+    const annotations = Object.fromEntries(
+      discovered.map((issue) => [issue.issueId, issue.specOnlyPlanned]),
+    );
+
+    expect(annotations).toEqual({
+      'PAN-2822': true,
+      'PAN-2823': false,
+      'PAN-2824': false,
+    });
   });
 });
 
