@@ -47,9 +47,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-17T09:33:58.050Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-17T09:41Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-17T09:41:37.594Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-17T09:41:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2647\n\nResources now reads one atomic health assessment, but still allows stale compatibility evidence to produce an open spawn gate.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2647 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/deploy.ts",
@@ -190,7 +203,7 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T09:41:36.992Z",
+  "updated": "2026-07-17T09:41:37.594Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "blocked",
