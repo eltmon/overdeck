@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T13:14:24.640Z",
+  "updated": "2026-07-17T13:15:02.671Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
@@ -45,8 +45,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "extract-grouped-body": {
+        "writerId": "agent-pan-1610",
+        "agentId": "agent-pan-1610",
+        "pid": 365862,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T13:15:02.670Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-1610",
@@ -68,7 +76,8 @@
     }
   },
   "statusOverrides": {
-    "catalog-merge-vbrief": "pending"
+    "catalog-merge-vbrief": "pending",
+    "extract-grouped-body": "running"
   },
   "sessionHistory": [
     {
