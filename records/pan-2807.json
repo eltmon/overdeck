@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T01:10:10.192Z",
+  "updated": "2026-07-17T01:11:32.468Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "pragma-user-version-driver-test": {
+        "writerId": "agent-pan-2807",
+        "agentId": "agent-pan-2807",
+        "pid": 1743522,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T01:11:32.468Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2807",
@@ -128,6 +136,7 @@
     "narrow-ladder-error-swallowing": "completed",
     "narrow-ladder-error-swallowing.narrow-ladder-error-swallowing.ac1": "completed",
     "narrow-ladder-error-swallowing.narrow-ladder-error-swallowing.ac2": "completed",
-    "narrow-ladder-error-swallowing.narrow-ladder-error-swallowing.ac3": "completed"
+    "narrow-ladder-error-swallowing.narrow-ladder-error-swallowing.ac3": "completed",
+    "pragma-user-version-driver-test": "running"
   }
 }
