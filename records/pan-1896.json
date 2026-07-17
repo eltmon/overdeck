@@ -130,7 +130,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-17T16:39:31.772Z",
+  "updated": "2026-07-17T16:50:27.467Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -259,5 +259,15 @@
     "codex-workagent-wire": "cancelled",
     "codex-conversation-wire": "cancelled"
   },
-  "workModel": "gpt-5.6-sol"
+  "workModel": "gpt-5.6-sol",
+  "recoveryTrips": [
+    {
+      "issue": "PAN-1896",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-17T16:39:25.661Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-17T16:50:27.456Z"
+    }
+  ]
 }
