@@ -5806,3 +5806,13 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - **NEW rule: ready=1 is not a merge license by itself — verify `reviewed_at_commit == the code you intend to ship AND no uncommitted fix is stranded in the workspace.** A flaky pass on pre-fix code + an uncommitted fix = HOLD and surface, don't merge.
 - **Also a pipeline concern (not filed yet):** review non-determinism let a prior-blocked commit reach ready=1 unchanged. That's a review-reliability gap worth a bug if it recurs.
 - **2829 idle ~245min, 2377 dead-inspection.** No change. **PAN-2817 plan offer + B11 TENET-10 still open with the operator.**
+
+## Tick 27 — 2026-07-17 ~18:53 — CORRECTION: 1610 is WORKING (not idle); merge-hold validated (flaky pass reverted to blocked)
+- **Main GREEN** (cc40b0fae9). **Merge-hold VALIDATED:** 1610's tick-26 "passed" reverted to **blocked** this tick on the same unchanged d54c6beb — confirming it was a review FLAKE. Had I merged on that transient pass, I'd have shipped flagged code. HOLD was correct.
+- **CORRECTION — I misread 1610 the last few ticks. It is WORKING, not idle-at-prompt.** Pane spinner = **Compacting** (actively continuing); cost climbed $45→$52→$55→$57→$62.67 and diff grew +2151→+2544 (~+400 lines) over 5 ticks — steady real progress on a SUBSTANTIAL six-surface parity review-fix (9 files). It hasn't committed only because the fix isn't done. **It does NOT need a commit nudge — it needs time.** My tick 24-26 "1610 idle, needs nudge" framing OVERSTATED its stuckness; the cost/diff climbing should have told me it was working. Lesson: a climbing cost+diff across ticks = WORKING even if the branch HEAD hasn't moved (large in-progress fix), distinct from frozen cost = idle.
+- **Re-scoped the tail honestly:**
+  - **PAN-1610: WORKING** (large parity fix in progress, uncommitted-but-growing). Leave it; merge-HOLD stands (don't merge pre-fix d54c6beb). It'll commit + `pan review request` when done, then I merge the real fix.
+  - **PAN-2829: genuinely IDLE-FROZEN** (~250min, cost $23.0888 unchanged for hours, no activity). THIS is the real PAN-2817 idle case needing a nudge/fix.
+  - **PAN-2377: dead-inspection** (PAN-2848).
+- **RULE reaffirmed: ready=1 + reviewed_at_commit excluding an in-progress fix = HOLD.** And review flakiness (blocked↔passed on identical code) means a single "passed" is not a merge trigger — confirm it's stable + at the intended head.
+- **PAN-2817 plan offer + B11 TENET-10 still open with the operator.** Only 2829 (idle) + 2377 (dead) genuinely need the substrate fix/nudge now; 1610 is self-progressing.
