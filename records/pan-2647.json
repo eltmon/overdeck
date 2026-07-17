@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T05:27:44.341Z",
+  "updated": "2026-07-17T06:20:33.857Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 33,
-    "claims": {
-      "no-loss-audit": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 2717666,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T05:27:44.341Z"
-      }
-    },
+    "sequence": 34,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -256,6 +248,17 @@
         "outcome": "completed",
         "reason": "Health page now renders the canonical status vocabulary with unknown fallback, preserves host/Deacon/TLDR at zero agents, presents optional TLDR neutrally, distinguishes warm from orphaned sessions, and passes focused tests plus repository typecheck.",
         "releasedAt": "2026-07-17T05:27:33.881Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 2717666,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T05:27:44.341Z",
+        "itemId": "no-loss-audit",
+        "outcome": "completed",
+        "reason": "Encoded and verified every legacy health surface against its V2 home or explicit leaked-focus supersession.",
+        "releasedAt": "2026-07-17T06:20:33.857Z"
       }
     ],
     "statusReasons": {
@@ -266,6 +269,10 @@
       "health-page-repair": {
         "reason": "Health page now renders the canonical status vocabulary with unknown fallback, preserves host/Deacon/TLDR at zero agents, presents optional TLDR neutrally, distinguishes warm from orphaned sessions, and passes focused tests plus repository typecheck.",
         "updatedAt": "2026-07-17T05:27:33.881Z"
+      },
+      "no-loss-audit": {
+        "reason": "Encoded and verified every legacy health surface against its V2 home or explicit leaked-focus supersession.",
+        "updatedAt": "2026-07-17T06:20:33.857Z"
       }
     }
   },
@@ -346,6 +353,9 @@
     "health-page-repair.health-page-repair.ac3": "completed",
     "health-page-repair.health-page-repair.ac4": "completed",
     "health-page-repair.health-page-repair.ac5": "completed",
-    "no-loss-audit": "running"
+    "no-loss-audit": "completed",
+    "no-loss-audit.no-loss-audit.ac1": "completed",
+    "no-loss-audit.no-loss-audit.ac2": "completed",
+    "no-loss-audit.no-loss-audit.ac3": "completed"
   }
 }
