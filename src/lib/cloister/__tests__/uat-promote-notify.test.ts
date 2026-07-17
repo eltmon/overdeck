@@ -45,7 +45,17 @@ describe('notifyFlywheelOfUatPromote', () => {
     );
     expect(d.message).toHaveBeenCalledWith(
       FLYWHEEL_ORCHESTRATOR_AGENT_ID,
-      expect.stringContaining('only the rows where inPipeline=true'),
+      expect.stringContaining('GET /api/registered-projects'),
+      'uat-promote-notify',
+    );
+    expect(d.message).toHaveBeenCalledWith(
+      FLYWHEEL_ORCHESTRATOR_AGENT_ID,
+      expect.stringContaining('GET /api/pipeline/membership?project=<URL-encoded-project-key>'),
+      'uat-promote-notify',
+    );
+    expect(d.message).toHaveBeenCalledWith(
+      FLYWHEEL_ORCHESTRATOR_AGENT_ID,
+      expect.stringContaining('only rows where inPipeline === true'),
       'uat-promote-notify',
     );
     expect(d.recordNudge).toHaveBeenCalledWith({
