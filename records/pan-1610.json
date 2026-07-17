@@ -90,17 +90,17 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:39:56.571Z",
+  "updated": "2026-07-17T16:39:58.174Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:39:56.532Z",
+    "updatedAt": "2026-07-17T16:39:58.131Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-1610-review",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
@@ -244,7 +244,7 @@
       },
       "costAtCloseOut": {
         "usd": 148.616547,
-        "pricingAsOf": "2026-07-17T16:39:56.564Z"
+        "pricingAsOf": "2026-07-17T16:39:58.155Z"
       }
     },
     "merges": [
