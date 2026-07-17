@@ -57,9 +57,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-17T18:10:38.806Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-17T18:49Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-17T18:49:35.601Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-17T18:49:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-1610\n\nBlocking: forbidden merge/viewVbrief IssueActionKey identities remain and the six-surface parity gate substitutes four real integrations.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1610 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-baseline.txt",
@@ -125,7 +138,7 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T18:49:35.234Z",
+  "updated": "2026-07-17T18:49:35.601Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "pending",
