@@ -9,6 +9,22 @@ export interface StrikeMergeRequest {
 }
 export type TriggerMergeRequest = { kind: 'normal' } | StrikeMergeRequest;
 
+export interface TriggerMergeResult {
+  success: boolean;
+  statusCode: number;
+  error?: string;
+  message?: string;
+  reviewStatus?: string;
+  testStatus?: string;
+  mergeStatus?: string;
+  prUrl?: string;
+  remote?: boolean;
+  repos?: Array<{ repo: string; success: boolean; message: string; testsStatus?: string }>;
+  testsStatus?: string;
+  note?: string;
+  mergeResult?: unknown;
+}
+
 export function parseStrikeMergeRequest(raw: unknown): StrikeMergeRequest | null {
   if (!raw || typeof raw !== 'object') return null;
   const request = raw as Record<string, unknown>;
