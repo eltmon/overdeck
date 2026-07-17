@@ -9,6 +9,11 @@ let unexpectedRequests: string[] = []
 
 beforeEach(() => {
   window.localStorage.clear()
+  actionInvoke.mockClear()
+  queryMocks.activityQuery.data.sections = [
+    { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
+  ]
+  queryMocks.reviewStatusQuery.data.verificationStatus = 'passed'
   unexpectedRequests = []
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input)
@@ -307,6 +312,35 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('button', { name: 'Collapse agent spine' })).toHaveAttribute('aria-expanded', 'true')
     expect(resetBody).toHaveAttribute('data-spine-collapsed', 'false')
     expect(resetBody?.className).not.toContain('spineCollapsed')
+  })
+
+  it('keeps the stale-review warning visible and actionable in the collapsed spine', () => {
+    queryMocks.activityQuery.data.sections.push({
+      type: 'reviewer',
+      sessionId: 'reviewer-pan-1661',
+      model: 'claude-sonnet-5',
+      status: 'completed',
+      startedAt: '2026-06-07T00:01:00Z',
+      duration: 1,
+    })
+    const { container } = renderMissionControl()
+
+    expect(container.querySelector('[data-section="Stale-review warning"]')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Complete review reset' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse agent spine' }))
+
+    expect(container.querySelector('[data-section="Stale-review warning"]')).toBeVisible()
+    const compactWarning = screen.getByRole('button', {
+      name: 'Stale review state: 1 leftover review agent. Expand agent spine for details and reset.',
+    })
+    expect(compactWarning).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Complete review reset' })).toBeNull()
+
+    fireEvent.click(compactWarning)
+
+    expect(screen.getByRole('button', { name: 'Collapse agent spine' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Complete review reset' })).toBeInTheDocument()
   })
 
   it('opens task progress in a drawer and preserves every close and full-view path', async () => {

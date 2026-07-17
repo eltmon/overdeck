@@ -44,6 +44,8 @@ function VerificationGatesGrid({ verification }: VerificationGatesProps) {
             data-section={VERIFICATION_GATES_SECTIONS[1]}
             data-gate-id={gate.id}
             data-gate-status={gate.status}
+            aria-label={`${gate.label}: ${GATE_STATUS_LABEL[gate.status]}`}
+            title={`${gate.label}: ${GATE_STATUS_LABEL[gate.status]}`}
             className={cn('rounded-[10px] border bg-background/45 px-[12px] py-[10px]', GATE_TONE_CLASSES[gate.status])}
           >
             <div className="text-[14px] font-medium leading-none">{GATE_STATUS_LABEL[gate.status]}</div>
