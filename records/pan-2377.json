@@ -21,18 +21,18 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-17T13:18:20.862Z",
+  "updated": "2026-07-17T13:20:36.002Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T13:18:20.836Z",
-    "inspectNotes": "Inspecting item contracts-orders"
+    "updatedAt": "2026-07-17T13:20:35.933Z",
+    "inspectNotes": "AC1 met (round-trip + lane-C + missing-issue rejection in orders.test.ts). AC3 export path verified statically (index.ts barrel export * from ./orders). AC2 not met: packages/contracts/src/__tests__/orders.test.ts 'remains compatible with status payloads without orders' (FlywheelStatus orders describe block) decodes validFlywheelStatus once and asserts orders is undefined, but never round-trips it — unlike the with-orders test, which re-encodes (JSON.stringify/parse) and re-decodes before asserting equality. AC2 explicitly requires 'round-trip test covers each' (with and without). Fix: add an encode-then-redecode-then-toEqual assertion to the without-orders test, mirroring the with-orders test's pattern."
   },
   "closeOut": {
     "usage": {
@@ -47,9 +47,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1154258,
-            "output": 51970,
-            "cacheRead": 12810240,
+            "input": 1172936,
+            "output": 55592,
+            "cacheRead": 14195712,
             "cacheWrite": 0
           }
         }
@@ -62,15 +62,15 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 1154258,
-          "output": 51970,
-          "cacheRead": 12810240,
+          "input": 1172936,
+          "output": 55592,
+          "cacheRead": 14195712,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 22.107772999999998,
-        "pricingAsOf": "2026-07-17T13:18:20.843Z"
+        "usd": 23.002559,
+        "pricingAsOf": "2026-07-17T13:20:35.976Z"
       }
     },
     "merges": [],
