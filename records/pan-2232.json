@@ -64,18 +64,18 @@
     "recordedAt": "2026-07-17T02:59:42.835Z"
   },
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T03:18:51.000Z",
+  "updated": "2026-07-17T03:36:36.360Z",
   "pipeline": {
     "issueId": "PAN-2232",
-    "reviewStatus": "passed",
+    "reviewStatus": "blocked",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T03:18:50.970Z",
-    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
+    "updatedAt": "2026-07-17T03:36:36.322Z",
+    "reviewNotes": "Requirements blocker: extracted seam modules export three symbols that were private in the original module",
     "inspectNotes": "All 7 functions moved byte-for-byte verbatim (verified via body-diff); only specialists.ts/specialists-spawn.ts touched; buildSpecialistBaseCommand + buildSpecialistCavemanExports re-exported, both existing test importers (specialist-resolve-harness.test.ts, specialists-caveman.test.ts) pass 13/13; resolveWorkspaceGitInfo/buildProviderExportLines/buildTmuxEnvFlags were pre-existing dead code before this move, unaffected.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2818",
     "lastVerifiedCommit": "5a29ce43f3924b1a4b912453bfc76dd7a1e60358",
@@ -109,6 +109,24 @@
       ],
       "recordedAt": "2026-07-17T02:59:42.835Z"
     },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "f0c03042df4adb606df910d28be774a99dc42226"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "f0c03042df4adb606df910d28be774a99dc42226"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "f0c03042df4adb606df910d28be774a99dc42226"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "f0c03042df4adb606df910d28be774a99dc42226"
+      }
+    },
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -124,9 +142,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 900984,
-            "output": 18870,
-            "cacheRead": 4750336,
+            "input": 1896131,
+            "output": 55116,
+            "cacheRead": 10121728,
             "cacheWrite": 0
           }
         },
@@ -170,11 +188,19 @@
             "cacheWrite": 226896
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 1533,
+            "output": 24650,
+            "cacheRead": 5384076,
+            "cacheWrite": 183678
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7086385,
-            "output": 423537,
-            "cacheRead": 106527744,
+            "input": 7472552,
+            "output": 441348,
+            "cacheRead": 114830848,
             "cacheWrite": 0
           }
         }
@@ -187,21 +213,21 @@
           "cacheWrite": 152114
         },
         "openai/gpt-5.6-sol": {
-          "input": 13022199,
-          "output": 513994,
-          "cacheRead": 120488960,
+          "input": 14403513,
+          "output": 568051,
+          "cacheRead": 134163456,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 54,
-          "output": 15549,
-          "cacheRead": 3438411,
-          "cacheWrite": 226896
+          "input": 1587,
+          "output": 40199,
+          "cacheRead": 8822487,
+          "cacheWrite": 410574
         }
       },
       "costAtCloseOut": {
-        "usd": 150.913263,
-        "pricingAsOf": "2026-07-17T03:18:50.978Z"
+        "usd": 168.064369,
+        "pricingAsOf": "2026-07-17T03:36:36.348Z"
       }
     },
     "merges": [
