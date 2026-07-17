@@ -703,21 +703,21 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-17T01:52:28.634Z",
+  "updated": "2026-07-17T01:52:31.058Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:52:28.593Z",
+    "updatedAt": "2026-07-17T01:52:30.718Z",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
     "reviewRequestedAt": "2026-07-17T01:52:28.263Z",
-    "reviewSpawnedAt": "2026-07-17T01:28:22.703Z",
+    "reviewSpawnedAt": "2026-07-17T01:52:30.716Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -830,7 +830,7 @@
       },
       "costAtCloseOut": {
         "usd": 405.797599,
-        "pricingAsOf": "2026-07-17T01:52:28.600Z"
+        "pricingAsOf": "2026-07-17T01:52:30.953Z"
       }
     },
     "merges": [
