@@ -4,17 +4,17 @@
     "created": "2026-07-17T13:10:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2445: bug(cloister): deacon lifecycle patrol auto-dispatches PLANNING for stale 'planning'-state issues — off-book, and staffed from roles.plan (= Fable) when no model is recorded",
-    "updated": "2026-07-17T13:15:07.508Z"
+    "updated": "2026-07-17T13:15:09.364Z"
   },
   "plan": {
     "id": "pan-2445",
     "title": "Gate autonomous planning dispatch behind operator pickup posture; never staff it by silent role default",
-    "status": "approved",
+    "status": "running",
     "uid": "2267dac7-bfe8-4b93-aa54-aa668639fa1d",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-17T13:10:00.000Z",
-    "updated": "2026-07-17T13:15:07.508Z",
+    "updated": "2026-07-17T13:15:09.364Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2445",

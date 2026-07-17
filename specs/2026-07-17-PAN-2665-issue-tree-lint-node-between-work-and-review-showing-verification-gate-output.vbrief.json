@@ -4,17 +4,17 @@
     "created": "2026-07-17T13:00:20.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2665: Issue tree: Lint node between Work and Review showing verification gate output",
-    "updated": "2026-07-17T13:15:17.357Z"
+    "updated": "2026-07-17T13:15:19.291Z"
   },
   "plan": {
     "id": "pan-2665",
     "title": "Issue tree: Lint node between Work and Review showing verification gate output",
-    "status": "approved",
+    "status": "running",
     "uid": "ea0e3392-c63a-4ff0-96f2-37d374c5fac3",
     "author": "agent:claude-fable-5",
-    "sequence": 6,
+    "sequence": 7,
     "created": "2026-07-17T13:00:20.000Z",
-    "updated": "2026-07-17T13:15:17.357Z",
+    "updated": "2026-07-17T13:15:19.291Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2665",
