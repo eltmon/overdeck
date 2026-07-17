@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { Issue, Agent } from '../types';
 // PAN-1048 — SpecialistAgent retired; specialist-style indicators now come
 // from role-tagged AgentSnapshots passed through the `specialists` prop.
@@ -19,6 +20,13 @@ vi.mock('@dnd-kit/core', async () => {
     useDroppable: (...args: Parameters<typeof import('@dnd-kit/core')['useDroppable']>) => mockUseDroppable(...args),
   };
 });
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
 
 describe('groupByLabels', () => {
   const createMockIssue = (id: string, labels: string[]): Issue => ({
@@ -766,6 +774,9 @@ describe('IssueCard', () => {
     } as Parameters<typeof useDashboardStore.setState>[0]);
     vi.stubGlobal('fetch', vi.fn((input: string | URL | Request, init?: RequestInit) => {
       const url = input.toString();
+      if (url.endsWith('/api/dashboard/session')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ csrfToken: 'test-csrf-token' }) } as Response);
+      }
       if (url === '/api/settings' && init?.method === 'PUT') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) } as Response);
       }
@@ -816,7 +827,7 @@ describe('IssueCard', () => {
       </QueryClientProvider>,
     );
 
-    return { ...defaultProps, ...result };
+    return { ...defaultProps, queryClient, ...result };
   }
 
   function boardActionRow() {
@@ -841,7 +852,7 @@ describe('IssueCard', () => {
     expect(screen.queryByTestId('card-start-agent-TEST-123')).not.toBeInTheDocument();
   });
 
-  it('renders a hover-revealed hybrid action row on ordinary Board cards', () => {
+  it('renders a hover-revealed primary-strip action row on ordinary Board cards', () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
     });
@@ -869,6 +880,46 @@ describe('IssueCard', () => {
       issue: createMockIssue({ status: 'In Review', state: 'in_review' }),
     });
     expect(boardActionRow()).toHaveAttribute('data-visible-mode', 'pinned');
+  });
+
+  it('routes paused-agent Unpause through the primary-strip registry overflow', async () => {
+    const { queryClient } = renderIssueCard({
+      workAgent: createMockAgent({
+        id: 'agent-test-123',
+        role: 'work',
+        status: 'running',
+        paused: true,
+        pausedReason: 'Operator pause',
+      }),
+    });
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+
+    expect(screen.getByTestId('card-paused-TEST-123')).toHaveTextContent('Paused');
+    expect(screen.queryByTestId('card-unpause-TEST-123')).not.toBeInTheDocument();
+    expect(inlineBoardActionIds()).toEqual([
+      'issue-action-tell',
+      'issue-action-doneWork',
+    ]);
+    expect(screen.getByTestId('issue-action-overflow-button')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(await screen.findByTestId('issue-action-unpause'));
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        '/api/agents/agent-test-123/unpause',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    await waitFor(() => {
+      expect(toast.success).toHaveBeenCalledWith(
+        'TEST-123 unpaused — deacon resumes it on the next patrol',
+      );
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['issues'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['agents'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['review-status'] });
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['agent-session'] });
+    });
   });
 
   it('surfaces the troubled gate as a badge on the Board card, with no one-click clear', () => {
@@ -941,7 +992,7 @@ describe('IssueCard', () => {
     expect(badge).not.toHaveAttribute('data-variant', 'INPUT');
   });
 
-  it('opens the hybrid Board action overflow menu on right-click', async () => {
+  it('opens the primary-strip Board action overflow menu on right-click', async () => {
     renderIssueCard({
       issue: createMockIssue({ status: 'Todo' }),
     });

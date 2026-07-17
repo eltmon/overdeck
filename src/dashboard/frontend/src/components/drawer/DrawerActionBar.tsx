@@ -11,19 +11,22 @@ export default function DrawerActionBar() {
       {issueId ? (
         <IssueActionMenu
           issueId={issueId}
-          mode="hybrid"
+          mode="primary-strip"
           pinRight={['viewPr']}
+          pinned={[{
+            key: 'merge',
+            render: (
+              <MergeButton
+                issueId={issueId}
+                reviewStatus={reviewStatus}
+                variant="inspector"
+                issueState={issue?.state ?? issue?.status}
+              />
+            ),
+          }]}
           className="flex min-w-0 flex-1 items-center gap-1"
         />
       ) : <div className="flex-1" />}
-      {issueId ? (
-        <MergeButton
-          issueId={issueId}
-          reviewStatus={reviewStatus}
-          variant="inspector"
-          issueState={issue?.state ?? issue?.status}
-        />
-      ) : null}
     </footer>
   );
 }

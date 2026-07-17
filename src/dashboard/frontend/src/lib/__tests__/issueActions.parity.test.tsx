@@ -311,7 +311,7 @@ function renderMenu() {
   return render(
     <QueryClientProvider client={client}>
       <DialogProvider>
-        <IssueActionMenu issueId="PAN-1331" mode="hybrid" />
+        <IssueActionMenu issueId="PAN-1331" mode="primary-strip" />
       </DialogProvider>
     </QueryClientProvider>,
   );
@@ -393,6 +393,7 @@ describe('issue action CLI ↔ dashboard parity', () => {
   it('renders every registry entry label through the shared drawer action menu surface', () => {
     renderMenu();
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
 
     const menu = screen.getByTestId('issue-action-menu');
     for (const action of ISSUE_ACTIONS) {

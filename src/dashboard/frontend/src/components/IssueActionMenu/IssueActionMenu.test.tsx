@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DialogProvider } from '../DialogProvider';
+import { ISSUE_ACTIONS } from '../../lib/issueActions';
 import { useDashboardStore } from '../../lib/store';
 import type { Agent, Issue } from '../../types';
 import { IssueActionMenu } from './IssueActionMenu';
@@ -121,13 +122,17 @@ describe('IssueActionMenu', () => {
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
 
     const menu = screen.getByTestId('issue-action-overflow-menu');
-    expect(screen.getByTestId('issue-action-tell')).toHaveTextContent('Tell agent');
-    expect(screen.getByTestId('issue-action-stopAgent')).toHaveTextContent('Stop agent');
-    expect(screen.getByTestId('issue-action-pause')).toHaveTextContent('Pause agent');
-    expect(screen.getByTestId('issue-action-unpause')).toHaveTextContent('Unpause agent');
-    expect(screen.getByTestId('issue-action-untroubled')).toHaveTextContent('Clear troubled gate');
-    expect(screen.getByTestId('issue-action-recoverAgent')).toHaveTextContent('Recover agent');
-    expect(screen.getByTestId('issue-action-resumeSession')).toHaveTextContent('Resume session');
+    for (const label of [
+      'Tell agent',
+      'Stop agent',
+      'Pause agent',
+      'Unpause agent',
+      'Clear troubled gate',
+      'Recover agent',
+      'Resume session',
+    ]) {
+      expect(within(menu).getByText(label)).toBeInTheDocument();
+    }
     expect(screen.queryByTestId('issue-action-switchModel')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-plan')).not.toBeInTheDocument();
     expect(within(menu).queryByTestId('issue-action-closeOut')).not.toBeInTheDocument();
@@ -140,7 +145,7 @@ describe('IssueActionMenu', () => {
     expect(within(menu).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
   });
 
-  it('renders hybrid primary actions plus overflow actions', () => {
+  it('renders primary-strip primaries with a labelled grouped overflow', () => {
     mockStore({ currentIssue: issue({ hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }), currentAgent: agent() });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
@@ -150,14 +155,19 @@ describe('IssueActionMenu', () => {
       return Response.json({ success: true });
     }));
 
-    renderMenu(<IssueActionMenu issueId="PAN-1" mode="hybrid" />);
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" />);
 
     expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
-    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    const overflowButton = screen.getByTestId('issue-action-overflow-button');
+    expect(overflowButton).toHaveTextContent(/^\d+ more$/);
+    fireEvent.click(overflowButton);
+    expect(screen.getByTestId('issue-action-overflow-menu')).toBeInTheDocument();
+    expect(document.querySelector('[data-issue-action-section="artifacts"]')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-tasks')).toHaveTextContent('Tasks');
+    expect(within(screen.getByTestId('issue-action-overflow-menu')).queryByTestId('issue-action-startAgent')).not.toBeInTheDocument();
   });
 
-  it('pins requested actions after a flex spacer', () => {
+  it('pins registry actions and declared components after a flex spacer', () => {
     mockStore({
       currentIssue: issue({ hasPlan: true, workspacePath: '/tmp/pan-1' }),
       reviewStatus: {
@@ -173,10 +183,67 @@ describe('IssueActionMenu', () => {
       },
     });
 
-    renderMenu(<IssueActionMenu issueId="PAN-1" mode="hybrid" pinRight={['viewPr']} />);
+    renderMenu(
+      <IssueActionMenu
+        issueId="PAN-1"
+        mode="primary-strip"
+        pinRight={['viewPr']}
+        pinned={[{ key: 'tasks', render: <button type="button">Pinned tasks</button> }]}
+      />,
+    );
 
     expect(screen.getByTestId('issue-action-pin-spacer')).toBeInTheDocument();
     expect(screen.getByTestId('issue-action-viewPr')).toHaveTextContent('View PR');
+    expect(screen.getByText('Pinned tasks')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    const overflow = screen.getByTestId('issue-action-overflow-menu');
+    expect(within(overflow).queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
+    expect(within(overflow).queryByTestId('issue-action-tasks')).not.toBeInTheDocument();
+    expect(within(overflow).queryByText('Pinned tasks')).not.toBeInTheDocument();
+  });
+
+  it('keeps a disabled requested registry pin in grouped overflow', () => {
+    renderMenu(
+      <IssueActionMenu
+        issueId="PAN-1"
+        mode="primary-strip"
+        pinRight={['viewPr']}
+      />,
+    );
+
+    expect(screen.queryByTestId('issue-action-viewPr')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('issue-action-pin-spacer')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    const overflow = screen.getByTestId('issue-action-overflow-menu');
+    expect(within(overflow).getByTestId('issue-action-disabled-viewPr')).toBeInTheDocument();
+    expect(within(overflow).getByTestId('issue-action-viewPr')).toBeDisabled();
+  });
+
+  it('renders only registry-backed action rows in grouped overflow', () => {
+    renderMenu(
+      <IssueActionMenu
+        issueId="PAN-1"
+        mode="overflow-only"
+        pinned={[{ key: 'merge', render: <button type="button">Merge component</button> }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
+
+    const registryKeys = new Set(ISSUE_ACTIONS.map((action) => action.key));
+    const renderedActionKeys = Array.from(
+      screen.getByTestId('issue-action-overflow-menu').querySelectorAll<HTMLElement>('[data-testid^="issue-action-"]'),
+    )
+      .map((element) => element.dataset.testid ?? '')
+      .filter((testId) => testId !== 'issue-action-overflow-menu' && testId !== 'issue-action-explain-toggle')
+      .map((testId) => testId.replace('issue-action-disabled-', '').replace('issue-action-', ''));
+
+    expect(renderedActionKeys.length).toBeGreaterThan(0);
+    expect(renderedActionKeys.every((key) => registryKeys.has(key as never))).toBe(true);
+    expect(within(screen.getByTestId('issue-action-overflow-menu')).queryByText('Merge component')).not.toBeInTheDocument();
   });
 
   it('opens a confirmation dialog before destructive actions can run', async () => {
@@ -185,6 +252,7 @@ describe('IssueActionMenu', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     fireEvent.click(screen.getByTestId('issue-action-resetIssue'));
 
     expect(screen.getByRole('alertdialog')).toBeInTheDocument();
@@ -210,6 +278,7 @@ describe('IssueActionMenu', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Danger \(\d+ available\)/ }));
     fireEvent.click(screen.getByTestId('issue-action-wipe'));
 
     const confirmButton = screen.getByRole('button', { name: 'Wipe' });
@@ -307,8 +376,9 @@ describe('IssueActionMenu', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
     fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
-    expect(screen.getByTestId('issue-action-open')).toBeDisabled();
-    expect(screen.getByTestId('issue-action-open')).toHaveAttribute('title', 'Workspace does not exist');
+    const disabledOpen = screen.getByTestId('issue-action-disabled-open');
+    expect(within(disabledOpen).getByRole('menuitem')).toBeDisabled();
+    expect(disabledOpen).toHaveAttribute('title', 'Workspace does not exist');
   });
 
   it('opens the shared tell dialog and sends the entered message', async () => {

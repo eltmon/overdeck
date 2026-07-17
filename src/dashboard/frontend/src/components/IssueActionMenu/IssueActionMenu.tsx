@@ -4,16 +4,27 @@ import { MoreHorizontal, X } from 'lucide-react';
 import { AgentTellForm } from '../AgentTellForm';
 import { PlanDialog } from '../PlanDialog';
 import type { IssueActionKey } from '../../lib/issueActions';
+import {
+  IssueActionGroupedBody,
+  type IssueActionMenuItemPrimitiveProps,
+  type IssueActionMenuPrimitives,
+} from './IssueActionGroupedBody';
 import { IssueOpenInDialog } from './IssueOpenInDialog';
 import type { IssueActionView, UseIssueActionsResult } from './useIssueActions';
 import { useIssueActions } from './useIssueActions';
 
-export type IssueActionMenuMode = 'inline' | 'overflow-only' | 'hybrid';
+export type IssueActionMenuMode = 'inline' | 'overflow-only' | 'primary-strip';
+
+export type IssueActionPinnedComponent = {
+  key: string;
+  render: ReactNode;
+};
 
 export interface IssueActionMenuProps {
   issueId: string;
   mode: IssueActionMenuMode;
   pinRight?: IssueActionKey[];
+  pinned?: IssueActionPinnedComponent[];
   className?: string;
   agentScopeOnly?: boolean;
   openSignal?: number;
@@ -56,24 +67,89 @@ function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionVi
   );
 }
 
-function OverflowMenu({ views, onClose }: { views: IssueActionView[]; onClose: () => void }) {
+function createPopoverMenuItem(onClose: () => void, destructive: boolean) {
+  return function PopoverMenuItem({
+    children,
+    className = '',
+    disabled,
+    role = 'menuitem',
+    onActivate,
+    preventClose,
+    ...props
+  }: IssueActionMenuItemPrimitiveProps) {
+    const colorClass = destructive
+      ? 'text-destructive hover:bg-destructive/10 hover:text-destructive'
+      : 'text-foreground hover:bg-accent hover:text-accent-foreground';
+
+    return (
+      <button
+        {...props}
+        type="button"
+        role={role}
+        disabled={disabled}
+        className={`relative flex w-full cursor-pointer select-none items-center rounded px-3 py-1.5 text-left text-xs outline-none transition-colors disabled:pointer-events-none disabled:opacity-40 ${colorClass} ${className}`}
+        onClick={() => {
+          onActivate?.();
+          if (!preventClose) onClose();
+        }}
+      >
+        {children}
+      </button>
+    );
+  };
+}
+
+function PopoverMenuLabel({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      {children}
+    </div>
+  );
+}
+
+function PopoverMenuSeparator() {
+  return <div className="mx-1 my-1 h-px bg-border" />;
+}
+
+function popoverMenuPrimitives(onClose: () => void): IssueActionMenuPrimitives {
+  return {
+    Item: createPopoverMenuItem(onClose, false),
+    DestructiveItem: createPopoverMenuItem(onClose, true),
+    Label: PopoverMenuLabel,
+    Separator: PopoverMenuSeparator,
+  };
+}
+
+function OverflowMenu({
+  actions,
+  onClose,
+}: {
+  actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
+  onClose: () => void;
+}) {
   return (
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <div
         role="menu"
         data-testid="issue-action-overflow-menu"
-        className="absolute right-0 top-full z-50 mt-1 flex min-w-[190px] flex-col gap-1 rounded-md border border-border bg-popover p-1.5 text-popover-foreground shadow-lg"
+        className="absolute right-0 top-full z-50 mt-1 max-h-[70vh] w-[320px] overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
       >
-        {views.map((view) => (
-          <ActionButton key={view.action.key} view={view} onInvoked={onClose} />
-        ))}
+        <IssueActionGroupedBody actions={actions} primitives={popoverMenuPrimitives(onClose)} />
       </div>
     </>
   );
 }
 
-function OverflowButton({ views, triggerRef, openSignal }: { views: IssueActionView[]; triggerRef?: RefObject<HTMLButtonElement>; openSignal?: number }) {
+function OverflowButton({
+  actions,
+  triggerRef,
+  openSignal,
+}: {
+  actions: Pick<UseIssueActionsResult, 'all' | 'primary' | 'phase'>;
+  triggerRef?: RefObject<HTMLButtonElement>;
+  openSignal?: number;
+}) {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -86,13 +162,14 @@ function OverflowButton({ views, triggerRef, openSignal }: { views: IssueActionV
         ref={triggerRef}
         type="button"
         data-testid="issue-action-overflow-button"
-        aria-label="More issue actions"
-        className="inline-flex items-center rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        aria-label={`${actions.all.length} more issue actions`}
+        className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         onClick={() => setOpen((value) => !value)}
       >
         <MoreHorizontal className="h-4 w-4" />
+        <span>{actions.all.length} more</span>
       </button>
-      {open ? <OverflowMenu views={views} onClose={() => setOpen(false)} /> : null}
+      {open ? <OverflowMenu actions={actions} onClose={() => setOpen(false)} /> : null}
     </div>
   );
 }
@@ -261,33 +338,64 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
   );
 }
 
-export function IssueActionMenu({ issueId, mode, pinRight = [], className, agentScopeOnly = false, openSignal }: IssueActionMenuProps) {
+export function IssueActionMenu({
+  issueId,
+  mode,
+  pinRight = [],
+  pinned = [],
+  className,
+  agentScopeOnly = false,
+  openSignal,
+}: IssueActionMenuProps) {
   const actions = useIssueActions(issueId);
   const overflowTriggerRef = useRef<HTMLButtonElement>(null);
   const restoreOverflowFocus = () => overflowTriggerRef.current?.focus();
-  const pinSet = useMemo(() => new Set(pinRight), [pinRight]);
+  const componentPinSet = useMemo(
+    () => new Set<string>(pinned.map((component) => component.key)),
+    [pinned],
+  );
+  const requestedPinSet = useMemo(
+    () => new Set<string>([...pinRight, ...componentPinSet]),
+    [pinRight, componentPinSet],
+  );
   const inScope = (view: IssueActionView) => !agentScopeOnly || AGENT_SCOPE_ACTION_KEYS.has(view.action.key);
   const scopedAll = actions.all.filter(inScope);
   const scopedPrimary = actions.primary.filter(inScope);
   const scopedSecondary = actions.secondary.filter(inScope);
   const scopedOverflow = actions.overflow.filter(inScope);
-  const pinned = pinRight
+  const registryPins = pinRight
     .map((key) => scopedAll.find((view) => view.action.key === key && view.enabled))
     .filter((view): view is IssueActionView => !!view);
-  const primary = scopedPrimary.filter((view) => !pinSet.has(view.action.key));
-  const hybridOverflow = [...scopedSecondary, ...scopedOverflow].filter((view) => !pinSet.has(view.action.key));
-  const overflowOnly = scopedAll.filter((view) => !pinSet.has(view.action.key));
+  const enabledRegistryPinSet = new Set(registryPins.map((view) => view.action.key));
+  const excludedFromOverflow = (view: IssueActionView) =>
+    enabledRegistryPinSet.has(view.action.key) || componentPinSet.has(view.action.key);
+  const primary = scopedPrimary.filter((view) => !requestedPinSet.has(view.action.key));
+  const primaryStripOverflow = [...scopedSecondary, ...scopedOverflow]
+    .filter((view) => !excludedFromOverflow(view));
+  const overflowOnly = scopedAll.filter((view) => !excludedFromOverflow(view));
+  const overflowActions = {
+    all: mode === 'overflow-only' ? overflowOnly : primaryStripOverflow,
+    primary: [],
+    phase: actions.phase,
+  };
+  const hasPins = registryPins.length > 0 || pinned.length > 0;
 
   return (
     <div data-testid="issue-action-menu" className={className ?? 'flex items-center gap-1'}>
       {mode !== 'overflow-only' ? primary.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />
       )) : null}
-      {mode === 'overflow-only' ? <OverflowButton views={overflowOnly} triggerRef={overflowTriggerRef} openSignal={openSignal} /> : null}
-      {mode === 'hybrid' && hybridOverflow.length > 0 ? <OverflowButton views={hybridOverflow} triggerRef={overflowTriggerRef} openSignal={openSignal} /> : null}
-      {pinned.length > 0 ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
-      {pinned.map((view) => (
+      {mode === 'overflow-only' || (mode === 'primary-strip' && primaryStripOverflow.length > 0) ? (
+        <OverflowButton actions={overflowActions} triggerRef={overflowTriggerRef} openSignal={openSignal} />
+      ) : null}
+      {hasPins ? <div data-testid="issue-action-pin-spacer" className="flex-1" /> : null}
+      {registryPins.map((view) => (
         <ActionButton key={view.action.key} view={view} inline />
+      ))}
+      {pinned.map((component) => (
+        <span key={component.key} data-issue-action-pinned-component={component.key} className="inline-flex">
+          {component.render}
+        </span>
       ))}
       <IssueActionDialogHost issueId={issueId} actions={actions} onAfterClose={restoreOverflowFocus} />
     </div>

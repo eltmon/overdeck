@@ -12,10 +12,22 @@ export interface IssueViewInventoryEntry {
   section: string;
   view: IssueViewDensity;
   home: string;
+  actionRelocation?: {
+    surface: string;
+    home: string;
+  };
 }
 
 export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
-  { section: 'DrawerActionBar', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx' },
+  {
+    section: 'DrawerActionBar',
+    view: 'console',
+    home: 'src/dashboard/frontend/src/components/drawer/DrawerActionBar.tsx',
+    actionRelocation: {
+      surface: 'DrawerActionBar',
+      home: 'src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx',
+    },
+  },
   { section: 'PhaseTimeline', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/PhaseTimeline.tsx' },
   { section: 'DrawerTabs', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerTabs.tsx' },
   { section: 'DrawerPickupSection / PickupGateControls', view: 'console', home: 'src/dashboard/frontend/src/components/backlog/PickupGateControls.tsx' },
@@ -33,7 +45,15 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'DrawerAgentSession', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx' },
   { section: 'StartAgentCta', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/StartAgentCta.tsx' },
 
-  { section: 'Header bar', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
+  {
+    section: 'Header bar',
+    view: 'cockpit',
+    home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx',
+    actionRelocation: {
+      surface: 'IssueActionMegaMenu',
+      home: 'src/dashboard/frontend/src/components/IssueActionMenu/IssueActionGroupedBody.tsx',
+    },
+  },
   { section: 'Stale-review warning', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
   { section: 'StatusNarrative', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
   { section: 'Pipeline Band', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
@@ -57,7 +77,15 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
 
   { section: 'Filter bar', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
   { section: 'Feature (issue) row', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
-  { section: 'FeatureContextMenu (issue-row right-click)', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
+  {
+    section: 'FeatureContextMenu (issue-row right-click)',
+    view: 'rail',
+    home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx',
+    actionRelocation: {
+      surface: 'FeatureContextMenu',
+      home: 'src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx',
+    },
+  },
   { section: 'Badges', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
   { section: 'MergeButton', view: 'rail', home: 'src/dashboard/frontend/src/components/MergeButton.tsx' },
   { section: 'Pipeline pips', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' },
