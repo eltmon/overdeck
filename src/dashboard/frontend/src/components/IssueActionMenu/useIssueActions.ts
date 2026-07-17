@@ -126,6 +126,8 @@ function bodyForAction(action: IssueActionEntry, issueId: string, issue: Issue |
       return { issueId, projectId: issue?.project?.id };
     case 'resetIssue':
       return { deleteWorkspace: true };
+    case 'wipe':
+      return { deleteWorkspace: true };
     case 'cancel':
       return { wipeWorkspace: true };
     case 'completeWorkReset':

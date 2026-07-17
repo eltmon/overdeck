@@ -197,7 +197,31 @@ describe('IssueActionMenu', () => {
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/reset', expect.objectContaining({ method: 'POST' }));
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/reset', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ deleteWorkspace: true }),
+      }));
+    });
+  });
+
+  it('sends deleteWorkspace true when the confirmed wipe action runs', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
+
+    fireEvent.click(screen.getByTestId('issue-action-overflow-button'));
+    fireEvent.click(screen.getByTestId('issue-action-wipe'));
+
+    const confirmButton = screen.getByRole('button', { name: 'Wipe' });
+    expect(confirmButton).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Confirmation text'), { target: { value: 'Wipe' } });
+    fireEvent.click(confirmButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/issues/PAN-1/deep-wipe', expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ deleteWorkspace: true }),
+      }));
     });
   });
 
