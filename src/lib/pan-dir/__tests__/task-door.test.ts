@@ -31,7 +31,7 @@ describe('task mutation door', () => {
     specPath = join(specsDir, '2026-07-14-DOOR-100-task-door.vbrief.json');
     writeFileSync(specPath, JSON.stringify({
       status: 'active',
-      vBRIEFInfo: { version: '1.0', created: '2026-07-14T00:00:00.000Z' },
+      xBRIEFInfo: { version: '1.0', created: '2026-07-14T00:00:00.000Z' },
       plan: {
         id: ISSUE_ID,
         title: 'Task door',

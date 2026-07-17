@@ -15,16 +15,16 @@ import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
   VBRIEF_LIFECYCLE_DIRS,
-  ensureVBriefDirsSync,
-  generateVBriefFilename,
-  parseVBriefFilename,
-  resolveVBriefDir,
+  ensureXBriefDirsSync,
+  generateXBriefFilename,
+  parseXBriefFilename,
+  resolveXBriefDir,
   slugify,
-  type VBriefLifecycleDir,
+  type XBriefLifecycleDir,
 } from './lifecycle.js';
-import { normalizeVBriefEnvelope, readPlanSync, serializeVBriefDocument } from './io.js';
-import { invalidateVBriefIndex } from './xbrief-index.js';
-import type { VBriefDocument } from './types.js';
+import { normalizeXBriefEnvelope, readPlanSync, serializeXBriefDocument } from './io.js';
+import { invalidateXBriefIndex } from './xbrief-index.js';
+import type { XBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
 import {
@@ -54,7 +54,7 @@ function readSpecFileSync(path: string): PanSpecDocument | null {
   }
   let parsed: unknown;
   try {
-    parsed = normalizeVBriefEnvelope(JSON.parse(raw));
+    parsed = normalizeXBriefEnvelope(JSON.parse(raw));
   } catch {
     return null;
   }
@@ -72,15 +72,15 @@ function updateSpecStatusSync(
   if (existing.status === newStatus) return existing;
   const nextDocument: PanSpecDocument = { ...existing.document, status: newStatus };
   const tmp = `${existing.path}.tmp`;
-  writeFileSync(tmp, serializeVBriefDocument(nextDocument), 'utf-8');
+  writeFileSync(tmp, serializeXBriefDocument(nextDocument), 'utf-8');
   renameSync(tmp, existing.path);
-  invalidateVBriefIndex(projectRoot);
+  invalidateXBriefIndex(projectRoot);
   return { ...existing, status: newStatus, document: nextDocument };
 }
 
 function writeSpecForIssueSync(
   projectRoot: string,
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   status: PanSpecStatus,
   filename?: string,
 ): PanSpecEntry {
@@ -89,13 +89,13 @@ function writeSpecForIssueSync(
     mkdirSync(specsDir, { recursive: true });
   }
   const specDocument: PanSpecDocument = { ...(doc as object), status } as PanSpecDocument;
-  const nextFilename = filename ?? generateVBriefFilename(doc.plan.id, doc.plan.title);
+  const nextFilename = filename ?? generateXBriefFilename(doc.plan.id, doc.plan.title);
   const path = join(specsDir, nextFilename);
   const tmp = `${path}.tmp`;
-  writeFileSync(tmp, serializeVBriefDocument(specDocument), 'utf-8');
+  writeFileSync(tmp, serializeXBriefDocument(specDocument), 'utf-8');
   renameSync(tmp, path);
-  invalidateVBriefIndex(projectRoot);
-  const parts = parseVBriefFilename(nextFilename);
+  invalidateXBriefIndex(projectRoot);
+  const parts = parseXBriefFilename(nextFilename);
   return {
     path,
     filename: nextFilename,
@@ -119,7 +119,7 @@ function findSpecByIssueSync(projectRoot: string, issueId: string): PanSpecEntry
   }
   filenames.sort();
   for (const filename of filenames) {
-    const parts = parseVBriefFilename(filename);
+    const parts = parseXBriefFilename(filename);
     if (!parts) continue;
     if (parts.issueId.toUpperCase() !== upperIssueId) continue;
     const path = join(specsDir, filename);
@@ -139,22 +139,22 @@ function findSpecByIssueSync(projectRoot: string, issueId: string): PanSpecEntry
   return null;
 }
 
-export interface FoundVBrief {
+export interface FoundXBrief {
   path: string;
-  lifecycleDir: VBriefLifecycleDir;
-  document: VBriefDocument;
+  lifecycleDir: XBriefLifecycleDir;
+  document: XBriefDocument;
   issueId: string;
   slug: string;
   date: string;
 }
 
 interface EnsurePanSpecResult {
-  found: FoundVBrief;
+  found: FoundXBrief;
   createdPanSpec: boolean;
   removedLegacyPath: string | null;
 }
 
-function specEntryToFound(entry: PanSpecEntry): FoundVBrief {
+function specEntryToFound(entry: PanSpecEntry): FoundXBrief {
   return {
     path: entry.path,
     lifecycleDir: entry.status,
@@ -165,9 +165,9 @@ function specEntryToFound(entry: PanSpecEntry): FoundVBrief {
   };
 }
 
-function findLegacyVBriefByIssue(projectRoot: string, issueId: string): FoundVBrief | null {
+function findLegacyXBriefByIssue(projectRoot: string, issueId: string): FoundXBrief | null {
   for (const lifecycleDir of VBRIEF_LIFECYCLE_DIRS) {
-    const dirPath = resolveVBriefDir(projectRoot, lifecycleDir);
+    const dirPath = resolveXBriefDir(projectRoot, lifecycleDir);
     if (!existsSync(dirPath)) continue;
     let entries: string[];
     try {
@@ -176,7 +176,7 @@ function findLegacyVBriefByIssue(projectRoot: string, issueId: string): FoundVBr
       continue;
     }
     for (const entry of entries) {
-      const parts = parseVBriefFilename(entry);
+      const parts = parseXBriefFilename(entry);
       if (!parts || parts.issueId !== issueId) continue;
       const path = join(dirPath, entry);
       try {
@@ -190,15 +190,15 @@ function findLegacyVBriefByIssue(projectRoot: string, issueId: string): FoundVBr
   return null;
 }
 
-export function findVBriefByIssueSync(projectRoot: string, issueId: string): FoundVBrief | null {
+export function findXBriefByIssueSync(projectRoot: string, issueId: string): FoundXBrief | null {
   const spec = findSpecByIssueSync(projectRoot, issueId);
   if (spec) {
     return specEntryToFound(spec);
   }
-  return findLegacyVBriefByIssue(projectRoot, issueId);
+  return findLegacyXBriefByIssue(projectRoot, issueId);
 }
 
-function ensurePanSpecForIssue(projectRoot: string, found: FoundVBrief): EnsurePanSpecResult {
+function ensurePanSpecForIssue(projectRoot: string, found: FoundXBrief): EnsurePanSpecResult {
   const existingSpec = findSpecByIssueSync(projectRoot, found.issueId);
   if (existingSpec) {
     return {
@@ -232,21 +232,21 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
   doc.plan.updated = now;
   doc.xBRIEFInfo.updated = now;
   const tmp = filePath + '.tmp';
-  writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
+  writeFileSync(tmp, serializeXBriefDocument(doc), 'utf-8');
   renameSync(tmp, filePath);
 }
 
-async function moveVBriefPromise(
+async function moveXBriefPromise(
   projectRoot: string,
   issueId: string,
-  targetDir: VBriefLifecycleDir,
-): Promise<{ from: FoundVBrief; toPath: string }> {
-  const found = findVBriefByIssueSync(projectRoot, issueId);
+  targetDir: XBriefLifecycleDir,
+): Promise<{ from: FoundXBrief; toPath: string }> {
+  const found = findXBriefByIssueSync(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureVBriefDirsSync(projectRoot);
+  ensureXBriefDirsSync(projectRoot);
   const ensured = ensurePanSpecForIssue(projectRoot, found);
   const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
   if (!updatedSpec) {
@@ -265,39 +265,39 @@ async function moveVBriefPromise(
     throw new Error(flushed.reason ?? `Spec move for ${issueId} was committed but not pushed`);
   }
 
-  invalidateVBriefIndex(projectRoot);
+  invalidateXBriefIndex(projectRoot);
   return {
     from: found,
     toPath: updatedSpec.path,
   };
 }
 
-export function moveVBriefFilesOnly(
+export function moveXBriefFilesOnly(
   projectRoot: string,
   issueId: string,
-  targetDir: VBriefLifecycleDir,
-): { from: FoundVBrief; toPath: string } {
-  const found = findVBriefByIssueSync(projectRoot, issueId);
+  targetDir: XBriefLifecycleDir,
+): { from: FoundXBrief; toPath: string } {
+  const found = findXBriefByIssueSync(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureVBriefDirsSync(projectRoot);
+  ensureXBriefDirsSync(projectRoot);
   ensurePanSpecForIssue(projectRoot, found);
   const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
   if (!updatedSpec) {
     throw new Error(`Failed to update pan spec status for ${issueId}`);
   }
 
-  invalidateVBriefIndex(projectRoot);
+  invalidateXBriefIndex(projectRoot);
   return {
     from: found,
     toPath: updatedSpec.path,
   };
 }
 
-export function deleteVBrief(projectRoot: string, issueId: string): boolean {
-  const found = findVBriefByIssueSync(projectRoot, issueId);
+export function deleteXBrief(projectRoot: string, issueId: string): boolean {
+  const found = findXBriefByIssueSync(projectRoot, issueId);
   if (!found) return false;
 
   const spec = findSpecByIssueSync(projectRoot, issueId);
@@ -307,32 +307,32 @@ export function deleteVBrief(projectRoot: string, issueId: string): boolean {
     unlinkSync(found.path);
   }
 
-  invalidateVBriefIndex(projectRoot);
+  invalidateXBriefIndex(projectRoot);
   return true;
 }
 
-export interface VBriefTransitionResult {
-  fromDir: VBriefLifecycleDir;
-  toDir: VBriefLifecycleDir;
+export interface XBriefTransitionResult {
+  fromDir: XBriefLifecycleDir;
+  toDir: XBriefLifecycleDir;
   toPath: string;
   statusUpdated: boolean;
   committed: boolean;
   moved: boolean;
 }
 
-async function transitionVBriefOnMainPromise(
+async function transitionXBriefOnMainPromise(
   projectRoot: string,
   issueId: string,
-  targetDir: VBriefLifecycleDir,
+  targetDir: XBriefLifecycleDir,
   newStatus: string,
   commitMessage: string,
-): Promise<VBriefTransitionResult> {
-  const found = findVBriefByIssueSync(projectRoot, issueId);
+): Promise<XBriefTransitionResult> {
+  const found = findXBriefByIssueSync(projectRoot, issueId);
   if (!found) {
     throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
-  ensureVBriefDirsSync(projectRoot);
+  ensureXBriefDirsSync(projectRoot);
   const ensured = ensurePanSpecForIssue(projectRoot, found);
   const ensuredSpec = ensured.found;
   const needsMove = ensuredSpec.lifecycleDir !== targetDir;
@@ -366,7 +366,7 @@ async function transitionVBriefOnMainPromise(
   }
 
   if (changed) {
-    invalidateVBriefIndex(projectRoot);
+    invalidateXBriefIndex(projectRoot);
   }
 
   return {
@@ -383,34 +383,34 @@ export function readJsonFile(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf-8'));
 }
 
-export interface PromotedVBrief {
-  destVBrief: string;
+export interface PromotedXBrief {
+  destXBrief: string;
   destContinue: string | null;
   canonicalFilename: string;
 }
 
-export function promoteVBriefToProposed(
+export function promoteXBriefToProposed(
   workspacePath: string,
   projectRoot: string,
   issueId: string,
-): PromotedVBrief {
+): PromotedXBrief {
   const panDir = join(workspacePath, PAN_DIRNAME);
-  const sourceVBrief = join(panDir, PAN_SPEC_FILENAME);
-  if (!existsSync(sourceVBrief)) {
+  const sourceXBrief = join(panDir, PAN_SPEC_FILENAME);
+  if (!existsSync(sourceXBrief)) {
     throw new Error(`No workspace spec found at ${join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME)}`);
   }
 
-  const planDoc = readPlanSync(sourceVBrief);
+  const planDoc = readPlanSync(sourceXBrief);
   const upperIssueId = issueId.toUpperCase();
   const existingFilename = planDoc.plan.metadata?.canonicalFilename;
   const canonicalFilename = (existingFilename && typeof existingFilename === 'string')
     ? existingFilename
-    : generateVBriefFilename(upperIssueId, slugify(planDoc.plan.title || planDoc.plan.id || upperIssueId));
+    : generateXBriefFilename(upperIssueId, slugify(planDoc.plan.title || planDoc.plan.id || upperIssueId));
 
   const promoted = writeSpecForIssueSync(projectRoot, planDoc, 'proposed', canonicalFilename);
 
-  invalidateVBriefIndex(projectRoot);
-  return { destVBrief: promoted.path, destContinue: null, canonicalFilename };
+  invalidateXBriefIndex(projectRoot);
+  return { destXBrief: promoted.path, destContinue: null, canonicalFilename };
 }
 
 export function readContinueStateForIssue(
@@ -466,36 +466,36 @@ export function clearFeedbackForIssue(
 // channel. Follows the additive-variant pattern established for io.ts /
 // xbrief-index.ts / auto-synthesize.ts in commit 3783c7003.
 
-/** Effect variant of `findVBriefByIssue` — failures surface as typed errors. */
-export const findVBriefByIssue = (
+/** Effect variant of `findXBriefByIssue` — failures surface as typed errors. */
+export const findXBriefByIssue = (
   projectRoot: string,
   issueId: string,
-): Effect.Effect<FoundVBrief | null, FsError> =>
+): Effect.Effect<FoundXBrief | null, FsError> =>
   Effect.try({
-    try: () => findVBriefByIssueSync(projectRoot, issueId),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'findVBriefByIssue', cause }),
+    try: () => findXBriefByIssueSync(projectRoot, issueId),
+    catch: (cause) => new FsError({ path: projectRoot, operation: 'findXBriefByIssue', cause }),
   });
 
-/** Effect variant of `moveVBrief`. */
-export const moveVBrief = (
+/** Effect variant of `moveXBrief`. */
+export const moveXBrief = (
   projectRoot: string,
   issueId: string,
-  targetDir: VBriefLifecycleDir,
-): Effect.Effect<{ from: FoundVBrief; toPath: string }, FsError> =>
+  targetDir: XBriefLifecycleDir,
+): Effect.Effect<{ from: FoundXBrief; toPath: string }, FsError> =>
   Effect.tryPromise({
-    try: () => moveVBriefPromise(projectRoot, issueId, targetDir),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'moveVBrief', cause }),
+    try: () => moveXBriefPromise(projectRoot, issueId, targetDir),
+    catch: (cause) => new FsError({ path: projectRoot, operation: 'moveXBrief', cause }),
   });
 
-/** Effect variant of `transitionVBriefOnMain`. */
-export const transitionVBriefOnMain = (
+/** Effect variant of `transitionXBriefOnMain`. */
+export const transitionXBriefOnMain = (
   projectRoot: string,
   issueId: string,
-  targetDir: VBriefLifecycleDir,
+  targetDir: XBriefLifecycleDir,
   newStatus: string,
   commitMessage: string,
-): Effect.Effect<VBriefTransitionResult, FsError> =>
+): Effect.Effect<XBriefTransitionResult, FsError> =>
   Effect.tryPromise({
-    try: () => transitionVBriefOnMainPromise(projectRoot, issueId, targetDir, newStatus, commitMessage),
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'transitionVBriefOnMain', cause }),
+    try: () => transitionXBriefOnMainPromise(projectRoot, issueId, targetDir, newStatus, commitMessage),
+    catch: (cause) => new FsError({ path: projectRoot, operation: 'transitionXBriefOnMain', cause }),
   });

@@ -13,7 +13,7 @@ import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '.
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
 import { findPlanSync, readPlanSync } from '../xbrief/io.js';
-import type { VBriefDocument } from '../xbrief/types.js';
+import type { XBriefDocument } from '../xbrief/types.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { loadCloisterConfig } from './config.js';
@@ -96,7 +96,7 @@ export interface HandleOrphanProposedSpecOptions {
   /** Project override for tests / callers that already resolved the issue. */
   project?: { projectKey: string; projectPath: string };
   /** Spec override so the safety net does not re-read the file. */
-  spec?: { path: string; doc: VBriefDocument };
+  spec?: { path: string; doc: XBriefDocument };
 }
 
 async function findSpecPathForIssue(projectPath: string, issueId: string): Promise<string | null> {
@@ -389,7 +389,7 @@ export async function handleOrphanProposedSpec(
 
   const issueLower = upperIssueId.toLowerCase();
 
-  let planDoc: VBriefDocument;
+  let planDoc: XBriefDocument;
   let planPath: string | null;
   if (options.spec) {
     planPath = options.spec.path;
@@ -533,7 +533,7 @@ export async function reconcileOrphanProposedSpecs(options: ReconcileOrphanPropo
     const candidates = await findOrphanProposedSpecsForReconciler(options);
 
     for (const candidate of candidates) {
-      let planDoc: VBriefDocument;
+      let planDoc: XBriefDocument;
       try {
         planDoc = readPlanSync(candidate.specPath);
       } catch {

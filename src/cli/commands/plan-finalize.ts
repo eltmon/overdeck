@@ -2,12 +2,12 @@ import chalk from 'chalk';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
-import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeVBriefDocument } from '../../lib/xbrief/io.js';
-import { generateVBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
+import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeXBriefDocument } from '../../lib/xbrief/io.js';
+import { generateXBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { checkPrdGateSync, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
-import type { VBriefDocument } from '../../lib/xbrief/types.js';
+import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/xbrief/quality-lint.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../../lib/projects.js';
@@ -28,7 +28,7 @@ export type PlanFinalizeQualityGateResult =
   | { ok: false; skipped: false; issues: QualityIssue[] };
 
 export function evaluatePlanFinalizeQualityGate(
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   options: Pick<PlanFinalizeOptions, 'qualityLint'> & { prdText?: string; hotspots?: string[] } = {},
 ): PlanFinalizeQualityGateResult {
   if (options.qualityLint === false) {
@@ -455,12 +455,12 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
  * Exported for tests.
  */
 export function stampPlanForFinalization(planPath: string, issueId: string): string {
-  const doc: VBriefDocument = readPlanSync(planPath);
+  const doc: XBriefDocument = readPlanSync(planPath);
   const slugSource = doc.plan.title || doc.plan.id || issueId;
   const slug = slugify(slugSource);
 
   const existingFilename = doc.plan.metadata?.canonicalFilename ?? null;
-  const canonicalFilename = existingFilename ?? generateVBriefFilename(issueId, slug);
+  const canonicalFilename = existingFilename ?? generateXBriefFilename(issueId, slug);
 
   doc.plan.metadata = { ...(doc.plan.metadata ?? {}), canonicalFilename };
 
@@ -471,7 +471,7 @@ export function stampPlanForFinalization(planPath: string, issueId: string): str
   doc.xBRIEFInfo.updated = now;
 
   const tmp = planPath + '.tmp';
-  writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
+  writeFileSync(tmp, serializeXBriefDocument(doc), 'utf-8');
   renameSync(tmp, planPath);
 
   return canonicalFilename;

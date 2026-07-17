@@ -6,15 +6,15 @@ import {
   groupFastTrack,
   isFastTrackAutoMergeAllowed,
 } from '../fast-track.js';
-import type { VBriefItem, VBriefItemMetadata } from '../../xbrief/types.js';
+import type { XBriefItem, XBriefItemMetadata } from '../../xbrief/types.js';
 
 let counter = 0;
-function item(metadata: VBriefItemMetadata, id?: string): VBriefItem {
+function item(metadata: XBriefItemMetadata, id?: string): XBriefItem {
   counter += 1;
   return { id: id ?? `item-${counter}`, title: `t${counter}`, status: 'pending', metadata };
 }
 
-function trivial(scope: string[], id?: string): VBriefItem {
+function trivial(scope: string[], id?: string): XBriefItem {
   return item({ difficulty: 'trivial', files_scope: scope, files_scope_confidence: 'high' }, id);
 }
 

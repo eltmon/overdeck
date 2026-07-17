@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, symlink
 import { homedir } from 'os';
 import { join } from 'path';
 import { loadConfigSync } from '../../lib/config.js';
-import { parseVBriefFilename } from '../../lib/xbrief/lifecycle.js';
+import { parseXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 import { resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { createBackupSync } from '../../lib/backup.js';
 import {
@@ -662,7 +662,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
           f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
         );
         for (const file of activeFiles) {
-          const parsed = parseVBriefFilename(file);
+          const parsed = parseXBriefFilename(file);
           if (!parsed) continue;
           const issueId = parsed.issueId.toUpperCase();
           const ghInfo = resolveGitHubIssueSync(issueId);
@@ -690,7 +690,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
           f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
         );
         for (const file of completedFiles) {
-          const parsed = parseVBriefFilename(file);
+          const parsed = parseXBriefFilename(file);
           if (!parsed) continue;
           const issueId = parsed.issueId.toUpperCase();
           const workspacePath = join(config.path, 'workspaces', `feature-${issueId.toLowerCase()}`);
@@ -713,7 +713,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
             readdirSync(activeDir)
               .filter(f => f.endsWith('.vbrief.json') && !f.startsWith('continue-'))
               .map(f => {
-                const parsed = parseVBriefFilename(f);
+                const parsed = parseXBriefFilename(f);
                 return parsed ? parsed.issueId.toUpperCase() : '';
               })
               .filter(Boolean)

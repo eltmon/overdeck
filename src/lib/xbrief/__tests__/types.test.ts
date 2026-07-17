@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { resolveVBriefItemKind } from '../types.js';
-import type { FilesScopeConfidence, ItemReadiness, VBriefItemKind, VBriefItemMetadata } from '../types.js';
+import { resolveXBriefItemKind } from '../types.js';
+import type { FilesScopeConfidence, ItemReadiness, XBriefItemKind, XBriefItemMetadata } from '../types.js';
 
 describe('vBRIEF item metadata types', () => {
   it('exposes swarm-contract metadata fields', () => {
@@ -11,11 +11,11 @@ describe('vBRIEF item metadata types', () => {
       expected_outputs: ['typecheck completes without errors'],
       readiness: 'ready',
       kind: 'docs',
-    } satisfies VBriefItemMetadata;
+    } satisfies XBriefItemMetadata;
 
     expectTypeOf(metadata.files_scope_confidence).toEqualTypeOf<FilesScopeConfidence>();
     expectTypeOf(metadata.readiness).toEqualTypeOf<ItemReadiness>();
-    expectTypeOf(metadata.kind).toEqualTypeOf<VBriefItemKind>();
+    expectTypeOf(metadata.kind).toEqualTypeOf<XBriefItemKind>();
   });
 
   it('keeps item kind optional and defaults omitted kind to backend', () => {
@@ -23,9 +23,9 @@ describe('vBRIEF item metadata types', () => {
       files_scope: ['src/lib/xbrief/types.ts'],
       files_scope_confidence: 'high',
       readiness: 'ready',
-    } satisfies VBriefItemMetadata;
+    } satisfies XBriefItemMetadata;
 
-    expectTypeOf(metadata).toMatchTypeOf<VBriefItemMetadata>();
-    expect(resolveVBriefItemKind(metadata)).toBe('backend');
+    expectTypeOf(metadata).toMatchTypeOf<XBriefItemMetadata>();
+    expect(resolveXBriefItemKind(metadata)).toBe('backend');
   });
 });

@@ -18,7 +18,7 @@
  */
 
 import type { RuntimeName } from '../runtimes/types.js';
-import type { VBriefItem } from '../xbrief/types.js';
+import type { XBriefItem } from '../xbrief/types.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { NormalizedConfig } from '../config-yaml/schema.js';
 import { resolveModel } from '../config-yaml/roles.js';
@@ -95,7 +95,7 @@ export function resolveImplicitStaffing(
  * explicit table cannot place the bead.
  */
 export function resolveStaffing(
-  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  item: Pick<XBriefItem, 'id' | 'title' | 'metadata'>,
   options: ResolveStaffingOptions = {},
 ): Staffing {
   const config = options.config ?? loadYamlConfig().config;

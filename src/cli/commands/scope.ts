@@ -2,7 +2,7 @@
  * pan scope — vBRIEF lifecycle manual overrides
  *
  * Commands to inspect and move scope vBRIEFs between lifecycle directories.
- * All transitions use `transitionVBriefOnMain` so they inherit idempotency,
+ * All transitions use `transitionXBriefOnMain` so they inherit idempotency,
  * branch-awareness, and background-push behavior.
  */
 
@@ -12,15 +12,15 @@ import { Effect } from 'effect';
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
 import {
-  findVBriefByIssueSync,
-  transitionVBriefOnMain,
-  type VBriefTransitionResult,
+  findXBriefByIssueSync,
+  transitionXBriefOnMain,
+  type XBriefTransitionResult,
 } from '../../lib/xbrief/lifecycle-io.js';
 import { findPlanSync, readPlanSync } from '../../lib/xbrief/io.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../../lib/pan-dir/record.js';
-import { listVBriefs, readVBriefDocument } from '../../lib/xbrief/xbrief-index.js';
+import { listXBriefs, readXBriefDocument } from '../../lib/xbrief/xbrief-index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, listProjectsSync } from '../../lib/projects.js';
-import type { VBriefDocument } from '../../lib/xbrief/types.js';
+import type { XBriefDocument } from '../../lib/xbrief/types.js';
 
 function getProjectPath(issueId: string): string {
   const resolved = resolveProjectFromIssueSync(issueId);
@@ -35,7 +35,7 @@ function getProjectPath(issueId: string): string {
   throw new Error(`Could not resolve project path for ${issueId}. Add the project to projects.yaml or pass --project.`);
 }
 
-function formatTransition(result: VBriefTransitionResult, _issueId: string): string {
+function formatTransition(result: XBriefTransitionResult, _issueId: string): string {
   const lines: string[] = [];
   if (result.moved) {
     lines.push(`${chalk.green('✓')} Moved vBRIEF ${result.fromDir} → ${result.toDir}`);
@@ -64,7 +64,7 @@ interface ScopeRow {
   path: string;
 }
 
-function safeReadPlan(path: string): VBriefDocument | null {
+function safeReadPlan(path: string): XBriefDocument | null {
   try {
     return readPlanSync(path);
   } catch {
@@ -73,7 +73,7 @@ function safeReadPlan(path: string): VBriefDocument | null {
 }
 
 /** Best-effort created date — prefer plan.created, fall back to filename date, then mtime. */
-function rowCreatedDate(doc: VBriefDocument | null, filenameDate: string | null, fallbackPath: string): string {
+function rowCreatedDate(doc: XBriefDocument | null, filenameDate: string | null, fallbackPath: string): string {
   const planCreated = doc?.plan?.created;
   if (planCreated && typeof planCreated === 'string') {
     const datePart = planCreated.slice(0, 10);
@@ -91,9 +91,9 @@ function rowCreatedDate(doc: VBriefDocument | null, filenameDate: string | null,
 function collectLifecycleRows(projectKey: string, projectPath: string) {
   return Effect.gen(function* () {
     const rows: ScopeRow[] = [];
-    const entries = yield* listVBriefs(projectPath);
+    const entries = yield* listXBriefs(projectPath);
     for (const entry of entries) {
-      const doc = yield* readVBriefDocument(entry.path).pipe(
+      const doc = yield* readXBriefDocument(entry.path).pipe(
         Effect.catch(() => Effect.succeed(null)),
       );
       rows.push({
@@ -266,7 +266,7 @@ async function listCommand(options: { project?: string }): Promise<void> {
 async function showCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
   const upperId = issueId.toUpperCase();
-  const found = findVBriefByIssueSync(projectPath, upperId);
+  const found = findXBriefByIssueSync(projectPath, upperId);
   if (!found) {
     console.log(chalk.red(`No vBRIEF found for ${upperId} in ${projectPath}`));
     process.exit(1);
@@ -395,7 +395,7 @@ async function showCommand(issueId: string, options: { project?: string }): Prom
 
 async function proposeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionXBriefOnMain(
     projectPath,
     issueId,
     'proposed',
@@ -407,7 +407,7 @@ async function proposeCommand(issueId: string, options: { project?: string }): P
 
 async function approveCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionXBriefOnMain(
     projectPath,
     issueId,
     'active',
@@ -419,7 +419,7 @@ async function approveCommand(issueId: string, options: { project?: string }): P
 
 async function completeCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionXBriefOnMain(
     projectPath,
     issueId,
     'completed',
@@ -431,7 +431,7 @@ async function completeCommand(issueId: string, options: { project?: string }): 
 
 async function cancelCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const result = await Effect.runPromise(transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionXBriefOnMain(
     projectPath,
     issueId,
     'cancelled',
@@ -443,7 +443,7 @@ async function cancelCommand(issueId: string, options: { project?: string }): Pr
 
 async function restoreCommand(issueId: string, options: { project?: string }): Promise<void> {
   const projectPath = options.project ? options.project : getProjectPath(issueId);
-  const found = findVBriefByIssueSync(projectPath, issueId);
+  const found = findXBriefByIssueSync(projectPath, issueId);
   if (!found) {
     console.log(chalk.red(`No vBRIEF found for ${issueId}`));
     process.exit(1);
@@ -452,7 +452,7 @@ async function restoreCommand(issueId: string, options: { project?: string }): P
     console.log(chalk.yellow(`vBRIEF is in ${found.lifecycleDir} — restore only works from completed/ or cancelled/`));
     process.exit(1);
   }
-  const result = await Effect.runPromise(transitionVBriefOnMain(
+  const result = await Effect.runPromise(transitionXBriefOnMain(
     projectPath,
     issueId,
     'active',

@@ -7,7 +7,7 @@ import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
 import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
 import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
-import type { VBriefDocument } from './xbrief/types.js';
+import type { XBriefDocument } from './xbrief/types.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
 
 export interface MergeQueueItem {
@@ -89,7 +89,7 @@ export function planMergeTrain<T extends MergeCandidateMeta>(candidates: Readonl
   };
 }
 
-export function declaredIssueFootprint(issueId: string, doc: VBriefDocument): IssueFileFootprint {
+export function declaredIssueFootprint(issueId: string, doc: XBriefDocument): IssueFileFootprint {
   return { issueId, files: computeIssueFootprint(doc), source: 'declared' };
 }
 

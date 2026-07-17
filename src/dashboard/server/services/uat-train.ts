@@ -40,7 +40,7 @@ import {
   type UatGeneration,
 } from '../../../lib/overdeck/merge-sync.js';
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
-import { findVBriefByIssue, readVBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
+import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync } from '../../../lib/projects.js';
 import { getDashboardIdentity } from '../identity.js';
 import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';
@@ -278,14 +278,14 @@ async function loadAcceptanceCriteriaCache(issueIds: ReadonlySet<string>): Promi
     }
 
     try {
-      const found = await Effect.runPromise(findVBriefByIssue(root, upperIssueId));
+      const found = await Effect.runPromise(findXBriefByIssue(root, upperIssueId));
       if (!found) {
         acceptanceCriteriaByIssue.delete(upperIssueId);
         cache.set(upperIssueId, []);
         return;
       }
       const { mtimeMs } = await stat(found.path);
-      const document = await Effect.runPromise(readVBriefDocument(found.path));
+      const document = await Effect.runPromise(readXBriefDocument(found.path));
       const criteria = extractACFromDocument(document).map((ac) => ({ title: ac.title, status: ac.status }));
       acceptanceCriteriaByIssue.set(upperIssueId, { path: found.path, mtimeMs, criteria });
       cache.set(upperIssueId, criteria);

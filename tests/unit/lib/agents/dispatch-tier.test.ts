@@ -2,9 +2,9 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { chooseDispatchTier } from '../../../../src/lib/agents/dispatch-tier.js';
-import type { VBriefItem } from '../../../../src/lib/xbrief/types.js';
+import type { XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
-function item(metadata: VBriefItem['metadata']): Pick<VBriefItem, 'metadata'> {
+function item(metadata: XBriefItem['metadata']): Pick<XBriefItem, 'metadata'> {
   return { metadata };
 }
 

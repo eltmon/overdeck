@@ -6,9 +6,9 @@ import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
-import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeVBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeVBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
+import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeXBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeXBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
 import { planBuilder } from '../builder.js';
-import { subItemsOf, type VBriefDocument, type VBriefSubItem } from '../types.js';
+import { subItemsOf, type XBriefDocument, type XBriefSubItem } from '../types.js';
 
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
@@ -20,7 +20,7 @@ const LEGACY_FIXTURE_PATH = join(
   'legacy-v05.vbrief.json',
 );
 
-function makePlanDoc(items: Array<{ id: string; status?: string }> = []): VBriefDocument {
+function makePlanDoc(items: Array<{ id: string; status?: string }> = []): XBriefDocument {
   return {
     xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
@@ -37,7 +37,7 @@ function makePlanDoc(items: Array<{ id: string; status?: string }> = []): VBrief
  * Write the spec to main-side `.pan/specs/` (canonical location for findPlan resolution).
  * Also writes a top-level `status` field required by parsePanSpecDocument.
  */
-function writeMainSpec(doc: VBriefDocument, specStatus: 'proposed' | 'active' | 'completed' | 'cancelled' = 'active'): string {
+function writeMainSpec(doc: XBriefDocument, specStatus: 'proposed' | 'active' | 'completed' | 'cancelled' = 'active'): string {
   const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
   const specPath = join(specsDir, SPEC_FILENAME);
@@ -49,11 +49,11 @@ function writeMainSpec(doc: VBriefDocument, specStatus: 'proposed' | 'active' | 
 /**
  * Write spec to main-side AND return the path (convenience for readPlan tests).
  */
-function writePlanDoc(doc: VBriefDocument): string {
+function writePlanDoc(doc: XBriefDocument): string {
   return writeMainSpec(doc);
 }
 
-function writeWorkspaceSpec(doc: VBriefDocument): string {
+function writeWorkspaceSpec(doc: XBriefDocument): string {
   const specsDir = join(WORKSPACE_PATH, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
   const specPath = join(specsDir, SPEC_FILENAME);
@@ -66,7 +66,7 @@ function createWorktreeShape(): void {
   mkdirSync(join(WORKSPACE_PATH, '.pan', 'specs'), { recursive: true });
 }
 
-function writeWorkspaceDraft(doc: VBriefDocument, runtimeDir = '.overdeck'): string {
+function writeWorkspaceDraft(doc: XBriefDocument, runtimeDir = '.overdeck'): string {
   const panDir = join(WORKSPACE_PATH, runtimeDir);
   mkdirSync(panDir, { recursive: true });
   const planPath = join(panDir, 'spec.vbrief.json');
@@ -209,7 +209,7 @@ describe('findPlan', () => {
 });
 
 describe('readPlan', () => {
-  it('parses and returns VBriefDocument', () => {
+  it('parses and returns XBriefDocument', () => {
     const doc = makePlanDoc([{ id: 'item-1' }]);
     const planPath = writePlanDoc(doc);
     const result = readPlanSync(planPath);
@@ -250,7 +250,7 @@ describe('readPlan', () => {
       plan: makePlanDoc().plan,
     };
 
-    expect(normalizeVBriefEnvelope(doc)).toBe(doc);
+    expect(normalizeXBriefEnvelope(doc)).toBe(doc);
   });
 
   it('mentions both accepted envelope keys when rejecting a malformed document', () => {
@@ -264,7 +264,7 @@ describe('readPlan', () => {
     const doc = makePlanDoc();
     doc.xBRIEFInfo.version = version;
 
-    const serialized = JSON.parse(serializeVBriefDocument(doc));
+    const serialized = JSON.parse(serializeXBriefDocument(doc));
 
     expect(serialized.xBRIEFInfo).toEqual(doc.xBRIEFInfo);
     expect(serialized.vBRIEFInfo).toBeUndefined();
@@ -272,11 +272,11 @@ describe('readPlan', () => {
 
   it('serializes the legacy v0.5 fixture with xBRIEFInfo only', () => {
     const legacyDocument = JSON.parse(readFileSync(LEGACY_FIXTURE_PATH, 'utf-8')) as {
-      vBRIEFInfo: VBriefDocument['xBRIEFInfo'];
-      plan: VBriefDocument['plan'];
+      vBRIEFInfo: XBriefDocument['xBRIEFInfo'];
+      plan: XBriefDocument['plan'];
     };
 
-    const serialized = JSON.parse(serializeVBriefDocument(legacyDocument));
+    const serialized = JSON.parse(serializeXBriefDocument(legacyDocument));
 
     expect(serialized.xBRIEFInfo).toEqual(legacyDocument.vBRIEFInfo);
     expect(serialized.vBRIEFInfo).toBeUndefined();
@@ -293,7 +293,7 @@ describe('readPlan', () => {
     };
     const planPath = writePlanDoc(doc);
 
-    const serialized = JSON.parse(serializeVBriefDocument(readPlanSync(planPath)));
+    const serialized = JSON.parse(serializeXBriefDocument(readPlanSync(planPath)));
 
     expect(serialized).toEqual({ ...doc, status: 'active' });
     expect(serialized.vBRIEFInfo).toBeUndefined();
@@ -303,7 +303,7 @@ describe('readPlan', () => {
     const doc = { ...makePlanDoc(), status: 'active' };
     doc.xBRIEFInfo.version = '0.8';
 
-    const serialized = JSON.parse(serializeVBriefDocument(doc));
+    const serialized = JSON.parse(serializeXBriefDocument(doc));
 
     expect(serialized.status).toBe('active');
     expect(serialized.xBRIEFInfo.version).toBe('0.8');
@@ -316,7 +316,7 @@ describe('readPlan', () => {
       })
       .build();
 
-    const serialized = JSON.parse(serializeVBriefDocument(doc));
+    const serialized = JSON.parse(serializeXBriefDocument(doc));
 
     expect(doc.xBRIEFInfo.version).toBe('0.8');
     expect(serialized.xBRIEFInfo.version).toBe('0.8');
@@ -343,7 +343,7 @@ describe('readWorkspacePlan', () => {
     expect(readWorkspacePlanSync(WORKSPACE_PATH)).toBeNull();
   });
 
-  it('returns VBriefDocument when plan exists', () => {
+  it('returns XBriefDocument when plan exists', () => {
     writePlanDoc(makePlanDoc([{ id: 'x' }]));
     const result = readWorkspacePlanSync(WORKSPACE_PATH);
     expect(result).not.toBeNull();
@@ -361,7 +361,7 @@ describe('readWorkspacePlan', () => {
   });
 
   it('returns equivalent child item views for v0.5 subItems and v0.6 items', () => {
-    const childItems: VBriefSubItem[] = [
+    const childItems: XBriefSubItem[] = [
       { id: 'item-1.ac1', title: 'First AC', status: 'pending', metadata: { kind: 'acceptance_criterion' } },
       { id: 'item-1.ac2', title: 'Second AC', status: 'completed', metadata: { kind: 'acceptance_criterion' } },
     ];
@@ -509,7 +509,7 @@ describe('tierOverrides', () => {
 });
 
 describe('updateSubItemStatus', () => {
-  function makePlanWithSubItems(): VBriefDocument {
+  function makePlanWithSubItems(): XBriefDocument {
     return {
       xBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
       plan: {
@@ -530,7 +530,7 @@ describe('updateSubItemStatus', () => {
     };
   }
 
-  function makePlanWithItems(): VBriefDocument {
+  function makePlanWithItems(): XBriefDocument {
     const doc = makePlanWithSubItems();
     doc.xBRIEFInfo.version = '0.6';
     doc.plan.items[0].items = doc.plan.items[0].subItems;

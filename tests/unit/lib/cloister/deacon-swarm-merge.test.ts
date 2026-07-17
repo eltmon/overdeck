@@ -6,11 +6,11 @@ let recordRemote: string | null = null;
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/xbrief/types.js';
+import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
-function doc(item: VBriefItem = itemFor('wi-1')): VBriefDocument {
+function doc(item: XBriefItem = itemFor('wi-1')): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: '2026-07-01T00:00:00.000Z',
       author: 'test',
@@ -28,7 +28,7 @@ function doc(item: VBriefItem = itemFor('wi-1')): VBriefDocument {
   };
 }
 
-function itemFor(id: string): VBriefItem {
+function itemFor(id: string): XBriefItem {
   return {
     id,
     title: id,
@@ -126,7 +126,7 @@ describe('verify-failed surfacing', () => {
   it('reports a verification failure as an action instead of dropping the slot silently', async () => {
     const { mergeReadySlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const doc = {
-      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      xBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
       plan: {
         id: 'pan-903', title: 't', status: 'active',
         items: [{ id: 'wi-1', title: 'item', status: 'pending' }],

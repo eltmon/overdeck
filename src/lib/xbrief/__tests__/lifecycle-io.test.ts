@@ -6,21 +6,21 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 import {
-  deleteVBrief,
-  findVBriefByIssueSync,
-  moveVBrief,
-  moveVBriefFilesOnly,
-  promoteVBriefToProposed,
-  transitionVBriefOnMain,
+  deleteXBrief,
+  findXBriefByIssueSync,
+  moveXBrief,
+  moveXBriefFilesOnly,
+  promoteXBriefToProposed,
+  transitionXBriefOnMain,
   updatePlanStatus,
 } from '../lifecycle-io.js';
 import {
-  ensureVBriefDirsSync,
-  generateVBriefFilename,
-  resolveVBriefDir,
+  ensureXBriefDirsSync,
+  generateXBriefFilename,
+  resolveXBriefDir,
 } from '../lifecycle.js';
 import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../pan-dir/index.js';
-import type { VBriefDocument } from '../types.js';
+import type { XBriefDocument } from '../types.js';
 
 let TEST_DIR: string;
 let isGitRepo = false;
@@ -36,7 +36,7 @@ function initGitRepo(dir: string): void {
   isGitRepo = true;
 }
 
-function makePlan(issueId: string, slug: string, status: string = 'proposed'): VBriefDocument {
+function makePlan(issueId: string, slug: string, status: string = 'proposed'): XBriefDocument {
   return {
     xBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
     plan: {
@@ -51,7 +51,7 @@ function makePlan(issueId: string, slug: string, status: string = 'proposed'): V
   };
 }
 
-function writePlan(dir: string, filename: string, doc: VBriefDocument): string {
+function writePlan(dir: string, filename: string, doc: XBriefDocument): string {
   const p = join(dir, filename);
   writeFileSync(p, JSON.stringify(doc, undefined, 2), 'utf-8');
   return p;
@@ -68,12 +68,12 @@ afterEach(() => {
   }
 });
 
-describe('findVBriefByIssue', () => {
+describe('findXBriefByIssue', () => {
   it('finds a vBRIEF in proposed/', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-946', 'foo', '2026-05-03');
-    writePlan(resolveVBriefDir(TEST_DIR, 'proposed'), filename, makePlan('PAN-946', 'foo'));
-    const found = findVBriefByIssueSync(TEST_DIR, 'PAN-946');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-946', 'foo', '2026-05-03');
+    writePlan(resolveXBriefDir(TEST_DIR, 'proposed'), filename, makePlan('PAN-946', 'foo'));
+    const found = findXBriefByIssueSync(TEST_DIR, 'PAN-946');
     expect(found).not.toBeNull();
     expect(found?.lifecycleDir).toBe('proposed');
     expect(found?.issueId).toBe('PAN-946');
@@ -82,75 +82,75 @@ describe('findVBriefByIssue', () => {
   });
 
   it('finds a vBRIEF in active/', () => {
-    ensureVBriefDirsSync(TEST_DIR);
+    ensureXBriefDirsSync(TEST_DIR);
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'active'),
-      generateVBriefFilename('PAN-100', 'bar', '2026-05-03'),
+      resolveXBriefDir(TEST_DIR, 'active'),
+      generateXBriefFilename('PAN-100', 'bar', '2026-05-03'),
       makePlan('PAN-100', 'bar', 'approved'),
     );
-    const found = findVBriefByIssueSync(TEST_DIR, 'PAN-100');
+    const found = findXBriefByIssueSync(TEST_DIR, 'PAN-100');
     expect(found?.lifecycleDir).toBe('active');
   });
 
   it('returns null when no vBRIEF exists', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    expect(findVBriefByIssueSync(TEST_DIR, 'PAN-999')).toBeNull();
+    ensureXBriefDirsSync(TEST_DIR);
+    expect(findXBriefByIssueSync(TEST_DIR, 'PAN-999')).toBeNull();
   });
 
   it('prefers proposed/ over active/ when both contain a match', () => {
-    ensureVBriefDirsSync(TEST_DIR);
+    ensureXBriefDirsSync(TEST_DIR);
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
-      generateVBriefFilename('PAN-1', 'foo', '2026-05-03'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
+      generateXBriefFilename('PAN-1', 'foo', '2026-05-03'),
       makePlan('PAN-1', 'foo', 'proposed'),
     );
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'active'),
-      generateVBriefFilename('PAN-1', 'foo', '2026-05-03'),
+      resolveXBriefDir(TEST_DIR, 'active'),
+      generateXBriefFilename('PAN-1', 'foo', '2026-05-03'),
       makePlan('PAN-1', 'foo', 'approved'),
     );
-    const found = findVBriefByIssueSync(TEST_DIR, 'PAN-1');
+    const found = findXBriefByIssueSync(TEST_DIR, 'PAN-1');
     expect(found?.lifecycleDir).toBe('proposed');
   });
 
   it('ignores files that do not match the canonical naming convention', () => {
-    ensureVBriefDirsSync(TEST_DIR);
+    ensureXBriefDirsSync(TEST_DIR);
     writeFileSync(
-      join(resolveVBriefDir(TEST_DIR, 'proposed'), 'plan.vbrief.json'),
+      join(resolveXBriefDir(TEST_DIR, 'proposed'), 'plan.vbrief.json'),
       JSON.stringify(makePlan('PAN-1', 'foo')),
     );
-    expect(findVBriefByIssueSync(TEST_DIR, 'PAN-1')).toBeNull();
+    expect(findXBriefByIssueSync(TEST_DIR, 'PAN-1')).toBeNull();
   });
 
   it('skips corrupt files matching the naming convention', () => {
-    ensureVBriefDirsSync(TEST_DIR);
+    ensureXBriefDirsSync(TEST_DIR);
     writeFileSync(
-      join(resolveVBriefDir(TEST_DIR, 'proposed'), generateVBriefFilename('PAN-1', 'corrupt', '2026-05-03')),
+      join(resolveXBriefDir(TEST_DIR, 'proposed'), generateXBriefFilename('PAN-1', 'corrupt', '2026-05-03')),
       'not valid json',
     );
     // Also write a valid one in active/
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'active'),
-      generateVBriefFilename('PAN-1', 'good', '2026-05-03'),
+      resolveXBriefDir(TEST_DIR, 'active'),
+      generateXBriefFilename('PAN-1', 'good', '2026-05-03'),
       makePlan('PAN-1', 'good', 'approved'),
     );
-    const found = findVBriefByIssueSync(TEST_DIR, 'PAN-1');
+    const found = findXBriefByIssueSync(TEST_DIR, 'PAN-1');
     expect(found?.lifecycleDir).toBe('active');
   });
 });
 
 describe('updatePlanStatus', () => {
   it('updates plan.status, increments sequence, refreshes timestamps', async () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
     await new Promise(r => setTimeout(r, 5));
     updatePlanStatus(path, 'approved');
-    const after = JSON.parse(readFileSync(path, 'utf-8')) as VBriefDocument;
+    const after = JSON.parse(readFileSync(path, 'utf-8')) as XBriefDocument;
     expect(after.plan.status).toBe('approved');
     expect(after.plan.sequence).toBe(2);
     expect(after.plan.updated).toBeTruthy();
@@ -158,10 +158,10 @@ describe('updatePlanStatus', () => {
   });
 
   it('writes atomically (no .tmp left behind)', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
@@ -170,61 +170,61 @@ describe('updatePlanStatus', () => {
   });
 });
 
-describe('moveVBriefFilesOnly', () => {
+describe('moveXBriefFilesOnly', () => {
   it('moves scope vBRIEF and continue file together', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const oldPath = writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    const result = moveVBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
+    const result = moveXBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
     expect(existsSync(oldPath)).toBe(false);
     expect(existsSync(result.toPath)).toBe(true);
     expect(result.toPath).toBe(join(TEST_DIR, '.pan', 'specs', filename));
 
-    const movedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument & { status: string };
+    const movedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument & { status: string };
     expect(movedDoc.status).toBe('active');
   });
 
   it('handles missing continue file (no-op for continue)', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    const result = moveVBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
+    const result = moveXBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
     expect(existsSync(result.toPath)).toBe(true);
   });
 
   it('throws when the issue has no vBRIEF', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    expect(() => moveVBriefFilesOnly(TEST_DIR, 'PAN-999', 'active')).toThrow();
+    ensureXBriefDirsSync(TEST_DIR);
+    expect(() => moveXBriefFilesOnly(TEST_DIR, 'PAN-999', 'active')).toThrow();
   });
 
   it('handles same source and target lifecycle dir as a no-op', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    const result = moveVBriefFilesOnly(TEST_DIR, 'PAN-1', 'proposed');
+    const result = moveXBriefFilesOnly(TEST_DIR, 'PAN-1', 'proposed');
     expect(existsSync(result.toPath)).toBe(true);
   });
 });
 
-describe('moveVBrief (with durable git write-through)', () => {
+describe('moveXBrief (with durable git write-through)', () => {
   it('moves and commits through the canonical state writer', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
@@ -232,7 +232,7 @@ describe('moveVBrief (with durable git write-through)', () => {
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(moveVBrief(TEST_DIR, 'PAN-1', 'active'));
+    const result = await Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-1', 'active'));
     expect(existsSync(result.toPath)).toBe(true);
 
     // The move is committed atomically; no staged residue remains.
@@ -244,32 +244,32 @@ describe('moveVBrief (with durable git write-through)', () => {
 
   it('throws when issue has no vBRIEF', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirsSync(TEST_DIR);
-    await expect(Effect.runPromise(moveVBrief(TEST_DIR, 'PAN-999', 'active'))).rejects.toThrow();
+    ensureXBriefDirsSync(TEST_DIR);
+    await expect(Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-999', 'active'))).rejects.toThrow();
   });
 });
 
-describe('deleteVBrief', () => {
+describe('deleteXBrief', () => {
   it('deletes the scope vBRIEF file', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const path = writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
-    expect(deleteVBrief(TEST_DIR, 'PAN-1')).toBe(true);
+    expect(deleteXBrief(TEST_DIR, 'PAN-1')).toBe(true);
     expect(existsSync(path)).toBe(false);
   });
 
   it('returns false when issue has no vBRIEF', () => {
-    ensureVBriefDirsSync(TEST_DIR);
-    expect(deleteVBrief(TEST_DIR, 'PAN-999')).toBe(false);
+    ensureXBriefDirsSync(TEST_DIR);
+    expect(deleteXBrief(TEST_DIR, 'PAN-999')).toBe(false);
   });
 });
 
-describe('promoteVBriefToProposed', () => {
-  function createWorkspace(workspacePath: string, plan: VBriefDocument): void {
+describe('promoteXBriefToProposed', () => {
+  function createWorkspace(workspacePath: string, plan: XBriefDocument): void {
     const panDir = join(workspacePath, PAN_DIRNAME);
     mkdirSync(panDir, { recursive: true });
     writeFileSync(
@@ -282,7 +282,7 @@ describe('promoteVBriefToProposed', () => {
   it('throws when workspace plan is missing', () => {
     const workspacePath = join(TEST_DIR, 'workspaces', 'feature-pan-1');
     mkdirSync(workspacePath, { recursive: true });
-    expect(() => promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-1')).toThrow(
+    expect(() => promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-1')).toThrow(
       /No workspace spec found/,
     );
   });
@@ -293,15 +293,15 @@ describe('promoteVBriefToProposed', () => {
     plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-1-foo.vbrief.json' };
     createWorkspace(workspacePath, plan);
 
-    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-1');
+    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-1');
 
     expect(result.canonicalFilename).toBe('2026-05-03-PAN-1-foo.vbrief.json');
-    expect(result.destVBrief).toBe(
+    expect(result.destXBrief).toBe(
       join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-1-foo.vbrief.json'),
     );
     expect(result.destContinue).toBeNull();
-    expect(existsSync(result.destVBrief)).toBe(true);
-    const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8')) as VBriefDocument & { status: string };
+    expect(existsSync(result.destXBrief)).toBe(true);
+    const copied = JSON.parse(readFileSync(result.destXBrief, 'utf-8')) as XBriefDocument & { status: string };
     expect(copied.plan.id).toBe('pan-1');
     expect(copied.status).toBe('proposed');
   });
@@ -313,12 +313,12 @@ describe('promoteVBriefToProposed', () => {
     // No metadata.canonicalFilename
     createWorkspace(workspacePath, plan);
 
-    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-2');
+    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-2');
 
     expect(result.canonicalFilename).toMatch(
       /^\d{4}-\d{2}-\d{2}-PAN-2-adopt-deft-vbrief-lifecycle-model\.vbrief\.json$/,
     );
-    expect(existsSync(result.destVBrief)).toBe(true);
+    expect(existsSync(result.destXBrief)).toBe(true);
   });
 
   it('uppercases issue ID for filename even when caller passes lowercase', () => {
@@ -326,9 +326,9 @@ describe('promoteVBriefToProposed', () => {
     const plan = makePlan('PAN-3', 'lowercase-test');
     createWorkspace(workspacePath, plan);
 
-    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'pan-3');
+    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'pan-3');
 
-    // generateVBriefFilename rejects lowercase issueId in its regex, so we verify
+    // generateXBriefFilename rejects lowercase issueId in its regex, so we verify
     // the filename has uppercase PAN-3.
     expect(result.canonicalFilename).toMatch(/PAN-3/);
   });
@@ -339,10 +339,10 @@ describe('promoteVBriefToProposed', () => {
     plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-4-with-continue.vbrief.json' };
     createWorkspace(workspacePath, plan);
 
-    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-4');
+    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-4');
 
     expect(result.destContinue).toBeNull();
-    expect(existsSync(result.destVBrief)).toBe(true);
+    expect(existsSync(result.destXBrief)).toBe(true);
   });
 
   it('creates canonical .pan/specs storage if it does not exist yet', () => {
@@ -354,7 +354,7 @@ describe('promoteVBriefToProposed', () => {
     expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(false);
     expect(existsSync(join(TEST_DIR, 'vbrief', 'proposed'))).toBe(false);
 
-    promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-6');
+    promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-6');
 
     expect(existsSync(join(TEST_DIR, '.pan', 'specs'))).toBe(true);
     expect(existsSync(join(TEST_DIR, '.pan', 'specs', '2026-05-03-PAN-6-first-promotion.vbrief.json'))).toBe(true);
@@ -367,7 +367,7 @@ describe('promoteVBriefToProposed', () => {
     plan.plan.metadata = { canonicalFilename: '2026-05-03-PAN-7-overwrite-test.vbrief.json' };
     createWorkspace(workspacePath, plan);
 
-    promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
+    promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
 
     // Modify the workspace plan and re-run promotion
     plan.plan.title = 'Updated title';
@@ -377,27 +377,27 @@ describe('promoteVBriefToProposed', () => {
       'utf-8',
     );
 
-    const result = promoteVBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
+    const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-7');
 
-    const copied = JSON.parse(readFileSync(result.destVBrief, 'utf-8'));
+    const copied = JSON.parse(readFileSync(result.destXBrief, 'utf-8'));
     expect(copied.plan.title).toBe('Updated title');
   });
 });
 
-describe('transitionVBriefOnMain', () => {
+describe('transitionXBriefOnMain', () => {
   it('moves vBRIEF between dirs, updates status, and commits on main', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "add proposed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionVBriefOnMain(
+    const result = await Effect.runPromise(transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
@@ -411,9 +411,9 @@ describe('transitionVBriefOnMain', () => {
     expect(result.statusUpdated).toBe(true);
     expect(result.committed).toBe(true);
     expect(existsSync(result.toPath)).toBe(true);
-    expect(existsSync(join(resolveVBriefDir(TEST_DIR, 'proposed'), filename))).toBe(false);
+    expect(existsSync(join(resolveXBriefDir(TEST_DIR, 'proposed'), filename))).toBe(false);
 
-    const updatedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument;
+    const updatedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
     expect(updatedDoc.plan.status).toBe('approved');
     expect(updatedDoc.plan.sequence).toBe(2);
 
@@ -423,7 +423,7 @@ describe('transitionVBriefOnMain', () => {
 
   it('is idempotent once the issue already lives in .pan/specs with the target lifecycle and status', async () => {
     initGitRepo(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     const migratedPath = join(TEST_DIR, '.pan', 'specs', filename);
     mkdirSync(join(TEST_DIR, '.pan', 'specs'), { recursive: true });
     writeFileSync(
@@ -437,7 +437,7 @@ describe('transitionVBriefOnMain', () => {
     execSync('git add .pan/specs/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed pan spec"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionVBriefOnMain(
+    const result = await Effect.runPromise(transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
@@ -456,17 +456,17 @@ describe('transitionVBriefOnMain', () => {
 
   it('updates status only when already in target dir but status differs', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'active'),
+      resolveXBriefDir(TEST_DIR, 'active'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'), // wrong status
     );
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed active proposed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionVBriefOnMain(
+    const result = await Effect.runPromise(transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
@@ -478,23 +478,23 @@ describe('transitionVBriefOnMain', () => {
     expect(result.statusUpdated).toBe(true);
     expect(result.committed).toBe(true);
 
-    const doc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as VBriefDocument;
+    const doc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument;
     expect(doc.plan.status).toBe('approved');
   });
 
   it('leaves continue file at canonical path during lifecycle transitions', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
     execSync('git add vbrief/', { cwd: TEST_DIR });
     execSync('git -c commit.gpgsign=false commit -q -m "seed"', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionVBriefOnMain(
+    const result = await Effect.runPromise(transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',
@@ -509,18 +509,18 @@ describe('transitionVBriefOnMain', () => {
 
   it('throws when no vBRIEF exists for the issue', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirsSync(TEST_DIR);
+    ensureXBriefDirsSync(TEST_DIR);
     await expect(Effect.runPromise(
-      transitionVBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 vBRIEF'),
+      transitionXBriefOnMain(TEST_DIR, 'PAN-999', 'active', 'approved', 'scope: approve PAN-999 vBRIEF'),
     )).rejects.toThrow();
   });
 
   it('does NOT commit when projectRoot is not on main', async () => {
     initGitRepo(TEST_DIR);
-    ensureVBriefDirsSync(TEST_DIR);
-    const filename = generateVBriefFilename('PAN-1', 'foo', '2026-05-03');
+    ensureXBriefDirsSync(TEST_DIR);
+    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
     writePlan(
-      resolveVBriefDir(TEST_DIR, 'proposed'),
+      resolveXBriefDir(TEST_DIR, 'proposed'),
       filename,
       makePlan('PAN-1', 'foo', 'proposed'),
     );
@@ -528,7 +528,7 @@ describe('transitionVBriefOnMain', () => {
     execSync('git -c commit.gpgsign=false commit -q -m "seed proposed"', { cwd: TEST_DIR });
     execSync('git checkout -q -b feature/test', { cwd: TEST_DIR });
 
-    const result = await Effect.runPromise(transitionVBriefOnMain(
+    const result = await Effect.runPromise(transitionXBriefOnMain(
       TEST_DIR,
       'PAN-1',
       'active',

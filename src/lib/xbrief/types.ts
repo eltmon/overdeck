@@ -6,12 +6,12 @@
  * Cloister for programmatic task execution and DAG visualization.
  *
  * v0.5 compatibility fields (PAN-453):
- *   - VBriefReference: external links (issues, PRDs, specs)
- *   - VBriefDocument.xBRIEFInfo: author (tool identifier), description
- *   - VBriefPlan: uid (UUID v4), sequence (write counter), references,
+ *   - XBriefReference: external links (issues, PRDs, specs)
+ *   - XBriefDocument.xBRIEFInfo: author (tool identifier), description
+ *   - XBriefPlan: uid (UUID v4), sequence (write counter), references,
  *     created, updated timestamps
- *   - VBriefItem: created, completed timestamps
- *   - VBriefSubItem: created, completed timestamps
+ *   - XBriefItem: created, completed timestamps
+ *   - XBriefSubItem: created, completed timestamps
  *
  * Overdeck extensions (via metadata fields):
  *   - metadata.difficulty: trivial | simple | medium | complex | expert
@@ -20,33 +20,33 @@
  *   - child metadata.kind: "acceptance_criterion" on child items
  */
 
-export type VBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
+export type XBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
 
 // vBRIEF status enum
-export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed';
+export type XBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed';
 
-export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
+export type XBriefPriority = 'critical' | 'high' | 'medium' | 'low';
 
-export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
 
-export type VBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
+export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
 
-export const DEFAULT_VBRIEF_ITEM_KIND: VBriefItemKind = 'backend';
+export const DEFAULT_VBRIEF_ITEM_KIND: XBriefItemKind = 'backend';
 
 export type FilesScopeConfidence = 'high' | 'medium' | 'low';
 
 export type ItemReadiness = 'ready' | 'sequential' | 'needs_refinement';
 
-export interface VBriefReference {
+export interface XBriefReference {
   uri: string;
   label?: string;
   type?: string;
 }
 
-export interface VBriefSubItem {
+export interface XBriefSubItem {
   id: string;
   title: string;
-  status: VBriefItemStatus;
+  status: XBriefItemStatus;
   /** ISO 8601 datetime, set when subItem is created */
   created?: string;
   /** ISO 8601 datetime, set when status transitions to 'completed' */
@@ -57,9 +57,9 @@ export interface VBriefSubItem {
   };
 }
 
-export interface VBriefItemMetadata {
-  difficulty?: VBriefDifficulty;
-  kind?: VBriefItemKind;
+export interface XBriefItemMetadata {
+  difficulty?: XBriefDifficulty;
+  kind?: XBriefItemKind;
   issueLabel?: string;
   phase?: number;
   /** Files/globs this item touches. Used for file-overlap enforcement during parallel dispatch. */
@@ -73,11 +73,11 @@ export interface VBriefItemMetadata {
   [key: string]: unknown;
 }
 
-export interface VBriefItem {
+export interface XBriefItem {
   id: string;
   title: string;
-  status: VBriefItemStatus;
-  priority?: VBriefPriority;
+  status: XBriefItemStatus;
+  priority?: XBriefPriority;
   /** ISO 8601 datetime, set when item is created */
   created?: string;
   /** ISO 8601 datetime, set when status transitions to 'completed' */
@@ -88,24 +88,24 @@ export interface VBriefItem {
   endDate?: string;
   /** RFC 3339 date-time (e.g., "2025-10-01T00:00:00Z"). NOT plain date. */
   dueDate?: string;
-  metadata?: VBriefItemMetadata;
+  metadata?: XBriefItemMetadata;
   narrative?: {
     Action?: string;
     [key: string]: string | undefined;
   };
   /** vBRIEF v0.6 child items. v0.5 documents used subItems for the same structure. */
-  items?: VBriefSubItem[];
+  items?: XBriefSubItem[];
   /** Legacy vBRIEF v0.5 child items. Kept as a read alias for compatibility. */
-  subItems?: VBriefSubItem[];
+  subItems?: XBriefSubItem[];
 }
 
-export interface VBriefEdge {
+export interface XBriefEdge {
   from: string;
   to: string;
-  type: VBriefEdgeType;
+  type: XBriefEdgeType;
 }
 
-export interface VBriefPlan {
+export interface XBriefPlan {
   id: string;
   title: string;
   status: string;
@@ -115,7 +115,7 @@ export interface VBriefPlan {
   /** Monotonically incrementing write counter, starts at 1 */
   sequence?: number;
   /** External references (PRDs, issues, specs) */
-  references?: VBriefReference[];
+  references?: XBriefReference[];
   /** ISO 8601 datetime, set at plan creation */
   created?: string;
   /** ISO 8601 datetime, updated on every write */
@@ -146,14 +146,14 @@ export interface VBriefPlan {
     docsJustification?: string;
     [key: string]: unknown;
   };
-  items: VBriefItem[];
-  edges: VBriefEdge[];
+  items: XBriefItem[];
+  edges: XBriefEdge[];
 }
 
 export const VBRIEF_INSPECTION_POLICIES = ['auto', 'never', 'fast', 'deep'] as const;
-export type VBriefInspectionPolicy = typeof VBRIEF_INSPECTION_POLICIES[number];
+export type XBriefInspectionPolicy = typeof VBRIEF_INSPECTION_POLICIES[number];
 
-export interface VBriefInfo {
+export interface XBriefInfo {
   version: string;
   /** RFC 3339 date-time */
   created: string;
@@ -164,20 +164,20 @@ export interface VBriefInfo {
   /** Human-readable description of the plan */
   description?: string;
   /** Overdeck inspection routing policy. Defaults to auto when omitted. */
-  inspectionPolicy?: VBriefInspectionPolicy;
+  inspectionPolicy?: XBriefInspectionPolicy;
 }
 
-export interface VBriefDocument {
-  xBRIEFInfo: VBriefInfo;
-  vBRIEFInfo?: VBriefInfo;
-  plan: VBriefPlan;
+export interface XBriefDocument {
+  xBRIEFInfo: XBriefInfo;
+  vBRIEFInfo?: XBriefInfo;
+  plan: XBriefPlan;
 }
 
-export function subItemsOf(item: VBriefItem): VBriefSubItem[] {
+export function subItemsOf(item: XBriefItem): XBriefSubItem[] {
   return item.items ?? item.subItems ?? [];
 }
 
-export function resolveVBriefItemKind(metadata?: Pick<VBriefItemMetadata, 'kind'>): VBriefItemKind {
+export function resolveXBriefItemKind(metadata?: Pick<XBriefItemMetadata, 'kind'>): XBriefItemKind {
   return metadata?.kind ?? DEFAULT_VBRIEF_ITEM_KIND;
 }
 

@@ -17,7 +17,7 @@ import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { findPlanSync, readPlan } from '../xbrief/io.js';
 import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-ingestion.js';
-import { findVBriefByIssueSync } from '../xbrief/lifecycle-io.js';
+import { findXBriefByIssueSync } from '../xbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
 
@@ -232,7 +232,7 @@ async function extractPlanReviewRequirements(workspace: string, issueId: string)
   try {
     const projectRoot = getDevrootPathSync();
     if (!projectRoot) return { acceptanceCriteria: [], nonGoals: [], traces: [] };
-    const found = findVBriefByIssueSync(projectRoot, issueId);
+    const found = findXBriefByIssueSync(projectRoot, issueId);
     if (found) {
       return {
         acceptanceCriteria: flattenAC(found.document),

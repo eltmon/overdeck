@@ -39,7 +39,7 @@ import type { MergeSet } from '../../lib/merge-set.js';
 import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { compileGlob } from '../../lib/xbrief/dag.js';
 import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
-import type { VBriefDocument } from '../../lib/xbrief/types.js';
+import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
 
@@ -257,7 +257,7 @@ function declaredScopeMatchesChangedFile(pattern: string, actualChangedFiles: st
   return actualChangedFiles.some((filePath) => compiled.regex.test(filePath) || compiled.exactDirectory === filePath);
 }
 
-export function declaredScopeUnion(doc: VBriefDocument): string[] {
+export function declaredScopeUnion(doc: XBriefDocument): string[] {
   return Array.from(
     new Set(
       doc.plan.items.flatMap((item) => item.metadata?.files_scope ?? []),
@@ -266,7 +266,7 @@ export function declaredScopeUnion(doc: VBriefDocument): string[] {
 }
 
 export function computeScopeDrift(
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   actualChangedFiles: Iterable<string>,
   recordedAt: string,
 ): ScopeDriftRecord | null {

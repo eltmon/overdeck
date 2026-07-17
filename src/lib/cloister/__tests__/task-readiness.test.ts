@@ -3,14 +3,14 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { isTaskReadySync, getUnblockedItemsSync } from '../task-readiness.js';
-import type { VBriefDocument } from '../../xbrief/types.js';
+import type { XBriefDocument } from '../../xbrief/types.js';
 
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
 const ISSUE_ID = 'PAN-300';
 const SPEC_FILENAME = '2026-01-01-PAN-300-test.vbrief.json';
 
-function writePlan(doc: VBriefDocument): void {
+function writePlan(doc: XBriefDocument): void {
   const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
   writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));
@@ -19,9 +19,9 @@ function writePlan(doc: VBriefDocument): void {
 function makeDoc(
   items: Array<{ id: string; status?: string }>,
   edges: Array<{ from: string; to: string; type?: string }>,
-): VBriefDocument {
+): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'TEST',
       title: 'Test',

@@ -4,7 +4,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { deliverAgentMessage, type DeliveryResult } from '../../../lib/agents.js';
 import { getIssueWorkspacePath } from '../../../lib/pan-dir/record.js';
 import { readWorkspacePlanSync } from '../../../lib/xbrief/io.js';
-import type { VBriefItem } from '../../../lib/xbrief/types.js';
+import type { XBriefItem } from '../../../lib/xbrief/types.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../../lib/review-status.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';
@@ -41,7 +41,7 @@ export interface TieredCalloutDeps {
   loadConfig?: (issueId: string) => TieredCalloutConfig | undefined;
   loadPlanMetadata?: (issueId: string) => Record<string, unknown> | undefined;
   getWorkspacePath?: (issueId: string) => string | null;
-  getItem?: (issueId: string, taskId: string) => VBriefItem | undefined;
+  getItem?: (issueId: string, taskId: string) => XBriefItem | undefined;
   recordCallout?: (callout: TieredCalloutBody) => void | Promise<void>;
   surfaceCallout?: (callout: TieredCalloutBody) => Promise<unknown>;
   deliverSupervisorReview?: (options: DeliverCommitForReviewOptions) => Promise<DeliveryResult>;
@@ -81,7 +81,7 @@ function defaultPlanMetadata(issueId: string): Record<string, unknown> | undefin
   return readWorkspacePlanSync(workspacePath)?.plan.metadata;
 }
 
-function defaultItem(issueId: string, taskId: string): VBriefItem | undefined {
+function defaultItem(issueId: string, taskId: string): XBriefItem | undefined {
   const workspacePath = defaultWorkspacePath(issueId);
   if (!workspacePath) return undefined;
   return readWorkspacePlanSync(workspacePath)?.plan.items.find((item) => item.id === taskId);

@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/xbrief/types.js';
+import type { XBriefDocument, XBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 const {
   mockMessageAgent,
@@ -50,9 +50,9 @@ vi.mock('../../../../src/lib/cloister/feedback-target.js', () => ({
   surfaceIssueFeedbackNeedsYou: mockSurfaceIssueFeedbackNeedsYou,
 }));
 
-function plan(items: VBriefItem[]): VBriefDocument {
+function plan(items: XBriefItem[]): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: '2026-07-01T00:00:00.000Z',
       updated: '2026-07-01T00:00:00.000Z',
@@ -71,7 +71,7 @@ function plan(items: VBriefItem[]): VBriefDocument {
   };
 }
 
-function slotItem(id: string): VBriefItem {
+function slotItem(id: string): XBriefItem {
   return {
     id,
     title: id,
@@ -86,7 +86,7 @@ function slotItem(id: string): VBriefItem {
   };
 }
 
-async function writePlan(doc: VBriefDocument): Promise<string> {
+async function writePlan(doc: XBriefDocument): Promise<string> {
   const workspace = join(tmpdir(), `pan-verdict-routing-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   await mkdir(join(workspace, '.pan'), { recursive: true });
   await writeFile(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify(doc, null, 2));

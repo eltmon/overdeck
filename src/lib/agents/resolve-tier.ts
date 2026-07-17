@@ -1,5 +1,5 @@
 import type { RuntimeName } from '../runtimes/types.js';
-import type { VBriefDifficulty, VBriefItem, VBriefItemKind } from '../xbrief/types.js';
+import type { XBriefDifficulty, XBriefItem, XBriefItemKind } from '../xbrief/types.js';
 import type { TierDefinition } from './tier-table.js';
 
 /**
@@ -44,9 +44,9 @@ export interface RoleDefaultTier {
  */
 export interface ResolveTierConfig {
   tiers: Record<string, TierDefinition>;
-  difficultyToTier: Partial<Record<VBriefDifficulty, string>>;
+  difficultyToTier: Partial<Record<XBriefDifficulty, string>>;
   /** Subject-matter routing: item kind -> configured tier name. */
-  byKind?: Partial<Record<VBriefItemKind, string>>;
+  byKind?: Partial<Record<XBriefItemKind, string>>;
   roleDefault?: RoleDefaultTier;
 }
 
@@ -57,7 +57,7 @@ export class ResolveTierError extends Error {
   }
 }
 
-function itemLabel(item: Pick<VBriefItem, 'id' | 'title'>): string {
+function itemLabel(item: Pick<XBriefItem, 'id' | 'title'>): string {
   return item.id || item.title || '<unknown item>';
 }
 
@@ -65,7 +65,7 @@ function lookupTier(
   config: ResolveTierConfig,
   tierName: string,
   source: string,
-  item: Pick<VBriefItem, 'id' | 'title'>,
+  item: Pick<XBriefItem, 'id' | 'title'>,
 ): ResolvedTier {
   const tier = config.tiers[tierName];
   if (!tier) {
@@ -78,7 +78,7 @@ function lookupTier(
 
 /** The chain below the per-bead override: byKind -> byDifficulty -> role default. */
 function resolveBaseTier(
-  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  item: Pick<XBriefItem, 'id' | 'title' | 'metadata'>,
   config: ResolveTierConfig,
 ): ResolvedTier | undefined {
   const kind = item.metadata?.kind;
@@ -105,7 +105,7 @@ function resolveBaseTier(
 }
 
 export function resolveTier(
-  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  item: Pick<XBriefItem, 'id' | 'title' | 'metadata'>,
   config: ResolveTierConfig,
 ): ResolvedTier {
   const base = resolveBaseTier(item, config);

@@ -3,10 +3,10 @@ import { join } from 'path';
 import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
 
-import { generateVBriefFilename } from './lifecycle.js';
-import { serializeVBriefDocument } from './io.js';
+import { generateXBriefFilename } from './lifecycle.js';
+import { serializeXBriefDocument } from './io.js';
 import { FsError } from '../errors.js';
-import type { VBriefDocument, VBriefSubItem } from './types.js';
+import type { XBriefDocument, XBriefSubItem } from './types.js';
 
 export interface AutoSynthesizeIssueInput {
   issueId: string;
@@ -16,7 +16,7 @@ export interface AutoSynthesizeIssueInput {
 }
 
 export interface AutoSynthesizeResult {
-  document: VBriefDocument;
+  document: XBriefDocument;
   workspaceSpecPath: string;
   projectSpecPath: string;
   canonicalFilename: string;
@@ -69,12 +69,12 @@ export function extractAcceptanceCriteriaFromIssue(title: string, body?: string 
   return [`Issue's stated fix implemented with tests`];
 }
 
-export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBriefDocument {
+export function synthesizeMinimalXBrief(issue: AutoSynthesizeIssueInput): XBriefDocument {
   const issueId = issue.issueId.toUpperCase();
   const issueLabel = issueId.toLowerCase();
   const now = new Date().toISOString();
   const criteria = extractAcceptanceCriteriaFromIssue(issue.title, issue.body);
-  const items: VBriefSubItem[] = criteria.map((criterion, index) => ({
+  const items: XBriefSubItem[] = criteria.map((criterion, index) => ({
     id: `auto-start.ac${index + 1}`,
     title: criterion,
     status: 'pending',
@@ -82,7 +82,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
     metadata: { kind: 'acceptance_criterion' },
   }));
 
-  const canonicalFilename = generateVBriefFilename(issueId, issue.title, now);
+  const canonicalFilename = generateXBriefFilename(issueId, issue.title, now);
 
   return {
     xBRIEFInfo: {
@@ -129,23 +129,23 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
       edges: [],
     },
   };
-}async function writeAutoStartVBriefPromise(
+}async function writeAutoStartXBriefPromise(
   projectRoot: string,
   workspacePath: string,
   issue: AutoSynthesizeIssueInput,
 ): Promise<AutoSynthesizeResult> {
-  const document = synthesizeMinimalVBrief(issue);
+  const document = synthesizeMinimalXBrief(issue);
   const canonicalFilename = document.plan.metadata?.canonicalFilename as string;
 
   const projectSpecsDir = join(projectRoot, '.pan', 'specs');
   const projectSpecPath = join(projectSpecsDir, canonicalFilename);
-  const projectDocument: VBriefDocument = {
+  const projectDocument: XBriefDocument = {
     ...document,
     plan: { ...document.plan, status: 'proposed' },
   };
 
   await mkdir(projectSpecsDir, { recursive: true });
-  await writeFile(projectSpecPath, serializeVBriefDocument(projectDocument), 'utf-8');
+  await writeFile(projectSpecPath, serializeXBriefDocument(projectDocument), 'utf-8');
 
   return {
     document,
@@ -158,17 +158,17 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
 // ─── Effect variant (PAN-1249) ────────────────────────────────────────────────
 
 /**
- * Effect variant of writeAutoStartVBrief. Wraps mkdir + writeFile in a typed
+ * Effect variant of writeAutoStartXBrief. Wraps mkdir + writeFile in a typed
  * FsError channel so callers in Effect-native code can compose with this
  * synthesis step without losing failure typing.
  */
-export const writeAutoStartVBrief = (
+export const writeAutoStartXBrief = (
   projectRoot: string,
   workspacePath: string,
   issue: AutoSynthesizeIssueInput,
 ): Effect.Effect<AutoSynthesizeResult, FsError> =>
   Effect.tryPromise({
-    try: () => writeAutoStartVBriefPromise(projectRoot, workspacePath, issue),
+    try: () => writeAutoStartXBriefPromise(projectRoot, workspacePath, issue),
     catch: (cause) =>
-      new FsError({ path: projectRoot, operation: 'writeAutoStartVBrief', cause }),
+      new FsError({ path: projectRoot, operation: 'writeAutoStartXBrief', cause }),
   });

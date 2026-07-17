@@ -1,14 +1,14 @@
 import type { RuntimeName } from '../runtimes/types.js';
-import type { VBriefDifficulty, VBriefItem } from '../xbrief/types.js';
+import type { XBriefDifficulty, XBriefItem } from '../xbrief/types.js';
 import { resolveTier, type ResolveTierConfig } from './resolve-tier.js';
 import { resolveTieredExecutionEnabled } from './tier-table.js';
 
 export type DispatchTier = 'in-context' | 'registered-slot';
 
-const CHEAP_DIFFICULTIES = new Set<VBriefDifficulty>(['trivial', 'simple']);
-const HEAVY_DIFFICULTIES = new Set<VBriefDifficulty>(['complex', 'expert']);
+const CHEAP_DIFFICULTIES = new Set<XBriefDifficulty>(['trivial', 'simple']);
+const HEAVY_DIFFICULTIES = new Set<XBriefDifficulty>(['complex', 'expert']);
 
-export function chooseDispatchTier(item: Pick<VBriefItem, 'metadata'>): DispatchTier {
+export function chooseDispatchTier(item: Pick<XBriefItem, 'metadata'>): DispatchTier {
   const metadata = item.metadata;
   const difficulty = metadata?.difficulty;
 
@@ -58,7 +58,7 @@ export interface TierAssignmentConfig extends ResolveTierConfig {
  * chooseDispatchTier's lane with no model or harness attached.
  */
 export function assignDispatchTier(
-  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  item: Pick<XBriefItem, 'id' | 'title' | 'metadata'>,
   config?: TierAssignmentConfig,
   planMetadata?: { [key: string]: unknown },
 ): TierAssignment {
@@ -76,7 +76,7 @@ export function assignDispatchTier(
  * no plan in scope, e.g. the enablement-gate parity tests).
  */
 export function chooseTierAssignment(
-  item: Pick<VBriefItem, 'id' | 'title' | 'metadata'>,
+  item: Pick<XBriefItem, 'id' | 'title' | 'metadata'>,
   tiering?: TierAssignmentConfig,
 ): TierAssignment {
   return assignDispatchTier(item, tiering);

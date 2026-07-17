@@ -45,8 +45,8 @@ vi.mock('../../xbrief/io.js', () => ({
   readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
 vi.mock('../../xbrief/lifecycle-io.js', () => ({
-  findVBriefByIssue: vi.fn(() => null),
-  findVBriefByIssueSync: vi.fn(() => null),
+  findXBriefByIssue: vi.fn(() => null),
+  findXBriefByIssueSync: vi.fn(() => null),
 }));
 vi.mock('../../config.js', () => ({
   getDevrootPath: vi.fn(() => null),
@@ -135,7 +135,7 @@ describe('buildReviewContext', () => {
   it('includes plan NonGoals in the manifest', async () => {
     vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
     mockReadPlan.mockReturnValue(Effect.succeed({
-      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      xBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
       plan: {
         id: issueId.toLowerCase(),
         title: 'Plan',
@@ -169,7 +169,7 @@ describe('buildReviewContext', () => {
   it("includes plan item traces in the manifest", async () => {
     vi.mocked(findPlanSync).mockReturnValue(join(workspace, '.pan', 'spec.vbrief.json'));
     mockReadPlan.mockReturnValue(Effect.succeed({
-      vBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
+      xBRIEFInfo: { version: '0.5', created: '2026-06-12T00:00:00Z' },
       plan: {
         id: issueId.toLowerCase(),
         title: 'Plan',

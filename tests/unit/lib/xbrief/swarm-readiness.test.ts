@@ -5,12 +5,12 @@ import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import { analyzeSwarmReadiness, computeIssueFootprint, resolveIssueFootprint } from '../../../../src/lib/xbrief/swarm-readiness.js';
 import { buildPanSpecFilename } from '../../../../src/lib/pan-dir/specs.js';
-import type { FilesScopeConfidence, ItemReadiness, VBriefDocument, VBriefItemStatus } from '../../../../src/lib/xbrief/types.js';
+import type { FilesScopeConfidence, ItemReadiness, XBriefDocument, XBriefItemStatus } from '../../../../src/lib/xbrief/types.js';
 
 function makeDoc(
   items: Array<{
     id: string;
-    status?: VBriefItemStatus;
+    status?: XBriefItemStatus;
     files_scope?: string[];
     files_scope_confidence?: FilesScopeConfidence;
     readiness?: ItemReadiness;
@@ -18,7 +18,7 @@ function makeDoc(
     expected_outputs?: string[];
   }>,
   edges: Array<{ from: string; to: string; type?: 'blocks' | 'informs' }> = [],
-): VBriefDocument {
+): XBriefDocument {
   return {
     xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {

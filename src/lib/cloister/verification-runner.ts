@@ -30,8 +30,8 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
-import { getVBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
-import { VBriefMergeConflictError } from '../xbrief/io.js';
+import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
+import { XBriefMergeConflictError } from '../xbrief/io.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
@@ -655,11 +655,11 @@ async function runVerificationForIssuePromise(
     // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
     // Wrap in try-catch to detect merge conflict markers in plan.vbrief.json and send
     // actionable feedback rather than falling through to a generic infrastructure error.
-    let acStatus: ReturnType<typeof getVBriefACStatusSync>;
+    let acStatus: ReturnType<typeof getXBriefACStatusSync>;
     try {
-      acStatus = getVBriefACStatusSync(workspacePath);
+      acStatus = getXBriefACStatusSync(workspacePath);
     } catch (vbriefErr: any) {
-      if (vbriefErr instanceof VBriefMergeConflictError) {
+      if (vbriefErr instanceof XBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
         const summary = `vBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;

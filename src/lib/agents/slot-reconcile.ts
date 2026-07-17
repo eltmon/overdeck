@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
 import { analyzeSwarmReadiness } from '../xbrief/swarm-readiness.js';
-import type { VBriefDocument } from '../xbrief/types.js';
+import type { XBriefDocument } from '../xbrief/types.js';
 import { listAgentStates } from './queries.js';
 import type { AgentState } from './agent-state.js';
 
@@ -63,7 +63,7 @@ export interface SlotReconcileOptions {
 export async function reconcileSlotState(
   issueId: string,
   workspace: string,
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   options: SlotReconcileOptions = {},
 ): Promise<SlotReconcileResult> {
   const deps: SlotReconcileDeps = {

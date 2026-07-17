@@ -25,8 +25,8 @@ const mocks = vi.hoisted(() => ({
   buildUatGenerationStore: vi.fn(),
   getUatGenerationSync: vi.fn(),
   notifyFlywheelOfUatPromote: vi.fn(),
-  findVBriefByIssue: vi.fn(),
-  readVBriefDocument: vi.fn(),
+  findXBriefByIssue: vi.fn(),
+  readXBriefDocument: vi.fn(),
   reviewRecordEligibility: vi.fn(),
 }));
 
@@ -99,8 +99,8 @@ vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
 });
 
 vi.mock('../../../../lib/xbrief/xbrief-index.js', () => ({
-  findVBriefByIssue: mocks.findVBriefByIssue,
-  readVBriefDocument: mocks.readVBriefDocument,
+  findXBriefByIssue: mocks.findXBriefByIssue,
+  readXBriefDocument: mocks.readXBriefDocument,
 }));
 
 function gen(members: UatGeneration['members']): UatGeneration {
@@ -122,7 +122,7 @@ function gen(members: UatGeneration['members']): UatGeneration {
 
 function doc(title: string) {
   return {
-    vBRIEFInfo: {},
+    xBRIEFInfo: {},
     plan: {
       id: 'PAN-X',
       title: 'Plan',
@@ -166,7 +166,7 @@ describe('getUatGenerationsPayload', () => {
     await expect(getUatGenerationsPayload()).resolves.toEqual([]);
 
     expect(mocks.listUatGenerationsSync).not.toHaveBeenCalled();
-    expect(mocks.findVBriefByIssue).not.toHaveBeenCalled();
+    expect(mocks.findXBriefByIssue).not.toHaveBeenCalled();
   });
 
   it('bounds member vBRIEF reads and reuses unchanged checklist summaries', async () => {
@@ -184,7 +184,7 @@ describe('getUatGenerationsPayload', () => {
 
     mocks.readCurrentFlywheelStatusForDashboard.mockResolvedValue({ runId: 'RUN-1' });
     mocks.listUatGenerationsSync.mockReturnValue([gen(members)]);
-    mocks.findVBriefByIssue.mockImplementation((_root: string, issueId: string) => Effect.succeed({
+    mocks.findXBriefByIssue.mockImplementation((_root: string, issueId: string) => Effect.succeed({
       path: pathByIssue.get(issueId)!,
       lifecycleDir: 'proposed',
       issueId,
@@ -192,7 +192,7 @@ describe('getUatGenerationsPayload', () => {
       date: '2026-06-10',
       filename: `${issueId}.vbrief.json`,
     }));
-    mocks.readVBriefDocument.mockImplementation((path: string) => Effect.promise(async () => {
+    mocks.readXBriefDocument.mockImplementation((path: string) => Effect.promise(async () => {
       activeReads += 1;
       maxActiveReads = Math.max(maxActiveReads, activeReads);
       await new Promise((resolve) => setTimeout(resolve, 1));
@@ -206,8 +206,8 @@ describe('getUatGenerationsPayload', () => {
     expect(first[0]!.members).toHaveLength(8);
     expect(second[0]!.members[0]!.acceptanceCriteria).toEqual(first[0]!.members[0]!.acceptanceCriteria);
     expect(maxActiveReads).toBeLessThanOrEqual(4);
-    expect(mocks.findVBriefByIssue).toHaveBeenCalledTimes(8);
-    expect(mocks.readVBriefDocument).toHaveBeenCalledTimes(8);
+    expect(mocks.findXBriefByIssue).toHaveBeenCalledTimes(8);
+    expect(mocks.readXBriefDocument).toHaveBeenCalledTimes(8);
   });
 });
 

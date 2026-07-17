@@ -25,7 +25,7 @@ function makeProject(itemIds: string[]): string {
   const specs = join(root, '.pan', 'specs');
   mkdirSync(specs, { recursive: true });
   writeFileSync(join(specs, '2026-07-14-LOCK-100-contention.vbrief.json'), JSON.stringify({
-    status: 'active', vBRIEFInfo: { version: '1', created: new Date().toISOString() },
+    status: 'active', xBRIEFInfo: { version: '1', created: new Date().toISOString() },
     plan: { id: 'LOCK-100', title: 'Contention', status: 'active', items: itemIds.map(id => ({ id, title: id, status: 'pending' })), edges: [] },
   }));
   return root;

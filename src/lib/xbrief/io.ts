@@ -33,9 +33,9 @@ import {
   writeStatusOverrideSync,
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
-import { parseVBriefFilename } from './lifecycle.js';
+import { parseXBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
-import { subItemsOf, type VBriefDifficulty, type VBriefDocument, type VBriefInfo, type VBriefItemStatus } from './types.js';
+import { subItemsOf, type XBriefDifficulty, type XBriefDocument, type XBriefInfo, type XBriefItemStatus } from './types.js';
 import type { TierOverridesMap } from './continue-state.js';
 
 export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry } from './continue-state.js';
@@ -61,7 +61,7 @@ function findSpecByIssueSync(projectRoot: string, issueId: string): { path: stri
   }
   filenames.sort();
   for (const filename of filenames) {
-    const parts = parseVBriefFilename(filename);
+    const parts = parseXBriefFilename(filename);
     if (!parts) continue;
     if (parts.issueId.toUpperCase() === upperIssueId) {
       return { path: join(specsDir, filename) };
@@ -82,7 +82,7 @@ async function findSpecByIssueFromDisk(projectRoot: string, issueId: string): Pr
   }
   filenames.sort();
   for (const filename of filenames) {
-    const parts = parseVBriefFilename(filename);
+    const parts = parseXBriefFilename(filename);
     if (!parts) continue;
     if (parts.issueId.toUpperCase() === upperIssueId) {
       return { path: join(specsDir, filename) };
@@ -95,20 +95,20 @@ async function findSpecByIssueFromDisk(projectRoot: string, issueId: string): Pr
 // ─── Effect-channel typed errors ─────────────────────────────────────────────
 
 /** vBRIEF document on disk had unresolved git merge conflict markers. */
-export class VBriefMergeConflictTaggedError extends Data.TaggedError('VBriefMergeConflictError')<{
+export class XBriefMergeConflictTaggedError extends Data.TaggedError('XBriefMergeConflictError')<{
   readonly planPath: string;
 }> {}
 
 /** vBRIEF document on disk does not match the supported spec shape. */
-export class VBriefInvalidFormatError extends Data.TaggedError('VBriefInvalidFormatError')<{
+export class XBriefInvalidFormatError extends Data.TaggedError('XBriefInvalidFormatError')<{
   readonly planPath: string;
   readonly reason: string;
 }> {}
 
-export type VBriefReadError =
+export type XBriefReadError =
   | FsError
-  | VBriefMergeConflictTaggedError
-  | VBriefInvalidFormatError;
+  | XBriefMergeConflictTaggedError
+  | XBriefInvalidFormatError;
 
 /**
  * Extract issue ID from a workspace directory path.
@@ -192,17 +192,17 @@ export function findPlanSync(workspacePath: string): string | null {
  * ({ issue, title, items, edges? }) produced by some planning prompts.
  * Throws if the file does not exist or is invalid JSON.
  */
-export class VBriefMergeConflictError extends Error {
+export class XBriefMergeConflictError extends Error {
   constructor(planPath: string) {
     super(
       `plan.vbrief.json at ${planPath} contains unresolved git merge conflict markers. ` +
       `Resolve all <<<<<<</=======/>>>>>>> markers in that file and commit the result before re-requesting review.`
     );
-    this.name = 'VBriefMergeConflictError';
+    this.name = 'XBriefMergeConflictError';
   }
 }
 
-export function normalizeVBriefEnvelope<T>(parsed: T): T {
+export function normalizeXBriefEnvelope<T>(parsed: T): T {
   if (!parsed || typeof parsed !== 'object') return parsed;
   const candidate = parsed as Record<string, unknown>;
   if ('vBRIEFInfo' in candidate && !('xBRIEFInfo' in candidate)) {
@@ -212,25 +212,25 @@ export function normalizeVBriefEnvelope<T>(parsed: T): T {
   return parsed;
 }
 
-type VBriefEnvelopeInput =
-  | { xBRIEFInfo: VBriefInfo; vBRIEFInfo?: VBriefInfo }
-  | { xBRIEFInfo?: VBriefInfo; vBRIEFInfo: VBriefInfo };
+type XBriefEnvelopeInput =
+  | { xBRIEFInfo: XBriefInfo; vBRIEFInfo?: XBriefInfo }
+  | { xBRIEFInfo?: XBriefInfo; vBRIEFInfo: XBriefInfo };
 
-export function serializeVBriefDocument<T extends VBriefEnvelopeInput>(doc: T): string {
+export function serializeXBriefDocument<T extends XBriefEnvelopeInput>(doc: T): string {
   const { xBRIEFInfo, vBRIEFInfo, ...rest } = doc;
   return JSON.stringify({ xBRIEFInfo: xBRIEFInfo ?? vBRIEFInfo, ...rest }, null, 2);
 }
 
-export function readPlanSync(planPath: string): VBriefDocument {
+export function readPlanSync(planPath: string): XBriefDocument {
   const raw = readFileSync(planPath, 'utf-8');
   if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
-    throw new VBriefMergeConflictError(planPath);
+    throw new XBriefMergeConflictError(planPath);
   }
-  const parsed = normalizeVBriefEnvelope(JSON.parse(raw));
+  const parsed = normalizeXBriefEnvelope(JSON.parse(raw));
 
   // vBRIEF/xBRIEF requires an info envelope and plan top-level key.
   if (parsed.xBRIEFInfo && parsed.plan) {
-    return parsed as VBriefDocument;
+    return parsed as XBriefDocument;
   }
 
   // Non-spec format — reject with helpful error
@@ -246,14 +246,14 @@ export function readPlanSync(planPath: string): VBriefDocument {
  * Apply statusOverrides from workspace continue.json onto a deep-cloned spec.
  * Keys are either `"item-id"` (item status) or `"item-id.sub-id"` (subItem status).
  */
-export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<string, string>): VBriefDocument {
-  const merged = JSON.parse(JSON.stringify(doc)) as VBriefDocument;
+export function applyStatusOverrides(doc: XBriefDocument, overrides: Record<string, string>): XBriefDocument {
+  const merged = JSON.parse(JSON.stringify(doc)) as XBriefDocument;
   for (const [key, status] of Object.entries(overrides)) {
     const dotIndex = key.indexOf('.');
     if (dotIndex === -1) {
       const item = merged.plan.items.find(i => i.id === key);
       if (item) {
-        item.status = status as VBriefItemStatus;
+        item.status = status as XBriefItemStatus;
         if (status === 'completed' && !item.completed) {
           item.completed = new Date().toISOString();
         }
@@ -265,7 +265,7 @@ export function applyStatusOverrides(doc: VBriefDocument, overrides: Record<stri
       const fullSubId = `${itemId}.${subId}`;
       const sub = item ? subItemsOf(item).find(s => s.id === subId || s.id === fullSubId || s.id === key) : undefined;
       if (sub) {
-        sub.status = status as VBriefItemStatus;
+        sub.status = status as XBriefItemStatus;
         if (status === 'completed' && !sub.completed) {
           sub.completed = new Date().toISOString();
         }
@@ -303,8 +303,8 @@ export function readTierOverrides(workspacePath: string): TierOverridesMap {
 export function recordTierPromotion(
   workspacePath: string,
   itemId: string,
-  from: VBriefDifficulty,
-  to: VBriefDifficulty,
+  from: XBriefDifficulty,
+  to: XBriefDifficulty,
   reason: string,
 ): void {
   const path = workspaceContinuePath(workspacePath);
@@ -347,7 +347,7 @@ export function recordTierPromotion(
  * resolve the spec themselves (e.g. the /plan API route) — without this, a
  * merged task reads 'pending' forever in every display.
  */
-export function mergeRecordStatusOverrides(doc: VBriefDocument, workspacePath: string): VBriefDocument {
+export function mergeRecordStatusOverrides(doc: XBriefDocument, workspacePath: string): XBriefDocument {
   const overrides = readStatusOverridesSync(workspacePath);
   if (overrides && Object.keys(overrides).length > 0) {
     return applyStatusOverrides(doc, overrides);
@@ -355,7 +355,7 @@ export function mergeRecordStatusOverrides(doc: VBriefDocument, workspacePath: s
   return doc;
 }
 
-export function readWorkspacePlanSync(workspacePath: string): VBriefDocument | null {
+export function readWorkspacePlanSync(workspacePath: string): XBriefDocument | null {
   const planPath = findPlanSync(workspacePath);
   if (!planPath) return null;
   const doc = readPlanSync(planPath);
@@ -423,7 +423,7 @@ function checkPlanStatus(
  * `statusOverrides` map. Does NOT mutate the spec on main.
  * No-ops gracefully if no plan exists for this workspace.
  */
-export function updateItemStatus(workspacePath: string, itemId: string, status: VBriefItemStatus): void {
+export function updateItemStatus(workspacePath: string, itemId: string, status: XBriefItemStatus): void {
   const planPath = findPlanSync(workspacePath);
   if (!planPath) return;
 
@@ -449,7 +449,7 @@ export function updateSubItemStatus(
   workspacePath: string,
   itemId: string,
   subItemId: string,
-  status: VBriefItemStatus,
+  status: XBriefItemStatus,
 ): void {
   const planPath = findPlanSync(workspacePath);
   if (!planPath) return;
@@ -484,33 +484,33 @@ export function updateSubItemStatus(
  */
 export const readPlan = (
   planPath: string,
-): Effect.Effect<VBriefDocument, VBriefReadError> =>
+): Effect.Effect<XBriefDocument, XBriefReadError> =>
   Effect.gen(function* () {
     const raw = yield* Effect.tryPromise({
       try: () => readFile(planPath, 'utf-8'),
       catch: (cause) => new FsError({ path: planPath, operation: 'readFile', cause }),
     });
     if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
-      return yield* Effect.fail(new VBriefMergeConflictTaggedError({ planPath }));
+      return yield* Effect.fail(new XBriefMergeConflictTaggedError({ planPath }));
     }
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch (cause) {
       return yield* Effect.fail(
-        new VBriefInvalidFormatError({ planPath, reason: `invalid JSON: ${(cause as Error).message}` }),
+        new XBriefInvalidFormatError({ planPath, reason: `invalid JSON: ${(cause as Error).message}` }),
       );
     }
-    const obj = normalizeVBriefEnvelope(parsed) as { xBRIEFInfo?: unknown; plan?: unknown };
+    const obj = normalizeXBriefEnvelope(parsed) as { xBRIEFInfo?: unknown; plan?: unknown };
     if (!obj || !obj.xBRIEFInfo || !obj.plan) {
       return yield* Effect.fail(
-        new VBriefInvalidFormatError({
+        new XBriefInvalidFormatError({
           planPath,
           reason: `missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys`,
         }),
       );
     }
-    return obj as VBriefDocument;
+    return obj as XBriefDocument;
   });
 
 export const findWorkspaceDraftPlan = (
@@ -575,7 +575,7 @@ export const findPlan = (
  */
 export const readWorkspacePlan = (
   workspacePath: string,
-): Effect.Effect<VBriefDocument | null, VBriefReadError> =>
+): Effect.Effect<XBriefDocument | null, XBriefReadError> =>
   Effect.gen(function* () {
     const planPath = yield* findPlan(workspacePath);
     if (!planPath) return null;
@@ -601,7 +601,7 @@ export const readWorkspacePlan = (
 export const isPlanningComplete = (
   workspacePath: string,
   _planningDir?: string,
-): Effect.Effect<boolean, VBriefReadError> =>
+): Effect.Effect<boolean, XBriefReadError> =>
   Effect.gen(function* () {
     const planPath = yield* findPlan(workspacePath);
     if (!planPath) return false;

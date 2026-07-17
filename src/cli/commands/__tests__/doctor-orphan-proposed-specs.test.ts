@@ -11,7 +11,7 @@ function writeSpec(projectPath: string, issueId: string, planItemCount: number):
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
   writeFileSync(join(specsDir, `${issueId}.vbrief.json`), JSON.stringify({
-    vBRIEFInfo: { version: '0.5', created: '2026-05-25T00:00:00.000Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-05-25T00:00:00.000Z' },
     plan: {
       id: issueId,
       title: issueId,

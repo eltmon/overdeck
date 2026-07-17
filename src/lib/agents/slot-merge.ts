@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { defaultRunWorkspace } from './spawn-prep.js';
-import type { VBriefItem } from '../xbrief/types.js';
+import type { XBriefItem } from '../xbrief/types.js';
 
 const execAsync = promisify(exec);
 
@@ -36,7 +36,7 @@ export interface SlotMergeOptions {
 export async function verifyAndMergeSlot(
   issue: string | SlotMergeIssue,
   slotIndex: number,
-  item: VBriefItem,
+  item: XBriefItem,
   options: SlotMergeOptions = {},
 ): Promise<SlotMergeResult> {
   const issueId = typeof issue === 'string' ? issue : issue.issueId;

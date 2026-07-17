@@ -23,8 +23,8 @@ import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
-import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
-import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
+import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
+import { transitionXBriefOnMain, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
 import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
 import {
   buildStartPlanningBody,
@@ -1190,7 +1190,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     if (options.auto && !findPlanSync(workspace)) {
       prep.update(`Synthesizing minimal vBRIEF for ${id}...`);
       const issue = await fetchIssueForAutoStart(id);
-      await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspace, issue));
+      await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspace, issue));
     }
 
     if (!findPlanSync(workspace)) {
@@ -1238,7 +1238,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {
-      const transition = await Effect.runPromise(transitionVBriefOnMain(
+      const transition = await Effect.runPromise(transitionXBriefOnMain(
         projectRoot,
         id,
         'active',

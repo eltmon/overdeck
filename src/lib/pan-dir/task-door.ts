@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import type { ProjectConfig } from '../projects.js';
 import type { TaskOperationType } from '../xbrief/dag.js';
 import { applyStatusOverrides, findPlanSync, readPlanSync } from '../xbrief/io.js';
-import { subItemsOf, type VBriefItemStatus } from '../xbrief/types.js';
+import { subItemsOf, type XBriefItemStatus } from '../xbrief/types.js';
 import {
   type PanIssueRecord,
   type TaskClaim,
@@ -26,7 +26,7 @@ export interface TaskStatusChange {
 export interface TaskStatusChangeResult {
   issueId: string;
   itemId: string;
-  status: VBriefItemStatus;
+  status: XBriefItemStatus;
   sequence: number;
   claim?: TaskClaim;
   idempotent?: boolean;
@@ -49,9 +49,9 @@ export class TaskStatusChangeError extends Error {
   }
 }
 
-const TERMINAL = new Set<VBriefItemStatus>(['completed', 'cancelled']);
+const TERMINAL = new Set<XBriefItemStatus>(['completed', 'cancelled']);
 
-function statusFor(type: TaskOperationType): VBriefItemStatus {
+function statusFor(type: TaskOperationType): XBriefItemStatus {
   if (type === 'claim') return 'running';
   if (type === 'done') return 'completed';
   if (type === 'block') return 'blocked';
@@ -59,7 +59,7 @@ function statusFor(type: TaskOperationType): VBriefItemStatus {
   return 'cancelled';
 }
 
-function allowedFrom(type: TaskOperationType, status: VBriefItemStatus): boolean {
+function allowedFrom(type: TaskOperationType, status: XBriefItemStatus): boolean {
   if (type === 'claim') return status === 'pending';
   if (type === 'done') return status === 'running';
   if (type === 'block') return status === 'pending' || status === 'running';

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { VBriefDocument, VBriefItem } from '../../xbrief/types.js';
+import type { XBriefDocument, XBriefItem } from '../../xbrief/types.js';
 import {
   assignDispatchTier,
   chooseDispatchTier,
@@ -55,7 +55,7 @@ const TIERING: TierAssignmentConfig = {
   },
 };
 
-function item(metadata: VBriefItem['metadata'], id = 'item-1'): Pick<VBriefItem, 'id' | 'title' | 'metadata'> {
+function item(metadata: XBriefItem['metadata'], id = 'item-1'): Pick<XBriefItem, 'id' | 'title' | 'metadata'> {
   return { id, title: 'test item', metadata };
 }
 
@@ -71,7 +71,7 @@ describe('assignDispatchTier', () => {
   });
 
   it('returns exactly the current dispatch lane with no model override when disabled', () => {
-    const candidates: Array<Pick<VBriefItem, 'id' | 'title' | 'metadata'>> = [
+    const candidates: Array<Pick<XBriefItem, 'id' | 'title' | 'metadata'>> = [
       item({ difficulty: 'expert' }),
       item({ difficulty: 'simple', files_scope: ['a.ts'], files_scope_confidence: 'high' }),
       item({ difficulty: 'medium', files_scope: ['a.ts'], files_scope_confidence: 'high', readiness: 'ready' }),
@@ -127,9 +127,9 @@ describe('chooseTierAssignment', () => {
 });
 
 describe('resolveSlotTierSpawnParams', () => {
-  function planDoc(items: VBriefItem[], planMetadata?: Record<string, unknown>): VBriefDocument {
+  function planDoc(items: XBriefItem[], planMetadata?: Record<string, unknown>): XBriefDocument {
     return {
-      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      xBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
       plan: {
         id: 'plan-1',
         title: 'test plan',
@@ -141,7 +141,7 @@ describe('resolveSlotTierSpawnParams', () => {
     };
   }
 
-  function planItem(id: string, metadata: VBriefItem['metadata']): VBriefItem {
+  function planItem(id: string, metadata: XBriefItem['metadata']): XBriefItem {
     return { id, title: id, status: 'pending', metadata };
   }
 
@@ -212,9 +212,9 @@ describe('resolveSlotTierSpawnParams', () => {
 });
 
 describe('resolveSingleWorkTierSpawnParams', () => {
-  function planDoc(items: VBriefItem[], planMetadata?: Record<string, unknown>): VBriefDocument {
+  function planDoc(items: XBriefItem[], planMetadata?: Record<string, unknown>): XBriefDocument {
     return {
-      vBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
+      xBRIEFInfo: { version: '0.6', created: '2026-07-02T00:00:00Z' },
       plan: {
         id: 'plan-1',
         title: 'test plan',
@@ -226,7 +226,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     };
   }
 
-  function planItem(id: string, metadata: VBriefItem['metadata'], status: VBriefItem['status'] = 'pending'): VBriefItem {
+  function planItem(id: string, metadata: XBriefItem['metadata'], status: XBriefItem['status'] = 'pending'): XBriefItem {
     return { id, title: id, status, metadata };
   }
 

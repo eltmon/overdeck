@@ -60,7 +60,7 @@ export interface IssueLensSignals {
   /** L4 — current-phase label (in-review/in-progress/planned/verifying-on-main/…), else null. */
   phaseLabel: string | null;
   /** L6-spec — a durable vBRIEF spec exists on `overdeck-state`; gather via `findSpecByIssue`, never the DB. */
-  hasVbriefSpec: boolean;
+  hasXbriefSpec: boolean;
   /** Durable Definition-of-Ready signal from the issue's `ready` label. */
   explicitlyReady: boolean;
 }
@@ -161,7 +161,7 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     // and classifies as backlog — visible and safe, unlike false close-out.)
     return result('planned_backlog', 'open issue with a convention branch but no unique commits — created, work not yet landed; needs work or disposition');
   }
-  if (s.hasVbriefSpec) {
+  if (s.hasXbriefSpec) {
     return result(
       'planned_backlog',
       PLANNED_BACKLOG_SPEC_ONLY_REASON,

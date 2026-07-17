@@ -1,6 +1,6 @@
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelId } from '../settings.js';
-import type { VBriefDifficulty, VBriefItemKind } from '../xbrief/types.js';
+import type { XBriefDifficulty, XBriefItemKind } from '../xbrief/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';
@@ -9,9 +9,9 @@ import { canUseHarnessSync } from '../harness-policy.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 
-export const TIERED_EXECUTION_DIFFICULTIES: readonly VBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
+export const TIERED_EXECUTION_DIFFICULTIES: readonly XBriefDifficulty[] = ['trivial', 'simple', 'medium', 'complex', 'expert'] as const;
 export const TIERED_EXECUTION_SUBSCRIPTIONS = ['all', 'flagged', 'sampled'] as const;
-export const TIERED_EXECUTION_ITEM_KINDS: readonly VBriefItemKind[] = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
+export const TIERED_EXECUTION_ITEM_KINDS: readonly XBriefItemKind[] = ['docs', 'api', 'backend', 'frontend', 'infra', 'test', 'refactor', 'design', 'spike'] as const;
 export const TIERED_EXECUTION_CALLOUT_POLICIES = ['off', 'notify', 'corroborate'] as const;
 export const TIERED_EXECUTION_COMPACTION_REROUTE_POLICIES = ['off', 'on'] as const;
 
@@ -29,7 +29,7 @@ export interface TierDistributionEntry {
 export interface TierDefinition {
   model: ModelId | string;
   harness: RuntimeName;
-  difficulties: VBriefDifficulty[];
+  difficulties: XBriefDifficulty[];
   /**
    * PAN-2391: weighted model+harness entries this tier spreads its beads
    * across (to consume multiple subscription plans). When present, the raw
@@ -66,21 +66,21 @@ export interface TieredEscalationConfig {
   enabled?: boolean;
   retries_at_tier?: number;
   max_promotions?: number;
-  flounder_budget_minutes?: Partial<Record<VBriefDifficulty, number>>;
+  flounder_budget_minutes?: Partial<Record<XBriefDifficulty, number>>;
 }
 
 export interface ValidatedEscalationConfig {
   enabled: boolean;
   retries_at_tier: number;
   max_promotions: number;
-  flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>;
+  flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
 }
 
 export interface TieredExecutionConfig {
   enabled: boolean;
   tiers: Record<string, TierDefinition>;
   supervisor?: TieredExecutionSupervisorConfig;
-  by_kind?: Partial<Record<VBriefItemKind, string>>;
+  by_kind?: Partial<Record<XBriefItemKind, string>>;
   feed?: TieredExecutionFeedConfig;
   escalation?: TieredEscalationConfig;
   compaction_reroute?: TieredExecutionCompactionReroutePolicy;
@@ -88,8 +88,8 @@ export interface TieredExecutionConfig {
 }
 
 export interface ValidatedTieredExecutionConfig extends TieredExecutionConfig {
-  difficultyToTier: Partial<Record<VBriefDifficulty, string>>;
-  byKind: Partial<Record<VBriefItemKind, string>>;
+  difficultyToTier: Partial<Record<XBriefDifficulty, string>>;
+  byKind: Partial<Record<XBriefItemKind, string>>;
   feed: ValidatedTieredExecutionFeedConfig;
   escalation: ValidatedEscalationConfig;
   compaction_reroute: TieredExecutionCompactionReroutePolicy;
@@ -226,7 +226,7 @@ function isRuntimeName(value: string): value is RuntimeName {
   return value === 'claude-code' || value === 'ohmypi' || value === 'codex';
 }
 
-function isDifficulty(value: string): value is VBriefDifficulty {
+function isDifficulty(value: string): value is XBriefDifficulty {
   return (TIERED_EXECUTION_DIFFICULTIES as readonly string[]).includes(value);
 }
 
@@ -234,7 +234,7 @@ function isSubscription(value: string): value is TieredExecutionSubscription {
   return (TIERED_EXECUTION_SUBSCRIPTIONS as readonly string[]).includes(value);
 }
 
-function isItemKind(value: string): value is VBriefItemKind {
+function isItemKind(value: string): value is XBriefItemKind {
   return (TIERED_EXECUTION_ITEM_KINDS as readonly string[]).includes(value);
 }
 
@@ -334,7 +334,7 @@ function validateFeedConfig(config?: TieredExecutionFeedConfig): ValidatedTiered
 }
 
 function validateEscalationConfig(config?: TieredEscalationConfig): ValidatedEscalationConfig {
-  const flounderBudget: Partial<Record<VBriefDifficulty, number>> = {};
+  const flounderBudget: Partial<Record<XBriefDifficulty, number>> = {};
   for (const [difficulty, budget] of Object.entries(config?.flounder_budget_minutes ?? {})) {
     if (!isDifficulty(difficulty)) {
       throw new TieredExecutionConfigError(`tiered_execution.escalation.flounder_budget_minutes contains unknown difficulty '${difficulty}'`);
@@ -376,7 +376,7 @@ export function validateTieredExecutionConfig(
     throw new TieredExecutionConfigError('tiered_execution.replay_threshold must be a number > 0 and <= 1');
   }
 
-  const difficultyOwners: Partial<Record<VBriefDifficulty, string[]>> = {};
+  const difficultyOwners: Partial<Record<XBriefDifficulty, string[]>> = {};
   const normalizedTiers: Record<string, TierDefinition> = {};
 
   for (const [tierName, tier] of Object.entries(config.tiers)) {
@@ -429,7 +429,7 @@ export function validateTieredExecutionConfig(
       throw new TieredExecutionConfigError(`${path}.difficulties must contain at least one difficulty`);
     }
 
-    const difficulties: VBriefDifficulty[] = [];
+    const difficulties: XBriefDifficulty[] = [];
     for (const difficulty of tier.difficulties) {
       if (!isDifficulty(difficulty)) {
         throw new TieredExecutionConfigError(`${path}.difficulties contains unknown difficulty '${difficulty as string}'`);
@@ -441,7 +441,7 @@ export function validateTieredExecutionConfig(
     normalizedTiers[tierName] = { model, harness, difficulties, ...(normalizedDistribution ? { distribution: normalizedDistribution } : {}) };
   }
 
-  const difficultyToTier: Partial<Record<VBriefDifficulty, string>> = {};
+  const difficultyToTier: Partial<Record<XBriefDifficulty, string>> = {};
   for (const difficulty of TIERED_EXECUTION_DIFFICULTIES) {
     const owners = difficultyOwners[difficulty] ?? [];
     if (owners.length === 0) {
@@ -453,7 +453,7 @@ export function validateTieredExecutionConfig(
     difficultyToTier[difficulty] = owners[0];
   }
 
-  const byKind: Partial<Record<VBriefItemKind, string>> = {};
+  const byKind: Partial<Record<XBriefItemKind, string>> = {};
   for (const [kind, tierName] of Object.entries(config.by_kind ?? {})) {
     if (!isItemKind(kind)) {
       throw new TieredExecutionConfigError(`tiered_execution.by_kind contains unknown item kind '${kind}'`);

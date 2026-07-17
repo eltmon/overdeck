@@ -12,12 +12,12 @@ import { Effect } from 'effect';
 
 import {
   VBRIEF_LIFECYCLE_DIRS,
-  parseVBriefFilename,
-  resolveVBriefDir,
-  type VBriefLifecycleDir,
+  parseXBriefFilename,
+  resolveXBriefDir,
+  type XBriefLifecycleDir,
 } from './lifecycle.js';
-import type { VBriefDocument } from './types.js';
-import { normalizeVBriefEnvelope, VBriefInvalidFormatError, VBriefMergeConflictTaggedError, type VBriefReadError } from './io.js';
+import type { XBriefDocument } from './types.js';
+import { normalizeXBriefEnvelope, XBriefInvalidFormatError, XBriefMergeConflictTaggedError, type XBriefReadError } from './io.js';
 import { FsError } from '../errors.js';
 import { PAN_DIRNAME, PAN_SPECS_DIRNAME, isPanSpecStatus } from '../pan-dir/types.js';
 
@@ -25,7 +25,7 @@ const CACHE_TTL_MS = 5_000;
 
 interface IndexEntry {
   path: string;
-  lifecycleDir: VBriefLifecycleDir;
+  lifecycleDir: XBriefLifecycleDir;
   issueId: string;
   slug: string;
   date: string;
@@ -52,7 +52,7 @@ async function scanPanSpecs(projectRoot: string): Promise<IndexEntry[]> {
   }
 
   const entries = await Promise.all(names.map(async (name) => {
-    const parts = parseVBriefFilename(name);
+    const parts = parseXBriefFilename(name);
     if (!parts) return null;
 
     const path = join(specsDir, name);
@@ -93,7 +93,7 @@ async function buildProjectIndex(projectRoot: string): Promise<ProjectIndex> {
   }
 
   for (const lifecycleDir of VBRIEF_LIFECYCLE_DIRS) {
-    const dirPath = resolveVBriefDir(projectRoot, lifecycleDir);
+    const dirPath = resolveXBriefDir(projectRoot, lifecycleDir);
     if (!existsSync(dirPath)) continue;
     let names: string[];
     try {
@@ -102,7 +102,7 @@ async function buildProjectIndex(projectRoot: string): Promise<ProjectIndex> {
       continue;
     }
     for (const name of names) {
-      const parts = parseVBriefFilename(name);
+      const parts = parseXBriefFilename(name);
       if (!parts || byIssue.has(parts.issueId)) continue;
       const entry: IndexEntry = {
         path: join(dirPath, name),
@@ -130,17 +130,17 @@ async function getOrBuildIndex(projectRoot: string): Promise<ProjectIndex> {
   return fresh;
 }
 
-export function invalidateVBriefIndex(projectRoot: string): void {
+export function invalidateXBriefIndex(projectRoot: string): void {
   projectIndexCache.delete(projectRoot);
 }
 
-export function resetVBriefIndex(): void {
+export function resetXBriefIndex(): void {
   projectIndexCache.clear();
 }
 
-export interface FoundVBrief {
+export interface FoundXBrief {
   path: string;
-  lifecycleDir: VBriefLifecycleDir;
+  lifecycleDir: XBriefLifecycleDir;
   issueId: string;
   slug: string;
   date: string;
@@ -148,57 +148,57 @@ export interface FoundVBrief {
 }
 
 
-export const findVBriefByIssue = (
+export const findXBriefByIssue = (
   projectRoot: string,
   issueId: string,
-): Effect.Effect<FoundVBrief | null, FsError> =>
+): Effect.Effect<FoundXBrief | null, FsError> =>
   Effect.tryPromise({
     try: async () => {
       const upper = issueId.toUpperCase();
       const index = await getOrBuildIndex(projectRoot);
       return index.byIssue.get(upper) ?? null;
     },
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'findVBriefByIssue', cause }),
+    catch: (cause) => new FsError({ path: projectRoot, operation: 'findXBriefByIssue', cause }),
   });
 
-export const listVBriefs = (
+export const listXBriefs = (
   projectRoot: string,
-): Effect.Effect<FoundVBrief[], FsError> =>
+): Effect.Effect<FoundXBrief[], FsError> =>
   Effect.tryPromise({
     try: async () => {
       const index = await getOrBuildIndex(projectRoot);
       return [...index.entries];
     },
-    catch: (cause) => new FsError({ path: projectRoot, operation: 'listVBriefs', cause }),
+    catch: (cause) => new FsError({ path: projectRoot, operation: 'listXBriefs', cause }),
   });
 
-export const readVBriefDocument = (
+export const readXBriefDocument = (
   path: string,
-): Effect.Effect<VBriefDocument, VBriefReadError> =>
+): Effect.Effect<XBriefDocument, XBriefReadError> =>
   Effect.gen(function* () {
     const raw = yield* Effect.tryPromise({
       try: () => readFile(path, 'utf-8'),
       catch: (cause) => new FsError({ path, operation: 'readFile', cause }),
     });
     if (raw.includes('<<<<<<<') && raw.includes('=======') && raw.includes('>>>>>>>')) {
-      return yield* Effect.fail(new VBriefMergeConflictTaggedError({ planPath: path }));
+      return yield* Effect.fail(new XBriefMergeConflictTaggedError({ planPath: path }));
     }
     let parsed: unknown;
     try {
-      parsed = normalizeVBriefEnvelope(JSON.parse(raw));
+      parsed = normalizeXBriefEnvelope(JSON.parse(raw));
     } catch (cause) {
       return yield* Effect.fail(
-        new VBriefInvalidFormatError({ planPath: path, reason: `invalid JSON: ${(cause as Error).message}` }),
+        new XBriefInvalidFormatError({ planPath: path, reason: `invalid JSON: ${(cause as Error).message}` }),
       );
     }
     const obj = parsed as { xBRIEFInfo?: unknown; plan?: unknown };
     if (!obj || !obj.xBRIEFInfo || !obj.plan) {
       return yield* Effect.fail(
-        new VBriefInvalidFormatError({
+        new XBriefInvalidFormatError({
           planPath: path,
           reason: `missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys`,
         }),
       );
     }
-    return obj as VBriefDocument;
+    return obj as XBriefDocument;
   });

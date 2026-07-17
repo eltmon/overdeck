@@ -5,13 +5,13 @@ import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { Data, Effect } from 'effect';
-import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus, type VBriefSubItem } from './types.js';
+import { subItemsOf, type XBriefDocument, type XBriefItem, type XBriefItemStatus, type XBriefSubItem } from './types.js';
 import {
   getProjectConfigFromWorkspacePath,
   resolveProjectForIssue,
 } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
-import { normalizeVBriefEnvelope, serializeVBriefDocument } from './io.js';
+import { normalizeXBriefEnvelope, serializeXBriefDocument } from './io.js';
 
 export interface WaveItem {
   id: string;
@@ -36,8 +36,8 @@ export interface Wave {
  * Returns waves in ascending order. Items within a wave are independent and
  * can execute in parallel.
  */
-export function groupItemsByWave(doc: VBriefDocument): Wave[] {
-  const skipStatuses = new Set<VBriefItemStatus>(['completed', 'cancelled', 'blocked', 'running']);
+export function groupItemsByWave(doc: XBriefDocument): Wave[] {
+  const skipStatuses = new Set<XBriefItemStatus>(['completed', 'cancelled', 'blocked', 'running']);
   const actionable = doc.plan.items.filter(i => !skipStatuses.has(i.status));
   if (actionable.length === 0) return [];
 
@@ -78,7 +78,7 @@ export function groupItemsByWave(doc: VBriefDocument): Wave[] {
     }
   }
 
-  const itemById = new Map<string, VBriefItem>(doc.plan.items.map(i => [i.id, i]));
+  const itemById = new Map<string, XBriefItem>(doc.plan.items.map(i => [i.id, i]));
   const waves: Wave[] = [];
 
   let currentLayer = Array.from(actionableIds).filter(id => (inDegree.get(id) ?? 0) === 0);
@@ -124,7 +124,7 @@ export function groupItemsByWave(doc: VBriefDocument): Wave[] {
  *
  * Returns [] for empty plans or plans with no blocking edges.
  */
-export function criticalPath(doc: VBriefDocument): string[] {
+export function criticalPath(doc: XBriefDocument): string[] {
   const items = doc.plan.items;
   const edges = doc.plan.edges ?? [];
   const blockEdges = edges.filter(e => e.type === 'blocks');
@@ -215,9 +215,9 @@ export function criticalPath(doc: VBriefDocument): string[] {
  *     OR has status 'completed'/'cancelled' in the plan.
  */
 export function getDispatchableItems(
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   mergedItemIds: Set<string>,
-): VBriefItem[] {
+): XBriefItem[] {
   const nonDispatchableStatuses = new Set(['completed', 'cancelled', 'running', 'blocked']);
   const actionable = doc.plan.items.filter(i => !nonDispatchableStatuses.has(i.status));
   if (actionable.length === 0) return [];
@@ -252,7 +252,7 @@ export function getDispatchableItems(
  * that are neither completed nor cancelled in the plan).
  * Count > 1 means the item is a DAG convergence point requiring a synthesis agent.
  */
-export function blockingParentCount(doc: VBriefDocument, itemId: string): number {
+export function blockingParentCount(doc: XBriefDocument, itemId: string): number {
   const completedStatuses = new Set(['completed', 'cancelled']);
   const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
   return doc.plan.edges.filter(e => {
@@ -262,12 +262,12 @@ export function blockingParentCount(doc: VBriefDocument, itemId: string): number
   }).length;
 }
 
-export function blockingParentTotal(doc: VBriefDocument, itemId: string): number {
+export function blockingParentTotal(doc: XBriefDocument, itemId: string): number {
   const itemIds = new Set(doc.plan.items.map(i => i.id));
   return doc.plan.edges.filter(e => e.type === 'blocks' && e.to === itemId && itemIds.has(e.from)).length;
 }
 
-export function deriveSynthesisMetadata(doc: VBriefDocument): VBriefDocument {
+export function deriveSynthesisMetadata(doc: XBriefDocument): XBriefDocument {
   const next = cloneDoc(doc);
   const itemIds = new Set(next.plan.items.map(item => item.id));
   const incomingBlockCounts = new Map<string, number>();
@@ -331,8 +331,8 @@ function pathMatchesAnyCompiled(filePath: string, patterns: CompiledGlob[]): boo
  * patterns, or a file in a running item matched by the candidate's patterns.
  */
 export function hasFileOverlap(
-  runningItems: VBriefItem[],
-  candidate: VBriefItem,
+  runningItems: XBriefItem[],
+  candidate: XBriefItem,
   precompiled?: Map<string, CompiledGlob[]>,
 ): boolean {
   const candidateScope = candidate.metadata?.files_scope;
@@ -367,18 +367,18 @@ export interface ActiveSlice {
   planSequence: number;
   objective?: string;
   globalConstraints: string[];
-  item: VBriefItem;
-  currentWorkSet: VBriefItem[];
+  item: XBriefItem;
+  currentWorkSet: XBriefItem[];
   /** Direct blocking parent items, regardless of status. */
-  blockers: VBriefItem[];
+  blockers: XBriefItem[];
   /** Resolved direct blocking parents that should inform this item. */
-  dependencies: VBriefItem[];
+  dependencies: XBriefItem[];
   /** Direct child items this work unlocks after completion. */
-  unlocks: VBriefItem[];
+  unlocks: XBriefItem[];
   /** Nearby items connected by non-blocking context edges or shared phase. */
-  nearbyContext: VBriefItem[];
+  nearbyContext: XBriefItem[];
   /** Direct child acceptance criteria/items for prompt-size boundedness. */
-  acceptanceCriteria: VBriefSubItem[];
+  acceptanceCriteria: XBriefSubItem[];
   /** Synthesis context for DAG convergence points, when available. */
   synthesisContext?: string;
   /** Minimal markdown prompt payload for work agents. */
@@ -392,25 +392,25 @@ export interface ActiveSliceOptions {
   synthesisOutputs?: Record<string, { contextUpdate: string }>;
 }
 
-function directBlockingParents(doc: VBriefDocument, itemId: string): VBriefItem[] {
+function directBlockingParents(doc: XBriefDocument, itemId: string): XBriefItem[] {
   const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
   return doc.plan.edges
     .filter(e => e.type === 'blocks' && e.to === itemId)
     .map(e => itemById.get(e.from))
-    .filter((item): item is VBriefItem => Boolean(item));
+    .filter((item): item is XBriefItem => Boolean(item));
 }
 
-function directUnlocks(doc: VBriefDocument, itemId: string): VBriefItem[] {
+function directUnlocks(doc: XBriefDocument, itemId: string): XBriefItem[] {
   const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
   return doc.plan.edges
     .filter(e => e.type === 'blocks' && e.from === itemId)
     .map(e => itemById.get(e.to))
-    .filter((item): item is VBriefItem => Boolean(item));
+    .filter((item): item is XBriefItem => Boolean(item));
 }
 
-function nearbyItems(doc: VBriefDocument, item: VBriefItem, excludedIds: Set<string>): VBriefItem[] {
+function nearbyItems(doc: XBriefDocument, item: XBriefItem, excludedIds: Set<string>): XBriefItem[] {
   const itemById = new Map(doc.plan.items.map(i => [i.id, i]));
-  const nearby = new Map<string, VBriefItem>();
+  const nearby = new Map<string, XBriefItem>();
   for (const edge of doc.plan.edges) {
     if (edge.type === 'blocks') continue;
     if (edge.from === item.id) {
@@ -434,7 +434,7 @@ function nearbyItems(doc: VBriefDocument, item: VBriefItem, excludedIds: Set<str
   return Array.from(nearby.values()).slice(0, 5);
 }
 
-function renderItemLine(item: VBriefItem): string {
+function renderItemLine(item: XBriefItem): string {
   const phase = item.metadata?.phase !== undefined ? ` phase=${item.metadata.phase}` : '';
   const difficulty = item.metadata?.difficulty ? ` difficulty=${item.metadata.difficulty}` : '';
   return `- ${item.id}: ${item.title} [${item.status}]${phase}${difficulty}`;
@@ -446,13 +446,13 @@ function renderItemLine(item: VBriefItem): string {
  * set, direct blockers, unlocks, nearby context, global constraints, acceptance
  * criteria, and optional persisted synthesis output for convergence points.
  */
-export function createActiveSlice(doc: VBriefDocument, options: ActiveSliceOptions): ActiveSlice {
+export function createActiveSlice(doc: XBriefDocument, options: ActiveSliceOptions): ActiveSlice {
   const item = doc.plan.items.find(i => i.id === options.itemId);
   if (!item) throw new Error(`Plan item not found: ${options.itemId}`);
   const currentIds = Array.from(new Set([...(options.currentItemIds ?? []), item.id]));
   const currentWorkSet = currentIds
     .map(id => doc.plan.items.find(i => i.id === id))
-    .filter((candidate): candidate is VBriefItem => Boolean(candidate));
+    .filter((candidate): candidate is XBriefItem => Boolean(candidate));
   const blockers = directBlockingParents(doc, item.id);
   const resolvedStatuses = new Set(['completed', 'cancelled']);
   const dependencies = blockers.filter(parent => resolvedStatuses.has(parent.status));
@@ -545,8 +545,8 @@ export interface TaskOperation {
 }
 
 export interface TaskOperationResult {
-  doc: VBriefDocument;
-  item: VBriefItem;
+  doc: XBriefDocument;
+  item: XBriefItem;
 }
 
 const TASK_OPERATION_TYPES = new Set<string>(['claim', 'done', 'block', 'unblock', 'cancel']);
@@ -560,7 +560,7 @@ export function isTaskCommand(value: string): value is TaskCommand {
   return TASK_COMMANDS.has(value);
 }
 
-function statusForOperation(type: TaskOperationType): VBriefItemStatus {
+function statusForOperation(type: TaskOperationType): XBriefItemStatus {
   switch (type) {
     case 'claim': return 'running';
     case 'done': return 'completed';
@@ -574,8 +574,8 @@ function statusForOperation(type: TaskOperationType): VBriefItemStatus {
   }
 }
 
-function cloneDoc(doc: VBriefDocument): VBriefDocument {
-  return JSON.parse(JSON.stringify(doc)) as VBriefDocument;
+function cloneDoc(doc: XBriefDocument): XBriefDocument {
+  return JSON.parse(JSON.stringify(doc)) as XBriefDocument;
 }
 
 /**
@@ -583,7 +583,7 @@ function cloneDoc(doc: VBriefDocument): VBriefDocument {
  * single mutation authority for swarm task status: legacy stores can mirror state during
  * migration, but the plan document wins and receives the sequence bump.
  */
-export function applyTaskOperation(doc: VBriefDocument, operation: TaskOperation): TaskOperationResult {
+export function applyTaskOperation(doc: XBriefDocument, operation: TaskOperation): TaskOperationResult {
   if (!isTaskOperationType(String(operation.type))) {
     throw new Error(`Unsupported vBRIEF task operation: ${String(operation.type)}`);
   }
@@ -631,19 +631,19 @@ export interface PlanPipelineMirror {
   [key: string]: unknown;
 }
 
-export function getPipelineMirror(doc: VBriefDocument): PlanPipelineMirror | undefined {
+export function getPipelineMirror(doc: XBriefDocument): PlanPipelineMirror | undefined {
   return doc.plan.metadata?.pipeline as PlanPipelineMirror | undefined;
 }
 
 /** Write pipeline state into plan.metadata.pipeline for pan-oversee and dashboard readers. */
-export function setPipelineMirror(doc: VBriefDocument, pipeline: PlanPipelineMirror): VBriefDocument {
+export function setPipelineMirror(doc: XBriefDocument, pipeline: PlanPipelineMirror): XBriefDocument {
   doc.plan.metadata = { ...(doc.plan.metadata ?? {}), pipeline };
   return doc;
 }
 
 export interface TaskGraphView {
   source: 'vbrief';
-  next: VBriefItem[];
+  next: XBriefItem[];
   waves: Wave[];
   criticalPath: string[];
 }
@@ -651,7 +651,7 @@ export interface TaskGraphView {
 const NON_ACTIONABLE_STATUSES = new Set(['completed', 'cancelled', 'running', 'blocked']);
 
 /** Build a document containing only actionable (non-terminal) items and their block edges. */
-export function actionableDoc(doc: VBriefDocument): VBriefDocument {
+export function actionableDoc(doc: XBriefDocument): XBriefDocument {
   const actionableItems = doc.plan.items.filter(i => !NON_ACTIONABLE_STATUSES.has(i.status));
   const actionableIds = new Set(actionableItems.map(i => i.id));
   const actionableEdges = (doc.plan.edges ?? []).filter(
@@ -668,7 +668,7 @@ export function actionableDoc(doc: VBriefDocument): VBriefDocument {
 }
 
 /** Canonical vBRIEF task graph view; no secondary task store is consulted here. */
-export function getTaskGraphView(doc: VBriefDocument, mergedItemIds: Set<string> = new Set()): TaskGraphView {
+export function getTaskGraphView(doc: XBriefDocument, mergedItemIds: Set<string> = new Set()): TaskGraphView {
   const filtered = actionableDoc(doc);
   return {
     source: 'vbrief',
@@ -690,15 +690,15 @@ export interface PersistedTaskOperation extends TaskOperation {
 
 export const activePlanWriters = new Map<string, string>();
 
-export class VBriefDagError extends Data.TaggedError('VBriefDagError')<{
+export class XBriefDagError extends Data.TaggedError('XBriefDagError')<{
   readonly planPath: string;
   readonly operation: string;
   readonly message: string;
   readonly cause?: unknown;
 }> {}
 
-function liftDagError(planPath: string, operation: string, cause: unknown): VBriefDagError {
-  return new VBriefDagError({
+function liftDagError(planPath: string, operation: string, cause: unknown): XBriefDagError {
+  return new XBriefDagError({
     planPath,
     operation,
     message: cause instanceof Error ? cause.message : String(cause),
@@ -825,11 +825,11 @@ export function buildPipelineMirrorFromStatus(issueId: string, status: Record<st
   };
 }
 
-async function readPlanFileFromDisk(planPath: string): Promise<VBriefDocument> {
-  return normalizeVBriefEnvelope(JSON.parse(await readFile(planPath, 'utf-8'))) as VBriefDocument;
+async function readPlanFileFromDisk(planPath: string): Promise<XBriefDocument> {
+  return normalizeXBriefEnvelope(JSON.parse(await readFile(planPath, 'utf-8'))) as XBriefDocument;
 }
 
-export const readPlanFile = (planPath: string): Effect.Effect<VBriefDocument, VBriefDagError> =>
+export const readPlanFile = (planPath: string): Effect.Effect<XBriefDocument, XBriefDagError> =>
   Effect.tryPromise({
     try: () => readPlanFileFromDisk(planPath),
     catch: (cause) => liftDagError(planPath, 'readPlanFile', cause),
@@ -841,7 +841,7 @@ export interface PromptSizeVerification {
   reductionRatio: number;
 }
 
-export function verifyActiveSlicePromptReduction(doc: VBriefDocument, slice: ActiveSlice): PromptSizeVerification {
+export function verifyActiveSlicePromptReduction(doc: XBriefDocument, slice: ActiveSlice): PromptSizeVerification {
   const fullPlanBytes = Buffer.byteLength(JSON.stringify(doc, null, 2), 'utf8');
   const activeSliceBytes = activeSlicePromptSize(slice);
   return {

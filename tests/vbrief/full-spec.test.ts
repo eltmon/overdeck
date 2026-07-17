@@ -2,9 +2,9 @@
  * vBRIEF v0.5 Full Spec Compliance Tests
  *
  * Verifies that all v0.5 fields are properly handled:
- * - uid, sequence, references, created, updated on VBriefPlan
- * - author, description on VBriefDocument.vBRIEFInfo
- * - created, completed on VBriefItem and VBriefSubItem
+ * - uid, sequence, references, created, updated on XBriefPlan
+ * - author, description on XBriefDocument.xBRIEFInfo
+ * - created, completed on XBriefItem and XBriefSubItem
  * - Timestamp and sequence updates in io.ts
  * - Planning prompt template includes all new v0.5 fields
  */
@@ -14,14 +14,14 @@ import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../../src/lib/xbrief/io.js';
-import type { VBriefDocument } from '../../src/lib/xbrief/types.js';
+import type { XBriefDocument } from '../../src/lib/xbrief/types.js';
 
 let PROJECT_ROOT: string;
 let TEST_DIR: string;
 
-function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocument {
+function makeFullSpecDoc(overrides: Partial<XBriefDocument['plan']> = {}): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.5',
       created: '2026-01-01T00:00:00Z',
       author: 'overdeck/0.6.0',
@@ -49,7 +49,7 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
           subItems: [
             {
               id: 'update-types.ac1',
-              title: 'VBriefPlan has uid field',
+              title: 'XBriefPlan has uid field',
               status: 'pending',
               created: '2026-01-01T00:00:00Z',
               metadata: { kind: 'acceptance_criterion' },
@@ -67,7 +67,7 @@ function makeFullSpecDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBrie
  * Write the spec to the main-side `.pan/specs/` directory (canonical location)
  * AND to the workspace `.pan/spec.vbrief.json` for tests that read directly.
  */
-function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
+function writePlanDoc(workspacePath: string, doc: XBriefDocument): string {
   const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
   const specPath = join(specsDir, '2026-01-01-PAN-453-full-vbrief-spec-support.vbrief.json');
@@ -80,7 +80,7 @@ function writePlanDoc(workspacePath: string, doc: VBriefDocument): string {
   return localPath;
 }
 
-function readPlanFromWorkspace(workspacePath: string): VBriefDocument {
+function readPlanFromWorkspace(workspacePath: string): XBriefDocument {
   return readPlanSync(join(workspacePath, '.pan', 'spec.vbrief.json'));
 }
 
@@ -101,27 +101,27 @@ afterEach(() => {
   rmSync(PROJECT_ROOT, { recursive: true, force: true });
 });
 
-// ─── vBRIEFInfo fields ────────────────────────────────────────────────────────
+// ─── xBRIEFInfo fields ────────────────────────────────────────────────────────
 
-describe('vBRIEFInfo v0.5 fields', () => {
-  it('readPlan preserves vBRIEFInfo.author', () => {
+describe('xBRIEFInfo v0.5 fields', () => {
+  it('readPlan preserves xBRIEFInfo.author', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
     const result = readPlanSync(planPath);
-    expect(result.vBRIEFInfo.author).toBe('overdeck/0.6.0');
+    expect(result.xBRIEFInfo.author).toBe('overdeck/0.6.0');
   });
 
-  it('readPlan preserves vBRIEFInfo.description', () => {
+  it('readPlan preserves xBRIEFInfo.description', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
     const result = readPlanSync(planPath);
-    expect(result.vBRIEFInfo.description).toBe('Plan for PAN-453: Full vBRIEF v0.5 Spec Support');
+    expect(result.xBRIEFInfo.description).toBe('Plan for PAN-453: Full vBRIEF v0.5 Spec Support');
   });
 });
 
-// ─── VBriefPlan v0.5 fields ───────────────────────────────────────────────────
+// ─── XBriefPlan v0.5 fields ───────────────────────────────────────────────────
 
-describe('VBriefPlan v0.5 fields', () => {
+describe('XBriefPlan v0.5 fields', () => {
   it('readPlan preserves plan.uid', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
@@ -161,9 +161,9 @@ describe('VBriefPlan v0.5 fields', () => {
   });
 });
 
-// ─── VBriefItem timestamps ────────────────────────────────────────────────────
+// ─── XBriefItem timestamps ────────────────────────────────────────────────────
 
-describe('VBriefItem created/completed fields', () => {
+describe('XBriefItem created/completed fields', () => {
   it('readPlan preserves item.created', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);

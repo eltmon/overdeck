@@ -126,11 +126,11 @@ const findSpecByIssue = (projectRoot: string, issueId: string) =>
   Effect.runPromise(findSpecByIssueProgram(projectRoot, issueId) as Effect.Effect<any, any, never>);
 const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
   Effect.runPromise(writeSpecForIssueProgram(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
-import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
-function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
+function makeXBrief(issueId: string, status = 'running'): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-05-18T00:00:00Z' },
     plan: {
       id: issueId,
       title: `Plan for ${issueId}`,
@@ -572,7 +572,7 @@ describe('workflows', () => {
       );
       const wsPath = join(testDir, 'workspaces', 'feature-pan-100');
       mkdirSync(wsPath, { recursive: true });
-      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
       mockExecAsync.mockImplementation(async (command: string) => {
         if (command.includes('gh issue view') && command.includes('--json labels')) {
           return { stdout: JSON.stringify(['verifying-on-main', 'needs-close-out', 'merged', 'ready']), stderr: '' };
@@ -603,7 +603,7 @@ describe('workflows', () => {
     });
 
     it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
-      await writeSpecForIssue(testDir, makeVBrief('PAN-100'), 'active');
+      await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });

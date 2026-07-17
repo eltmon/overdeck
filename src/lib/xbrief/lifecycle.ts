@@ -25,7 +25,7 @@ export const VBRIEF_ROOT_DIRNAME = 'vbrief';
 
 export const VBRIEF_LIFECYCLE_DIRS = ['proposed', 'active', 'completed', 'cancelled'] as const;
 
-export type VBriefLifecycleDir = typeof VBRIEF_LIFECYCLE_DIRS[number];
+export type XBriefLifecycleDir = typeof VBRIEF_LIFECYCLE_DIRS[number];
 
 const FILENAME_RE = /^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+)\.vbrief\.json$/;
 
@@ -73,7 +73,7 @@ function formatDate(value: Date | string): string {
  *                      Defaults to "now". Always interpreted in UTC so filenames
  *                      are stable across timezones.
  */
-export function generateVBriefFilename(
+export function generateXBriefFilename(
   issueId: string,
   slug: string,
   createdDate: Date | string = new Date(),
@@ -94,7 +94,7 @@ export function generateVBriefFilename(
  * Parse a canonical vBRIEF filename back into its parts. Returns null if the
  * filename doesn't match the convention so callers can ignore stray files.
  */
-export function parseVBriefFilename(filename: string): { issueId: string; slug: string; date: string } | null {
+export function parseXBriefFilename(filename: string): { issueId: string; slug: string; date: string } | null {
   const match = filename.match(FILENAME_RE);
   if (!match) return null;
   return { date: match[1], issueId: match[2], slug: match[3] };
@@ -106,7 +106,7 @@ export function parseVBriefFilename(filename: string): { issueId: string; slug: 
  *
  * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function resolveVBriefDir(projectRoot: string, lifecycleDir: VBriefLifecycleDir, vbriefDirname?: string): string {
+export function resolveXBriefDir(projectRoot: string, lifecycleDir: XBriefLifecycleDir, vbriefDirname?: string): string {
   return join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME, lifecycleDir);
 }
 
@@ -114,7 +114,7 @@ export function resolveVBriefDir(projectRoot: string, lifecycleDir: VBriefLifecy
  * Resolve the absolute path to a project's vBRIEF root directory (without a
  * lifecycle subdirectory). Pure path math.
  */
-export function resolveVBriefRoot(projectRoot: string, vbriefDirname?: string): string {
+export function resolveXBriefRoot(projectRoot: string, vbriefDirname?: string): string {
   return join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
 }
 
@@ -124,7 +124,7 @@ export function resolveVBriefRoot(projectRoot: string, vbriefDirname?: string): 
  *
  * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function ensureVBriefDirsSync(projectRoot: string, vbriefDirname?: string): string {
+export function ensureXBriefDirsSync(projectRoot: string, vbriefDirname?: string): string {
   const root = join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
   mkdirSync(root, { recursive: true });
   for (const dir of VBRIEF_LIFECYCLE_DIRS) {
@@ -136,11 +136,11 @@ export function ensureVBriefDirsSync(projectRoot: string, vbriefDirname?: string
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
- * Effect variant of `ensureVBriefDirs`. Uses fs/promises so dashboard server
+ * Effect variant of `ensureXBriefDirs`. Uses fs/promises so dashboard server
  * routes can create the vBRIEF lifecycle directories without blocking the
  * Node.js event loop. Idempotent.
  */
-export const ensureVBriefDirs = (
+export const ensureXBriefDirs = (
   projectRoot: string,
   vbriefDirname?: string,
 ): Effect.Effect<string, FsError> =>

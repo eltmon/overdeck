@@ -8,7 +8,7 @@ import {
   planUatCandidate,
 } from '../../../src/lib/flywheel-merge-order.js';
 import type { SequenceNode } from '../../../src/lib/backlog/types.js';
-import type { VBriefDocument } from '../../../src/lib/xbrief/types.js';
+import type { XBriefDocument } from '../../../src/lib/xbrief/types.js';
 
 const c = (issueId: string, footprint: number, conflictCount: number) => ({
   issueId,
@@ -16,9 +16,9 @@ const c = (issueId: string, footprint: number, conflictCount: number) => ({
   conflictCount,
 });
 
-function spec(issueId: string, filesScope: string[]): VBriefDocument {
+function spec(issueId: string, filesScope: string[]): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-06-30T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-06-30T00:00:00Z' },
     plan: {
       id: issueId.toLowerCase(),
       title: issueId,

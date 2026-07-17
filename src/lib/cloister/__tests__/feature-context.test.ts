@@ -113,7 +113,7 @@ describe('writeStoryFeatureContext', () => {
 
     // Write the parent spec to the main-side .pan/specs/ directory
     const planDoc = {
-      vBRIEFInfo: { version: '0.5', created: '2024-01-01T00:00:00Z' },
+      xBRIEFInfo: { version: '0.5', created: '2024-01-01T00:00:00Z' },
       plan: {
         id: 'F-456',
         title: 'Feature Plan',

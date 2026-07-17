@@ -3,7 +3,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),
@@ -38,7 +38,7 @@ afterEach(async () => {
   await rm(tempRoot, { recursive: true, force: true });
 });
 
-function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): void {
+function writeSpec(projectPath: string, issueId: string, doc: XBriefDocument): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
   writeFileSync(join(specsDir, `2026-07-01-${issueId}-test.vbrief.json`), JSON.stringify({
@@ -47,10 +47,10 @@ function writeSpec(projectPath: string, issueId: string, doc: VBriefDocument): v
   }, null, 2));
 }
 
-function makeDoc(issueId: string, itemCount: number): VBriefDocument {
+function makeDoc(issueId: string, itemCount: number): XBriefDocument {
   const now = '2026-07-01T00:00:00.000Z';
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.6',
       created: now,
       author: 'test',

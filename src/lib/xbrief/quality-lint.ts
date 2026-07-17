@@ -2,11 +2,11 @@ import {
   subItemsOf,
   type FilesScopeConfidence,
   type ItemReadiness,
-  type VBriefDifficulty,
-  type VBriefDocument,
-  type VBriefItem,
-  type VBriefItemMetadata,
-  type VBriefSubItem,
+  type XBriefDifficulty,
+  type XBriefDocument,
+  type XBriefItem,
+  type XBriefItemMetadata,
+  type XBriefSubItem,
 } from './types.js';
 import { compileGlob } from './dag.js';
 import { analyzeSwarmReadiness } from './swarm-readiness.js';
@@ -44,7 +44,7 @@ const BANNED_AC_PATTERNS = [
 
 const FILES_SCOPE_CONFIDENCE_VALUES = new Set<FilesScopeConfidence>(['high', 'medium', 'low']);
 const ITEM_READINESS_VALUES = new Set<ItemReadiness>(['ready', 'sequential', 'needs_refinement']);
-const HEAVY_DIFFICULTIES = new Set<VBriefDifficulty>(['complex', 'expert']);
+const HEAVY_DIFFICULTIES = new Set<XBriefDifficulty>(['complex', 'expert']);
 const PARALLEL_SAFE_REASON_FIELDS = ['parallelSafeReason', 'parallel_safe_reason', 'readinessReason', 'readiness_reason'];
 const FILE_SIZE_BASELINE_PATH = 'scripts/file-size-baseline.txt';
 const FILE_SIZE_RECONCILIATION_PATTERN = /\b(?:drop(?:ped|ping)?|lower(?:ed|ing)?|reconcil(?:e|ed|es|ing|iation)|remov(?:e|ed|es|ing)|updat(?:e|ed|es|ing))\b/i;
@@ -58,11 +58,11 @@ function warning(itemId: string | null, rule: string, message: string): QualityI
   return { itemId, rule, message, severity: 'warn' };
 }
 
-function acceptanceCriteria(item: VBriefItem): VBriefSubItem[] {
+function acceptanceCriteria(item: XBriefItem): XBriefSubItem[] {
   return subItemsOf(item).filter(subItem => subItem.metadata?.kind === 'acceptance_criterion');
 }
 
-function hasAcJustification(item: VBriefItem): boolean {
+function hasAcJustification(item: XBriefItem): boolean {
   const value = item.metadata?.acJustification;
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -75,7 +75,7 @@ function stringValue(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() : null;
 }
 
-function hasParallelSafeReason(metadata: VBriefItemMetadata): boolean {
+function hasParallelSafeReason(metadata: XBriefItemMetadata): boolean {
   return PARALLEL_SAFE_REASON_FIELDS.some(field => (stringValue(metadata[field])?.length ?? 0) > 0);
 }
 
@@ -91,7 +91,7 @@ function isDocumentationPath(value: string): boolean {
   return scope.split('/').filter(Boolean).some(segment => segment === 'docs');
 }
 
-function documentsSomething(item: VBriefItem): boolean {
+function documentsSomething(item: XBriefItem): boolean {
   if (item.metadata?.kind === 'docs') return true;
   const filesScope = item.metadata?.files_scope;
   if (!Array.isArray(filesScope)) return false;
@@ -107,7 +107,7 @@ function isBroadFilesScope(value: string): boolean {
   return !scope.includes('*') && !hasFilenameLikeSegment(scope);
 }
 
-function lintRequiredDispatchMetadata(item: VBriefItem): QualityIssue[] {
+function lintRequiredDispatchMetadata(item: XBriefItem): QualityIssue[] {
   const issues: QualityIssue[] = [];
   const metadata = item.metadata ?? {};
   const filesScope = metadata.files_scope;
@@ -154,7 +154,7 @@ function lintRequiredDispatchMetadata(item: VBriefItem): QualityIssue[] {
   return issues;
 }
 
-function lintItem(item: VBriefItem): QualityIssue[] {
+function lintItem(item: XBriefItem): QualityIssue[] {
   const issues: QualityIssue[] = [];
   const acs = acceptanceCriteria(item);
 
@@ -194,7 +194,7 @@ function lintItem(item: VBriefItem): QualityIssue[] {
   return issues;
 }
 
-function lintDocumentReferences(doc: VBriefDocument): QualityIssue[] {
+function lintDocumentReferences(doc: XBriefDocument): QualityIssue[] {
   const issues: QualityIssue[] = [];
   const itemIds = new Set(doc.plan.items.map(item => item.id));
 
@@ -235,7 +235,7 @@ function collectDeclaredTraceIds(prdText: string): Set<string> {
   return ids;
 }
 
-function collectCoveredTraceIds(doc: VBriefDocument): Set<string> {
+function collectCoveredTraceIds(doc: XBriefDocument): Set<string> {
   const ids = new Set<string>();
   for (const item of doc.plan.items) {
     if (item.status === 'cancelled') continue;
@@ -248,7 +248,7 @@ function collectCoveredTraceIds(doc: VBriefDocument): Set<string> {
   return ids;
 }
 
-function lintTraceCoverage(doc: VBriefDocument, prdText?: string): QualityIssue[] {
+function lintTraceCoverage(doc: XBriefDocument, prdText?: string): QualityIssue[] {
   if (!prdText) return [];
   const declared = collectDeclaredTraceIds(prdText);
   if (declared.size === 0) return [];
@@ -258,7 +258,7 @@ function lintTraceCoverage(doc: VBriefDocument, prdText?: string): QualityIssue[
     .map(id => warning(null, 'trace-uncovered', `Requirement ${id} is declared in the PRD but no plan item metadata.traces references it`));
 }
 
-function lintDocsCoverage(doc: VBriefDocument): QualityIssue[] {
+function lintDocsCoverage(doc: XBriefDocument): QualityIssue[] {
   if (stringValue(doc.plan.metadata?.docsJustification)) return [];
 
   const active = doc.plan.items.filter(item => item.status !== 'cancelled');
@@ -271,7 +271,7 @@ function lintDocsCoverage(doc: VBriefDocument): QualityIssue[] {
   )];
 }
 
-function itemSearchText(item: VBriefItem): string {
+function itemSearchText(item: XBriefItem): string {
   return [
     item.title,
     item.narrative?.Action,
@@ -282,17 +282,17 @@ function itemSearchText(item: VBriefItem): string {
     .join('\n');
 }
 
-function scopeIncludesPath(item: VBriefItem, filePath: string): boolean {
+function scopeIncludesPath(item: XBriefItem, filePath: string): boolean {
   return (item.metadata?.files_scope ?? []).some(scope => compileGlob(scope).regex.test(filePath));
 }
 
-function requiresFileSizeLint(item: VBriefItem): boolean {
+function requiresFileSizeLint(item: XBriefItem): boolean {
   const commands = item.metadata?.verify_commands ?? [];
   if (commands.some(command => typeof command === 'string' && FILE_SIZE_LINT_COMMAND_PATTERN.test(command))) return true;
   return acceptanceCriteria(item).some(ac => FILE_SIZE_LINT_COMMAND_PATTERN.test(ac.title));
 }
 
-function lintDeferredFileSizeRatchet(doc: VBriefDocument): QualityIssue[] {
+function lintDeferredFileSizeRatchet(doc: XBriefDocument): QualityIssue[] {
   const activeItems = doc.plan.items.filter(item => item.status !== 'cancelled');
   const readiness = analyzeSwarmReadiness(doc);
   const issues: QualityIssue[] = [];
@@ -335,7 +335,7 @@ function orderedPairKey(left: string, right: string): string {
   return [left, right].sort().join('\0');
 }
 
-function connectedBlocksPairs(doc: VBriefDocument): Set<string> {
+function connectedBlocksPairs(doc: XBriefDocument): Set<string> {
   const itemIds = new Set(doc.plan.items.map(item => item.id));
   const pairs = new Set<string>();
   for (const edge of doc.plan.edges ?? []) {
@@ -345,7 +345,7 @@ function connectedBlocksPairs(doc: VBriefDocument): Set<string> {
   return pairs;
 }
 
-function lintOverlapAudit(doc: VBriefDocument, options: Pick<QualityLintOptions, 'hotspots'> = {}): QualityIssue[] {
+function lintOverlapAudit(doc: XBriefDocument, options: Pick<QualityLintOptions, 'hotspots'> = {}): QualityIssue[] {
   const issues: QualityIssue[] = [];
   const activeItemIds = new Set(doc.plan.items.filter(item => item.status !== 'cancelled').map(item => item.id));
   const connectedPairs = connectedBlocksPairs(doc);
@@ -371,7 +371,7 @@ function lintOverlapAudit(doc: VBriefDocument, options: Pick<QualityLintOptions,
   return issues;
 }
 
-function hasBlocksCycle(doc: VBriefDocument): boolean {
+function hasBlocksCycle(doc: XBriefDocument): boolean {
   const itemIds = new Set(doc.plan.items.map(item => item.id));
   const inDegree = new Map<string, number>();
   const outgoing = new Map<string, string[]>();
@@ -402,7 +402,7 @@ function hasBlocksCycle(doc: VBriefDocument): boolean {
   return visited < itemIds.size;
 }
 
-export function lintPlanQuality(doc: VBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
+export function lintPlanQuality(doc: XBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
   return [
     ...doc.plan.items.flatMap(item => item.status === 'cancelled' ? [] : lintItem(item)),
     ...lintDocumentReferences(doc),
@@ -413,7 +413,7 @@ export function lintPlanQuality(doc: VBriefDocument, options: QualityLintOptions
   ];
 }
 
-export function qualityLintErrors(doc: VBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
+export function qualityLintErrors(doc: XBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
   return lintPlanQuality(doc, options).filter(issue => issue.severity === 'error');
 }
 
@@ -434,7 +434,7 @@ export function formatQualityIssues(issues: QualityIssue[]): string[] {
   return lines;
 }
 
-export function assertPlanQuality(doc: VBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
+export function assertPlanQuality(doc: XBriefDocument, options: QualityLintOptions = {}): QualityIssue[] {
   const issues = lintPlanQuality(doc, options);
   const errors = issues.filter(issue => issue.severity === 'error');
   if (errors.length > 0) {

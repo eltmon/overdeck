@@ -6,8 +6,8 @@ import { join } from 'node:path';
 
 import {
   extractAcceptanceCriteriaFromIssue,
-  synthesizeMinimalVBrief,
-  writeAutoStartVBrief,
+  synthesizeMinimalXBrief,
+  writeAutoStartXBrief,
 } from '../auto-synthesize.js';
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
@@ -82,9 +82,9 @@ This is just background information.
   });
 });
 
-describe('synthesizeMinimalVBrief', () => {
+describe('synthesizeMinimalXBrief', () => {
   it('creates a proposed no-inspection v0.8 xBRIEF with acceptance-criterion items', () => {
-    const doc = synthesizeMinimalVBrief({
+    const doc = synthesizeMinimalXBrief({
       issueId: 'pan-1071',
       title: 'Auto start work agents',
       body: '## Acceptance Criteria\n- [ ] Synthesizes a minimal vBRIEF\n- [ ] Starts the normal flow',
@@ -110,13 +110,13 @@ describe('synthesizeMinimalVBrief', () => {
   });
 });
 
-describe('writeAutoStartVBrief', () => {
+describe('writeAutoStartXBrief', () => {
   it('writes workspace and canonical project specs', async () => {
     await withTempDir(async (root) => {
       const projectRoot = join(root, 'project');
       const workspacePath = join(projectRoot, 'workspaces', 'feature-pan-1071');
 
-      const result = await Effect.runPromise(writeAutoStartVBrief(projectRoot, workspacePath, {
+      const result = await Effect.runPromise(writeAutoStartXBrief(projectRoot, workspacePath, {
         issueId: 'PAN-1071',
         title: 'Auto start work agents',
         body: '- [ ] Start from an issue body',

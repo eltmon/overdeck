@@ -9,7 +9,7 @@ import {
 import { Effect } from 'effect';
 import type { FsError } from '../errors.js';
 import { findSpecByIssue } from '../pan-dir/specs.js';
-import type { FilesScopeConfidence, ItemReadiness, VBriefDocument, VBriefItem } from './types.js';
+import type { FilesScopeConfidence, ItemReadiness, XBriefDocument, XBriefItem } from './types.js';
 
 export interface SwarmReadinessOptions {
   hotspots?: string[];
@@ -43,7 +43,7 @@ export interface SwarmReadinessVerdict {
   swarmEligible: boolean;
 }
 
-export function computeIssueFootprint(doc: VBriefDocument): string[] {
+export function computeIssueFootprint(doc: XBriefDocument): string[] {
   const footprint = new Set<string>();
   for (const item of doc.plan.items) {
     for (const filePath of item.metadata?.files_scope ?? []) {
@@ -64,14 +64,14 @@ export function resolveIssueFootprint(
 }
 
 interface NormalizedItem {
-  item: VBriefItem;
+  item: XBriefItem;
   scope: string[];
   lowConfidence: boolean;
   missingScope: boolean;
 }
 
 export function analyzeSwarmReadiness(
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   opts: SwarmReadinessOptions = {},
 ): SwarmReadinessVerdict {
   const hotspots = (opts.hotspots ?? []).map(compileGlob);
@@ -123,7 +123,7 @@ export function analyzeSwarmReadiness(
   };
 }
 
-function normalizeItem(item: VBriefItem, hotspots: CompiledGlob[]): NormalizedItem {
+function normalizeItem(item: XBriefItem, hotspots: CompiledGlob[]): NormalizedItem {
   const rawScope = item.metadata?.files_scope ?? [];
   return {
     item,
@@ -133,7 +133,7 @@ function normalizeItem(item: VBriefItem, hotspots: CompiledGlob[]): NormalizedIt
   };
 }
 
-function isSlotEligible(item: VBriefItem, normalized?: NormalizedItem): boolean {
+function isSlotEligible(item: XBriefItem, normalized?: NormalizedItem): boolean {
   if (!normalized || normalized.missingScope || normalized.lowConfidence) return false;
   return item.metadata?.readiness === 'ready'
     && normalized.scope.length > 0
@@ -158,7 +158,7 @@ function analyzePairOverlap(
   return { overlaps: true, sharedFiles: sharedFilesFor(left, right), lowConfidence: false };
 }
 
-function withScope(item: VBriefItem, scope: string[]): VBriefItem {
+function withScope(item: XBriefItem, scope: string[]): XBriefItem {
   return {
     ...item,
     metadata: {

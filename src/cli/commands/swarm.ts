@@ -9,7 +9,7 @@ import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
-import type { VBriefDocument } from '../../lib/xbrief/types.js';
+import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import {
   classifyInFlightSlots,
   clearAllSlotAssignments,
@@ -767,7 +767,7 @@ async function ensureFeatureWorkspace(issueId: string, project: ResolvedProjectL
 async function loadSwarmPlan(
   issueId: string,
   deps: Pick<SwarmCommandDeps, 'resolveProjectFromIssueSync' | 'findSpecByIssue'>,
-): Promise<{ ok: true; project: ResolvedProjectLike; doc: VBriefDocument } | { ok: false; error: string }> {
+): Promise<{ ok: true; project: ResolvedProjectLike; doc: XBriefDocument } | { ok: false; error: string }> {
   const project = deps.resolveProjectFromIssueSync(issueId);
   if (!project) return { ok: false, error: `Could not resolve project for ${issueId}.` };
 

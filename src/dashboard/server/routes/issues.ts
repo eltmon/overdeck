@@ -702,7 +702,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
 
 // ─── Route: POST /api/issues/:id/generate-tasks ──────────────────────────────
 //
-// Runs createTasksFromVBrief() against the workspace. Same logic as
+// Runs createTasksFromXBrief() against the workspace. Same logic as
 // `pan plan finalize`, exposed so the
 // dashboard can offer a one-click "Generate Tasks" action when a vBRIEF plan
 // exists but tasks were never created (e.g. plans authored before the

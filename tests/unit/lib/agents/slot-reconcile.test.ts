@@ -5,11 +5,11 @@ import {
   type ReconciledSlotAssignment,
   type ReconciledSlotBranch,
 } from '../../../../src/lib/agents/slot-reconcile.js';
-import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
+import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
-function makeDoc(itemIds: string[]): VBriefDocument {
+function makeDoc(itemIds: string[]): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'PAN-1762',
       title: 'PAN-1762',

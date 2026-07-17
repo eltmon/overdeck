@@ -88,10 +88,10 @@ describe('gatherProjectLensSignals', () => {
     const result = await gatherProjectLensSignals(project, deps());
 
     expect(result).toEqual([
-      { issueId: 'PAN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: true, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: 'in-review', hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-2', issueOpen: false, hasOpenPr: true, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
-      { issueId: 'PAN-4', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
+      { issueId: 'PAN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: true, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: 'in-review', hasXbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-2', issueOpen: false, hasOpenPr: true, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-4', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, hasMergedBranchWork: false, phaseLabel: null, hasXbriefSpec: true, explicitlyReady: false },
     ]);
   });
 

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { verifyAndMergeSlot } from '../slot-merge.js';
-import type { VBriefItem } from '../../xbrief/types.js';
+import type { XBriefItem } from '../../xbrief/types.js';
 
-function makeItem(overrides: Partial<VBriefItem['metadata']> = {}): VBriefItem {
+function makeItem(overrides: Partial<XBriefItem['metadata']> = {}): XBriefItem {
   return {
     id: 'item-1',
     title: 't',

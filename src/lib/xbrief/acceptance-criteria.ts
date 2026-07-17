@@ -7,8 +7,8 @@
  */
 
 import { Effect } from 'effect';
-import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from './io.js';
-import { subItemsOf, type VBriefDocument, type VBriefItem, type VBriefItemStatus } from './types.js';
+import { readWorkspacePlanSync, readWorkspacePlan, type XBriefReadError } from './io.js';
+import { subItemsOf, type XBriefDocument, type XBriefItem, type XBriefItemStatus } from './types.js';
 
 /** A single acceptance criterion with its parent task context. */
 export interface AcceptanceCriterion {
@@ -21,7 +21,7 @@ export interface AcceptanceCriterion {
   /** AC description */
   title: string;
   /** Current status */
-  status: VBriefItemStatus;
+  status: XBriefItemStatus;
 }
 
 /** Result of checking whether all AC are completed. */
@@ -39,7 +39,7 @@ export interface ItemACStatus {
   criteria: AcceptanceCriterion[];
 }
 
-export interface VBriefACStatus {
+export interface XBriefACStatus {
   allCompleted: boolean;
   items: ItemACStatus[];
   totalCompleted: number;
@@ -47,7 +47,7 @@ export interface VBriefACStatus {
   totalCount: number;
 }
 
-export function getVBriefACStatusSync(workspacePath: string): VBriefACStatus | null {
+export function getXBriefACStatusSync(workspacePath: string): XBriefACStatus | null {
   const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return null;
   const allCriteria = extractACFromDocument(doc);
@@ -88,14 +88,14 @@ export function extractAcceptanceCriteriaSync(workspacePath: string): Acceptance
 /**
  * Extract AC from an already-loaded document (avoids re-reading the file).
  */
-function isDeferredOrCancelledItem(item: VBriefItem): boolean {
+function isDeferredOrCancelledItem(item: XBriefItem): boolean {
   const status = String(item.status);
   return status === 'cancelled'
     || status === 'deferred'
     || item.metadata?.deferred === true;
 }
 
-export function extractACFromDocument(doc: VBriefDocument): AcceptanceCriterion[] {
+export function extractACFromDocument(doc: XBriefDocument): AcceptanceCriterion[] {
   const criteria: AcceptanceCriterion[] = [];
 
   for (const item of doc.plan.items) {
@@ -182,7 +182,7 @@ export function checkAllCriteriaCompletedSync(workspacePath: string): ACCompleti
 /** Effect variant of `extractAcceptanceCriteria`. */
 export const extractAcceptanceCriteria = (
   workspacePath: string,
-): Effect.Effect<AcceptanceCriterion[], VBriefReadError> =>
+): Effect.Effect<AcceptanceCriterion[], XBriefReadError> =>
   Effect.gen(function* () {
     const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return [];
@@ -192,7 +192,7 @@ export const extractAcceptanceCriteria = (
 /** Effect variant of `checkAllCriteriaCompleted`. */
 export const checkAllCriteriaCompleted = (
   workspacePath: string,
-): Effect.Effect<ACCompletionResult, VBriefReadError> =>
+): Effect.Effect<ACCompletionResult, XBriefReadError> =>
   Effect.gen(function* () {
     const criteria = yield* extractAcceptanceCriteria(workspacePath);
     if (criteria.length === 0) return { allCompleted: true, incomplete: [] };

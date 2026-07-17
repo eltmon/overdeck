@@ -4,7 +4,7 @@
 >
 > - `bd version` still reports **1.0.2**
 > - `withBdMutex` still used in `cloister/triggers.ts`, `cloister/handoff-context.ts`, `cloister/inspect-agent.ts`
-> - `createBeadsFromVBrief` still in `src/lib/xbrief/beads.ts`
+> - `createBeadsFromXBrief` still in `src/lib/xbrief/beads.ts`
 >
 > PAN-1105 (referenced below) has since been closed as obsolete — the convoy-reviewer silent-exit pipeline has been refactored independently. Drop PAN-1105 from the motivation when re-planning; the rest of the rationale (permissions warnings, torn audit logs, bundled wrapper scaffolding that 1.0.3+ subsumes) still applies.
 >
@@ -26,7 +26,7 @@ Recent beads-related incidents this user keeps hitting:
 - PAN-1105 (convoy reviewers silent-exit) and PAN-457 review error both fire when the workspace beads DB is in an unexpected state.
 - The \"permissions 0775 (recommended: 0700)\" warning on every bd call.
 - Concurrent \`bd list\` invocations producing torn audit-log lines and the \"Command failed: bd list\" error class.
-- Our \`createBeadsFromVBrief\` recovery historically ran \`bd init --prefix\` inside a redirect-managed worktree — clobbered the redirect, half-initialized a server-mode DB, permanently broke the worktree (fixed in commit \`7d0e50cf3\`).
+- Our \`createBeadsFromXBrief\` recovery historically ran \`bd init --prefix\` inside a redirect-managed worktree — clobbered the redirect, half-initialized a server-mode DB, permanently broke the worktree (fixed in commit \`7d0e50cf3\`).
 
 Each one is a symptom of the same root cause: **beads has been growing native support for the things we hand-roll, and our wrapper code interferes with the cleaner native paths.**
 
@@ -59,9 +59,9 @@ Each one is a symptom of the same root cause: **beads has been growing native su
 | What we do today | Why it can be simplified after upgrade |
 | --- | --- |
 | \`src/lib/workspace-manager.ts\` writes \`.beads/redirect\` manually on every worktree create | beads has worktree-native support; with v1.0.4 \`fix(hooks): auto-import .beads/issues.jsonl after pull/checkout\` we can lean on bd to hydrate the worktree DB from the committed jsonl instead of redirecting. |
-| \`src/lib/xbrief/beads.ts::createBeadsFromVBrief\` does its own connectivity probe + recovery (with stale-artifact heuristics) | Replace probe with \`bd ping\`. Replace recovery with \`bd doctor --fix\` (already wrapped by \`pan admin beads doctor\`). |
+| \`src/lib/xbrief/beads.ts::createBeadsFromXBrief\` does its own connectivity probe + recovery (with stale-artifact heuristics) | Replace probe with \`bd ping\`. Replace recovery with \`bd doctor --fix\` (already wrapped by \`pan admin beads doctor\`). |
 | \`withBdMutex\` serializes \`bd list\` calls across the dashboard server | v1.0.3 \`fix(audit)\` removes one whole class of races inside beads — keep the mutex for now but treat it as a workaround we can re-evaluate. |
-| Hand-roll \`bd init --prefix\` recovery in createBeadsFromVBrief | beads now repairs perms + metadata defaults on init. Recovery surface should shrink to a single \`bd init || bd doctor --fix\` rather than the multi-branch logic we have today. |
+| Hand-roll \`bd init --prefix\` recovery in createBeadsFromXBrief | beads now repairs perms + metadata defaults on init. Recovery surface should shrink to a single \`bd init || bd doctor --fix\` rather than the multi-branch logic we have today. |
 | Committed \`.beads/metadata.json\` + \`.beads/hooks/\` in main as ambient noise | v1.0.4 \`fix(hooks): use BeadsDirPerm (0700)\` writes hooks with correct perms; we can choose whether they stay committed or get \`.gitignore\`d (commit \`5fb7e0bcd\` is when hooks were originally added — worth re-evaluating). |
 
 ## Work items
@@ -81,7 +81,7 @@ Each one is a symptom of the same root cause: **beads has been growing native su
 
 ### 3. Lean on native support (incremental — do NOT do all at once)
 - [ ] **Replace** our \`bd list --json --limit 0\` connectivity probe in \`src/lib/xbrief/beads.ts\` with \`bd ping --json\`
-- [ ] **Simplify** \`createBeadsFromVBrief\` recovery: on \`bd ping\` failure, try \`bd doctor --fix\` once; otherwise return a clear error and stop. Remove the stale-artifact heuristic.
+- [ ] **Simplify** \`createBeadsFromXBrief\` recovery: on \`bd ping\` failure, try \`bd doctor --fix\` once; otherwise return a clear error and stop. Remove the stale-artifact heuristic.
 - [ ] **Evaluate** removing the \`.beads/redirect\` setup in workspace-manager.ts in favor of the v1.0.4 \`auto-import after pull/checkout\` hook flow. (May not be a free swap — verify behavior with a manual test before deleting code.)
 - [ ] **Decide** whether \`.beads/hooks/\` and \`.beads/metadata.json\` should remain committed. v1.0.4 writes them with correct perms; if we keep them, add a comment to \`.beads/.gitignore\` explaining why; if we drop them, \`git rm\` and add to \`.gitignore\`.
 
@@ -94,7 +94,7 @@ Each one is a symptom of the same root cause: **beads has been growing native su
 1. \`bd --version\` reports \`1.0.4\` (or later patch on the \`1.0.x\` line)
 2. \`pan install\` installs v1.0.4 and the version check accepts only v1.0.4+
 3. Creating a fresh worktree no longer produces the \"permissions 0775\" warning on any bd call
-4. \`createBeadsFromVBrief\` uses \`bd ping\` for connectivity (verified by reading the source); the stale-artifact heuristic is gone
+4. \`createBeadsFromXBrief\` uses \`bd ping\` for connectivity (verified by reading the source); the stale-artifact heuristic is gone
 5. The PAN-457 recurring symptom (probe → \"table not found: issues\" → workspace permanently broken) does not reproduce: simulating a corrupted local dolt manifest in a worktree, \`bd ping\` recovers via v1.0.3's auto-recovery rather than requiring our wrapper to intervene
 6. Tests in \`src/lib/xbrief/__tests__/create-beads.test.ts\` updated to reflect the simplified recovery surface
 7. No regression in PAN-457-style symptoms across 5 consecutive \`pan start\` / sync-main cycles
@@ -133,7 +133,7 @@ I re-audited the original issue body against current main. The Beads upgrade pie
 Implemented evidence:
 - Local `bd --version` reports `bd version 1.0.4 (ce242a879)`.
 - `bd ping --json` succeeds with `"status": "ok"`.
-- `createBeadsFromVBrief` uses `bd ping --json` and one `bd doctor --fix` retry: `src/lib/xbrief/beads.ts:191-218`.
+- `createBeadsFromXBrief` uses `bd ping --json` and one `bd doctor --fix` retry: `src/lib/xbrief/beads.ts:191-218`.
 - PAN-457-style table-missing recovery is covered in `src/lib/xbrief/__tests__/create-beads.test.ts:219-248`.
 
 Remaining gaps:

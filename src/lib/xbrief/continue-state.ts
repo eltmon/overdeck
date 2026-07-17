@@ -6,7 +6,7 @@
  * import them as type annotations and the structural shape must stay stable.
  */
 
-import type { VBriefDifficulty } from './types.js';
+import type { XBriefDifficulty } from './types.js';
 
 export const CONTINUE_FILENAME_SUFFIX = '.vbrief.json';
 
@@ -76,13 +76,13 @@ export interface ScopeDriftRecord {
 
 export interface TierPromotionHistoryEntry {
   at: string;
-  from: VBriefDifficulty;
-  to: VBriefDifficulty;
+  from: XBriefDifficulty;
+  to: XBriefDifficulty;
   reason: string;
 }
 
 export interface TierOverride {
-  effectiveDifficulty: VBriefDifficulty;
+  effectiveDifficulty: XBriefDifficulty;
   promotions: number;
   history: TierPromotionHistoryEntry[];
 }

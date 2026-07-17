@@ -7,15 +7,15 @@
 
 import { createRequire } from 'module';
 import type {
-  VBriefDocument,
-  VBriefPlan,
-  VBriefItem,
-  VBriefSubItem,
-  VBriefEdgeType,
-  VBriefItemStatus,
-  VBriefPriority,
-  VBriefDifficulty,
-  VBriefReference,
+  XBriefDocument,
+  XBriefPlan,
+  XBriefItem,
+  XBriefSubItem,
+  XBriefEdgeType,
+  XBriefItemStatus,
+  XBriefPriority,
+  XBriefDifficulty,
+  XBriefReference,
 } from './types.js';
 
 const require = createRequire(import.meta.url);
@@ -31,7 +31,7 @@ function getPackageVersion(): string {
 }
 
 export class PlanBuilder {
-  private plan: VBriefPlan;
+  private plan: XBriefPlan;
   private _description?: string;
 
   constructor(id: string, title: string) {
@@ -65,7 +65,7 @@ export class PlanBuilder {
     return this;
   }
 
-  references(refs: VBriefReference[]): this {
+  references(refs: XBriefReference[]): this {
     this.plan.references = refs;
     return this;
   }
@@ -92,19 +92,19 @@ export class PlanBuilder {
     return this;
   }
 
-  addItem(item: VBriefItem): this {
+  addItem(item: XBriefItem): this {
     this.plan.items.push(item);
     return this;
   }
 
   addTask(id: string, title: string, opts?: {
     narrative?: string;
-    difficulty?: VBriefDifficulty;
+    difficulty?: XBriefDifficulty;
     phase?: number;
-    priority?: VBriefPriority;
-    items?: VBriefSubItem[];
+    priority?: XBriefPriority;
+    items?: XBriefSubItem[];
     /** Legacy input alias retained for call sites that still pass v0.5-style children. */
-    subItems?: VBriefSubItem[];
+    subItems?: XBriefSubItem[];
     created?: string;
   }): this {
     this.plan.items.push({
@@ -133,7 +133,7 @@ export class PlanBuilder {
     return this;
   }
 
-  build(): VBriefDocument {
+  build(): XBriefDocument {
     const now = new Date().toISOString();
     const version = getPackageVersion();
     return {

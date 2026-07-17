@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { lintPlanQuality, OBSERVABLE_TERMS, PLACEHOLDER_AC_PATTERNS, DOCS_ONLY_AC_PATTERNS, VAGUE_AC_PATTERNS, qualityLintErrors } from '../quality-lint.js';
-import type { VBriefDocument, VBriefItem } from '../types.js';
+import type { XBriefDocument, XBriefItem } from '../types.js';
 
 function ac(id: string, title: string) {
   return {
@@ -11,7 +11,7 @@ function ac(id: string, title: string) {
   };
 }
 
-function item(overrides: Partial<VBriefItem> = {}): VBriefItem {
+function item(overrides: Partial<XBriefItem> = {}): XBriefItem {
   const id = overrides.id ?? 'item-1';
   const defaultMetadata = {
     requiresInspection: false,
@@ -37,7 +37,7 @@ function item(overrides: Partial<VBriefItem> = {}): VBriefItem {
   };
 }
 
-function doc(items: VBriefItem[], planMetadata: Record<string, unknown> = { docsJustification: 'Fixture plan; docs coverage is exercised in its own suite' }): VBriefDocument {
+function doc(items: XBriefItem[], planMetadata: Record<string, unknown> = { docsJustification: 'Fixture plan; docs coverage is exercised in its own suite' }): XBriefDocument {
   return {
     xBRIEFInfo: {
       version: '0.5',
@@ -54,7 +54,7 @@ function doc(items: VBriefItem[], planMetadata: Record<string, unknown> = { docs
   };
 }
 
-function rulesFor(items: VBriefItem[]): string[] {
+function rulesFor(items: XBriefItem[]): string[] {
   return lintPlanQuality(doc(items)).map(issue => issue.rule);
 }
 
@@ -196,7 +196,7 @@ describe('lintPlanQuality dispatch metadata', () => {
 });
 
 describe('lintPlanQuality file-size ratchet ownership', () => {
-  function extractionItem(overrides: Partial<VBriefItem> = {}): VBriefItem {
+  function extractionItem(overrides: Partial<XBriefItem> = {}): XBriefItem {
     return item({
       id: 'extract-seam',
       narrative: { Action: 'Extract functions from src/lib/cloister/specialists.ts into a focused module without behavior changes' },
@@ -211,7 +211,7 @@ describe('lintPlanQuality file-size ratchet ownership', () => {
     });
   }
 
-  function reconciliationItem(): VBriefItem {
+  function reconciliationItem(): XBriefItem {
     return item({
       id: 'reconcile-ratchet',
       narrative: { Action: 'Run the updater to lower scripts/file-size-baseline.txt for src/lib/cloister/specialists.ts after all extractions' },
@@ -324,7 +324,7 @@ describe('lintPlanQuality overlap audit', () => {
 });
 
 describe('lintPlanQuality DAG and references', () => {
-  function validItem(id: string, overrides: Partial<VBriefItem> = {}): VBriefItem {
+  function validItem(id: string, overrides: Partial<XBriefItem> = {}): XBriefItem {
     return item({
       id,
       title: id,
@@ -418,7 +418,7 @@ describe('lintPlanQuality DAG and references', () => {
 describe('lintPlanQuality documentation coverage', () => {
   const noWaiver: Record<string, unknown> = {};
 
-  function rulesForPlan(items: VBriefItem[], planMetadata = noWaiver): string[] {
+  function rulesForPlan(items: XBriefItem[], planMetadata = noWaiver): string[] {
     return lintPlanQuality(doc(items, planMetadata)).map(issue => issue.rule);
   }
 

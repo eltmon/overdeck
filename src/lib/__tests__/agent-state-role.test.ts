@@ -480,7 +480,7 @@ describe('AgentState role persistence', () => {
     const workspace = mkdtempSync(join(tmpdir(), 'pan-stack-host-'));
     mkdirSync(join(workspace, '.pan'), { recursive: true });
     writeFileSync(join(workspace, '.pan', 'spec.vbrief.json'), JSON.stringify({
-      vBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
+      xBRIEFInfo: { version: '0.5', created: '2026-07-14T00:00:00.000Z' },
       plan: {
         id: 'PAN-1140',
         title: 'Host override fixture',

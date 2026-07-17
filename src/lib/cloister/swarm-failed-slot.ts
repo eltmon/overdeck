@@ -8,7 +8,7 @@ import {
 import { updateIssueRecordForWorkspace } from '../pan-dir/record-update.js';
 import { createMinimalIssueRecord, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import type { PersistedTaskOperation } from '../xbrief/dag.js';
-import type { VBriefDocument } from '../xbrief/types.js';
+import type { XBriefDocument } from '../xbrief/types.js';
 import { recordRecoveryFailure } from './recovery-trip.js';
 import { getAgentStateSync } from '../agents/agent-state.js';
 import { decideAutonomousRedrive } from './redrive-gate.js';
@@ -81,11 +81,11 @@ export async function requeueFailedSwarmSlots(
   issueId: string,
   workspacePath: string,
   classified: ClassifiedSlot[],
-  doc: VBriefDocument,
+  doc: XBriefDocument,
   reconciled: SlotReconcileResult,
   deps: FailedSlotArchiveDeps & { applyTaskOperationToPlanFile: (issueId: string, operation: PersistedTaskOperation, workspacePath?: string) => Promise<unknown> },
   blockedSlotIndexes: Set<number> = new Set(),
-): Promise<{ doc: VBriefDocument; actions: string[] }> {
+): Promise<{ doc: XBriefDocument; actions: string[] }> {
   let nextDoc = doc;
   const actions: string[] = [];
   for (const slot of classified.filter(candidate => candidate.lifecycle === 'failed')) {

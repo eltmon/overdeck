@@ -9,10 +9,10 @@
  */
 
 import { Effect } from 'effect';
-import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from '../xbrief/io.js';
-import type { VBriefItemStatus } from '../xbrief/types.js';
+import { readWorkspacePlanSync, readWorkspacePlan, type XBriefReadError } from '../xbrief/io.js';
+import type { XBriefItemStatus } from '../xbrief/types.js';
 
-const TERMINAL_STATUSES: VBriefItemStatus[] = ['completed', 'cancelled'];
+const TERMINAL_STATUSES: XBriefItemStatus[] = ['completed', 'cancelled'];
 
 /**
  * Returns true if the given vBRIEF item can be worked on — i.e., all items
@@ -102,7 +102,7 @@ export function getUnblockedItemsSync(workspacePath: string, justCompletedId: st
 export const isTaskReady = (
   itemId: string,
   workspacePath: string,
-): Effect.Effect<boolean, VBriefReadError> =>
+): Effect.Effect<boolean, XBriefReadError> =>
   Effect.gen(function* () {
     const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return true;
@@ -131,7 +131,7 @@ export const isTaskReady = (
 export const getUnblockedItems = (
   workspacePath: string,
   justCompletedId: string,
-): Effect.Effect<string[], VBriefReadError> =>
+): Effect.Effect<string[], XBriefReadError> =>
   Effect.gen(function* () {
     const doc = yield* readWorkspacePlan(workspacePath);
     if (!doc) return [];

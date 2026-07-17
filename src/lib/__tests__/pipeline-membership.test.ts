@@ -10,7 +10,7 @@ const sig = (over: Partial<IssueLensSignals>): IssueLensSignals => ({
   hasConventionBranch: false,
   branchUnmerged: false, hasMergedBranchWork: false,
   phaseLabel: null,
-  hasVbriefSpec: false,
+  hasXbriefSpec: false,
   explicitlyReady: false,
   ...over,
 });
@@ -53,7 +53,7 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
   });
 
   it('planned_backlog: open issue with a vBRIEF spec but no branch or PR', () => {
-    const r = resolvePipelineMembership(sig({ issueOpen: true, hasVbriefSpec: true }));
+    const r = resolvePipelineMembership(sig({ issueOpen: true, hasXbriefSpec: true }));
     expect(r.bucket).toBe('planned_backlog');
     expect(r.inPipeline).toBe(true);
   });
@@ -65,7 +65,7 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
   });
 
   it('clean_terminal: closed issue with a vBRIEF spec and no open PR remains terminal', () => {
-    const r = resolvePipelineMembership(sig({ issueOpen: false, hasVbriefSpec: true }));
+    const r = resolvePipelineMembership(sig({ issueOpen: false, hasXbriefSpec: true }));
     expect(r.bucket).toBe('clean_terminal');
     expect(r.inPipeline).toBe(false);
   });

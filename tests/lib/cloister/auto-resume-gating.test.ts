@@ -108,7 +108,7 @@ describe('auto-resume gates', () => {
     writeFileSync(
       join(panDir, 'spec.vbrief.json'),
       JSON.stringify({
-        vBRIEFInfo: {
+        xBRIEFInfo: {
           version: '0.6',
           created: BASE_TIME.toISOString(),
           author: 'test',

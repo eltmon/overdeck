@@ -32,7 +32,7 @@ import {
   writeSpec,
   writeWorkspaceContext,
 } from '../index.js'
-import type { VBriefDocument } from '../../xbrief/types.js'
+import type { XBriefDocument } from '../../xbrief/types.js'
 
 let TEST_DIR: string
 
@@ -46,7 +46,7 @@ afterEach(() => {
   }
 })
 
-function makeDoc(issueId: string, title: string, status = 'draft'): VBriefDocument {
+function makeDoc(issueId: string, title: string, status = 'draft'): XBriefDocument {
   return {
     xBRIEFInfo: {
       version: '0.5',

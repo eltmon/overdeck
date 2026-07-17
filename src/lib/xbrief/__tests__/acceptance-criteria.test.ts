@@ -8,7 +8,7 @@ import {
   formatAcceptanceCriteria,
   checkAllCriteriaCompletedSync,
 } from '../acceptance-criteria.js';
-import type { VBriefDocument } from '../types.js';
+import type { XBriefDocument } from '../types.js';
 
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
@@ -21,7 +21,7 @@ function makePlanWithAC(items: Array<{
   status?: string;
   metadata?: Record<string, unknown>;
   subItems?: Array<{ id: string; title: string; status?: string; kind?: string }>;
-}>): VBriefDocument {
+}>): XBriefDocument {
   return {
     xBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
     plan: {
@@ -45,7 +45,7 @@ function makePlanWithAC(items: Array<{
   };
 }
 
-function writePlan(doc: VBriefDocument): void {
+function writePlan(doc: XBriefDocument): void {
   const specsDir = join(PROJECT_ROOT, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
   writeFileSync(join(specsDir, SPEC_FILENAME), JSON.stringify({ ...doc, status: 'active' }, null, 2));

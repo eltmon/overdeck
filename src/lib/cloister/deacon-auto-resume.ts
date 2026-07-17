@@ -46,7 +46,7 @@ import {
 } from '../tmux.js';
 import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { getDispatchableItems } from '../xbrief/dag.js';
-import type { VBriefItem } from '../xbrief/types.js';
+import type { XBriefItem } from '../xbrief/types.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
 
 export interface AutoResumeNotifierDeps {
@@ -408,7 +408,7 @@ function buildStalledResumePrompt(state: AgentState): string | null {
   return buildDefaultResumeContinueMessage(state.issueId);
 }
 
-function readyTaskLine(item: VBriefItem): string {
+function readyTaskLine(item: XBriefItem): string {
   return `${item.id} ${item.title}`.trim();
 }
 

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { analyzeSwarmReadiness } from '../../../src/lib/xbrief/swarm-readiness.js';
 import { formatReadinessReport } from '../../../src/cli/commands/plan-finalize.js';
-import type { VBriefDocument } from '../../../src/lib/xbrief/types.js';
+import type { XBriefDocument } from '../../../src/lib/xbrief/types.js';
 
-function makeDoc(): VBriefDocument {
+function makeDoc(): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'PAN-1762',
       title: 'Readiness report',

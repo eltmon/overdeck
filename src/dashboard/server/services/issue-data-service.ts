@@ -22,14 +22,14 @@ import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig }
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { findPlan, readWorkspacePlan } from '../../../lib/xbrief/io.js';
-import type { VBriefDocument } from '../../../lib/xbrief/types.js';
+import type { XBriefDocument } from '../../../lib/xbrief/types.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 
 /**
  * Compute task progress counts from a cached plan document.
  * Exported for testing.
  */
-export function computeTaskCounts(doc: VBriefDocument | null): { completed: number; total: number } | null {
+export function computeTaskCounts(doc: XBriefDocument | null): { completed: number; total: number } | null {
   const items = doc?.plan?.items ?? [];
   if (items.length === 0) return null;
   return { completed: items.filter((i) => i.status === 'completed').length, total: items.length };

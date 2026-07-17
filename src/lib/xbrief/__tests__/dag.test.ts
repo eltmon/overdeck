@@ -4,9 +4,9 @@ import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { criticalPath, readPlanFile } from '../dag.js';
-import type { VBriefDocument } from '../types.js';
+import type { XBriefDocument } from '../types.js';
 
-function makeDoc(items: Array<{ id: string }>, edges: Array<{ from: string; to: string; type?: string }>): VBriefDocument {
+function makeDoc(items: Array<{ id: string }>, edges: Array<{ from: string; to: string; type?: string }>): XBriefDocument {
   return {
     xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {

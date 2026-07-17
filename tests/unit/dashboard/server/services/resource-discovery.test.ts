@@ -177,7 +177,7 @@ describe('resource-discovery grouping', () => {
           tmuxSessionCount: 0,
           tmuxSessionNames: [],
           prs: [],
-          hasVbrief: false,
+          hasXbrief: false,
           hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
@@ -214,7 +214,7 @@ describe('resource-discovery grouping', () => {
           tmuxSessionCount: 0,
           tmuxSessionNames: [],
           prs: [],
-          hasVbrief: false,
+          hasXbrief: false,
           hasTasks: false,
           dockerContainerCount: 0,
           dockerContainerNames: [],
@@ -256,7 +256,7 @@ describe('resource-discovery grouping', () => {
               isDraft: false,
             },
           ],
-          hasVbrief: true,
+          hasXbrief: true,
           hasTasks: true,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-100-db'],
@@ -310,7 +310,7 @@ describe('resource-discovery sanitization', () => {
               isDraft: false,
             },
           ],
-          hasVbrief: false,
+          hasXbrief: false,
           hasTasks: false,
           dockerContainerCount: 1,
           dockerContainerNames: ['pan-300-db'],
@@ -713,7 +713,7 @@ describe('resource-discovery vbrief recency signal', () => {
   beforeEach(() => {
     resetResourceAllocatedIssuesCacheForTests();
     mocks.issueService.getIssues.mockReturnValue([
-      { identifier: 'PAN-9005', title: 'Vbrief recency issue', state: 'open', rawTrackerState: 'OPEN' },
+      { identifier: 'PAN-9005', title: 'Xbrief recency issue', state: 'open', rawTrackerState: 'OPEN' },
     ]);
     mocks.findSpecByIssue.mockReturnValue(Effect.succeed({ path: '/state/specs/pan-9005.vbrief.json' }));
   });

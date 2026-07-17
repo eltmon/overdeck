@@ -51,7 +51,7 @@ export interface ResourceDetails {
   remoteBranchCount: number;
   tmuxSessionCount: number;
   prs: ResourcePullRequest[];
-  hasVbrief: boolean;
+  hasXbrief: boolean;
   hasTasks: boolean;
   dockerContainerCount: number;
   /** Current HEAD of the agent's workspace, or null when no workspace exists. */
@@ -233,7 +233,7 @@ function summarizeResourceDetails(details: InternalResourceDetails): ResourceDet
       state: pr.state,
       isDraft: pr.isDraft,
     })),
-    hasVbrief: details.vbriefPath !== null,
+    hasXbrief: details.vbriefPath !== null,
     hasTasks: details.tasksPath !== null,
     dockerContainerCount: details.dockerContainers.length,
     actualBranch: details.actualBranch,
@@ -451,7 +451,7 @@ interface WorkspaceScanResult {
   hasPlanning: boolean;
   hasPrd: boolean;
   hasState: boolean;
-  hasVbrief: boolean;
+  hasXbrief: boolean;
   vbriefPath: string | null;
   vbriefMtime: number | null;
   hasTasks: boolean;
@@ -488,7 +488,7 @@ async function scanWorkspace(
     hasPlanning: workspaceEntries.has(PAN_DIRNAME),
     hasPrd: panEntries.has('prd.md'),
     hasState: panEntries.has(PAN_CONTINUE_FILENAME),
-    hasVbrief: vbriefPath !== null,
+    hasXbrief: vbriefPath !== null,
     vbriefPath,
     vbriefMtime,
     hasTasks: vbriefPath !== null,
@@ -894,7 +894,7 @@ export function sanitizeResourceAllocatedIssues(issues: ResourceAllocatedIssue[]
         state: pr.state,
         isDraft: pr.isDraft,
       })),
-      hasVbrief: issue.resourceDetails.hasVbrief,
+      hasXbrief: issue.resourceDetails.hasXbrief,
       hasTasks: issue.resourceDetails.hasTasks,
       dockerContainerCount: issue.resourceDetails.dockerContainerCount,
       actualBranch: issue.resourceDetails.actualBranch,

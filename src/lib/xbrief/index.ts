@@ -10,20 +10,20 @@
 
 // Types
 export type {
-  VBriefDocument,
-  VBriefPlan,
-  VBriefItem,
-  VBriefSubItem,
-  VBriefEdge,
-  VBriefEdgeType,
-  VBriefItemStatus,
-  VBriefPriority,
-  VBriefDifficulty,
-  VBriefItemKind,
+  XBriefDocument,
+  XBriefPlan,
+  XBriefItem,
+  XBriefSubItem,
+  XBriefEdge,
+  XBriefEdgeType,
+  XBriefItemStatus,
+  XBriefPriority,
+  XBriefDifficulty,
+  XBriefItemKind,
 } from './types.js';
 
 // Date helpers
-export { DEFAULT_VBRIEF_ITEM_KIND, isRFC3339DateTime, resolveVBriefItemKind, toRFC3339 } from './types.js';
+export { DEFAULT_VBRIEF_ITEM_KIND, isRFC3339DateTime, resolveXBriefItemKind, toRFC3339 } from './types.js';
 
 // Builder
 export { PlanBuilder, planBuilder } from './builder.js';
@@ -42,10 +42,10 @@ export {
   readPlan,
   findPlan,
   readWorkspacePlan,
-  VBriefMergeConflictTaggedError,
-  VBriefInvalidFormatError,
+  XBriefMergeConflictTaggedError,
+  XBriefInvalidFormatError,
 } from './io.js';
-export type { VBriefReadError } from './io.js';
+export type { XBriefReadError } from './io.js';
 
 export { getDispatchableItems, getTaskGraphView } from './dag.js';
 

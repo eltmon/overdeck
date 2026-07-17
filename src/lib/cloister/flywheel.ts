@@ -11,7 +11,7 @@ import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
-import type { VBriefDocument } from '../xbrief/types.js';
+import type { XBriefDocument } from '../xbrief/types.js';
 import {
   getFlywheelActiveRunId,
   isFlywheelAutoPickupBacklog,
@@ -159,7 +159,7 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
               const issueId = match[1]!.toUpperCase();
               issuesWithSpecs.add(issueId);
               try {
-                const doc = JSON.parse(readFileSync(join(specsDir, f), 'utf-8')) as VBriefDocument;
+                const doc = JSON.parse(readFileSync(join(specsDir, f), 'utf-8')) as XBriefDocument;
                 declaredFootprints.push(declaredIssueFootprint(issueId, doc));
               } catch {
                 // A malformed spec should not break flywheel startup; planned-ness

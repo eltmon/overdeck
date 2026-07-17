@@ -28,7 +28,7 @@ import {
 } from '../../../../lib/overdeck/planning-promotion.js';
 import { applyStatusOverrides } from '../../../../lib/xbrief/io.js';
 import { lintPlanQuality, PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
-import type { VBriefDocument } from '../../../../lib/xbrief/types.js';
+import type { XBriefDocument } from '../../../../lib/xbrief/types.js';
 
 let projectRoot: string | null = null;
 
@@ -43,9 +43,9 @@ function makeProject(issueId: string): { projectPath: string; workspacePath: str
   return { projectPath: projectRoot, workspacePath };
 }
 
-function makeDoc(issueId: string): VBriefDocument {
+function makeDoc(issueId: string): XBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-05-16T00:00:00.000Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-05-16T00:00:00.000Z' },
     plan: {
       id: issueId,
       title: 'First run promotion',
@@ -113,7 +113,7 @@ function makeDoc(issueId: string): VBriefDocument {
   };
 }
 
-function makeFileSizeRatchetDoc(issueId: string, intermediateCommand: string): VBriefDocument {
+function makeFileSizeRatchetDoc(issueId: string, intermediateCommand: string): XBriefDocument {
   const doc = makeDoc(issueId);
   doc.plan.title = 'Extract specialist spawn seam';
   doc.plan.items = [
@@ -373,7 +373,7 @@ describe('completePlanningArtifacts', () => {
 
     expect(result.proposed).toEqual({ path: canonicalPath, filename: canonicalFilename });
     expect(readdirSync(specsDir)).toEqual([canonicalFilename]);
-    const promoted = JSON.parse(readFileSync(canonicalPath, 'utf-8')) as VBriefDocument & { status: string };
+    const promoted = JSON.parse(readFileSync(canonicalPath, 'utf-8')) as XBriefDocument & { status: string };
     expect(promoted.status).toBe('proposed');
     expect(promoted.plan.items[0]?.metadata?.verify_commands).toEqual(['npm run typecheck']);
     expect(readFileSync(recordPath, 'utf-8')).toBe(recordBefore);

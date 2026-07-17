@@ -210,7 +210,7 @@ export function closeOut(
     }
 
     // 3. Mark the vBRIEF completed on main before teardown removes local state.
-    const vbriefStep = yield* Effect.promise(() => completeVBriefStep(ctx));
+    const vbriefStep = yield* Effect.promise(() => completeXBriefStep(ctx));
     allSteps.push(vbriefStep);
     if (!vbriefStep.success && !vbriefStep.skipped) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — vBRIEF completion failed, workspace preserved'));
@@ -432,11 +432,11 @@ export function cancelIssueWorkflow(
 
 // --- Internal helpers ---
 
-async function completeVBriefStep(ctx: LifecycleContext): Promise<StepResult> {
+async function completeXBriefStep(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:vbrief-completed';
   try {
-    const { transitionVBriefOnMain } = await import('../xbrief/lifecycle-io.js');
-    const result = await Effect.runPromise(transitionVBriefOnMain(
+    const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
+    const result = await Effect.runPromise(transitionXBriefOnMain(
       ctx.projectPath,
       ctx.issueId,
       'completed',
@@ -887,7 +887,7 @@ async function clearReviewStatusStepImpl(issueId: string): Promise<StepResult> {
 }
 
 export const __testInternals = {
-  completeVBriefStep,
+  completeXBriefStep,
   verifyBranchMerged,
 };
 
