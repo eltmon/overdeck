@@ -86,23 +86,32 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 }))
 
 vi.mock('../../../lib/issueActions', () => ({
+  GROUP_LABELS: {
+    planning: 'Planning',
+    work: 'Work',
+    review: 'Review & Test',
+    agent: 'Agent',
+    workspace: 'Workspace',
+    artifacts: 'Artifacts',
+    navigation: 'Navigation',
+    danger: 'Danger',
+  },
+  GROUP_ORDER: ['planning', 'work', 'review', 'agent', 'workspace', 'artifacts', 'navigation', 'danger'],
   ISSUE_ACTIONS: [
-    { key: 'plan', label: 'Plan', group: 'planning', kind: 'dialog' },
-    { key: 'startAgent', label: 'Start agent', group: 'work', kind: 'dialog' },
-    { key: 'reviewTest', label: 'Review & test', group: 'review', kind: 'dialog' },
-    { key: 'tell', label: 'Tell agent', group: 'agent', kind: 'dialog' },
-    { key: 'wipe', label: 'Wipe', group: 'danger', kind: 'destructive' },
+    { key: 'plan', label: 'Plan', description: 'Plan this issue.', group: 'planning', kind: 'dialog' },
+    { key: 'startAgent', label: 'Start agent', description: 'Start work on this issue.', group: 'work', kind: 'dialog' },
+    { key: 'tell', label: 'Tell agent', description: 'Send the agent a message.', group: 'agent', kind: 'dialog' },
+    { key: 'wipe', label: 'Wipe', description: 'Erase this issue.', group: 'danger', kind: 'destructive' },
   ],
 }))
 
 vi.mock('../../IssueActionMenu/useIssueActions', () => ({
   useIssueActions: () => {
     const all = [
-      { action: { key: 'plan', label: 'Plan', group: 'planning', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
-      { action: { key: 'startAgent', label: 'Start agent', group: 'work', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
-      { action: { key: 'reviewTest', label: 'Review & test', group: 'review', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
-      { action: { key: 'tell', label: 'Tell agent', group: 'agent', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
-      { action: { key: 'wipe', label: 'Wipe', group: 'danger', kind: 'destructive' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'plan', label: 'Plan', description: 'Plan this issue.', group: 'planning', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'startAgent', label: 'Start agent', description: 'Start work on this issue.', group: 'work', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'tell', label: 'Tell agent', description: 'Send the agent a message.', group: 'agent', kind: 'dialog' }, enabled: true, isPending: false, invoke: actionInvoke },
+      { action: { key: 'wipe', label: 'Wipe', description: 'Erase this issue.', group: 'danger', kind: 'destructive' }, enabled: false, disabledReason: 'Wipe is unavailable.', isPending: false, invoke: actionInvoke },
     ]
     return {
       all,
@@ -258,10 +267,10 @@ describe('IssueMissionControl', () => {
 
     expect(screen.getByText('Planning')).toBeTruthy()
     expect(screen.getAllByText('Work').length).toBeGreaterThan(0)
-    expect(screen.getByText('Review & Test')).toBeTruthy()
     expect(screen.getAllByText('Agent').length).toBeGreaterThan(0)
     expect(screen.getByText('Danger')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Wipe' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Plan' })).toHaveAttribute('title', 'Plan this issue.')
+    expect(screen.getByRole('button', { name: 'Wipe' })).toHaveAttribute('title', 'Wipe is unavailable.')
   })
 
   it('shows first-class CI checks from the Code tab', () => {

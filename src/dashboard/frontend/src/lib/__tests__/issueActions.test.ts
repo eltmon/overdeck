@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  GROUP_LABELS,
+  GROUP_ORDER,
   ISSUE_ACTIONS,
   deriveIssueActionPhase,
   getEnabledActions,
@@ -55,7 +57,6 @@ const preservedActionKeys: readonly IssueActionKey[] = [
   'completeWorkReset',
   'restartFromPlan',
   'restartAgent',
-  'reviewTest',
 ];
 
 const baseState: IssueActionState = {
@@ -100,9 +101,28 @@ describe('ISSUE_ACTIONS', () => {
     expect(registered.size).toBe(ISSUE_ACTIONS.length);
   });
 
+  it('exports every action group once in the cockpit order', () => {
+    expect(GROUP_ORDER).toEqual([
+      'planning',
+      'work',
+      'review',
+      'agent',
+      'workspace',
+      'artifacts',
+      'navigation',
+      'danger',
+    ]);
+    expect(new Set(GROUP_ORDER).size).toBe(GROUP_ORDER.length);
+    expect(Object.keys(GROUP_LABELS)).toEqual(GROUP_ORDER);
+    for (const action of ISSUE_ACTIONS) {
+      expect(GROUP_ORDER, action.key).toContain(action.group);
+    }
+  });
+
   it('fully describes every registry entry', () => {
     for (const action of ISSUE_ACTIONS) {
       expect(action.label.trim(), action.key).not.toBe('');
+      expect(action.description.trim(), action.key).not.toBe('');
       expect(action, action.key).toHaveProperty('panVerb');
       expect(action, action.key).toHaveProperty('endpoint');
       expect(typeof action.enabledWhen, action.key).toBe('function');
@@ -150,7 +170,6 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('completeWorkReset').kind).toBe('destructive');
     expect(action('completeWorkReset').group).toBe('danger');
     expect(action('completeWorkReset').endpoint).toBe('/api/agents/:agentId/restart-fresh');
-    expect(action('reviewTest').panVerb).toBe('review request');
   });
 
   it('aligns PRD action kinds for lifecycle and navigation actions', () => {

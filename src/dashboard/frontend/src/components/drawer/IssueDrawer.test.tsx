@@ -766,7 +766,6 @@ describe('IssueDrawer', () => {
           "issue-action-statusReview",
           "issue-action-copySettings",
           "issue-action-restartFromPlan",
-          "issue-action-reviewTest",
           "issue-action-viewPr",
         ],
         "WORK_RUNNING": [
@@ -789,7 +788,6 @@ describe('IssueDrawer', () => {
           "issue-action-completeWorkReset",
           "issue-action-restartFromPlan",
           "issue-action-restartAgent",
-          "issue-action-reviewTest",
         ],
       }
     `);

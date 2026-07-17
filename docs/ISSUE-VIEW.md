@@ -31,7 +31,11 @@ To add or move an issue-view section without losing an existing surface:
 3. Render the matching `data-section` attribute on the real visible element. Do not satisfy the gate with hidden marker elements.
 4. Add or update the component test, then run `tests/unit/dashboard/frontend/issue-view-no-loss.test.ts` and `IssueView.test.tsx`.
 
-The no-loss tests are a surface lock. The root test fixes the historical 44-section inventory, requires unique names and valid owning files, and fails when an old surface disappears. The frontend render test requires every inventory entry to have a declared density and rejects hidden section markers. A refactor is complete only when each old action, status, route, view, and affordance still has a real home.
+The no-loss tests are a surface lock. The root test fixes the historical inventory, requires unique names and valid owning files, and fails when an old surface disappears. The frontend render test requires every inventory entry to have a declared density and rejects hidden section markers. A refactor is complete only when each old action, status, route, view, and affordance still has a real home.
+
+## Protected issue-row action menu
+
+`FeatureContextMenu (issue-row right-click)` is a protected rail inventory surface. `FeatureItem.tsx` renders it through the shared `GroupedIssueActionMenu`, which derives its semantic sections from the issue-action registry's `GROUP_ORDER`; changes must preserve its matching visible `data-section` marker and no-loss inventory entry.
 
 ## Recovery start contract
 

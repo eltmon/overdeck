@@ -59,8 +59,7 @@ export type IssueActionKey =
   | 'resetSession'
   | 'completeWorkReset'
   | 'restartFromPlan'
-  | 'restartAgent'
-  | 'reviewTest';
+  | 'restartAgent';
 
 export type IssueActionKind = 'safe' | 'dialog' | 'destructive';
 
@@ -72,8 +71,29 @@ export type IssueActionGroup =
   | 'workspace'
   | 'artifacts'
   | 'danger'
-  | 'navigation'
-  | 'preserved';
+  | 'navigation';
+
+export const GROUP_LABELS: Record<IssueActionGroup, string> = {
+  planning: 'Planning',
+  work: 'Work',
+  review: 'Review & Test',
+  agent: 'Agent',
+  workspace: 'Workspace',
+  artifacts: 'Artifacts',
+  navigation: 'Navigation',
+  danger: 'Danger',
+};
+
+export const GROUP_ORDER: IssueActionGroup[] = [
+  'planning',
+  'work',
+  'review',
+  'agent',
+  'workspace',
+  'artifacts',
+  'navigation',
+  'danger',
+];
 
 export interface IssueActionState {
   reviewStatus?: PipelineReviewStatus | null;
@@ -96,6 +116,7 @@ export interface IssueActionState {
 export interface IssueActionEntry {
   key: IssueActionKey;
   label: string;
+  description: string;
   panVerb: string | null;
   endpoint: string | null;
   enabledWhen: (state: IssueActionState) => boolean;
@@ -216,50 +237,49 @@ const PHASE_PRIMARY_ACTION_KEYS_BY_ACTION: Partial<Record<IssueActionKey, Pipeli
 ) as Partial<Record<IssueActionKey, PipelinePhase[]>>;
 
 export const ISSUE_ACTIONS: IssueActionEntry[] = [
-  { key: 'plan', label: 'Plan', panVerb: 'plan', endpoint: '/api/issues/:id/start-planning', enabledWhen: canPlan, phasePrimary: phasePrimary('plan'), kind: 'dialog', group: 'planning' },
-  { key: 'autoPlan', label: 'Auto-plan', panVerb: 'plan --auto', endpoint: '/api/issues/:id/plan', enabledWhen: canPlan, phasePrimary: [], kind: 'dialog', group: 'planning' },
-  { key: 'watchPlanning', label: 'Watch planning', panVerb: null, endpoint: null, enabledWhen: (state) => deriveIssueActionPhase(state) === 'PLANNING', phasePrimary: phasePrimary('watchPlanning'), kind: 'dialog', group: 'planning' },
-  { key: 'donePlanning', label: 'Done planning', panVerb: 'plan finalize', endpoint: '/api/issues/:id/complete-planning', enabledWhen: canFinalizePlanning, phasePrimary: phasePrimary('donePlanning'), kind: 'safe', group: 'planning' },
-  { key: 'startAgent', label: 'Start agent', panVerb: 'start', endpoint: '/api/agents', enabledWhen: canStartAgent, phasePrimary: phasePrimary('startAgent'), kind: 'dialog', group: 'work' },
-  { key: 'startSkipPlanning', label: 'Start without planning', panVerb: 'start --auto', endpoint: '/api/agents', enabledWhen: canStartWithoutPlanning, phasePrimary: [], kind: 'dialog', group: 'work' },
-  { key: 'tell', label: 'Tell agent', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasLiveAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'agent' },
-  { key: 'doneWork', label: 'Done — mark work complete & start review', panVerb: 'done', endpoint: '/api/agents/:agentId/tell', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'work' },
-  { key: 'requestReview', label: 'Request review', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'review' },
-  { key: 'restartReview', label: 'Re-run review on latest commit', panVerb: 'review restart', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'review' },
-  { key: 'recoverReview', label: 'Reset stalled review state', panVerb: 'review reset', endpoint: '/api/review/:id/reset', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'review' },
-  { key: 'purgeReview', label: 'Remove review sessions & reset', panVerb: null, endpoint: '/api/review/:id/purge', enabledWhen: canPurgeReview, phasePrimary: [], kind: 'destructive', group: 'review' },
-  { key: 'stopAgent', label: 'Stop agent', panVerb: 'kill', endpoint: '/api/agents/:agentId/stop', enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'safe', group: 'agent' },
-  { key: 'pause', label: 'Pause agent', panVerb: 'pause', endpoint: '/api/agents/:agentId/pause', enabledWhen: (state) => hasLiveAgent(state) && !isPaused(state), phasePrimary: [], kind: 'dialog', group: 'agent' },
-  { key: 'unpause', label: 'Unpause agent', panVerb: 'unpause', endpoint: '/api/agents/:agentId/unpause', enabledWhen: isPaused, phasePrimary: [], kind: 'safe', group: 'agent' },
-  { key: 'untroubled', label: 'Clear troubled gate', panVerb: 'untroubled', endpoint: '/api/agents/:agentId/untroubled', enabledWhen: isTroubled, phasePrimary: [], kind: 'safe', group: 'agent' },
-  { key: 'recoverAgent', label: 'Recover agent', panVerb: 'recover', endpoint: '/api/agents/:agentId/recover', enabledWhen: canRecoverAgent, phasePrimary: phasePrimary('recoverAgent'), kind: 'safe', group: 'agent' },
-  { key: 'resumeSession', label: 'Resume session', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'dialog', group: 'agent' },
-  { key: 'syncMain', label: 'Sync main', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'safe', group: 'workspace' },
-  { key: 'rebuildAndStart', label: 'Rebuild & start', panVerb: 'workspace rebuild && start', endpoint: '/api/workspaces/:id/rebuild-and-start', enabledWhen: canRebuildAndStart, phasePrimary: [], kind: 'safe', group: 'workspace' },
-  { key: 'inspectTask', label: 'Inspect task', panVerb: 'inspect --task', endpoint: '/api/issues/:id/tasks/:taskId/inspect', enabledWhen: canInspectTask, phasePrimary: [], kind: 'dialog', group: 'review' },
-  { key: 'reopen', label: 'Reopen', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'safe', group: 'danger' },
-  { key: 'closeOut', label: 'Close out', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'destructive', group: 'danger' },
-  { key: 'wipe', label: 'Wipe', panVerb: 'wipe', endpoint: '/api/issues/:id/deep-wipe', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'destroyWorkspace', label: 'Destroy workspace', panVerb: 'destroy', endpoint: '/api/issues/:id/cleanup-workspace', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'open', label: 'Open', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'safe', group: 'navigation' },
-  { key: 'resetIssue', label: 'Reset issue', panVerb: null, endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'resetToPlanned', label: 'Reset to planned', panVerb: 'reset-to-planned', endpoint: '/api/issues/:id/reset-to-planned', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'work' },
-  { key: 'viewPr', label: 'View PR', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
-  { key: 'cancel', label: 'Cancel issue', panVerb: null, endpoint: '/api/issues/:id/cancel', enabledWhen: canCancelIssue, phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'tasks', label: 'Tasks', panVerb: null, endpoint: '/api/issues/:id/tasks', enabledWhen: (state) => state.hasTasks || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },
-  { key: 'inference', label: 'Inference', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasInference === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
-  { key: 'discussions', label: 'Discussions', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasDiscussions === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
-  { key: 'transcripts', label: 'Transcripts', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasTranscripts === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
-  { key: 'upload', label: 'Upload transcript', panVerb: null, endpoint: null, enabledWhen: always, phasePrimary: [], kind: 'dialog', group: 'artifacts' },
-  { key: 'syncDiscussions', label: 'Sync discussions', panVerb: null, endpoint: '/api/issues/:id/discussions/sync', enabledWhen: always, phasePrimary: [], kind: 'dialog', group: 'artifacts' },
-  { key: 'statusReview', label: 'Status review', panVerb: null, endpoint: '/api/review/:id/status', enabledWhen: always, phasePrimary: [], kind: 'safe', group: 'artifacts' },
-  { key: 'createWorkspace', label: 'Create workspace', panVerb: null, endpoint: '/api/workspaces', enabledWhen: (state) => !hasWorkspace(state), phasePrimary: [], kind: 'dialog', group: 'workspace' },
-  { key: 'copySettings', label: 'Copy settings', panVerb: null, endpoint: '/api/issues/:id/copy-settings', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'dialog', group: 'workspace' },
-  { key: 'resetSession', label: 'Reset session', panVerb: null, endpoint: '/api/agents/:agentId/reset-session', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'destructive', group: 'agent' },
-  { key: 'completeWorkReset', label: 'Complete work reset', panVerb: null, endpoint: '/api/agents/:agentId/restart-fresh', enabledWhen: (state) => hasAgent(state) && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'restartFromPlan', label: 'Restart from plan', panVerb: null, endpoint: '/api/agents', enabledWhen: (state) => state.hasPlan && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
-  { key: 'restartAgent', label: 'Restart agent', panVerb: null, endpoint: '/api/agents/:agentId/restart', enabledWhen: (state) => hasAgent(state) && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'agent' },
-  { key: 'reviewTest', label: 'Review & test', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'dialog', group: 'preserved' },
+  { key: 'plan', label: 'Plan', description: 'Have an AI planner interview you and write the implementation plan for this issue.', panVerb: 'plan', endpoint: '/api/issues/:id/start-planning', enabledWhen: canPlan, phasePrimary: phasePrimary('plan'), kind: 'dialog', group: 'planning' },
+  { key: 'autoPlan', label: 'Auto-plan', description: 'Write the plan automatically, no questions asked. Good for well-understood work.', panVerb: 'plan --auto', endpoint: '/api/issues/:id/plan', enabledWhen: canPlan, phasePrimary: [], kind: 'dialog', group: 'planning' },
+  { key: 'watchPlanning', label: 'Watch planning', description: 'Open the live planning session to watch or steer it.', panVerb: null, endpoint: null, enabledWhen: (state) => deriveIssueActionPhase(state) === 'PLANNING', phasePrimary: phasePrimary('watchPlanning'), kind: 'dialog', group: 'planning' },
+  { key: 'donePlanning', label: 'Done planning', description: 'Accept the finished plan so work can start.', panVerb: 'plan finalize', endpoint: '/api/issues/:id/complete-planning', enabledWhen: canFinalizePlanning, phasePrimary: phasePrimary('donePlanning'), kind: 'safe', group: 'planning' },
+  { key: 'startAgent', label: 'Start agent', description: 'Start an AI agent implementing this issue from its plan.', panVerb: 'start', endpoint: '/api/agents', enabledWhen: canStartAgent, phasePrimary: phasePrimary('startAgent'), kind: 'dialog', group: 'work' },
+  { key: 'startSkipPlanning', label: 'Start without planning', description: 'Skip planning: generate a minimal plan from the issue text and start immediately.', panVerb: 'start --auto', endpoint: '/api/agents', enabledWhen: canStartWithoutPlanning, phasePrimary: [], kind: 'dialog', group: 'work' },
+  { key: 'tell', label: 'Tell agent', description: 'Send the running agent a message — feedback, direction, a question.', panVerb: 'tell', endpoint: '/api/agents/:agentId/tell', enabledWhen: hasLiveAgent, phasePrimary: phasePrimary('tell'), kind: 'dialog', group: 'agent' },
+  { key: 'doneWork', label: 'Done — mark work complete & start review', description: 'Tell the agent to wrap up; code review starts automatically.', panVerb: 'done', endpoint: '/api/agents/:agentId/tell', enabledWhen: (state) => hasLiveAgent(state) && deriveIssueActionPhase(state) === 'WORK_RUNNING', phasePrimary: phasePrimary('doneWork'), kind: 'safe', group: 'work' },
+  { key: 'requestReview', label: 'Request review', description: 'Send the current code out for AI review.', panVerb: 'review request', endpoint: '/api/review/:id/trigger', enabledWhen: canRequestReview, phasePrimary: phasePrimary('requestReview'), kind: 'safe', group: 'review' },
+  { key: 'restartReview', label: 'Re-run review on latest commit', description: 'Review again from the newest commit (e.g. after pushing fixes).', panVerb: 'review restart', endpoint: '/api/review/:id/trigger?force=true', enabledWhen: canRestartReview, phasePrimary: [], kind: 'safe', group: 'review' },
+  { key: 'recoverReview', label: 'Reset stalled review state', description: 'Un-wedge a review that stopped moving; nothing is deleted.', panVerb: 'review reset', endpoint: '/api/review/:id/reset', enabledWhen: hasReviewFailure, phasePrimary: [], kind: 'safe', group: 'review' },
+  { key: 'purgeReview', label: 'Remove review sessions & reset', description: 'Kill every reviewer session and clear review state — the "review is haunted" fix.', panVerb: null, endpoint: '/api/review/:id/purge', enabledWhen: canPurgeReview, phasePrimary: [], kind: 'destructive', group: 'review' },
+  { key: 'stopAgent', label: 'Stop agent', description: 'Stop the running agent. Its work, branch, and session are kept.', panVerb: 'kill', endpoint: '/api/agents/:agentId/stop', enabledWhen: hasLiveAgent, phasePrimary: [], kind: 'safe', group: 'agent' },
+  { key: 'pause', label: 'Pause agent', description: 'Pause the agent (optionally with a reason). Resume anytime.', panVerb: 'pause', endpoint: '/api/agents/:agentId/pause', enabledWhen: (state) => hasLiveAgent(state) && !isPaused(state), phasePrimary: [], kind: 'dialog', group: 'agent' },
+  { key: 'unpause', label: 'Unpause agent', description: 'Let a paused agent continue.', panVerb: 'unpause', endpoint: '/api/agents/:agentId/unpause', enabledWhen: isPaused, phasePrimary: [], kind: 'safe', group: 'agent' },
+  { key: 'untroubled', label: 'Clear troubled gate', description: 'Clear the "kept failing, gave up" flag after you\'ve fixed the underlying cause.', panVerb: 'untroubled', endpoint: '/api/agents/:agentId/untroubled', enabledWhen: isTroubled, phasePrimary: [], kind: 'safe', group: 'agent' },
+  { key: 'recoverAgent', label: 'Recover agent', description: 'Bring back an agent that stopped, crashed, or got stuck.', panVerb: 'recover', endpoint: '/api/agents/:agentId/recover', enabledWhen: canRecoverAgent, phasePrimary: phasePrimary('recoverAgent'), kind: 'safe', group: 'agent' },
+  { key: 'resumeSession', label: 'Resume session', description: 'Reopen the stopped agent\'s saved session with its memory intact.', panVerb: 'resume', endpoint: '/api/agents/:agentId/resume', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'dialog', group: 'agent' },
+  { key: 'syncMain', label: 'Sync main', description: 'Pull the latest main branch into this issue\'s branch.', panVerb: 'sync-main', endpoint: '/api/issues/:id/sync-main', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'safe', group: 'workspace' },
+  { key: 'rebuildAndStart', label: 'Rebuild & start', description: 'Rebuild the dev containers, then start the agent — the fix for "stack unhealthy".', panVerb: 'workspace rebuild && start', endpoint: '/api/workspaces/:id/rebuild-and-start', enabledWhen: canRebuildAndStart, phasePrimary: [], kind: 'safe', group: 'workspace' },
+  { key: 'inspectTask', label: 'Inspect task', description: 'Have an inspector verify one plan task against the actual diff.', panVerb: 'inspect --task', endpoint: '/api/issues/:id/tasks/:taskId/inspect', enabledWhen: canInspectTask, phasePrimary: [], kind: 'dialog', group: 'review' },
+  { key: 'reopen', label: 'Reopen', description: 'Bring a closed or canceled issue back into the pipeline.', panVerb: 'reopen', endpoint: '/api/issues/:id/reopen', enabledWhen: isDoneOrCanceled, phasePrimary: [], kind: 'safe', group: 'danger' },
+  { key: 'closeOut', label: 'Close out', description: 'The final ceremony: archive artifacts, tidy the workspace, close the tracker issue.', panVerb: 'close', endpoint: '/api/issues/:id/close-out', enabledWhen: canCloseOut, phasePrimary: phasePrimary('closeOut'), kind: 'destructive', group: 'danger' },
+  { key: 'wipe', label: 'Wipe', description: 'Erase this issue\'s agent state and workspace. Cannot be undone.', panVerb: 'wipe', endpoint: '/api/issues/:id/deep-wipe', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'destroyWorkspace', label: 'Destroy workspace', description: 'Delete the workspace folder and containers. The issue itself survives.', panVerb: 'destroy', endpoint: '/api/issues/:id/cleanup-workspace', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'open', label: 'Open', description: 'Open this issue\'s workspace in your editor.', panVerb: 'open', endpoint: null, enabledWhen: hasWorkspace, phasePrimary: phasePrimary('open'), kind: 'safe', group: 'navigation' },
+  { key: 'resetIssue', label: 'Reset issue', description: 'Back to square one: stop agents, delete workspace and branch, return the issue to Todo.', panVerb: null, endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'resetToPlanned', label: 'Reset to planned', description: 'Throw away progress but keep the workspace, branch, and plan — start implementation over.', panVerb: 'reset-to-planned', endpoint: '/api/issues/:id/reset-to-planned', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'work' },
+  { key: 'viewPr', label: 'View PR', description: 'Open the pull request in your browser.', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
+  { key: 'cancel', label: 'Cancel issue', description: 'Cancel this issue and clean up its abandoned run.', panVerb: null, endpoint: '/api/issues/:id/cancel', enabledWhen: canCancelIssue, phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'tasks', label: 'Tasks', description: 'Open the plan\'s task checklist.', panVerb: null, endpoint: '/api/issues/:id/tasks', enabledWhen: (state) => state.hasTasks || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'artifacts' },
+  { key: 'inference', label: 'Inference', description: 'Open the AI-inference artifact for this issue.', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasInference === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
+  { key: 'discussions', label: 'Discussions', description: 'Open recorded design discussions.', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasDiscussions === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
+  { key: 'transcripts', label: 'Transcripts', description: 'Open saved agent session transcripts.', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasTranscripts === true, phasePrimary: [], kind: 'safe', group: 'artifacts' },
+  { key: 'upload', label: 'Upload transcript', description: 'Attach an outside transcript to this issue.', panVerb: null, endpoint: null, enabledWhen: always, phasePrimary: [], kind: 'dialog', group: 'artifacts' },
+  { key: 'syncDiscussions', label: 'Sync discussions', description: 'Refresh discussion data from the tracker.', panVerb: null, endpoint: '/api/issues/:id/discussions/sync', enabledWhen: always, phasePrimary: [], kind: 'dialog', group: 'artifacts' },
+  { key: 'statusReview', label: 'Status review', description: 'Open the pipeline status overview for this issue.', panVerb: null, endpoint: '/api/review/:id/status', enabledWhen: always, phasePrimary: [], kind: 'safe', group: 'artifacts' },
+  { key: 'createWorkspace', label: 'Create workspace', description: 'Create the isolated working copy (branch + folder + containers) for this issue.', panVerb: null, endpoint: '/api/workspaces', enabledWhen: (state) => !hasWorkspace(state), phasePrimary: [], kind: 'dialog', group: 'workspace' },
+  { key: 'copySettings', label: 'Copy settings', description: 'Copy your editor/tooling settings into this issue\'s workspace.', panVerb: null, endpoint: '/api/issues/:id/copy-settings', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'dialog', group: 'workspace' },
+  { key: 'resetSession', label: 'Reset session', description: 'Discard the saved session memory. The next start begins fresh.', panVerb: null, endpoint: '/api/agents/:agentId/reset-session', enabledWhen: hasResumableSession, phasePrimary: [], kind: 'destructive', group: 'agent' },
+  { key: 'completeWorkReset', label: 'Complete work reset', description: 'Delete agent state but keep the workspace, plan, and tasks — a fresh brain, same desk.', panVerb: null, endpoint: '/api/agents/:agentId/restart-fresh', enabledWhen: (state) => hasAgent(state) && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'restartFromPlan', label: 'Restart from plan', description: 'Start a brand-new run from the existing plan.', panVerb: null, endpoint: '/api/agents', enabledWhen: (state) => state.hasPlan && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'danger' },
+  { key: 'restartAgent', label: 'Restart agent', description: 'Stop the agent and start a replacement that keeps the issue context.', panVerb: null, endpoint: '/api/agents/:agentId/restart', enabledWhen: (state) => hasAgent(state) && !isMerged(state), phasePrimary: [], kind: 'destructive', group: 'agent' },
 ];
 
 const ACTION_BY_KEY = new Map(ISSUE_ACTIONS.map((action) => [action.key, action]));
