@@ -90,20 +90,21 @@
     "recordedAt": "2026-07-17T16:36:23.110Z"
   },
   "created": "2026-07-17T12:49:43.832Z",
-  "updated": "2026-07-17T16:36:26.834Z",
+  "updated": "2026-07-17T16:39:33.213Z",
   "pipeline": {
     "issueId": "PAN-1610",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T16:36:25.970Z",
+    "updatedAt": "2026-07-17T16:39:33.196Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "ActionEntryBase/ActionEntry union added; non-issue entries now carry enabledWhen/invoke/description/kind/confirm reusing existing scope+ownerSurface literals; no-actions-lost separation assertions added; zero non-test consumers of the two arrays so change is genuinely additive.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2851",
+    "lastVerifiedCommit": "d54c6beb2f32b6e431ca1043cc7e85f3ac12c983",
     "reviewRequestedAt": "2026-07-17T16:36:23.957Z",
     "reviewSpawnedAt": "2026-07-17T16:36:24.952Z",
     "scopeDrift": {
@@ -192,9 +193,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2459171,
-            "output": 51952,
-            "cacheRead": 7307776,
+            "input": 2995349,
+            "output": 54898,
+            "cacheRead": 7439872,
             "cacheWrite": 0
           }
         },
@@ -208,9 +209,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7985245,
-            "output": 530161,
-            "cacheRead": 118326784,
+            "input": 7993538,
+            "output": 531359,
+            "cacheRead": 119580672,
             "cacheWrite": 0
           }
         }
@@ -229,9 +230,9 @@
           "cacheWrite": 180202
         },
         "openai/gpt-5.6-sol": {
-          "input": 10444416,
-          "output": 582113,
-          "cacheRead": 125634560,
+          "input": 10988887,
+          "output": 586257,
+          "cacheRead": 127020544,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -242,8 +243,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 145.07688,
-        "pricingAsOf": "2026-07-17T16:36:26.000Z"
+        "usd": 148.616547,
+        "pricingAsOf": "2026-07-17T16:39:33.203Z"
       }
     },
     "merges": [
