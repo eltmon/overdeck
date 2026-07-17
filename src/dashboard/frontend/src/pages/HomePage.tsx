@@ -5,7 +5,8 @@ import { NotificationClassBadge } from '../components/NotificationClassBadge';
 import { ActionStatusChip } from '../components/ActionStatusChip';
 import type { AgentSnapshot, FeatureRegistryEntry, MemoryHealthSnapshot, MemoryObservation, MemoryStatus, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { WorkspaceStatusCard, type WorkspaceStatusStats } from '../components/CommandDeck/WorkspaceStatusCard';
-import { fetchProjects, type ProjectData } from '../components/CommandDeck/projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, type ProjectData } from '../components/CommandDeck/projectsData';
+import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
 import { useDashboardStore, selectLatestMemoryFailure } from '../lib/store';
 import { formatRelativeTime } from '../lib/formatRelativeTime';
 import { bucketByTime, type TimeBucketKey } from '../lib/timeBuckets';
@@ -113,6 +114,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
     retry: false,
   });
   const projects: ProjectData[] = projectsQuery.data ?? [];
+  const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
   const statusByIssueId = useDashboardStore((state) => state.statusByIssueId);
   const observationsByIssueId = useDashboardStore((state) => state.observationsByIssueId);
@@ -246,7 +248,8 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
             ) : projects.length > 0 ? (
               <ul className="divide-y divide-border rounded-lg border border-border">
                 {projects.map((project) => {
-                  const hasActivity = project.features.length > 0;
+                  const visibleFeatures = filterSpecOnlyPlanned(project.features, showPlannedBacklog);
+                  const hasActivity = visibleFeatures.length > 0;
                   return (
                     <li key={project.path}>
                       <button
@@ -261,7 +264,7 @@ export function HomePage({ onOpenWorkspaceHome, onNewProject, onSelectProject, o
                         />
                         <span className="truncate">{project.name}</span>
                         {hasActivity && (
-                          <span className="ml-auto text-xs text-muted-foreground">{project.features.length}</span>
+                          <span className="ml-auto text-xs text-muted-foreground">{visibleFeatures.length}</span>
                         )}
                       </button>
                     </li>
