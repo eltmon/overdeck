@@ -180,17 +180,18 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T09:25:21.638Z",
+  "updated": "2026-07-17T09:28:57.898Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T09:25:20.352Z",
+    "updatedAt": "2026-07-17T09:28:57.866Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
     "lastVerifiedCommit": "1504807ef76b8807a6bbe9ee16c2a6d17d6db08a",
@@ -226,9 +227,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 28400892,
-            "output": 1459373,
-            "cacheRead": 267155456,
+            "input": 28674006,
+            "output": 1462681,
+            "cacheRead": 268278784,
             "cacheWrite": 0
           }
         }
@@ -241,9 +242,9 @@
           "cacheWrite": 143876
         },
         "openai/gpt-5.6-sol": {
-          "input": 35684853,
-          "output": 1565929,
-          "cacheRead": 276260352,
+          "input": 35957967,
+          "output": 1569237,
+          "cacheRead": 277383680,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -254,8 +255,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 369.659861,
-        "pricingAsOf": "2026-07-17T09:25:20.378Z"
+        "usd": 371.686335,
+        "pricingAsOf": "2026-07-17T09:28:57.892Z"
       }
     },
     "merges": [
