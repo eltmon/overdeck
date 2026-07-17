@@ -8,7 +8,12 @@ import { acquireRestartLock, readRestartLockHolder } from '../../lib/restart-loc
 import { readPlatformConfigSync, restartDashboard, StageError } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
-import { resolveBundledServerPath, spawnDashboardDetached } from './restart.js';
+import {
+  refuseNonPrimaryDashboardCwd,
+  resolveBundledServerPath,
+  resolvePrimaryDashboardIdentity,
+  spawnDashboardDetached,
+} from './restart.js';
 
 export interface ReloadOptions {
   skipBuild?: boolean;
@@ -192,6 +197,8 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
     return;
   }
 
+  if (refuseNonPrimaryDashboardCwd(process.cwd(), 'reload')) return;
+
   const restartInitiator = process.env.OVERDECK_AGENT_ID;
   if (restartInitiator) {
     const restartBlock = await agentRestartBlockReason({
@@ -283,7 +290,7 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, { deacon: options.deacon }), {
       healthTimeoutMs,
-      expectedIdentity: { repoRoot, mode: 'primary' },
+      expectedIdentity: resolvePrimaryDashboardIdentity(),
     }));
     await recordReloadStatus(startedAt, true);
     console.log(chalk.green('✓ Dashboard reloaded and healthy'));

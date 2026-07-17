@@ -5499,3 +5499,14 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - 1897: fixes were already pushed (tree clean, 0 ahead); missing piece was a review of current head df7a0e99 (old verdict was @4ad533fd) → review restarted. Note: restart again said "resumed (session preserved)" — if no synthesis by next tick, apply the pan-tell nudge (playbook 2/2 so far).
 - 2232/2647/2807 idle-at-prompt within ~1h of fresh start → nudged to resume autonomously + pan done when complete. PATTERN: gpt-5.6-sol claude-code sessions repeatedly go idle-at-prompt mid-task tonight; the pan-tell nudge reliably unsticks them. If this generalizes, the idle-detection/redrive gap is worth an issue.
 - 1491 close-out owed (merge → verify-on-main → deploy next batch → close). Deploy batching: 1491 + whatever else lands this hour.
+
+## Tick 80 — 2026-07-16 ~22:15 — PAN-2252 MERGED (8 total)
+- **PAN-2252 MERGED → bdd780abcd** via PR#2812. APPROVED@86bf035b; head cdde84e7 delta = docs/FLYWHEEL-STATE.md only (rebase artifact), feature src verified byte-identical. All CI green incl. overdeck/review.
+- Session: 8 merges (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252) + 2811 strike landing + 2 deploys + 14 close-outs.
+- In flight: 1897 review @correct head (synthesizing), 1966 CI+review on fix head 33680748, 2232/2647/2807 working (no PR yet).
+- Close-out owed on 1491 + 2252 (+ next deploy batch).
+
+## Tick 81 — 2026-07-16 ~22:50 — idle-redrive gap filed (https://github.com/eltmon/overdeck/issues/2817)
+- 1897 pushed perf fixes (head 27818d81, review synthesizing on it). 2807 opened PR#2816 (CLEAN, review running). 1966 review coordinator idled AGAIN before synthesis (3rd time) → re-nudged. 2232/2647 re-idled → re-nudged.
+- **Idle-at-prompt is systemic** (6+ gpt-5.6-sol agents tonight; nudge works but they re-idle) → filed the mechanical redrive-gap issue (see title above). Root-cause of the idling itself flagged as separate investigation.
+- Merge queue: 1966 (CLEAN, awaiting synthesis), 2807 PR#2816 (CLEAN, review running), 1897 (review on 27818d81), 2232/2647 (pre-PR).

@@ -1,8 +1,14 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { getBuildInfo } from '../../../src/lib/deploy/build-info.js';
 import {
   getDashboardIdentity,
+  isLinkedWorktreeRoot,
+  primaryRootFromLinkedWorktree,
   shouldRefuseHostDashboardPort,
 } from '../../../src/dashboard/server/identity.js';
 
@@ -18,6 +24,37 @@ describe('dashboard build identity', () => {
       buildCommit: null,
       builtAt: null,
     });
+  });
+});
+
+describe('linked git worktree identity', () => {
+  it('detects a linked worktree and resolves its primary root', () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), 'pan-linked-worktree-'));
+    try {
+      writeFileSync(join(repoRoot, '.git'), 'gitdir: /primary/.git/worktrees/x\n');
+
+      expect(isLinkedWorktreeRoot(repoRoot)).toBe(true);
+      expect(primaryRootFromLinkedWorktree(repoRoot)).toBe('/primary');
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects primary repositories and directories without git metadata', () => {
+    const fixtureRoot = mkdtempSync(join(tmpdir(), 'pan-primary-repo-'));
+    try {
+      const primaryRoot = join(fixtureRoot, 'primary');
+      const noGitRoot = join(fixtureRoot, 'no-git');
+      mkdirSync(join(primaryRoot, '.git'), { recursive: true });
+      mkdirSync(noGitRoot);
+
+      expect(isLinkedWorktreeRoot(primaryRoot)).toBe(false);
+      expect(primaryRootFromLinkedWorktree(primaryRoot)).toBeNull();
+      expect(isLinkedWorktreeRoot(noGitRoot)).toBe(false);
+      expect(primaryRootFromLinkedWorktree(noGitRoot)).toBeNull();
+    } finally {
+      rmSync(fixtureRoot, { recursive: true, force: true });
+    }
   });
 });
 
@@ -60,6 +97,30 @@ describe('dashboard identity port guard', () => {
       hostDashboardApiPort: 3011,
       runningInContainer: false,
     })).toBe(false);
+  });
+
+  it('refuses a linked worktree on the host port except inside a container', () => {
+    const repoRoot = mkdtempSync(join(tmpdir(), 'hoff-linked-worktree-'));
+    try {
+      writeFileSync(join(repoRoot, '.git'), 'gitdir: /primary/.git/worktrees/hoff\n');
+      const input = {
+        repoRoot,
+        mode: 'primary' as const,
+        port: 3011,
+        hostDashboardApiPort: 3011,
+      };
+
+      expect(shouldRefuseHostDashboardPort({
+        ...input,
+        runningInContainer: false,
+      })).toBe(true);
+      expect(shouldRefuseHostDashboardPort({
+        ...input,
+        runningInContainer: true,
+      })).toBe(false);
+    } finally {
+      rmSync(repoRoot, { recursive: true, force: true });
+    }
   });
 
   it('allows a peer dashboard on the host dashboard API port inside a container', () => {

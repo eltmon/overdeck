@@ -53,6 +53,8 @@ The supervisor also polls the Qwen TTS daemon every 10 seconds when TTS is enabl
 
 The latest restart outcome is written to `${OVERDECK_HOME}/restart-status.json`. `pan status` renders that state, including failures and watchdog give-up alarms.
 
+`pan up`, `pan reload`, and dashboard-starting `pan restart` scopes refuse to run from a non-primary checkout, including workspace and handoff worktrees. They exit with code 2 and name the primary checkout to use. Their post-boot health gates also require `/api/health` to report the expected `repoRoot` and `mode`; a 200 response from a different server fails as `port held by non-primary server (cwd=…, mode=…)`. This prevents the workspace-peer port-squatting incident class tracked by [PAN-2252](https://github.com/eltmon/overdeck/issues/2252).
+
 ## Automatic deployment after merges
 
 Production builds embed their Git commit and build time. Deacon compares that commit with
