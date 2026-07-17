@@ -1,0 +1,710 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-17T10:10:56.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-2661: Organize the issue actions context menu into clear sections",
+    "updated": "2026-07-17T10:16:09.993Z"
+  },
+  "plan": {
+    "id": "pan-2661",
+    "title": "Organize the issue actions context menu into clear sections",
+    "status": "proposed",
+    "uid": "73fd23a4-eef6-4f20-9e7b-2a680b1d393c",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-17T10:10:56.000Z",
+    "updated": "2026-07-17T10:16:09.993Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2661",
+        "label": "PAN-2661",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-2661.md",
+        "label": "PRD rev 2 (BINDING)",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/design/mockups/issue-actions-grouped-pan-2661.html",
+        "label": "Mockup v2 + spec appendix (BINDING)",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "frontend",
+      "dashboard",
+      "context-menu",
+      "issue-actions",
+      "no-loss"
+    ],
+    "narratives": {
+      "Problem": "The issue right-click menu (FeatureContextMenu in FeatureItem.tsx) flattens all 44 registry actions into one unlabeled list, appends three hardcoded extras (Open State Dir, View JSONL, a duplicate Deep Wipe with window.confirm), and mixes destructive operations with routine controls. The cockpit's action panel already ships an operator-proven grouping taxonomy (GROUP_ORDER/GROUP_LABELS in IssueMissionControl.tsx) that the registry does not own, so the two surfaces can drift.",
+      "Proposal": "Follow PRD rev 2 (drafts/pan-2661.md) and the binding mockup exactly: (1) retire the orphaned reviewTest entry via the D-6 migration table; (2) move GROUP_ORDER/GROUP_LABELS into the shared registry (issueActions.ts) and add a required description field with the mockup appendix copy; (3) build a shared GroupedIssueActionMenu implementing the D-3 structure (phase header, 'For this phase', registry groups in order, 'This session' extras, collapsed Danger disclosure last) with an Explain toggle (D-5); (4) adopt it in FeatureContextMenu, deleting the flat dump and the hardcoded Deep Wipe after unifying the wipe body to {deleteWorkspace:true} (D-4); (5) lock everything with an extended parity test and a new FeatureContextMenu row in the PAN-2499 no-loss inventory.",
+      "NonGoals": "- No changes to any enabledWhen gating predicate (issueActions.ts:137-195) — semantics stay byte-identical to useIssueActions.\n- No registry promotion of Open State Dir / View JSONL / other surface extras — that is PAN-1610; here they render as sessionExtras props.\n- No changes to dialog routing, confirm flows, or the IssueActionDialogHost mount.\n- No new grouping taxonomy — the cockpit's existing groups are reused verbatim.\n- No behavior changes beyond the two in the D-7 ledger (wipe unification, reviewTest migration); a third behavior change is out of spec.\n- No cockpit IssueActionMegaMenu redesign — it only switches to the registry-exported GROUP_ORDER/GROUP_LABELS and gains description tooltips on enabled buttons.\n- No Mintlify page for the context menu (none exists today; PRD + mockup are the design record)."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ran fully from PRD rev 2 + mockup spec appendix as binding inputs; no operator questions asked.",
+        "rationale": "The PRD is implementation-grade, operator-reviewed (rev 2 incorporates the gpt-5.6 feedback), and the issue comments confirm the approach. All PRD claims were re-verified against the current tree (post-PAN-2499)."
+      },
+      {
+        "summary": "reviewTest retirement (D-6) is sequenced BEFORE exporting the 8-group GROUP_ORDER from the registry.",
+        "rationale": "The cockpit's current GROUP_ORDER includes 'preserved' and renders reviewTest today. Exporting the binding 8-group order first would silently hide reviewTest before its migration lands — a no-loss violation. Retirement first also lets the IssueActionGroup union drop 'preserved' so the exported GROUP_LABELS record type covers exactly 8 groups."
+      },
+      {
+        "summary": "spotlight.ts Tests-failed migration goes to restartReview, deviating from PRD D-6 clause (2) which names requestReview.",
+        "rationale": "IssueBlockerSpotlight filters to enabled actions only (IssueBlockerSpotlight.tsx:26), and canRequestReview requires !state.reviewStatus — false in every Tests-failed state — so requestReview would silently drop the re-run affordance, violating the issue's no-loss requirement. canRestartReview covers testStatus 'failed'/'dispatch_failed' exactly, preserving the affordance with a correct gate. The drawer-legacy 'Review & Test' parity-map rows still migrate to requestReview (same panVerb and endpoint as reviewTest)."
+      },
+      {
+        "summary": "Wipe body unification (bodyForAction('wipe') → {deleteWorkspace:true}) lands as its own item BEFORE the hardcoded Deep Wipe is deleted.",
+        "rationale": "Deleting the hardcoded item first would leave an interval where the only wipe path sends {} (no workspace deletion) — a silent capability regression. Landing the body first keeps every intermediate commit at-or-above today's behavior."
+      },
+      {
+        "summary": "Docs gate satisfied by updating docs/ISSUE-VIEW.md in the inventory item rather than a docs-only item.",
+        "rationale": "The PRD states (verified) that no Mintlify page documents the context menu; the genuinely documented surface is the issue-view no-loss inventory described in docs/ISSUE-VIEW.md, which gains the FeatureContextMenu row."
+      }
+    ],
+    "items": [
+      {
+        "id": "retire-reviewtest",
+        "title": "Retire the orphaned reviewTest registry entry via the D-6 migration table",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/ReviewVerificationCard.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/spotlight.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/lib/__tests__/issueActions.no-actions-lost.test.ts src/components/CommandDeck/__tests__/action-parity.test.ts src/components/drawer/IssueDrawer.test.tsx src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+            "grep -rn \"reviewTest\" src/dashboard/frontend/src --include='*.ts' --include='*.tsx' | grep -v test || true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all five named test files pass",
+            "the grep over non-test sources returns no reviewTest references"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Execute the D-6 migration table, one commit-reviewable row per consumer, then delete the entry. (1) ReviewVerificationCard.tsx:115-119 — replace the reviewTest lookup with recoverReview so actionButtons becomes [restartReview, recoverReview] filtered by .enabled (PRD product call: the card's purpose is re-running a failed/stuck review). (2) spotlight.ts:52 (Tests failed case) — replace 'reviewTest' with 'restartReview' in actionKeys (see plan autoDecisions: deviates from PRD D-6(2)'s requestReview because the spotlight renders enabled actions only and canRequestReview is false whenever reviewStatus exists; canRestartReview covers testStatus failed/dispatch_failed). (3) Update each named test in the same commit as its consumer: action-parity.test.ts:8 maps legacy 'Review & Test' → 'requestReview'; issueActions.no-actions-lost.test.ts:20,63 rows migrate registryKey to 'requestReview'; issueActions.test.ts:153 and the key list at :58 drop reviewTest; IssueDrawer.test.tsx:769,792 replace 'issue-action-reviewTest' expectations with the surviving actions rendered there; IssueMissionControl.test.tsx:92,103 drop the reviewTest fixtures. (4) Only after all consumers are migrated: delete the reviewTest entry (issueActions.ts:262), the 'reviewTest' member of IssueActionKey (:63), the 'preserved' member of IssueActionGroup (:76), and the 'preserved' rows of the cockpit's local GROUP_LABELS/GROUP_ORDER (IssueMissionControl.tsx:93-115). Do NOT move or export GROUP_ORDER in this item — that is registry-group-exports."
+        },
+        "items": [
+          {
+            "id": "retire-reviewtest.ac1",
+            "title": "Given the Review & Verification card with a failed/stuck review, when it renders, it renders Restart review and Reset stalled review buttons gated by their own enabledWhen predicates, and no Review & test button",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-reviewtest.ac2",
+            "title": "Given reviewStatus.testStatus = 'failed', when the blocker spotlight derives its actions, it emits 'restartReview' (enabled in that state) in place of 'reviewTest'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-reviewtest.ac3",
+            "title": "ISSUE_ACTIONS no longer contains a reviewTest entry, IssueActionKey and IssueActionGroup no longer contain 'reviewTest'/'preserved', and typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-reviewtest.ac4",
+            "title": "Each of the five named test suites passes with legacy 'Review & Test' rows migrated to requestReview, and a grep over non-test frontend sources returns zero reviewTest references",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registry-group-exports",
+        "title": "Export GROUP_ORDER and GROUP_LABELS from the issue-action registry; cockpit imports them",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "issueActions and IssueMissionControl suites pass, proving the cockpit panel renders identically from the imported constants"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Move the cockpit's GROUP_LABELS/GROUP_ORDER constants (IssueMissionControl.tsx, currently ~:93-115 after retire-reviewtest trims the 'preserved' rows) into src/dashboard/frontend/src/lib/issueActions.ts as exported constants typed Record<IssueActionGroup, string> and IssueActionGroup[]. Order is BINDING per PRD D-1: planning, work, review, agent, workspace, artifacts, navigation, danger. Labels are the cockpit's existing strings (Planning, Work, Review & Test, Agent, Workspace, Artifacts, Navigation, Danger). Delete the cockpit's local copies and import from the registry; no render change. Add a unit test asserting GROUP_ORDER lists each IssueActionGroup exactly once in the binding order and every ISSUE_ACTIONS entry's group appears in GROUP_ORDER."
+        },
+        "items": [
+          {
+            "id": "registry-group-exports.ac1",
+            "title": "issueActions.ts exports GROUP_ORDER and GROUP_LABELS in the binding 8-group order, and a unit test validates that GROUP_ORDER contains each IssueActionGroup exactly once and that every registry entry's group appears in it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-group-exports.ac2",
+            "title": "IssueMissionControl.tsx contains no local GROUP_ORDER/GROUP_LABELS declarations and renders its grouped panel from the imported constants with existing tests green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "registry-descriptions",
+        "title": "Add a required description field to every registry entry with the mockup appendix copy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.test.ts src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors (description is required on the entry type)",
+            "unit test proving every entry has a non-empty description passes; cockpit tests pass including the new enabled-button title assertions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-2: add `description: string` as a REQUIRED field on IssueActionEntry (issueActions.ts:96-105) and fill all 43 retained entries with the copy from the mockup's generated spec appendix (docs/design/mockups/issue-actions-grouped-pan-2661.html — the per-action data array's desc column, rendered in the 'Spec appendix' table) VERBATIM; the copy is BINDING. A mismatch between appendix and registry keys is a mockup bug to raise, not a license to improvise. Add a unit test asserting every ISSUE_ACTIONS entry has a non-empty description. Cockpit tooltip precedence change (deliberate, tested): in IssueMissionControl's action panel, enabled buttons gain title={action.description}; disabled buttons keep their current disabled-reason titles unchanged."
+        },
+        "items": [
+          {
+            "id": "registry-descriptions.ac1",
+            "title": "IssueActionEntry requires description (omitting it fails typecheck) and all 43 entries carry the appendix copy verbatim; a unit test asserts every entry's description is a non-empty string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "registry-descriptions.ac2",
+            "title": "Given the cockpit action panel, when a button is enabled it renders title equal to the action's description, and when disabled it preserves today's disabled-reason title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grouped-menu-component",
+        "title": "Build the shared GroupedIssueActionMenu implementing the D-3 structure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "explain-toggle",
+            "adopt-rail-menu",
+            "extend-parity-test"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+            "src/dashboard/frontend/src/components/shared/ContextMenu.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the new structure test passes: section order, phase-primary content for two phases, danger disclosure collapsed and last, counts line, disabled-item reason tooltips"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx rendering PRD D-3's BINDING structure from the registry + hook state, using the existing shared ContextMenu primitives (ContextMenuContent, ContextMenuItem, ContextMenuDestructiveItem, ContextMenuLabel, ContextMenuSeparator from shared/ContextMenu.tsx). Props: the useIssueActions action views, sessionExtras (label/icon/onSelect/destructive entries supplied by the host surface), and the explain default (wired fully in explain-toggle). Structure top-to-bottom: header label + phase chip (deriveIssueActionPhase) + counts line ('N available now · M gated') → 'For this phase' section from getPhasePrimaryActions × current phase, enabled items only, section hidden when none → registry groups in GROUP_ORDER order (skip 'danger'), each labeled with GROUP_LABELS, empty groups hidden, disabled items rendered visible-dimmed → 'This session' section from sessionExtras → collapsed 'Danger (N available)' disclosure LAST that expands to the danger-group items. Phase-primary items ARE repeated in their home group (D-3a). kind:'destructive' items outside the danger group (purgeReview, resetToPlanned, resetSession, restartAgent) stay in their home group with destructive styling and their existing confirm gates. FR-5 (verified constraint): Radix disabled items suppress pointer events, so a disabled row renders as a NON-disabled wrapper span carrying the reason tooltip via title and aria-describedby while the row itself stays non-invocable; enabled rows carry title={description}. Add max-height:70vh + overflow-y:auto to ContextMenuContent (it has none today — shared/ContextMenu.tsx ContextMenuContent className). NFR-1: DM Sans, semantic tokens, group labels uppercase 10px muted matching the cockpit panel, --destructive only for destruction. NFR-2: Radix arrow-key navigation must traverse items; disclosure toggles with Enter/Space; visible focus states. Structure test: assert full section order for two phases (e.g. WORK_RUNNING and STUCK — STUCK leads with Recover agent / Tell agent), danger collapsed by default and last, counts line, and reason tooltips on disabled items."
+        },
+        "items": [
+          {
+            "id": "grouped-menu-component.ac1",
+            "title": "Given a WORK_RUNNING fixture state, when the menu renders, it renders header + phase chip + counts line, then 'For this phase' with only enabled primaries, then non-empty registry groups in GROUP_ORDER (danger excluded), then 'This session', then the Danger disclosure last and collapsed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-menu-component.ac2",
+            "title": "Given a STUCK fixture state, when the menu renders, the 'For this phase' section leads with Recover agent and Tell agent per PHASE_PRIMARY_KEYS",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-menu-component.ac3",
+            "title": "Given a disabled action, when the menu renders it, the row appears dimmed but visible and exposes the useIssueActions disabled-reason string via tooltip and aria-describedby, and selecting it does not invoke the action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-menu-component.ac4",
+            "title": "The Danger disclosure header shows an available-count, expands and collapses with Enter and Space, and destructive items inside and outside danger render with --destructive styling and keep their existing confirm gating",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouped-menu-component.ac5",
+            "title": "ContextMenuContent applies max-height 70vh with vertical overflow scrolling, and existing consumers of the shared primitives (e.g. SessionNode context menu) keep their tests green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "explain-toggle",
+        "title": "Add the persisted Explain toggle with inline descriptions and pan-verb chips",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "toggle tests pass: off by default, persists to localStorage, renders inline descriptions and pan-verb chips when on"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-5: add a footer row 'Explain actions' to GroupedIssueActionMenu that toggles inline rendering of each action's description under its label plus a `pan <verb>` chip for actions with a non-null panVerb. Persist the boolean in localStorage under the key 'overdeck.issueActions.explain'; default OFF. Chips follow the style-guide tint formula (no pills, semantic tokens). Tests: default off; toggling on renders descriptions + chips and writes the localStorage key; a fresh render with the key set true starts on. jsdom localStorage is available in vitest; no timers involved."
+        },
+        "items": [
+          {
+            "id": "explain-toggle.ac1",
+            "title": "Given no stored preference, when the menu renders, inline descriptions and pan-verb chips are absent and the footer row 'Explain actions' is present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explain-toggle.ac2",
+            "title": "When the toggle is activated, the menu renders each action's description inline and a pan-verb chip for every action with a panVerb, and persists true under localStorage key 'overdeck.issueActions.explain'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "explain-toggle.ac3",
+            "title": "Given localStorage 'overdeck.issueActions.explain' = true, when a fresh menu mounts, it renders with Explain on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wipe-body-unification",
+        "title": "Send {deleteWorkspace:true} from the registry wipe action",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssueActionMenu/IssueActionMenu.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "a test with mocked fetch asserts the wipe invocation POSTs a JSON body containing deleteWorkspace: true"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D-4 (deliberate behavior change #1 in the D-7 ledger): add `case 'wipe': return { deleteWorkspace: true };` to bodyForAction in useIssueActions.ts (:118-139 — note the existing {deleteWorkspace:true} at :128 belongs to resetIssue, NOT wipe; today wipe falls to the default undefined and the endpoint receives no body). The registry wipe keeps its existing typed confirmation. Add a test (mocked fetch only — NEVER a real request; the deep-wipe endpoint is irreversible) asserting that invoking the wipe action POSTs /api/issues/:id/deep-wipe with body {deleteWorkspace:true}."
+        },
+        "items": [
+          {
+            "id": "wipe-body-unification.ac1",
+            "title": "When the registry wipe action is invoked after its typed confirmation, the client POSTs the deep-wipe endpoint with a JSON body containing deleteWorkspace: true (asserted against a mocked fetch)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wipe-body-unification.ac2",
+            "title": "The change preserves resetIssue's existing {deleteWorkspace:true} body and every other bodyForAction case byte-identically, and the existing IssueActionMenu suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "adopt-rail-menu",
+        "title": "Adopt GroupedIssueActionMenu in FeatureContextMenu; delete the flat dump and hardcoded Deep Wipe",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/__tests__/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "scripts/file-size-baseline.txt"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CommandDeck suites pass including the updated FeatureItem menu tests and the exactly-one-wipe assertion",
+            "lint:file-size passes with the FeatureItem.tsx baseline lowered to its new line count"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In FeatureItem.tsx's FeatureContextMenu (~:693-742): render GroupedIssueActionMenu in place of the flat 'Issue actions' label + FeatureIssueActionItems dump (delete the flatten at ~:711-714 and the FeatureIssueActionItems helper at ~:663 if it becomes unused). Delete the hardcoded Deep Wipe item and its handleDeepWipe window.confirm handler (~:698-706, item ~:732-737); the registry wipe (typed confirmation + deleteWorkspace body from wipe-body-unification) is now the single wipe entry — deliberate behavior unification per D-4/D-7: typed confirm replaces window.confirm. Pass Open State Dir and View JSONL as sessionExtras props (surface-local; registry promotion is PAN-1610), preserving their workSessionId/hasJsonl conditions. The IssueActionDialogHost mount and the onDeepWipe→CommandDeck/index.tsx handler chain: keep the dialog host untouched; if the onDeepWipe prop becomes unused after deleting the hardcoded item, remove the now-orphaned prop threading created by this change (Karpathy: remove only orphans your change creates). Reconcile scripts/file-size-baseline.txt line 5 (FeatureItem.tsx, currently 1350) to the new lower count IN THIS COMMIT — the ratchet guard fails otherwise. Tests: update FeatureItem menu tests to the grouped structure; add an explicit assertion that exactly one menu item with a wipe label exists."
+        },
+        "items": [
+          {
+            "id": "adopt-rail-menu.ac1",
+            "title": "Given an issue row right-click, when the context menu opens, it renders the GroupedIssueActionMenu structure (phase header, grouped sections, danger disclosure last) instead of the flat 'Issue actions' list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-rail-menu.ac2",
+            "title": "Exactly one wipe-labeled item exists in the rendered menu, it routes through the registry's typed-confirmation flow, and no window.confirm call remains in FeatureItem.tsx",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-rail-menu.ac3",
+            "title": "The menu renders Open State Dir and View JSONL under 'This session' and preserves their existing workSessionId/hasJsonl visibility conditions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "adopt-rail-menu.ac4",
+            "title": "IssueActionDialogHost stays mounted unchanged, and lint:file-size passes with the FeatureItem.tsx baseline reconciled in the same commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inventory-docs-row",
+        "title": "Add the FeatureContextMenu row to the PAN-2499 no-loss inventory and document it",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "docs/ISSUE-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the no-loss gate test passes with the new FeatureContextMenu inventory row resolved by a rendered data-section marker"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "The PAN-2499 inventory (ISSUE_VIEW_INVENTORY in src/dashboard/frontend/src/components/issue-view/inventory.ts) protects the per-agent 'SessionNode context menu' (:65) — a DIFFERENT menu. Add a distinct rail-view row `{ section: 'FeatureContextMenu (issue-row right-click)', view: 'rail', home: 'src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx' }` and stamp a matching data-section=\"FeatureContextMenu (issue-row right-click)\" marker on the grouped menu mount in FeatureItem.tsx, following the existing marker pattern (e.g. :788, :1067). Extend/adjust the IssueView.test.tsx no-loss gate only as needed for the marker to be observed the way sibling rail rows are. Update docs/ISSUE-VIEW.md to state that the issue-row right-click menu is a protected inventory surface rendered by the shared GroupedIssueActionMenu from the issue-action registry's GROUP_ORDER."
+        },
+        "items": [
+          {
+            "id": "inventory-docs-row.ac1",
+            "title": "ISSUE_VIEW_INVENTORY contains the 'FeatureContextMenu (issue-row right-click)' rail row and the rendered menu carries the matching data-section marker, keeping the no-loss gate green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-docs-row.ac2",
+            "title": "docs/ISSUE-VIEW.md contains a section naming the issue-row right-click menu as a protected inventory surface that renders via GroupedIssueActionMenu from the registry's GROUP_ORDER",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "extend-parity-test",
+        "title": "Extend the parity test: multiplicity, group order, gating agreement, single wipe, retirement audit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-17T10:10:56.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-2661",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck:dashboard",
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issueActions.parity.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the extended parity suite passes: per-phase multiplicity, group order, gating agreement, exactly one wipe entry, and the D-6 retirement audit constant"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "EXTEND src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx (it already covers CLI coverage and registry rendering around :140-213 — do NOT create a competing file). Add grouped-menu parity: render GroupedIssueActionMenu against fixture states for at least three phases (WORK_RUNNING, STUCK, MERGED) and assert (1) MULTIPLICITY per D-3a — each phase-primary key renders exactly twice (shortcut + home group) and every other registry key exactly once; (2) section order equals GROUP_ORDER with danger last as a disclosure; (3) enabled/disabled state of every rendered item agrees with the entry's enabledWhen against the fixture state; (4) exactly one wipe entry; (5) a RETIREMENT_AUDIT constant encoding the D-6 migration table (retired key → successor keys per consumer: ReviewVerificationCard → restartReview/recoverReview, spotlight Tests-failed → restartReview, drawer-legacy 'Review & Test' → requestReview) asserted against the registry so any future silent retirement fails loudly. Keep fetch stubbed as the file already does — no real requests."
+        },
+        "items": [
+          {
+            "id": "extend-parity-test.ac1",
+            "title": "For WORK_RUNNING, STUCK, and MERGED fixtures, the menu renders each phase-primary key exactly twice and every other registry key exactly once, plus session extras, matching the registry item multiset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extend-parity-test.ac2",
+            "title": "The test fails when an action is added to the registry without rendering, when group order drifts from GROUP_ORDER, or when a second wipe-labeled item appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extend-parity-test.ac3",
+            "title": "Each rendered item's enabled/disabled state agrees with its enabledWhen predicate for the fixture state, and destructive items are confirm-gated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "extend-parity-test.ac4",
+            "title": "A retirement-audit constant records the reviewTest → successor mapping and the suite fails if a registry key disappears without a corresponding audit row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "retire-reviewtest",
+        "to": "registry-group-exports",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-group-exports",
+        "to": "registry-descriptions",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-group-exports",
+        "to": "grouped-menu-component",
+        "type": "blocks"
+      },
+      {
+        "from": "registry-descriptions",
+        "to": "grouped-menu-component",
+        "type": "blocks"
+      },
+      {
+        "from": "grouped-menu-component",
+        "to": "explain-toggle",
+        "type": "blocks"
+      },
+      {
+        "from": "grouped-menu-component",
+        "to": "adopt-rail-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "wipe-body-unification",
+        "to": "adopt-rail-menu",
+        "type": "blocks"
+      },
+      {
+        "from": "adopt-rail-menu",
+        "to": "inventory-docs-row",
+        "type": "blocks"
+      },
+      {
+        "from": "adopt-rail-menu",
+        "to": "extend-parity-test",
+        "type": "blocks"
+      },
+      {
+        "from": "explain-toggle",
+        "to": "extend-parity-test",
+        "type": "informs"
+      },
+      {
+        "from": "retire-reviewtest",
+        "to": "extend-parity-test",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-17-PAN-2661-organize-the-issue-actions-context-menu-into-clear-sections.vbrief.json"
+    }
+  },
+  "status": "proposed"
+}
