@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T10:39:48.019Z",
+  "updated": "2026-07-17T10:40:02.374Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "registry-descriptions": {
+        "writerId": "agent-pan-2661",
+        "agentId": "agent-pan-2661",
+        "pid": 1744191,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:40:02.373Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2661",
@@ -86,6 +94,7 @@
     "retire-reviewtest.retire-reviewtest.ac4": "completed",
     "registry-group-exports": "completed",
     "registry-group-exports.registry-group-exports.ac1": "completed",
-    "registry-group-exports.registry-group-exports.ac2": "completed"
+    "registry-group-exports.registry-group-exports.ac2": "completed",
+    "registry-descriptions": "running"
   }
 }
