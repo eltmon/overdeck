@@ -905,6 +905,28 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         </div>
       </header>
 
+      <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
+        {TABS.map((tab) => {
+          const badge = tabBadge(tab.id, checks.data)
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              aria-selected={activeTab === tab.id}
+              onClick={() => selectTab(tab.id)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12px] font-medium transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-primary/9 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+              {badge && <CockpitPill tone={badge.tone} className="px-[5px] py-0 text-[9px]">{badge.label}</CockpitPill>}
+            </button>
+          )
+        })}
+      </nav>
+
       <div className={styles.missionBody}>
         <div data-section="AgentsLane"><IssueTreeLane
           issueId={issueId}
@@ -916,27 +938,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           onOpenVerification={() => selectTab('overview')}
         /></div>
         <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
-          <nav data-section="Detail Tabs" className="flex flex-wrap gap-1 border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
-            {TABS.map((tab) => {
-              const badge = tabBadge(tab.id, checks.data)
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  aria-selected={activeTab === tab.id}
-                  onClick={() => selectTab(tab.id)}
-                  className={`relative top-px flex shrink-0 items-center gap-1.5 rounded-t-[10px] border px-3 py-2 text-[12px] font-semibold transition-colors ${
-                    activeTab === tab.id
-                      ? 'border-border border-b-card bg-card text-foreground'
-                      : 'border-transparent text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {tab.label}
-                  {badge && <CockpitPill tone={badge.tone} className="px-[5px] py-0 text-[9px]">{badge.label}</CockpitPill>}
-                </button>
-              )
-            })}
-          </nav>
           <div className="p-4">
             {(treeContext || selectedTreeSession) && (
               <div data-section="SessionPanel"><IssueTreeContextPanel
