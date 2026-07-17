@@ -108,10 +108,10 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
   }
 
   // Validate required vBRIEF shape
-  if (!doc.vBRIEFInfo || !doc.plan) {
+  if (!doc.xBRIEFInfo || !doc.plan) {
     throw new Error(
-      `Invalid vBRIEF format in ${path}: missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys. ` +
-        `vBRIEF/xBRIEF v0.5-v0.8 requires { "vBRIEFInfo" or "xBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
+      `Invalid vBRIEF format in ${path}: missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+        `vBRIEF/xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
         `See docs/VBRIEF.md for the correct format.`,
     )
   }

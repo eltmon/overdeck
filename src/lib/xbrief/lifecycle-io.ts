@@ -230,7 +230,7 @@ export function updatePlanStatus(filePath: string, newStatus: string): void {
   doc.plan.status = newStatus;
   doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
   doc.plan.updated = now;
-  doc.vBRIEFInfo.updated = now;
+  doc.xBRIEFInfo.updated = now;
   const tmp = filePath + '.tmp';
   writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');
   renameSync(tmp, filePath);

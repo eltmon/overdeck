@@ -23,7 +23,7 @@ function makePlanWithAC(items: Array<{
   subItems?: Array<{ id: string; title: string; status?: string; kind?: string }>;
 }>): VBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'TEST',
       title: 'Test Plan',

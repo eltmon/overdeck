@@ -20,7 +20,7 @@ function makeDoc(
   edges: Array<{ from: string; to: string; type?: 'blocks' | 'informs' }> = [],
 ): VBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'TEST',
       title: 'Test Plan',

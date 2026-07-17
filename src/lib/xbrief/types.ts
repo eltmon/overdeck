@@ -7,7 +7,7 @@
  *
  * v0.5 compatibility fields (PAN-453):
  *   - VBriefReference: external links (issues, PRDs, specs)
- *   - VBriefDocument.vBRIEFInfo: author (tool identifier), description
+ *   - VBriefDocument.xBRIEFInfo: author (tool identifier), description
  *   - VBriefPlan: uid (UUID v4), sequence (write counter), references,
  *     created, updated timestamps
  *   - VBriefItem: created, completed timestamps
@@ -168,8 +168,8 @@ export interface VBriefInfo {
 }
 
 export interface VBriefDocument {
-  vBRIEFInfo: VBriefInfo;
-  xBRIEFInfo?: VBriefInfo;
+  xBRIEFInfo: VBriefInfo;
+  vBRIEFInfo?: VBriefInfo;
   plan: VBriefPlan;
 }
 

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, existsSync, rmSync, readFileSync } from 'fs';
 import { createHash } from 'crypto';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 import { applyEffectiveDifficulty } from '../../agents/tier-escalation.js';
 import { resolveTier } from '../../agents/resolve-tier.js';
 import { findPlanSync, isPlanningCompleteSync, isPlanningProposed, normalizeVBriefEnvelope, readPlanSync, readTierOverrides, readWorkspacePlanSync, recordTierPromotion, serializeVBriefDocument, updateItemStatus, updateSubItemStatus } from '../io.js';
@@ -13,10 +14,15 @@ let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
 const ISSUE_ID = 'PAN-100';
 const SPEC_FILENAME = '2026-01-01-PAN-100-test-plan.vbrief.json';
+const LEGACY_FIXTURE_PATH = join(
+  dirname(fileURLToPath(import.meta.url)),
+  'fixtures',
+  'legacy-v05.vbrief.json',
+);
 
 function makePlanDoc(items: Array<{ id: string; status?: string }> = []): VBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'TEST',
       title: 'Test Plan',
@@ -212,33 +218,32 @@ describe('readPlan', () => {
     expect(result.plan.items[0].id).toBe('item-1');
   });
 
-  it('accepts xBRIEFInfo v0.8 documents and exposes the internal vBRIEFInfo field', () => {
+  it('accepts xBRIEFInfo v0.8 documents as the canonical envelope', () => {
     const doc = makePlanDoc([{ id: 'item-1' }]);
-    const planPath = writePlanDoc({
-      ...doc,
-      vBRIEFInfo: undefined,
-      xBRIEFInfo: { version: '0.8', created: '2026-01-01T00:00:00Z' },
-    } as unknown as VBriefDocument);
-
-    const result = readPlanSync(planPath);
-
-    expect(result.vBRIEFInfo.version).toBe('0.8');
-    expect(result.xBRIEFInfo).toBeUndefined();
-    expect(result.plan.items[0].id).toBe('item-1');
-  });
-
-  it('still accepts vBRIEFInfo v0.6 documents unchanged', () => {
-    const doc = makePlanDoc([{ id: 'item-1' }]);
-    doc.vBRIEFInfo.version = '0.6';
+    doc.xBRIEFInfo.version = '0.8';
     const planPath = writePlanDoc(doc);
 
     const result = readPlanSync(planPath);
 
-    expect(result.vBRIEFInfo).toEqual(doc.vBRIEFInfo);
-    expect(result.plan).toEqual(doc.plan);
+    expect(result.xBRIEFInfo).toEqual(doc.xBRIEFInfo);
+    expect(result.vBRIEFInfo).toBeUndefined();
+    expect(result.plan.items[0].id).toBe('item-1');
   });
 
-  it('leaves documents with vBRIEFInfo unchanged when normalizing', () => {
+  it('loads a legacy v0.5 fixture and normalizes its envelope to xBRIEFInfo', () => {
+    const result = readPlanSync(LEGACY_FIXTURE_PATH);
+
+    expect(result.xBRIEFInfo).toEqual({
+      version: '0.5',
+      created: '2026-01-01T00:00:00Z',
+      author: 'legacy/planner',
+      description: 'Legacy vBRIEF envelope fixture',
+    });
+    expect(result.vBRIEFInfo).toBeUndefined();
+    expect(result.plan.id).toBe('PAN-LEGACY');
+  });
+
+  it('leaves documents with both envelope keys unchanged when normalizing', () => {
     const doc = {
       vBRIEFInfo: { version: '0.6', created: '2026-01-01T00:00:00Z' },
       xBRIEFInfo: { version: '0.8', created: '2026-01-02T00:00:00Z' },
@@ -252,59 +257,51 @@ describe('readPlan', () => {
     const badPath = join(PROJECT_ROOT, 'missing-envelope.json');
     writeFileSync(badPath, JSON.stringify({ plan: makePlanDoc().plan }, null, 2));
 
-    expect(() => readPlanSync(badPath)).toThrow(/vBRIEFInfo.*xBRIEFInfo|xBRIEFInfo.*vBRIEFInfo/);
+    expect(() => readPlanSync(badPath)).toThrow(/xBRIEFInfo.*vBRIEFInfo|vBRIEFInfo.*xBRIEFInfo/);
   });
 
-  it('serializes v0.8 documents with xBRIEFInfo', () => {
+  it.each(['0.5', '0.6', '0.8'])('serializes v%s documents with xBRIEFInfo only', (version) => {
     const doc = makePlanDoc();
-    doc.vBRIEFInfo.version = '0.8';
+    doc.xBRIEFInfo.version = version;
 
     const serialized = JSON.parse(serializeVBriefDocument(doc));
 
-    expect(serialized.xBRIEFInfo).toEqual(doc.vBRIEFInfo);
+    expect(serialized.xBRIEFInfo).toEqual(doc.xBRIEFInfo);
     expect(serialized.vBRIEFInfo).toBeUndefined();
   });
 
-  it('serializes v0.6 documents with vBRIEFInfo', () => {
-    const doc = makePlanDoc();
-    doc.vBRIEFInfo.version = '0.6';
+  it('serializes the legacy v0.5 fixture with xBRIEFInfo only', () => {
+    const legacyDocument = JSON.parse(readFileSync(LEGACY_FIXTURE_PATH, 'utf-8')) as {
+      vBRIEFInfo: VBriefDocument['xBRIEFInfo'];
+      plan: VBriefDocument['plan'];
+    };
 
-    const serialized = JSON.parse(serializeVBriefDocument(doc));
+    const serialized = JSON.parse(serializeVBriefDocument(legacyDocument));
 
-    expect(serialized.vBRIEFInfo).toEqual(doc.vBRIEFInfo);
-    expect(serialized.xBRIEFInfo).toBeUndefined();
-  });
-
-  it('round-trips v0.8 files with xBRIEFInfo', () => {
-    const doc = makePlanDoc([{ id: 'item-1' }]);
-    const planPath = writePlanDoc({
-      ...doc,
-      vBRIEFInfo: undefined,
-      xBRIEFInfo: { version: '0.8', created: '2026-01-01T00:00:00Z' },
-    } as unknown as VBriefDocument);
-
-    const serialized = JSON.parse(serializeVBriefDocument(readPlanSync(planPath)));
-
-    expect(serialized.xBRIEFInfo.version).toBe('0.8');
+    expect(serialized.xBRIEFInfo).toEqual(legacyDocument.vBRIEFInfo);
     expect(serialized.vBRIEFInfo).toBeUndefined();
-    expect(serialized.plan.items[0].id).toBe('item-1');
+    expect(serialized.plan).toEqual(legacyDocument.plan);
   });
 
-  it('round-trips v0.6 files with vBRIEFInfo', () => {
+  it('round-trips an xBRIEF v0.8 document without changing its content', () => {
     const doc = makePlanDoc([{ id: 'item-1' }]);
-    doc.vBRIEFInfo.version = '0.6';
+    doc.xBRIEFInfo = {
+      version: '0.8',
+      created: '2026-01-01T00:00:00Z',
+      author: 'overdeck/test',
+      description: 'Canonical xBRIEF round-trip',
+    };
     const planPath = writePlanDoc(doc);
 
     const serialized = JSON.parse(serializeVBriefDocument(readPlanSync(planPath)));
 
-    expect(serialized.vBRIEFInfo.version).toBe('0.6');
-    expect(serialized.xBRIEFInfo).toBeUndefined();
-    expect(serialized.plan.items[0].id).toBe('item-1');
+    expect(serialized).toEqual({ ...doc, status: 'active' });
+    expect(serialized.vBRIEFInfo).toBeUndefined();
   });
 
   it('preserves extra top-level keys when serializing pan spec documents', () => {
     const doc = { ...makePlanDoc(), status: 'active' };
-    doc.vBRIEFInfo.version = '0.8';
+    doc.xBRIEFInfo.version = '0.8';
 
     const serialized = JSON.parse(serializeVBriefDocument(doc));
 
@@ -321,7 +318,7 @@ describe('readPlan', () => {
 
     const serialized = JSON.parse(serializeVBriefDocument(doc));
 
-    expect(doc.vBRIEFInfo.version).toBe('0.8');
+    expect(doc.xBRIEFInfo.version).toBe('0.8');
     expect(serialized.xBRIEFInfo.version).toBe('0.8');
     expect(serialized.vBRIEFInfo).toBeUndefined();
     expect(serialized.plan).toEqual(expect.objectContaining({ id: 'PAN-2426', title: 'xBRIEF writer bump' }));
@@ -369,7 +366,7 @@ describe('readWorkspacePlan', () => {
       { id: 'item-1.ac2', title: 'Second AC', status: 'completed', metadata: { kind: 'acceptance_criterion' } },
     ];
     const legacyDoc = makePlanDoc([{ id: 'item-1' }]);
-    legacyDoc.vBRIEFInfo.version = '0.5';
+    legacyDoc.xBRIEFInfo.version = '0.5';
     legacyDoc.plan.items[0].subItems = childItems;
     writePlanDoc(legacyDoc);
     const legacyView = readWorkspacePlanSync(WORKSPACE_PATH)!;
@@ -378,7 +375,7 @@ describe('readWorkspacePlan', () => {
     mkdirSync(WORKSPACE_PATH, { recursive: true });
 
     const currentDoc = makePlanDoc([{ id: 'item-1' }]);
-    currentDoc.vBRIEFInfo.version = '0.6';
+    currentDoc.xBRIEFInfo.version = '0.6';
     currentDoc.plan.items[0].items = childItems;
     writePlanDoc(currentDoc);
     const currentView = readWorkspacePlanSync(WORKSPACE_PATH)!;
@@ -514,7 +511,7 @@ describe('tierOverrides', () => {
 describe('updateSubItemStatus', () => {
   function makePlanWithSubItems(): VBriefDocument {
     return {
-      vBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
+      xBRIEFInfo: { version: '0.5', created: '2026-01-01T00:00:00Z' },
       plan: {
         id: 'TEST',
         title: 'Test Plan',
@@ -535,7 +532,7 @@ describe('updateSubItemStatus', () => {
 
   function makePlanWithItems(): VBriefDocument {
     const doc = makePlanWithSubItems();
-    doc.vBRIEFInfo.version = '0.6';
+    doc.xBRIEFInfo.version = '0.6';
     doc.plan.items[0].items = doc.plan.items[0].subItems;
     delete doc.plan.items[0].subItems;
     return doc;

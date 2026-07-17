@@ -137,7 +137,7 @@ export class PlanBuilder {
     const now = new Date().toISOString();
     const version = getPackageVersion();
     return {
-      vBRIEFInfo: {
+      xBRIEFInfo: {
         version: '0.8',
         created: now,
         author: `overdeck/${version}`,

@@ -39,7 +39,7 @@ import { listSessionNames, capturePane } from '../../../../lib/tmux.js';
 import { getActiveSessionModelSync } from '../../../../lib/cost-parsers/jsonl-parser.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import { listStashes, isSalvageableStash } from '../../../../lib/stashes.js';
-import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan } from '../../../../lib/xbrief/io.js';
+import { findPlan, isPlanningComplete, mergeRecordStatusOverrides, readPlan, serializeVBriefDocument } from '../../../../lib/xbrief/io.js';
 import { getCostsForIssueSync } from '../../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../../services/running-agents-cache.js';
@@ -858,8 +858,8 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
     const now = new Date().toISOString();
     const updated: VBriefDocument = {
       ...location.doc,
-      vBRIEFInfo: {
-        ...location.doc.vBRIEFInfo,
+      xBRIEFInfo: {
+        ...location.doc.xBRIEFInfo,
         inspectionPolicy: policy as VBriefInspectionPolicy,
         updated: now,
       },
@@ -869,7 +869,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
       },
     };
 
-    yield* Effect.promise(() => writeFile(location.path, JSON.stringify(updated, null, 2) + '\n', 'utf-8'));
+    yield* Effect.promise(() => writeFile(location.path, `${serializeVBriefDocument(updated)}\n`, 'utf-8'));
     const cp = criticalPath(updated);
     return jsonResponse({ ...updated, criticalPath: cp, lifecycleDir: location.lifecycleDir });
   }))

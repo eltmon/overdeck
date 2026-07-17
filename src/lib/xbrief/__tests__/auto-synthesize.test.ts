@@ -91,8 +91,8 @@ describe('synthesizeMinimalVBrief', () => {
       url: 'https://example.test/PAN-1071',
     });
 
-    expect(doc.vBRIEFInfo.version).toBe('0.8');
-    expect(doc.vBRIEFInfo.inspectionPolicy).toBe('never');
+    expect(doc.xBRIEFInfo.version).toBe('0.8');
+    expect(doc.xBRIEFInfo.inspectionPolicy).toBe('never');
     expect(doc.plan.id).toBe('pan-1071');
     expect(doc.plan.status).toBe('proposed');
     expect(doc.plan.references).toEqual([{ uri: 'https://example.test/PAN-1071', label: 'PAN-1071', type: 'issue' }]);

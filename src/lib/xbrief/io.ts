@@ -35,7 +35,7 @@ import {
 import type { ProjectConfig } from '../projects.js';
 import { parseVBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
-import { subItemsOf, type VBriefDifficulty, type VBriefDocument, type VBriefItemStatus } from './types.js';
+import { subItemsOf, type VBriefDifficulty, type VBriefDocument, type VBriefInfo, type VBriefItemStatus } from './types.js';
 import type { TierOverridesMap } from './continue-state.js';
 
 export type { TierOverride, TierOverridesMap, TierPromotionHistoryEntry } from './continue-state.js';
@@ -187,7 +187,8 @@ export function findPlanSync(workspacePath: string): string | null {
 
 /**
  * Reads and parses plan.vbrief.json from the given path.
- * Handles both standard format ({ vBRIEFInfo, plan: {...} }) and flat format
+ * Handles both standard format ({ xBRIEFInfo, plan: {...} }) and legacy
+ * envelope format ({ vBRIEFInfo, plan: {...} }). Flat format
  * ({ issue, title, items, edges? }) produced by some planning prompts.
  * Throws if the file does not exist or is invalid JSON.
  */
@@ -204,21 +205,20 @@ export class VBriefMergeConflictError extends Error {
 export function normalizeVBriefEnvelope<T>(parsed: T): T {
   if (!parsed || typeof parsed !== 'object') return parsed;
   const candidate = parsed as Record<string, unknown>;
-  if ('xBRIEFInfo' in candidate && !('vBRIEFInfo' in candidate)) {
-    const { xBRIEFInfo, ...rest } = candidate;
-    return { vBRIEFInfo: xBRIEFInfo, ...rest } as T;
+  if ('vBRIEFInfo' in candidate && !('xBRIEFInfo' in candidate)) {
+    const { vBRIEFInfo, ...rest } = candidate;
+    return { xBRIEFInfo: vBRIEFInfo, ...rest } as T;
   }
   return parsed;
 }
 
-export function serializeVBriefDocument(doc: { vBRIEFInfo: { version: string } }): string {
-  const version = Number.parseFloat(doc.vBRIEFInfo.version);
-  if (Number.isFinite(version) && version >= 0.7) {
-    const { vBRIEFInfo, ...rest } = doc;
-    return JSON.stringify({ xBRIEFInfo: vBRIEFInfo, ...rest }, null, 2);
-  }
-  const legacyDocument = doc;
-  return JSON.stringify(legacyDocument, null, 2);
+type VBriefEnvelopeInput =
+  | { xBRIEFInfo: VBriefInfo; vBRIEFInfo?: VBriefInfo }
+  | { xBRIEFInfo?: VBriefInfo; vBRIEFInfo: VBriefInfo };
+
+export function serializeVBriefDocument<T extends VBriefEnvelopeInput>(doc: T): string {
+  const { xBRIEFInfo, vBRIEFInfo, ...rest } = doc;
+  return JSON.stringify({ xBRIEFInfo: xBRIEFInfo ?? vBRIEFInfo, ...rest }, null, 2);
 }
 
 export function readPlanSync(planPath: string): VBriefDocument {
@@ -229,14 +229,14 @@ export function readPlanSync(planPath: string): VBriefDocument {
   const parsed = normalizeVBriefEnvelope(JSON.parse(raw));
 
   // vBRIEF/xBRIEF requires an info envelope and plan top-level key.
-  if (parsed.vBRIEFInfo && parsed.plan) {
+  if (parsed.xBRIEFInfo && parsed.plan) {
     return parsed as VBriefDocument;
   }
 
   // Non-spec format — reject with helpful error
   throw new Error(
-    `Invalid vBRIEF format in ${planPath}: missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys. ` +
-    `vBRIEF/xBRIEF v0.5-v0.8 requires { "vBRIEFInfo" or "xBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
+    `Invalid vBRIEF format in ${planPath}: missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+    `vBRIEF/xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
     `See docs/VBRIEF.md for the correct format.`
   );
 }
@@ -501,12 +501,12 @@ export const readPlan = (
         new VBriefInvalidFormatError({ planPath, reason: `invalid JSON: ${(cause as Error).message}` }),
       );
     }
-    const obj = normalizeVBriefEnvelope(parsed) as { vBRIEFInfo?: unknown; plan?: unknown };
-    if (!obj || !obj.vBRIEFInfo || !obj.plan) {
+    const obj = normalizeVBriefEnvelope(parsed) as { xBRIEFInfo?: unknown; plan?: unknown };
+    if (!obj || !obj.xBRIEFInfo || !obj.plan) {
       return yield* Effect.fail(
         new VBriefInvalidFormatError({
           planPath,
-          reason: `missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys`,
+          reason: `missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys`,
         }),
       );
     }
@@ -528,8 +528,8 @@ export const findWorkspaceDraftPlan = (
           try {
             await readFile(candidate, 'utf-8');
             return true;
-          } catch (error: any) {
-            if (error?.code === 'ENOENT') return false;
+          } catch (error: unknown) {
+            if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') return false;
             throw error;
           }
         },

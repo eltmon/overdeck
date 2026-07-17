@@ -85,7 +85,7 @@ export function synthesizeMinimalVBrief(issue: AutoSynthesizeIssueInput): VBrief
   const canonicalFilename = generateVBriefFilename(issueId, issue.title, now);
 
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.8',
       created: now,
       updated: now,

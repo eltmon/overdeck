@@ -191,12 +191,12 @@ export const readVBriefDocument = (
         new VBriefInvalidFormatError({ planPath: path, reason: `invalid JSON: ${(cause as Error).message}` }),
       );
     }
-    const obj = parsed as { vBRIEFInfo?: unknown; plan?: unknown };
-    if (!obj || !obj.vBRIEFInfo || !obj.plan) {
+    const obj = parsed as { xBRIEFInfo?: unknown; plan?: unknown };
+    if (!obj || !obj.xBRIEFInfo || !obj.plan) {
       return yield* Effect.fail(
         new VBriefInvalidFormatError({
           planPath: path,
-          reason: `missing 'vBRIEFInfo' or 'xBRIEFInfo' and/or 'plan' top-level keys`,
+          reason: `missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys`,
         }),
       );
     }

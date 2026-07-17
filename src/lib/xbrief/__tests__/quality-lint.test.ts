@@ -39,7 +39,7 @@ function item(overrides: Partial<VBriefItem> = {}): VBriefItem {
 
 function doc(items: VBriefItem[], planMetadata: Record<string, unknown> = { docsJustification: 'Fixture plan; docs coverage is exercised in its own suite' }): VBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.5',
       created: '2026-06-12T00:00:00Z',
     },
@@ -506,7 +506,7 @@ describe('lintPlanQuality requirement traces', () => {
 
 describe('lintPlanQuality observable-term tuning (PAN-1796)', () => {
   const planWith = (acTitle: string) => ({
-    vBRIEFInfo: { version: '0.6', created: 'x' },
+    xBRIEFInfo: { version: '0.6', created: 'x' },
     plan: {
       id: 'pan-1', title: 't', status: 'approved',
       metadata: { docsJustification: 'Fixture plan; docs coverage is exercised in its own suite' },

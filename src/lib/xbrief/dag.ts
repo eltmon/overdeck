@@ -463,7 +463,7 @@ export function createActiveSlice(doc: VBriefDocument, options: ActiveSliceOptio
   const synthesisContext = options.synthesisOutputs?.[item.id]?.contextUpdate;
   const globalConstraints = [doc.plan.narratives?.Constraint, doc.plan.narratives?.Risk]
     .filter((value): value is string => Boolean(value));
-  const objective = doc.plan.narratives?.Problem ?? doc.plan.narratives?.Proposal ?? doc.vBRIEFInfo.description;
+  const objective = doc.plan.narratives?.Problem ?? doc.plan.narratives?.Proposal ?? doc.xBRIEFInfo.description;
   const prompt = renderActiveSlicePrompt({
     issueId: options.issueId,
     planId: doc.plan.id,
@@ -617,7 +617,7 @@ export function applyTaskOperation(doc: VBriefDocument, operation: TaskOperation
   }
   next.plan.sequence = currentSequence + 1;
   next.plan.updated = now;
-  next.vBRIEFInfo.updated = now;
+  next.xBRIEFInfo.updated = now;
   if (operation.pipeline) setPipelineMirror(next, operation.pipeline);
   return { doc: next, item };
 }

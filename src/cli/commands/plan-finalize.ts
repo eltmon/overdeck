@@ -468,7 +468,7 @@ export function stampPlanForFinalization(planPath: string, issueId: string): str
   doc.plan.status = 'proposed';
   doc.plan.sequence = (doc.plan.sequence ?? 0) + 1;
   doc.plan.updated = now;
-  doc.vBRIEFInfo.updated = now;
+  doc.xBRIEFInfo.updated = now;
 
   const tmp = planPath + '.tmp';
   writeFileSync(tmp, serializeVBriefDocument(doc), 'utf-8');

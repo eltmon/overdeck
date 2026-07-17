@@ -8,7 +8,7 @@ import type { VBriefDocument } from '../types.js';
 
 function makeDoc(items: Array<{ id: string }>, edges: Array<{ from: string; to: string; type?: string }>): VBriefDocument {
   return {
-    vBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
+    xBRIEFInfo: { version: '1.0', created: '2026-01-01T00:00:00Z' },
     plan: {
       id: 'TEST',
       title: 'Test Plan',
@@ -115,7 +115,7 @@ describe('criticalPath', () => {
 });
 
 describe('readPlanFile', () => {
-  it('normalizes xBRIEFInfo v0.8 documents before callers mutate vBRIEFInfo.updated', async () => {
+  it('preserves xBRIEFInfo v0.8 documents as the canonical envelope', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'vbrief-dag-'));
     try {
       const path = join(dir, 'plan.vbrief.json');
@@ -133,14 +133,14 @@ describe('readPlanFile', () => {
       );
 
       const doc = await Effect.runPromise(readPlanFile(path));
-      doc.vBRIEFInfo.updated = '2026-07-01T00:00:00Z';
+      doc.xBRIEFInfo.updated = '2026-07-01T00:00:00Z';
 
-      expect(doc.vBRIEFInfo).toEqual({
+      expect(doc.xBRIEFInfo).toEqual({
         version: '0.8',
         created: '2026-06-30T00:00:00Z',
         updated: '2026-07-01T00:00:00Z',
       });
-      expect(doc.xBRIEFInfo).toBeUndefined();
+      expect(doc.vBRIEFInfo).toBeUndefined();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

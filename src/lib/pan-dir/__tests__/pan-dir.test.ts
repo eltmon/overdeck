@@ -48,7 +48,7 @@ afterEach(() => {
 
 function makeDoc(issueId: string, title: string, status = 'draft'): VBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.5',
       created: '2026-05-04T00:00:00Z',
       updated: '2026-05-04T00:00:00Z',
@@ -144,7 +144,7 @@ describe('spec helpers', () => {
 
       const read = yield* readSpec(path)
       expect(read.status).toBe('active')
-      expect(read.vBRIEFInfo.version).toBe('0.8')
+      expect(read.xBRIEFInfo.version).toBe('0.8')
       expect(read.plan.id).toBe('PAN-2426')
     }),
   )

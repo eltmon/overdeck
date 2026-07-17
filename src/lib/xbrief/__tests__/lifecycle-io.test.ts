@@ -38,7 +38,7 @@ function initGitRepo(dir: string): void {
 
 function makePlan(issueId: string, slug: string, status: string = 'proposed'): VBriefDocument {
   return {
-    vBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
+    xBRIEFInfo: { version: '0.5', created: '2026-05-03T00:00:00Z' },
     plan: {
       id: issueId.toLowerCase(),
       title: `Plan for ${issueId}`,
@@ -154,7 +154,7 @@ describe('updatePlanStatus', () => {
     expect(after.plan.status).toBe('approved');
     expect(after.plan.sequence).toBe(2);
     expect(after.plan.updated).toBeTruthy();
-    expect(after.vBRIEFInfo.updated).toBeTruthy();
+    expect(after.xBRIEFInfo.updated).toBeTruthy();
   });
 
   it('writes atomically (no .tmp left behind)', () => {
