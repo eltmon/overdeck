@@ -589,15 +589,7 @@
       "timestamp": "2026-07-17T01:18:02.565Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-17T01:18:02Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1966\n\n# Review Synthesis — PAN-1966 — 2026-07-17T01:14:00Z\n\n## Verdict: CHANGES REQUESTED — the cycle-10 post-UAT flywheel instruction calls a project-scoped endpoint without the required project query\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-e6c7f946/context.json`\n- Branch: `feature/pan-1966`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966`\n- HEAD reviewed: `e6c7f946156764b213be4732dde5ec75d33b1401`\n- Cycle number: 10\n- Prior cycle SHA: `41b0474d6d027e7840b29ea391995d0e52f6ee62`\n\n## Convoy Status\n| Sub-role | Signal | Output | Reported findings | Blocking after deduplication and convergence |\n| --- | --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-e6c7f946/security.md` | 0 | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-e6c7f946/correctness.md` | 4 | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-e6c7f946/performance.md` | 1 | 0 |\n| requirements | ready, fresh pass | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-e6c7f946/requirements.md` | 5 | 1 |\n\nCorrectness, performance, and requirements overlap on the same five underlying defects. They are deduplicated below, retaining requirements scope and the strongest concrete correctness or measurement evidence.\n\n## Blocking Findings\n\n### [correctness, requirements] The changed post-UAT nudge calls the membership endpoint without its required project query — `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/lib/cloister/uat-promote-notify.ts:23`\n\n- **Scope:** `in_pr_scope`\n- **Requirement:** FR-5 and trace item `wire-flywheel` require every flywheel membership decision to use the canonical read door.\n- **Failure:** The cycle-10 change tells the flywheel to derive `activePipeline` from `GET /api/pipeline/membership`, but `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/dashboard/server/routes/issues.ts:908` returns HTTP 400 unless the request includes `?project=<project-key>`. Following the post-promotion instruction literally cannot rebuild the canonical member set, so merged or regressed UAT members can remain in the flywheel's stale ready set.\n- **Convergence:** The defective nudge line changed between `41b0474d6d027e7840b29ea391995d0e52f6ee62` and the reviewed HEAD, so it remains blocking in cycle 10. The same invalid request shape in `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/roles/flywheel.md:77` corroborates the feature-level gap, but that unchanged line is not independently promoted as a cycle-10 blocker.\n- **Required correction:** Tell the flywheel how to issue the project-qualified request for every configured project and combine only rows where `inPipeline === true`, or expose an aggregate read-door request matching the instruction. Lock the executable request shape with a test.\n\n## Non-blocking Findings\n\nThese defects remain confirmed and actionable, but their cited defect lines are outside the cycle diff from `41b0474d6d027e7840b29ea391995d0e52f6ee62` to `e6c7f946156764b213be4732dde5ec75d33b1401`. Under cycle-10 convergence policy they are retained as previously reviewed evidence rather than promoted to blockers in this cycle.\n\n### [correctness, requirements] Non-GitHub projects have no canonical membership path\n\n`/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/lib/pipeline-membership-gather.ts:200` returns no signals whenever `github_repo` is absent, so durable tracker, git, branch, and vBRIEF evidence is never evaluated for configured non-GitHub projects. `pan pending`, dashboard discovery, and flywheel pickup consequently exclude real work for those projects.\n\n### [correctness, requirements] Membership unavailability hides live diagnostic resources\n\n`/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/dashboard/server/services/resource-discovery.ts:757` retains live residue only when an explicit membership row exists. A cold refresh failure or unsupported project therefore removes running agents, tmux sessions, workspaces, and remote agents from the diagnostic resource surface instead of preserving them as unavailable-membership drift.\n\n### [correctness, requirements] Canonical members can be grouped under the unrendered `todo` phase\n\n`/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/dashboard/frontend/src/lib/pipeline-state.ts:193` can return `todo` for an admitted canonical member, while `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/dashboard/frontend/src/components/Pipeline/PipelineView.tsx:21` omits `todo` from the rendered phases. A `post_merge_limbo` or other authoritative member without legacy phase annotations can therefore disappear from the Pipeline view.\n\n### [performance, requirements] GraphQL chunks execute serially within each project\n\n`/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/lib/pipeline-membership-gather.ts:97` and `/home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/src/lib/pipeline-membership-gather.ts:129` await each 50-alias GraphQL document in sequence. The performance reviewer measured 13 merged-head chunks taking 8,182 ms for 639 open issues, and projected approximately 80 seconds at ten times that scale before the rest of the cold membership gather completes.\n\n## Scope Note\n\nThe fresh requirements pass found all five defects inside the pull request's feature scope. Cycle convergence changes blocking eligibility, not validity: the four demoted findings still need resolution or explicit follow-up, but only the changed post-UAT instruction can block this tenth review cycle. All seven explicit non-goals remain respected, including the prohibition on an `orphan_branch` bucket, a separate lane taxonomy, a new CLI verb, and destructive recovery acceptance tests.\n\n## Clean Sub-roles\n\n- Security found no confirmed vulnerability. New subprocesses use `execFile` argument arrays, GraphQL and URL values are escaped, the endpoint exposes no sensitive data, the frontend introduces no unsafe HTML path, and no dependency was added.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1966/.pan/review/agent-pan-1966-review-e6c7f946/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1966 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
@@ -686,19 +678,20 @@
     "recordedAt": "2026-07-16T12:25:26.029Z"
   },
   "created": "2026-07-16T04:02:54.129Z",
-  "updated": "2026-07-17T01:28:21.730Z",
+  "updated": "2026-07-17T01:28:22.759Z",
   "pipeline": {
     "issueId": "PAN-1966",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:28:21.703Z",
+    "updatedAt": "2026-07-17T01:28:22.704Z",
     "inspectNotes": "AC4 now fully met: forbiddenModule regex broadened to /\\/database\\/|review-status|agent-state|tmux/ correctly catches the real DB layer (src/lib/database/*-db.ts) and hyphen-derived review-status/agent-state/tmux filenames, verified against actual repo paths with no false positives on legitimate deps; combined with the real transitive import-graph walk from the prior commit, AC4's 'by construction' guarantee now holds. AC1/2/3/5 previously verified and unaffected (test-only diff).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2790",
+    "reviewSpawnedAt": "2026-07-17T01:28:22.703Z",
     "strikeRecoveryCount": 0
   },
   "closeOut": {
@@ -803,7 +796,7 @@
       },
       "costAtCloseOut": {
         "usd": 388.245999,
-        "pricingAsOf": "2026-07-17T01:28:21.724Z"
+        "pricingAsOf": "2026-07-17T01:28:22.755Z"
       }
     },
     "merges": [
