@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:56:12.910Z",
-  "updated": "2026-07-17T16:41:00.819Z",
+  "updated": "2026-07-17T16:41:08.419Z",
   "pipeline": {
     "issueId": "PAN-2445",
     "reviewStatus": "pending",
@@ -170,5 +170,35 @@
     "docs-autonomous-plan": "completed",
     "docs-autonomous-plan.docs-autonomous-plan.ac1": "completed",
     "docs-autonomous-plan.docs-autonomous-plan.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "src/lib/config-yaml/merge.ts"
+    ],
+    "declaredScope": [
+      "docs/FLYWHEEL.md",
+      "docs/MODEL-CALLS.md",
+      "src/lib/cloister/__tests__/autonomous-plan-dispatch.test.ts",
+      "src/lib/cloister/__tests__/reactive-scheduler.test.ts",
+      "src/lib/cloister/autonomous-plan-dispatch.ts",
+      "src/lib/cloister/service-reactive.ts",
+      "src/lib/config-yaml/__tests__/planning-config.test.ts",
+      "src/lib/config-yaml/merge.ts",
+      "src/lib/config-yaml/roles.ts",
+      "src/lib/config-yaml/schema.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/FLYWHEEL.md",
+      "docs/MODEL-CALLS.md",
+      "src/lib/cloister/__tests__/autonomous-plan-dispatch.test.ts",
+      "src/lib/cloister/__tests__/reactive-scheduler.test.ts",
+      "src/lib/cloister/autonomous-plan-dispatch.ts",
+      "src/lib/cloister/service-reactive.ts",
+      "src/lib/config-yaml/__tests__/planning-config.test.ts",
+      "src/lib/config-yaml/roles.ts",
+      "src/lib/config-yaml/schema.ts"
+    ],
+    "recordedAt": "2026-07-17T16:41:08.418Z"
   }
 }
