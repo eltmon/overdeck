@@ -12,6 +12,7 @@ vi.mock('lucide-react', async (importOriginal) => {
     ChevronDown: (props: Record<string, unknown>) => <svg data-testid="chevron-down" {...props} />,
     CircleCheck: (props: Record<string, unknown>) => <svg data-testid="circle-check" {...props} />,
     CircleX: (props: Record<string, unknown>) => <svg data-testid="circle-x" {...props} />,
+    ListChecks: (props: Record<string, unknown>) => <svg data-testid="list-checks" {...props} />,
   };
 });
 
@@ -189,6 +190,24 @@ describe('AgentStepRow', () => {
     );
 
     expect(screen.getByText('Slot 2')).toBeInTheDocument();
+  });
+
+  it('renders a lint rail row with its label, icon, and verification purpose', () => {
+    render(
+      <AgentStepRow
+        session={makeSession({ type: 'lint', sessionId: 'lint-pan-2665' })}
+        issueId="PAN-2665"
+        density="rail"
+        onAction={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Lint')).toBeInTheDocument();
+    expect(screen.getByTestId('list-checks')).toBeInTheDocument();
+    expect(screen.getByTestId('list-checks').parentElement).toHaveAttribute(
+      'title',
+      expect.stringContaining('Quality-gate run (install/typecheck/lint/test) that gates review dispatch.'),
+    );
   });
 
   it('shows a spinner for live activity in cockpit', () => {
