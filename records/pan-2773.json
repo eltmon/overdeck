@@ -431,7 +431,7 @@
     "recordedAt": "2026-07-16T21:54:06.876Z"
   },
   "created": "2026-07-16T04:55:30.302Z",
-  "updated": "2026-07-16T23:09:49.518Z",
+  "updated": "2026-07-17T00:10:35.084Z",
   "pipeline": {
     "issueId": "PAN-2773",
     "reviewStatus": "passed",
@@ -441,7 +441,7 @@
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-16T23:09:49.494Z",
+    "updatedAt": "2026-07-17T00:10:35.069Z",
     "reviewNotes": "Approved after cycle-10 convergence gate; no blocking findings remain",
     "testNotes": "Gates: npm run typecheck (pass, incl. dashboard-types guard 70 known/0 new), npm run lint (pass, all 13 sub-gates incl. file-size/circular/ratchet/quarantine-audit). npm test (root vitest): 1027 passed, 1 failed - tests/unit/lib/cloister/deacon-swarm-doneness.test.ts (ENOTEMPTY rmdir race), reproduced on 2 full-suite runs but passes in isolation; file is explicitly listed in scripts/flaky-quarantine.txt under PAN-2421 as a known pre-existing flake unrelated to this branch's diff (touches deacon/swarm logic, not any CommandDeck/Stage file this issue changed) - treated as non-blocking per project quarantine policy. Frontend suite (npm --prefix src/dashboard/frontend run test): 216/216 files, 2052/2052 tests passed. PAN-2773-specific files explicitly re-run and confirmed: CommandDeck.test.tsx, Launcher.test.tsx, IssueOverview.test.tsx, ProjectHome.test.tsx, HomePane.test.tsx, App.test.tsx, ChatMarkdown.test.tsx = 7 files/88 tests passed; root's chained issueActions suite = 3 files/32 tests passed. UAT: not required - vBRIEF's own verify_commands for every item are Vitest/RTL only (no Playwright/browser/UAT mentioned anywhere in the vBRIEF, issue text, or session history), and every acceptance criterion (inline role=alert errors, Unknown-project state, busy-suppression, retry-clears-error) is already exercised by RTL tests against real rendered DOM/accessible roles, which is the plan's stated verification method for this frontend-only bug fix. Note: GitHub Actions PR#2798 'test' check shows FAILURE, but its log shows a bun install tarball-integrity error for app-builder-lib (unrelated CI infra flake, not a code/test failure) - the branch was also just rebased onto latest main locally (18 commits, clean tree) so that stale CI run predates the rebase.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -615,7 +615,7 @@
       },
       "costAtCloseOut": {
         "usd": 274.555005,
-        "pricingAsOf": "2026-07-16T23:09:49.514Z"
+        "pricingAsOf": "2026-07-17T00:10:35.081Z"
       }
     },
     "merges": [
