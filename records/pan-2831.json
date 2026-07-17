@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:19.469Z",
-  "updated": "2026-07-17T13:40:54.605Z",
+  "updated": "2026-07-17T13:41:02.915Z",
   "pipeline": {
     "issueId": "PAN-2831",
     "reviewStatus": "pending",
@@ -144,5 +144,34 @@
     "server-callsites-numeric-sort.server-callsites-numeric-sort.ac1": "completed",
     "server-callsites-numeric-sort.server-callsites-numeric-sort.ac2": "completed",
     "server-callsites-numeric-sort.server-callsites-numeric-sort.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/issue-sort.test.ts",
+      "packages/contracts/src/issue-sort.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/MergePolicySection.tsx",
+      "src/dashboard/frontend/src/hooks/useSearch.ts",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/dashboard/server/services/resource-discovery.ts"
+    ],
+    "actualChangedFiles": [
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/issue-sort.test.ts",
+      "packages/contracts/src/issue-sort.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/MergePolicySection.tsx",
+      "src/dashboard/frontend/src/hooks/useSearch.ts",
+      "src/dashboard/frontend/src/pages/HomePage.tsx",
+      "src/dashboard/server/routes/projects.ts",
+      "src/dashboard/server/services/resource-discovery.ts"
+    ],
+    "recordedAt": "2026-07-17T13:41:02.914Z"
   }
 }
