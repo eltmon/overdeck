@@ -10,8 +10,71 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
+      "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/__tests__/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx"
+    ],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/__tests__/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/ReviewVerificationCard.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/spotlight.ts",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+      "src/dashboard/frontend/src/components/shared/ContextMenu.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+      "src/dashboard/frontend/src/lib/issueActions.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/ReviewVerificationCard.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/spotlight.ts",
+      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
+      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+      "src/dashboard/frontend/src/components/shared/ContextMenu.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+      "src/dashboard/frontend/src/lib/issueActions.ts",
+      "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+    ],
+    "recordedAt": "2026-07-17T12:01:04.835Z"
+  },
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T12:01:04.836Z",
+  "updated": "2026-07-17T12:01:07.948Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -21,8 +84,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T11:08:03.938Z",
-    "inspectNotes": "AC3 fix verified: GroupedIssueActionMenu.tsx:49 now passes aria-describedby directly to <Item>, which forwards it via {...props} onto the real role=menuitem Radix node (confirmed against @radix-ui/react-menu source), so the disabled reason is now correctly associated with the focusable menuitem for AT. Test updated to assert on the menuitem element itself, not just the wrapper. All 5 ACs satisfied."
+    "updatedAt": "2026-07-17T12:01:07.904Z",
+    "inspectNotes": "AC3 fix verified: GroupedIssueActionMenu.tsx:49 now passes aria-describedby directly to <Item>, which forwards it via {...props} onto the real role=menuitem Radix node (confirmed against @radix-ui/react-menu source), so the disabled reason is now correctly associated with the focusable menuitem for AT. Test updated to assert on the menuitem element itself, not just the wrapper. All 5 ACs satisfied.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2832"
   },
   "closeOut": {
     "usage": {
@@ -37,17 +101,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 26,
-            "output": 14123,
-            "cacheRead": 1729687,
-            "cacheWrite": 125966
+            "input": 28,
+            "output": 14582,
+            "cacheRead": 1884102,
+            "cacheWrite": 131881
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1991728,
-            "output": 154166,
-            "cacheRead": 32598016,
+            "input": 4537860,
+            "output": 300691,
+            "cacheRead": 63756800,
             "cacheWrite": 0
           }
         }
@@ -60,28 +124,30 @@
           "cacheWrite": 184049
         },
         "anthropic/claude-sonnet-5": {
-          "input": 26,
-          "output": 14123,
-          "cacheRead": 1729687,
-          "cacheWrite": 125966
+          "input": 28,
+          "output": 14582,
+          "cacheRead": 1884102,
+          "cacheWrite": 131881
         },
         "openai/gpt-5.6-sol": {
-          "input": 1991728,
-          "output": 154166,
-          "cacheRead": 32598016,
+          "input": 4537860,
+          "output": 300691,
+          "cacheRead": 63756800,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.242944,
-        "pricingAsOf": "2026-07-17T11:08:04.290Z"
+        "usd": 72.999011,
+        "pricingAsOf": "2026-07-17T12:01:07.932Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2832"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 18,
     "claims": {},
@@ -216,68 +282,5 @@
     "extend-parity-test.extend-parity-test.ac2": "completed",
     "extend-parity-test.extend-parity-test.ac3": "completed",
     "extend-parity-test.extend-parity-test.ac4": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
-      "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/__tests__/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx"
-    ],
-    "declaredScope": [
-      "docs/ISSUE-VIEW.md",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/__tests__/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
-      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/ReviewVerificationCard.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/spotlight.ts",
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-      "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx",
-      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
-      "src/dashboard/frontend/src/components/shared/ContextMenu.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
-      "src/dashboard/frontend/src/lib/issueActions.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/ISSUE-VIEW.md",
-      "scripts/file-size-baseline.txt",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/action-parity.test.ts",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/GroupedIssueActionMenu.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/index.ts",
-      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/ReviewVerificationCard.tsx",
-      "src/dashboard/frontend/src/components/Stage/cockpit/spotlight.ts",
-      "src/dashboard/frontend/src/components/drawer/IssueDrawer.test.tsx",
-      "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
-      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
-      "src/dashboard/frontend/src/components/shared/ContextMenu.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.parity.test.tsx",
-      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
-      "src/dashboard/frontend/src/lib/issueActions.ts",
-      "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
-    ],
-    "recordedAt": "2026-07-17T12:01:04.835Z"
   }
 }
