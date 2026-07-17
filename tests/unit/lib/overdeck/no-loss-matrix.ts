@@ -731,3 +731,38 @@ export const BEADS_REMOVAL_NO_LOSS_MATRIX: BeadsRemovalMatrixEntry[] = [
   { surface: 'docs/BEADS.md and configuration/beads.mdx', disposition: 'DELETE', target: 'vBRIEF and task documentation replaces live Beads documentation' },
   { surface: 'record.beadsMapping field', disposition: 'DELETE', target: 'New records omit it; readers tolerate the legacy field' },
 ];
+
+/** PAN-2647 system-health surface lock. */
+export type HealthNoLossDisposition = 'V2_HOME' | 'SUPERSEDED';
+
+export interface HealthNoLossMatrixEntry {
+  surface: string;
+  disposition: HealthNoLossDisposition;
+  /** Concrete V2 home, or the explicit reason for supersession. */
+  target: string;
+}
+
+export const HEALTH_NO_LOSS_MATRIX: HealthNoLossMatrixEntry[] = [
+  { surface: 'Header health pill metric', disposition: 'V2_HOME', target: 'SystemHealthPill state-specific trigger copy from SystemHealthSnapshot.state and admission evidence' },
+  { surface: 'CPU and load', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics.cpuPercent and loadPerCore1m in SystemHealthPill' },
+  { surface: 'Memory totals', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics usedMemoryBytes, totalMemoryBytes, and availableMemoryBytes in SystemHealthPill' },
+  { surface: 'Swap fields', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics swap occupancy shown as diagnostic context in SystemHealthPill' },
+  { surface: 'Committed-memory diagnostic', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.host.metrics virtualCommitmentPercent shown as Overcommit diagnostic in SystemHealthPill' },
+  { surface: 'Memory attributions', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.summary overdeckMemoryBytes and overdeckMemoryPercent in SystemHealthPill' },
+  { surface: 'Role counts', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.summary role counts, admission admittedWorkAgentCount, and HealthDashboard status summary cards' },
+  { surface: 'Webhook state', disposition: 'V2_HOME', target: 'SystemHealthSnapshot.services webhook-relay entry with legacy summary fallback in SystemHealthPill' },
+  { surface: 'Kill action', disposition: 'V2_HOME', target: 'SystemHealthConsumer.killTarget agent and specialist actions through useKillAgent or the specialist kill endpoint' },
+  { surface: 'Remove action', disposition: 'V2_HOME', target: 'SystemHealthConsumer.killTarget container action through DELETE /api/resources/docker/container/:id' },
+  { surface: 'Leaked-focus supersession', disposition: 'SUPERSEDED', target: 'Critical transitions focus leaked consumers first; Show all restores the complete top-consumer list' },
+  { surface: 'Transition event', disposition: 'V2_HOME', target: 'SystemHealthPill emits one operator-facing toast when accepted health transitions to critical' },
+  { surface: 'GET /api/system/health', disposition: 'V2_HOME', target: 'Accepted SystemHealthSnapshot V2 compatibility route from getAcceptedSystemHealthSnapshot()' },
+  { surface: 'GET /api/godview/system-health', disposition: 'V2_HOME', target: 'Accepted SystemHealthSnapshot V2 plus retained Godview scalar projections for one compatibility cycle' },
+  { surface: 'GET /api/health/agents', disposition: 'V2_HOME', target: 'AgentHealthSnapshot[] projection from the canonical read model and live tmux liveness' },
+  { surface: 'Resources host vitals', disposition: 'V2_HOME', target: 'GET /api/resources hostVitals projected from accepted SystemHealthSnapshot.host metrics' },
+  { surface: 'Spawn gate', disposition: 'V2_HOME', target: 'GET /api/resources spawnGate projected from accepted admission evidence and enforcement decision' },
+  { surface: 'Capacity guardrail', disposition: 'V2_HOME', target: 'mapSpawnGateDecision preserves blocking enforcement decisions while attaching accepted health evidence' },
+  { surface: 'Summary cards', disposition: 'V2_HOME', target: 'HealthDashboard renders all accepted AgentHealthStatus counts with accessible names' },
+  { surface: 'Deacon section', disposition: 'V2_HOME', target: 'HealthDashboard DeaconStatus remains visible while loading, unavailable, or agent-empty' },
+  { surface: 'TLDR section', disposition: 'V2_HOME', target: 'HealthDashboard TldrServiceStatus distinguishes optional unconfigured from request unavailable' },
+  { surface: 'pan doctor', disposition: 'V2_HOME', target: 'Independent dependency, installation, state-worktree, and system diagnostic command; it is not a live V2 snapshot view' },
+];
