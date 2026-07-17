@@ -77,17 +77,17 @@
     "recordedAt": "2026-07-17T02:59:42.835Z"
   },
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T04:29:40.175Z",
+  "updated": "2026-07-17T04:39:52.990Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
     "testStatus": "testing",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T04:29:40.100Z",
+    "updatedAt": "2026-07-17T04:39:52.964Z",
     "reviewNotes": "Requirements blocker: extracted seam modules export three symbols that were private in the original module",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/specialists-project-meta.ts\n  - src/lib/cloister/specialists-registry.ts\n  - src/lib/cloister/specialists-spawn.ts\n  - src/lib/cloister/specialists-status.ts\n  - src/lib/cloister/specialists.ts",
     "inspectNotes": "All 7 functions moved byte-for-byte verbatim (verified via body-diff); only specialists.ts/specialists-spawn.ts touched; buildSpecialistBaseCommand + buildSpecialistCavemanExports re-exported, both existing test importers (specialist-resolve-harness.test.ts, specialists-caveman.test.ts) pass 13/13; resolveWorkspaceGitInfo/buildProviderExportLines/buildTmuxEnvFlags were pre-existing dead code before this move, unaffected.",
@@ -186,17 +186,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1571,
-            "output": 38178,
-            "cacheRead": 9659808,
-            "cacheWrite": 213862
+            "input": 1575,
+            "output": 39907,
+            "cacheRead": 10138156,
+            "cacheWrite": 216054
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8085725,
-            "output": 456226,
-            "cacheRead": 121566720,
+            "input": 8284468,
+            "output": 462556,
+            "cacheRead": 125014528,
             "cacheWrite": 0
           }
         }
@@ -209,21 +209,21 @@
           "cacheWrite": 152114
         },
         "openai/gpt-5.6-sol": {
-          "input": 15022526,
-          "output": 584779,
-          "cacheRead": 141261824,
+          "input": 15221269,
+          "output": 591109,
+          "cacheRead": 144709632,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1625,
-          "output": 53727,
-          "cacheRead": 13098219,
-          "cacheWrite": 440758
+          "input": 1629,
+          "output": 55456,
+          "cacheRead": 13576567,
+          "cacheWrite": 442950
         }
       },
       "costAtCloseOut": {
-        "usd": 176.276421,
-        "pricingAsOf": "2026-07-17T04:29:40.130Z"
+        "usd": 179.302388,
+        "pricingAsOf": "2026-07-17T04:39:52.982Z"
       }
     },
     "merges": [
