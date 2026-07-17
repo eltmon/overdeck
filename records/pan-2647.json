@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T01:05:17.635Z",
+  "updated": "2026-07-17T01:07:14.241Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T01:05:17.619Z",
-    "inspectNotes": "Inspecting item contract-v2"
+    "updatedAt": "2026-07-17T01:07:14.172Z",
+    "inspectNotes": "AC1-4 verified: decode preserves all fields (test), unknown enums map to explicit unavailable/other/unknown without throwing (test), legacy projector covers all 20 existing summary fields + smeeRelay + new committed diagnostics with exact field-set pin, index.ts exports wired. Confirmed SchemaGetter/decodeTo/Literals/NullOr are real effect@4.0.0-beta.73 APIs; own test suite (5 tests) passes."
   },
   "closeOut": {
     "usage": {
@@ -35,11 +35,19 @@
             "cacheWrite": 143876
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 16,
+            "output": 7862,
+            "cacheRead": 989137,
+            "cacheWrite": 118359
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2327253,
-            "output": 210997,
-            "cacheRead": 20469248,
+            "input": 2337143,
+            "output": 212215,
+            "cacheRead": 21151744,
             "cacheWrite": 0
           }
         }
@@ -51,16 +59,22 @@
           "cacheRead": 1299838,
           "cacheWrite": 143876
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 16,
+          "output": 7862,
+          "cacheRead": 989137,
+          "cacheWrite": 118359
+        },
         "openai/gpt-5.6-sol": {
-          "input": 2327253,
-          "output": 210997,
-          "cacheRead": 20469248,
+          "input": 2337143,
+          "output": 212215,
+          "cacheRead": 21151744,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 33.237309,
-        "pricingAsOf": "2026-07-17T01:05:17.624Z"
+        "usd": 34.236925,
+        "pricingAsOf": "2026-07-17T01:07:14.217Z"
       }
     },
     "merges": [],
