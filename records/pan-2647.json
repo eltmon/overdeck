@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T04:50:37.229Z",
+  "updated": "2026-07-17T04:50:47.248Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 28,
-    "claims": {},
+    "sequence": 29,
+    "claims": {
+      "pill-repair": {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 1900573,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T04:50:47.248Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -300,6 +308,7 @@
     "frontend-hook": "completed",
     "frontend-hook.frontend-hook.ac1": "completed",
     "frontend-hook.frontend-hook.ac2": "completed",
-    "frontend-hook.frontend-hook.ac3": "completed"
+    "frontend-hook.frontend-hook.ac3": "completed",
+    "pill-repair": "running"
   }
 }
