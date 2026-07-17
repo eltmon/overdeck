@@ -91,7 +91,7 @@
     "recordedAt": "2026-07-08T23:32:23.025Z"
   },
   "created": "2026-07-08T21:36:56.346Z",
-  "updated": "2026-07-08T23:40:01.975Z",
+  "updated": "2026-07-17T03:33:58.962Z",
   "pipeline": {
     "issueId": "PAN-2167",
     "reviewStatus": "reviewing",
@@ -237,5 +237,6 @@
     "state-plane-status-predicate.ac2": "completed",
     "state-plane-status-predicate.ac3": "completed",
     "state-plane-status-predicate.ac4": "completed"
-  }
+  },
+  "reviewMode": "quick"
 }
