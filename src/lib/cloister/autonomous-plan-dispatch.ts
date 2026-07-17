@@ -8,7 +8,7 @@ import {
   VETOED_LABEL,
 } from '../backlog/pickup.js';
 import { derefWorkhorse, loadConfigSync, type NormalizedConfig } from '../config-yaml.js';
-import { isFlywheelAutoPickupBacklog } from '../database/app-settings.js';
+import { isFlywheelAutoPickupBacklog } from '../overdeck/control-settings.js';
 
 export interface AutonomousPlanDispatchInput {
   autoPickupBacklog: boolean;
