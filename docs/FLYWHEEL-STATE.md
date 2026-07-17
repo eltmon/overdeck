@@ -5516,3 +5516,9 @@ Remaining in flight: PAN-2710 strike (nudged at 83m idle), 7 work agents + 1491,
 - Session: **9 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966) + 2811 strike + 2 deploys + 14 close-outs + PAN-2809/2810/2813/2817 filed.
 - In flight: 1897 CLEAN @27818d81 (review convoy active on it, 13min), 2807 PR#2816 head 61c7a4f4 past its CHANGES REQUESTED@5ca6f844 (work agent addressing), 2232/2647 pre-PR.
 - Close-out owed: 1491, 2252, 1966 (+ deploy batch when 1897/2807 land or the hour turns).
+
+## Tick 83 — 2026-07-16 ~23:15 — PAN-2807 MERGED (10 total)
+- **PAN-2807 MERGED → 47a49023e9** via PR#2816: FRESH APPROVED @bf5fd0c2==head (23:09), all CI green after poll, CLEAN. The silent-migration defect fix (PAN-2318 family) is on main.
+- Session: **10 merges** (1987, 2772, 2760, 2619, 2773, 2045, 1491, 2252, 1966, 2807) + 2811 strike + 2 deploys + 14 close-outs.
+- In flight: 1897 (review synthesizing @27818d81), 2232 PR#2818 CLEAN (review synthesizing @head), 2647 pre-PR.
+- Close-out owed: 1491, 2252, 1966, 2807. Deploy batch after 1897/2232 resolve or the set drains.
