@@ -170,18 +170,18 @@
     "recordedAt": "2026-07-17T08:29:20.426Z"
   },
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T09:09:39.610Z",
+  "updated": "2026-07-17T09:13:53.417Z",
   "pipeline": {
     "issueId": "PAN-2647",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T09:09:39.578Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-17T09:13:53.385Z",
+    "reviewNotes": "Resources can combine spawn admission and display evidence from different accepted health generations, violating atomic assessment semantics.",
     "inspectNotes": "All 5 ACs verified against health.ts: intentional-inactivity states (idle/waiting/suspended/warm) checked before active-runtime stall detection; 5-min startup grace gates tmux-missing->dead; 15/30min boundaries use >= exactly; corrupt state resolves to structured unavailable reason (was silently excluded before); contextPercent 0 preserved via ?? not ||. No violations found.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2823",
     "lastVerifiedCommit": "1504807ef76b8807a6bbe9ee16c2a6d17d6db08a",
@@ -201,9 +201,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5330880,
-            "output": 69069,
-            "cacheRead": 7925760,
+            "input": 7234466,
+            "output": 93951,
+            "cacheRead": 8454144,
             "cacheWrite": 0
           }
         },
@@ -232,9 +232,9 @@
           "cacheWrite": 143876
         },
         "openai/gpt-5.6-sol": {
-          "input": 33316356,
-          "output": 1503413,
-          "cacheRead": 267177472,
+          "input": 35219942,
+          "output": 1528295,
+          "cacheRead": 267705856,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -245,8 +245,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 351.400456,
-        "pricingAsOf": "2026-07-17T09:09:39.587Z"
+        "usd": 361.929038,
+        "pricingAsOf": "2026-07-17T09:13:53.404Z"
       }
     },
     "merges": [
