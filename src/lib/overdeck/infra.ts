@@ -195,15 +195,20 @@ function ensureReleaseSetTablesSync(db: SqliteDatabase): void {
 }
 
 function warnSchemaDriftSync(db: SqliteDatabase): void {
-  const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
-  for (const table of report.missingTables) {
-    console.warn(`[schema-audit] missing table: ${table}`);
-  }
-  for (const index of report.missingIndexes) {
-    console.warn(`[schema-audit] missing index: ${index}`);
-  }
-  for (const { table, column } of report.missingColumns) {
-    console.warn(`[schema-audit] missing column: ${table}.${column}`);
+  try {
+    const report = auditOverdeckSchemaSync(db, OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS);
+    for (const table of report.missingTables) {
+      console.warn(`[schema-audit] missing table: ${table}`);
+    }
+    for (const index of report.missingIndexes) {
+      console.warn(`[schema-audit] missing index: ${index}`);
+    }
+    for (const { table, column } of report.missingColumns) {
+      console.warn(`[schema-audit] missing column: ${table}.${column}`);
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[schema-audit] audit failed: ${message}`);
   }
 }
 
