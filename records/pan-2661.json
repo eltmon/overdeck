@@ -74,7 +74,7 @@
     "recordedAt": "2026-07-17T12:01:04.835Z"
   },
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T12:01:34.074Z",
+  "updated": "2026-07-17T12:01:35.086Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -84,7 +84,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T12:01:34.014Z",
+    "updatedAt": "2026-07-17T12:01:35.067Z",
     "inspectNotes": "AC3 fix verified: GroupedIssueActionMenu.tsx:49 now passes aria-describedby directly to <Item>, which forwards it via {...props} onto the real role=menuitem Radix node (confirmed against @radix-ui/react-menu source), so the disabled reason is now correctly associated with the focusable menuitem for AT. Test updated to assert on the menuitem element itself, not just the wrapper. All 5 ACs satisfied.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2832"
   },
@@ -138,7 +138,7 @@
       },
       "costAtCloseOut": {
         "usd": 73.105049,
-        "pricingAsOf": "2026-07-17T12:01:34.038Z"
+        "pricingAsOf": "2026-07-17T12:01:35.078Z"
       }
     },
     "merges": [
