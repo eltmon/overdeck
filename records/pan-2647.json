@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T19:28:50.583Z",
-  "updated": "2026-07-17T03:11:49.283Z",
+  "updated": "2026-07-17T04:08:59.162Z",
   "pipeline": {
     "issueId": "PAN-2647",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "routes-health-unify": {
-        "writerId": "agent-pan-2647",
-        "agentId": "agent-pan-2647",
-        "pid": 338654,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T03:11:49.282Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2647",
@@ -205,6 +197,16 @@
         "itemId": "specialist-lifecycle",
         "outcome": "completed",
         "releasedAt": "2026-07-17T03:11:36.062Z"
+      },
+      {
+        "writerId": "agent-pan-2647",
+        "agentId": "agent-pan-2647",
+        "pid": 338654,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T03:11:49.282Z",
+        "itemId": "routes-health-unify",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T04:08:59.162Z"
       }
     ],
     "statusReasons": {
@@ -266,6 +268,10 @@
     "specialist-lifecycle.specialist-lifecycle.ac1": "completed",
     "specialist-lifecycle.specialist-lifecycle.ac2": "completed",
     "specialist-lifecycle.specialist-lifecycle.ac3": "completed",
-    "routes-health-unify": "running"
+    "routes-health-unify": "completed",
+    "routes-health-unify.routes-health-unify.ac1": "completed",
+    "routes-health-unify.routes-health-unify.ac2": "completed",
+    "routes-health-unify.routes-health-unify.ac3": "completed",
+    "routes-health-unify.routes-health-unify.ac4": "completed"
   }
 }
