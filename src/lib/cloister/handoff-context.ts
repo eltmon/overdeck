@@ -13,9 +13,9 @@ import type { TokenUsage, RuntimeName } from '../runtimes/types.js';
 import type { ComplexityLevel } from './complexity.js';
 import type { AgentState } from '../agents.js';
 import { renderPrompt } from './prompts.js';
-import type { ContinueState } from '../vbrief/continue-state.js';
+import type { ContinueState } from '../xbrief/continue-state.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 
 const execAsync = promisify(exec);
 

@@ -13,7 +13,7 @@ import {
   writeIssueDraft,
   writeSpecDocument,
 } from '../index.js'
-import type { VBriefDocument } from '../../vbrief/types.js'
+import type { VBriefDocument } from '../../xbrief/types.js'
 
 // PAN-2677: the state write door must commit+push every mutation immediately so
 // the state worktree never lingers dirty. These tests exercise the door write

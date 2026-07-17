@@ -7,8 +7,8 @@ import { Effect } from 'effect';
 
 import { ProcessSpawnError } from '../errors.js';
 import { isStatePlaneOnlyStatus } from '../state-plane.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
-import { subItemsOf } from '../vbrief/types.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
+import { subItemsOf } from '../xbrief/types.js';
 import { runTestRequirementCheck } from './test-requirement-gate.js';
 
 const execAsync = promisify(exec);

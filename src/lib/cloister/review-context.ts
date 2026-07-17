@@ -14,10 +14,10 @@ import { join } from 'path';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
-import { findPlanSync, readPlan } from '../vbrief/io.js';
+import { findPlanSync, readPlan } from '../xbrief/io.js';
 import { scanStubUi, type StubUiFinding } from './lint-stub-ui.js';
 import { fetchCodeRabbitFindings, type CodeRabbitFinding } from './coderabbit-ingestion.js';
-import { findVBriefByIssueSync } from '../vbrief/lifecycle-io.js';
+import { findVBriefByIssueSync } from '../xbrief/lifecycle-io.js';
 import { getDevrootPathSync } from '../config.js';
 import { FsError } from '../errors.js';
 

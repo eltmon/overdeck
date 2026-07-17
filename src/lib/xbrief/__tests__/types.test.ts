@@ -5,7 +5,7 @@ import type { FilesScopeConfidence, ItemReadiness, VBriefItemKind, VBriefItemMet
 describe('vBRIEF item metadata types', () => {
   it('exposes swarm-contract metadata fields', () => {
     const metadata = {
-      files_scope: ['src/lib/vbrief/types.ts'],
+      files_scope: ['src/lib/xbrief/types.ts'],
       files_scope_confidence: 'high',
       verify_commands: ['npm run typecheck'],
       expected_outputs: ['typecheck completes without errors'],
@@ -20,7 +20,7 @@ describe('vBRIEF item metadata types', () => {
 
   it('keeps item kind optional and defaults omitted kind to backend', () => {
     const metadata = {
-      files_scope: ['src/lib/vbrief/types.ts'],
+      files_scope: ['src/lib/xbrief/types.ts'],
       files_scope_confidence: 'high',
       readiness: 'ready',
     } satisfies VBriefItemMetadata;

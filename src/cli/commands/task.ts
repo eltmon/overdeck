@@ -7,8 +7,8 @@ import { applyTaskStatusChange, type TaskStatusChange } from '../../lib/pan-dir/
 import { isPidDead } from '../../lib/pan-dir/fs-lock.js';
 import { readIssueRecordSync } from '../../lib/pan-dir/record.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../lib/projects.js';
-import { getDispatchableItems } from '../../lib/vbrief/dag.js';
-import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { getDispatchableItems } from '../../lib/xbrief/dag.js';
+import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 
 interface TaskOptions {
   json?: boolean;

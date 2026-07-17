@@ -11,7 +11,7 @@ import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
-import type { VBriefDocument } from '../vbrief/types.js';
+import type { VBriefDocument } from '../xbrief/types.js';
 import {
   getFlywheelActiveRunId,
   isFlywheelAutoPickupBacklog,

@@ -11,7 +11,7 @@ import { join } from 'path';
 import { Data, Effect } from 'effect';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { clearFeedback, getWorkspacePanPaths, readFeedback, writeFeedback } from '../pan-dir/index.js';
-import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue, appendFeedbackEntryForIssue, clearFeedbackForIssue, readContinueStateForIssue } from '../xbrief/lifecycle-io.js';
 
 export interface WriteFeedbackOptions {
   issueId: string;

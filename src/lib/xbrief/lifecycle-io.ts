@@ -23,7 +23,7 @@ import {
   type VBriefLifecycleDir,
 } from './lifecycle.js';
 import { normalizeVBriefEnvelope, readPlanSync, serializeVBriefDocument } from './io.js';
-import { invalidateVBriefIndex } from './vbrief-index.js';
+import { invalidateVBriefIndex } from './xbrief-index.js';
 import type { VBriefDocument } from './types.js';
 import { getProjectPanPaths, updateSpecStatus } from '../pan-dir/specs.js';
 import type { PanSpecDocument, PanSpecEntry, PanSpecStatus } from '../pan-dir/types.js';
@@ -464,7 +464,7 @@ export function clearFeedbackForIssue(
 // Effect-channel adapters around the existing sync/Promise helpers so callers
 // composing vBRIEF lifecycle ops with other Effect code can stay on the
 // channel. Follows the additive-variant pattern established for io.ts /
-// vbrief-index.ts / auto-synthesize.ts in commit 3783c7003.
+// xbrief-index.ts / auto-synthesize.ts in commit 3783c7003.
 
 /** Effect variant of `findVBriefByIssue` — failures surface as typed errors. */
 export const findVBriefByIssue = (

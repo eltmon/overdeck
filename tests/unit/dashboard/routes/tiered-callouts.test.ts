@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleTieredCallout, type TieredCalloutBody } from '../../../../src/dashboard/server/routes/tiered-callouts.js';
-import type { VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 const BASE_CALLOUT: TieredCalloutBody = {
   issueId: 'PAN-2222',

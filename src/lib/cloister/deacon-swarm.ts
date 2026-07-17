@@ -29,12 +29,12 @@ import {
   createActiveSlice,
   getDispatchableItems,
   type PersistedTaskOperation,
-} from '../vbrief/dag.js';
+} from '../xbrief/dag.js';
 import { applyTaskStatusChange } from '../pan-dir/task-door.js';
 import { getProjectConfigFromWorkspacePath, resolveProjectForIssue } from '../pan-dir/record.js';
-import { applyStatusOverrides } from '../vbrief/io.js';
-import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import { applyStatusOverrides } from '../xbrief/io.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../xbrief/swarm-readiness.js';
+import type { VBriefDocument, VBriefItem } from '../xbrief/types.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { isDeaconGloballyPausedSync } from '../overdeck/control-settings.js';
 import { resolveAutomaticSwarmPolicy, resolveSwarmMaxSlots } from '../swarm-policy.js';

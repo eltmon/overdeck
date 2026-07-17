@@ -5,10 +5,10 @@ import { FsError } from '../errors.js'
 import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
 import { resolveStateReadHomeSync } from '../state-read-home.js'
 
-import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictError } from '../vbrief/io.js'
-import { generateVBriefFilename, parseVBriefFilename, slugify } from '../vbrief/lifecycle.js'
-import { invalidateVBriefIndex } from '../vbrief/vbrief-index.js'
-import type { VBriefDocument } from '../vbrief/types.js'
+import { normalizeVBriefEnvelope, serializeVBriefDocument, VBriefMergeConflictError } from '../xbrief/io.js'
+import { generateVBriefFilename, parseVBriefFilename, slugify } from '../xbrief/lifecycle.js'
+import { invalidateVBriefIndex } from '../xbrief/xbrief-index.js'
+import type { VBriefDocument } from '../xbrief/types.js'
 import { deriveProjectRoot, flushAutoCommits, queueAutoCommit } from './auto-commit.js'
 import {
   PAN_DIRNAME,

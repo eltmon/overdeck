@@ -3,7 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 const {
   mockMessageAgent,

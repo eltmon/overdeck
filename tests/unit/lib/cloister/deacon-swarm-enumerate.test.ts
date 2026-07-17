@@ -3,7 +3,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),

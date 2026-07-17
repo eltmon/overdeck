@@ -21,8 +21,8 @@ import { CacheService, DEFAULT_TTLS, parseIntegerHeader } from './cache-service.
 import { getGitHubConfig, getLinearApiKey, getRallyConfig, validateRallyConfig } from './tracker-config.js';
 import { loadReviewStatusesForIssues, type ReviewStatus } from '../../../lib/review-status.js';
 import { resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import { findPlan, readWorkspacePlan } from '../../../lib/vbrief/io.js';
-import type { VBriefDocument } from '../../../lib/vbrief/types.js';
+import { findPlan, readWorkspacePlan } from '../../../lib/xbrief/io.js';
+import type { VBriefDocument } from '../../../lib/xbrief/types.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 
 /**

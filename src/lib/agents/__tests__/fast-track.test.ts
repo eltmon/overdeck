@@ -6,7 +6,7 @@ import {
   groupFastTrack,
   isFastTrackAutoMergeAllowed,
 } from '../fast-track.js';
-import type { VBriefItem, VBriefItemMetadata } from '../../vbrief/types.js';
+import type { VBriefItem, VBriefItemMetadata } from '../../xbrief/types.js';
 
 let counter = 0;
 function item(metadata: VBriefItemMetadata, id?: string): VBriefItem {

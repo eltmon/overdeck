@@ -32,7 +32,7 @@ import type {
   ContinueResumePoint,
   ContinueSessionEntry,
   ScopeDriftRecord,
-} from '../vbrief/continue-state.js';
+} from '../xbrief/continue-state.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
   getIssueWorkspacePath,

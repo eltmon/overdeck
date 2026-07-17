@@ -65,7 +65,7 @@ import { httpHandler } from './http-handler.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
 import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../lib/pan-dir/types.js';
-import { isPlanningComplete, readWorkspacePlan } from '../../../lib/vbrief/io.js';
+import { isPlanningComplete, readWorkspacePlan } from '../../../lib/xbrief/io.js';
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);

@@ -6,9 +6,9 @@ import { Effect } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import type { RuntimeName } from '../../../../lib/runtimes/types.js';
 import { resolveStaffing } from '../../../../lib/agents/staffing.js';
-import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
+import { findPlanSync, readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from '../../../../lib/agents/tier-table.js';
-import { getDispatchableItems } from '../../../../lib/vbrief/dag.js';
+import { getDispatchableItems } from '../../../../lib/xbrief/dag.js';
 import { loadConfigSync } from '../../../../lib/config-yaml.js';
 import { getIssueStageSync, isTerminalIssueStage } from '../../../../lib/overdeck/agents.js';
 

@@ -4,8 +4,8 @@ import type {
   VBriefItem,
   VBriefItemStatus,
   VBriefPlan,
-} from '../vbrief/types.js'
-import type { ContinueSessionEntry, ContinueState } from '../vbrief/continue-state.js'
+} from '../xbrief/types.js'
+import type { ContinueSessionEntry, ContinueState } from '../xbrief/continue-state.js'
 
 export const PAN_DIRNAME = '.pan'
 export const WORKSPACE_RUNTIME_DIRNAME = '.overdeck'

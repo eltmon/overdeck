@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import type { VBriefDocument, VBriefItem } from '../../vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../../xbrief/types.js';
 import {
   assignDispatchTier,
   chooseDispatchTier,
@@ -15,12 +15,12 @@ vi.mock('../../config-yaml.js', async (importOriginal) => {
     loadConfigSync: vi.fn(),
   };
 });
-vi.mock('../../vbrief/io.js', () => ({
+vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlanSync: vi.fn(),
 }));
 
 import { loadConfigSync } from '../../config-yaml.js';
-import { readWorkspacePlanSync } from '../../vbrief/io.js';
+import { readWorkspacePlanSync } from '../../xbrief/io.js';
 import { applyTierAssignment, resolveSingleWorkTierSpawnParams, resolveSlotTierSpawnParams } from '../spawn-prep.js';
 
 const TIER_CONFIG: TierAssignmentConfig = {

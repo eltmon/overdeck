@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import {
   finalizeSwarmIssueIfComplete,
   type RequestIssueReviewResult,

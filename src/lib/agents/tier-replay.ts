@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { ModelId } from '../settings.js';
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
-import type { TierOverridesMap } from '../vbrief/io.js';
+import type { VBriefDocument, VBriefItem } from '../xbrief/types.js';
+import type { TierOverridesMap } from '../xbrief/io.js';
 import { getModelCapabilitySync, hasModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { AgentState } from './agent-state.js';
 import type { DeliveryResult } from './delivery.js';

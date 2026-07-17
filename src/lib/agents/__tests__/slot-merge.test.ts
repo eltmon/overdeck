@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { verifyAndMergeSlot } from '../slot-merge.js';
-import type { VBriefItem } from '../../vbrief/types.js';
+import type { VBriefItem } from '../../xbrief/types.js';
 
 function makeItem(overrides: Partial<VBriefItem['metadata']> = {}): VBriefItem {
   return {

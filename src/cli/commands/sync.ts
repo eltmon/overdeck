@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, symlink
 import { homedir } from 'os';
 import { join } from 'path';
 import { loadConfigSync } from '../../lib/config.js';
-import { parseVBriefFilename } from '../../lib/vbrief/lifecycle.js';
+import { parseVBriefFilename } from '../../lib/xbrief/lifecycle.js';
 import { resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { createBackupSync } from '../../lib/backup.js';
 import {

@@ -3,7 +3,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { resolveSlotTierSpawnParams, resolveSingleWorkTierSpawnParams } from '../spawn-prep.js';
-import type { VBriefDocument } from '../../vbrief/types.js';
+import type { VBriefDocument } from '../../xbrief/types.js';
 
 describe('Dispatch record override (PAN-2383)', () => {
   let testDir: string;

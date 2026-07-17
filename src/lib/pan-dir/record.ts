@@ -32,7 +32,7 @@ import type {
   ContinueResumePoint,
   ContinueSessionEntry,
   ScopeDriftRecord,
-} from '../vbrief/continue-state.js';
+} from '../xbrief/continue-state.js';
 import type { PanIssueTasksRecord } from './record-task-types.js';
 import type { DodRowResult } from '../lifecycle/dod.js';
 export type { PanIssueTasksRecord, TaskClaim, TaskClaimHistoryEntry } from './record-task-types.js';
@@ -361,7 +361,7 @@ function preserveCorruptRecordSync(path: string): void {
  * renamed file parses as JSON. A mid-write crash can no longer truncate the
  * record in place (rename is atomic); a write that somehow produces unparseable
  * bytes throws instead of leaving a corrupt record for readers to silently
- * fabricate over. Modeled on writePlanFileAtomic (src/lib/vbrief/dag-cli.ts:101).
+ * fabricate over. Modeled on writePlanFileAtomic (src/lib/xbrief/dag-cli.ts:101).
  */
 function writeRecordFileAtomicSync(path: string, record: PanIssueRecord): void {
   preserveCorruptRecordSync(path);

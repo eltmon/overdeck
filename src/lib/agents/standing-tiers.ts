@@ -36,8 +36,8 @@
  * start — so a cancelled run never strands sessions it would not have used.
  */
 
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
-import { groupItemsByWave } from '../vbrief/dag.js';
+import type { VBriefDocument, VBriefItem } from '../xbrief/types.js';
+import { groupItemsByWave } from '../xbrief/dag.js';
 import { resolveTier, type ResolveTierConfig } from './resolve-tier.js';
 import type { AgentState } from './agent-state.js';
 import type { SpawnRunOptions } from './spawn-prep.js';

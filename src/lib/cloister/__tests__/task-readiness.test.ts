@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { isTaskReadySync, getUnblockedItemsSync } from '../task-readiness.js';
-import type { VBriefDocument } from '../../vbrief/types.js';
+import type { VBriefDocument } from '../../xbrief/types.js';
 
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;

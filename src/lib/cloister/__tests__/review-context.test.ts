@@ -38,13 +38,13 @@ vi.mock('child_process', () => ({
 }));
 
 // ── vbrief / config mocks ──────────────────────────────────────────────────
-vi.mock('../../vbrief/io.js', () => ({
+vi.mock('../../xbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
   findPlanSync: vi.fn(() => null),
   readPlan: (...args: unknown[]) => mockReadPlan(...args),
   readPlanProgram: (...args: unknown[]) => mockReadPlan(...args),
 }));
-vi.mock('../../vbrief/lifecycle-io.js', () => ({
+vi.mock('../../xbrief/lifecycle-io.js', () => ({
   findVBriefByIssue: vi.fn(() => null),
   findVBriefByIssueSync: vi.fn(() => null),
 }));
@@ -66,7 +66,7 @@ vi.mock('../coderabbit-ingestion.js', () => ({
 
 // ── import after mocks ─────────────────────────────────────────────────────
 import { buildReviewContext, formatTier1Summary, REVIEW_LARGE_CHANGESET_FILES, REVIEW_LARGE_CHANGESET_LINES } from '../review-context.js';
-import { findPlanSync } from '../../vbrief/io.js';
+import { findPlanSync } from '../../xbrief/io.js';
 import { scanStubUi } from '../lint-stub-ui.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────

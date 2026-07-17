@@ -4,10 +4,10 @@ import { tmpdir } from 'os';
 import { mkdtemp, rm } from 'fs/promises';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Effect } from 'effect';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
 import type { CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import { applyStatusOverrides } from '../../../../src/lib/vbrief/io.js';
-import { getDispatchableItems } from '../../../../src/lib/vbrief/dag.js';
+import { applyStatusOverrides } from '../../../../src/lib/xbrief/io.js';
+import { getDispatchableItems } from '../../../../src/lib/xbrief/dag.js';
 
 const mocks = vi.hoisted(() => ({
   listProjectsSync: vi.fn(),

@@ -1,5 +1,5 @@
 import type { RuntimeName } from '../runtimes/types.js';
-import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
+import type { VBriefDifficulty, VBriefItem } from '../xbrief/types.js';
 import { resolveTier, type ResolveTierConfig } from './resolve-tier.js';
 import { resolveTieredExecutionEnabled } from './tier-table.js';
 

@@ -19,7 +19,7 @@ import { resolveProjectFromIssueSync } from '../projects.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataStatic } from '../remote/workspace-metadata.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 
 function isGitHubIssue(issueId: string): {

@@ -39,8 +39,8 @@ import {
   listUatGenerationsSync,
   type UatGeneration,
 } from '../../../lib/overdeck/merge-sync.js';
-import { extractACFromDocument } from '../../../lib/vbrief/acceptance-criteria.js';
-import { findVBriefByIssue, readVBriefDocument } from '../../../lib/vbrief/vbrief-index.js';
+import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
+import { findVBriefByIssue, readVBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync } from '../../../lib/projects.js';
 import { getDashboardIdentity } from '../identity.js';
 import { readCurrentFlywheelStatusForDashboard } from './flywheel-actions.js';

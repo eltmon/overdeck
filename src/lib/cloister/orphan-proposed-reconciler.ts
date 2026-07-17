@@ -12,8 +12,8 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.j
 import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '../projects.js';
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
-import { findPlanSync, readPlanSync } from '../vbrief/io.js';
-import type { VBriefDocument } from '../vbrief/types.js';
+import { findPlanSync, readPlanSync } from '../xbrief/io.js';
+import type { VBriefDocument } from '../xbrief/types.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { loadCloisterConfig } from './config.js';

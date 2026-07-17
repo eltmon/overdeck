@@ -1,5 +1,5 @@
-import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
-import { hasFileOverlap } from '../vbrief/dag.js';
+import type { VBriefDifficulty, VBriefItem } from '../xbrief/types.js';
+import { hasFileOverlap } from '../xbrief/dag.js';
 import { verifyAndMergeSlot, type SlotMergeIssue, type SlotMergeOptions, type SlotMergeResult } from './slot-merge.js';
 
 /**

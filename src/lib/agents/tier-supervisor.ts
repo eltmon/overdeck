@@ -30,7 +30,7 @@ import { execFile } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import type { VBriefDocument, VBriefEdge, VBriefItem, VBriefSubItem } from '../vbrief/types.js';
+import type { VBriefDocument, VBriefEdge, VBriefItem, VBriefSubItem } from '../xbrief/types.js';
 import type { AgentState } from './agent-state.js';
 import { deliverAgentMessage } from './delivery.js';
 import type { DeliveryResult } from './delivery.js';

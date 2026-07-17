@@ -13,7 +13,7 @@ import {
 } from './review-status.js';
 import { Data, Effect } from 'effect';
 import { resolveProjectFromIssueSync } from './projects.js';
-import { appendContinueSessionEntryForIssue } from './vbrief/lifecycle-io.js';
+import { appendContinueSessionEntryForIssue } from './xbrief/lifecycle-io.js';
 import { clearIssueClosedCache } from './cloister/issue-closed.js';
 
 export interface ReopenResult {

@@ -435,7 +435,7 @@ export function cancelIssueWorkflow(
 async function completeVBriefStep(ctx: LifecycleContext): Promise<StepResult> {
   const step = 'close-out:vbrief-completed';
   try {
-    const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
+    const { transitionVBriefOnMain } = await import('../xbrief/lifecycle-io.js');
     const result = await Effect.runPromise(transitionVBriefOnMain(
       ctx.projectPath,
       ctx.issueId,

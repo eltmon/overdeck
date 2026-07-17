@@ -23,8 +23,8 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
-import { createActiveSlice } from '../vbrief/dag.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { createActiveSlice } from '../xbrief/dag.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import {
   getAgentDir,
   markAgentRunning,

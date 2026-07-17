@@ -1,14 +1,14 @@
 import { existsSync, readdirSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { Effect } from 'effect';
-import type { ContinueFeedbackEntry } from '../vbrief/continue-state.js';
+import type { ContinueFeedbackEntry } from '../xbrief/continue-state.js';
 import { renderPrompt } from './prompts.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../projects.js';
 import { isTldrEnabledSync } from '../config-yaml.js';
 import { getReadableWorkspacePanPaths, readWorkspaceContext, readFeedback, writeWorkspaceContext } from '../pan-dir/index.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../pan-dir/record.js';
-import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../vbrief/io.js';
-import { createActiveSlice, getDispatchableItems } from '../vbrief/dag.js';
+import { findPlanSync, readWorkspacePlanSync, readPlanSync, readWorkspacePlan } from '../xbrief/io.js';
+import { createActiveSlice, getDispatchableItems } from '../xbrief/dag.js';
 import { loadConfigSync } from '../config.js';
 import { createTrackerFromConfig } from '../tracker/factory.js';
 import { NotImplementedError } from '../tracker/interface.js';

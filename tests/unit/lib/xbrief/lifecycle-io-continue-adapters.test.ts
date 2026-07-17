@@ -24,7 +24,7 @@ import {
   appendFeedbackEntryForIssue,
   clearFeedbackForIssue,
   readContinueStateForIssue,
-} from '../../../../src/lib/vbrief/lifecycle-io.js';
+} from '../../../../src/lib/xbrief/lifecycle-io.js';
 import { readIssueRecordSync } from '../../../../src/lib/pan-dir/record.js';
 
 describe('PAN-1919: lifecycle-io continue adapters → per-issue record', () => {

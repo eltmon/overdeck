@@ -43,7 +43,7 @@ const oraMocks = vi.hoisted(() => {
 
 vi.mock('../../../lib/work-agent-lifecycle.js', () => lifecycleMocks);
 
-vi.mock('../../../lib/vbrief/io.js', () => ({
+vi.mock('../../../lib/xbrief/io.js', () => ({
   findPlanSync: findPlanSyncMock,
 }));
 

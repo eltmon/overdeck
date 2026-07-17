@@ -39,7 +39,7 @@ import {
 import type { ModelId } from '../settings.js';
 import { getProviderEnvForModel, saveAgentRuntimeState, saveAgentState } from '../agents.js';
 import { isIssueClosed } from './issue-closed.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { resolveTieredExecutionEnabled } from '../agents/tier-table.js';
 import {
   deliverCommitForReview,

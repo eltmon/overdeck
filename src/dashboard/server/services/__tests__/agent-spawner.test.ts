@@ -49,7 +49,7 @@ vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
 // ─── Mock vBRIEF plan reader ─────────────────────────────────────────────────
 
 const mockReadWorkspacePlanSync = vi.fn();
-vi.mock('../../../../lib/vbrief/io.js', () => ({
+vi.mock('../../../../lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: mockReadWorkspacePlanSync,
 }));
 

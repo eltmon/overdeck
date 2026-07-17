@@ -12,7 +12,7 @@ import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { spawnInspectAgent, type InspectContext } from '../../lib/cloister/inspect-agent.js';
 import { getDiffBase, getDiffStats } from '../../lib/cloister/inspect-checkpoints.js';
-import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 
 interface InspectOptions {
   item: string;

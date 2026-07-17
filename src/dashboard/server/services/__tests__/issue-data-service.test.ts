@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { computeTaskCounts, IssueDataService, shouldRefreshPlanningStateForIssue } from '../issue-data-service.js';
-import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../../lib/xbrief/types.js';
 import { mergeConfigs } from '../../../../lib/config-yaml.js';
 
 describe('computeTaskCounts', () => {

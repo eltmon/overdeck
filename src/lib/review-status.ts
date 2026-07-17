@@ -16,7 +16,7 @@ import { registerReviewStatusMapReader } from './cloister/review-status-source.j
 import { normalizeReviewStatusSync } from './review-status-normalize.js';
 import { updateIssueRecordForReviewStatusSync, enrichReviewNotesFromRecordSync, readJournalStatusSync } from './overdeck/review-status-record-sync.js';
 import { needsReviewDispatch } from './review-dispatch-decision.js';
-import type { ScopeDriftRecord } from './vbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
+import type { ScopeDriftRecord } from './xbrief/continue-state.js'; import type { StrikeLandingStatus } from './strike-landing.js';
 import type { InspectionStatusFields } from './inspection-status.js';
 
 function emitReactiveLifecycleEvent(type: 'review.approved' | 'test.passed', issueId: string): void {

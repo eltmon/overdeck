@@ -5,9 +5,9 @@ import { getReviewStatusSync, mergeGateEligibility, type MergeGateEligibility } 
 import { resolveGitHubIssueSync } from './tracker-utils.js';
 import type { SequenceNode } from './backlog/types.js';
 import { classifyIssue, isAutoPickable, type ClassifyLookups } from './backlog/pickup.js';
-import { compileGlob, type CompiledGlob } from './vbrief/dag.js';
-import { computeIssueFootprint } from './vbrief/swarm-readiness.js';
-import type { VBriefDocument } from './vbrief/types.js';
+import { compileGlob, type CompiledGlob } from './xbrief/dag.js';
+import { computeIssueFootprint } from './xbrief/swarm-readiness.js';
+import type { VBriefDocument } from './xbrief/types.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from './projects.js';
 
 export interface MergeQueueItem {

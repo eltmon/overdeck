@@ -25,8 +25,8 @@ import { isStateMigrated } from '../state-home.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
 import { killSession, sessionExists } from '../tmux.js';
-import { findPlan, findWorkspaceDraftPlan, readPlan } from '../vbrief/io.js';
-import { assertPlanQuality, PlanQualityLintError } from '../vbrief/quality-lint.js';
+import { findPlan, findWorkspaceDraftPlan, readPlan } from '../xbrief/io.js';
+import { assertPlanQuality, PlanQualityLintError } from '../xbrief/quality-lint.js';
 import { flushAutoCommits } from '../pan-dir/auto-commit.js';
 import { resolveIssueProjectPathSync } from './issue-reads.js';
 

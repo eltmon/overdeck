@@ -5,7 +5,7 @@ import {
   emptyUatContextGitFields,
 } from '../workspaces/workspace-data.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
-import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../../lib/xbrief/types.js';
 
 function makeDoc(items: VBriefDocument['plan']['items']): VBriefDocument {
   return {

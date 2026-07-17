@@ -204,7 +204,7 @@ export async function runDestructiveIssueLifecycle(
   // vBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
   if (mode === 'cancel') {
     try {
-      const { transitionVBriefOnMain } = await import('../vbrief/lifecycle-io.js');
+      const { transitionVBriefOnMain } = await import('../xbrief/lifecycle-io.js');
       const tx = await Effect.runPromise(transitionVBriefOnMain(
         ctx.projectPath,
         id,

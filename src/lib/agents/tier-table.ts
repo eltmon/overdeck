@@ -1,6 +1,6 @@
 import type { RuntimeName } from '../runtimes/types.js';
 import type { ModelId } from '../settings.js';
-import type { VBriefDifficulty, VBriefItemKind } from '../vbrief/types.js';
+import type { VBriefDifficulty, VBriefItemKind } from '../xbrief/types.js';
 import type { AuthMode } from '../subscription-types.js';
 import type { ModelProvider } from '../model-fallback.js';
 import { resolveModelIdSync } from '../model-capabilities.js';

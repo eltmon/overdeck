@@ -13,8 +13,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../../src/lib/vbrief/io.js';
-import type { VBriefDocument } from '../../src/lib/vbrief/types.js';
+import { readPlanSync, readWorkspacePlanSync, updateItemStatus, updateSubItemStatus } from '../../src/lib/xbrief/io.js';
+import type { VBriefDocument } from '../../src/lib/xbrief/types.js';
 
 let PROJECT_ROOT: string;
 let TEST_DIR: string;

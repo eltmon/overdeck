@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireTieredCommitHooks, type FireTieredCommitHooksDeps } from '../swarm-tiered-hooks.js';
 import type { ValidatedTieredExecutionConfig } from '../../agents/tier-table.js';
-import type { VBriefDocument, VBriefItem } from '../../vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../../xbrief/types.js';
 
 const ISSUE_ID = 'PAN-2385';
 const WORKSPACE = '/workspace/feature-pan-2385';

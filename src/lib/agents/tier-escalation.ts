@@ -1,5 +1,5 @@
-import type { TierOverridesMap } from '../vbrief/io.js';
-import type { VBriefDifficulty, VBriefItem } from '../vbrief/types.js';
+import type { TierOverridesMap } from '../xbrief/io.js';
+import type { VBriefDifficulty, VBriefItem } from '../xbrief/types.js';
 import type { ValidatedEscalationConfig } from './tier-table.js';
 import { TIERED_EXECUTION_DIFFICULTIES } from './tier-table.js';
 

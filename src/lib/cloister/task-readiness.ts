@@ -9,8 +9,8 @@
  */
 
 import { Effect } from 'effect';
-import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from '../vbrief/io.js';
-import type { VBriefItemStatus } from '../vbrief/types.js';
+import { readWorkspacePlanSync, readWorkspacePlan, type VBriefReadError } from '../xbrief/io.js';
+import type { VBriefItemStatus } from '../xbrief/types.js';
 
 const TERMINAL_STATUSES: VBriefItemStatus[] = ['completed', 'cancelled'];
 

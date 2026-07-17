@@ -1,5 +1,5 @@
 import type { RuntimeName } from '../runtimes/types.js';
-import type { VBriefDifficulty, VBriefItem, VBriefItemKind } from '../vbrief/types.js';
+import type { VBriefDifficulty, VBriefItem, VBriefItemKind } from '../xbrief/types.js';
 import type { TierDefinition } from './tier-table.js';
 
 /**

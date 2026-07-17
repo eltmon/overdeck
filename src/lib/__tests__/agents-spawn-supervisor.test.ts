@@ -125,8 +125,8 @@ function mockSpawnDependencies(): void {
   vi.doMock('../workspace/stack-health.js', () => ({
     getWorkspaceStackHealth: vi.fn(() => Effect.succeed({ healthy: true, reasons: [], lastObserved: null })),
   }));
-  vi.doMock('../vbrief/io.js', async (importOriginal) => ({
-    ...((await importOriginal()) as typeof import('../vbrief/io.js')),
+  vi.doMock('../xbrief/io.js', async (importOriginal) => ({
+    ...((await importOriginal()) as typeof import('../xbrief/io.js')),
     readWorkspacePlanSync: vi.fn(() => ({ plan: { items: [{ id: 'item-1' }] } })),
   }));
   vi.doMock('../activity-logger.js', () => ({
@@ -214,7 +214,7 @@ afterEach(() => {
   vi.doUnmock('../paths.js');
   vi.doUnmock('../tmux.js');
   vi.doUnmock('../workspace/stack-health.js');
-  vi.doUnmock('../vbrief/io.js');
+  vi.doUnmock('../xbrief/io.js');
   vi.doUnmock('../activity-logger.js');
   vi.doUnmock('../cloister/work-agent-prompt.js');
   vi.doUnmock('../config-yaml.js');

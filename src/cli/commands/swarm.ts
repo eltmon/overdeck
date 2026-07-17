@@ -8,8 +8,8 @@ import chalk from 'chalk';
 import { resolveProjectFromIssueSync } from '../../lib/projects.js';
 import { createWorkspace } from '../../lib/workspace-manager.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
-import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
+import type { VBriefDocument } from '../../lib/xbrief/types.js';
 import {
   classifyInFlightSlots,
   clearAllSlotAssignments,

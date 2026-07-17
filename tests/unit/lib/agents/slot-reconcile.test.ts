@@ -5,7 +5,7 @@ import {
   type ReconciledSlotAssignment,
   type ReconciledSlotBranch,
 } from '../../../../src/lib/agents/slot-reconcile.js';
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
 function makeDoc(itemIds: string[]): VBriefDocument {
   return {

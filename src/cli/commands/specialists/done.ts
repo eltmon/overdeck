@@ -61,7 +61,7 @@ export async function doneCommand(
     if (!options.item) throw new Error('--item is required for inspect verdicts');
 
     const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
-    const { readWorkspacePlanSync } = await import('../../../lib/vbrief/io.js');
+    const { readWorkspacePlanSync } = await import('../../../lib/xbrief/io.js');
     const { join } = await import('node:path');
     const project = resolveProjectFromIssueSync(normalizedIssueId);
     const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);

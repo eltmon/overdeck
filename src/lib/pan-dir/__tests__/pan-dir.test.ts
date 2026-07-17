@@ -32,7 +32,7 @@ import {
   writeSpec,
   writeWorkspaceContext,
 } from '../index.js'
-import type { VBriefDocument } from '../../vbrief/types.js'
+import type { VBriefDocument } from '../../xbrief/types.js'
 
 let TEST_DIR: string
 

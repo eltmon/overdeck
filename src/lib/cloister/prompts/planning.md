@@ -369,7 +369,7 @@ It MUST have exactly two top-level keys: `xBRIEFInfo` and `plan`.
 - Acceptance criteria MUST name observable behavior — prefer Given/When/Then; include a
   concrete verb like creates / returns / rejects / persists / renders / emits / exits /
   applies / accepts / falls back / defaults to / preserves / survives / produces
-  (full list: OBSERVABLE_TERMS in src/lib/vbrief/quality-lint.ts).
+  (full list: OBSERVABLE_TERMS in src/lib/xbrief/quality-lint.ts).
   Banned phrasings (finalize lint rejects them): "works as expected", "passes tests",
   "handles errors", "is implemented", "TBD"-style placeholders, docs-only criteria.
 - 2–5 ACs per item; if an item genuinely needs fewer/more, set metadata.acJustification.

@@ -28,7 +28,7 @@ import { enqueueMerge, getCurrentMerge, markMergeProcessing, dequeueMerge, getAl
 import { findProjectByTeamSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
 import { isStatePlaneOnlyStatus } from '../../../../lib/state-plane.js';
-import { findPlan } from '../../../../lib/vbrief/io.js';
+import { findPlan } from '../../../../lib/xbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge } from '../../../../lib/github-app.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';

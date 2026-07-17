@@ -14,7 +14,7 @@ import {
   PlanEmpty,
   WorkspaceNotFound,
 } from './typed-errors.js';
-import { readWorkspacePlanSync } from '../../../lib/vbrief/io.js';
+import { readWorkspacePlanSync } from '../../../lib/xbrief/io.js';
 
 // ─── Domain types ─────────────────────────────────────────────────────────────
 

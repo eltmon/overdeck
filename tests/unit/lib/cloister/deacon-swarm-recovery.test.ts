@@ -28,7 +28,7 @@ import {
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { readIssueRecordForWorkspaceSync, writeIssueRecordForWorkspaceSync } from '../../../../src/lib/pan-dir/record.js';
 import { requeueFailedSwarmSlots } from '../../../../src/lib/cloister/swarm-failed-slot.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 beforeEach(() => {
   mocks.listProjectsSync.mockReturnValue([]);

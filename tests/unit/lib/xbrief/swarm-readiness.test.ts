@@ -3,9 +3,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
-import { analyzeSwarmReadiness, computeIssueFootprint, resolveIssueFootprint } from '../../../../src/lib/vbrief/swarm-readiness.js';
+import { analyzeSwarmReadiness, computeIssueFootprint, resolveIssueFootprint } from '../../../../src/lib/xbrief/swarm-readiness.js';
 import { buildPanSpecFilename } from '../../../../src/lib/pan-dir/specs.js';
-import type { FilesScopeConfidence, ItemReadiness, VBriefDocument, VBriefItemStatus } from '../../../../src/lib/vbrief/types.js';
+import type { FilesScopeConfidence, ItemReadiness, VBriefDocument, VBriefItemStatus } from '../../../../src/lib/xbrief/types.js';
 
 function makeDoc(
   items: Array<{

@@ -157,7 +157,7 @@ import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, type Revi
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { isDeaconGloballyPaused } from '../overdeck/control-settings.js';
 import { findWorkspacePath } from '../lifecycle/archive-planning.js';

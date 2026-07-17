@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 import { resolveIssueProjectPathSync } from './issue-reads.js';
 
 export function buildChildStoriesFromRally(

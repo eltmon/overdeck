@@ -98,7 +98,7 @@ vi.mock('../../../../lib/flywheel-merge-order.js', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../../lib/vbrief/vbrief-index.js', () => ({
+vi.mock('../../../../lib/xbrief/xbrief-index.js', () => ({
   findVBriefByIssue: mocks.findVBriefByIssue,
   readVBriefDocument: mocks.readVBriefDocument,
 }));

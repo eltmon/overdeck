@@ -14,7 +14,7 @@ import { Effect } from 'effect';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 import { loadCloisterConfigSync } from './config.js';
-import { readWorkspacePlanSync } from '../vbrief/io.js';
+import { readWorkspacePlanSync } from '../xbrief/io.js';
 
 /** Single-flight prevents concurrent dashboard polls from duplicating the canonical read. */
 const taskCompletionInflight = new Map<string, Promise<TriggerDetection>>();

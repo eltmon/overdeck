@@ -15,12 +15,12 @@ import {
   findVBriefByIssueSync,
   transitionVBriefOnMain,
   type VBriefTransitionResult,
-} from '../../lib/vbrief/lifecycle-io.js';
-import { findPlanSync, readPlanSync } from '../../lib/vbrief/io.js';
+} from '../../lib/xbrief/lifecycle-io.js';
+import { findPlanSync, readPlanSync } from '../../lib/xbrief/io.js';
 import { getProjectConfigFromWorkspacePath, readRecordContinueViewSync, resolveProjectForIssue } from '../../lib/pan-dir/record.js';
-import { listVBriefs, readVBriefDocument } from '../../lib/vbrief/vbrief-index.js';
+import { listVBriefs, readVBriefDocument } from '../../lib/xbrief/xbrief-index.js';
 import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync, listProjectsSync } from '../../lib/projects.js';
-import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import type { VBriefDocument } from '../../lib/xbrief/types.js';
 
 function getProjectPath(issueId: string): string {
   const resolved = resolveProjectFromIssueSync(issueId);

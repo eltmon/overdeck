@@ -2,14 +2,14 @@ import chalk from 'chalk';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { dirname, join, resolve } from 'path';
-import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeVBriefDocument } from '../../lib/vbrief/io.js';
-import { generateVBriefFilename, slugify } from '../../lib/vbrief/lifecycle.js';
+import { findPlanSync, findWorkspaceDraftPlanSync, readPlanSync, serializeVBriefDocument } from '../../lib/xbrief/io.js';
+import { generateVBriefFilename, slugify } from '../../lib/xbrief/lifecycle.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 import { checkPrdGateSync, getIssueDraftPath, MIN_PRD_LINES, type PrdGateResult, PAN_DIRNAME, PAN_SPEC_FILENAME } from '../../lib/pan-dir/index.js';
-import type { VBriefDocument } from '../../lib/vbrief/types.js';
-import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/vbrief/quality-lint.js';
-import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/vbrief/swarm-readiness.js';
+import type { VBriefDocument } from '../../lib/xbrief/types.js';
+import { formatQualityIssues, lintPlanQuality, type QualityIssue } from '../../lib/xbrief/quality-lint.js';
+import { analyzeSwarmReadiness, type SwarmReadinessVerdict } from '../../lib/xbrief/swarm-readiness.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../../lib/projects.js';
 
 interface PlanFinalizeOptions {

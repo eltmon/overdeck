@@ -2,8 +2,8 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
-import { analyzeSwarmReadiness } from '../vbrief/swarm-readiness.js';
-import type { VBriefDocument } from '../vbrief/types.js';
+import { analyzeSwarmReadiness } from '../xbrief/swarm-readiness.js';
+import type { VBriefDocument } from '../xbrief/types.js';
 import { listAgentStates } from './queries.js';
 import type { AgentState } from './agent-state.js';
 

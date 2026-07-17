@@ -6,7 +6,7 @@ let recordRemote: string | null = null;
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { mergeReadySlots, resetSwarmLoopSafetyForTests, type ClassifiedSwarmSlot, type CoordinateSwarmSlotsDeps } from '../../../../src/lib/cloister/deacon-swarm.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 function doc(item: VBriefItem = itemFor('wi-1')): VBriefDocument {
   return {

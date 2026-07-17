@@ -26,9 +26,9 @@ import {
   recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
-import { applyStatusOverrides } from '../../../../lib/vbrief/io.js';
-import { lintPlanQuality, PlanQualityLintError } from '../../../../lib/vbrief/quality-lint.js';
-import type { VBriefDocument } from '../../../../lib/vbrief/types.js';
+import { applyStatusOverrides } from '../../../../lib/xbrief/io.js';
+import { lintPlanQuality, PlanQualityLintError } from '../../../../lib/xbrief/quality-lint.js';
+import type { VBriefDocument } from '../../../../lib/xbrief/types.js';
 
 let projectRoot: string | null = null;
 

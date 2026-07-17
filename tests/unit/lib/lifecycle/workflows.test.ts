@@ -126,7 +126,7 @@ const findSpecByIssue = (projectRoot: string, issueId: string) =>
   Effect.runPromise(findSpecByIssueProgram(projectRoot, issueId) as Effect.Effect<any, any, never>);
 const writeSpecForIssue = (projectRoot: string, doc: any, status: any, filename?: string) =>
   Effect.runPromise(writeSpecForIssueProgram(projectRoot, doc, status, filename) as Effect.Effect<any, any, never>);
-import type { VBriefDocument } from '../../../../src/lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
 function makeVBrief(issueId: string, status = 'running'): VBriefDocument {
   return {

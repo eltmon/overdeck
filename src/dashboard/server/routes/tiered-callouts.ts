@@ -3,8 +3,8 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { deliverAgentMessage, type DeliveryResult } from '../../../lib/agents.js';
 import { getIssueWorkspacePath } from '../../../lib/pan-dir/record.js';
-import { readWorkspacePlanSync } from '../../../lib/vbrief/io.js';
-import type { VBriefItem } from '../../../lib/vbrief/types.js';
+import { readWorkspacePlanSync } from '../../../lib/xbrief/io.js';
+import type { VBriefItem } from '../../../lib/xbrief/types.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../../../lib/review-status.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../../lib/activity-logger.js';

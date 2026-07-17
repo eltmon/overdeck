@@ -1,7 +1,7 @@
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { defaultRunWorkspace } from './spawn-prep.js';
-import type { VBriefItem } from '../vbrief/types.js';
+import type { VBriefItem } from '../xbrief/types.js';
 
 const execAsync = promisify(exec);
 

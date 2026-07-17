@@ -98,7 +98,7 @@ vi.mock('../../agents.js', () => ({
   saveAgentState: mocks.saveAgentState,
 }));
 
-vi.mock('../../vbrief/io.js', () => ({
+vi.mock('../../xbrief/io.js', () => ({
   readWorkspacePlanSync: mocks.readWorkspacePlanSync,
 }));
 

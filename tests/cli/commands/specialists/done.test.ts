@@ -28,7 +28,7 @@ vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: mockResolveProject,
 }));
 
-vi.mock('../../../../src/lib/vbrief/io.js', () => ({
+vi.mock('../../../../src/lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: mockReadWorkspacePlan,
 }));
 

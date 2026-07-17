@@ -21,10 +21,10 @@ import { Effect } from 'effect';
 import { getLinearApiKey } from '../../lib/shadow-utils.js';
 import { getReadableWorkspacePanPaths } from '../../lib/pan-dir/index.js';
 import type { RuntimeName } from '../../lib/runtimes/types.js';
-import { findPlanSync, readWorkspacePlanSync } from '../../lib/vbrief/io.js';
+import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
-import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/vbrief/auto-synthesize.js';
-import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/vbrief/lifecycle-io.js';
+import { writeAutoStartVBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
+import { transitionVBriefOnMain, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
 import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
 import {
   buildStartPlanningBody,

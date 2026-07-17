@@ -42,8 +42,8 @@ import type { IssuePipelineMembership } from '@overdeck/contracts';
 import { extractTeamPrefix, findProjectByTeamSync, getProjectSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
 import { extractPrefixSync, parseIssueIdSync } from '../../../lib/issue-id.js';
 import { panCliInvocation } from '../../../lib/pan-cli-invocation.js';
-import { isPlanningComplete, readPlanSync } from '../../../lib/vbrief/io.js';
-import { appendContinueSessionEntryForIssue } from '../../../lib/vbrief/lifecycle-io.js';
+import { isPlanningComplete, readPlanSync } from '../../../lib/xbrief/io.js';
+import { appendContinueSessionEntryForIssue } from '../../../lib/xbrief/lifecycle-io.js';
 import {
   completePlanningForIssue,
 } from '../../../lib/overdeck/planning-promotion.js';

@@ -3,9 +3,9 @@ import { hostname } from 'node:os';
 import { join } from 'node:path';
 
 import type { ProjectConfig } from '../projects.js';
-import type { TaskOperationType } from '../vbrief/dag.js';
-import { applyStatusOverrides, findPlanSync, readPlanSync } from '../vbrief/io.js';
-import { subItemsOf, type VBriefItemStatus } from '../vbrief/types.js';
+import type { TaskOperationType } from '../xbrief/dag.js';
+import { applyStatusOverrides, findPlanSync, readPlanSync } from '../xbrief/io.js';
+import { subItemsOf, type VBriefItemStatus } from '../xbrief/types.js';
 import {
   type PanIssueRecord,
   type TaskClaim,

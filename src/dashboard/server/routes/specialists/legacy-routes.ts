@@ -10,7 +10,7 @@ import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeStat
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus } from '../../../../lib/review-status.js';
-import { readWorkspacePlanSync } from '../../../../lib/vbrief/io.js';
+import { readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { validateAgentRuntimeEventAuth } from '../agents.js';

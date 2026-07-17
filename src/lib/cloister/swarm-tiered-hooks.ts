@@ -35,7 +35,7 @@ import {
   supervisorAgentId,
 } from '../agents/tier-supervisor.js';
 import { listSlotAssignments } from '../agents/slot-reconcile.js';
-import type { VBriefDocument, VBriefItem } from '../vbrief/types.js';
+import type { VBriefDocument, VBriefItem } from '../xbrief/types.js';
 
 const execAsync = promisify(exec);
 

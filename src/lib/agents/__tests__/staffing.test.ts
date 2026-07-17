@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { IMPLICIT_TIER_NAME, resolveImplicitStaffing, resolveStaffing } from '../staffing.js';
 import { resolveModel } from '../../config-yaml/roles.js';
-import type { VBriefItem } from '../../vbrief/types.js';
+import type { VBriefItem } from '../../xbrief/types.js';
 
 const WORK_ROLES = { work: { model: 'claude-sonnet-5' } } as never;
 

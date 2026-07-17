@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import { setReviewStatusSync, getReviewStatusSync } from '../review-status.js';
-import { applyStatusOverrides } from '../vbrief/io.js';
-import type { VBriefDocument } from '../vbrief/types.js';
+import { applyStatusOverrides } from '../xbrief/io.js';
+import type { VBriefDocument } from '../xbrief/types.js';
 
 export interface RequestIssueReviewResult {
   success: boolean;

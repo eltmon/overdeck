@@ -30,8 +30,8 @@ import { writeFeedbackFile } from './feedback-writer.js';
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from './feedback-target.js';
 import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
-import { getVBriefACStatusSync } from '../vbrief/acceptance-criteria.js';
-import { VBriefMergeConflictError } from '../vbrief/io.js';
+import { getVBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
+import { VBriefMergeConflictError } from '../xbrief/io.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 

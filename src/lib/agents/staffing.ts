@@ -18,7 +18,7 @@
  */
 
 import type { RuntimeName } from '../runtimes/types.js';
-import type { VBriefItem } from '../vbrief/types.js';
+import type { VBriefItem } from '../xbrief/types.js';
 import { loadConfigSync as loadYamlConfig } from '../config-yaml.js';
 import type { NormalizedConfig } from '../config-yaml/schema.js';
 import { resolveModel } from '../config-yaml/roles.js';

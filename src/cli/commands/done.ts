@@ -36,10 +36,10 @@ import {
 } from '../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
 import type { MergeSet } from '../../lib/merge-set.js';
-import { readWorkspacePlanSync } from '../../lib/vbrief/io.js';
-import { compileGlob } from '../../lib/vbrief/dag.js';
-import type { ScopeDriftRecord } from '../../lib/vbrief/continue-state.js';
-import type { VBriefDocument } from '../../lib/vbrief/types.js';
+import { readWorkspacePlanSync } from '../../lib/xbrief/io.js';
+import { compileGlob } from '../../lib/xbrief/dag.js';
+import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
+import type { VBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
 

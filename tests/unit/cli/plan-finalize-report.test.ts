@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { analyzeSwarmReadiness } from '../../../src/lib/vbrief/swarm-readiness.js';
+import { analyzeSwarmReadiness } from '../../../src/lib/xbrief/swarm-readiness.js';
 import { formatReadinessReport } from '../../../src/cli/commands/plan-finalize.js';
-import type { VBriefDocument } from '../../../src/lib/vbrief/types.js';
+import type { VBriefDocument } from '../../../src/lib/xbrief/types.js';
 
 function makeDoc(): VBriefDocument {
   return {

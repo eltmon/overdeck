@@ -20,7 +20,7 @@
  */
 import { existsSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import type { VBriefDocument } from '../vbrief/types.js';
+import type { VBriefDocument } from '../xbrief/types.js';
 
 export interface TestVerdictArtifact {
   status: 'passed' | 'failed';

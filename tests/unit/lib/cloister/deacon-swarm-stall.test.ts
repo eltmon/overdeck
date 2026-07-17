@@ -16,8 +16,8 @@ import {
   type DoneWithoutSignalObservation,
 } from '../../../../src/lib/cloister/deacon-swarm-completion.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
-import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import { analyzeSwarmReadiness } from '../../../../src/lib/xbrief/swarm-readiness.js';
+import type { VBriefDocument, VBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 const STALL_THRESHOLD_MS = 10_000;
 

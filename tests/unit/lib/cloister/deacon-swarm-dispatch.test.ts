@@ -7,8 +7,8 @@ import {
 } from '../../../../src/lib/cloister/deacon-swarm.js';
 import { countRunningSwarmSlotsForIssue } from '../../../../src/lib/cloister/concurrency.js';
 import type { ReconciledSlotItem, SlotReconcileResult } from '../../../../src/lib/agents/slot-reconcile.js';
-import { analyzeSwarmReadiness } from '../../../../src/lib/vbrief/swarm-readiness.js';
-import type { VBriefDocument, VBriefItem } from '../../../../src/lib/vbrief/types.js';
+import { analyzeSwarmReadiness } from '../../../../src/lib/xbrief/swarm-readiness.js';
+import type { VBriefDocument, VBriefItem } from '../../../../src/lib/xbrief/types.js';
 
 function item(id: string, filesScope: string[]): VBriefItem {
   return {

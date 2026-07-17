@@ -79,7 +79,7 @@ vi.mock('node:fs/promises', async () => {
 });
 
 const mockIsPlanningComplete = vi.hoisted(() => vi.fn(() => Effect.succeed(false)));
-vi.mock('../../../../../src/lib/vbrief/io.js', () => ({
+vi.mock('../../../../../src/lib/xbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
 }));
 
