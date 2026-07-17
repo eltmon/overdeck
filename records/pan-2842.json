@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-17T15:57:20.904Z",
+  "updated": "2026-07-17T15:57:29.021Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "pending",
@@ -177,5 +177,52 @@
     "docs-cockpit-layout": "completed",
     "docs-cockpit-layout.docs-cockpit-layout.ac1": "completed",
     "docs-cockpit-layout.docs-cockpit-layout.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/TasksRail.tsx",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+      "src/dashboard/frontend/src/components/issue-view/TasksSections.test.tsx",
+      "src/dashboard/frontend/src/index.css"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/densitySections.ts"
+    ],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/TasksDrawer.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/agentsLane.module.css",
+      "src/dashboard/frontend/src/components/Stage/cockpit/cockpitBody.module.css",
+      "src/dashboard/frontend/src/components/issue-view/IssueView.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
+      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+      "src/dashboard/frontend/src/lib/taskStatus.ts",
+      "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/TasksDrawer.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/TasksRail.tsx",
+      "src/dashboard/frontend/src/components/Stage/cockpit/agentsLane.module.css",
+      "src/dashboard/frontend/src/components/Stage/cockpit/cockpitBody.module.css",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx",
+      "src/dashboard/frontend/src/components/issue-view/TasksSections.test.tsx",
+      "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+      "src/dashboard/frontend/src/index.css",
+      "src/dashboard/frontend/src/lib/taskStatus.ts",
+      "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+    ],
+    "recordedAt": "2026-07-17T15:57:29.020Z"
   }
 }
