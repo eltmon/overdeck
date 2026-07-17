@@ -436,18 +436,19 @@
     "recordedAt": "2026-07-17T06:23:54.484Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T06:29:49.876Z",
+  "updated": "2026-07-17T06:35:16.500Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-17T06:29:49.855Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-17T06:35:16.429Z",
     "reviewNotes": "Approved: Git-root-wide state-writer reconciliation is fixed; focused migration suites pass 34 tests.",
+    "testNotes": "Reconciled from green GitHub Actions CI on fa43a499: guard (https://github.com/eltmon/overdeck/actions/runs/29559920222/job/87819982352)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs satisfied: TTY/non-TTY branching in update() via stream.isTTY check; 15s heartbeat naming step+elapsed; PrepStepTimeoutError names step+budget in seconds; success path clears interval+timeout (verified via getTimerCount()===0) and emits completion line. Diff matches its own test assertions 1:1.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2803",
@@ -552,9 +553,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 20005177,
-            "output": 618562,
-            "cacheRead": 71218176,
+            "input": 20011093,
+            "output": 628528,
+            "cacheRead": 71847936,
             "cacheWrite": 0
           }
         },
@@ -615,9 +616,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 57759911,
-          "output": 1955268,
-          "cacheRead": 341993728,
+          "input": 57765827,
+          "output": 1965234,
+          "cacheRead": 342623488,
           "cacheWrite": 0
         },
         "cliproxy/gpt-5.4-mini": {
@@ -640,8 +641,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 515.519931,
-        "pricingAsOf": "2026-07-17T06:29:49.869Z"
+        "usd": 516.163371,
+        "pricingAsOf": "2026-07-17T06:35:16.473Z"
       }
     },
     "merges": [
