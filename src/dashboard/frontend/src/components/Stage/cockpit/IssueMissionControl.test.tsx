@@ -201,6 +201,33 @@ describe('IssueMissionControl', () => {
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
   })
 
+  it('lifts the detail tabs between the header and body without wrapping', () => {
+    const { container } = renderMissionControl()
+    const header = container.querySelector('[data-section="Header bar"]')
+    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+
+    expect(container.querySelectorAll('[data-section="Detail Tabs"]')).toHaveLength(1)
+    expect(header?.nextElementSibling).toBe(nav)
+    expect(nav.nextElementSibling?.querySelector('main')).toBeInTheDocument()
+    expect(nav.closest('main')).toBeNull()
+    expect(nav).toHaveClass('flex-nowrap', 'overflow-x-auto')
+    expect(nav).not.toHaveClass('flex-wrap')
+  })
+
+  it('renders every detail tab and badge with the pill treatment', () => {
+    renderMissionControl()
+    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+    const buttons = Array.from(nav.querySelectorAll('button'))
+
+    expect(buttons).toHaveLength(11)
+    for (const label of ['Overview', 'Code', 'PRD / Plan', 'Timeline', 'Discussion', 'Costs', 'Artifacts', 'Ship', 'Conversation', 'Files', 'Terminal']) {
+      expect(buttons.some((button) => button.textContent?.includes(label)), label).toBe(true)
+    }
+    expect(screen.getByRole('button', { name: /Code/ })).toHaveTextContent('✓')
+    expect(screen.getByRole('button', { name: 'Overview' })).toHaveClass('rounded-[9px]', 'font-medium', 'bg-primary/9', 'text-primary')
+    for (const button of buttons) expect(button).not.toHaveClass('font-semibold')
+  })
+
   it('renders the status narrative + journey strip in place of the chip and gate rows (PAN-2398)', () => {
     renderMissionControl()
 
