@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T02:17:58.646Z",
+  "updated": "2026-07-17T02:29:05.503Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -89,16 +89,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "wi-4-project-meta": {
-        "writerId": "agent-pan-2232",
-        "agentId": "agent-pan-2232",
-        "pid": 3295232,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T02:17:58.646Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2232",
@@ -129,6 +121,16 @@
         "itemId": "wi-3-lifecycle",
         "outcome": "completed",
         "releasedAt": "2026-07-17T02:17:56.088Z"
+      },
+      {
+        "writerId": "agent-pan-2232",
+        "agentId": "agent-pan-2232",
+        "pid": 3295232,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T02:17:58.646Z",
+        "itemId": "wi-4-project-meta",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T02:29:05.503Z"
       }
     ],
     "statusReasons": {
@@ -151,6 +153,9 @@
     "wi-3-lifecycle.wi-3-lifecycle.ac1": "completed",
     "wi-3-lifecycle.wi-3-lifecycle.ac2": "completed",
     "wi-3-lifecycle.wi-3-lifecycle.ac3": "completed",
-    "wi-4-project-meta": "running"
+    "wi-4-project-meta": "completed",
+    "wi-4-project-meta.wi-4-project-meta.ac1": "completed",
+    "wi-4-project-meta.wi-4-project-meta.ac2": "completed",
+    "wi-4-project-meta.wi-4-project-meta.ac3": "completed"
   }
 }
