@@ -77,17 +77,18 @@
     "recordedAt": "2026-07-17T02:59:42.835Z"
   },
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T04:40:50.829Z",
+  "updated": "2026-07-17T04:41:03.555Z",
   "pipeline": {
     "issueId": "PAN-2232",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-17T04:40:50.816Z",
+    "updatedAt": "2026-07-17T04:41:03.429Z",
+    "testNotes": "Skipped: issue is already merged",
     "inspectNotes": "All 7 functions moved byte-for-byte verbatim (verified via body-diff); only specialists.ts/specialists-spawn.ts touched; buildSpecialistBaseCommand + buildSpecialistCavemanExports re-exported, both existing test importers (specialist-resolve-harness.test.ts, specialists-caveman.test.ts) pass 13/13; resolveWorkspaceGitInfo/buildProviderExportLines/buildTmuxEnvFlags were pre-existing dead code before this move, unaffected.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2818",
     "scopeDrift": {
@@ -189,8 +190,8 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8284468,
-            "output": 462556,
+            "input": 8694503,
+            "output": 464541,
             "cacheRead": 125014528,
             "cacheWrite": 0
           }
@@ -204,8 +205,8 @@
           "cacheWrite": 152114
         },
         "openai/gpt-5.6-sol": {
-          "input": 15221269,
-          "output": 591109,
+          "input": 15631304,
+          "output": 593094,
           "cacheRead": 144709632,
           "cacheWrite": 0
         },
@@ -217,8 +218,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 179.302388,
-        "pricingAsOf": "2026-07-17T04:40:50.823Z"
+        "usd": 181.412113,
+        "pricingAsOf": "2026-07-17T04:41:03.437Z"
       }
     },
     "merges": [
