@@ -4,17 +4,17 @@
     "created": "2026-07-17T12:57:01.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2831: Issues pane sorts issue IDs lexicographically — PAN-532 renders after PAN-2822",
-    "updated": "2026-07-17T12:59:50.789Z"
+    "updated": "2026-07-17T12:59:55.489Z"
   },
   "plan": {
     "id": "pan-2831",
     "title": "Issues pane sorts issue IDs lexicographically — PAN-532 renders after PAN-2822",
-    "status": "proposed",
+    "status": "running",
     "uid": "8fc92c5a-4c3c-4e77-ba84-c806538be1f7",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 4,
     "created": "2026-07-17T12:57:01.000Z",
-    "updated": "2026-07-17T12:59:50.789Z",
+    "updated": "2026-07-17T12:59:55.489Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2831",
@@ -330,5 +330,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
