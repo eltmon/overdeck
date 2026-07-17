@@ -4,17 +4,17 @@
     "created": "2026-07-17T13:02:00Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1610: Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer)",
-    "updated": "2026-07-17T13:14:32.464Z"
+    "updated": "2026-07-17T19:36:28.665Z"
   },
   "plan": {
     "id": "pan-1610",
     "title": "Consistent issue actions across all surfaces (Command Deck cockpit, Pipeline rows, Board cards, IssueDrawer)",
-    "status": "running",
+    "status": "completed",
     "uid": "da112d50-fa77-4972-90dd-abf194af8a6f",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-17T13:02:00Z",
-    "updated": "2026-07-17T13:14:32.464Z",
+    "updated": "2026-07-17T19:36:28.665Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1610",
@@ -811,5 +811,5 @@
       "canonicalFilename": "2026-07-17-PAN-1610-consistent-issue-actions-across-all-surfaces-command-deck-cockpit-pipeline-rows-board-cards-issuedrawer.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
