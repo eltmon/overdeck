@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-13T00:00:33.644Z",
-  "updated": "2026-07-17T02:06:36.605Z",
+  "updated": "2026-07-17T02:17:56.088Z",
   "pipeline": {
     "issueId": "PAN-2232",
     "reviewStatus": "pending",
@@ -89,16 +89,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "wi-3-lifecycle": {
-        "writerId": "agent-pan-2232",
-        "agentId": "agent-pan-2232",
-        "pid": 3004488,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T02:06:36.605Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2232",
@@ -119,6 +111,16 @@
         "itemId": "wi-2-registry",
         "outcome": "completed",
         "releasedAt": "2026-07-17T02:06:31.095Z"
+      },
+      {
+        "writerId": "agent-pan-2232",
+        "agentId": "agent-pan-2232",
+        "pid": 3004488,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T02:06:36.605Z",
+        "itemId": "wi-3-lifecycle",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T02:17:56.088Z"
       }
     ],
     "statusReasons": {
@@ -137,6 +139,9 @@
     "wi-2-registry.wi-2-registry.ac1": "completed",
     "wi-2-registry.wi-2-registry.ac2": "completed",
     "wi-2-registry.wi-2-registry.ac3": "completed",
-    "wi-3-lifecycle": "running"
+    "wi-3-lifecycle": "completed",
+    "wi-3-lifecycle.wi-3-lifecycle.ac1": "completed",
+    "wi-3-lifecycle.wi-3-lifecycle.ac2": "completed",
+    "wi-3-lifecycle.wi-3-lifecycle.ac3": "completed"
   }
 }
