@@ -381,6 +381,18 @@ describe('IssueMissionControl', () => {
     expect(conversation).toHaveTextContent('Timeline')
   })
 
+  it('caps the selected session at a centered 980px measure', () => {
+    renderMissionControl()
+
+    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
+
+    expect(screen.getByTestId('session-panel').parentElement).toHaveClass(
+      'mx-auto',
+      'w-full',
+      'max-w-[980px]',
+    )
+  })
+
   it('keeps tabs visible but unselected when an issue-tree node drives the pane', () => {
     renderMissionControl()
 

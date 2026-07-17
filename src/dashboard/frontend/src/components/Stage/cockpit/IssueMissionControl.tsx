@@ -283,11 +283,13 @@ function IssueTreeContextPanel({
   const body = (() => {
     if (selectedSession) {
       return (
-        <SessionPanel
-          session={selectedSession}
-          issueId={issueId}
-          reviewers={treeSessions.filter((session) => session.type === 'reviewer')}
-        />
+        <div className="mx-auto w-full max-w-[980px]">
+          <SessionPanel
+            session={selectedSession}
+            issueId={issueId}
+            reviewers={treeSessions.filter((session) => session.type === 'reviewer')}
+          />
+        </div>
       )
     }
     if (context === 'issue') return (
