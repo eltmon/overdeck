@@ -398,10 +398,10 @@
       "tests/unit/lib/git-utils-process-probes.test.ts",
       "tests/unit/lib/git-utils.test.ts"
     ],
-    "recordedAt": "2026-07-17T02:45:52.906Z"
+    "recordedAt": "2026-07-17T05:45:07.089Z"
   },
   "created": "2026-06-23T14:40:20.192Z",
-  "updated": "2026-07-17T05:45:00.111Z",
+  "updated": "2026-07-17T05:45:07.091Z",
   "pipeline": {
     "issueId": "PAN-1897",
     "reviewStatus": "failed",
