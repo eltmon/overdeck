@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-16T20:17:51.768Z",
-  "updated": "2026-07-17T02:12:16.007Z",
+  "updated": "2026-07-17T02:12:22.788Z",
   "pipeline": {
     "issueId": "PAN-2807",
     "reviewStatus": "pending",
@@ -186,5 +186,39 @@
     "docs-db-schema-lifecycle.docs-db-schema-lifecycle.ac1": "completed",
     "docs-db-schema-lifecycle.docs-db-schema-lifecycle.ac2": "completed",
     "docs-db-schema-lifecycle.docs-db-schema-lifecycle.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/__tests__/event-store-discovered-sessions-schema.test.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/overdeck-db-erd-notes.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "src/lib/database/__tests__/driver.test.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/overdeck/__tests__/schema-audit.test.ts",
+      "src/lib/overdeck/__tests__/schema-topups.test.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/overdeck/schema-audit.ts",
+      "tests/unit/lib/database/schema-migrations.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/overdeck-db-erd-notes.md",
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "scripts/file-size-baseline.txt",
+      "src/dashboard/server/__tests__/event-store-discovered-sessions-schema.test.ts",
+      "src/lib/database/__tests__/driver.test.ts",
+      "src/lib/database/__tests__/pending-auto-merges-schema.test.ts",
+      "src/lib/database/schema.ts",
+      "src/lib/overdeck/__tests__/schema-audit.test.ts",
+      "src/lib/overdeck/__tests__/schema-topups.test.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/overdeck/schema-audit.ts",
+      "tests/unit/lib/database/schema-migrations.test.ts"
+    ],
+    "recordedAt": "2026-07-17T02:12:22.787Z"
   }
 }
