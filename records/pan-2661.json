@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T10:04:46.989Z",
-  "updated": "2026-07-17T11:08:05.165Z",
+  "updated": "2026-07-17T11:08:16.265Z",
   "pipeline": {
     "issueId": "PAN-2661",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "grouped-menu-component": {
-        "writerId": "agent-pan-2661",
-        "agentId": "agent-pan-2661",
-        "pid": 2004549,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T10:47:57.833Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2661",
@@ -133,6 +125,16 @@
         "itemId": "wipe-body-unification",
         "outcome": "completed",
         "releasedAt": "2026-07-17T10:47:51.212Z"
+      },
+      {
+        "writerId": "agent-pan-2661",
+        "agentId": "agent-pan-2661",
+        "pid": 2004549,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T10:47:57.833Z",
+        "itemId": "grouped-menu-component",
+        "outcome": "completed",
+        "releasedAt": "2026-07-17T11:08:16.264Z"
       }
     ]
   },
@@ -151,6 +153,11 @@
     "wipe-body-unification": "completed",
     "wipe-body-unification.wipe-body-unification.ac1": "completed",
     "wipe-body-unification.wipe-body-unification.ac2": "completed",
-    "grouped-menu-component": "running"
+    "grouped-menu-component": "completed",
+    "grouped-menu-component.grouped-menu-component.ac1": "completed",
+    "grouped-menu-component.grouped-menu-component.ac2": "completed",
+    "grouped-menu-component.grouped-menu-component.ac3": "completed",
+    "grouped-menu-component.grouped-menu-component.ac4": "completed",
+    "grouped-menu-component.grouped-menu-component.ac5": "completed"
   }
 }
