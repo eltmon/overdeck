@@ -26,29 +26,72 @@ function collectFiles(directory: string, extension: string): string[] {
   });
 }
 
-const COCKPIT_SOURCE_TAGS = collectFiles(COCKPIT_COMPONENTS_ROOT, '.tsx')
-  .filter((file) => !file.endsWith('.test.tsx'))
-  .flatMap((file) => {
-    const source = readFileSync(file, 'utf8');
-    return [...source.matchAll(/<[^>]*data-section="[^"]+"[^>]*>/gs)].map((match) => ({
-      file: path.relative(REPO_ROOT, file),
-      tag: match[0],
-    }));
-  });
+interface CockpitSectionTag {
+  file: string;
+  tag: string;
+  section: string;
+  cssModuleClasses: string[];
+}
 
-const HIDDEN_COCKPIT_SECTION_RULES = collectFiles(COCKPIT_COMPONENTS_ROOT, '.css').flatMap((file) => {
-  const source = readFileSync(file, 'utf8');
+function parseCockpitSectionTags(source: string, file: string): CockpitSectionTag[] {
+  return [...source.matchAll(/<[^>]*data-section="[^"]+"[^>]*>/gs)].map((match) => {
+    const tag = match[0];
+    const section = tag.match(/data-section="([^"]+)"/)?.[1] ?? '';
+    const cssModuleClasses = [...tag.matchAll(/styles\.([A-Za-z_][\w-]*)/g)]
+      .map((classMatch) => classMatch[1]);
+    return { file, tag, section, cssModuleClasses };
+  });
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function findHiddenCockpitSectionRules(
+  source: string,
+  file: string,
+  markers: CockpitSectionTag[],
+): Array<{ file: string; selector: string; sections: string[] }> {
   return [...source.matchAll(/([^{}]+)\{([^{}]*)\}/gs)].flatMap((match) => {
-    const selector = match[1].trim();
     const declarations = match[2];
     if (!/\bdisplay\s*:\s*none\b/.test(declarations)) return [];
-    return selector
+
+    return match[1]
       .split(',')
       .map((candidate) => candidate.trim())
-      .filter((candidate) => /\[data-section="[^"]+"\]\s*$/.test(candidate))
-      .map((candidate) => ({ file: path.relative(REPO_ROOT, file), selector: candidate }));
+      .flatMap((selector) => {
+        const sections = markers
+          .filter((marker) => {
+            const directMarker = new RegExp(
+              `\\[data-section="${escapeRegExp(marker.section)}"\\][^\\s>+~]*$`,
+            ).test(selector);
+            const markerClass = marker.cssModuleClasses.some((className) => new RegExp(
+              `\\.${escapeRegExp(className)}(?=[.#:\\[]|$)[^\\s>+~]*$`,
+            ).test(selector));
+            return directMarker || markerClass;
+          })
+          .map((marker) => marker.section);
+
+        return sections.length > 0
+          ? [{ file, selector, sections: [...new Set(sections)] }]
+          : [];
+      });
   });
-});
+}
+
+const COCKPIT_SOURCE_TAGS = collectFiles(COCKPIT_COMPONENTS_ROOT, '.tsx')
+  .filter((file) => !file.endsWith('.test.tsx'))
+  .flatMap((file) => parseCockpitSectionTags(
+    readFileSync(file, 'utf8'),
+    path.relative(REPO_ROOT, file),
+  ));
+
+const HIDDEN_COCKPIT_SECTION_RULES = collectFiles(COCKPIT_COMPONENTS_ROOT, '.css').flatMap((file) =>
+  findHiddenCockpitSectionRules(
+    readFileSync(file, 'utf8'),
+    path.relative(REPO_ROOT, file),
+    COCKPIT_SOURCE_TAGS,
+  ));
 
 /**
  * FR-0 surface-lock (PAN-2499): the complete no-loss checklist from
@@ -168,13 +211,30 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     ).toEqual([]);
   });
 
-  it('does not hide cockpit section markers directly in collapsed-mode CSS', () => {
+  it('does not hide cockpit section markers through direct selectors or their CSS-module classes', () => {
     expect(
       HIDDEN_COCKPIT_SECTION_RULES,
       `cockpit CSS hides required section marker(s): ${HIDDEN_COCKPIT_SECTION_RULES
-        .map(({ file, selector }) => `${selector} in ${file}`)
+        .map(({ file, selector, sections }) => `${sections.join(' / ')} via ${selector} in ${file}`)
         .join(', ')}`,
     ).toEqual([]);
+  });
+
+  it('detects class-based hiding of a marker-owning cockpit element', () => {
+    const markers = parseCockpitSectionTags(
+      '<div className={styles.resources} data-section="StackDrawer">',
+      'AgentsLane.tsx',
+    );
+
+    expect(findHiddenCockpitSectionRules(
+      ':global([data-spine-collapsed="true"]) .resources { display: none; }',
+      'agentsLane.module.css',
+      markers,
+    )).toEqual([{
+      file: 'agentsLane.module.css',
+      selector: ':global([data-spine-collapsed="true"]) .resources',
+      sections: ['StackDrawer'],
+    }]);
   });
 
   it('records the physical homes of the cockpit sections moved by PAN-2842', () => {
