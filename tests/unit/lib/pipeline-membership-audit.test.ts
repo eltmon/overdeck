@@ -83,13 +83,16 @@ describe('pipeline membership no-loss audit', () => {
     );
   });
 
-  it('does not identify branch-backed planned backlog as spec-only', () => {
+  it('names both convention branches in the branch-backed planned backlog reason', () => {
     const membership = resolvePipelineMembership(signals({
       hasConventionBranch: true,
       branchUnmerged: true,
     }));
 
     expect(membership.bucket).toBe('planned_backlog');
+    expect(membership.reasons).toContain(
+      'open issue with an unmerged convention branch (feature/ or strike/) but no PR — needs a PR or disposition',
+    );
     expect(membership.reasons).not.toContain(PLANNED_BACKLOG_SPEC_ONLY_REASON);
   });
 });
