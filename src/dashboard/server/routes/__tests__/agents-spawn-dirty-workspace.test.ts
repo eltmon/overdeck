@@ -6,7 +6,30 @@ vi.mock('../../../../lib/activity-logger.js', () => ({
   emitActivityEntrySync: mockEmitActivityEntrySync,
 }));
 
-import { emitDirtyWorkspaceRefusalActivity } from '../agents/spawn.js';
+import {
+  emitDirtyWorkspaceRefusalActivity,
+  isOnlyOverdeckRuntimeWorkspaceChanges,
+} from '../agents/spawn.js';
+
+describe('isOnlyOverdeckRuntimeWorkspaceChanges', () => {
+  it.each([
+    ['an unexpanded legacy runtime directory', '?? .pan/'],
+    ['a canonical workspace spec', ' M .overdeck/spec.vbrief.json'],
+    ['a canonical continue file', ' M .overdeck/continue.json'],
+    ['a legacy workspace spec', '?? .pan/spec.vbrief.json'],
+    ['a legacy continue file', '?? .pan/continue.json'],
+  ])('allows %s', (_label, porcelain) => {
+    expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain)).toBe(true);
+  });
+
+  it.each([
+    ['a source file', ' M src/index.ts'],
+    ['runtime files mixed with a source file', '?? .pan/spec.vbrief.json\n M src/index.ts'],
+    ['an unknown legacy path', '?? .pan/user-notes.md'],
+  ])('rejects %s', (_label, porcelain) => {
+    expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain)).toBe(false);
+  });
+});
 
 describe('emitDirtyWorkspaceRefusalActivity', () => {
   beforeEach(() => {

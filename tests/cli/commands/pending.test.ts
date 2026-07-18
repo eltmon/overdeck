@@ -127,6 +127,23 @@ describe('pendingCommand', () => {
     expect(output(logSpy)).not.toContain('PAN-3');
   });
 
+  it('lists a refused planning auto-handoff as blocked', async () => {
+    getStatuses.mockReturnValue({
+      'PAN-1': status('PAN-1', {
+        stuck: true,
+        stuckReason: 'planning_auto_handoff_failed',
+        stuckDetails: JSON.stringify({
+          workAgentSkipReason: 'guardrails',
+          workAgentError: 'Workspace has uncommitted changes',
+        }),
+      }),
+    });
+
+    await pendingCommand({ blocked: true });
+
+    expect(output(logSpy)).toContain('PAN-1  stuck=planning_auto_handoff_failed');
+  });
+
   it('prints resolver membership and drift when review status is empty', async () => {
     gatherProjects.mockResolvedValue([{
       project: { name: 'overdeck', path: '/project' },

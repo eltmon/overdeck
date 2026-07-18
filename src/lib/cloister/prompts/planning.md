@@ -41,8 +41,8 @@ optional:
 - Ask clarifying questions (use AskUserQuestion tool)
 - Explore the codebase to understand context (read files, grep)
 - Generate planning artifacts:
-  - **continue.json** at `.pan/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
-  - **vBRIEF plan** at `.pan/spec.vbrief.json` (workspace working copy — `plan finalize` promotes it to main's `.pan/specs/`)
+  - **continue.json** at `.overdeck/continue.json` — structured decisions, hazards, and approach context (see format below). Replaces the old STATE.md.
+  - **vBRIEF plan** at `.overdeck/spec.vbrief.json` (workspace working copy — `plan finalize` promotes it to `specs/` on `overdeck-state` through the state write door)
 - Present options and tradeoffs for the user to decide
 
 **Finalizing the session:** When your vBRIEF is written and you're ready to hand off, run:
@@ -51,7 +51,7 @@ optional:
 pan plan finalize
 ```
 
-This marks your `.pan/spec.vbrief.json` as `plan.status = "proposed"`, promotes the canonical spec to main's `.pan/specs/`, transitions the issue to Planned, and terminates this planning session. The vBRIEF `items[]` array is the executable task checklist.
+This marks your `.overdeck/spec.vbrief.json` as `plan.status = "proposed"`, promotes the canonical spec to `specs/` on `overdeck-state` through the state write door, transitions the issue to Planned, and terminates this planning session. The vBRIEF `items[]` array is the executable task checklist.
 
 `pan plan finalize` is your final action — the pipeline terminates this session after it succeeds; no dashboard "Done" click is needed. What happens next is not your decision: if this planning run was launched with `--auto-start` (autonomous orchestrators), the work agent starts automatically; otherwise the issue waits in Planned until a human runs `pan start <id>` or clicks Start Agent. Never try to start the work agent yourself. (The dashboard Done button remains the manual handoff path for `--no-promote` runs.)
 
@@ -280,8 +280,8 @@ When `requiresInspection` is `true`, set `metadata.inspectionDepth` to `"fast"` 
 6. Do edges encode only real dependencies (output→input, shared mutation, ordering)?
 
 When discovery is complete:
-1. Create **continue.json** at `.pan/continue.json` with decisions, hazards, and approach context (see format below).
-2. Create a **vBRIEF plan** at `.pan/spec.vbrief.json` — **MUST follow the exact format below**.
+1. Create **continue.json** at `.overdeck/continue.json` with decisions, hazards, and approach context (see format below).
+2. Create a **vBRIEF plan** at `.overdeck/spec.vbrief.json` — **MUST follow the exact format below**.
 3. Run `pan plan finalize` from the workspace root. This finalizes the tasks in your vBRIEF and sets `plan.status` to `proposed`.
 4. Summarize the plan and STOP
 
@@ -386,7 +386,7 @@ It MUST have exactly two top-level keys: `xBRIEFInfo` and `plan`.
 
 ### continue.vbrief.json Format
 
-The continue file is a **structured replacement for STATE.md**. It lives at `.pan/continue.json` in the workspace; the pipeline mirrors a project-level continue file on main as part of plan finalization. You do not write that mirror yourself — `pan plan finalize` handles it.
+The continue file is a **structured replacement for STATE.md**. It lives at `.overdeck/continue.json` in the workspace; the pipeline mirrors a project-level continue file on main as part of plan finalization. You do not write that mirror yourself — `pan plan finalize` handles it.
 
 ```json
 {

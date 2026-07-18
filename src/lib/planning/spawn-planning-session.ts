@@ -553,7 +553,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     progress(1, 'Creating workspace', workspaceCreated ? 'Workspace ready' : 'Already exists', 'complete');
 
     // ── Step 2: Prepare planning environment ──────────────────────────────
-    progress(2, 'Preparing planning environment', '.pan/ workspace artifacts');
+    progress(2, 'Preparing planning environment', '.overdeck/ workspace artifacts');
 
     // Kill existing planning session if any
     await Effect.runPromise(killSession(sessionName)).catch(() => {});
@@ -566,7 +566,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     );
 
     if (existsSync(workspacePanPaths.continuePath)) {
-      console.log('[start-planning] Clearing stale .pan/continue.json');
+      console.log('[start-planning] Clearing stale .overdeck/continue.json');
       await rm(workspacePanPaths.continuePath, { force: true });
     }
 

@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
   shadowMock, cvMock, contextMock, healthMock,
-  getShadowStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock, getAgentStateMock,
+  getShadowStateMock, pingAgentMock, getAgentCVMock, getAgentRuntimeStateMock, getAgentStateMock, getReviewStatusMock,
 } = vi.hoisted(() => ({
   shadowMock: vi.fn().mockResolvedValue(undefined),
   cvMock: vi.fn().mockResolvedValue(undefined),
@@ -23,6 +23,7 @@ const {
   getAgentCVMock: vi.fn(),
   getAgentRuntimeStateMock: vi.fn(),
   getAgentStateMock: vi.fn(),
+  getReviewStatusMock: vi.fn(),
 }));
 
 vi.mock('../../../src/cli/commands/shadow.js', () => ({
@@ -52,6 +53,9 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getAgentStateSync: getAgentStateMock,
   getAgentRuntimeState: getAgentRuntimeStateMock,
   getAgentRuntimeStateSync: getAgentRuntimeStateMock,
+}));
+vi.mock('../../../src/lib/review-status.js', () => ({
+  getReviewStatusSync: getReviewStatusMock,
 }));
 
 import { showCommand } from '../../../src/cli/commands/show.js';
@@ -89,6 +93,7 @@ describe('showCommand', () => {
       recentWork: [],
     });
     getAgentRuntimeStateMock.mockReturnValue(null);
+    getReviewStatusMock.mockReturnValue(null);
     getAgentStateMock.mockReturnValue({
       id: 'agent-pan-6',
       issueId: 'PAN-6',
@@ -155,6 +160,7 @@ describe('showCommand', () => {
       expect(getAgentStateMock).toHaveBeenCalledWith('agent-pan-6');
       expect(pingAgentMock).toHaveBeenCalledWith('agent-pan-6');
       expect(getAgentCVMock).toHaveBeenCalledWith('agent-pan-6');
+      expect(getReviewStatusMock).toHaveBeenCalledWith('PAN-6');
     });
 
     it('does not ping health when there is no agent state to read', async () => {
@@ -170,6 +176,33 @@ describe('showCommand', () => {
       expect(pingAgentMock).not.toHaveBeenCalled();
       expect(payload.health).toBeNull();
       expect(payload.cv).toBeNull();
+      expect(payload.pipeline).toBeNull();
+    });
+
+    it('shows a refused planning auto-handoff as a blocked pipeline state', async () => {
+      getReviewStatusMock.mockReturnValue({
+        issueId: 'PAN-2860',
+        reviewStatus: 'pending',
+        testStatus: 'pending',
+        updatedAt: '2026-07-17T00:00:00.000Z',
+        readyForMerge: false,
+        stuck: true,
+        stuckReason: 'planning_auto_handoff_failed',
+        stuckDetails: JSON.stringify({
+          workAgentSkipReason: 'guardrails',
+          workAgentError: 'Workspace has uncommitted changes',
+        }),
+      });
+
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      await showCommand('PAN-2860');
+      const text = logSpy.mock.calls.map(call => String(call[0])).join('\n');
+      logSpy.mockRestore();
+
+      expect(text).toContain('pipeline');
+      expect(text).toContain('blocked');
+      expect(text).toContain('planning_auto_handoff_failed');
+      expect(text).toContain('Workspace has uncommitted changes');
     });
 
     it('output stays at or below 25 lines (PRD compact-summary requirement)', async () => {
@@ -228,6 +261,7 @@ describe('showCommand', () => {
       expect(payload).toHaveProperty('shadow');
       expect(payload).toHaveProperty('health');
       expect(payload).toHaveProperty('cv');
+      expect(payload).toHaveProperty('pipeline');
     });
 
     it('shows in-progress work with started time instead of never and uses lastActivity instead of lastPing', async () => {

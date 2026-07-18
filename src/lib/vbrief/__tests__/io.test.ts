@@ -60,8 +60,8 @@ function createWorktreeShape(): void {
   mkdirSync(join(WORKSPACE_PATH, '.pan', 'specs'), { recursive: true });
 }
 
-function writeWorkspaceDraft(doc: VBriefDocument): string {
-  const panDir = join(WORKSPACE_PATH, '.pan');
+function writeWorkspaceDraft(doc: VBriefDocument, runtimeDir = '.overdeck'): string {
+  const panDir = join(WORKSPACE_PATH, runtimeDir);
   mkdirSync(panDir, { recursive: true });
   const planPath = join(panDir, 'spec.vbrief.json');
   writeFileSync(planPath, JSON.stringify(doc, undefined, 2));
@@ -151,6 +151,26 @@ describe('findPlan', () => {
 
     expect(findPlanSync(WORKSPACE_PATH)).toBe(draftPath);
     expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('draft-worktree-item');
+  });
+
+  it('falls back to a legacy .pan workspace draft when no canonical draft exists', () => {
+    const doc = makePlanDoc([{ id: 'legacy-draft-item' }]);
+    doc.plan.id = ISSUE_ID.toLowerCase();
+    const draftPath = writeWorkspaceDraft(doc, '.pan');
+
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(draftPath);
+  });
+
+  it('prefers the canonical .overdeck workspace draft over a legacy draft', () => {
+    const legacyDoc = makePlanDoc([{ id: 'legacy-draft-item' }]);
+    legacyDoc.plan.id = ISSUE_ID.toLowerCase();
+    writeWorkspaceDraft(legacyDoc, '.pan');
+    const canonicalDoc = makePlanDoc([{ id: 'canonical-draft-item' }]);
+    canonicalDoc.plan.id = ISSUE_ID.toLowerCase();
+    const canonicalPath = writeWorkspaceDraft(canonicalDoc);
+
+    expect(findPlanSync(WORKSPACE_PATH)).toBe(canonicalPath);
+    expect(readWorkspacePlanSync(WORKSPACE_PATH)?.plan.items[0].id).toBe('canonical-draft-item');
   });
 
   it('resolves post-promotion specs from the main project specs directory, not the workspace specs directory', () => {
@@ -420,18 +440,22 @@ describe('tierOverrides', () => {
     return createHash('sha256').update(readFileSync(path)).digest('hex');
   }
 
-  it('round-trips tier promotions through workspace continue.json', () => {
+  it('reads legacy tier state and writes promotions to canonical workspace continue.json', () => {
     writePlanDoc(makePlanDoc([{ id: 'item-1' }]));
+    const legacyPath = join(WORKSPACE_PATH, '.pan', 'continue.json');
     mkdirSync(join(WORKSPACE_PATH, '.pan'), { recursive: true });
     writeFileSync(
-      join(WORKSPACE_PATH, '.pan', 'continue.json'),
+      legacyPath,
       JSON.stringify({ statusOverrides: { 'item-2': 'running' } }, null, 2),
     );
+    const legacyBefore = readFileSync(legacyPath, 'utf-8');
 
     recordTierPromotion(WORKSPACE_PATH, 'item-1', 'simple', 'medium', 'verification failed');
     recordTierPromotion(WORKSPACE_PATH, 'item-1', 'medium', 'complex', 'blocked by supervisor');
 
-    const continueState = JSON.parse(readFileSync(join(WORKSPACE_PATH, '.pan', 'continue.json'), 'utf-8'));
+    const canonicalPath = join(WORKSPACE_PATH, '.overdeck', 'continue.json');
+    const continueState = JSON.parse(readFileSync(canonicalPath, 'utf-8'));
+    expect(readFileSync(legacyPath, 'utf-8')).toBe(legacyBefore);
     expect(continueState.statusOverrides).toEqual({ 'item-2': 'running' });
     expect(continueState.tierOverrides['item-1'].effectiveDifficulty).toBe('complex');
 

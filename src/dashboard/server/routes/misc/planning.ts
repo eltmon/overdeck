@@ -247,7 +247,7 @@ const postPlanningMessageRoute = HttpRouter.add(
 **YOU SHOULD ONLY:**
 - Ask clarifying questions
 - Explore the codebase to understand context
-- Generate planning artifacts (\`.pan/continue.json\`, \`.pan/spec.vbrief.json\`)
+- Generate planning artifacts (\`.overdeck/continue.json\`, \`.overdeck/spec.vbrief.json\`)
 - Present options and tradeoffs
 
 ---

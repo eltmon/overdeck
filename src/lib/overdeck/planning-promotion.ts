@@ -20,6 +20,7 @@ import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.j
 import { checkPrdGateSync, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue } from '../pan-dir/index.js';
 import { resolveAutoSpawnOnFinalize } from '../planning/spawn-planning-session.js';
 import { extractTeamPrefix, findProjectByPathSync, findProjectByTeamSync, resolveProjectFromIssueSync } from '../projects.js';
+import { markWorkspaceStuck } from '../review-status.js';
 import { isStateMigrated } from '../state-home.js';
 import { loadRemoteAgentState } from '../remote/remote-agents.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -151,7 +152,7 @@ export async function completePlanningArtifacts(options: {
     return (yield* findWorkspaceDraftPlan(workspacePath)) ?? (yield* findPlan(workspacePath));
   }));
   if (!workspacePlanPath) {
-    throw new Error(`No workspace vBRIEF found for ${upperIssueId} at ${workspacePath}/.pan/spec.vbrief.json`);
+    throw new Error(`No workspace vBRIEF found for ${upperIssueId} at ${workspacePath}/.overdeck/spec.vbrief.json`);
   }
 
   const workspaceDoc = await Effect.runPromise(readPlan(workspacePlanPath));
@@ -282,6 +283,43 @@ export function resolveCompletePlanningTerminalStatus(
   autoSpawnResult: CompletePlanningAutoSpawnResult | null,
 ): CompletePlanningPhaseStatus {
   return autoSpawnRequested && autoSpawnResult?.workAgentSpawned !== true ? 'failure' : 'success';
+}
+
+export async function recordPlanningAutoHandoffFailure(options: {
+  issueId: string;
+  result: CompletePlanningAutoSpawnResult;
+  eventStore: any;
+  now?: () => string;
+  markStuck?: typeof markWorkspaceStuck;
+  emitActivity?: typeof emitActivityEntrySync;
+}): Promise<string> {
+  const skipReason = options.result.workAgentSkipReason ?? 'spawn-failed';
+  const error = options.result.workAgentError ?? `Work agent startup failed: ${skipReason}`;
+  const details = {
+    workAgentSkipReason: skipReason,
+    workAgentError: error,
+  };
+
+  await Effect.runPromise(options.eventStore.append({
+    type: 'planning.failed',
+    timestamp: (options.now ?? (() => new Date().toISOString()))(),
+    payload: {
+      issueId: options.issueId,
+      error,
+      stage: 'auto-handoff',
+      ...details,
+    },
+  }));
+  (options.markStuck ?? markWorkspaceStuck)(options.issueId, 'planning_auto_handoff_failed', details);
+  (options.emitActivity ?? emitActivityEntrySync)({
+    source: 'plan',
+    level: 'error',
+    message: `${options.issueId} planning complete, but work-agent startup failed: ${error}`,
+    issueId: options.issueId,
+    details: JSON.stringify(details),
+  });
+
+  return error;
 }
 
 export async function completePlanningAutoSpawn(options: {
@@ -687,21 +725,6 @@ export async function completePlanningForIssue(options: {
     // Clear agents cache so the dashboard stops showing the planning agent as active
     invalidateAgentsCache();
 
-    // Emit activity + TTS for planning completion
-    emitActivityEntrySync({
-      source: 'plan',
-      level: 'info',
-      message: `${id} planning complete — ready for work`,
-      issueId: id,
-    });
-    emitActivityTtsSync({
-      utterance: `${id} planning complete, ready for work`,
-      priority: 2,
-      issueId: id,
-      source: 'planning-agent',
-      eventType: 'planning.complete',
-    });
-
     // Suppress unused variable warning — remoteVmName used for remote session cleanup if added later
     void isRemotePlanning; void remoteVmName;
 
@@ -719,6 +742,33 @@ export async function completePlanningForIssue(options: {
       skipKill,
       sessionName,
     });
+    const autoHandoffFailed = effectiveAutoSpawn && autoSpawnResult?.workAgentSpawned !== true;
+    let autoHandoffError: string | undefined;
+    if (autoHandoffFailed && autoSpawnResult) {
+      autoHandoffError = await recordPlanningAutoHandoffFailure({
+        issueId: id,
+        result: autoSpawnResult,
+        eventStore,
+      });
+    } else {
+      emitActivityEntrySync({
+        source: 'plan',
+        level: 'info',
+        message: autoSpawnResult?.workAgentSpawned
+          ? `${id} planning complete — work-agent startup accepted`
+          : `${id} planning complete — ready for work`,
+        issueId: id,
+      });
+      emitActivityTtsSync({
+        utterance: autoSpawnResult?.workAgentSpawned
+          ? `${id} planning complete, work agent starting`
+          : `${id} planning complete, ready for work`,
+        priority: 2,
+        issueId: id,
+        source: 'planning-agent',
+        eventType: 'planning.complete',
+      });
+    }
     emitCompletePlanningPhase(id, 'terminal', resolveCompletePlanningTerminalStatus(effectiveAutoSpawn, autoSpawnResult), autoSpawnResult?.workAgentSpawned ? 'planning complete and work agent spawn requested' : autoSpawnResult?.workAgentSkipReason ?? 'planning complete', {
       autoSpawn: effectiveAutoSpawn,
       workAgentSpawned: autoSpawnResult?.workAgentSpawned ?? false,
@@ -732,11 +782,13 @@ export async function completePlanningForIssue(options: {
       gitPushed,
       ...(taskWarning ? { taskWarning } : {}),
       ...(autoSpawnResult ?? {}),
-      message: autoSpawnResult?.workAgentSpawned
-        ? 'Planning complete and work agent spawn requested'
-        : gitPushed
-          ? 'Planning complete and pushed to git - ready for execution'
-          : 'Planning complete - ready for execution',
+      message: autoHandoffFailed
+        ? `Planning complete, but work-agent startup failed (${autoSpawnResult?.workAgentSkipReason ?? 'spawn-failed'}): ${autoHandoffError}`
+        : autoSpawnResult?.workAgentSpawned
+          ? 'Planning complete and work agent spawn requested'
+          : gitPushed
+            ? 'Planning complete and pushed to git - ready for execution'
+            : 'Planning complete - ready for execution',
     });
   } finally {
     completePlanningLease.release();
