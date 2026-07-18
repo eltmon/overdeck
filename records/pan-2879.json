@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T13:36:29.113Z",
-  "updated": "2026-07-18T16:48:25.257Z",
+  "updated": "2026-07-18T16:49:20.636Z",
   "pipeline": {
     "issueId": "PAN-2879",
     "reviewStatus": "pending",
@@ -12,13 +12,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:48:23.391Z",
-    "mergeNotes": "GitHub PR #2881 has failing required checks on HEAD caa83ba0. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/2881 for details.",
+    "updatedAt": "2026-07-18T16:49:20.629Z",
+    "mergeNotes": "Strike merge request failed: fetch failed",
     "lastVerifiedCommit": "caa83ba09eb87af8636669f1ac5a5a958c2b23cf",
     "strikeReadyHead": "65b9b083bd42b1c8b9e6125921ab21383af9dc3d",
     "strikeReadyAt": "2026-07-18T16:37:02.270Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-18T14:45:06.449Z",
@@ -47,6 +47,13 @@
         "mainHead": "f1aee6f27bae02633256a7c362f0d1f7f4eca302",
         "outcome": "failed",
         "detail": "GitHub PR #2881 has failing required checks on HEAD caa83ba0. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/2881 for details."
+      },
+      {
+        "timestamp": "2026-07-18T16:49:11.346Z",
+        "strikeHead": "65b9b083bd42b1c8b9e6125921ab21383af9dc3d",
+        "mainHead": "30d3e8b34c0217e607e3116dcee0e3696aebe802",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -72,7 +79,7 @@
       },
       "costAtCloseOut": {
         "usd": 59.380474,
-        "pricingAsOf": "2026-07-18T16:48:24.868Z"
+        "pricingAsOf": "2026-07-18T16:49:20.631Z"
       }
     },
     "merges": [],
