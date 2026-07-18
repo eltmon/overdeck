@@ -322,6 +322,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T20:16:59.944Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-18T20:25:37.441Z"
     }
   ],
   "feedback": [],
@@ -651,17 +656,18 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:25:36.366Z",
+  "updated": "2026-07-18T20:25:37.632Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:25:36.328Z",
+    "updatedAt": "2026-07-18T20:25:37.617Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-2858-review already running. Use 'pan tell' to message it.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
@@ -728,7 +734,7 @@
       },
       "costAtCloseOut": {
         "usd": 737.116194,
-        "pricingAsOf": "2026-07-18T20:25:36.353Z"
+        "pricingAsOf": "2026-07-18T20:25:37.626Z"
       }
     },
     "merges": [
