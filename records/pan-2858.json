@@ -142,6 +142,11 @@
       "reason": "feedback",
       "note": "[2026-07-18T12:15Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-18T12:15:01.199Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-18T12:32:03.028Z"
     }
   ],
   "feedback": [],
@@ -421,7 +426,7 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T12:32:01.933Z",
+  "updated": "2026-07-18T12:32:03.028Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "reviewing",
@@ -431,12 +436,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T12:32:01.890Z",
+    "updatedAt": "2026-07-18T12:32:02.699Z",
     "inspectNotes": "All 5 ACs verified. AC1: tsdown entry emits dist/acp-host.js; host.test.ts binds sockets/acp-<id>.sock + writes 0600 acp-token/acp-session-id under a stubbed runtime. AC2: wrong token->401 with zero transcript/prompt writes; correct token+message forwards to runtime.prompt() and appends both turns to acp-session.jsonl. AC3: handleSessionUpdate/handleRequestPermission registered before runtime.start() (host.ts:79-96); test proves order + that an update fired during start() is captured (observedSessionUpdates:1), not dropped. AC4: kimi-scoped auth-failure catch writes '[error] kimi authentication is required... /login' to stdout, rethrows without retry (startCalls===1), main() sets process.exitCode=1. AC5: acp-session-id persisted 0600; --resume threads through main()->makeRuntime->session-runtime.ts's pre-existing resumeSessionId->session/load path (session-runtime.ts:567-640). Non-blocking flag for follow-up: src/lib/acp/host-render.ts's stripAcpPaneControl regex has literal raw control bytes instead of \\x escapes, making git treat the file as binary (breaks future diff/blame, likely trips eslint no-control-regex at verification) — doesn't affect any tested string here.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "92326bebc47695e82be48aed87f1f5f5bb0a7ccb",
     "reviewRequestedAt": "2026-07-18T12:31:58.714Z",
-    "reviewSpawnedAt": "2026-07-18T12:32:01.889Z",
+    "reviewSpawnedAt": "2026-07-18T12:32:02.697Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "bun.lock",
@@ -769,7 +774,7 @@
       },
       "costAtCloseOut": {
         "usd": 431.84282,
-        "pricingAsOf": "2026-07-18T12:32:01.923Z"
+        "pricingAsOf": "2026-07-18T12:32:02.780Z"
       }
     },
     "merges": [
