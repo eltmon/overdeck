@@ -104,23 +104,27 @@ describe('fetchIssuePullRequest — GET /api/issues/:id/pr', () => {
     expect(mockExec).not.toHaveBeenCalled();
   });
 
-  it('returns { pr: null } when no PR exists for the feature branch', async () => {
+  it('returns { pr: null } when no PR exists for the feature or strike branch', async () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
       repo: 'overdeck',
       number: 830,
     });
+    // Both branch probes miss: feature/ first, then the strike/ fallback (PAN-2883).
+    mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
     mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
 
     const result = await fetchIssuePullRequest('PAN-830');
 
     expect(result.pr).toBeNull();
-    expect(mockExec).toHaveBeenCalledTimes(1);
-    const [cmd] = mockExec.mock.calls[0]!;
-    expect(cmd).toContain('gh pr list');
-    expect(cmd).toContain('--head feature/pan-830');
-    expect(cmd).toContain('eltmon/overdeck');
+    expect(mockExec).toHaveBeenCalledTimes(2);
+    const [featureCmd] = mockExec.mock.calls[0]!;
+    expect(featureCmd).toContain('gh pr list');
+    expect(featureCmd).toContain('--head feature/pan-830');
+    expect(featureCmd).toContain('eltmon/overdeck');
+    const [strikeCmd] = mockExec.mock.calls[1]!;
+    expect(strikeCmd).toContain('--head strike/pan-830');
   });
 
   it('returns parsed pr metadata on the happy path', async () => {
@@ -245,20 +249,22 @@ describe('fetchIssueCheckRuns — GET /api/issues/:id/check-runs', () => {
     expect(mockExec).not.toHaveBeenCalled();
   });
 
-  it('returns empty checks when no PR exists for the feature branch', async () => {
+  it('returns empty checks when no PR exists for the feature or strike branch', async () => {
     mockResolveGitHubIssue.mockReturnValue({
       isGitHub: true,
       owner: 'eltmon',
       repo: 'overdeck',
       number: 830,
     });
+    // feature/ probe then strike/ fallback, both miss (PAN-2883).
+    mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
     mockExec.mockResolvedValueOnce({ stdout: '', stderr: '' });
 
     const result = await fetchIssueCheckRuns('PAN-830');
 
     expect(result.pr).toBeNull();
     expect(result.checkRuns).toEqual([]);
-    expect(mockExec).toHaveBeenCalledTimes(1);
+    expect(mockExec).toHaveBeenCalledTimes(2);
   });
 
   it('returns normalized check runs and summary counts', async () => {
