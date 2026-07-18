@@ -10,7 +10,7 @@ import { packageRoot } from './paths.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
 
 export interface LauncherConfig {
   role: Role;

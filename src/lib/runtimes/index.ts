@@ -96,6 +96,9 @@ export class RuntimeRegistry implements RuntimeRegistryInterface {
     if (harness === 'codex') {
       return this.get('codex') ?? null;
     }
+    if (harness === 'acp') {
+      return this.get('acp') ?? null;
+    }
     return this.get('claude-code') ?? null;
   }
 }

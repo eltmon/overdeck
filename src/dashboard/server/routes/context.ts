@@ -70,7 +70,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -274,7 +274,7 @@ async function buildSyncTargets(projects: ProjectEntry[]): Promise<ContextSyncTa
       await describeSyncTarget('claude-code', 'project', key, `${config.name} · CLAUDE.md`, join(config.path, 'CLAUDE.md')),
     );
     targets.push(
-      await describeSyncTarget('pi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
+      await describeSyncTarget('ohmypi', 'project', key, `${config.name} · AGENTS.md`, join(config.path, 'AGENTS.md')),
     );
   }
 
@@ -419,6 +419,10 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '',
     previews.codex || '(no rendered context)',
     '',
+    '## Overdeck-controlled ACP bundle',
+    '',
+    previews.acp || '(no rendered context)',
+    '',
     '## Runtime-only sections',
     '',
     '- Memory retrieval: injected at agent spawn when enabled; unavailable in this layer editor preview.',
@@ -483,6 +487,7 @@ export async function previewContextLayers(
       'claude-code': previews['claude-code'],
       ohmypi: previews.ohmypi,
       codex: previews.codex,
+      acp: previews.acp,
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

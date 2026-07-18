@@ -3,22 +3,24 @@ import type { Harness } from "./types"
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
 
-export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server"
+export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host"
 export type HarnessDeliveryKind =
   | "pty-supervisor"
   | "rpc-fifo"
   | "codex-exec-resume"
   | "codex-app-server-rpc"
+  | "acp-host-rpc"
   | "tmux-paste"
 export type HarnessReadinessKind =
   | "claude-session-signal"
   | "ohmypi-ready-file"
   | "codex-tui-prompt"
   | "codex-app-server-ready"
-export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl"
-export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex"
-export type HarnessFeedKind = "claude_code" | "pi" | "codex"
+  | "acp-host-ready"
+export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl"
+export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp"
+export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp"
 
 export interface HarnessBehavior {
   readonly displayName: string
@@ -38,7 +40,7 @@ export interface HarnessBehavior {
   readonly usesRpcFifo: boolean
   readonly usesCodexHome: boolean
   readonly injectsPromptTimeMemory: boolean
-  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server"
+  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host"
   readonly readyTimeoutSeconds: number
 }
 
@@ -108,15 +110,39 @@ export const CODEX_BEHAVIOR: HarnessBehavior = {
   readyTimeoutSeconds: 30,
 }
 
+export const ACP_BEHAVIOR: HarnessBehavior = {
+  displayName: "ACP",
+  executableName: "acp-host",
+  processNames: ["acp-host", "kimi"],
+  launchCommandKind: "acp-host",
+  deliveryKind: "acp-host-rpc",
+  readinessKind: "acp-host-ready",
+  transcriptKind: "acp-jsonl",
+  sessionIdSource: "acp-session-id",
+  contextLayerKind: "acp",
+  feedKind: "acp",
+  supportsPtySupervisor: false,
+  supportsChannelsBridge: false,
+  supportsConversationStreaming: true,
+  supportsPatchProjection: false,
+  usesRpcFifo: false,
+  usesCodexHome: false,
+  injectsPromptTimeMemory: false,
+  workAgentMode: "acp-host",
+  readyTimeoutSeconds: 30,
+}
+
 const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "claude-code": CLAUDE_CODE_BEHAVIOR,
   ohmypi: OHMYPI_BEHAVIOR,
   codex: CODEX_BEHAVIOR,
+  acp: ACP_BEHAVIOR,
 }
 
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
   if (harness === "ohmypi" || harness === "pi") return OHMYPI_BEHAVIOR
   if (harness === "codex") return CODEX_BEHAVIOR
+  if (harness === "acp") return ACP_BEHAVIOR
   return CLAUDE_CODE_BEHAVIOR
 }
 

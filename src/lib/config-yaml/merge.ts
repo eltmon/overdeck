@@ -51,8 +51,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, or codex`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, or acp`);
   }
 }
 

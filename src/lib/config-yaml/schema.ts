@@ -367,7 +367,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /** PAN-1862 (FR-7): re-review scope for the review role (default 'changed'). */

@@ -16,7 +16,7 @@ const MODEL_BY_PROVIDER = {
   openrouter: 'qwen/qwen3.6-plus:free',
 } as const
 
-const HARNESSES: RuntimeName[] = ['claude-code', 'pi', 'ohmypi', 'codex']
+const HARNESSES: Array<RuntimeName | 'pi'> = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp']
 const PROVIDERS = Object.keys(MODEL_BY_PROVIDER) as Array<keyof typeof MODEL_BY_PROVIDER>
 const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', undefined]
 
@@ -139,8 +139,8 @@ describe('canUseHarness', () => {
     },
   )
 
-  it('AC(PAN-1989): covers the full 4 x 5 x 3 matrix — only ohmypi+anthropic+subscription is blocked', () => {
-    const cells: Array<{ harness: RuntimeName; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
+  it('AC(PAN-1989): covers the full 5 x 5 x 3 matrix — only ohmypi+anthropic+subscription is blocked', () => {
+    const cells: Array<{ harness: RuntimeName | 'pi'; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {
       for (const provider of PROVIDERS) {
         for (const authMode of AUTH_MODES) {
@@ -150,7 +150,7 @@ describe('canUseHarness', () => {
         }
       }
     }
-    expect(cells).toHaveLength(4 * 5 * 3)
+    expect(cells).toHaveLength(5 * 5 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
       const decision = canUseHarnessSync(cell.harness, model, cell.authMode)

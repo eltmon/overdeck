@@ -245,7 +245,7 @@ const piAdapter: ConversationTranscriptAdapter = {
 
 // ─── Registry ─────────────────────────────────────────────────────────────
 
-const REGISTRY: Record<RuntimeName, ConversationTranscriptAdapter> = {
+const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'claude-code': claudeCodeAdapter,
   'ohmypi': piAdapter,
   'codex': claudeCodeAdapter,

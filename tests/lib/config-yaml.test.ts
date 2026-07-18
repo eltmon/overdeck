@@ -174,7 +174,7 @@ api_keys:
             openai: { enabled: true, harness: 'bad' as never },
           },
         },
-      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, or codex');
+      })).toThrow('models.providers.openai.harness must be claude-code, ohmypi, codex, or acp');
     });
 
     it('normalizes legacy DashScope API keys without re-enabling an explicitly disabled provider', () => {
