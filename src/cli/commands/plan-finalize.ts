@@ -171,7 +171,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   const planPath = findWorkspaceDraftPlanSync(workspacePath) ?? findPlanSync(workspacePath);
   if (!planPath) {
-    const msg = `vBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
+    const msg = `xBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
     else console.error(chalk.red('✗ ' + msg));
     process.exit(1);
@@ -204,7 +204,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
 
   if (!options.json) {
     console.log(chalk.dim(`workspace: ${workspacePath}`));
-    console.log(chalk.dim('finalizing vBRIEF checklist…'));
+    console.log(chalk.dim('finalizing xBRIEF checklist…'));
   }
 
   const planDoc = readPlanSync(planPath);
@@ -219,9 +219,9 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   } else {
     if (!qualityGate.ok) {
       if (options.json) {
-        console.log(JSON.stringify({ success: false, error: 'vBRIEF quality lint failed', qualityIssues: qualityGate.issues }));
+        console.log(JSON.stringify({ success: false, error: 'xBRIEF quality lint failed', qualityIssues: qualityGate.issues }));
       } else {
-        console.error(chalk.red('✗ vBRIEF quality lint failed:'));
+        console.error(chalk.red('✗ xBRIEF quality lint failed:'));
         for (const line of formatQualityIssues(qualityGate.issues)) {
           console.error(chalk.red('  ' + line));
         }
@@ -236,7 +236,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       if (options.json) {
         console.error(JSON.stringify({ qualityWarnings: warnings }));
       } else {
-        console.error(chalk.yellow('⚠ vBRIEF quality warnings:'));
+        console.error(chalk.yellow('⚠ xBRIEF quality warnings:'));
         for (const line of formatQualityIssues(warnings)) {
           console.error(chalk.yellow('  ' + line));
         }
@@ -250,7 +250,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   const autoSpawnOnFinalize = readAutoSpawnOnFinalize(issueId);
 
   // Stamp plan.status='proposed' and plan.metadata.canonicalFilename onto the
-  // vBRIEF only after beads creation succeeds. Atomic temp+rename.
+  // xBRIEF only after beads creation succeeds. Atomic temp+rename.
   const canonicalFilename = stampPlanForFinalization(planPath, issueId);
 
   emitActivityEntrySync({

@@ -1095,7 +1095,7 @@ function promptForDispatchItem(issueId: string, doc: XBriefDocument, item: XBrie
     'Do not implement this item yet. Summarize the blocking parent outputs into a concise context update for the implementation slot.',
     `Blocking parents: ${parentIds.join(', ') || '(none)'}`,
     '',
-    'Persist the synthesis context on the vBRIEF item metadata as synthesisContext, commit it, then stop.',
+    'Persist the synthesis context on the xBRIEF item metadata as synthesisContext, commit it, then stop.',
   ].join('\n');
 }
 

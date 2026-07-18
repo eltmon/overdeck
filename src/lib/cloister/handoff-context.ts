@@ -166,7 +166,7 @@ async function captureGitState(context: HandoffContext, workspace: string): Prom
 }
 
 /**
- * Capture merged vBRIEF task state.
+ * Capture merged xBRIEF task state.
  */
 function captureTasks(context: HandoffContext, workspace: string): void {
   try {

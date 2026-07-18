@@ -644,9 +644,9 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
   }
 
-  // vBRIEF state disagreement audit (PAN-946: workspace-9ny)
+  // xBRIEF state disagreement audit (PAN-946: workspace-9ny)
   try {
-    const auditSpinner = ora('Running vBRIEF state audit...').start();
+    const auditSpinner = ora('Running xBRIEF state audit...').start();
     const disagreements: Array<{ issueId: string; problem: string; fix: string }> = [];
     const hasGh = checkCommand('gh');
 
@@ -656,7 +656,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       const activeDir = join(config.path, 'vbrief', 'active');
       const completedDir = join(config.path, 'vbrief', 'completed');
 
-      // (1) vBRIEF in active/ but tracker says closed
+      // (1) xBRIEF in active/ but tracker says closed
       if (existsSync(activeDir)) {
         const activeFiles = readdirSync(activeDir).filter(
           f => isXBriefFilename(f) && !f.startsWith('continue-')
@@ -675,7 +675,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
               if (state.toLowerCase() === 'closed') {
                 disagreements.push({
                   issueId,
-                  problem: 'vBRIEF in active/ but GitHub issue is closed',
+                  problem: 'xBRIEF in active/ but GitHub issue is closed',
                   fix: `pan scope complete ${issueId}`,
                 });
               }
@@ -684,7 +684,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         }
       }
 
-      // (2) vBRIEF in completed/ but workspace still exists
+      // (2) xBRIEF in completed/ but workspace still exists
       if (existsSync(completedDir)) {
         const completedFiles = readdirSync(completedDir).filter(
           f => isXBriefFilename(f) && !f.startsWith('continue-')
@@ -697,14 +697,14 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
           if (existsSync(workspacePath)) {
             disagreements.push({
               issueId,
-              problem: 'vBRIEF in completed/ but workspace worktree still exists',
+              problem: 'xBRIEF in completed/ but workspace worktree still exists',
               fix: `pan close ${issueId}`,
             });
           }
         }
       }
 
-      // (3) tracker shows in-progress but no vBRIEF in active/ (scanning worktrees)
+      // (3) tracker shows in-progress but no xBRIEF in active/ (scanning worktrees)
       const workspacesDir = join(config.path, 'workspaces');
       if (existsSync(workspacesDir)) {
         let activeIssueIds = new Set<string>();
@@ -739,13 +739,13 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
             } catch { /* skip if gh fails — fall through to heuristic */ }
           }
 
-          // Flag if tracker is open OR if we couldn't check tracker (workspace without active vBRIEF is always suspicious)
+          // Flag if tracker is open OR if we couldn't check tracker (workspace without active xBRIEF is always suspicious)
           if (trackerOpen || !ghInfo.isGitHub || !hasGh) {
             disagreements.push({
               issueId: worktreeIssueId,
               problem: trackerOpen
-                ? 'Tracker shows open but no vBRIEF in active/'
-                : 'Workspace exists but no vBRIEF in active/',
+                ? 'Tracker shows open but no xBRIEF in active/'
+                : 'Workspace exists but no xBRIEF in active/',
               fix: `pan scope approve ${worktreeIssueId}`,
             });
           }
@@ -754,16 +754,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     }
 
     if (disagreements.length === 0) {
-      auditSpinner.succeed('vBRIEF state audit passed — no disagreements');
+      auditSpinner.succeed('xBRIEF state audit passed — no disagreements');
     } else {
-      auditSpinner.warn(`Found ${disagreements.length} vBRIEF state disagreement(s)`);
+      auditSpinner.warn(`Found ${disagreements.length} xBRIEF state disagreement(s)`);
       for (const d of disagreements) {
         console.log(chalk.yellow(`  ⚠ ${d.issueId}: ${d.problem}`));
         console.log(chalk.dim(`    Fix: ${d.fix}`));
       }
     }
   } catch (auditErr: any) {
-    console.warn(`[pan sync] vBRIEF audit failed (non-fatal): ${auditErr?.message ?? auditErr}`);
+    console.warn(`[pan sync] xBRIEF audit failed (non-fatal): ${auditErr?.message ?? auditErr}`);
   }
 
   // Record the input hash so a future startup sync can skip when nothing changed.

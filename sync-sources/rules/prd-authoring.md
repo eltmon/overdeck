@@ -16,7 +16,7 @@ Author every plan so it can be executed without re-research or judgment calls:
   paths, and before/after code. The downstream executor is a model, not a senior
   engineer who can fill gaps from taste and tribal knowledge — so the *how* must be
   on the page. Specifying the implementation is required, not scope-creep. (`pan
-  plan` then mechanically lowers the PRD into a vBRIEF; the richer the PRD, the
+  plan` then mechanically lowers the PRD into a xBRIEF; the richer the PRD, the
   less the planner has to invent.)
 
 - **Glossary first.** Define every term of art the document uses before using it.

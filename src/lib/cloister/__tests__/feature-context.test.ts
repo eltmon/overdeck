@@ -108,7 +108,7 @@ describe('writeStoryFeatureContext', () => {
     expect(mockGetIssue).not.toHaveBeenCalled();
   });
 
-  it('synthesizes context from parent vBRIEF spec on main', async () => {
+  it('synthesizes context from parent xBRIEF spec on main', async () => {
     mockTrackerResponse('US-123', 'F-456', 'The Big Feature');
 
     // Write the parent spec to the main-side .pan/specs/ directory

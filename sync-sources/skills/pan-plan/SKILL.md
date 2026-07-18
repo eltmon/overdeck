@@ -18,7 +18,7 @@ allowed-tools:
 
 # Overdeck Planning Lifecycle
 
-`pan plan <id>` is the plan-ONLY verb: it starts a planning session for an issue and produces a PRD and vBRIEF, but it does not start the work agent. Use `pan start <id>` when you want planning and work in one command.
+`pan plan <id>` is the plan-ONLY verb: it starts a planning session for an issue and produces a PRD and xBRIEF, but it does not start the work agent. Use `pan start <id>` when you want planning and work in one command.
 
 Use `--auto` when the user wants the planning agent to run non-interactively and infer defensible defaults. Use `--probe` when the plan needs an adversarial pre-finalize self-pass; `--effort high` enables the same probe instructions automatically.
 
@@ -85,13 +85,13 @@ What it does:
 2. Validates the tasks already stored in `plan.items[]`, including their declared dependencies.
 3. Flips the spec's `plan.status` from `draft` to `proposed`.
 4. Calls the dashboard's complete-planning endpoint to promote the canonical spec into `<projectRoot>/.pan/specs/`, commit it on main, push, transition the tracker state to Planned, and terminate the planning session — same flow as `pan plan done` and the dashboard Done button.
-5. Returns a summary of finalized vBRIEF tasks and promotion status, or JSON with `--json`.
+5. Returns a summary of finalized xBRIEF tasks and promotion status, or JSON with `--json`.
 
-Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs vBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
+Use `-w <path>` to point at another workspace. Use `--no-promote` to leave the spec at `status=proposed` without promoting (rare; for humans who want to review the plan in the dashboard before clicking Done). Finalize runs xBRIEF quality lint by default; use `--no-quality-lint` only as a loud one-run emergency bypass when the plan must be promoted despite known quality issues.
 
 ### PRD-first gate
 
-Finalize and complete-planning refuse to promote a plan unless a **PRD draft** of at least 20 lines exists for the issue. `roles/plan.md` has always required the PRD as the first artifact; this gate makes it mechanical. The gate searches, in order, for `<ISSUE-ID>.md` (uppercase then lowercase) under `<projectRoot>/.pan/drafts/` then `<workspace>/.pan/drafts/`; the first existing file with ≥20 lines satisfies it. A found-but-thinner draft fails with its line count; a fully missing draft fails naming the canonical path to write. `pan start <id> --auto` is structurally exempt (it synthesizes a minimal vBRIEF and never POSTs complete-planning, so the gate cannot block it). Use `--no-prd` (on `finalize` or `done`) only for a genuinely trivial issue that went through interactive planning anyway — it prints a yellow `⚠ PRD gate SKIPPED` warning and tells the endpoint to skip the check too.
+Finalize and complete-planning refuse to promote a plan unless a **PRD draft** of at least 20 lines exists for the issue. `roles/plan.md` has always required the PRD as the first artifact; this gate makes it mechanical. The gate searches, in order, for `<ISSUE-ID>.md` (uppercase then lowercase) under `<projectRoot>/.pan/drafts/` then `<workspace>/.pan/drafts/`; the first existing file with ≥20 lines satisfies it. A found-but-thinner draft fails with its line count; a fully missing draft fails naming the canonical path to write. `pan start <id> --auto` is structurally exempt (it synthesizes a minimal xBRIEF and never POSTs complete-planning, so the gate cannot block it). Use `--no-prd` (on `finalize` or `done`) only for a genuinely trivial issue that went through interactive planning anyway — it prints a yellow `⚠ PRD gate SKIPPED` warning and tells the endpoint to skip the check too.
 
 ## Completing planning (`pan plan done`)
 
@@ -101,7 +101,7 @@ Finalize and complete-planning refuse to promote a plan unless a **PRD draft** o
 pan plan done PAN-1071
 ```
 
-This promotes the workspace vBRIEF to `<projectRoot>/.pan/specs/`, syncs vBRIEF tasks, and transitions the tracker state to Planned. It is subject to the same PRD-first gate as `finalize`; pass `--no-prd` only for a genuinely trivial issue.
+This promotes the workspace xBRIEF to `<projectRoot>/.pan/specs/`, syncs xBRIEF tasks, and transitions the tracker state to Planned. It is subject to the same PRD-first gate as `finalize`; pass `--no-prd` only for a genuinely trivial issue.
 
 ## Related commands
 
@@ -112,5 +112,5 @@ This promotes the workspace vBRIEF to `<projectRoot>/.pan/specs/`, syncs vBRIEF 
 ## See also
 
 - `roles/plan.md` — planning role prompt.
-- `docs/VBRIEF.md` — vBRIEF schema, artifact locations, lifecycle states.
+- `docs/VBRIEF.md` — xBRIEF schema, artifact locations, lifecycle states.
 - `docs/SKILLS-CONVENTION.md` — skill/CLI naming convention.

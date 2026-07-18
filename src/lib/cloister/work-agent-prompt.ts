@@ -116,11 +116,11 @@ async function buildActiveSliceContext(workspacePath: string, issueId: string): 
       synthesisOutputs: undefined,
     });
     return [
-      '## Active vBRIEF Slice (Canonical Task Graph)',
+      '## Active xBRIEF Slice (Canonical Task Graph)',
       '',
       slice.prompt,
       '',
-      '_The merged vBRIEF is the canonical task authority._',
+      '_The merged xBRIEF is the canonical task authority._',
     ].join('\n');
   } catch {
     return '';
@@ -485,9 +485,9 @@ export async function writeStoryFeatureContext(workspacePath: string, issueId: s
               `## Plan Narratives\n${narrativeSection || '_No narratives found._'}\n\n` +
               `## Cross-Story Dependencies\n${edgesSection || '_No dependency edges found._'}\n\n` +
               `## Related Plan Items\n${itemsSection || '_No plan items found for this story._'}\n\n` +
-              `---\n*Synthesized from parent feature workspace vBRIEF*\n`;
+              `---\n*Synthesized from parent feature workspace xBRIEF*\n`;
           } catch (planErr) {
-            console.warn(`[writeStoryFeatureContext] Could not read parent workspace vBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
+            console.warn(`[writeStoryFeatureContext] Could not read parent workspace xBRIEF: ${planErr instanceof Error ? planErr.message : String(planErr)}`);
           }
         }
 

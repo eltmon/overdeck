@@ -1,6 +1,6 @@
 ---
 name: work
-description: Primary work-agent prompt — reads the per-issue record, processes feedback, and drives the vBRIEF item loop until pan done.
+description: Primary work-agent prompt — reads the per-issue record, processes feedback, and drives the xBRIEF item loop until pan done.
 requires:
   - ISSUE_ID
   - ISSUE_ID_LOWER
@@ -94,9 +94,9 @@ These files contain critical context that may have been updated since the last s
 {{#REMOTE}}
 Your workspace is at /workspace (a full clone of the repo, checked out on your feature branch). Check for planning artifacts:
 - `/workspace/.pan/records/{{ISSUE_ID_LOWER}}.json` — per-issue record: decisions, hazards, resumePoint, sessionHistory from planning. Do NOT read `.pan/continue.json` (retired).
-- `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.vbrief.json` — the canonical vBRIEF plan, committed on main. READ-ONLY: never edit a spec file.
+- `/workspace/.pan/specs/<date>-<ISSUE-ID>-*.xbrief.json` — the canonical xBRIEF plan. READ-ONLY: never edit a spec file.
 - `/workspace/.pan/drafts/<ISSUE-ID>.md` — PRD draft (markdown narrative), if planning produced one
-- Task state is read from the merged vBRIEF with `pan task next {{ISSUE_ID}}` and `pan task show {{ISSUE_ID}} <item>`.
+- Task state is read from the merged xBRIEF with `pan task next {{ISSUE_ID}}` and `pan task show {{ISSUE_ID}} <item>`.
 
 Start by reading the per-issue record (if present) and the spec to understand the plan, then begin implementation.
 If neither exists, check the issue tracker for requirements.
@@ -319,7 +319,7 @@ writes.
 - Declare infrastructure "complete" when tests still fail
 - Poll or `curl` the specialist API in a loop — the pipeline is event-driven, not polling-based
 - Use `sleep` to wait for reviews, tests, or any external process
-- **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between vBRIEF tasks.
+- **Stop after completing a subset of tasks to ask "what should I do next?"** Just continue to the next task. The plan IS the input; no human kickoff is coming between xBRIEF tasks.
 - **End your turn with a multi-paragraph "what I just did" summary and idle.** Complete the item with `pan task done {{ISSUE_ID}} <item>`, then immediately call `pan task next {{ISSUE_ID}}` and start the next one.
 - If you encounter an error on a task, try to fix it. If you truly cannot proceed, skip it and move to the next task, noting what failed in a `pan tell` message and in your commit body.
 
@@ -384,7 +384,7 @@ git add -A && git commit -m "feat: description"
 git push -u origin $(git branch --show-current)
 git status   # must show a clean tree and the branch pushed
 ```
-NEVER edit `.pan/specs/*.vbrief.json` — specs are immutable after planning. Task closure + the pushed branch are your completion record.
+NEVER edit `.pan/specs/*.xbrief.json` — specs are immutable after planning. Task closure + the pushed branch are your completion record.
 
 After the push succeeds, signal completion by running:
 ```bash

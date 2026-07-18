@@ -1,5 +1,5 @@
 /**
- * Feedback Writer — writes specialist feedback to the scope vBRIEF continue
+ * Feedback Writer — writes specialist feedback to the scope xBRIEF continue
  * file and mirrors it into workspace `.pan/feedback/` for agent consumption.
  *
  * All I/O is async (fs/promises) — never execSync.
@@ -121,9 +121,9 @@ async function writeFeedbackFilePromise(opts: WriteFeedbackOptions): Promise<Wri
   const relativePath = `.pan/feedback/${filename}`;
   const filePath = workspacePath ? join(getWorkspacePanPaths(workspacePath).feedbackDir, filename) : undefined;
 
-  // Write to the scope vBRIEF's continue file (primary store, Layer 3+).
+  // Write to the scope xBRIEF's continue file (primary store, Layer 3+).
   //
-  // Best-effort: if a single malformed vBRIEF on main (e.g. one missing a
+  // Best-effort: if a single malformed xBRIEF on main (e.g. one missing a
   // valid root status) makes appendFeedbackEntryForIssue throw, do NOT abort
   // the whole feedback delivery. The workspace mirror at .pan/feedback/NNN-*.md
   // is what the agent reads, and the messageAgent call is what nudges it to

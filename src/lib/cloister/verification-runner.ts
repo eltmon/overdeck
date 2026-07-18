@@ -653,7 +653,7 @@ async function runVerificationForIssuePromise(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    // vBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
+    // xBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
     // Wrap in try-catch to detect merge conflict markers in plan.vbrief.json and send
     // actionable feedback rather than falling through to a generic infrastructure error.
     let acStatus: ReturnType<typeof getXBriefACStatusSync>;
@@ -663,21 +663,21 @@ async function runVerificationForIssuePromise(
       if (vbriefErr instanceof XBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
-        const summary = `vBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
+        const summary = `xBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
         setStateDerivedVerificationFailure(issueId, failedCheck, summary, newCycleCount, currentStatus);
         if (shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)) {
           await escalateVerificationStuck(issueId, failedCheck, newCycleCount, summary, logPrefix);
         }
         const feedbackBody = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
           ? `VERIFICATION STUCK for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n${buildFinalFailureInstructions(issueId)}`
-          : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in vBRIEF spec BEFORE resubmitting\n\n1. Open the vBRIEF spec (on main in .pan/specs/)\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file on main\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec merge conflict"\n\nDo NOT resubmit until the spec parses cleanly.`;
+          : `VERIFICATION FAILED for ${issueId} (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES}):\n\nFailed check: ${failedCheck}\n\n${summary}\n\n## REQUIRED: Fix merge conflicts in xBRIEF spec BEFORE resubmitting\n\n1. Open the xBRIEF spec (on main in .pan/specs/)\n2. Find and resolve all <<<<<<< HEAD / ======= / >>>>>>> conflict markers\n3. Ensure the file is valid JSON (only keep ONE version of each conflicted block)\n4. Commit the fixed file on main\n5. ONLY THEN resubmit: pan review request ${issueId} -m "Resolved spec merge conflict"\n\nDo NOT resubmit until the spec parses cleanly.`;
         try {
           const fileResult = await Effect.runPromise(writeFeedbackFile({
             issueId,
             workspacePath,
             specialist: 'verification-gate',
             outcome: 'failed',
-            summary: `vBRIEF plan has merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
+            summary: `xBRIEF plan has merge conflicts (attempt ${newCycleCount}/${VERIFICATION_MAX_CYCLES})`,
             markdownBody: feedbackBody,
           }));
           if (fileResult.success) {
@@ -690,7 +690,7 @@ async function runVerificationForIssuePromise(
             }, logPrefix);
           }
         } catch (feedbackErr: any) {
-          console.error(`[${logPrefix}] Failed to write vBRIEF conflict feedback for ${issueId}:`, feedbackErr);
+          console.error(`[${logPrefix}] Failed to write xBRIEF conflict feedback for ${issueId}:`, feedbackErr);
         }
         return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
       }
@@ -792,7 +792,7 @@ async function runVerificationForIssuePromise(
 
     // PAN-2179: reject a plan-only / zombie changeset before it can reach
     // review/merge. A work agent that never got its kickoff (or did nothing)
-    // leaves a branch whose only changes are pipeline artifacts (.pan/vBRIEF task state);
+    // leaves a branch whose only changes are pipeline artifacts (.pan/xBRIEF task state);
     // lint/test/build and the AC gate all pass trivially on no code, so without
     // this guard the empty "completion" silently advances. Bounce it back.
     try {
@@ -803,7 +803,7 @@ async function runVerificationForIssuePromise(
       if (changesetHasNoContent(changedOut.split('\n'))) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'empty-changeset';
-        const summary = `Branch has no implementation — only pipeline artifacts (.pan/vBRIEF task state) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
+        const summary = `Branch has no implementation — only pipeline artifacts (.pan/xBRIEF task state) changed vs ${changedBase}. The work agent produced no code (likely a kickoff-delivery zombie — PAN-2179).`;
         setReviewStatusSync(issueId, {
           reviewStatus: 'pending',
           verificationStatus: 'failed',
@@ -817,7 +817,7 @@ async function runVerificationForIssuePromise(
         try {
           const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
             ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after ${newCycleCount}/${VERIFICATION_MAX_CYCLES} attempts — branch still has no implementation.\n\n${buildFinalFailureInstructions(issueId)}`
-            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/vBRIEF task state changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
+            : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — your branch contains NO code (only .pan/xBRIEF task state changed vs ${changedBase}).\n\nYou must actually implement the issue: read the plan (.pan/spec.vbrief.json + the issue body), write and commit the code, push, then run pan review request. Do NOT stop at the prompt — keep working until pan review request completes.`;
           await deliverVerificationFeedback(issueId, msg, {
             failedCheck,
             changedBase,

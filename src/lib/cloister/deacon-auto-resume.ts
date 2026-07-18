@@ -555,7 +555,7 @@ export async function nudgeIdleWorkAgentsWithOpenBeads(): Promise<string[]> {
         ``,
         `Next ready task: ${firstTask}`,
         ``,
-        `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the vBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
+        `If you don't already have your full brief for ${state.issueId} in context (work-agent role instructions, the xBRIEF plan, recorded decisions & hazards), re-read it now — it is on disk at ${briefPath}, plus .pan/continue.json and .pan/spec.vbrief.json in your workspace. Startup kickoff delivery can silently fail on large briefs, so do not assume you received it.`,
         ``,
         `Continue the per-item workflow without asking — claim it (\`pan task claim <item-id>\`), implement, commit, push, then complete it through \`pan task done <item-id>\`. ` +
         `Inspection is conditional on metadata.requiresInspection (default false; check the plan item before deciding to call \`pan inspect\`). ` +

@@ -2,7 +2,7 @@
  * pan plan done <id>
  *
  * Complete planning for an issue — kills the planning tmux session,
- * promotes the vBRIEF to proposed on main, syncs beads, and transitions
+ * promotes the xBRIEF to proposed on main, syncs beads, and transitions
  * the issue to "Planned".
  *
  * Delegates to promotePlanning() (POST /api/issues/:id/complete-planning),

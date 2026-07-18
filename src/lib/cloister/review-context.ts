@@ -262,7 +262,7 @@ function flattenAC(doc: { plan?: { items?: PanItem[] } }): string[] {
     if (Array.isArray(item.acceptanceCriteria)) {
       acs.push(...item.acceptanceCriteria);
     }
-    // Standard vBRIEF v0.5 sub-items
+    // Standard xBRIEF v0.5 sub-items
     for (const sub of item.subItems ?? []) {
       const text = sub.title ?? sub.description ?? '';
       if (text) acs.push(text);

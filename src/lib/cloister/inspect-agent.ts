@@ -60,7 +60,7 @@ export interface InspectContext {
   projectKey: string;
   projectPath: string;
   issueId: string;
-  /** Canonical vBRIEF item id being inspected. */
+  /** Canonical xBRIEF item id being inspected. */
   itemId: string;
   workspace: string;
   branch?: string;
@@ -87,7 +87,7 @@ async function buildInspectPromptPromise(context: InspectContext): Promise<strin
 
   const doc = readWorkspacePlanSync(context.workspace);
   const item = doc?.plan.items.find(candidate => candidate.id === context.itemId);
-  if (!item) throw new Error(`Item ${context.itemId} requires a readable vBRIEF entry in ${context.workspace}.`);
+  if (!item) throw new Error(`Item ${context.itemId} requires a readable xBRIEF entry in ${context.workspace}.`);
   const itemDescription = `**Title:** ${item.title}\n\n**Action:** ${item.narrative?.Action ?? 'No narrative provided.'}`;
 
   // Get diff scope
@@ -131,7 +131,7 @@ async function routeInspectToStandingSupervisorIfEnabled(
   const item = doc?.plan.items.find(candidate => candidate.id === context.itemId);
   if (!doc || !item) {
     throw new Error(
-      `Standing supervisor inspection for ${context.issueId} item ${context.itemId} requires a readable vBRIEF item in ${context.workspace}.`,
+      `Standing supervisor inspection for ${context.issueId} item ${context.itemId} requires a readable xBRIEF item in ${context.workspace}.`,
     );
   }
 

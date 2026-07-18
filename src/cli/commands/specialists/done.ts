@@ -21,7 +21,7 @@ import {
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
-  /** vBRIEF item receiving an inspect verdict. Required for inspect. */
+  /** xBRIEF item receiving an inspect verdict. Required for inspect. */
   item?: string;
   /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
   reviewers?: string;
@@ -67,7 +67,7 @@ export async function doneCommand(
     const workspacePath = project && join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
     const plan = workspacePath ? readWorkspacePlanSync(workspacePath) : undefined;
     if (!plan?.plan.items.some(item => item.id === options.item)) {
-      throw new Error(`Item "${options.item}" does not exist in the vBRIEF for ${normalizedIssueId}`);
+      throw new Error(`Item "${options.item}" does not exist in the xBRIEF for ${normalizedIssueId}`);
     }
 
     const baseUrl = (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
@@ -194,7 +194,7 @@ export async function doneCommand(
       if (options.notes) update.inspectNotes = options.notes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Inspection passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Agent can proceed to the next vBRIEF task'));
+        console.log(chalk.dim('  Agent can proceed to the next xBRIEF task'));
       } else {
         console.log(chalk.yellow(`✗ Inspection blocked for ${normalizedIssueId}`));
         console.log(chalk.dim('  Agent must fix issues and re-request inspection'));

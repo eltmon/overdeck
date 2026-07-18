@@ -772,7 +772,7 @@ async function loadSwarmPlan(
   if (!project) return { ok: false, error: `Could not resolve project for ${issueId}.` };
 
   const spec = await Effect.runPromise(deps.findSpecByIssue(project.projectPath, issueId));
-  if (!spec) return { ok: false, error: `No main-side vBRIEF spec found for ${issueId}.` };
+  if (!spec) return { ok: false, error: `No main-side xBRIEF spec found for ${issueId}.` };
 
   return { ok: true, project, doc: spec.document };
 }

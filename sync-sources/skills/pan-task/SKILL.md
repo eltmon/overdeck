@@ -1,6 +1,6 @@
 ---
 name: pan-task
-description: "pan task <verb> <issue> — claim and complete vBRIEF checklist items"
+description: "pan task <verb> <issue> — claim and complete xBRIEF checklist items"
 triggers:
   - pan task
   - claim task
@@ -11,7 +11,7 @@ allowed-tools:
 
 # pan task
 
-Run the requested task command now. Task state belongs to one issue's vBRIEF checklist.
+Run the requested task command now. Task state belongs to one issue's xBRIEF checklist.
 
 ```bash
 pan task next PAN-123

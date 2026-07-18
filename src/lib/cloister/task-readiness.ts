@@ -2,7 +2,7 @@
  * DAG-aware task readiness module for Cloister scheduling (PAN-388 Phase 4)
  *
  * Provides:
- * - isTaskReady(): checks if a vBRIEF item's hard dependencies are all done
+ * - isTaskReady(): checks if a xBRIEF item's hard dependencies are all done
  * - getUnblockedItems(): returns items newly unblocked after a task completes
  *
  * Gracefully degrades when no plan.vbrief.json exists — all tasks are ready.
@@ -15,7 +15,7 @@ import type { XBriefItemStatus } from '../xbrief/types.js';
 const TERMINAL_STATUSES: XBriefItemStatus[] = ['completed', 'cancelled'];
 
 /**
- * Returns true if the given vBRIEF item can be worked on — i.e., all items
+ * Returns true if the given xBRIEF item can be worked on — i.e., all items
  * that block it have reached a terminal status (completed or cancelled).
  *
  * When no plan exists for the workspace, returns true (no-op for legacy flows).
@@ -24,7 +24,7 @@ export function isTaskReadySync(itemId: string, workspacePath: string): boolean 
   const doc = readWorkspacePlanSync(workspacePath);
   if (!doc) return true; // No plan → all tasks ready
 
-  // If item doesn't exist in this plan, don't block it (e.g., legacy bead not in vBRIEF)
+  // If item doesn't exist in this plan, don't block it (e.g., legacy bead not in xBRIEF)
   const itemExists = doc.plan.items.some(i => i.id === itemId);
   if (!itemExists) return true;
 
