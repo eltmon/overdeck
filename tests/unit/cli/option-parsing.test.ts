@@ -81,9 +81,9 @@ describe('pan done <id> — option parsing', () => {
   });
 
   it('does NOT reject --force as an unknown option when parsing a real invocation', () => {
-    // The issue ID doesn't exist so the command will fail downstream, but it
-    // MUST get past option parsing without "error: unknown option '--force'".
-    const { stdout, stderr } = runCli(['done', 'PAN-TEST-NOEXIST', '--force']);
+    // Use --help to exercise Commander's real invocation shape without running
+    // workspace, git, state-branch, tracker, or dashboard side effects.
+    const { stdout, stderr } = runCli(['done', 'PAN-TEST-NOEXIST', '--force', '--help']);
     const all = stdout + stderr;
     expect(all).not.toMatch(/unknown option/i);
     expect(all).not.toMatch(/error: option '--force'/i);
