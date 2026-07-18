@@ -58,6 +58,10 @@ export interface AcpSpawnInput {
   readonly env?: NodeJS.ProcessEnv;
 }
 
+export type AcpAuthMethodIdResolver = (
+  initializeResult: EffectAcpSchema.InitializeResponse,
+) => string;
+
 export interface AcpSessionRuntimeOptions {
   readonly spawn: AcpSpawnInput;
   readonly cwd: string;
@@ -69,7 +73,7 @@ export interface AcpSessionRuntimeOptions {
     readonly name: string;
     readonly version: string;
   };
-  readonly authMethodId: string;
+  readonly authMethodId: string | AcpAuthMethodIdResolver;
   readonly mcpServers?: ReadonlyArray<EffectAcpSchema.McpServer>;
   readonly requestLogger?: (event: AcpSessionRequestLogEvent) => Effect.Effect<void, never>;
   readonly protocolLogging?: {
@@ -528,8 +532,25 @@ export const make = (
         acp.agent.initialize(initializePayload),
       );
 
+      const authMethodIdOption = options.authMethodId;
+      const authMethodId =
+        typeof authMethodIdOption === "string"
+          ? authMethodIdOption
+          : yield* Effect.try({
+              try: () => authMethodIdOption(initializeResult),
+              catch: (cause) =>
+                new EffectAcpErrors.AcpTransportError({
+                  operation: "call-rpc",
+                  method: "authenticate",
+                  detail:
+                    cause instanceof Error
+                      ? cause.message
+                      : "Failed to resolve the ACP authentication method",
+                  cause,
+                }),
+            });
       const authenticatePayload = {
-        methodId: options.authMethodId,
+        methodId: authMethodId,
       } satisfies EffectAcpSchema.AuthenticateRequest;
 
       yield* runLoggedRequest(

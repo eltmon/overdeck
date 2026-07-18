@@ -163,6 +163,18 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
       win: 'npm install -g @openai/codex',
     },
   },
+  {
+    id: 'kimi',
+    name: 'Kimi Code CLI',
+    required: false,
+    purpose: 'Kimi Code agents through the Agent Client Protocol (ACP)',
+    versionArgs: ['--version'],
+    install: {
+      linux: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
+      mac: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
+      win: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',
+    },
+  },
 ];
 
 export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;
