@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T03:42:37.502Z",
+  "updated": "2026-07-18T03:59:20.055Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "acp-host": {
-        "writerId": "agent-pan-2858",
-        "agentId": "agent-pan-2858",
-        "pid": 1829113,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T03:42:37.502Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -154,6 +146,16 @@
         "itemId": "kimi-acp-support",
         "outcome": "completed",
         "releasedAt": "2026-07-18T03:39:47.196Z"
+      },
+      {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 1829113,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T03:42:37.502Z",
+        "itemId": "acp-host",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T03:59:20.055Z"
       }
     ],
     "statusReasons": {
@@ -193,6 +195,11 @@
     "kimi-acp-support.kimi-acp-support.ac2": "completed",
     "kimi-acp-support.kimi-acp-support.ac3": "completed",
     "kimi-acp-support.kimi-acp-support.ac4": "completed",
-    "acp-host": "running"
+    "acp-host": "completed",
+    "acp-host.acp-host.ac1": "completed",
+    "acp-host.acp-host.ac2": "completed",
+    "acp-host.acp-host.ac3": "completed",
+    "acp-host.acp-host.ac4": "completed",
+    "acp-host.acp-host.ac5": "completed"
   }
 }
