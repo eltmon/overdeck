@@ -1,25 +1,6 @@
 {
   "issueId": "PAN-2857",
   "schemaVersion": 2,
-  "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T00:38:49.141Z",
-  "pipeline": {
-    "issueId": "PAN-2857",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-18T00:34:46.468Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-fable-5",
   "sessionHistory": [
     {
       "reason": "planning",
@@ -27,5 +8,62 @@
       "note": "Planning session started for PAN-2857: Pipeline membership is blind to strike/ branches — active strike work shows as 'backlog, never started' and is hidden from the issue rail",
       "timestamp": "2026-07-18T00:38:48.580Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-07-18T00:34:46.468Z",
+  "updated": "2026-07-18T00:46:31.146Z",
+  "pipeline": {
+    "issueId": "PAN-2857",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-18T00:46:31.108Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 360,
+            "output": 26148,
+            "cacheRead": 2632349,
+            "cacheWrite": 150942
+          }
+        },
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 325627,
+            "output": 16313,
+            "cacheRead": 3703808,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 360,
+          "output": 26148,
+          "cacheRead": 2632349,
+          "cacheWrite": 150942
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 325627,
+          "output": 16313,
+          "cacheRead": 3703808,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 9.799555999999999,
+        "pricingAsOf": "2026-07-18T00:46:31.140Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
 }
