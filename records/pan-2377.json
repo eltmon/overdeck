@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T20:05:14.857Z",
+  "updated": "2026-07-18T20:05:24.249Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,8 +114,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "lane-enforcement": {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 1824962,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T20:05:24.249Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -239,6 +247,7 @@
     "pickup-membership-release": "completed",
     "pickup-membership-release.pickup-membership-release.ac1": "completed",
     "pickup-membership-release.pickup-membership-release.ac2": "completed",
-    "pickup-membership-release.pickup-membership-release.ac3": "completed"
+    "pickup-membership-release.pickup-membership-release.ac3": "completed",
+    "lane-enforcement": "running"
   }
 }
