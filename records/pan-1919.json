@@ -78,7 +78,7 @@
   "feedback": [],
   "beadsMapping": {},
   "created": "2026-06-21T00:03:06.401Z",
-  "updated": "2026-07-18T06:04:00.337Z",
+  "updated": "2026-07-18T06:14:15.655Z",
   "pipeline": {
     "issueId": "PAN-1919",
     "reviewStatus": "passed",
@@ -341,6 +341,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-17T10:56:47.459Z"
+    },
+    {
+      "issue": "PAN-1919",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T06:04:00.309Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T06:14:15.648Z"
     }
   ]
 }
