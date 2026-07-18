@@ -571,18 +571,18 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T17:05:14.554Z",
+  "updated": "2026-07-18T17:08:35.590Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T17:05:14.532Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-2858-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-18T17:08:35.554Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "275eb63b0984b0139f7f35ad59b686d0e681d51f",
     "reviewRequestedAt": "2026-07-18T17:05:09.205Z",
@@ -617,9 +617,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 40016376,
-            "output": 1536376,
-            "cacheRead": 386060288,
+            "input": 40028702,
+            "output": 1538211,
+            "cacheRead": 387356672,
             "cacheWrite": 0
           }
         }
@@ -632,9 +632,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 65580628,
-          "output": 2085202,
-          "cacheRead": 458621952,
+          "input": 65592954,
+          "output": 2087037,
+          "cacheRead": 459918336,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -645,8 +645,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 634.471418,
-        "pricingAsOf": "2026-07-18T17:05:14.549Z"
+        "usd": 635.23629,
+        "pricingAsOf": "2026-07-18T17:08:35.578Z"
       }
     },
     "merges": [
