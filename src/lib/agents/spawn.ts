@@ -20,7 +20,6 @@ import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { getRuntime } from '../runtimes/index.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
@@ -401,9 +400,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     if (shouldDeliverPromptViaAcp) {
       try {
         await waitForPromptReady(agentId, resolvedHarness, 30);
-        const runtime = getRuntime('acp');
-        if (!runtime) throw new Error('ACP runtime is not registered.');
-        await runtime.sendMessage(agentId, prompt);
+        await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
         if (tracksKickoffDelivery) {
           state.kickoffDelivered = true;
           await Effect.runPromise(saveAgentState(state));
@@ -780,9 +777,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (prompt && isAcp) {
     try {
       await waitForPromptReady(agentId, resolvedHarness, 30);
-      const runtime = getRuntime('acp');
-      if (!runtime) throw new Error('ACP runtime is not registered.');
-      await runtime.sendMessage(agentId, prompt);
+      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
       if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
         saveAgentStateSync(state);
