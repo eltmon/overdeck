@@ -47,17 +47,18 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T01:45:23.051Z",
+  "updated": "2026-07-18T01:45:44.436Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-18T01:45:22.979Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-18T01:45:44.279Z",
     "reviewNotes": "Prior FR-3 blocker is fixed; all requirements are covered with no correctness, security, or performance blockers.",
+    "testNotes": "Reconciled from green GitHub Actions CI on 6fed9834: guard (https://github.com/eltmon/overdeck/actions/runs/29625352098/job/88028530424)",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
     "reviewedAtCommit": "6fed9834ad25193a679d0d40f5a8e5b7502e2b67",
@@ -90,10 +91,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 81,
-            "output": 32158,
-            "cacheRead": 9838372,
-            "cacheWrite": 265663
+            "input": 85,
+            "output": 32953,
+            "cacheRead": 10389113,
+            "cacheWrite": 267311
           }
         },
         "plan": {
@@ -106,9 +107,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1626900,
-            "output": 39941,
-            "cacheRead": 4918784,
+            "input": 1631481,
+            "output": 40811,
+            "cacheRead": 5227520,
             "cacheWrite": 0
           }
         },
@@ -122,30 +123,30 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1472169,
-            "output": 52588,
-            "cacheRead": 19004416,
+            "input": 1497601,
+            "output": 54620,
+            "cacheRead": 19774976,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 441,
-          "output": 58306,
-          "cacheRead": 12470721,
-          "cacheWrite": 416605
+          "input": 445,
+          "output": 59101,
+          "cacheRead": 13021462,
+          "cacheWrite": 418253
         },
         "openai/gpt-5.6-sol": {
-          "input": 3424696,
-          "output": 108842,
-          "cacheRead": 27627008,
+          "input": 3454709,
+          "output": 111744,
+          "cacheRead": 28706304,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 54.800252,
-        "pricingAsOf": "2026-07-18T01:45:23.036Z"
+        "usd": 56.188157,
+        "pricingAsOf": "2026-07-18T01:45:44.422Z"
       }
     },
     "merges": [
