@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import type { OrderBook } from '@overdeck/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ListOrdered, GitFork, RefreshCw, Filter, Play, Trash2 } from 'lucide-react';
 import { BacklogDAG, RationaleSidePanel, type SequenceNode } from '../components/backlog/BacklogDAG';
@@ -105,6 +106,10 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
   const [searchQuery, setSearchQuery] = useState('');
   const [hasPrdOnly, setHasPrdOnly] = useState(false);
   const [selectedNode, setSelectedNode] = useState<SequenceNode | null>(null);
+  const [promotionIssueId, setPromotionIssueId] = useState<string | null>(null);
+  const [promotingIssueId, setPromotingIssueId] = useState<string | null>(null);
+  const [promotedIssues, setPromotedIssues] = useState<Set<string>>(() => new Set());
+  const [promotionError, setPromotionError] = useState<string | null>(null);
 
   const { data, isLoading, error, refetch } = useQuery<SequenceResponse>({
     queryKey: ['backlog-sequence'],
@@ -115,6 +120,31 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
     },
     refetchInterval: 60_000,
   });
+  const { data: orderBooks = [] } = useQuery<OrderBook[]>({
+    queryKey: ['order-books'],
+    queryFn: async () => {
+      const response = await fetch('/api/orders');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json() as { books?: OrderBook[] };
+      return payload.books ?? [];
+    },
+    staleTime: 15_000,
+  });
+  const activeOrderBooks = useMemo(() => orderBooks.filter((book) => book.status !== 'complete'), [orderBooks]);
+  const promotionTarget = useMemo(
+    () => activeOrderBooks.find((book) => book.status === 'running')
+      ?? activeOrderBooks.find((book) => book.status === 'ready')
+      ?? activeOrderBooks[0]
+      ?? null,
+    [activeOrderBooks],
+  );
+  const bookByIssue = useMemo(() => {
+    const result = new Map<string, OrderBook>();
+    for (const book of activeOrderBooks) {
+      for (const item of book.items) result.set(item.issue.toUpperCase(), book);
+    }
+    return result;
+  }, [activeOrderBooks]);
 
   // Live sequencer-pass progress (PAN-2005). Polls every 3s; the sequence query is
   // refetched when a pass finishes so the new ranking appears without a manual refresh.
@@ -278,6 +308,31 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
     }).catch(() => null);
     if (res?.ok) {
       queryClient.invalidateQueries({ queryKey: ['backlog-sequence'] });
+    }
+  }
+
+  async function handlePromoteToOrderBook(issueId: string, lane: 'A' | 'B') {
+    if (!promotionTarget || promotingIssueId) return;
+    setPromotingIssueId(issueId);
+    setPromotionError(null);
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(promotionTarget.id)}/items`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ item: { issue: issueId, lane } }),
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+        throw new Error(typeof payload?.error === 'string' ? payload.error : `Request failed (HTTP ${response.status})`);
+      }
+      setPromotedIssues((current) => new Set(current).add(issueId.toUpperCase()));
+      setPromotionIssueId(null);
+      await queryClient.invalidateQueries({ queryKey: ['order-books'] });
+    } catch (cause) {
+      setPromotionError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setPromotingIssueId(null);
     }
   }
 
@@ -648,6 +703,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                     <th className="text-center px-2 py-2 font-medium w-24 cursor-help" title="AI condition: ok · needs-refinement (vague spec) · stale (likely close)">Condition</th>
                     <th className="text-center px-2 py-2 font-medium w-20 cursor-help" title="Operator pickup gate: auto (normal) · promote (jump queue) · vetoed (never pick)">Gate</th>
                     <th className="text-center px-2 py-2 font-medium w-14 cursor-help" title="Impact score (0–100) the sequencer assigned">Score</th>
+                    <th className="px-2 py-2 font-medium w-28"><span className="sr-only">Order book</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -660,7 +716,7 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                       <tr
                         key={node.issueId}
                         onClick={() => setSelectedNode((p) => (p?.issueId === node.issueId ? null : node))}
-                        className={`transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${
+                        className={`group transition-colors cursor-pointer ${isStale ? 'opacity-50' : ''} ${
                           isSelected
                             ? 'bg-[color-mix(in_srgb,var(--color-accent)_14%,transparent)] ring-inset ring-1 ring-[var(--color-accent)]'
                             : 'even:bg-[color-mix(in_srgb,var(--color-fg)_3%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-fg)_9%,transparent)]'
@@ -719,6 +775,35 @@ export function BacklogSequencerPage({ onIssueAction }: BacklogSequencerPageProp
                         </td>
                         <td className="px-2 py-2 text-center text-[var(--color-fg-muted)] tabular-nums">
                           {node.score}
+                        </td>
+                        <td className="relative px-2 py-2 text-right" onClick={(event) => event.stopPropagation()}>
+                          {bookByIssue.has(node.issueId.toUpperCase()) || promotedIssues.has(node.issueId.toUpperCase()) ? (
+                            <a href="/orders" className="text-[10px] text-[var(--color-accent)] opacity-0 hover:underline group-hover:opacity-100 focus:opacity-100">Open order book</a>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={!promotionTarget}
+                              onClick={() => { setPromotionError(null); setPromotionIssueId((current) => current === node.issueId ? null : node.issueId); }}
+                              className="rounded border border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-fg-muted)] opacity-0 transition-opacity hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] focus:opacity-100 disabled:cursor-not-allowed disabled:opacity-30 group-hover:opacity-100"
+                              title={promotionTarget ? `Add to ${promotionTarget.name}` : 'Create an order book first'}
+                            >
+                              + Order book
+                            </button>
+                          )}
+                          {promotionIssueId === node.issueId && promotionTarget && (
+                            <div className="absolute right-2 top-full z-30 w-52 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-2 text-left shadow-lg" role="dialog" aria-label={`Choose lane for ${node.issueId}`}>
+                              <p className="truncate text-[10px] text-[var(--color-fg-muted)]">Add to {promotionTarget.name}</p>
+                              <div className="mt-2 flex gap-2">
+                                {(['A', 'B'] as const).map((lane) => (
+                                  <button key={lane} type="button" disabled={promotingIssueId === node.issueId} onClick={() => { void handlePromoteToOrderBook(node.issueId, lane); }} className="flex-1 rounded border border-[var(--color-border)] px-2 py-1 text-[10px] text-[var(--color-fg)] hover:border-[var(--color-accent)] disabled:opacity-50">
+                                    Lane {lane}
+                                  </button>
+                                ))}
+                              </div>
+                              <a href="/orders" className="mt-2 block text-[10px] text-[var(--color-accent)] hover:underline">Open Order Book</a>
+                              {promotionError && <p className="mt-2 text-[10px] text-[var(--destructive)]" role="alert">{promotionError}</p>}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );

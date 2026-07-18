@@ -61,7 +61,8 @@ export type IssueActionKey =
   | 'resetSession'
   | 'completeWorkReset'
   | 'restartFromPlan'
-  | 'restartAgent';
+  | 'restartAgent'
+  | 'addToOrderBook';
 
 export type IssueActionKind = 'safe' | 'dialog' | 'destructive';
 
@@ -107,6 +108,8 @@ export interface IssueActionState {
   prUrl?: string | null;
   selectedTaskId?: string | null;
   hasPendingInput?: boolean;
+  orderBooksLoaded?: boolean;
+  isInActiveOrderBook?: boolean;
 }
 
 interface ActionEntryBase<Key extends string> {
@@ -564,6 +567,8 @@ const canCancelIssue = (state: IssueActionState) => {
   const canonical = canonicalState(state);
   return canonical !== 'verifying_on_main' && canonical !== 'verifying' && !isMerged(state) && !isDoneOrCanceled(state);
 };
+const canAddToOrderBook = (state: IssueActionState) =>
+  state.orderBooksLoaded === true && !state.isInActiveOrderBook && !isMerged(state) && !isDoneOrCanceled(state);
 
 const phasePrimary = (key: IssueActionKey): PipelinePhase[] => PHASE_PRIMARY_ACTION_KEYS_BY_ACTION[key] ?? [];
 
@@ -623,6 +628,7 @@ const ISSUE_ACTION_DEFINITIONS: Omit<IssueActionEntry, 'scope'>[] = [
   { key: 'resetIssue', label: 'Reset issue', description: 'Back to square one: stop agents, delete workspace and branch, return the issue to Todo.', panVerb: null, endpoint: '/api/issues/:id/reset', enabledWhen: always, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'resetToPlanned', label: 'Reset to planned', description: 'Throw away progress but keep the workspace, branch, and plan — start implementation over.', panVerb: 'reset-to-planned', endpoint: '/api/issues/:id/reset-to-planned', enabledWhen: hasWorkspace, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'viewPr', label: 'View PR', description: 'Open the pull request in your browser.', panVerb: null, endpoint: null, enabledWhen: hasPrTarget, phasePrimary: phasePrimary('viewPr'), kind: 'safe', group: 'navigation' },
+  { key: 'addToOrderBook', label: 'Add to order book', description: 'Promote this open issue into a non-complete order book.', panVerb: null, endpoint: null, enabledWhen: canAddToOrderBook, phasePrimary: [], kind: 'dialog', group: 'navigation' },
   { key: 'cancel', label: 'Cancel issue', description: 'Cancel this issue and clean up its abandoned run.', panVerb: null, endpoint: '/api/issues/:id/cancel', enabledWhen: canCancelIssue, phasePrimary: [], kind: 'destructive', group: 'danger' },
   { key: 'tasks', label: 'Tasks', description: 'Open the plan\'s task checklist.', panVerb: null, endpoint: '/api/issues/:id/tasks', enabledWhen: (state) => state.hasTasks || state.hasPlan, phasePrimary: [], kind: 'safe', group: 'inspect' },
   { key: 'inference', label: 'Inference', description: 'Open the AI-inference artifact for this issue.', panVerb: null, endpoint: null, enabledWhen: (state) => state.hasInference === true, phasePrimary: [], kind: 'safe', group: 'inspect' },

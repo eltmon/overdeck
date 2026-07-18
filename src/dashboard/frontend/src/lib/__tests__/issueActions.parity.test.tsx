@@ -94,6 +94,7 @@ const AUDITED_REGISTRY_KEYS = [
   'completeWorkReset',
   'restartFromPlan',
   'restartAgent',
+  'addToOrderBook',
   'reviewTest',
 ] as const;
 
@@ -327,6 +328,12 @@ function mockFetch() {
     if (url.includes('/planning-state')) {
       return Response.json({ hasPlan: true, hasTasks: true, tasksCount: 7, planningComplete: true });
     }
+    if (url === '/api/orders') {
+      return Response.json({ books: [
+        { id: 'active-book', name: 'Active campaign', status: 'running', settings: { laneAConcurrency: 2, posture: 'open' }, items: [], createdAt: '2026-07-18T00:00:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z' },
+        { id: 'done-book', name: 'Completed campaign', status: 'complete', settings: { laneAConcurrency: 2, posture: 'open' }, items: [], createdAt: '2026-07-17T00:00:00.000Z', updatedAt: '2026-07-17T00:00:00.000Z' },
+      ] });
+    }
     if (url.includes('/api/workspaces/')) {
       return Response.json({
         exists: true,
@@ -402,6 +409,24 @@ describe('issue action CLI ↔ dashboard parity', () => {
     }
   });
 
+  it('renders the order-book submenu from the shared issue action registry', async () => {
+    renderLiveGroupedMenu();
+
+    await screen.findByTestId('issue-action-addToOrderBook');
+    await vi.waitFor(() => expect(screen.getByTestId('issue-action-addToOrderBook')).not.toHaveAttribute('data-disabled'));
+    fireEvent.click(screen.getByTestId('issue-action-addToOrderBook'));
+
+    expect(screen.getByRole('group', { name: 'Add to order book options' })).toHaveTextContent('Active campaign');
+    expect(screen.getByRole('group', { name: 'Add to order book options' })).not.toHaveTextContent('Completed campaign');
+    expect(screen.getByText('+ New book…')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Active campaign'));
+    await vi.waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/orders/active-book/items', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ item: { issue: 'PAN-1331', lane: 'A' } }),
+    })));
+  });
+
   it('keeps client-only dashboard actions explicitly out of CLI parity', () => {
     const clientOnlyActions = ISSUE_ACTIONS.filter((action): action is IssueActionEntry & { panVerb: null } => action.panVerb === null);
 
@@ -420,6 +445,7 @@ describe('issue action CLI ↔ dashboard parity', () => {
       'resetSession',
       'restartFromPlan',
       'restartAgent',
+      'addToOrderBook',
       'cancel',
     ]));
   });
@@ -491,9 +517,10 @@ describe('issue action CLI ↔ dashboard parity', () => {
   it('keeps every destructive registry action behind the shared typed-confirmation gate', async () => {
     expect(ISSUE_ACTIONS.filter((action) => action.kind === 'destructive').map((action) => action.key)).toEqual(DESTRUCTIVE_ACTION_KEYS);
     const fetchMock = vi.mocked(fetch);
-    const callsBeforeSelection = fetchMock.mock.calls.length;
 
     renderLiveGroupedMenu();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/orders'));
+    const callsBeforeSelection = fetchMock.mock.calls.length;
     fireEvent.click(screen.getByRole('menuitem', { name: /^Danger \(\d+ available\)$/ }));
     fireEvent.click(screen.getByTestId('issue-action-wipe'));
 

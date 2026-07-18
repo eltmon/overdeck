@@ -89,6 +89,7 @@ function ActionRow({
   primitives: IssueActionMenuPrimitives;
 }) {
   const reasonId = useId();
+  const [submenuOpen, setSubmenuOpen] = useState(false);
   const disabled = !view.enabled || view.isPending;
   const Item = view.action.kind === 'destructive' ? primitives.DestructiveItem : primitives.Item;
 
@@ -111,6 +112,32 @@ function ActionRow({
         </Item>
         <span id={reasonId} className="sr-only">{reason}</span>
       </span>
+    );
+  }
+
+  if (view.submenu) {
+    return (
+      <div data-testid={`issue-action-submenu-${view.action.key}`}>
+        <Item
+          title={view.action.description}
+          data-testid={`issue-action-${view.action.key}`}
+          aria-expanded={submenuOpen}
+          onActivate={() => setSubmenuOpen((open) => !open)}
+          preventClose
+        >
+          <ActionContent view={view} explain={explain} />
+          <ChevronRight className={`ml-2 h-3 w-3 shrink-0 transition-transform ${submenuOpen ? 'rotate-90' : ''}`} />
+        </Item>
+        {submenuOpen ? (
+          <div className="ml-3 border-l border-border pl-1" role="group" aria-label={`${view.action.label} options`}>
+            {view.submenu.map((option) => (
+              <primitives.Item key={option.key} data-testid={`issue-action-${view.action.key}-${option.key}`} onActivate={option.invoke}>
+                {option.label}
+              </primitives.Item>
+            ))}
+          </div>
+        ) : null}
+      </div>
     );
   }
 
