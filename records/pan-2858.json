@@ -693,18 +693,18 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:50:55.274Z",
+  "updated": "2026-07-18T20:51:08.508Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:50:53.619Z",
-    "reviewNotes": "ACP resume/recovery still discards persisted sessions and queued prompts; auth diagnostics, context delivery, and transcript streaming also remain blocked",
+    "updatedAt": "2026-07-18T20:51:08.440Z",
+    "reviewNotes": "ACP resume/recovery still ignores acp-session-id and owed queued prompts; auth errors, context delivery, and transcript parsing also remain blocking",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
@@ -1068,9 +1068,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 42164165,
-            "output": 1690756,
-            "cacheRead": 455565312,
+            "input": 42177961,
+            "output": 1694348,
+            "cacheRead": 457244672,
             "cacheWrite": 0
           }
         }
@@ -1083,9 +1083,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 76262152,
-          "output": 2503128,
-          "cacheRead": 631393280,
+          "input": 76275948,
+          "output": 2506720,
+          "cacheRead": 633072640,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1096,8 +1096,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 786.802482,
-        "pricingAsOf": "2026-07-18T20:50:53.633Z"
+        "usd": 787.818902,
+        "pricingAsOf": "2026-07-18T20:51:08.481Z"
       }
     },
     "merges": [
