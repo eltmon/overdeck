@@ -69,9 +69,10 @@ export class LinearTracker implements IssueTracker {
     const team = filters?.team ?? this.defaultTeam;
     const self = this;
 
-    return linearCall('listIssues', () =>
-      self.client.issues({
-        first: filters?.limit ?? 50,
+    return linearCall('listIssues', async () => {
+      const limit = filters?.limit;
+      const result = await self.client.issues({
+        first: Math.min(limit ?? 50, 50),
         filter: {
           team: team ? { key: { eq: team } } : undefined,
           state: filters?.state
@@ -86,12 +87,18 @@ export class LinearTracker implements IssueTracker {
             ? { name: { containsIgnoreCase: filters.assignee } }
             : undefined,
         },
-      }),
-    ).pipe(
-      Effect.flatMap((result) =>
+      });
+
+      while (result.pageInfo?.hasNextPage && (limit === undefined || result.nodes.length < limit)) {
+        await result.fetchNext();
+      }
+
+      return limit === undefined ? result.nodes : result.nodes.slice(0, limit);
+    }).pipe(
+      Effect.flatMap((nodes) =>
         linearCall('listIssues:normalize', async () => {
           const issues: Issue[] = [];
-          for (const node of result.nodes) {
+          for (const node of nodes) {
             issues.push(await self.normalizeIssue(node));
           }
           return issues;
