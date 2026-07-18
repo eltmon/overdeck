@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T20:37:32.453Z",
+  "updated": "2026-07-18T20:51:54.783Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "cli-flywheel-complete": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 3198772,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T20:37:32.452Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -223,6 +215,17 @@
         "outcome": "completed",
         "reason": "Added active-book release and mechanical dispatch doctrine, documented drained-run retro/complete/end-turn semantics for orders-bound runs while preserving bookless behavior, and added live-model regression cases for retro gating and completion.",
         "releasedAt": "2026-07-18T20:37:17.098Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 3198772,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T20:37:32.452Z",
+        "itemId": "cli-flywheel-complete",
+        "outcome": "completed",
+        "reason": "Added pan flywheel complete with drained/force gating, retrospective report composition, active-gate clearing, canonical book completion, in-process next-book or backlog continuation, idle needs-you output, skill docs, and continuation-matrix tests.",
+        "releasedAt": "2026-07-18T20:51:54.783Z"
       }
     ],
     "statusReasons": {
@@ -261,6 +264,10 @@
       "doctrine-order-books": {
         "reason": "Added active-book release and mechanical dispatch doctrine, documented drained-run retro/complete/end-turn semantics for orders-bound runs while preserving bookless behavior, and added live-model regression cases for retro gating and completion.",
         "updatedAt": "2026-07-18T20:37:17.098Z"
+      },
+      "cli-flywheel-complete": {
+        "reason": "Added pan flywheel complete with drained/force gating, retrospective report composition, active-gate clearing, canonical book completion, in-process next-book or backlog continuation, idle needs-you output, skill docs, and continuation-matrix tests.",
+        "updatedAt": "2026-07-18T20:51:54.783Z"
       }
     }
   },
@@ -305,6 +312,10 @@
     "doctrine-order-books": "completed",
     "doctrine-order-books.doctrine-order-books.ac1": "completed",
     "doctrine-order-books.doctrine-order-books.ac2": "completed",
-    "cli-flywheel-complete": "running"
+    "cli-flywheel-complete": "completed",
+    "cli-flywheel-complete.cli-flywheel-complete.ac1": "completed",
+    "cli-flywheel-complete.cli-flywheel-complete.ac2": "completed",
+    "cli-flywheel-complete.cli-flywheel-complete.ac3": "completed",
+    "cli-flywheel-complete.cli-flywheel-complete.ac4": "completed"
   }
 }
