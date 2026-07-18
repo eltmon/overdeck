@@ -137,9 +137,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T12:14:48.373Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-18T12:15Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-18T12:15:01.199Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-18T12:15:01Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nACP delivery can still report or preserve a healthy launch when session/prompt fails, while configured Kimi paths and the registered runtime lifecycle remain incomplete\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -416,7 +429,7 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T12:15:00.562Z",
+  "updated": "2026-07-18T12:15:01.199Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "blocked",
