@@ -11,18 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T03:59:20.055Z",
+  "updated": "2026-07-18T03:59:39.564Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "passed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T03:24:08.798Z",
-    "inspectNotes": "All 4 ACs verified: getHarness/normalizeHarness preserve 'acp' (types.ts:72-86, conversations.ts), ACP_BEHAVIOR fields (launchCommandKind/transcriptKind/feedKind/processNames) distinct from all other harnesses, repo-wide sweep of the 3-harness literal union confirmed zero remaining acp-rejecting validator sites (the two non-matches are out-of-scope: a separate HookHarness type and an inert pi/codex-only cost-reconcile scanner), contracts dist rebuilt with acp included."
+    "updatedAt": "2026-07-18T03:59:39.547Z",
+    "inspectNotes": "Inspecting item acp-host"
   },
   "closeOut": {
     "usage": {
@@ -37,17 +37,17 @@
         },
         "review.supervisor": {
           "anthropic/claude-sonnet-5": {
-            "input": 24,
-            "output": 11658,
-            "cacheRead": 1628310,
-            "cacheWrite": 297072
+            "input": 26,
+            "output": 11999,
+            "cacheRead": 1812832,
+            "cacheWrite": 298360
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5176346,
-            "output": 344343,
-            "cacheRead": 75925504,
+            "input": 7138976,
+            "output": 511375,
+            "cacheRead": 102411264,
             "cacheWrite": 0
           }
         }
@@ -60,21 +60,21 @@
           "cacheWrite": 213417
         },
         "anthropic/claude-sonnet-5": {
-          "input": 24,
-          "output": 11658,
-          "cacheRead": 1628310,
-          "cacheWrite": 297072
+          "input": 26,
+          "output": 11999,
+          "cacheRead": 1812832,
+          "cacheWrite": 298360
         },
         "openai/gpt-5.6-sol": {
-          "input": 5176346,
-          "output": 344343,
-          "cacheRead": 75925504,
+          "input": 7138976,
+          "output": 511375,
+          "cacheRead": 102411264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 87.828539,
-        "pricingAsOf": "2026-07-18T03:24:08.847Z"
+        "usd": 115.939067,
+        "pricingAsOf": "2026-07-18T03:59:39.554Z"
       }
     },
     "merges": [],
