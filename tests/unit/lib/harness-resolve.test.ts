@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   loadConfigSync: vi.fn(),
   canUseHarnessSync: vi.fn(),
   getProviderAuthMode: vi.fn(),
-  exec: vi.fn(),
+  resolveHarnessBinary: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
@@ -24,8 +24,9 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getProviderAuthMode: mocks.getProviderAuthMode,
 }));
 
-vi.mock('child_process', () => ({
-  exec: mocks.exec,
+vi.mock('../../../src/lib/harness-binary.js', () => ({
+  harnessBinaryName: (harness: RuntimeName) => harness === 'ohmypi' ? 'omp' : harness === 'codex' ? 'codex' : 'claude',
+  resolveHarnessBinary: mocks.resolveHarnessBinary,
 }));
 
 function setConfig(config: { roles?: Record<string, { harness?: RuntimeName }>; providerHarnesses?: Record<string, RuntimeName> }) {
@@ -38,16 +39,7 @@ function setConfig(config: { roles?: Record<string, { harness?: RuntimeName }>; 
 }
 
 function setBinaryAvailable(available: boolean) {
-  mocks.exec.mockImplementation((_command: string, optionsOrCallback: unknown, maybeCallback?: unknown) => {
-    const callback = typeof optionsOrCallback === 'function' ? optionsOrCallback : maybeCallback;
-    if (typeof callback !== 'function') return {} as never;
-    if (available) {
-      callback(null, '/usr/bin/harness\n', '');
-    } else {
-      callback(new Error('not found'), '', '');
-    }
-    return {} as never;
-  });
+  mocks.resolveHarnessBinary.mockResolvedValue(available ? '/usr/bin/harness' : null);
 }
 
 async function loadSubject() {
@@ -108,7 +100,7 @@ describe('resolveHarness', () => {
 
     await expect(resolveHarness({ model: 'glm5.2' })).rejects.toThrow('Unknown model "glm5.2". Did you mean "glm-5.2"?');
     expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
-    expect(mocks.exec).not.toHaveBeenCalled();
+    expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('passes the resolved provider-default winner through the harness policy gate', async () => {
@@ -122,7 +114,7 @@ describe('resolveHarness', () => {
     await expect(resolveHarness({ explicit: 'ohmypi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
 
     expect(mocks.canUseHarnessSync).toHaveBeenCalledWith('claude-code', 'claude-sonnet-4-6', 'subscription');
-    expect(mocks.exec).not.toHaveBeenCalled();
+    expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('falls back to claude-code when a native model’s provider-default harness is policy-denied (only after checking the fallback)', async () => {
@@ -149,7 +141,7 @@ describe('resolveHarness', () => {
     await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('needs a ChatGPT/Codex subscription sign-in');
 
     expect(mocks.canUseHarnessSync).not.toHaveBeenCalled();
-    expect(mocks.exec).not.toHaveBeenCalled();
+    expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
   it('refuses to silently fall back to claude-code when a non-native model’s harness binary is missing (PAN-1871)', async () => {
@@ -161,7 +153,7 @@ describe('resolveHarness', () => {
     // binary must fail loudly rather than degrade onto claude-code/CLIProxy.
     await expect(resolveHarness({ model: 'gpt-5.5' })).rejects.toThrow('has no installed codex binary at spawn');
 
-    expect(mocks.exec).toHaveBeenCalledWith('command -v codex', expect.any(Function));
+    expect(mocks.resolveHarnessBinary).toHaveBeenCalledWith('codex');
   });
 
   it('logs the built-in provider-default notice once per provider', async () => {

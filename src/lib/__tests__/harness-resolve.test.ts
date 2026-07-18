@@ -20,15 +20,14 @@ vi.mock('../providers.js', () => ({
 }));
 vi.mock('../config-yaml.js', () => ({ loadConfigSync: configMock.loadConfigSync }));
 vi.mock('../agents.js', () => ({ getProviderAuthMode: vi.fn(async () => 'apikey') }));
-// Make `command -v omp` succeed so hasHarnessBinary('ohmypi') returns true in all tests.
+// Make the harness-binary probe succeed so hasHarnessBinary('ohmypi') returns
+// true in all tests regardless of what is installed on the host/CI runner.
 // Tests that never reach the binary check (they throw earlier) are unaffected.
-vi.mock('child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('child_process')>();
+vi.mock('../harness-binary.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../harness-binary.js')>();
   return {
     ...actual,
-    exec: vi.fn((cmd: string, callback: (err: null | Error, stdout: string, stderr: string) => void) => {
-      callback(null, '/usr/local/bin/omp', '');
-    }),
+    resolveHarnessBinary: vi.fn(async (harness) => `/usr/local/bin/${actual.harnessBinaryName(harness)}`),
   };
 });
 

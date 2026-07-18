@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 let overdeckHome: string;
 let channelsEnabled = false;
 let createSupervisorSocket = false;
+let resolvedHarnessBinary: string | null = '/usr/bin/claude';
 let dismissDevChannelsDialogMock: ReturnType<typeof vi.fn>;
 let createSessionCalls: Array<{ session: string; command: string }> = [];
 
@@ -29,6 +30,22 @@ vi.mock('../../../../lib/agents.js', () => {
     getProviderAuthMode: vi.fn().mockResolvedValue('anthropic'),
   };
 });
+
+vi.mock('../../../../lib/harness-binary.js', () => ({
+  prepareHarnessLaunch: vi.fn(async (harness: string) => {
+    if (!resolvedHarnessBinary) {
+      const name = harness === 'claude-code' ? 'Claude Code' : harness === 'ohmypi' ? 'OhMyPi' : 'Codex CLI';
+      throw new Error(
+        `${name} executable was not found. Install ${name} or add its installation directory to PATH, then restart Overdeck. No terminal session was created.`,
+      );
+    }
+    const directory = dirname(resolvedHarnessBinary);
+    return {
+      binaryPath: resolvedHarnessBinary,
+      pathExport: `export PATH='${directory}':"$PATH"`,
+    };
+  }),
+}));
 
 vi.mock('../../../../lib/config-yaml.js', () => ({
   isClaudeCodeChannelsEnabled: vi.fn(() => channelsEnabled),
@@ -108,6 +125,7 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     delete process.env.PAN_DOCKER;
     delete process.env.OVERDECK_DOCKER_WORKSPACE;
     createSupervisorSocket = false;
+    resolvedHarnessBinary = '/usr/bin/claude';
     createSessionCalls = [];
   });
 
@@ -119,8 +137,9 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     delete process.env.OVERDECK_DOCKER_WORKSPACE;
   });
 
-  it('wraps Claude Code conversations with the PTY supervisor and waits for its socket', async () => {
+  it('launches a PATH-invisible Claude binary through the shared resolver', async () => {
     createSupervisorSocket = true;
+    resolvedHarnessBinary = '/home/test/.local/bin/claude';
     const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
 
     await spawnConversationSession(
@@ -135,12 +154,40 @@ describe('spawnConversationSession PTY supervisor wiring', () => {
     );
 
     const launcher = launcherFor('conv-supervisor-test');
+    expect(launcher).toContain("export PATH='/home/test/.local/bin':\"$PATH\"");
     expect(launcher).toContain("export OVERDECK_AGENT_ID='conv-supervisor-test'");
     expect(launcher).toContain("node '");
     expect(launcher).toContain("/dist/pty-supervisor.js' claude --model claude-sonnet-4-6");
     expect(existsSync(join(overdeckHome, 'agents', 'conv-supervisor-test', 'pty-token'))).toBe(true);
     expect((statSync(join(overdeckHome, 'sockets', 'pty-conv-supervisor-test.sock')).mode & 0o777)).toBe(0o600);
     expect(dismissDevChannelsDialogMock).not.toHaveBeenCalled();
+  });
+
+  it('reports a missing harness before creating a tmux session', async () => {
+    resolvedHarnessBinary = null;
+    const { spawnConversationSession } = await import('../../../../lib/overdeck/conversation-runtime.js');
+
+    let error: unknown;
+    try {
+      await spawnConversationSession(
+        'conv-missing-harness-test',
+        tmpdir(),
+        'session-missing-harness-test',
+        'claude-sonnet-4-6',
+        undefined,
+        'PAN-2869',
+        false,
+        'claude-code',
+      );
+    } catch (cause) {
+      error = cause;
+    }
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('Install Claude Code or add its installation directory to PATH');
+    expect((error as Error).message).not.toContain('execvp');
+    expect(createSessionCalls).toEqual([]);
+    expect(existsSync(conversationDir('conv-missing-harness-test'))).toBe(false);
   });
 
   it('launches Codex app-server conversations without the PTY supervisor', async () => {

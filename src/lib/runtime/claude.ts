@@ -22,6 +22,7 @@ import { FsError } from '../errors.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getClaudePermissionFlagsSync } from '../claude-permissions.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
+import { prepareHarnessLaunch, resolveHarnessBinary } from '../harness-binary.js';
 
 const CLAUDE_DIR = join(homedir(), '.claude');
 
@@ -42,23 +43,19 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
     config,
 
     async isAvailable(): Promise<boolean> {
-      try {
-        const { execa } = await import('execa');
-        const result = await execa('which', ['claude']);
-        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:isAvailable | command="which claude" | available=${result.exitCode === 0}`);
-        return result.exitCode === 0;
-      } catch {
-        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:isAvailable | command="which claude" | available=false`);
-        return false;
-      }
+      const resolved = await resolveHarnessBinary('claude-code');
+      console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:isAvailable | command="resolve claude" | available=${resolved !== null}`);
+      return resolved !== null;
     },
 
     async getVersion(): Promise<string | null> {
       try {
+        const resolved = await resolveHarnessBinary('claude-code');
+        if (!resolved) return null;
         const { execa } = await import('execa');
-        const result = await execa('claude', ['--version']);
+        const result = await execa(resolved, ['--version']);
         const version = result.stdout.trim();
-        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:getVersion | command="claude --version" | version="${version}"`);
+        console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:getVersion | command="${resolved} --version" | version="${version}"`);
         return version;
       } catch {
         console.log(`[claude-invoke] purpose=runtime-check | model=n/a | source=runtime/claude.ts:getVersion | command="claude --version" | version=null`);
@@ -75,6 +72,7 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
 
     async spawnAgent(id: string, options: AgentSpawnOptions): Promise<boolean> {
       try {
+        const harnessLaunch = await prepareHarnessLaunch('claude-code');
         const { execa } = await import('execa');
         const { mkdirSync, writeFileSync } = await import('fs');
         const { join } = await import('path');
@@ -110,6 +108,7 @@ export function createClaudeAdapterSync(): RuntimeAdapterLegacy {
             promptFile,
             baseCommand: 'claude',
             appendSystemPromptFiles: [await ensureSessionContextBriefingFile()],
+            extraEnvExports: [harnessLaunch.pathExport],
             extraArgs: args.length > 0 ? args.join(' ') : undefined,
           }),
           { mode: 0o755 },

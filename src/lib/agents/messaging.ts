@@ -4,6 +4,7 @@ import { Effect } from 'effect';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
@@ -240,6 +241,7 @@ export async function messageAgent(
     // emitted a launcher that would crash on resume for any Pi role agent.
     const resumeModel = agentState.model || 'claude-sonnet-4-6';
     const fallbackHarness = agentState.harness ?? 'claude-code';
+    const harnessLaunch = await prepareHarnessLaunch(fallbackHarness);
     const { assertWorkspaceStackHealthyForSpawn } = await import('../agents.js');
     await assertWorkspaceStackHealthyForSpawn(
       agentState.issueId || normalizedId.replace(/^agent-/, '').toUpperCase(),
@@ -260,6 +262,7 @@ export async function messageAgent(
       changeDir: false,
       setTerminalEnv: true,
       providerExports,
+      extraEnvExports: [harnessLaunch.pathExport],
       baseCommand: await getRoleRuntimeBaseCommand(
         resumeModel,
         normalizedId,

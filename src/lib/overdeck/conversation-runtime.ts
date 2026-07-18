@@ -50,6 +50,7 @@ import { isClaudeCodeChannelsEnabled, loadConfigSync } from '../config-yaml.js';
 import { writePtyToken } from '../pty-token.js';
 import { canUseHarnessSync } from '../harness-policy.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getProviderForModelSync, piProviderForModel, UnknownModelError } from '../providers.js';
 import { getOhmypiCodexAuthStatus } from '../ohmypi-codex-auth.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -509,6 +510,7 @@ export async function spawnConversationSession(
   plainFork = false,
 ): Promise<void> {
   const behavior = getHarnessBehavior(harness);
+  const harnessLaunch = await prepareHarnessLaunch(harness);
   const stateDir = join(getOverdeckHome(), 'conversations', tmuxSession);
   await mkdir(stateDir, { recursive: true });
   clearReadySignal(tmuxSession);
@@ -640,6 +642,7 @@ export async function spawnConversationSession(
       unsetProviderEnv: true,
       overdeckEnv: { ...(issueId ? { issueId } : {}), ...((piFields || codexFields || useSupervisor) ? { agentId: tmuxSession } : {}) },
       extraEnvExports: [
+        harnessLaunch.pathExport,
         `export OVERDECK_DASHBOARD_URL="http://127.0.0.1:${process.env['API_PORT'] ?? process.env['PORT'] ?? '3011'}"`,
       ],
       providerExports: providerExportsStr || undefined,
