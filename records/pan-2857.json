@@ -50,16 +50,16 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T01:22:43.714Z",
+  "updated": "2026-07-18T01:28:55.118Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T01:22:43.062Z",
+    "updatedAt": "2026-07-18T01:28:54.415Z",
     "reviewNotes": "Merged strike PRs are missed when another convention branch ref still exists, violating FR-3 and misclassifying post-merge issues.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
     "reviewRequestedAt": "2026-07-18T01:19:52.588Z",
@@ -91,10 +91,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 26,
-            "output": 10854,
-            "cacheRead": 2622987,
-            "cacheWrite": 200391
+            "input": 32,
+            "output": 13934,
+            "cacheRead": 3257218,
+            "cacheWrite": 203880
           }
         },
         "plan": {
@@ -107,9 +107,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 627459,
-            "output": 25334,
-            "cacheRead": 3155968,
+            "input": 633078,
+            "output": 28419,
+            "cacheRead": 3698176,
             "cacheWrite": 0
           }
         },
@@ -123,30 +123,30 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1265507,
-            "output": 37173,
-            "cacheRead": 14325248,
+            "input": 1318294,
+            "output": 46787,
+            "cacheRead": 16669696,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 386,
-          "output": 37002,
-          "cacheRead": 5255336,
-          "cacheWrite": 351333
+          "input": 392,
+          "output": 40082,
+          "cacheRead": 5889567,
+          "cacheWrite": 354822
         },
         "openai/gpt-5.6-sol": {
-          "input": 2218593,
-          "output": 78820,
-          "cacheRead": 21185024,
+          "input": 2276999,
+          "output": 91519,
+          "cacheRead": 24071680,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 35.551042,
-        "pricingAsOf": "2026-07-18T01:22:43.141Z"
+        "usd": 38.499275,
+        "pricingAsOf": "2026-07-18T01:28:54.579Z"
       }
     },
     "merges": [
