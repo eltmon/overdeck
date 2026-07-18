@@ -24,6 +24,7 @@ import { CacheService } from '../../dashboard/server/services/cache-service.js';
 import { classifyDashboardAgent } from '../../dashboard/frontend/src/lib/agent-classifier.js';
 import { getMainDivergence, type MainDivergence } from '../../lib/state-plane.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
+import { isXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 // Minimum supported omp harness version (PAN-1989); its lineage differs from pi and was baselined at 16.1.16.
 export const SUPPORTED_OMP_VERSION_MIN = '16.1.0';
 
@@ -577,7 +578,7 @@ export function findOrphanProposedSpecs(options: {
     if (!existsSync(specsDir)) continue;
 
     for (const entry of readdirSync(specsDir, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith('.vbrief.json')) continue;
+      if (!entry.isFile() || !isXBriefFilename(entry.name)) continue;
       const spec = readJsonFile(join(specsDir, entry.name));
       if (spec?.plan?.status !== 'proposed') continue;
       const issueId = normalizeDoctorIssueId(spec.plan?.id);

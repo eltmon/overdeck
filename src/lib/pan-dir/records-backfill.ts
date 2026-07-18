@@ -2,7 +2,7 @@
  * PAN-1908: one-time backfill of per-issue permanent records.
  *
  * Builds a record for every in-flight issue (anything with a review_status
- * row, an agents-table row, or a `.pan/continues/<issue>.vbrief.json` file)
+ * row, an agents-table row, or a `.pan/continues/<issue>.{xbrief,vbrief}.json` file)
  * and writes it into the declared infra repo. Re-running is safe: records
  * whose content has not changed are skipped, and unchanged commits are
  * suppressed by the auto-commit diff check.
@@ -13,6 +13,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
+import { isXBriefFilename, XBRIEF_FILENAME_SUFFIXES } from '../xbrief/lifecycle.js';
 import {
   getProjectSync,
   loadProjectsConfigSync,
@@ -58,8 +59,10 @@ async function collectContinueIssueIds(project: ProjectConfig): Promise<Set<stri
   try {
     const entries = await readdir(continuesDir, { withFileTypes: true });
     for (const entry of entries) {
-      if (!entry.isFile()) continue;
-      const match = entry.name.match(/^([a-z0-9]+-\d+)\.vbrief\.json$/i);
+      if (!entry.isFile() || !isXBriefFilename(entry.name)) continue;
+      const suffix = XBRIEF_FILENAME_SUFFIXES.find((candidate) => entry.name.endsWith(candidate));
+      if (!suffix) continue;
+      const match = entry.name.slice(0, -suffix.length).match(/^([a-z0-9]+-\d+)$/i);
       if (!match) continue;
       ids.add(match[1].toUpperCase());
     }

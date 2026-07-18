@@ -124,7 +124,7 @@ describe('backfillIssueRecords', () => {
   it('produces one record per in-flight issue combining continue and review_status data', async () => {
     mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
     writeFileSync(
-      join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
+      join(projectRoot, '.pan', 'continues', 'pan-1908.xbrief.json'),
       JSON.stringify({
         issueId: 'PAN-1908',
         decisions: [{ id: 'D1', summary: 'big bang', recordedAt: '2026-01-01' }],

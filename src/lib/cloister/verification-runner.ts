@@ -32,6 +32,7 @@ import { messageAgent, setAgentPaused, stopAgent } from '../agents.js';
 import { findProjectByPathSync, resolveProjectFromIssueSync } from '../projects.js';
 import { getXBriefACStatusSync } from '../xbrief/acceptance-criteria.js';
 import { XBriefMergeConflictError } from '../xbrief/io.js';
+import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import { checkIncompletePlanItemsPromise } from '../work/done-preflight.js';
 import type { TemplatePlaceholders } from '../workspace-config.js';
 
@@ -347,7 +348,7 @@ export function changesetHasNoContent(changedFiles: readonly string[]): boolean 
   const content = changedFiles
     .map((f) => f.trim())
     .filter(Boolean)
-    .filter((f) => !f.startsWith('.pan/') && !f.endsWith('.vbrief.json'));
+    .filter((f) => !f.startsWith('.pan/') && !isXBriefFilename(f));
   return content.length === 0;
 }
 

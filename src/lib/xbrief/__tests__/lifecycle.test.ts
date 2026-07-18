@@ -6,6 +6,7 @@ import {
   VBRIEF_LIFECYCLE_DIRS,
   ensureXBriefDirsSync,
   generateXBriefFilename,
+  isXBriefFilename,
   parseXBriefFilename,
   resolveXBriefDir,
   slugify,
@@ -42,17 +43,17 @@ describe('slugify', () => {
 });
 
 describe('generateXBriefFilename', () => {
-  it('produces YYYY-MM-DD-ISSUE-ID-slug.vbrief.json', () => {
+  it('produces YYYY-MM-DD-ISSUE-ID-slug.xbrief.json', () => {
     const fname = generateXBriefFilename('PAN-946', 'vbrief-lifecycle', '2026-05-03');
-    expect(fname).toBe('2026-05-03-PAN-946-vbrief-lifecycle.vbrief.json');
+    expect(fname).toBe('2026-05-03-PAN-946-vbrief-lifecycle.xbrief.json');
   });
   it('accepts a Date object', () => {
     const fname = generateXBriefFilename('PAN-1', 'foo', new Date(Date.UTC(2026, 0, 5)));
-    expect(fname).toBe('2026-01-05-PAN-1-foo.vbrief.json');
+    expect(fname).toBe('2026-01-05-PAN-1-foo.xbrief.json');
   });
   it('normalizes the slug', () => {
     const fname = generateXBriefFilename('PAN-100', 'Hello World!', '2026-05-03');
-    expect(fname).toBe('2026-05-03-PAN-100-hello-world.vbrief.json');
+    expect(fname).toBe('2026-05-03-PAN-100-hello-world.xbrief.json');
   });
   it('rejects invalid issue IDs', () => {
     expect(() => generateXBriefFilename('not-an-issue', 'slug', '2026-05-03')).toThrow();
@@ -60,13 +61,29 @@ describe('generateXBriefFilename', () => {
   });
   it('normalizes a lowercase issue ID to uppercase (PAN-1050)', () => {
     const fname = generateXBriefFilename('pan-1194', 'foo', '2026-05-18');
-    expect(fname).toBe('2026-05-18-PAN-1194-foo.vbrief.json');
+    expect(fname).toBe('2026-05-18-PAN-1194-foo.xbrief.json');
+  });
+});
+
+describe('isXBriefFilename', () => {
+  it.each([
+    '2026-05-03-PAN-946-vbrief-lifecycle.vbrief.json',
+    '2026-05-03-PAN-946-vbrief-lifecycle.xbrief.json',
+  ])('accepts %s', (filename) => {
+    expect(isXBriefFilename(filename)).toBe(true);
+  });
+
+  it('rejects unrelated JSON files', () => {
+    expect(isXBriefFilename('plan.json')).toBe(false);
   });
 });
 
 describe('parseXBriefFilename', () => {
-  it('extracts parts from a canonical filename', () => {
-    const parts = parseXBriefFilename('2026-05-03-PAN-946-vbrief-lifecycle.vbrief.json');
+  it.each([
+    '2026-05-03-PAN-946-vbrief-lifecycle.vbrief.json',
+    '2026-05-03-PAN-946-vbrief-lifecycle.xbrief.json',
+  ])('extracts parts from %s', (filename) => {
+    const parts = parseXBriefFilename(filename);
     expect(parts).toEqual({ date: '2026-05-03', issueId: 'PAN-946', slug: 'vbrief-lifecycle' });
   });
   it('returns null for non-matching filenames', () => {

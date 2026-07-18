@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -57,6 +57,7 @@ import {
   markRecordPipelineClosedOutSync,
   queueIssueRecordCommit,
   readIssueRecord,
+  resolveContinuePath,
   updateIssueRecordForIssue,
   claimIssueOwner,
   clearIssueOwner,
@@ -737,6 +738,40 @@ describe('PAN-1919: buildIssueRecord backfill migration', () => {
     const record = await buildIssueRecord(project, 'PAN-1919');
     expect(record.schemaVersion).toBe(RECORD_SCHEMA_VERSION);
     expect(record.schemaVersion).toBe(2);
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('reuses an existing legacy continue filename and otherwise resolves the canonical extension', () => {
+    const project = makeProject();
+    const continuesDir = join(project.path, '.pan', 'continues');
+    mkdirSync(continuesDir, { recursive: true });
+
+    expect(resolveContinuePath(project.path, 'PAN-1919')).toBe(
+      join(continuesDir, 'pan-1919.xbrief.json'),
+    );
+
+    const legacyPath = join(continuesDir, 'pan-1919.vbrief.json');
+    writeFileSync(legacyPath, '{}');
+    expect(resolveContinuePath(project.path, 'PAN-1919')).toBe(legacyPath);
+
+    const canonicalPath = join(continuesDir, 'pan-1919.xbrief.json');
+    expect(existsSync(canonicalPath)).toBe(false);
+    writeFileSync(canonicalPath, '{}');
+    expect(resolveContinuePath(project.path, 'PAN-1919')).toBe(canonicalPath);
+    rmSync(project.path, { recursive: true, force: true });
+  });
+
+  it('reads durable continue state from the canonical extension', async () => {
+    const project = makeProject();
+    const continuesDir = join(project.path, '.pan', 'continues');
+    mkdirSync(continuesDir, { recursive: true });
+    writeFileSync(
+      join(continuesDir, 'pan-1919.xbrief.json'),
+      JSON.stringify({ decisions: [{ id: 'D1', summary: 'canonical', recordedAt: '2026-01-01' }] }),
+    );
+
+    const record = await buildIssueRecord(project, 'PAN-1919');
+    expect(record.decisions).toEqual([{ id: 'D1', summary: 'canonical', recordedAt: '2026-01-01' }]);
     rmSync(project.path, { recursive: true, force: true });
   });
 

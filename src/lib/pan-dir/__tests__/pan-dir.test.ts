@@ -157,7 +157,7 @@ describe('spec helpers', () => {
         asPanSpecDocument(makeDoc('PAN-1', 'First Plan'), 'proposed'),
       )
       yield* writeSpec(
-        join(paths.specsDir, '2026-05-04-PAN-2-second.vbrief.json'),
+        join(paths.specsDir, '2026-05-04-PAN-2-second.xbrief.json'),
         asPanSpecDocument(makeDoc('PAN-2', 'Second Plan'), 'active'),
       )
 
@@ -208,6 +208,24 @@ describe('spec helpers', () => {
       } finally {
         console.warn = originalWarn
       }
+    }),
+  )
+
+  it.effect('findSpecByIssue prefers the xBRIEF extension when both variants exist', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-04-PAN-4-plan.vbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-4', 'Legacy extension'), 'proposed'),
+      )
+      yield* writeSpec(
+        join(paths.specsDir, '2026-05-04-PAN-4-plan.xbrief.json'),
+        asPanSpecDocument(makeDoc('PAN-4', 'Canonical extension'), 'active'),
+      )
+
+      const found = yield* findSpecByIssue(TEST_DIR, 'pan-4')
+      expect(found?.filename).toBe('2026-05-04-PAN-4-plan.xbrief.json')
+      expect(found?.status).toBe('active')
     }),
   )
 

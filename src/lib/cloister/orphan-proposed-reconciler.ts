@@ -13,6 +13,7 @@ import { listProjects, resolveProjectFromIssueSync, type ProjectConfig } from '.
 import { getReviewStatusSync, type ReviewStatus } from '../review-status.js';
 import { listSessionNames } from '../tmux.js';
 import { findPlanSync, readPlanSync } from '../xbrief/io.js';
+import { isXBriefFilename } from '../xbrief/lifecycle.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { isGitHubAppConfigured, listPullRequestsForHead } from '../github-app.js';
 import { resolveGitHubIssueSync } from '../tracker-utils.js';
@@ -109,7 +110,7 @@ async function findSpecPathForIssue(projectPath: string, issueId: string): Promi
     return null;
   }
   for (const filename of filenames) {
-    if (!filename.endsWith('.vbrief.json')) continue;
+    if (!isXBriefFilename(filename)) continue;
     const specPath = join(specsDir, filename);
     try {
       const doc = readPlanSync(specPath);
@@ -188,7 +189,7 @@ export async function findOrphanProposedSpecsForReconciler(options: FindOrphanPr
 
     const entries = await readdir(specsDir, { withFileTypes: true }).catch(() => []);
     for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.vbrief.json')) continue;
+      if (!entry.isFile() || !isXBriefFilename(entry.name)) continue;
 
       const specPath = join(specsDir, entry.name);
       const spec = await readJsonFile<ProposedSpecState>(specPath);

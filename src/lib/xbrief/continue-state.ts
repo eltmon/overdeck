@@ -8,7 +8,7 @@
 
 import type { XBriefDifficulty } from './types.js';
 
-export const CONTINUE_FILENAME_SUFFIX = '.vbrief.json';
+export const CONTINUE_FILENAME_SUFFIX = '.xbrief.json';
 
 /** Snapshot of git state at write time. */
 export interface ContinueGitState {

@@ -1,7 +1,7 @@
 /**
- * vBRIEF Lifecycle Foundation
+ * xBRIEF Lifecycle Foundation
  *
- * Filesystem-as-state lifecycle model for scope vBRIEFs. Each registered
+ * Filesystem-as-state lifecycle model for scope xBRIEFs. Each registered
  * project gets a `./vbrief/` directory at its repo root with four lifecycle
  * subdirectories that act as the source of truth for plan status:
  *
@@ -10,9 +10,10 @@
  *   ./vbrief/completed/  — merged/closed, immutable archive
  *   ./vbrief/cancelled/  — abandoned, immutable archive
  *
- * Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json` where
- * the date is the immutable creation date. Issue ID gives Overdeck ergonomics
- * (one vBRIEF per issue) and slug gives human readability.
+ * Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.xbrief.json` where
+ * the date is the immutable creation date. Readers also accept the legacy
+ * `.vbrief.json` extension. Issue ID gives Overdeck ergonomics (one xBRIEF per
+ * issue) and slug gives human readability.
  */
 
 import { mkdirSync } from 'fs';
@@ -27,7 +28,11 @@ export const VBRIEF_LIFECYCLE_DIRS = ['proposed', 'active', 'completed', 'cancel
 
 export type XBriefLifecycleDir = typeof VBRIEF_LIFECYCLE_DIRS[number];
 
-const FILENAME_RE = /^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+)\.vbrief\.json$/;
+export const XBRIEF_FILENAME_SUFFIX = '.xbrief.json';
+export const LEGACY_VBRIEF_FILENAME_SUFFIX = '.vbrief.json';
+export const XBRIEF_FILENAME_SUFFIXES = [XBRIEF_FILENAME_SUFFIX, LEGACY_VBRIEF_FILENAME_SUFFIX] as const;
+
+const FILENAME_STEM_RE = /^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+)$/;
 
 /**
  * Slugify an arbitrary string for use in a vBRIEF filename. Lowercases,
@@ -58,10 +63,10 @@ function formatDate(value: Date | string): string {
 }
 
 /**
- * Generate the canonical vBRIEF filename for an issue.
+ * Generate the canonical xBRIEF filename for an issue.
  *
- * Format: `YYYY-MM-DD-<ISSUE-ID>-<slug>.vbrief.json`
- * Example: `2026-05-03-PAN-946-vbrief-lifecycle.vbrief.json`
+ * Format: `YYYY-MM-DD-<ISSUE-ID>-<slug>.xbrief.json`
+ * Example: `2026-05-03-PAN-946-xbrief-lifecycle.xbrief.json`
  *
  * @param issueId - Issue identifier in the form `PREFIX-NUMBER` (e.g. `PAN-946`).
  *                  Normalized to uppercase in the filename — issue IDs are
@@ -79,7 +84,7 @@ export function generateXBriefFilename(
   createdDate: Date | string = new Date(),
 ): string {
   if (!/^[A-Za-z][A-Za-z0-9]*-\d+$/.test(issueId)) {
-    throw new Error(`Invalid issue ID for vBRIEF filename: ${issueId} (expected e.g. PAN-946)`);
+    throw new Error(`Invalid issue ID for xBRIEF filename: ${issueId} (expected e.g. PAN-946)`);
   }
   // Issue IDs are uppercase by convention (PAN-, MIN-, AUR-). Normalize so a
   // lowercased issueId from an upstream caller cannot produce a second spec
@@ -87,15 +92,25 @@ export function generateXBriefFilename(
   const canonicalIssueId = issueId.toUpperCase();
   const date = formatDate(createdDate);
   const normalized = slugify(slug);
-  return `${date}-${canonicalIssueId}-${normalized}.vbrief.json`;
+  return `${date}-${canonicalIssueId}-${normalized}${XBRIEF_FILENAME_SUFFIX}`;
+}
+
+/** Return whether a filename uses a supported xBRIEF document extension. */
+export function isXBriefFilename(filename: string): boolean {
+  return XBRIEF_FILENAME_SUFFIXES.some((suffix) => filename.endsWith(suffix));
 }
 
 /**
- * Parse a canonical vBRIEF filename back into its parts. Returns null if the
- * filename doesn't match the convention so callers can ignore stray files.
+ * Parse a canonical xBRIEF filename back into its parts. Both the canonical
+ * `.xbrief.json` and legacy `.vbrief.json` extensions are accepted. Returns
+ * null if the filename doesn't match the convention so callers can ignore
+ * stray files.
  */
 export function parseXBriefFilename(filename: string): { issueId: string; slug: string; date: string } | null {
-  const match = filename.match(FILENAME_RE);
+  if (!isXBriefFilename(filename)) return null;
+  const suffix = XBRIEF_FILENAME_SUFFIXES.find((candidate) => filename.endsWith(candidate));
+  if (!suffix) return null;
+  const match = filename.slice(0, -suffix.length).match(FILENAME_STEM_RE);
   if (!match) return null;
   return { date: match[1], issueId: match[2], slug: match[3] };
 }

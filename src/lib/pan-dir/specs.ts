@@ -6,7 +6,12 @@ import { findProjectByPathSync, type ProjectConfig } from '../projects.js'
 import { resolveStateReadHomeSync } from '../state-read-home.js'
 
 import { normalizeXBriefEnvelope, serializeXBriefDocument, XBriefMergeConflictError } from '../xbrief/io.js'
-import { generateXBriefFilename, parseXBriefFilename, slugify } from '../xbrief/lifecycle.js'
+import {
+  generateXBriefFilename,
+  parseXBriefFilename,
+  slugify,
+  XBRIEF_FILENAME_SUFFIX,
+} from '../xbrief/lifecycle.js'
 import { invalidateXBriefIndex } from '../xbrief/xbrief-index.js'
 import type { XBriefDocument } from '../xbrief/types.js'
 import { deriveProjectRoot, flushAutoCommits, queueAutoCommit } from './auto-commit.js'
@@ -243,7 +248,10 @@ export function findSpecByIssue(
     const upperIssueId = issueId.toUpperCase()
     const matching = filenames
       .filter((filename) => parseXBriefFilename(filename)?.issueId.toUpperCase() === upperIssueId)
-      .sort((a, b) => a.localeCompare(b))
+      .sort((a, b) => {
+        const extensionOrder = Number(!a.endsWith(XBRIEF_FILENAME_SUFFIX)) - Number(!b.endsWith(XBRIEF_FILENAME_SUFFIX))
+        return extensionOrder || a.localeCompare(b)
+      })
 
     for (const filename of matching) {
       const entry = yield* entryFromFile(specsDir, filename)

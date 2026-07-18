@@ -24,7 +24,7 @@ import { CONTINUE_FILENAME_SUFFIX } from '../continue-state.js';
 describe('ContinueState type exports (types-only module)', () => {
   it('CONTINUE_FILENAME_SUFFIX is a string constant', () => {
     expect(typeof CONTINUE_FILENAME_SUFFIX).toBe('string');
-    expect(CONTINUE_FILENAME_SUFFIX).toBe('.vbrief.json');
+    expect(CONTINUE_FILENAME_SUFFIX).toBe('.xbrief.json');
   });
 
   it('ContinueState shape is structurally valid at compile time', () => {

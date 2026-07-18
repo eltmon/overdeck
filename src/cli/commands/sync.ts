@@ -6,7 +6,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync, statSync, symlink
 import { homedir } from 'os';
 import { join } from 'path';
 import { loadConfigSync } from '../../lib/config.js';
-import { parseXBriefFilename } from '../../lib/xbrief/lifecycle.js';
+import { isXBriefFilename, parseXBriefFilename } from '../../lib/xbrief/lifecycle.js';
 import { resolveGitHubIssueSync } from '../../lib/tracker-utils.js';
 import { createBackupSync } from '../../lib/backup.js';
 import {
@@ -659,7 +659,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       // (1) vBRIEF in active/ but tracker says closed
       if (existsSync(activeDir)) {
         const activeFiles = readdirSync(activeDir).filter(
-          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+          f => isXBriefFilename(f) && !f.startsWith('continue-')
         );
         for (const file of activeFiles) {
           const parsed = parseXBriefFilename(file);
@@ -687,7 +687,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       // (2) vBRIEF in completed/ but workspace still exists
       if (existsSync(completedDir)) {
         const completedFiles = readdirSync(completedDir).filter(
-          f => f.endsWith('.vbrief.json') && !f.startsWith('continue-')
+          f => isXBriefFilename(f) && !f.startsWith('continue-')
         );
         for (const file of completedFiles) {
           const parsed = parseXBriefFilename(file);
@@ -711,7 +711,7 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
         if (existsSync(activeDir)) {
           activeIssueIds = new Set(
             readdirSync(activeDir)
-              .filter(f => f.endsWith('.vbrief.json') && !f.startsWith('continue-'))
+              .filter(f => isXBriefFilename(f) && !f.startsWith('continue-'))
               .map(f => {
                 const parsed = parseXBriefFilename(f);
                 return parsed ? parsed.issueId.toUpperCase() : '';

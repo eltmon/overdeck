@@ -91,10 +91,16 @@ import {
 
 let testDir: string;
 
-function writeSpec(projectPath: string, issueId: string, status: string, planItemCount = 2): void {
+function writeSpec(
+  projectPath: string,
+  issueId: string,
+  status: string,
+  planItemCount = 2,
+  extension: 'vbrief' | 'xbrief' = 'vbrief',
+): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `${issueId}.vbrief.json`), JSON.stringify({
+  writeFileSync(join(specsDir, `${issueId}.${extension}.json`), JSON.stringify({
     xBRIEFInfo: { version: '0.5', created: '2026-05-25T00:00:00.000Z' },
     plan: {
       id: issueId,
@@ -215,7 +221,7 @@ describe('orphan proposed spec reconciler', () => {
   it('keeps all-pending review status rows eligible as candidates', async () => {
     const projectPath = join(testDir, 'project');
     mkdirSync(projectPath, { recursive: true });
-    writeSpec(projectPath, 'PAN-3402', 'proposed');
+    writeSpec(projectPath, 'PAN-3402', 'proposed', 2, 'xbrief');
     writeTasks(projectPath, 'PAN-3402');
 
     await expect(findOrphanProposedSpecsForReconciler({

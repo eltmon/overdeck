@@ -33,6 +33,10 @@ import type {
   ContinueSessionEntry,
   ScopeDriftRecord,
 } from '../xbrief/continue-state.js';
+import {
+  LEGACY_VBRIEF_FILENAME_SUFFIX,
+  XBRIEF_FILENAME_SUFFIX,
+} from '../xbrief/lifecycle.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import {
   getIssueWorkspacePath,
@@ -163,10 +167,18 @@ function projectMerges(issueId: string): string[] {
 
 // ─── Record builder ───────────────────────────────────────────────────────────
 
+export function resolveContinuePath(projectRoot: string, issueId: string): string {
+  const basePath = join(projectRoot, PAN_DIRNAME, PAN_CONTINUES_DIRNAME, issueId.toLowerCase());
+  const canonicalPath = `${basePath}${XBRIEF_FILENAME_SUFFIX}`;
+  const legacyPath = `${basePath}${LEGACY_VBRIEF_FILENAME_SUFFIX}`;
+  if (existsSync(canonicalPath)) return canonicalPath;
+  if (existsSync(legacyPath)) return legacyPath;
+  return canonicalPath;
+}
+
 async function readLegacyContinueText(projectRoot: string, issueId: string): Promise<string | null> {
-  const path = join(projectRoot, PAN_DIRNAME, PAN_CONTINUES_DIRNAME, `${issueId.toLowerCase()}.vbrief.json`);
   try {
-    return await fsp.readFile(path, 'utf-8');
+    return await fsp.readFile(resolveContinuePath(projectRoot, issueId), 'utf-8');
   } catch {
     return null;
   }
