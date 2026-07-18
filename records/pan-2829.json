@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-18T19:42:29.663Z",
+  "updated": "2026-07-18T19:50:29.218Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "skill-rename": {
-        "writerId": "agent-pan-2829",
-        "agentId": "agent-pan-2829",
-        "pid": 898869,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:42:29.663Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -199,6 +191,17 @@
         "outcome": "completed",
         "reason": "Renamed dashboard xBRIEF component directory/files/symbols and visible copy, preserved legacy protocol/path values needed by existing backend contracts, and passed frontend tests/build/typecheck",
         "releasedAt": "2026-07-18T19:42:16.360Z"
+      },
+      {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 898869,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:42:29.663Z",
+        "itemId": "skill-rename",
+        "outcome": "completed",
+        "reason": "Added canonical write-xbrief guidance with .xbrief.json outputs and explicit legacy workspace path, retained a write-vbrief redirect stub, and retargeted prompt schema lint; full lint passes",
+        "releasedAt": "2026-07-18T19:50:29.218Z"
       }
     ],
     "statusReasons": {
@@ -217,6 +220,10 @@
       "frontend-rename": {
         "reason": "Renamed dashboard xBRIEF component directory/files/symbols and visible copy, preserved legacy protocol/path values needed by existing backend contracts, and passed frontend tests/build/typecheck",
         "updatedAt": "2026-07-18T19:42:16.360Z"
+      },
+      "skill-rename": {
+        "reason": "Added canonical write-xbrief guidance with .xbrief.json outputs and explicit legacy workspace path, retained a write-vbrief redirect stub, and retargeted prompt schema lint; full lint passes",
+        "updatedAt": "2026-07-18T19:50:29.218Z"
       }
     }
   },
@@ -248,6 +255,9 @@
     "frontend-rename.frontend-rename.ac1": "completed",
     "frontend-rename.frontend-rename.ac2": "completed",
     "frontend-rename.frontend-rename.ac3": "completed",
-    "skill-rename": "running"
+    "skill-rename": "completed",
+    "skill-rename.skill-rename.ac1": "completed",
+    "skill-rename.skill-rename.ac2": "completed",
+    "skill-rename.skill-rename.ac3": "completed"
   }
 }
