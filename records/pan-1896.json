@@ -130,7 +130,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-18T15:36:02.758Z",
+  "updated": "2026-07-18T15:41:43.741Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
@@ -276,6 +276,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-18T13:29:28.380Z"
+    },
+    {
+      "issue": "PAN-1896",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-07-18T15:36:02.730Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T15:41:43.740Z"
     }
   ]
 }
