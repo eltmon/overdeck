@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T19:33:20.415Z",
+  "updated": "2026-07-18T19:45:13.220Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "cli-pan-orders": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 659293,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:33:20.414Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -157,6 +149,17 @@
         "outcome": "completed",
         "reason": "Added authenticated Effect /api/orders CRUD, candidates, validation/start, preview routes with resolver/writer-only access; registered the layer and added fixture-backed route tests.",
         "releasedAt": "2026-07-18T19:32:47.986Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 659293,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:33:20.414Z",
+        "itemId": "cli-pan-orders",
+        "outcome": "completed",
+        "reason": "Added pan orders create/list/show/add/remove/move/start commands, command registration, exact CLI skill documentation, and fixture-backed command tests.",
+        "releasedAt": "2026-07-18T19:45:13.220Z"
       }
     ],
     "statusReasons": {
@@ -171,6 +174,10 @@
       "orders-routes": {
         "reason": "Added authenticated Effect /api/orders CRUD, candidates, validation/start, preview routes with resolver/writer-only access; registered the layer and added fixture-backed route tests.",
         "updatedAt": "2026-07-18T19:32:47.986Z"
+      },
+      "cli-pan-orders": {
+        "reason": "Added pan orders create/list/show/add/remove/move/start commands, command registration, exact CLI skill documentation, and fixture-backed command tests.",
+        "updatedAt": "2026-07-18T19:45:13.220Z"
       }
     }
   },
@@ -190,6 +197,9 @@
     "orders-routes.orders-routes.ac2": "completed",
     "orders-routes.orders-routes.ac3": "completed",
     "orders-routes.orders-routes.ac4": "completed",
-    "cli-pan-orders": "running"
+    "cli-pan-orders": "completed",
+    "cli-pan-orders.cli-pan-orders.ac1": "completed",
+    "cli-pan-orders.cli-pan-orders.ac2": "completed",
+    "cli-pan-orders.cli-pan-orders.ac3": "completed"
   }
 }
