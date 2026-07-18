@@ -55,7 +55,7 @@ vi.mock('../../src/lib/cliproxy.js', () => ({
 }));
 
 import { generateLauncherScriptSync } from '../../src/lib/launcher-generator.js';
-import { getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../../src/lib/agents.js';
+import { buildSpawnEnvForModel, getProviderEnvForModel, getAgentRuntimeBaseCommand, getProviderExportsForModel, roleAgentDefinitionPath } from '../../src/lib/agents.js';
 
 describe('agents auth routing', () => {
   beforeEach(() => {
@@ -250,6 +250,7 @@ describe('agents auth routing', () => {
         'unset ANTHROPIC_SMALL_FAST_MODEL',
         'unset CLAUDE_CODE_SUBAGENT_MODEL',
         'unset CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+        'unset CLAUDE_CODE_MAX_CONTEXT_TOKENS',
         'unset OPENAI_API_KEY',
         'unset GEMINI_API_KEY',
         'unset API_TIMEOUT_MS',
@@ -275,6 +276,51 @@ describe('agents auth routing', () => {
     expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="overdeck-local-cliproxy-key"');
   });
 
+  it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'])(
+    'applies the 372K Claude Code context policy to %s launchers and direct spawns',
+    async (model) => {
+      mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+      const providerExports = await getProviderExportsForModel(model);
+      expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+      expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+      expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="372000"');
+      expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="372000"');
+
+      const launcher = generateLauncherScriptSync({
+        role: 'work',
+        workingDir: '/workspace/project',
+        providerExports,
+        baseCommand: `claude --agent pan-work-agent --model '${model}'`,
+      });
+      expect(launcher).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="372000"');
+      expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="372000"');
+
+      const spawnEnv = await buildSpawnEnvForModel(model, {
+        CLAUDE_CODE_MAX_CONTEXT_TOKENS: '999999',
+        CLAUDE_CODE_AUTO_COMPACT_WINDOW: '999999',
+      });
+      expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe('372000');
+      expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('372000');
+    },
+  );
+
+  it('preserves the conservative GPT-5.5 auto-compaction policy without a maximum override', async () => {
+    mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+    const providerExports = await getProviderExportsForModel('gpt-5.5');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="150000"');
+
+    const spawnEnv = await buildSpawnEnvForModel('gpt-5.5', {
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '372000',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '372000',
+    });
+    expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
+    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('150000');
+  });
+
   it('exports the registry context window as Claude Code auto-compact window for Kimi launches', async () => {
     mockLoadYamlConfig.mockReturnValue({
       config: {
@@ -284,6 +330,8 @@ describe('agents auth routing', () => {
     });
 
     const providerExports = await getProviderExportsForModel('kimi-k2.7-code');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
     expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
     expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
 
@@ -296,5 +344,22 @@ describe('agents auth routing', () => {
 
     expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
     expect(launcher).toContain("exec claude --agent pan-work-agent --model 'kimi-k2.7-code'");
+  });
+
+  it('clears inherited Claude Code context overrides for Anthropic launchers and direct spawns', async () => {
+    const providerExports = await getProviderExportsForModel('claude-sonnet-4-6');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).not.toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+
+    const spawnEnv = await buildSpawnEnvForModel('claude-sonnet-4-6', {
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '372000',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '372000',
+      KEEP_ME: 'yes',
+    });
+    expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBeUndefined();
+    expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBeUndefined();
+    expect(spawnEnv.KEEP_ME).toBe('yes');
   });
 });

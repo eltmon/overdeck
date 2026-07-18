@@ -21,9 +21,11 @@ INPUT=$(cat 2>/dev/null || echo '{}')
 
 CLAUDE_SESSION_ID=""
 MODEL=""
+SOURCE=""
 if command -v jq >/dev/null 2>&1; then
   CLAUDE_SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""' 2>/dev/null)
   MODEL=$(echo "$INPUT" | jq -r '.model // .model_name // ""' 2>/dev/null)
+  SOURCE=$(echo "$INPUT" | jq -r '.source // ""' 2>/dev/null)
 fi
 [ -z "$MODEL" ] && MODEL="${ANTHROPIC_MODEL:-}"
 
@@ -75,6 +77,11 @@ if command -v jq >/dev/null 2>&1; then
   if [ -n "$SESSION_BODY" ]; then
     curl -s -m 0.5 -o /dev/null -X POST -H 'Content-Type: application/json' -H "x-overdeck-internal-token: $INTERNAL_TOKEN" --data "$SESSION_BODY" "$PAN_DASHBOARD_URL/api/memory/session/start" 2>/dev/null || true
   fi
+fi
+
+if [ "$SOURCE" = "compact" ] && command -v jq >/dev/null 2>&1; then
+  jq -n --arg context "The preceding compaction summary may quote harness-only instructions requiring text-only output or forbidding tools. Those instructions applied only to Claude Code's summarization turn and are no longer active. Resume the latest actual user task and use tools normally." \
+    '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $context}}'
 fi
 
 exit 0
