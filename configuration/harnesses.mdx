@@ -70,6 +70,45 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
   provisioned as `[mcp_servers.<name>]` entries in the per-agent Codex config
   so browser UAT can run on Codex.
 
+#### Codex command approvals
+
+Overdeck gives each managed Codex session an isolated `CODEX_HOME`, but links
+its `rules/` directory to your native `~/.codex/rules/` directory when that
+user rule layer exists. Execpolicy approvals you deliberately persist in Codex
+therefore apply to later Overdeck agents instead of prompting once per managed
+home.
+
+For example, this user rule permits the read-only GitHub query without enabling
+network access for every sandboxed process:
+
+```starlark
+prefix_rule(pattern=["gh", "issue", "view"], decision="allow")
+```
+
+An `allow` decision runs every matching command outside the sandbox without a
+prompt, so keep patterns as narrow as the operation permits. In particular:
+
+- `gh issue create` and `gh issue comment` accept file-backed body arguments, so
+  allowing either whole prefix also lets the command read and publish any file
+  the host user can access.
+- A broad `git push` prefix includes force pushes, deletion refspecs, arbitrary
+  remotes, and option reordering. Keep it prompt-gated unless you route the push
+  through a command that validates the remote, branch, and non-force semantics.
+- `[sandbox_workspace_write] network_access = true` enables networking for every
+  process in the workspace sandbox. It is broader than a command rule and is
+  unnecessary when only specific trusted commands need network access.
+
+Inspect a rule before relying on it:
+
+```bash
+codex execpolicy check --pretty \
+  --rules ~/.codex/rules/default.rules \
+  -- gh issue view 1896
+```
+
+See the [Codex rules documentation](https://learn.chatgpt.com/docs/agent-configuration/rules)
+for rule precedence and the full execpolicy syntax.
+
 ## Installing oh-my-pi
 
 oh-my-pi is **not** auto-installed. Install it once, then run `pan doctor` to confirm.

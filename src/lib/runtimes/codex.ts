@@ -302,6 +302,7 @@ export interface InitCodexHomeOpts {
  *     config.toml   — Codex settings (approval_policy, sandbox_mode, project
  *                     trust, notify hooks)
  *     AGENTS.md     — Populated by context-layering bead; placeholder for now
+ *     rules/        — Symlink to the user's global Codex execpolicy rules
  *     sessions/     — Codex writes rollout JSONL here
  */
 export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}): void {
@@ -388,9 +389,16 @@ export function initCodexHome(codexHomeDir: string, opts: InitCodexHomeOpts = {}
   // `codex login` heals everyone. Best-effort: if the user has never signed in
   // to Codex globally there is nothing to link, and onboarding will (correctly)
   // prompt for a real first-time login.
+  const globalCodexHome = join(homedir(), '.codex')
   const homeAuthPath = join(codexHomeDir, 'auth.json')
-  const globalAuthPath = join(homedir(), '.codex', 'auth.json')
+  const globalAuthPath = join(globalCodexHome, 'auth.json')
   seedCodexAuthSymlink(homeAuthPath, globalAuthPath)
+
+  // Managed sessions use an isolated CODEX_HOME, so Codex would otherwise skip
+  // the user's native execpolicy layer at ~/.codex/rules and ask again in every
+  // agent home. Link the directory rather than copying it so rule amendments
+  // accepted in one persistent session remain available to later sessions.
+  seedCodexRulesSymlink(join(codexHomeDir, 'rules'), join(globalCodexHome, 'rules'))
 
   const agentsMdPath = join(codexHomeDir, 'AGENTS.md')
   if (!existsSync(agentsMdPath)) {
@@ -454,6 +462,30 @@ export function seedCodexAuthSymlink(homeAuthPath: string, globalAuthPath: strin
   } catch {
     // Best-effort: if the symlink cannot be created (permissions, race), leave the
     // home without auth.json — codex onboarding prompts, which is the safe default.
+  }
+}
+
+/**
+ * Share user-approved Codex execpolicy rules with an isolated managed home.
+ * Existing per-agent rule state is preserved rather than replaced: rules can
+ * authorize out-of-sandbox execution, so Overdeck must never silently discard
+ * or redirect a rule directory it did not create.
+ */
+export function seedCodexRulesSymlink(homeRulesPath: string, globalRulesPath: string): void {
+  if (!existsSync(globalRulesPath)) return
+
+  try {
+    const homeRules = lstatSync(homeRulesPath)
+    if (homeRules.isSymbolicLink() && readlinkSync(homeRulesPath) === globalRulesPath) return
+    return
+  } catch {
+    // The managed home has no rules path yet; install the native user rule layer.
+  }
+
+  try {
+    symlinkSync(globalRulesPath, homeRulesPath, 'dir')
+  } catch {
+    // Best-effort: without the link, Codex safely falls back to prompting.
   }
 }
 
