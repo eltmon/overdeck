@@ -78,7 +78,7 @@ check_schema_key_agreement() {
   local file key
   local files=(
     "src/lib/cloister/prompts/planning.md"
-    "sync-sources/skills/write-vbrief/SKILL.md"
+    "sync-sources/skills/write-xbrief/SKILL.md"
     "docs/VBRIEF.md"
   )
   local keys=(
@@ -189,7 +189,7 @@ write_passing_fixture() {
     "$root/src/lib/cloister/prompts" \
     "$root/src/lib/cloister" \
     "$root/roles" \
-    "$root/sync-sources/skills/write-vbrief" \
+    "$root/sync-sources/skills/write-xbrief" \
     "$root/docs"
 
   cat > "$root/src/lib/cloister/prompts/planning.md" <<'EOF'
@@ -237,7 +237,7 @@ EOF
   cat > "$root/src/lib/cloister/verification-runner.ts" <<'EOF'
 Complete every finished item with pan task done.
 EOF
-  for file in "$root/sync-sources/skills/write-vbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
+  for file in "$root/sync-sources/skills/write-xbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
     cat > "$file" <<'EOF'
 requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals traces
 EOF
