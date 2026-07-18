@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T00:54:47.315Z",
+  "updated": "2026-07-18T00:57:14.343Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "generalize-branch-reason-wording": {
-        "writerId": "agent-pan-2857",
-        "agentId": "agent-pan-2857",
-        "pid": 2014911,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T00:54:47.315Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2857",
@@ -99,6 +91,17 @@
         "outcome": "completed",
         "reason": "Added strike fallback heads to merged-PR lookup and deletion fallback; focused tests now prove exact live heads and merged deleted strike branches, with typecheck green.",
         "releasedAt": "2026-07-18T00:54:31.473Z"
+      },
+      {
+        "writerId": "agent-pan-2857",
+        "agentId": "agent-pan-2857",
+        "pid": 2014911,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T00:54:47.315Z",
+        "itemId": "generalize-branch-reason-wording",
+        "outcome": "completed",
+        "reason": "Generalized branch-backed membership comments and reason text to feature/ and strike/, preserved the spec-only reason byte-for-byte, and passed 28 focused tests plus typecheck.",
+        "releasedAt": "2026-07-18T00:57:14.343Z"
       }
     ],
     "statusReasons": {
@@ -109,6 +112,10 @@
       "strike-merge-oracle-fallbacks": {
         "reason": "Added strike fallback heads to merged-PR lookup and deletion fallback; focused tests now prove exact live heads and merged deleted strike branches, with typecheck green.",
         "updatedAt": "2026-07-18T00:54:31.473Z"
+      },
+      "generalize-branch-reason-wording": {
+        "reason": "Generalized branch-backed membership comments and reason text to feature/ and strike/, preserved the spec-only reason byte-for-byte, and passed 28 focused tests plus typecheck.",
+        "updatedAt": "2026-07-18T00:57:14.343Z"
       }
     }
   },
@@ -123,6 +130,9 @@
     "strike-merge-oracle-fallbacks.strike-merge-oracle-fallbacks.ac1": "completed",
     "strike-merge-oracle-fallbacks.strike-merge-oracle-fallbacks.ac2": "completed",
     "strike-merge-oracle-fallbacks.strike-merge-oracle-fallbacks.ac3": "completed",
-    "generalize-branch-reason-wording": "running"
+    "generalize-branch-reason-wording": "completed",
+    "generalize-branch-reason-wording.generalize-branch-reason-wording.ac1": "completed",
+    "generalize-branch-reason-wording.generalize-branch-reason-wording.ac2": "completed",
+    "generalize-branch-reason-wording.generalize-branch-reason-wording.ac3": "completed"
   }
 }
