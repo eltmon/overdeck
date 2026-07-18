@@ -302,6 +302,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T19:21:45.550Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-18T19:37:50.890Z"
     }
   ],
   "feedback": [],
@@ -631,7 +636,7 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T19:37:49.756Z",
+  "updated": "2026-07-18T19:37:50.891Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "reviewing",
