@@ -62,6 +62,12 @@
 }
 .resToggle:hover { background: var(--accent); }
 .resToggle .sum { margin-left: auto; font-size: 10px; }
+.resCompact {
+  display: none; width: 28px; height: 28px; place-items: center; padding: 0;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--card);
+  cursor: pointer;
+}
+.resCompact:hover { background: var(--accent); }
 .resList { padding: 2px 6px 6px; }
 .resRow { display: flex; align-items: center; gap: 8px; padding: 4px 6px; font-size: 11px; color: var(--foreground); }
 .resRow .ri { width: 13px; height: 13px; flex: none; color: var(--muted-foreground); }
@@ -86,3 +92,39 @@
    info-tone (running/reviewing/testing/verifying) row is visibly alive. */
 .spin { animation: laneSpin 1s linear infinite; vertical-align: -1px; margin-right: 3px; }
 @keyframes laneSpin { to { transform: rotate(360deg); } }
+
+/* The cockpit owns collapse state. Rows remain the same clickable components;
+ * the ancestor attribute only removes their text and centers the icon tiles. */
+@container (min-width: 840px) {
+  :global([data-spine-collapsed="true"]) .header,
+  :global([data-spine-collapsed="true"]) .body,
+  :global([data-spine-collapsed="true"]) .caret,
+  :global([data-spine-collapsed="true"]) .resToggle,
+  :global([data-spine-collapsed="true"]) .resList {
+    display: none;
+  }
+
+  :global([data-spine-collapsed="true"]) .resources {
+    display: grid;
+    place-items: center;
+  }
+
+  :global([data-spine-collapsed="true"]) .resCompact {
+    display: grid;
+  }
+
+  :global([data-spine-collapsed="true"]) .row {
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    padding-inline: 0;
+  }
+
+  :global([data-spine-collapsed="true"]) .row.child {
+    margin-left: 0;
+  }
+
+  :global([data-spine-collapsed="true"]) .tile {
+    margin-top: 0;
+  }
+}

@@ -70,6 +70,7 @@ function InfoRow({
   return (
     <button
       type="button"
+      title={`${name} — ${status.label}`}
       className={`${styles.row} ${indent ? styles.child : ''} ${selected ? styles.sel : ''}`}
       onClick={onClick}
     >
@@ -117,7 +118,17 @@ function InfoRow({
  * branch + ahead/behind. Honest to the data: no cpu/mem, no per-container
  * logs/restart; actions are stack-level.
  */
-function StackDrawer({ issueId, feature, branch }: { issueId: string; feature?: ProjectFeature; branch: string }) {
+function StackDrawer({
+  issueId,
+  feature,
+  branch,
+  onExpandSpine,
+}: {
+  issueId: string
+  feature?: ProjectFeature
+  branch: string
+  onExpandSpine: () => void
+}) {
   const [open, setOpen] = useState(false)
   const ws = useWorkspaceQuery(issueId).data
   const actions = useIssueActions(issueId)
@@ -136,6 +147,8 @@ function StackDrawer({ issueId, feature, branch }: { issueId: string; feature?: 
   const branchName = git?.branch ?? branch
   const ahead = git?.ahead ?? 0
   const behind = git?.behind ?? 0
+  const stackStatus = summary?.label ?? 'Stack status unavailable'
+  const compactLabel = `${stackStatus}. ${ahead > 0 ? `${ahead} commit${ahead === 1 ? '' : 's'} ahead. ` : ''}${prs.length} pull request${prs.length === 1 ? '' : 's'}. Expand agent spine for details.`
 
   const services = (ws?.services?.filter((s) => s.url) ?? []).slice()
   if (services.length === 0) {
@@ -149,7 +162,25 @@ function StackDrawer({ issueId, feature, branch }: { issueId: string; feature?: 
 
   return (
     <div className={styles.resources} data-section="StackDrawer">
-      <button type="button" className={styles.resToggle} onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className={styles.resCompact}
+        data-testid="stack-compact-control"
+        aria-label={compactLabel}
+        title={compactLabel}
+        onClick={() => {
+          setOpen(true)
+          onExpandSpine()
+        }}
+      >
+        <span className={styles.dot} style={{ background: healthColor }} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={styles.resToggle}
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
         {open ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
         Stack
         <span className="sum" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -234,7 +265,7 @@ function useSessionCostLookup(issueId: string): (session: SessionNode) => string
 }
 
 export function AgentsLane({
-  issueId, sessions, feature, branch, selectedSessionId, onSelectSession, onOpenVerification,
+  issueId, sessions, feature, branch, selectedSessionId, onSelectSession, onOpenVerification, onExpandSpine,
 }: {
   issueId: string
   sessions: readonly SessionNode[]
@@ -243,6 +274,7 @@ export function AgentsLane({
   selectedSessionId: string | null
   onSelectSession: (session: SessionNode) => void
   onOpenVerification: () => void
+  onExpandSpine: () => void
 }) {
   const [reviewExpanded, setReviewExpanded] = useState(true)
   const [verExpanded, setVerExpanded] = useState(true)
@@ -365,7 +397,7 @@ export function AgentsLane({
         />
       ))}
 
-      <StackDrawer issueId={issueId} feature={feature} branch={branch} />
+      <StackDrawer issueId={issueId} feature={feature} branch={branch} onExpandSpine={onExpandSpine} />
     </div>
   )
 }

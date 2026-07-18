@@ -6,6 +6,7 @@ import { emitActivityEntrySync } from '../activity-logger.js';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { buildCompactRecoverySeedMessage } from '../context-overflow.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { sessionFilePath } from '../paths.js';
@@ -315,6 +316,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       role: agentState.role,
       model,
     });
+    const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
     const legacyHarnessMigrated =
       !hasSessionOrigin && priorHarness !== undefined && priorHarness !== effectiveHarness;
     agentState.harness = effectiveHarness;
@@ -401,6 +403,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
+      extraEnvExports: [harnessLaunch.pathExport],
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');

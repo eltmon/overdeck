@@ -1,22 +1,20 @@
 import { useEffect, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
-import { taskStatusBucket } from '../../../lib/taskStatus'
+import type { TaskStatusRollup } from '../../../lib/taskStatus'
 import styles from './tasksRail.module.css'
 
 /**
- * TasksRail — the persistent at-a-glance progress column for the issue cockpit
- * (PAN-1991 item #1). Tasks moved out of the tab strip into a vertical rail:
- * completed ✓ → working-now (in_progress, blue) → upcoming. All data comes from
- * the existing `/api/issues/:id/tasks` endpoint (same query key as
- * TasksPanel, so the cache is shared and there is no extra fetch).
+ * TasksRail — the compact at-a-glance progress view for the issue cockpit.
+ * It renders inside the Tasks drawer as completed ✓ → working-now → upcoming.
+ * The parent owns the existing `/api/issues/:id/tasks` query so the tab-band
+ * chip and this detail view share one polling observer and one bucketing helper.
  *
  * The full list/graph (DAG) + per-task detail is preserved: `onOpenFull` opens
- * the existing Tasks panel in the main area. The rail is the glance; that is the
- * drill-down.
+ * the existing Tasks panel in the main area.
  */
 
-interface TaskTask {
+export interface TaskTask {
   id: string
   name?: string
   title?: string
@@ -30,7 +28,7 @@ interface TaskTask {
   closedAt?: string
 }
 
-interface TasksResponse {
+export interface TasksResponse {
   issueId: string
   workspacePath: string
   tasks: TaskTask[]
@@ -67,10 +65,9 @@ function BlockedNote({ blockedBy }: { blockedBy: string[] }) {
   )
 }
 
-export function TasksRail({ issueId, onOpenFull }: { issueId: string; onOpenFull: () => void }) {
+export function useTasksQuery(issueId: string): UseQueryResult<TasksResponse> {
   const queryClient = useQueryClient()
-  const [showAllCompleted, setShowAllCompleted] = useState(false)
-  const { data, isLoading, refetch, isRefetching } = useQuery<TasksResponse>({
+  const query = useQuery<TasksResponse>({
     queryKey: ['tasks', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/issues/${issueId}/tasks`)
@@ -79,19 +76,36 @@ export function TasksRail({ issueId, onOpenFull }: { issueId: string; onOpenFull
     },
     refetchInterval: 10_000,
   })
+
   useEffect(() => {
     const invalidate = () => { void queryClient.invalidateQueries({ queryKey: ['tasks', issueId] }) }
     window.addEventListener('overdeck:tasks-freshness', invalidate)
     return () => window.removeEventListener('overdeck:tasks-freshness', invalidate)
   }, [issueId, queryClient])
 
-  const tasks = data?.tasks ?? []
-  const done = tasks.filter((t) => taskStatusBucket(t.status) === 'done')
-  const working = tasks.filter((t) => taskStatusBucket(t.status) === 'working')
-  const upcoming = tasks.filter((t) => taskStatusBucket(t.status) === 'upcoming')
-  const total = tasks.length
-  const pctDone = total ? Math.round((done.length / total) * 100) : 0
-  const pctWorking = total ? Math.round((working.length / total) * 100) : 0
+  return query
+}
+
+export function TasksRail({
+  onOpenFull,
+  query,
+  rollup,
+}: {
+  issueId: string
+  onOpenFull: () => void
+  query: UseQueryResult<TasksResponse>
+  rollup: TaskStatusRollup<TaskTask>
+}) {
+  const [showAllCompleted, setShowAllCompleted] = useState(false)
+  const { isLoading, refetch, isRefetching } = query
+  const {
+    doneTasks: done,
+    workingTasks: working,
+    upcomingTasks: upcoming,
+    total,
+    percentDone: pctDone,
+    percentWorking: pctWorking,
+  } = rollup
 
   const completedShown = showAllCompleted ? done : done.slice(Math.max(0, done.length - COMPLETED_PREVIEW))
   const hiddenCompleted = done.length - completedShown.length

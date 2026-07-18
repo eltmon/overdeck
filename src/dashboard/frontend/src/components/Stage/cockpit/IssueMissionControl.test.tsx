@@ -8,6 +8,12 @@ let queryClient: QueryClient | undefined
 let unexpectedRequests: string[] = []
 
 beforeEach(() => {
+  window.localStorage.clear()
+  actionInvoke.mockClear()
+  queryMocks.activityQuery.data.sections = [
+    { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
+  ]
+  queryMocks.reviewStatusQuery.data.verificationStatus = 'passed'
   unexpectedRequests = []
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input)
@@ -21,6 +27,19 @@ beforeEach(() => {
     }
     if (url === '/api/workspaces/PAN-1661/plan') {
       return Response.json({ plan: { items: [] } })
+    }
+    if (url === '/api/issues/PAN-1661/tasks') {
+      return Response.json({
+        issueId: 'PAN-1661',
+        workspacePath: '/workspace',
+        tasks: [
+          { id: 'done-1', title: 'Done one', status: 'completed', labels: [], blockedBy: [] },
+          { id: 'done-2', title: 'Done two', status: 'closed', labels: [], blockedBy: [] },
+          { id: 'working', title: 'Working', status: 'running', labels: [], blockedBy: [] },
+          { id: 'upcoming-1', title: 'Upcoming one', status: 'planned', labels: [], blockedBy: [] },
+          { id: 'upcoming-2', title: 'Upcoming two', status: 'open', labels: [], blockedBy: [] },
+        ],
+      })
     }
     unexpectedRequests.push(`${method} ${url}`)
     return Response.json({}, { status: 500 })
@@ -136,6 +155,7 @@ vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Rev
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({ BeadsTab: () => <div>Beads tab</div> }))
+vi.mock('../../CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({ TasksTab: () => <div>Tasks tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/CostsTab', () => ({ CostsTab: () => <div>Costs tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab', () => ({ DiscussionsTab: () => <div>Discussions tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/MarkdownTab', () => ({ MarkdownTab: ({ body }: { body?: string }) => <div>{body ?? 'Markdown tab'}</div> }))
@@ -151,7 +171,18 @@ vi.mock('./ReviewVerificationCard', () => ({ ReviewVerificationCard: () => <div>
 vi.mock('./StatusHistoryTab', () => ({ StatusHistoryTab: () => <div>Status history</div> }))
 vi.mock('./IssueBlockerSpotlight', () => ({ IssueBlockerSpotlight: () => <div>Blocker spotlight</div> }))
 vi.mock('./AgentsLane', () => ({ AgentsLane: () => <div>Agents lane</div> }))
-vi.mock('./TasksRail', () => ({ TasksRail: () => <div>Tasks rail</div> }))
+vi.mock('./TasksRail', async () => {
+  const actual = await vi.importActual<typeof import('./TasksRail')>('./TasksRail')
+  return {
+    ...actual,
+    TasksRail: ({ onOpenFull }: { onOpenFull: () => void }) => (
+      <div data-testid="tasks-rail">
+        Tasks rail
+        <button type="button" onClick={onOpenFull}>Open full tasks view</button>
+      </div>
+    ),
+  }
+})
 vi.mock('./PickupGateCard', () => ({ PickupGateCard: () => <div>Pickup gate</div> }))
 vi.mock('./ChangedFilesView', () => ({ ChangedFilesView: () => <div>Changed files</div> }))
 
@@ -202,6 +233,141 @@ describe('IssueMissionControl', () => {
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
   })
 
+  it('lifts the detail tabs between the header and body without wrapping', () => {
+    const { container } = renderMissionControl()
+    const header = container.querySelector('[data-section="Header bar"]')
+    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+
+    expect(container.querySelectorAll('[data-section="Detail Tabs"]')).toHaveLength(1)
+    expect(header?.nextElementSibling).toBe(nav)
+    expect(nav.nextElementSibling?.querySelector('main')).toBeInTheDocument()
+    expect(nav.closest('main')).toBeNull()
+    expect(nav).toHaveClass('flex-nowrap', 'overflow-x-auto')
+    expect(nav).not.toHaveClass('flex-wrap')
+  })
+
+  it('renders every detail tab and badge with the pill treatment', () => {
+    renderMissionControl()
+    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+    const buttons = Array.from(nav.querySelectorAll('button[aria-selected]'))
+
+    expect(buttons).toHaveLength(10)
+    for (const label of ['Overview', 'Code', 'PRD / Plan', 'Timeline', 'Discussion', 'Costs', 'Artifacts', 'Ship', 'Files', 'Terminal']) {
+      expect(buttons.some((button) => button.textContent?.includes(label)), label).toBe(true)
+    }
+    expect(screen.queryByRole('button', { name: 'Conversation' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Code/ })).toHaveTextContent('✓')
+    expect(screen.getByRole('button', { name: 'Overview' })).toHaveClass('rounded-[9px]', 'font-medium', 'bg-primary/9', 'text-primary')
+    for (const button of buttons) expect(button).not.toHaveClass('font-semibold')
+  })
+
+  it('shows the shared task rollup in an always-visible tab-band chip', async () => {
+    const { container } = renderMissionControl()
+    const chip = await screen.findByRole('button', {
+      name: 'Tasks: 2 of 5 complete. Open plan progress',
+    })
+
+    expect(chip).toHaveAttribute('data-section', 'TasksRail / TasksTab')
+    expect(chip).toHaveTextContent('Tasks')
+    expect(chip).toHaveTextContent('2/5')
+    expect(chip).toHaveClass('sticky', 'right-0', 'ml-auto', 'badge-bg-primary', 'badge-border-primary')
+    expect(chip).not.toHaveClass('rounded-full')
+    expect(chip.querySelector('[style="width: 40%;"]')).toBeInTheDocument()
+
+    const missionBody = container.querySelector('main')?.parentElement
+    expect(missionBody?.children).toHaveLength(2)
+    expect(screen.queryByTestId('tasks-rail')).toBeNull()
+  })
+
+  it('persists the collapsible agent spine and defaults to expanded without a saved choice', () => {
+    const firstView = renderMissionControl()
+    const firstBody = firstView.container.querySelector('[data-spine-collapsed]')
+    const collapse = screen.getByRole('button', { name: 'Collapse agent spine' })
+
+    expect(collapse).toHaveAttribute('aria-expanded', 'true')
+    expect(firstBody).toHaveAttribute('data-spine-collapsed', 'false')
+    expect(firstBody?.className).not.toContain('spineCollapsed')
+
+    fireEvent.click(collapse)
+
+    expect(screen.getByRole('button', { name: 'Expand agent spine' })).toHaveAttribute('aria-expanded', 'false')
+    expect(firstBody).toHaveAttribute('data-spine-collapsed', 'true')
+    expect(firstBody?.className).toContain('spineCollapsed')
+    expect(window.localStorage.getItem('overdeck.cockpit.spineCollapsed')).toBe('true')
+
+    firstView.unmount()
+    queryClient?.clear()
+    const restoredView = renderMissionControl()
+    const restoredBody = restoredView.container.querySelector('[data-spine-collapsed]')
+
+    expect(screen.getByRole('button', { name: 'Expand agent spine' })).toHaveAttribute('aria-expanded', 'false')
+    expect(restoredBody).toHaveAttribute('data-spine-collapsed', 'true')
+    expect(restoredBody?.className).toContain('spineCollapsed')
+
+    restoredView.unmount()
+    queryClient?.clear()
+    window.localStorage.removeItem('overdeck.cockpit.spineCollapsed')
+    const resetView = renderMissionControl()
+    const resetBody = resetView.container.querySelector('[data-spine-collapsed]')
+
+    expect(screen.getByRole('button', { name: 'Collapse agent spine' })).toHaveAttribute('aria-expanded', 'true')
+    expect(resetBody).toHaveAttribute('data-spine-collapsed', 'false')
+    expect(resetBody?.className).not.toContain('spineCollapsed')
+  })
+
+  it('keeps the stale-review warning visible and actionable in the collapsed spine', () => {
+    queryMocks.activityQuery.data.sections.push({
+      type: 'reviewer',
+      sessionId: 'reviewer-pan-1661',
+      model: 'claude-sonnet-5',
+      status: 'completed',
+      startedAt: '2026-06-07T00:01:00Z',
+      duration: 1,
+    })
+    const { container } = renderMissionControl()
+
+    expect(container.querySelector('[data-section="Stale-review warning"]')).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Complete review reset' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse agent spine' }))
+
+    expect(container.querySelector('[data-section="Stale-review warning"]')).toBeVisible()
+    const compactWarning = screen.getByRole('button', {
+      name: 'Stale review state: 1 leftover review agent. Expand agent spine for details and reset.',
+    })
+    expect(compactWarning).toBeVisible()
+    expect(screen.queryByRole('button', { name: 'Complete review reset' })).toBeNull()
+
+    fireEvent.click(compactWarning)
+
+    expect(screen.getByRole('button', { name: 'Collapse agent spine' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Complete review reset' })).toBeInTheDocument()
+  })
+
+  it('opens task progress in a drawer and preserves every close and full-view path', async () => {
+    renderMissionControl()
+    const chip = await screen.findByRole('button', {
+      name: 'Tasks: 2 of 5 complete. Open plan progress',
+    })
+
+    fireEvent.click(chip)
+    expect(screen.getByRole('dialog', { name: 'Plan progress' })).toBeInTheDocument()
+    expect(screen.getByTestId('tasks-rail')).toBeInTheDocument()
+    expect(chip).toHaveAttribute('aria-expanded', 'true')
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Plan progress' })).toBeNull()
+
+    fireEvent.click(chip)
+    fireEvent.click(screen.getByRole('button', { name: 'Close plan progress' }))
+    expect(screen.queryByRole('dialog', { name: 'Plan progress' })).toBeNull()
+
+    fireEvent.click(chip)
+    fireEvent.click(screen.getByRole('button', { name: 'Open full tasks view' }))
+    expect(screen.queryByRole('dialog', { name: 'Plan progress' })).toBeNull()
+    expect(screen.getByText('Tasks tab')).toBeInTheDocument()
+  })
+
   it('renders the status narrative + journey strip in place of the chip and gate rows (PAN-2398)', () => {
     renderMissionControl()
 
@@ -231,14 +397,35 @@ describe('IssueMissionControl', () => {
     expect(screen.getByText(/Merge — blocked by review/)).toBeTruthy()
   })
 
-  it('moves the launch composition into the Conversation tab', () => {
+  it('shows a selected session, then relocates the conversation cards below the issue overview', () => {
+    const { container } = renderMissionControl()
+
+    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
+
+    expect(container.querySelector('[data-section="SessionPanel"]')).toBeInTheDocument()
+    expect(screen.getByTestId('session-panel')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
+
+    const conversation = container.querySelector('[data-section="Conversation / Files / Terminal tabs"]')
+    expect(conversation).toBeInTheDocument()
+    expect(conversation?.previousElementSibling).toHaveTextContent('Review blocked — awaiting the work agent')
+    expect(conversation).toHaveTextContent('Launcher')
+    expect(conversation).toHaveTextContent('Agent dock')
+    expect(conversation).toHaveTextContent('Action dock')
+    expect(conversation).toHaveTextContent('Timeline')
+  })
+
+  it('caps the selected session at a centered 980px measure', () => {
     renderMissionControl()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Conversation' }))
+    fireEvent.click(screen.getByRole('button', { name: /Building/ }))
 
-    expect(screen.getByText('Launcher')).toBeTruthy()
-    expect(screen.getByText('Agent dock')).toBeTruthy()
-    expect(screen.getByText('Action dock')).toBeTruthy()
+    expect(screen.getByTestId('session-panel').parentElement).toHaveClass(
+      'mx-auto',
+      'w-full',
+      'max-w-[980px]',
+    )
   })
 
   it('keeps tabs visible but unselected when an issue-tree node drives the pane', () => {
@@ -250,7 +437,7 @@ describe('IssueMissionControl', () => {
     expect(screen.getByTestId('session-panel')).toBeTruthy()
     expect(screen.getByText('Issue overview')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-selected')).toBe('false')
-    expect(screen.getByRole('button', { name: 'Conversation' }).getAttribute('aria-selected')).toBe('false')
+    expect(screen.queryByRole('button', { name: 'Conversation' })).toBeNull()
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
     expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()

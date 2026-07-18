@@ -4,6 +4,15 @@ import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
+const harnessMocks = vi.hoisted(() => ({
+  prepareHarnessLaunch: vi.fn(async () => ({
+    binaryPath: '/home/test/.local/bin/omp',
+    pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+  })),
+}))
+
+vi.mock('../../harness-binary.js', () => harnessMocks)
+
 import { OhmypiRuntimeSync, createOhmypiRuntimeSync, OhmypiSpawnTimeout } from '../ohmypi.js'
 import { getGlobalRegistry, getRuntime, setGlobalRegistry, RuntimeRegistry } from '../index.js'
 import { createClaudeCodeRuntimeSync } from '../claude-code.js'

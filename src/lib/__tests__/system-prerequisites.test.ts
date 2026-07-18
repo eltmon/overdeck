@@ -5,8 +5,11 @@ import { collectSetupDiagnostics, checkSystemPrerequisites, PREREQUISITES } from
 // PAN-774: host-tool setup checklist served by GET /api/prerequisites.
 
 describe('checkSystemPrerequisites', () => {
-  it('reports found tools with their first version line', async () => {
-    const report = await checkSystemPrerequisites(async (cmd) => `${cmd} 1.2.3\nextra noise\n`);
+  const resolveAll = async (command: string) => `/resolved/bin/${command}`;
+
+  it('probes resolved absolute paths and reports their first version line', async () => {
+    const probe = async (cmd: string) => `${cmd.split('/').at(-1)} 1.2.3\nextra noise\n`;
+    const report = await checkSystemPrerequisites(probe, resolveAll);
 
     expect(report.allRequiredFound).toBe(true);
     expect(report.checks).toHaveLength(PREREQUISITES.length);
@@ -14,21 +17,36 @@ describe('checkSystemPrerequisites', () => {
     expect(tmux).toMatchObject({ found: true, version: 'tmux 1.2.3', required: true });
   });
 
-  it('flags missing required tools and keeps optional misses non-blocking', async () => {
-    const report = await checkSystemPrerequisites(async (cmd) => {
-      if (cmd === 'tmux') throw Object.assign(new Error('spawn tmux ENOENT'), { code: 'ENOENT' });
-      if (cmd === 'docker') throw Object.assign(new Error('spawn docker ENOENT'), { code: 'ENOENT' });
-      return `${cmd} 9.9.9`;
+  it('accepts Claude when the shared resolver finds it outside the server PATH', async () => {
+    const resolver = async (command: string) => command === 'claude'
+      ? '/home/test/.local/bin/claude'
+      : `/usr/bin/${command}`;
+    const probe = async (cmd: string) => `${cmd} 1.2.3`;
+
+    const report = await checkSystemPrerequisites(probe, resolver);
+
+    expect(report.checks.find((check) => check.id === 'claude')).toMatchObject({
+      found: true,
+      version: '/home/test/.local/bin/claude 1.2.3',
     });
+  });
+
+  it('flags missing required tools and keeps optional misses non-blocking', async () => {
+    const missingTmuxAndDocker = async (command: string) =>
+      command === 'tmux' || command === 'docker' ? null : `/resolved/bin/${command}`;
+    const report = await checkSystemPrerequisites(
+      async (cmd) => `${cmd} 9.9.9`,
+      missingTmuxAndDocker,
+    );
 
     expect(report.allRequiredFound).toBe(false);
     expect(report.checks.find((check) => check.id === 'tmux')).toMatchObject({ found: false, version: null });
     expect(report.checks.find((check) => check.id === 'docker')).toMatchObject({ found: false, required: false });
 
-    const onlyOptionalMissing = await checkSystemPrerequisites(async (cmd) => {
-      if (cmd === 'docker' || cmd === 'codex') throw new Error('ENOENT');
-      return `${cmd} 9.9.9`;
-    });
+    const onlyOptionalMissing = await checkSystemPrerequisites(
+      async (cmd) => `${cmd} 9.9.9`,
+      async (command) => command === 'docker' || command === 'codex' ? null : `/resolved/bin/${command}`,
+    );
     expect(onlyOptionalMissing.allRequiredFound).toBe(true);
   });
 

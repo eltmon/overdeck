@@ -16,6 +16,7 @@ import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { resetPipelineVerdictsForWorkStartSync } from '../review-status.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -164,6 +165,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     role,
     model: selectedModel,
   });
+  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
   // PAN-2285: never launch a fresh Codex agent when native Codex auth is
   // missing/expired/burned — it would wedge silently in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
@@ -318,7 +320,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
   if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
 
-  const extraEnvExports = [...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])];
+  const extraEnvExports = [harnessLaunch.pathExport, ...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])];
   if (role === 'knowledge' && !extraEnvExports.includes('export PATH="$HOME/.overdeck/bin:$PATH"')) {
     extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
   }
@@ -499,6 +501,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role,
     model: selectedModel,
   });
+  const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
   // PAN-2285: never launch a fresh Codex agent when native Codex auth is
   // missing/expired/burned — it would wedge silently in a 401 loop.
   assertCodexNativeAuthForSpawn(resolvedHarness, listAgentStates());
@@ -677,7 +680,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
     sessionId: state.sessionId,
-    extraEnvExports: flywheelEnvExports(flywheelEnv),
+    extraEnvExports: [harnessLaunch.pathExport, ...flywheelEnvExports(flywheelEnv)],
     effort: options.effort,
   });
 

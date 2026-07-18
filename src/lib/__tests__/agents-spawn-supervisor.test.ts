@@ -13,6 +13,7 @@ let packageRootDir: string;
 let createSessionMock: ReturnType<typeof vi.fn>;
 let sendRawKeystrokeMock: ReturnType<typeof vi.fn>;
 let resolveHarnessMock: ReturnType<typeof vi.fn>;
+let prepareHarnessLaunchMock: ReturnType<typeof vi.fn>;
 let emitAgentEventMock: ReturnType<typeof vi.fn>;
 let ensureLifecycleHooksMock: ReturnType<typeof vi.fn>;
 let capturePaneText: string;
@@ -49,12 +50,19 @@ function mockSpawnDependencies(): void {
   resolveHarnessMock = vi.fn(async ({ explicit, model }: { explicit?: string; model: string }) => {
     if (explicit) return explicit;
     if (model === 'gpt-5.5') return 'codex';
-    if (model === 'kimi-k2.6') return 'pi';
+    if (model === 'kimi-k2.6') return 'ohmypi';
     return 'claude-code';
   });
+  prepareHarnessLaunchMock = vi.fn(async (harness: string) => ({
+    binaryPath: `/home/test/.local/bin/${harness === 'claude-code' ? 'claude' : harness === 'ohmypi' ? 'omp' : 'codex'}`,
+    pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+  }));
 
   vi.doMock('../harness-resolve.js', () => ({
     resolveHarness: resolveHarnessMock,
+  }));
+  vi.doMock('../harness-binary.js', () => ({
+    prepareHarnessLaunch: prepareHarnessLaunchMock,
   }));
   vi.doMock('../agent-runtime.js', () => ({
     emitAgentEvent: emitAgentEventMock,
@@ -196,6 +204,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.doUnmock('../harness-resolve.js');
+  vi.doUnmock('../harness-binary.js');
   vi.doUnmock('../agent-runtime.js');
   vi.doUnmock('../agents/hook-readiness.js');
   vi.doUnmock('../agent-runtime-mirror.js');
@@ -385,9 +394,11 @@ describe('spawnAgent PTY supervisor wiring', () => {
       });
 
       expect(openaiState.harness).toBe('codex');
-      expect(kimiState.harness).toBe('pi');
+      expect(kimiState.harness).toBe('ohmypi');
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'gpt-5.5' });
       expect(resolveHarnessMock).toHaveBeenCalledWith({ explicit: undefined, role: 'work', model: 'kimi-k2.6' });
+      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('codex');
+      expect(prepareHarnessLaunchMock).toHaveBeenCalledWith('ohmypi');
     } finally {
       delete process.env.KIMI_API_KEY;
     }

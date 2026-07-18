@@ -39,7 +39,9 @@ describe('VerificationGatesGrid', () => {
     render(<VerificationGatesGrid verification={verification} />);
 
     expect(screen.getByTestId('verification-gate-typecheck')).toHaveAttribute('data-gate-status', 'passed');
+    expect(screen.getByTestId('verification-gate-typecheck')).toHaveAccessibleName('typecheck: pass');
     expect(screen.getByTestId('verification-gate-lint')).toHaveAttribute('data-gate-status', 'failed');
+    expect(screen.getByTestId('verification-gate-lint')).toHaveAccessibleName('lint: fail');
     expect(screen.getByTestId('verification-gate-test')).toHaveAttribute('data-gate-status', 'pending');
     expect(screen.getByTestId('verification-gate-uat')).toHaveAttribute('data-gate-status', 'infra-unavailable');
 

@@ -744,7 +744,9 @@ async function runVerificationForIssuePromise(
       return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
     }
 
-    const taskBlockers = await checkIncompletePlanItemsPromise(workspacePath, issueId);
+    const taskBlockers = options.skipPlanChecklist
+      ? []
+      : await checkIncompletePlanItemsPromise(workspacePath, issueId);
     if (taskBlockers.length > 0) {
       const newCycleCount = currentCycles + 1;
       const failedCheck = 'incomplete-plan-items';

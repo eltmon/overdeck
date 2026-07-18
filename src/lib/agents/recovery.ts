@@ -7,6 +7,7 @@ import { sendGracefulRestartWarning } from '../graceful-restart.js';
 import { checkHookSync, generateFixedPointPromptSync } from '../hooks.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { normalizeModelOverrideSync, requireModelOverrideSync } from '../model-validation.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
@@ -99,18 +100,20 @@ export async function restartAgent(
     return { success: false, error: reason };
   }
 
-  if (graceful && await Effect.runPromise(sessionExists(normalizedId))) {
-    await sendGracefulRestartWarning(normalizedId, agentState.harness, agentState.workspace);
-  }
-
-  await Effect.runPromise(stopAgent(normalizedId));
-
   const effectiveModel = newModel || requireModelOverrideSync(agentState.model || 'claude-sonnet-4-6');
   const effectiveHarness = await resolveHarness({
     explicit: newHarness ?? agentState.harness,
     role: agentState.role,
     model: effectiveModel,
   });
+  const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
+
+  if (graceful && await Effect.runPromise(sessionExists(normalizedId))) {
+    await sendGracefulRestartWarning(normalizedId, agentState.harness, agentState.workspace);
+  }
+
+  await Effect.runPromise(stopAgent(normalizedId));
+
   if (newModel && newModel !== agentState.model) {
     agentState.model = newModel;
   }
@@ -132,6 +135,7 @@ export async function restartAgent(
       harness: effectiveHarness,
       useSupervisor: supervisorLaunch.useSupervisor,
       supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
+      extraEnvExports: [harnessLaunch.pathExport],
     });
 
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
@@ -311,6 +315,7 @@ export async function recoverAgent(
   // and route through getRoleRuntimeBaseCommand so review/test/ship don't get
   // resurrected as work agents.
   const recoveryHarness: RuntimeName = normalizeHarness(state.harness ?? null) ?? 'claude-code';
+  const harnessLaunch = await prepareHarnessLaunch(recoveryHarness);
   const recoverySupervisorLaunch = await prepareSupervisorForRelaunch(normalizedId, state, state.model, recoveryHarness);
   saveAgentStateSync(state);
 
@@ -327,6 +332,7 @@ export async function recoverAgent(
       role: recoveryRole,
       isPlanning: recoveryRole === 'plan',
       harness: 'ohmypi',
+      extraEnvExports: [harnessLaunch.pathExport],
     });
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
@@ -361,6 +367,7 @@ export async function recoverAgent(
     changeDir: false,
     setTerminalEnv: true,
     providerExports: (await getProviderExportsForModel(state.model)).trimEnd(),
+    extraEnvExports: [harnessLaunch.pathExport],
     baseCommand: await getRoleRuntimeBaseCommand(state.model, normalizedId, recoveryRole, recoveryHarness),
     appendSystemPromptFiles: await claudeSystemPromptFiles(state.workspace, recoveryHarness),
     ...(recoveryHarness === 'codex' ? {} : { promptInline: recoveryPrompt }),

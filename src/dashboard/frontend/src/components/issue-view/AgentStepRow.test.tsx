@@ -177,6 +177,7 @@ describe('AgentStepRow', () => {
     expect(screen.getByText('Work')).toBeInTheDocument();
     expect(screen.getByText('sonnet-4-6')).toBeInTheDocument();
     expect(screen.getByText('2m')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Work/ })).toHaveAttribute('title', 'Work — running');
   });
 
   it('renders a rail row with slot label for swarm slots', () => {
