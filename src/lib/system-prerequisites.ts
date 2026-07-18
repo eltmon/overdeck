@@ -3,23 +3,21 @@
  *
  * Overdeck drives host tools — tmux sessions, the Claude Code CLI, git — that
  * no install flavor bundles (the desktop app ships only the dashboard). The
- * checks run from the SERVER process, so what they see on PATH is exactly what
- * spawned agents and conversations will see; a tool missing here is a tool
- * whose spawn will fail. Served by GET /api/prerequisites and rendered by the
- * frontend SetupChecklistBanner.
+ * checks and harness launchers share one executable resolver so a GUI-started
+ * dashboard with a minimal PATH cannot accept or reject a harness differently
+ * from the process it later launches. Served by GET /api/prerequisites and
+ * rendered by the frontend SetupChecklistBanner.
  *
- * Detection runs `<cmd> <versionArg>` directly (ENOENT = not installed),
- * which both proves the tool is executable and captures its version in one
+ * Detection resolves an absolute executable path before running its version
  * probe. Install hints are copyable commands, not actions — installing system
  * packages needs sudo/user consent, so Overdeck never runs them itself.
  */
 
 import { execFile } from 'node:child_process';
-import { access } from 'node:fs/promises';
-import { constants } from 'node:fs';
 import { homedir } from 'node:os';
-import { delimiter, join } from 'node:path';
 import { promisify } from 'node:util';
+
+import { resolveExecutable } from './harness-binary.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -168,6 +166,7 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
 ];
 
 export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;
+export type PrerequisiteResolver = (command: string) => Promise<string | null>;
 
 const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
   const { stdout } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
@@ -193,52 +192,24 @@ function failureKind(error: unknown): string {
   return 'probe failed';
 }
 
-async function executablePath(command: string, pathValue: string): Promise<string | null> {
-  for (const directory of pathValue.split(delimiter).filter(Boolean)) {
-    const candidate = join(directory, command);
-    try {
-      await access(candidate, constants.X_OK);
-      return redactHome(candidate);
-    } catch {
-      // Continue through PATH. Diagnostics must remain best-effort.
-    }
-  }
-  return null;
-}
-
 /** Build a bounded, secret-free support report from the dashboard process environment. */
 export async function collectSetupDiagnostics(overdeckVersion: string): Promise<SetupDiagnosticsReport> {
   const pathValue = process.env['PATH'] ?? '';
   const toolLines = await Promise.all(PREREQUISITES.map(async ({ id, versionArgs }) => {
-    const resolvedPath = await executablePath(id, pathValue);
+    const resolvedPath = await resolveExecutable(id, { pathValue });
+    if (!resolvedPath) return `✗ ${id}: command not found`;
     try {
-      const output = await defaultProbe(id, versionArgs);
-      return `✓ ${id}: ${firstLine(output) ?? 'version unavailable'} — ${resolvedPath ?? 'path unresolved'}`;
+      const output = await defaultProbe(resolvedPath, versionArgs);
+      return `✓ ${id}: ${firstLine(output) ?? 'version unavailable'} — ${redactHome(resolvedPath)}`;
     } catch (error) {
-      return `✗ ${id}: ${failureKind(error)}${resolvedPath ? ` — ${resolvedPath}` : ''}`;
+      return `✗ ${id}: ${failureKind(error)} — ${redactHome(resolvedPath)}`;
     }
   }));
 
-  const claudeCandidates = [
-    join(homedir(), '.local', 'bin', 'claude'),
-    join(homedir(), '.npm-global', 'bin', 'claude'),
-    join(homedir(), '.bun', 'bin', 'claude'),
-  ];
-  const candidateLines = await Promise.all(claudeCandidates.map(async (candidate) => {
-    try {
-      await access(candidate, constants.X_OK);
-      return `- ${redactHome(candidate)}: executable`;
-    } catch {
-      return `- ${redactHome(candidate)}: missing`;
-    }
-  }));
-  const claudeOnPath = await executablePath('claude', pathValue);
-  const candidateFound = candidateLines.some((line) => line.endsWith(': executable'));
-  const likelyCause = !claudeOnPath && candidateFound
-    ? 'Claude appears to be installed, but its directory is absent from the dashboard server PATH. Restart Overdeck after correcting PATH.'
-    : !claudeOnPath
-      ? 'The dashboard server cannot find a Claude executable on PATH or in the common user install locations checked.'
-      : 'Claude is visible on the dashboard server PATH; use the probe result above if startup still fails.';
+  const claudePath = await resolveExecutable('claude', { pathValue });
+  const likelyCause = claudePath
+    ? 'Claude resolved to an executable path; conversation and agent launchers will prepend that directory to PATH.'
+    : 'Claude was not found on the server PATH, in common user install locations, under the global npm prefix, or through the login shell.';
 
   const markdown = [
     '## Overdeck setup diagnostics',
@@ -254,9 +225,8 @@ export async function collectSetupDiagnostics(overdeckVersion: string): Promise<
     ...toolLines,
     '',
     '### Claude lookup',
-    `Dashboard PATH lookup: ${claudeOnPath ?? 'not found'}`,
-    'Common user install locations:',
-    ...candidateLines,
+    `Shared resolver: ${claudePath ? redactHome(claudePath) : 'not found'}`,
+    'Lookup order: server PATH → ~/.local/bin → ~/.claude/local → ~/.npm-global/bin → global npm prefix/bin → ~/.bun/bin → login shell',
     '',
     `Likely cause: ${likelyCause}`,
     '',
@@ -268,11 +238,14 @@ export async function collectSetupDiagnostics(overdeckVersion: string): Promise<
 
 export async function checkSystemPrerequisites(
   probe: PrerequisiteProbe = defaultProbe,
+  resolver: PrerequisiteResolver = resolveExecutable,
 ): Promise<PrerequisitesReport> {
   const checks = await Promise.all(
     PREREQUISITES.map(async ({ versionArgs, ...definition }): Promise<PrerequisiteCheck> => {
       try {
-        const output = await probe(definition.id, versionArgs);
+        const executable = await resolver(definition.id);
+        if (!executable) return { ...definition, found: false, version: null };
+        const output = await probe(executable, versionArgs);
         return { ...definition, found: true, version: firstLine(output) };
       } catch {
         return { ...definition, found: false, version: null };

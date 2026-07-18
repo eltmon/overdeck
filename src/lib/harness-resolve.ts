@@ -1,16 +1,10 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { canUseHarnessSync, canUseModelWithAuthSync } from './harness-policy.js';
+import { harnessBinaryName, resolveHarnessBinary } from './harness-binary.js';
 import { getBuiltInDefaultHarness, getProviderForModelSync } from './providers.js';
 import type { RuntimeName } from './runtimes/types.js';
 import type { Role } from './agents.js';
 import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 
-const execAsync = promisify(exec);
-const BINARY_BY_HARNESS: Partial<Record<RuntimeName, string>> = {
-  ohmypi: 'omp',
-  codex: 'codex',
-};
 const harnessAvailabilityCache = new Map<RuntimeName, Promise<boolean>>();
 const builtInDefaultNoticeProviders = new Set<string>();
 
@@ -39,16 +33,14 @@ async function getProviderAuthModeForModel(model: string) {
 }
 
 async function hasHarnessBinary(harness: RuntimeName): Promise<boolean> {
-  const binary = BINARY_BY_HARNESS[harness];
-  if (!binary) return true;
+  // Claude Code availability is enforced by the shared launch preflight. Keep
+  // the native fallback decision here independent of whether Claude is installed.
+  if (harness === 'claude-code') return true;
 
   const cached = harnessAvailabilityCache.get(harness);
   if (cached) return cached;
 
-  const check = execAsync(`command -v ${binary}`).then(
-    () => true,
-    () => false
-  );
+  const check = resolveHarnessBinary(harness).then((resolved) => resolved !== null);
   harnessAvailabilityCache.set(harness, check);
   return check;
 }
@@ -108,7 +100,7 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
   }
 
   if (!(await hasHarnessBinary(winner))) {
-    const binary = BINARY_BY_HARNESS[winner];
+    const binary = harnessBinaryName(winner);
     // PAN-1871 — never silently fall back to claude-code from a non-native
     // (CLIProxy) model whose own binary is missing at spawn. Silently routing
     // kimi onto claude-code is what leaked PAN-1845. Fail loudly so the cause is

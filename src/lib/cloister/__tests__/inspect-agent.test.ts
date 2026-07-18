@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   loadConfigSync: vi.fn(),
   loadPrdDraft: vi.fn(),
   mkdirSync: vi.fn(),
+  prepareHarnessLaunch: vi.fn(),
   readFileSync: vi.fn(),
   readWorkspacePlanSync: vi.fn(),
   setReviewStatusSync: vi.fn(),
@@ -59,6 +60,10 @@ vi.mock('../../review-status.js', () => ({
 
 vi.mock('../../bd-mutex.js', () => ({
   withBdMutex: <T>(effect: T) => effect,
+}));
+
+vi.mock('../../harness-binary.js', () => ({
+  prepareHarnessLaunch: mocks.prepareHarnessLaunch,
 }));
 
 vi.mock('../../launcher-generator.js', () => ({
@@ -120,6 +125,10 @@ describe('spawnInspectAgent', () => {
     mocks.getDiffStats.mockReturnValue(Effect.succeed('diff stats'));
     mocks.getCurrentHead.mockReturnValue(Effect.succeed('fedcba9876543210'));
     mocks.getProviderEnvForModel.mockResolvedValue({});
+    mocks.prepareHarnessLaunch.mockResolvedValue({
+      binaryPath: '/home/test/.local/bin/claude',
+      pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+    });
     mocks.generateLauncherScriptSync.mockReturnValue('#!/usr/bin/env bash\n');
     mocks.saveAgentState.mockReturnValue(Effect.succeed(undefined));
     mocks.loadConfigSync.mockReturnValue({ config: {} });
@@ -165,8 +174,11 @@ describe('spawnInspectAgent', () => {
       message: 'Spawned inspect for PAN-1613 item workspace-b95lw',
     }));
     expect(result.skipped).toBeUndefined();
+    expect(mocks.prepareHarnessLaunch).toHaveBeenCalledWith('claude-code');
     expect(mocks.sessionExists).toHaveBeenCalledWith('inspect-pan-1613-workspace-b95lw');
-    expect(mocks.generateLauncherScriptSync).toHaveBeenCalled();
+    expect(mocks.generateLauncherScriptSync).toHaveBeenCalledWith(expect.objectContaining({
+      extraEnvExports: [`export PATH='/home/test/.local/bin':"$PATH"`],
+    }));
     expect(mocks.createSession).toHaveBeenCalledWith(
       'inspect-pan-1613-workspace-b95lw',
       '/workspace',
@@ -178,6 +190,28 @@ describe('spawnInspectAgent', () => {
       inspectBeadId: 'workspace-b95lw',
       inspectOwnerSession: 'inspect-pan-1613-workspace-b95lw',
     }));
+  });
+
+  it('does not create a tmux session when Claude is missing', async () => {
+    mocks.prepareHarnessLaunch.mockRejectedValue(
+      new Error('Claude Code executable was not found. Install Claude Code or add its installation directory to PATH, then restart Overdeck. No terminal session was created.'),
+    );
+
+    const result = await Effect.runPromise(spawnInspectAgent({
+      projectKey: 'overdeck',
+      projectPath: '/repo',
+      issueId: 'PAN-2869',
+      itemId: 'workspace-b95lw',
+      workspace: '/workspace',
+    }));
+
+    expect(result).toEqual(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining('Install Claude Code or add its installation directory to PATH'),
+    }));
+    expect(result.error).not.toContain('execvp');
+    expect(mocks.sessionExists).not.toHaveBeenCalled();
+    expect(mocks.createSession).not.toHaveBeenCalled();
   });
 
   it('writes a minimal state.json so the inspect agent is enumerable', async () => {

@@ -12,6 +12,8 @@ export interface WorkspaceInfo {
 
 export interface VerificationRunnerOptions {
   syncTargetBranch?: boolean;
+  /** Strike workspaces intentionally have no vBRIEF checklist. */
+  skipPlanChecklist?: boolean;
   /** PAN-2487: receives human-readable gate progress lines (ship-log mirror). */
   onGateLog?: (line: string) => void;
 }

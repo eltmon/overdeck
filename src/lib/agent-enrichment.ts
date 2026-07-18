@@ -181,13 +181,19 @@ function getProjectPathByPrefix(issuePrefix: string): string {
     const trimmed = paneCwd.trim()
     if (trimmed && existsSync(trimmed)) return trimmed
   } catch {}
-  const issueId = agentId.replace(/^(agent-|planning-)/, '').toUpperCase()
+  const isStrikeAgent = agentId.startsWith('strike-')
+  const issueId = agentId.replace(/^(agent-|planning-|strike-)/, '').toUpperCase()
   const prefix = extractPrefixSync(issueId)
   if (!prefix) return null
   try {
     const projectPath = getProjectPathByPrefix(prefix)
-    const workspacePath = join(projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`)
-    if (existsSync(workspacePath)) return workspacePath
+    const workspaceNames = isStrikeAgent
+      ? [`feature-${issueId.toLowerCase()}-strike`, `feature-${issueId.toLowerCase()}`]
+      : [`feature-${issueId.toLowerCase()}`]
+    for (const workspaceName of workspaceNames) {
+      const workspacePath = join(projectPath, 'workspaces', workspaceName)
+      if (existsSync(workspacePath)) return workspacePath
+    }
     return projectPath
   } catch {
     return null

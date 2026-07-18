@@ -23,11 +23,25 @@ function blockerKind(status: ReviewStatus): string | null {
   return null;
 }
 
+function lensGatherErrorSummary(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const githubAppHint = /GitHub API .* failed: 404/i.test(message) && !/GitHub App not configured/i.test(message)
+    ? ' — GitHub App not configured for this repository or repository inaccessible'
+    : '';
+  return `${message.slice(0, 300)}${githubAppHint}`;
+}
+
 async function loadPipelineMembership(): Promise<PipelineMembership[]> {
   const projects = listProjectsSync().filter(({ config }) => config.github_repo);
   const results = await gatherProjectLensSignalsForProjects(projects.map(({ config }) => config));
-  const failed = results.find((result) => result.error);
-  if (failed) throw failed.error;
+  const failed = results.filter((result) => result.error);
+  for (const result of failed) {
+    console.error(`[review pending] Skipping project ${result.project.name}: lens gather failed — ${lensGatherErrorSummary(result.error)}`);
+  }
+  if (results.length > 0 && failed.length === results.length) {
+    const summaries = failed.map((result) => `${result.project.name}: ${lensGatherErrorSummary(result.error)}`);
+    throw new Error(`Pipeline membership lens gather failed for all projects — ${summaries.join('; ')}`);
+  }
   return results.flatMap((result) => result.signals ?? [])
     .map(resolvePipelineMembership).filter((membership) => membership.inPipeline);
 }

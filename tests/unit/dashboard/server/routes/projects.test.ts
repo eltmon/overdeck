@@ -83,7 +83,11 @@ vi.mock('../../../../../src/lib/vbrief/io.js', () => ({
   isPlanningComplete: mockIsPlanningComplete,
 }));
 
-import { fetchProjectSessionTree, getSlotWorkSessionNumber } from '../../../../../src/dashboard/server/routes/projects.ts';
+import {
+  fetchProjectSessionTree,
+  getSessionTreeWorkspacePath,
+  getSlotWorkSessionNumber,
+} from '../../../../../src/dashboard/server/routes/projects.ts';
 import { listProjectsSync } from '../../../../../src/lib/projects.js';
 import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
@@ -163,6 +167,15 @@ describe('fetchProjectSessionTree', () => {
     expect(getSlotWorkSessionNumber('agent-pan-2203-slot-1', 'pan-2203')).toBe(1);
     expect(getSlotWorkSessionNumber('agent-pan-2203-slot-2', 'pan-2203')).toBe(2);
     expect(getSlotWorkSessionNumber('agent-pan-2203-2', 'pan-2203')).toBeNull();
+  });
+
+  it('derives the strike workspace for strike session tree nodes', () => {
+    expect(getSessionTreeWorkspacePath(
+      'pan-2857',
+      '/tmp/overdeck/workspaces/feature-pan-2857',
+      '/tmp/overdeck',
+      'strike-pan-2857',
+    )).toBe('/tmp/overdeck/workspaces/feature-pan-2857-strike');
   });
 
   it('aggregates sessions for active feature workspaces', async () => {

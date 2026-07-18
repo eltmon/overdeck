@@ -22,6 +22,7 @@ import {
   saveCheckpoint,
 } from './inspect-checkpoints.js';
 import { setReviewStatusSync } from '../review-status.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import {
   createSession,
@@ -197,6 +198,8 @@ async function spawnInspectAgentPromise(
     const supervisorRoute = await routeInspectToStandingSupervisorIfEnabled(context);
     if (supervisorRoute) return supervisorRoute;
 
+    const harnessLaunch = await prepareHarnessLaunch('claude-code');
+
     if (await Effect.runPromise(sessionExists(tmuxSession))) {
       // Stale session left behind by a previous inspection run — clear it.
       await Effect.runPromise(killSession(tmuxSession)).catch(() => {});
@@ -240,6 +243,7 @@ async function spawnInspectAgentPromise(
         workingDir: context.workspace,
         setTerminalEnv: true,
         unsetProviderEnv: true,
+        extraEnvExports: [harnessLaunch.pathExport],
         providerExports: Object.entries(providerEnv)
           .map(([k, v]) => `export ${k}='${v.replace(/'/g, "'\"'\"'")}'`)
           .join('\n') + (Object.keys(providerEnv).length ? '\n' : ''),

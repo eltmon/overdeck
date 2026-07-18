@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pendingCommand } from '../../../src/cli/commands/pending.js';
 import { getAllReviewStatusesFromDb } from '../../../src/lib/overdeck/review-status-sync.js';
 import { gatherProjectLensSignalsForProjects } from '../../../src/lib/pipeline-membership-gather.js';
+import { listProjectsSync } from '../../../src/lib/projects.js';
 import type { ReviewStatus } from '../../../src/lib/review-status.js';
 
 vi.mock('../../../src/lib/overdeck/review-status-sync.js', () => ({
@@ -26,6 +27,7 @@ vi.mock('../../../src/lib/pipeline-membership-gather.js', () => ({
 
 const getStatuses = vi.mocked(getAllReviewStatusesFromDb);
 const gatherProjects = vi.mocked(gatherProjectLensSignalsForProjects);
+const listProjects = vi.mocked(listProjectsSync);
 
 function signal(issueId: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -63,6 +65,10 @@ describe('pendingCommand', () => {
   beforeEach(() => {
     logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     getStatuses.mockReturnValue({});
+    listProjects.mockReturnValue([{
+      key: 'overdeck',
+      config: { name: 'overdeck', path: '/project', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN' },
+    }]);
     gatherProjects.mockResolvedValue([{
       project: { name: 'overdeck', path: '/project' },
       signals: [signal('PAN-1'), signal('PAN-2'), signal('PAN-3')],
@@ -152,5 +158,56 @@ describe('pendingCommand', () => {
     await pendingCommand({ blocked: true });
     expect(output(logSpy)).toContain('PAN-1');
     expect(output(logSpy)).not.toContain('PAN-2');
+  });
+
+  it('skips a failed project and lists memberships from healthy projects', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    listProjects.mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/project', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN' },
+      },
+      {
+        key: 'lexerra',
+        config: { name: 'lexerra', path: '/lexerra', github_repo: 'eltmon/lexerra', issue_prefix: 'LEX' },
+      },
+    ]);
+    gatherProjects.mockResolvedValue([
+      { project: { name: 'overdeck', path: '/project' }, signals: [signal('PAN-1')] },
+      {
+        project: { name: 'lexerra', path: '/lexerra' },
+        error: new Error('GitHub API GET /repos/eltmon/lexerra/issues failed: 404'),
+      },
+    ]);
+
+    await pendingCommand();
+
+    expect(output(logSpy)).toContain('PAN-1');
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining(
+      '[review pending] Skipping project lexerra: lens gather failed',
+    ));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('GitHub App not configured'));
+  });
+
+  it('fails clearly when every project lens gather fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    listProjects.mockReturnValue([
+      {
+        key: 'overdeck',
+        config: { name: 'overdeck', path: '/project', github_repo: 'eltmon/overdeck', issue_prefix: 'PAN' },
+      },
+      {
+        key: 'lexerra',
+        config: { name: 'lexerra', path: '/lexerra', github_repo: 'eltmon/lexerra', issue_prefix: 'LEX' },
+      },
+    ]);
+    gatherProjects.mockResolvedValue([
+      { project: { name: 'overdeck', path: '/project' }, error: new Error('overdeck unavailable') },
+      { project: { name: 'lexerra', path: '/lexerra' }, error: new Error('lexerra unavailable') },
+    ]);
+
+    await expect(pendingCommand()).rejects.toThrow(
+      'Pipeline membership lens gather failed for all projects — overdeck: overdeck unavailable; lexerra: lexerra unavailable',
+    );
   });
 });

@@ -45,6 +45,7 @@ import type {
 import { OHMYPI_BEHAVIOR } from './behavior.js'
 import { sessionExists, killSession, createSession, listSessionsSync } from '../tmux.js'
 import { parseOhmypiSessionSync } from '../cost-parsers/ohmypi-parser.js'
+import { prepareHarnessLaunch } from '../harness-binary.js'
 import { generateLauncherScriptSync } from '../launcher-generator.js'
 import { createOhmypiFifo, destroyOhmypiFifoSync, writeOhmypiCommandSync, ohmypiFifoPaths, OhmypiNotReady } from './ohmypi-fifo.js'
 import { ProcessSpawnError, ProcessTimeoutError, TmuxError } from '../errors.js'
@@ -328,6 +329,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       throw new Error('OhmypiRuntime.spawnAgent requires piExtensionPath in config')
     }
 
+    const harnessLaunch = await prepareHarnessLaunch('ohmypi')
     const agentId = config.agentId
     const dir = agentDirFor(agentId)
     const sessionDir = ohmypiSessionDirFor(agentId)
@@ -361,6 +363,7 @@ export class OhmypiRuntimeSync implements AgentRuntimeSync {
       resumeSessionId,
       overdeckEnv: { agentId },
       setTerminalEnv: true,
+      extraEnvExports: [harnessLaunch.pathExport],
       trapHup: true,
     })
 
