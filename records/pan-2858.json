@@ -192,9 +192,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T13:59:12.419Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-18T14:14Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-18T14:14:32.334Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-18T14:14:32Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nACP sessions are discoverable but dashboard transcript parsing is unwired, leaving live views in perpetual discovery and ended agent conversations empty.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -471,7 +484,7 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T14:14:31.751Z",
+  "updated": "2026-07-18T14:14:32.335Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "blocked",
