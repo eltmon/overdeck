@@ -49,6 +49,73 @@ async function checkCommand(cmd: string, args: string[] = ["--version"]): Promis
   }
 }
 
+export type LinuxPackageManager = "pacman" | "dnf" | "zypper" | "apk" | "apt-get";
+type LinuxPackageTool = "tmux" | "jq";
+type CommandAvailable = (command: string) => Promise<boolean>;
+
+const LINUX_PACKAGE_MANAGERS: readonly LinuxPackageManager[] = [
+  "pacman",
+  "dnf",
+  "zypper",
+  "apk",
+  "apt-get",
+];
+
+export async function detectLinuxPackageManager(
+  commandAvailable: CommandAvailable = checkCommand,
+): Promise<LinuxPackageManager | null> {
+  for (const packageManager of LINUX_PACKAGE_MANAGERS) {
+    if (await commandAvailable(packageManager)) return packageManager;
+  }
+  return null;
+}
+
+export function getLinuxInstallCommand(
+  tool: LinuxPackageTool,
+  packageManager: LinuxPackageManager,
+): string {
+  switch (packageManager) {
+    case "pacman":
+      return `sudo pacman -S --noconfirm ${tool}`;
+    case "dnf":
+      return `sudo dnf install -y ${tool}`;
+    case "zypper":
+      return `sudo zypper install -y ${tool}`;
+    case "apk":
+      return `sudo apk add ${tool}`;
+    case "apt-get":
+      return `sudo apt-get update && sudo apt-get install -y ${tool}`;
+  }
+}
+
+export function getLinuxManualInstallHint(
+  tool: LinuxPackageTool,
+  packageManager: LinuxPackageManager | null,
+): string {
+  if (packageManager) return getLinuxInstallCommand(tool, packageManager);
+  const downloadUrl =
+    tool === "jq"
+      ? "https://jqlang.github.io/jq/download/"
+      : "https://github.com/tmux/tmux/wiki/Installing";
+  return `${tool} — download from ${downloadUrl}`;
+}
+
+async function installLinuxPackage(tool: LinuxPackageTool): Promise<void> {
+  const packageManager = await detectLinuxPackageManager();
+  if (!packageManager) {
+    throw new Error(
+      `No supported Linux package manager found. Install ${getLinuxManualInstallHint(tool, null)}`,
+    );
+  }
+  await execAsync(getLinuxInstallCommand(tool, packageManager), { timeout: 120000 });
+}
+
+async function getManualInstallHint(tool: LinuxPackageTool): Promise<string> {
+  const plat = await Effect.runPromise(detectPlatform());
+  if (plat === "darwin") return `brew install ${tool}`;
+  return getLinuxManualInstallHint(tool, await detectLinuxPackageManager());
+}
+
 export async function isToolInstalled(tool: PrereqTool): Promise<boolean> {
   if (tool === "docker") {
     return checkCommand("docker", ["info"]);
@@ -132,22 +199,11 @@ export async function installTool(tool: PrereqTool): Promise<InstallResult> {
  * Optional integrations are best-effort. Already-present tools are silent no-ops.
  */
 export async function ensureHostTools(): Promise<void> {
-  const tools: Array<{ tool: PrereqTool; label: string; fatal: boolean; manual: string }> = [
-    {
-      tool: "tmux",
-      label: "tmux",
-      fatal: true,
-      manual: "brew install tmux (macOS) or sudo apt-get install tmux (Linux)",
-    },
-    {
-      tool: "jq",
-      label: "jq",
-      fatal: false,
-      manual:
-        "brew install jq (macOS) or sudo apt install jq (Linux) — the Claude Code hooks (auto-approve, live status, cost tracking) need it.",
-    },
+  const tools: Array<{ tool: LinuxPackageTool; label: string; fatal: boolean }> = [
+    { tool: "tmux", label: "tmux", fatal: true },
+    { tool: "jq", label: "jq", fatal: false },
   ];
-  for (const { tool, label, fatal, manual } of tools) {
+  for (const { tool, label, fatal } of tools) {
     if (await isToolInstalled(tool)) continue;
     console.log(chalk.yellow(`  ${label} not found. Installing...`));
     const result = await installTool(tool);
@@ -160,7 +216,12 @@ export async function ensureHostTools(): Promise<void> {
         ? chalk.red(`  ✗ Failed to install ${label}: ${result.message}`)
         : chalk.yellow(`  ⚠ Failed to install ${label}: ${result.message}`),
     );
-    console.error(chalk.dim(`  Install manually: ${manual}`));
+    const manual = await getManualInstallHint(tool);
+    const context =
+      tool === "jq"
+        ? " — the Claude Code hooks (auto-approve, live status, cost tracking) need it."
+        : "";
+    console.error(chalk.dim(`  Install manually: ${manual}${context}`));
     if (fatal) process.exit(1);
   }
 }
@@ -172,9 +233,7 @@ async function installTmux(): Promise<InstallResult> {
   if (plat === "darwin") {
     await execAsync("brew install tmux", { timeout: 120000 });
   } else {
-    await execAsync("sudo apt-get update && sudo apt-get install -y tmux", {
-      timeout: 120000,
-    });
+    await installLinuxPackage("tmux");
   }
   return { tool: "tmux", success: true, message: "tmux installed" };
 }
@@ -239,9 +298,7 @@ async function installJq(): Promise<InstallResult> {
   if (plat === "darwin") {
     await execAsync("brew install jq", { timeout: 120000 });
   } else {
-    await execAsync("sudo apt-get update && sudo apt-get install -y jq", {
-      timeout: 120000,
-    });
+    await installLinuxPackage("jq");
   }
   return { tool: "jq", success: true, message: "jq installed" };
 }

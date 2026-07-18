@@ -1409,4 +1409,4 @@ if (process.argv.length === 2) {
 }
 
 // Short-lived commands must drain durable state writes before exit (PAN-2692).
-await program.parseAsync().finally(drainPendingDurableWrites);
+await program.parseAsync(process.argv, { from: 'node' }).finally(drainPendingDurableWrites);
