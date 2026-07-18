@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-18T20:23:12.989Z",
+  "updated": "2026-07-18T20:23:27.602Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -114,8 +114,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "grep-audit": {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 2700246,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T20:23:27.602Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -296,6 +304,7 @@
     "docs-migration": "completed",
     "docs-migration.docs-migration.ac1": "completed",
     "docs-migration.docs-migration.ac2": "completed",
-    "docs-migration.docs-migration.ac3": "completed"
+    "docs-migration.docs-migration.ac3": "completed",
+    "grep-audit": "running"
   }
 }
