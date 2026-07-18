@@ -22,6 +22,7 @@ import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawne
 import type * as EffectAcpSchema from "effect-acp/schema";
 
 import { BRIDGE_TOKEN_HEADER } from "../bridge-token.js";
+import { INPUT_PURGE_MAX_CHARS } from "../channels/injection-budget.js";
 import { renderAcpHostEvent, stripAcpPaneControl } from "./host-render.js";
 import {
   isRejectPermissionOption,
@@ -86,28 +87,40 @@ export class AcpHost {
   async start(): Promise<void> {
     await mkdir(this.agentDir(), { recursive: true });
     await mkdir(this.socketDir(), { recursive: true });
+    await rm(this.sessionIdPath(), { force: true });
+    await rm(this.socketPath(), { force: true });
+
     this.token = randomUUID();
     await writeFile(this.tokenPath(), `${this.token}\n`, { mode: FILE_MODE });
     await chmod(this.tokenPath(), FILE_MODE);
 
-    await Effect.runPromise(
-      this.options.runtime.handleSessionUpdate((notification) =>
-        Effect.sync(() => {
-          this.observedSessionUpdates += 1;
-          this.sessionId = notification.sessionId;
-        }),
-      ),
-    );
-    await Effect.runPromise(
-      this.options.runtime.handleRequestPermission((request) =>
-        Effect.promise(() => this.handlePermissionRequest(request)),
-      ),
-    );
-    this.startEventPump();
-
-    let started: AcpSessionRuntimeStartResult;
     try {
-      started = await Effect.runPromise(this.options.runtime.start());
+      await Effect.runPromise(
+        this.options.runtime.handleSessionUpdate((notification) =>
+          Effect.sync(() => {
+            this.observedSessionUpdates += 1;
+            this.sessionId = notification.sessionId;
+          }),
+        ),
+      );
+      await Effect.runPromise(
+        this.options.runtime.handleRequestPermission((request) =>
+          Effect.promise(() => this.handlePermissionRequest(request)),
+        ),
+      );
+      this.startEventPump();
+
+      const started: AcpSessionRuntimeStartResult = await Effect.runPromise(
+        this.options.runtime.start(),
+      );
+      this.sessionId = started.sessionId;
+      if (this.options.model) {
+        await Effect.runPromise(this.options.runtime.setModel(this.options.model));
+      }
+      await this.listen();
+      this.state = "ready";
+      await writeFile(this.sessionIdPath(), `${started.sessionId}\n`, { mode: FILE_MODE });
+      await chmod(this.sessionIdPath(), FILE_MODE);
     } catch (error) {
       if (this.options.provider === "kimi" && isAuthenticationFailure(error)) {
         this.writePaneLine(
@@ -115,17 +128,9 @@ export class AcpHost {
         );
       }
       await this.stop();
+      await rm(this.sessionIdPath(), { force: true });
       throw error;
     }
-
-    this.sessionId = started.sessionId;
-    await writeFile(this.sessionIdPath(), `${started.sessionId}\n`, { mode: FILE_MODE });
-    await chmod(this.sessionIdPath(), FILE_MODE);
-    if (this.options.model) {
-      await Effect.runPromise(this.options.runtime.setModel(this.options.model));
-    }
-    await this.listen();
-    this.state = "ready";
   }
 
   async stop(): Promise<void> {
@@ -325,7 +330,6 @@ export class AcpHost {
   }
 
   private async listen(): Promise<void> {
-    await rm(this.socketPath(), { force: true });
     this.server = createServer((request, response) => {
       void this.handleRequest(request, response).catch((error) => {
         if (!response.headersSent) sendJson(response, 500, { error: errorMessage(error) });
@@ -351,13 +355,14 @@ export class AcpHost {
       sendJson(response, 401, { error: "unauthorized" });
       return;
     }
-    const chunks: Buffer[] = [];
-    for await (const chunk of request) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const body = await readBoundedBody(request, INPUT_PURGE_MAX_CHARS);
+    if (!body) {
+      sendJson(response, 413, { error: "request body too large" });
+      return;
     }
     let payload: unknown;
     try {
-      payload = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+      payload = JSON.parse(body.toString("utf-8"));
     } catch {
       sendJson(response, 400, { error: "invalid JSON body" });
       return;
@@ -398,6 +403,40 @@ export class AcpHost {
   private transcriptPath(): string {
     return join(this.agentDir(), "acp-session.jsonl");
   }
+}
+
+function readBoundedBody(
+  request: IncomingMessage,
+  maxBytes: number,
+): Promise<Buffer | null> {
+  return new Promise((resolve, reject) => {
+    let chunks: Buffer[] = [];
+    let totalBytes = 0;
+    let settled = false;
+
+    request.on("data", (chunk: Buffer | string) => {
+      if (settled) return;
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += buffer.length;
+      if (totalBytes > maxBytes) {
+        settled = true;
+        chunks = [];
+        resolve(null);
+        return;
+      }
+      chunks.push(buffer);
+    });
+    request.once("end", () => {
+      if (settled) return;
+      settled = true;
+      resolve(Buffer.concat(chunks));
+    });
+    request.once("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
+  });
 }
 
 function sendJson(response: ServerResponse, status: number, body: JsonRecord): void {

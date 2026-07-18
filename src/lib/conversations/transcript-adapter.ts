@@ -9,6 +9,8 @@
  * - Pi records have top-level `type: 'message'|'session'|'model_change'|
  *   'thinking_level_change'|...`, with the user/assistant role nested in
  *   `entry.message.role` and blocks of type `text|thinking|toolCall|toolResult`.
+ * - ACP records have top-level `role`, `content`, and optional normalized
+ *   `toolCalls` written by the persistent ACP host.
  * - Future harnesses (Codex, etc.) will have their own shapes.
  *
  * The handoff authoring pipeline doesn't care about any of that. It needs
@@ -22,12 +24,12 @@
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { homedir } from 'node:os';
 import { Effect } from 'effect';
 
+import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/transcript.js';
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
-import { sessionFilePath } from '../paths.js';
+import { getOverdeckHome, sessionFilePath } from '../paths.js';
 import {
   parseEntries as parseClaudeCodeEntries,
   serializeConversation as serializeClaudeCodeConversation,
@@ -138,7 +140,7 @@ const claudeCodeAdapter: ConversationTranscriptAdapter = {
  * ISO timestamp prefix so this is deterministic.
  */
 async function resolvePiSessionFileFromTmux(tmuxSession: string): Promise<string | null> {
-  const sessionDir = join(homedir(), '.overdeck', 'agents', tmuxSession, 'sessions');
+  const sessionDir = join(getOverdeckHome(), 'agents', tmuxSession, 'sessions');
   if (!existsSync(sessionDir)) return null;
   try {
     const entries = (await readdir(sessionDir)).filter((name) => name.endsWith('.jsonl'));
@@ -243,12 +245,106 @@ const piAdapter: ConversationTranscriptAdapter = {
   },
 };
 
+// ─── ACP ──────────────────────────────────────────────────────────────────
+
+const ACP_TOOL_DETAIL_MAX_CHARS = 500;
+
+function truncateAcpToolDetail(value: string): string {
+  return value.length > ACP_TOOL_DETAIL_MAX_CHARS
+    ? `${value.slice(0, ACP_TOOL_DETAIL_MAX_CHARS)}…`
+    : value;
+}
+
+function serializeAcpToolCall(
+  toolCall: Partial<AcpTranscriptToolCallState>,
+): string | undefined {
+  const name = toolCall.title?.trim() || toolCall.kind?.trim();
+  if (!name) return undefined;
+
+  const status = toolCall.status ? ` (${toolCall.status})` : '';
+  const lines = [`[tool_use: ${name}${status}]`];
+  if (toolCall.command?.trim()) {
+    lines.push(`$ ${truncateAcpToolDetail(toolCall.command.trim())}`);
+  }
+  if (toolCall.detail?.trim()) {
+    lines.push(truncateAcpToolDetail(toolCall.detail.trim()));
+  }
+  return lines.join('\n');
+}
+
+function serializeAcpEntry(entry: Partial<AcpTranscriptEntry>): string | undefined {
+  if (
+    entry.role !== 'user' &&
+    entry.role !== 'assistant' &&
+    entry.role !== 'tool' &&
+    entry.role !== 'system'
+  ) {
+    return undefined;
+  }
+
+  const lines = [`[${entry.role}]`];
+  if (typeof entry.content === 'string' && entry.content.trim()) {
+    lines.push(entry.content);
+  }
+  if (Array.isArray(entry.toolCalls)) {
+    for (const toolCall of entry.toolCalls) {
+      if (!toolCall || typeof toolCall !== 'object') continue;
+      const serialized = serializeAcpToolCall(toolCall);
+      if (serialized) lines.push(serialized);
+    }
+  }
+  return lines.length > 1 ? lines.join('\n') : undefined;
+}
+
+const acpAdapter: ConversationTranscriptAdapter = {
+  name: 'acp',
+  supportsPlainForkAsSource: false,
+  supportsSourceAuthoredHandoff: false,
+
+  async resolveSessionFile(conv) {
+    const path = join(getOverdeckHome(), 'agents', conv.tmuxSession, 'acp-session.jsonl');
+    return existsSync(path) ? path : null;
+  },
+
+  async serializeTranscript(sessionFile) {
+    const content = await readFile(sessionFile, 'utf-8');
+    const parts: string[] = [];
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      let entry: Partial<AcpTranscriptEntry>;
+      try {
+        entry = JSON.parse(line) as Partial<AcpTranscriptEntry>;
+      } catch {
+        continue;
+      }
+      const serialized = serializeAcpEntry(entry);
+      if (serialized) parts.push(serialized);
+    }
+    return parts.join('\n\n');
+  },
+
+  async compactSummary(sessionFile, options) {
+    const serialized = await acpAdapter.serializeTranscript(sessionFile);
+    if (!serialized.trim()) {
+      return { summary: '', summaryModel: null };
+    }
+    const summary = await summarizeSerializedText(serialized, {
+      model: options?.model,
+      richMode: options?.richMode ?? false,
+      harness: options?.harness ?? 'claude-code',
+      timeoutMs: options?.timeoutMs,
+    });
+    return { summary, summaryModel: options?.model ?? null };
+  },
+};
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'claude-code': claudeCodeAdapter,
   'ohmypi': piAdapter,
   'codex': claudeCodeAdapter,
+  'acp': acpAdapter,
 };
 
 /**

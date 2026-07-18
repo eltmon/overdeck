@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +12,7 @@ import type * as EffectAcpSchema from "effect-acp/schema";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { BRIDGE_TOKEN_HEADER } from "../../bridge-token.js";
+import { INPUT_PURGE_MAX_CHARS } from "../../channels/injection-budget.js";
 import {
   AcpHost,
   type AcpHostRuntime,
@@ -28,6 +29,8 @@ interface StubRuntimeOptions {
   readonly promptError?: Error;
   readonly promptStarted?: Deferred.Deferred<void>;
   readonly promptGate?: Deferred.Deferred<void>;
+  readonly setModelStarted?: Deferred.Deferred<void>;
+  readonly setModelGate?: Deferred.Deferred<void>;
 }
 
 interface StubRuntime {
@@ -120,7 +123,16 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         return { stopReason: "end_turn" as const };
       }),
     cancel: Effect.void,
-    setModel: () => Effect.void,
+    setModel: () =>
+      Effect.gen(function* () {
+        order.push("set-model");
+        if (options.setModelStarted) {
+          yield* Deferred.succeed(options.setModelStarted, undefined);
+        }
+        if (options.setModelGate) {
+          yield* Deferred.await(options.setModelGate);
+        }
+      }),
   };
 
   return {
@@ -142,6 +154,14 @@ function postSocket(
   socketPath: string,
   token: string,
   body: Record<string, unknown>,
+): Promise<SocketResponse> {
+  return postSocketBody(socketPath, token, JSON.stringify(body));
+}
+
+function postSocketBody(
+  socketPath: string,
+  token: string,
+  body: string,
 ): Promise<SocketResponse> {
   return new Promise((resolve, reject) => {
     const client = request(
@@ -166,7 +186,7 @@ function postSocket(
       },
     );
     client.once("error", reject);
-    client.end(JSON.stringify(body));
+    client.end(body);
   });
 }
 
@@ -222,6 +242,49 @@ describe("AcpHost", () => {
     );
   });
 
+  it("publishes readiness only after replacing stale state and binding the current socket", async () => {
+    const overdeckHome = await makeHome();
+    const agentId = "agent-generation-safe";
+    const agentDir = join(overdeckHome, "agents", agentId);
+    const socketDir = join(overdeckHome, "sockets");
+    const sessionIdPath = join(agentDir, "acp-session-id");
+    const socketPath = join(socketDir, `acp-${agentId}.sock`);
+    await mkdir(agentDir, { recursive: true });
+    await mkdir(socketDir, { recursive: true });
+    await writeFile(sessionIdPath, "stale-session\n", "utf-8");
+    await writeFile(socketPath, "stale-socket", "utf-8");
+
+    const setModelStarted = await Effect.runPromise(Deferred.make<void>());
+    const setModelGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ setModelStarted, setModelGate });
+    const host = new AcpHost({
+      agentId,
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "kimi-k2.6",
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+
+    const starting = host.start();
+    await Effect.runPromise(Deferred.await(setModelStarted));
+    try {
+      await expect(readFile(sessionIdPath, "utf-8")).rejects.toMatchObject({ code: "ENOENT" });
+      await expect(stat(socketPath)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      await Effect.runPromise(Deferred.succeed(setModelGate, undefined));
+    }
+    await starting;
+
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+    await expect(postSocket(socketPath, token, { op: "status" })).resolves.toEqual({
+      status: 200,
+      body: expect.objectContaining({ state: "ready", sessionId: "acp-session-1" }),
+    });
+    await expect(readFile(sessionIdPath, "utf-8")).resolves.toBe("acp-session-1\n");
+  });
+
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {
     const overdeckHome = await makeHome();
     const stub = await makeStubRuntime({ assistantResponse: "hello from kimi" });
@@ -275,6 +338,32 @@ describe("AcpHost", () => {
     ]);
     expect(output.text()).toContain("[user] hello agent");
     expect(output.text()).toContain("[assistant] hello from kimi");
+  });
+
+  it("rejects authenticated request bodies above the delivery limit", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-request-limit",
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-request-limit");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-request-limit.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+
+    await expect(
+      postSocketBody(socketPath, token, "x".repeat(INPUT_PURGE_MAX_CHARS + 1)),
+    ).resolves.toEqual({
+      status: 413,
+      body: { error: "request body too large" },
+    });
+    expect(stub.prompts).toEqual([]);
   });
 
   it("withholds delivery success until session/prompt completes", async () => {
