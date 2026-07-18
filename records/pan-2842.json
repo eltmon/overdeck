@@ -153,16 +153,16 @@
     "recordedAt": "2026-07-17T15:57:29.020Z"
   },
   "created": "2026-07-17T13:45:00.461Z",
-  "updated": "2026-07-18T11:28:41.333Z",
+  "updated": "2026-07-18T11:41:38.943Z",
   "pipeline": {
     "issueId": "PAN-2842",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-18T11:28:41.273Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-18T11:41:38.910Z",
     "reviewNotes": "Mainline integration preserves cockpit requirements and shared issue-action parity; no new blocking correctness, security, requirements, or performance findings",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2849",
@@ -176,10 +176,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-opus-4-8": {
-            "input": 6,
-            "output": 1514,
-            "cacheRead": 324216,
-            "cacheWrite": 6994
+            "input": 41,
+            "output": 12698,
+            "cacheRead": 2620160,
+            "cacheWrite": 25663
           }
         },
         "plan": {
@@ -217,10 +217,10 @@
       },
       "totals": {
         "anthropic/claude-opus-4-8": {
-          "input": 6,
-          "output": 1514,
-          "cacheRead": 324216,
-          "cacheWrite": 6994
+          "input": 41,
+          "output": 12698,
+          "cacheRead": 2620160,
+          "cacheWrite": 25663
         },
         "anthropic/claude-fable-5": {
           "input": 1536,
@@ -242,8 +242,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 191.605873,
-        "pricingAsOf": "2026-07-18T11:28:41.324Z"
+        "usd": 193.150304,
+        "pricingAsOf": "2026-07-18T11:41:38.929Z"
       }
     },
     "merges": [
