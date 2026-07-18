@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T07:12:49.415Z",
+  "updated": "2026-07-18T07:15:21.190Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "acp-config": {
-        "writerId": "agent-pan-2858",
-        "agentId": "agent-pan-2858",
-        "pid": 3984048,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T07:12:49.415Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -204,6 +196,16 @@
         "itemId": "acp-policy-resolve",
         "outcome": "completed",
         "releasedAt": "2026-07-18T07:12:37.219Z"
+      },
+      {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 3984048,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T07:12:49.415Z",
+        "itemId": "acp-config",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T07:15:21.190Z"
       }
     ],
     "statusReasons": {
@@ -266,6 +268,9 @@
     "acp-policy-resolve.acp-policy-resolve.ac1": "completed",
     "acp-policy-resolve.acp-policy-resolve.ac2": "completed",
     "acp-policy-resolve.acp-policy-resolve.ac3": "completed",
-    "acp-config": "running"
+    "acp-config": "completed",
+    "acp-config.acp-config.ac1": "completed",
+    "acp-config.acp-config.ac2": "completed",
+    "acp-config.acp-config.ac3": "completed"
   }
 }
