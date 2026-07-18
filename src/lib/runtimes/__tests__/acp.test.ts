@@ -146,6 +146,35 @@ describe('AcpRuntimeSync', () => {
     await expect(runtime.isRunning('agent-spawn')).resolves.toBe(true)
   })
 
+  it('surfaces the host launch diagnostic without waiting for readiness timeout', async () => {
+    const home = makeHome()
+    tmuxMocks.createSession.mockImplementation(async (agentId: string) => {
+      writeAgentFile(
+        home,
+        agentId,
+        'acp-launch-error',
+        'Kimi authentication is required. Run `kimi`, then /login, and retry.\n',
+      )
+    })
+    tmuxMocks.sessionExists.mockResolvedValue(true)
+    const runtime = new AcpRuntimeSync({
+      overdeckHome: home,
+      prepareLaunch: async () => ({
+        binaryPath: '/opt/kimi/bin/kimi',
+        pathExport: 'export PATH=/opt/kimi/bin:"$PATH"',
+      }),
+    })
+
+    await expect(runtime.spawnAgent({
+      agentId: 'agent-auth-failed',
+      workspace: '/tmp/workspace',
+      runtime: 'acp',
+    })).rejects.toThrow(
+      'ACP host agent-auth-failed failed to start: Kimi authentication is required. Run `kimi`, then /login, and retry.',
+    )
+    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-auth-failed')
+  })
+
   it('kills a host that never produces fresh readiness', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     const home = makeHome()

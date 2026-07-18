@@ -27,6 +27,7 @@ interface StubRuntimeOptions {
   readonly updateDuringStart?: string;
   readonly startError?: Error;
   readonly promptError?: Error;
+  readonly promptErrorCount?: number;
   readonly promptStarted?: Deferred.Deferred<void>;
   readonly promptGate?: Deferred.Deferred<void>;
   readonly setModelStarted?: Deferred.Deferred<void>;
@@ -48,6 +49,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
   const prompts: EffectAcpSchema.PromptRequest["prompt"][] = [];
   const order: string[] = [];
   let starts = 0;
+  let remainingPromptErrors = options.promptErrorCount ?? (options.promptError ? Number.POSITIVE_INFINITY : 0);
   let sessionUpdateHandler:
     | Parameters<AcpHostRuntime["handleSessionUpdate"]>[0]
     | undefined;
@@ -109,7 +111,8 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         if (options.promptGate) {
           yield* Deferred.await(options.promptGate);
         }
-        if (options.promptError) {
+        if (options.promptError && remainingPromptErrors > 0) {
+          remainingPromptErrors -= 1;
           return yield* Effect.fail(options.promptError);
         }
         if (options.assistantResponse) {
@@ -382,6 +385,43 @@ describe("AcpHost", () => {
         text: "<overdeck-context>\nACP guardrail: never bypass review.\n</overdeck-context>\n\nfirst",
       }],
       [{ type: "text", text: "second" }],
+    ]);
+  });
+
+  it("retries Overdeck context when the first fresh prompt fails", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({
+      promptError: new Error("first prompt failed"),
+      promptErrorCount: 1,
+    });
+    const host = new AcpHost({
+      agentId: "agent-context-retry",
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      context: "ACP guardrail: preserve context on retry.",
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-context-retry");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-context-retry.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+    await postSocket(socketPath, token, { op: "message", content: "first" });
+    await host.waitForIdle();
+    await postSocket(socketPath, token, { op: "message", content: "retry" });
+    await host.waitForIdle();
+
+    expect(stub.prompts).toEqual([
+      [{
+        type: "text",
+        text: "<overdeck-context>\nACP guardrail: preserve context on retry.\n</overdeck-context>\n\nfirst",
+      }],
+      [{
+        type: "text",
+        text: "<overdeck-context>\nACP guardrail: preserve context on retry.\n</overdeck-context>\n\nretry",
+      }],
     ]);
   });
 

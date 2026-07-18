@@ -2,10 +2,31 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import { renderForHarness } from '../context-layers/harness.js';
-import { workspaceContextFile } from '../context-layers/layers.js';
+import { resolveWorkspaceContextFile } from '../context-layers/layers.js';
 import { renderGlobalLayer, renderProjectLayer } from '../context-layers/render.js';
 import { isDevMode } from '../paths.js';
 import { findProjectByPathSync } from '../projects.js';
+
+const SECTION_SEPARATOR = '\n\n---\n\n';
+
+export function removeEmbeddedProjectLayer(
+  workspaceContent: string,
+  embeddedProjectLayer: string,
+): string {
+  const project = embeddedProjectLayer.trim();
+  if (!project) return workspaceContent;
+  let removed = false;
+  return workspaceContent
+    .split(SECTION_SEPARATOR)
+    .filter((section) => {
+      if (!removed && section.trim() === project) {
+        removed = true;
+        return false;
+      }
+      return true;
+    })
+    .join(SECTION_SEPARATOR);
+}
 
 export function materializeAcpContextFile(
   agentDir: string,
@@ -14,14 +35,21 @@ export function materializeAcpContextFile(
   const sections = [renderGlobalLayer('acp', isDevMode())];
   const project = findProjectByPathSync(workspace);
   if (project) sections.push(renderProjectLayer(project.path, 'acp'));
-  const workspaceFile = workspaceContextFile(workspace);
+  const workspaceFile = resolveWorkspaceContextFile(workspace);
   if (existsSync(workspaceFile)) {
-    sections.push(renderForHarness(readFileSync(workspaceFile, 'utf8'), 'acp').trim());
+    const workspaceContent = readFileSync(workspaceFile, 'utf8');
+    const workspaceOnly = project
+      ? removeEmbeddedProjectLayer(
+          workspaceContent,
+          renderProjectLayer(project.path, 'claude-code'),
+        )
+      : workspaceContent;
+    sections.push(renderForHarness(workspaceOnly, 'acp').trim());
   }
 
   const content = sections
     .filter((section) => section.trim().length > 0)
-    .join('\n\n---\n\n');
+    .join(SECTION_SEPARATOR);
   const contextPath = join(agentDir, 'acp-context.md');
   mkdirSync(dirname(contextPath), { recursive: true });
   writeFileSync(contextPath, `${content.trim()}\n`, { mode: 0o600 });

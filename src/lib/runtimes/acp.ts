@@ -192,6 +192,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
     if (config.model) command.push('--model', shellQuote(config.model))
 
     rmSync(this.agentPath(config.agentId, 'acp-session-id'), { force: true })
+    rmSync(this.agentPath(config.agentId, 'acp-launch-error'), { force: true })
 
     await tmuxCreateSession(
       config.agentId,
@@ -281,6 +282,14 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
     }
   }
 
+  private readLaunchError(agentId: string): string | null {
+    try {
+      return readFileSync(this.agentPath(agentId, 'acp-launch-error'), 'utf8').trim() || null
+    } catch {
+      return null
+    }
+  }
+
   private readSessionId(agentId: string): string | null {
     try {
       return readFileSync(this.agentPath(agentId, 'acp-session-id'), 'utf8').trim() || null
@@ -292,6 +301,8 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   private async waitForSessionId(agentId: string): Promise<string | null> {
     const deadline = Date.now() + SPAWN_READY_TIMEOUT_MS
     while (Date.now() < deadline) {
+      const launchError = this.readLaunchError(agentId)
+      if (launchError) throw new Error(`ACP host ${agentId} failed to start: ${launchError}`)
       const sessionId = this.readSessionId(agentId)
       if (sessionId) return sessionId
       await delay(POLL_INTERVAL_MS)

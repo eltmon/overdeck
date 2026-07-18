@@ -220,13 +220,13 @@ export class AcpHost {
         }
         this.writePaneLine(`[user] ${content}`);
         const context = this.contextPending;
-        this.contextPending = undefined;
         const promptContent = context
           ? `<overdeck-context>\n${context}\n</overdeck-context>\n\n${content}`
           : content;
         const promptResult = await Effect.runPromise(
           this.options.runtime.prompt({ prompt: [{ type: "text", text: promptContent }] }),
         );
+        if (context) this.contextPending = undefined;
         await Effect.runPromise(this.options.runtime.drainEvents);
         await this.transcript.append({
           role: "system",

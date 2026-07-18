@@ -44,6 +44,13 @@ const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK: HarnessPolicyDecision = {
 /** Canonical reason returned for the blocked cell (exposed for tests + UI). */
 export const OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK_REASON = OHMYPI_ANTHROPIC_SUBSCRIPTION_BLOCK.reason!
 
+const ACP_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
+  allowed: false,
+  reason: 'ACP currently supports the Kimi provider only. Pick a Kimi model or use the provider\'s supported harness.',
+}
+
+export const ACP_KIMI_ONLY_BLOCK_REASON = ACP_KIMI_ONLY_BLOCK.reason!
+
 const SUBSCRIPTION_ONLY_MODEL_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
@@ -87,7 +94,7 @@ export function canUseHarnessSync(
   }
 
   if (harness === 'acp') {
-    return ALLOWED
+    return getProviderForModelSync(model).name === 'kimi' ? ALLOWED : ACP_KIMI_ONLY_BLOCK
   }
 
   if (harness === 'ohmypi') {

@@ -31,8 +31,20 @@ interface AcpParserCacheEntry {
   bytesRead: number;
 }
 
+export const ACP_PARSER_CACHE_MAX_ENTRIES = 16;
+
 const parserCache = new Map<string, AcpParserCacheEntry>();
 const parserQueue = new Map<string, Promise<void>>();
+
+function touchParserCache(sessionFile: string, cache: AcpParserCacheEntry): void {
+  parserCache.delete(sessionFile);
+  parserCache.set(sessionFile, cache);
+  while (parserCache.size > ACP_PARSER_CACHE_MAX_ENTRIES) {
+    const oldest = parserCache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    parserCache.delete(oldest);
+  }
+}
 
 function truncateToolMetadata(value: string | undefined): string | undefined {
   if (!value) return undefined;
@@ -103,7 +115,7 @@ function processTranscriptEntry(state: AcpParserState, entry: AcpTranscriptEntry
 
   if (entry.event === 'prompt_queued') return;
 
-  if (entry.event === 'turn_completed') {
+  if (entry.event === 'turn_completed' || entry.event === 'prompt_failed') {
     state.lastTurnCompletedAt = createdAt;
     if (state.currentTurnAssistantIndex !== undefined) {
       const assistant = state.messages[state.currentTurnAssistantIndex];
@@ -116,7 +128,7 @@ function processTranscriptEntry(state: AcpParserState, entry: AcpTranscriptEntry
       }
     }
     state.pendingToolUse.clear();
-    return;
+    if (entry.event === 'turn_completed') return;
   }
 
   if (entry.role === 'assistant') {
@@ -292,7 +304,7 @@ async function parseAcpConversationMessagesUnlocked(sessionFile: string): Promis
       mtimeMs: fileStats.mtimeMs,
       bytesRead: 0,
     };
-    parserCache.set(sessionFile, cache);
+    touchParserCache(sessionFile, cache);
   }
 
   if (fileStats.size > cache.byteOffset) {
@@ -306,6 +318,7 @@ async function parseAcpConversationMessagesUnlocked(sessionFile: string): Promis
     cache.bytesRead += appended.length;
   }
   cache.mtimeMs = fileStats.mtimeMs;
+  touchParserCache(sessionFile, cache);
   return snapshotResult(cache.state, fileStats.size, fileStats.mtimeMs);
 }
 
@@ -315,12 +328,17 @@ export async function parseAcpConversationMessages(sessionFile: string): Promise
   const operation = previous.then(async () => {
     result = await parseAcpConversationMessagesUnlocked(sessionFile);
   });
-  parserQueue.set(sessionFile, operation.then(
+  const settled = operation.then(
     () => undefined,
     () => undefined,
-  ));
-  await operation;
-  return result!;
+  );
+  parserQueue.set(sessionFile, settled);
+  try {
+    await operation;
+    return result!;
+  } finally {
+    if (parserQueue.get(sessionFile) === settled) parserQueue.delete(sessionFile);
+  }
 }
 
 export function acpParserReadStatsForTests(sessionFile: string): {

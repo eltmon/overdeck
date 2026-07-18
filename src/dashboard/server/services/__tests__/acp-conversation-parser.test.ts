@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  ACP_PARSER_CACHE_MAX_ENTRIES,
   acpParserReadStatsForTests,
   parseAcpConversationMessages,
 } from '../acp-conversation-parser.js';
@@ -285,6 +286,54 @@ describe('parseAcpConversationMessages', () => {
       byteOffset: concurrentSize,
       bytesRead: concurrentSize,
     });
+  });
+
+  it('evicts least-recently-used transcript state at the cache bound', async () => {
+    const paths: string[] = [];
+    for (let index = 0; index <= ACP_PARSER_CACHE_MAX_ENTRIES; index += 1) {
+      const path = join(tempDir, `session-${index}.jsonl`);
+      await writeFile(path, `${JSON.stringify({
+        timestamp: `2026-07-18T10:00:${String(index).padStart(2, '0')}.000Z`,
+        role: 'user',
+        content: `Message ${index}`,
+      })}\n`);
+      paths.push(path);
+      await parseAcpConversationMessages(path);
+    }
+
+    expect(acpParserReadStatsForTests(paths[0]!)).toBeUndefined();
+    expect(acpParserReadStatsForTests(paths.at(-1)!)).toBeDefined();
+  });
+
+  it('clears pending tools when the prompt fails', async () => {
+    const path = await writeTranscript([
+      {
+        timestamp: '2026-07-18T10:00:00.000Z',
+        role: 'tool',
+        content: 'running',
+        toolCalls: [{
+          toolCallId: 'tool-pending',
+          title: 'Run command',
+          status: 'inProgress',
+          data: {},
+        }],
+      },
+      {
+        timestamp: '2026-07-18T10:00:01.000Z',
+        role: 'system',
+        content: 'provider rejected prompt',
+        event: 'prompt_failed',
+      },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.pendingToolUse.size).toBe(0);
+    expect(result.lastTurnCompletedAt).toBe('2026-07-18T10:00:01.000Z');
+    expect(result.messages.at(-1)).toEqual(expect.objectContaining({
+      role: 'system',
+      text: 'provider rejected prompt',
+    }));
   });
 
   it('marks completed and failed tool updates terminal', async () => {
