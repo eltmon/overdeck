@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T22:03:43.159Z",
+  "updated": "2026-07-18T22:17:58.155Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 31,
-    "claims": {
-      "readonly-projections": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 19197,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T22:03:43.159Z"
-      }
-    },
+    "sequence": 32,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -288,6 +280,16 @@
         "itemId": "cross-surface-add-actions",
         "outcome": "completed",
         "releasedAt": "2026-07-18T22:03:22.670Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 19197,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T22:03:43.159Z",
+        "itemId": "readonly-projections",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T22:17:58.155Z"
       }
     ],
     "statusReasons": {
@@ -416,6 +418,9 @@
     "cross-surface-add-actions.cross-surface-add-actions.ac1": "completed",
     "cross-surface-add-actions.cross-surface-add-actions.ac2": "completed",
     "cross-surface-add-actions.cross-surface-add-actions.ac3": "completed",
-    "readonly-projections": "running"
+    "readonly-projections": "completed",
+    "readonly-projections.readonly-projections.ac1": "completed",
+    "readonly-projections.readonly-projections.ac2": "completed",
+    "readonly-projections.readonly-projections.ac3": "completed"
   }
 }
