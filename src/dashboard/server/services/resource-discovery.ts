@@ -749,25 +749,29 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
   }
 
   const memberships = new Map<string, PipelineMembership>();
+  const unavailableProjects = new Set<string>();
   const projectMemberships = await getPipelineMembershipSnapshotsForResourceDiscovery(projects.map((project) => project.config));
   for (const result of projectMemberships) {
+    if (result.error) unavailableProjects.add(result.project.name);
     for (const membership of result.memberships ?? []) {
       ensureIssue(membership.issueId);
       memberships.set(membership.issueId, membership);
     }
   }
 
-  // The canonical resolver owns pipeline inclusion. Resource residue remains
-  // discoverable internally for diagnostics, but it cannot create a pipeline row.
+  // The canonical resolver owns pipeline inclusion whenever it returns a verdict.
+  // While a project's membership is unavailable, retain only rows backed by a live
+  // resource so a transient tracker failure cannot erase running work.
   const discoveredIssues = [...issueMap.values()]
     .filter((issue) => issue.resourceSources.size > 0)
     .filter((issue) => {
       const membership = memberships.get(issue.issueId);
       return membership?.inPipeline === true
-        || (membership?.bucket === 'clean_terminal' && isLiveResource(issue));
+        || (membership?.bucket === 'clean_terminal' && isLiveResource(issue))
+        || (!membership && unavailableProjects.has(issue.projectName) && isLiveResource(issue));
     })
     .map((issue) => {
-        const membership = memberships.get(issue.issueId)!;
+        const membership = memberships.get(issue.issueId);
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
         const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);
         const stateLabel = deriveStateLabel(issue, hasTmux, hasRecentHeartbeat);
@@ -800,10 +804,12 @@ async function computeResourceAllocatedIssues(): Promise<InternalDiscoveredIssue
           resourceSources: new Set([...issue.resourceSources].sort()),
           resourceDetails: issue.resourceDetails,
           taskTotals: issue.taskTotals,
-          pipelineBucket: membership.bucket,
-          specOnlyPlanned: membership.bucket === 'planned_backlog'
-            && membership.reasons.includes(PLANNED_BACKLOG_SPEC_ONLY_REASON),
-          resourceDrift: !membership.inPipeline,
+          pipelineBucket: membership?.bucket,
+          specOnlyPlanned: membership
+            ? membership.bucket === 'planned_backlog'
+              && membership.reasons.includes(PLANNED_BACKLOG_SPEC_ONLY_REASON)
+            : undefined,
+          resourceDrift: membership ? !membership.inPipeline : undefined,
         } satisfies InternalDiscoveredIssue;
       });
 

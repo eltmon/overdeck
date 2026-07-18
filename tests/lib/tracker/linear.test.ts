@@ -143,6 +143,40 @@ describe('LinearTracker', () => {
         }),
       });
     });
+
+    it('should fetch every page when no result limit is requested', async () => {
+      const { LinearClient } = await import('@linear/sdk');
+      const mockClient = new LinearClient({ apiKey: 'test' });
+      const issue = (identifier: string) => ({
+        id: identifier,
+        identifier,
+        title: identifier,
+        description: '',
+        url: `https://linear.app/issue/${identifier}`,
+        createdAt: new Date('2024-01-01'),
+        updatedAt: new Date('2024-01-02'),
+        state: Promise.resolve({ type: 'started' }),
+        assignee: Promise.resolve(null),
+        labels: () => Promise.resolve({ nodes: [] }),
+      });
+      const connection = {
+        nodes: [issue('MIN-1')],
+        pageInfo: { hasNextPage: true },
+        fetchNext: vi.fn(async function (this: typeof connection) {
+          this.nodes.push(issue('MIN-2'));
+          this.pageInfo.hasNextPage = false;
+          return this;
+        }),
+      };
+      (mockClient.issues as any).mockResolvedValue(connection);
+
+      const tracker: any = wrap(new LinearTracker('test-api-key'));
+      (tracker as any).client = mockClient;
+
+      await expect(tracker.listIssues({ team: 'MIN', includeClosed: true }))
+        .resolves.toHaveLength(2);
+      expect(connection.fetchNext).toHaveBeenCalledOnce();
+    });
   });
 
   describe('getIssue', () => {

@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
 
 import { Effect } from 'effect';
@@ -9,10 +10,13 @@ import {
 } from './github-app.js';
 import { createSettledTtlPromiseCache, withConcurrencyLimitPromise } from './concurrency.js';
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
+import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
 import { getIssuePrefix, type ProjectConfig } from './projects.js';
 import { parseIssueIdFromTextSync } from './resource-utils.js';
+import { createTracker } from './tracker/factory.js';
+import type { Issue, TrackerType } from './tracker/interface.js';
 
 const execFileAsync = promisify(execFile);
 const GRAPHQL_ALIAS_CHUNK_SIZE = 50;
@@ -151,12 +155,70 @@ export async function listIssueStatesBatched(
   return states;
 }
 
+export interface ProjectTrackerIssueRow {
+  issueId: string;
+  state: 'open' | 'closed';
+  labels: string[];
+}
+
+function resolveProjectTrackerType(project: ProjectConfig): TrackerType {
+  if (project.tracker) return project.tracker;
+  if (project.rally_project) return 'rally';
+  if (project.github_repo) return 'github';
+  if (getIssuePrefix(project)) return 'linear';
+  if (project.gitlab_repo) return 'gitlab';
+  throw new Error(`Cannot resolve tracker for ${project.name}`);
+}
+
+async function listProjectTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]> {
+  const issuePrefix = getIssuePrefix(project)?.toUpperCase();
+  if (!issuePrefix) throw new Error(`Missing issue_prefix for project ${project.name}`);
+
+  const trackerType = resolveProjectTrackerType(project);
+  const trackerConfig = loadConfigSync().trackers[trackerType];
+  const tracker = createTracker({
+    type: trackerType,
+    apiKeyEnv: trackerConfig && 'api_key_env' in trackerConfig
+      ? trackerConfig.api_key_env
+      : undefined,
+    tokenEnv: trackerConfig && 'token_env' in trackerConfig
+      ? trackerConfig.token_env
+      : undefined,
+    team: issuePrefix,
+    owner: project.github_repo?.split('/')[0],
+    repo: project.github_repo?.split('/')[1],
+    projectId: project.gitlab_repo,
+    server: trackerType === 'rally' && trackerConfig && 'server' in trackerConfig
+      ? trackerConfig.server
+      : undefined,
+    workspace: trackerType === 'rally' && trackerConfig && 'workspace' in trackerConfig
+      ? trackerConfig.workspace
+      : undefined,
+    project: project.rally_project,
+  });
+  const issues = await Effect.runPromise(tracker.listIssues({
+    team: issuePrefix,
+    includeClosed: true,
+  }));
+
+  return issues.flatMap((issue: Issue) => {
+    const issueId = issue.ref.toUpperCase();
+    if (!issueId.startsWith(`${issuePrefix}-`)) return [];
+    return [{
+      issueId,
+      state: issue.state === 'closed' ? 'closed' as const : 'open' as const,
+      labels: issue.labels,
+    }];
+  });
+}
+
 export interface PipelineMembershipGatherDeps {
   listOpenIssues(owner: string, repo: string): Promise<Array<{ number: number; labels: string[] }>>;
   listPhaseLabeledIssues(owner: string, repo: string): Promise<Array<{ number: number; state: 'open' | 'closed'; labels: string[] }>>;
   listOpenPullRequests(owner: string, repo: string): Promise<PullRequestRow[]>;
   listMergedPullRequestHeads(owner: string, repo: string, heads: string[]): Promise<string[]>;
   listIssueStates(owner: string, repo: string, numbers: number[]): Promise<Array<{ number: number; state: 'open' | 'closed' }>>;
+  listTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
   run(command: string, args: string[], cwd?: string): Promise<string>;
 }
@@ -167,6 +229,7 @@ const defaultDeps: PipelineMembershipGatherDeps = {
   listOpenPullRequests: listOpenPullRequestsSnapshot,
   listMergedPullRequestHeads: listMergedPullRequestHeadsBatched,
   listIssueStates: listIssueStatesBatched,
+  listTrackerIssues: listProjectTrackerIssues,
   listSpecIssueIds: async (projectPath) =>
     (await Effect.runPromise(listSpecs(projectPath))).map((entry) => entry.issueId),
   run: async (command, args, cwd) => {
@@ -192,28 +255,65 @@ function issueIdFromRef(ref: string, issuePrefix: string): string | null {
   return issueId?.startsWith(`${issuePrefix}-`) ? issueId : null;
 }
 
-/** Gather all durable pipeline lenses for one GitHub-backed project in batches. */
+interface ProjectRepository {
+  path: string;
+  defaultBranch: string;
+}
+
+function projectRepositories(project: ProjectConfig): ProjectRepository[] {
+  if (!project.workspace?.repos?.length) {
+    return [{
+      path: project.path,
+      defaultBranch: project.workspace?.default_branch ?? 'main',
+    }];
+  }
+
+  return project.workspace.repos.map((repo) => ({
+    path: join(project.path, repo.path),
+    defaultBranch: repo.default_branch ?? project.workspace?.default_branch ?? 'main',
+  }));
+}
+
+/** Gather all durable pipeline lenses for one project in batches. */
 export async function gatherProjectLensSignals(
   project: ProjectConfig,
   deps: PipelineMembershipGatherDeps = defaultDeps,
 ): Promise<IssueLensSignals[]> {
-  if (!project.github_repo) return [];
-  const [owner, repo] = project.github_repo.split('/');
-  if (!owner || !repo) throw new Error(`Invalid github_repo for ${project.name}: ${project.github_repo}`);
   const issuePrefix = getIssuePrefix(project)?.toUpperCase();
-  if (!issuePrefix) throw new Error(`Missing issue_prefix for GitHub project ${project.name}`);
+  if (!issuePrefix) throw new Error(`Missing issue_prefix for project ${project.name}`);
 
-  const [openIssues, phaseLabeledIssues, openPrs, branchRefs, unmergedRefs, specIssueIds] = await Promise.all([
-    deps.listOpenIssues(owner, repo),
-    deps.listPhaseLabeledIssues(owner, repo),
-    deps.listOpenPullRequests(owner, repo),
-    deps.run('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
-    deps.run('git', ['for-each-ref', '--no-merged=main', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
+  const githubRepository = project.github_repo?.split('/');
+  const owner = githubRepository?.[0];
+  const repo = githubRepository?.[1];
+  if (project.github_repo && (!owner || !repo)) {
+    throw new Error(`Invalid github_repo for ${project.name}: ${project.github_repo}`);
+  }
+
+  const repositories = projectRepositories(project);
+  const branchSnapshots = repositories.map(async (repository) => {
+    const [refs, unmergedRefs] = await Promise.all([
+      deps.run('git', [
+        'for-each-ref', '--format=%(refname:short)',
+        'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
+      ], repository.path),
+      deps.run('git', [
+        'for-each-ref', `--no-merged=${repository.defaultBranch}`,
+        '--format=%(refname:short)',
+        'refs/heads/feature/*', 'refs/remotes/origin/feature/*',
+      ], repository.path),
+    ]);
+    return { refs, unmergedRefs };
+  });
+
+  const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, branches, specIssueIds] = await Promise.all([
+    project.github_repo ? Promise.resolve([]) : deps.listTrackerIssues(project),
+    owner && repo ? deps.listOpenIssues(owner, repo) : Promise.resolve([]),
+    owner && repo ? deps.listPhaseLabeledIssues(owner, repo) : Promise.resolve([]),
+    owner && repo ? deps.listOpenPullRequests(owner, repo) : Promise.resolve([]),
+    Promise.all(branchSnapshots),
     deps.listSpecIssueIds(project.path),
   ]);
 
-  const refs = branchRefs.split('\n').map((ref) => ref.trim()).filter(Boolean);
-  const unmerged = new Set(unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
   const candidates = new Set<string>();
   const labelsByIssue = new Map<string, string[]>();
   const knownStateByIssue = new Map<string, 'open' | 'closed'>();
@@ -222,8 +322,19 @@ export async function gatherProjectLensSignals(
   const headRefsByIssue = new Map<string, Set<string>>();
   const branchIssues = new Set<string>();
   const unmergedBranchIssues = new Set<string>();
-  const specIssues = new Set(specIssueIds.map((id) => id.toUpperCase()).filter((id) => id.startsWith(`${issuePrefix}-`)));
+  const specIssues = new Set(specIssueIds
+    .map((id) => id.toUpperCase())
+    .filter((id) => id.startsWith(`${issuePrefix}-`)));
 
+  for (const issue of trackerIssues) {
+    const id = issue.issueId.toUpperCase();
+    if (!id.startsWith(`${issuePrefix}-`)) continue;
+    labelsByIssue.set(id, issue.labels);
+    knownStateByIssue.set(id, issue.state);
+    if (issue.state === 'open' || STALE_PIPELINE_LABELS.some((label) => issue.labels.includes(label))) {
+      candidates.add(id);
+    }
+  }
   for (const issue of openIssues) {
     const id = `${issuePrefix}-${issue.number}`;
     candidates.add(id);
@@ -237,7 +348,7 @@ export async function gatherProjectLensSignals(
     knownStateByIssue.set(id, issue.state);
   }
   for (const pr of openPrs) {
-    if (pr.headRepoFullName.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) continue;
+    if (!owner || !repo || pr.headRepoFullName.toLowerCase() !== `${owner}/${repo}`.toLowerCase()) continue;
     const id = issueIdFromRef(pr.headRefName, issuePrefix);
     if (id) {
       candidates.add(id);
@@ -245,39 +356,44 @@ export async function gatherProjectLensSignals(
       headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), pr.headRefName]));
     }
   }
-  for (const ref of refs) {
-    const id = issueIdFromRef(ref, issuePrefix);
-    if (id) {
-      candidates.add(id);
-      branchIssues.add(id);
-      const headRef = ref.replace(/^origin\//, '');
-      headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), headRef]));
-      if (unmerged.has(ref)) unmergedBranchIssues.add(id);
+  for (const snapshot of branches) {
+    const refs = snapshot.refs.split('\n').map((ref) => ref.trim()).filter(Boolean);
+    const unmerged = new Set(snapshot.unmergedRefs.split('\n').map((ref) => ref.trim()).filter(Boolean));
+    for (const ref of refs) {
+      const id = issueIdFromRef(ref, issuePrefix);
+      if (id) {
+        candidates.add(id);
+        branchIssues.add(id);
+        const headRef = ref.replace(/^origin\//, '');
+        headRefsByIssue.set(id, new Set([...(headRefsByIssue.get(id) ?? []), headRef]));
+        if (unmerged.has(ref)) unmergedBranchIssues.add(id);
+      }
     }
   }
   for (const id of specIssues) candidates.add(id);
 
-  const candidateHeads = [...new Set([...candidates].flatMap((id) =>
-    [...(headRefsByIssue.get(id) ?? new Set([`feature/${id.toLowerCase()}`]))]))];
-  const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
-  for (const [id, heads] of headRefsByIssue) {
-    if ([...heads].some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
-  }
-  for (const id of candidates) {
-    if (!headRefsByIssue.has(id) && mergedHeads.has(`feature/${id.toLowerCase()}`)) mergedPrIssues.add(id);
-  }
+  if (owner && repo) {
+    const candidateHeads = [...new Set([...candidates].flatMap((id) =>
+      [...(headRefsByIssue.get(id) ?? new Set([`feature/${id.toLowerCase()}`]))]))];
+    const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
+    for (const [id, heads] of headRefsByIssue) {
+      if ([...heads].some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
+    }
+    for (const id of candidates) {
+      if (!headRefsByIssue.has(id) && mergedHeads.has(`feature/${id.toLowerCase()}`)) mergedPrIssues.add(id);
+    }
 
-  const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
-  const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
-  const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
-  const issueOpen = new Map([...candidates].map((id) => [
-    id,
-    knownStateByIssue.get(id) === 'open' || stateByNumber.get(issueNumber(id)) === 'open',
-  ]));
+    const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
+    const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
+    const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
+    for (const id of unknownIssueIds) {
+      knownStateByIssue.set(id, stateByNumber.get(issueNumber(id)) ?? 'closed');
+    }
+  }
 
   return [...candidates].sort().map((id) => ({
     issueId: id,
-    issueOpen: issueOpen.get(id) ?? false,
+    issueOpen: knownStateByIssue.get(id) === 'open',
     hasOpenPr: openPrIssues.has(id),
     hasMergedPr: mergedPrIssues.has(id),
     hasConventionBranch: branchIssues.has(id),

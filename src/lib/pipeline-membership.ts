@@ -26,7 +26,7 @@
  * annotate "is an agent running right now," but it NEVER decides membership.
  */
 
-/** Durable lens signals for one issue. Gather these from GitHub + git, never L5. */
+/** Durable lens signals for one issue. Gather these from the tracker, forge, and git, never L5. */
 import type { PipelineBucket } from '@overdeck/contracts';
 
 export type { PipelineBucket } from '@overdeck/contracts';
@@ -35,7 +35,7 @@ export const PLANNED_BACKLOG_SPEC_ONLY_REASON = 'open issue with a vBRIEF spec b
 
 export interface IssueLensSignals {
   issueId: string;
-  /** L3 — the GitHub issue state is open. */
+  /** L3 — the tracker issue state is open. */
   issueOpen: boolean;
   /** L1 — an open PR whose head branch is `feature/<id>`. */
   hasOpenPr: boolean;
