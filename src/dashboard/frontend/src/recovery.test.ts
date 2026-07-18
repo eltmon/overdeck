@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import posthog from 'posthog-js';
 import {
+  captureRecoveryReload,
   hideOverlay,
   isModuleLoadError,
   recordRecoveryReload,
@@ -10,11 +12,16 @@ import {
   showOverlay,
 } from './recovery';
 
+vi.mock('posthog-js', () => ({
+  default: { capture: vi.fn() },
+}));
+
 const INDEX_HTML = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
 
 afterEach(() => {
   document.body.innerHTML = '';
   sessionStorage.clear();
+  vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -42,7 +49,7 @@ describe('isModuleLoadError', () => {
 });
 
 describe('sameOriginResourceUrl', () => {
-  it('accepts same-origin scripts and stylesheets', () => {
+  it('accepts same-origin scripts, stylesheets, and message URLs', () => {
     const script = document.createElement('script');
     script.src = '/assets/app.js';
     const link = document.createElement('link');
@@ -50,6 +57,7 @@ describe('sameOriginResourceUrl', () => {
 
     expect(sameOriginResourceUrl(script)).toBe(`${window.location.origin}/assets/app.js`);
     expect(sameOriginResourceUrl(link)).toBe(`${window.location.origin}/assets/app.css`);
+    expect(sameOriginResourceUrl('/assets/chunk.js')).toBe(`${window.location.origin}/assets/chunk.js`);
   });
 
   it('ignores blocked cross-origin scripts such as PostHog remote config', () => {
@@ -60,15 +68,17 @@ describe('sameOriginResourceUrl', () => {
 
     expect(sameOriginResourceUrl(script)).toBeNull();
     expect(sameOriginResourceUrl(link)).toBeNull();
+    expect(sameOriginResourceUrl('https://example.com/assets/chunk.js')).toBeNull();
   });
 });
 
 describe('recovery reload circuit breaker', () => {
-  it('stops after three consecutive reloads and resets outside the recovery window', () => {
+  it('persists the count, stops after three consecutive reloads, and resets outside the window', () => {
     expect(recordRecoveryReload(1_000)).toEqual({ count: 1, shouldReload: true });
     expect(recordRecoveryReload(2_000)).toEqual({ count: 2, shouldReload: true });
     expect(recordRecoveryReload(3_000)).toEqual({ count: 3, shouldReload: true });
     expect(recordRecoveryReload(4_000)).toEqual({ count: 4, shouldReload: false });
+    expect(sessionStorage.getItem('pan.recovery.reloadCount')).toBe('4');
     expect(recordRecoveryReload(20_000)).toEqual({ count: 1, shouldReload: true });
   });
 });
@@ -95,6 +105,65 @@ describe('recovery overlay', () => {
     hideOverlay();
     hideOverlay();
     expect(document.getElementById('pan-recovery-overlay')).toBeNull();
+  });
+});
+
+describe('recovery reload telemetry', () => {
+  it('sends the accepted resource URL and recorded reload count immediately', () => {
+    const script = document.createElement('script');
+    script.src = '/assets/App.js';
+    const resource = sameOriginResourceUrl(script) ?? undefined;
+    const decision = recordRecoveryReload(1_000);
+
+    captureRecoveryReload({
+      trigger: 'asset_load_error',
+      resource,
+      message: 'Module asset failed to load',
+    }, decision);
+
+    expect(posthog.capture).toHaveBeenCalledWith(
+      'frontend_recovery_reload',
+      expect.objectContaining({
+        trigger: 'asset_load_error',
+        resource: `${window.location.origin}/assets/App.js`,
+        message: 'Module asset failed to load',
+        reloadCount: 1,
+        appVersion: expect.any(String),
+      }),
+      { send_instantly: true },
+    );
+    expect(posthog.capture).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends loop telemetry immediately when the circuit breaker trips', () => {
+    recordRecoveryReload(1_000);
+    recordRecoveryReload(2_000);
+    recordRecoveryReload(3_000);
+    const decision = recordRecoveryReload(4_000);
+
+    captureRecoveryReload({
+      trigger: 'root_error_boundary',
+      resource: `${window.location.origin}/assets/App.js`,
+      message: 'Failed to fetch dynamically imported module: /assets/App.js',
+      stackHead: 'Error: chunk failed',
+    }, decision);
+
+    expect(posthog.capture).toHaveBeenNthCalledWith(
+      1,
+      'frontend_recovery_reload',
+      expect.objectContaining({
+        trigger: 'root_error_boundary',
+        reloadCount: 4,
+        stackHead: 'Error: chunk failed',
+      }),
+      { send_instantly: true },
+    );
+    expect(posthog.capture).toHaveBeenNthCalledWith(
+      2,
+      'frontend_recovery_reload_loop',
+      expect.objectContaining({ reloadCount: 4 }),
+      { send_instantly: true },
+    );
   });
 });
 
