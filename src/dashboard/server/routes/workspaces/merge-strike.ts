@@ -2,12 +2,22 @@ import { Effect } from 'effect';
 
 import { getAgentState, messageAgent, spawnAgent } from '../../../../lib/agents.js';
 import { getWorkAgentLifecycleStateSync } from '../../../../lib/work-agent-lifecycle.js';
+import type { VerificationRunnerOptions } from '../../../../lib/cloister/verification-types.js';
 import type { ReviewStatus } from '../../../../lib/review-status.js';
 
 export interface StrikeMergeRequest {
   kind: 'strike'; markerHead: string; workspacePath: string; branchName: string; recoveryTarget: string;
 }
 export type TriggerMergeRequest = { kind: 'normal' } | StrikeMergeRequest;
+
+export function mergeVerificationOptions(
+  request: TriggerMergeRequest,
+): Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'> {
+  return {
+    syncTargetBranch: false,
+    ...(request.kind === 'strike' ? { skipPlanChecklist: true } : {}),
+  };
+}
 
 export interface TriggerMergeResult {
   success: boolean;

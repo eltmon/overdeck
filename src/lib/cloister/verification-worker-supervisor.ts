@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { spawn } from 'node:child_process';
 
 import { getOverdeckHome, packageRoot } from '../paths.js';
-import type { VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
+import type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
 type WorkerState = {
   runId: string;
@@ -77,7 +77,7 @@ export async function runSupervisedVerification(
   workspacePath: string,
   workspaceInfo: WorkspaceInfo,
   logPrefix: string,
-  options: { syncTargetBranch?: boolean } = {},
+  options: Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'> = {},
 ): Promise<VerificationRunnerOutcome> {
   const existing = readVerificationWorkerState(issueId);
   if (existing && existing.workspacePath === workspacePath && isProcessAlive(existing.pid) && !existsSync(existing.resultPath)) {

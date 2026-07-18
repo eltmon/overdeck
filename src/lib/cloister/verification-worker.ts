@@ -13,7 +13,7 @@ type WorkerRequest = {
   workspacePath: string;
   workspaceInfo: WorkspaceInfo;
   logPrefix: string;
-  options: Pick<VerificationRunnerOptions, 'syncTargetBranch'>;
+  options: Pick<VerificationRunnerOptions, 'syncTargetBranch' | 'skipPlanChecklist'>;
   resultPath: string;
 };
 

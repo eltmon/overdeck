@@ -40,7 +40,7 @@ import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { internalStrikeMergeRoute } from './internal-strike-merge.js';
-import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, ensureAgentReadyForMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -1066,7 +1066,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
           workspacePath,
           { isRemote: false },
           'merge-verify',
-          { syncTargetBranch: false, onGateLog: (line) => appendShipLog(issueId, line, 'verifying') },
+          { ...mergeVerificationOptions(request), onGateLog: (line) => appendShipLog(issueId, line, 'verifying') },
         ));
       })();
 

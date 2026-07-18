@@ -13,6 +13,7 @@ import {
 const originalHome = process.env.OVERDECK_HOME;
 const originalWorkerPath = process.env.OVERDECK_VERIFICATION_WORKER_PATH;
 const originalDelay = process.env.VERIFICATION_FIXTURE_DELAY_MS;
+const originalEchoOptions = process.env.VERIFICATION_FIXTURE_ECHO_OPTIONS;
 const homes: string[] = [];
 
 function useFixture(delayMs = 100): string {
@@ -35,6 +36,8 @@ afterEach(() => {
   else process.env.OVERDECK_VERIFICATION_WORKER_PATH = originalWorkerPath;
   if (originalDelay === undefined) delete process.env.VERIFICATION_FIXTURE_DELAY_MS;
   else process.env.VERIFICATION_FIXTURE_DELAY_MS = originalDelay;
+  if (originalEchoOptions === undefined) delete process.env.VERIFICATION_FIXTURE_ECHO_OPTIONS;
+  else process.env.VERIFICATION_FIXTURE_ECHO_OPTIONS = originalEchoOptions;
   for (const home of homes.splice(0)) rmSync(home, { recursive: true, force: true });
 });
 
@@ -53,6 +56,22 @@ describe('verification worker supervisor', () => {
     expect(state?.pid).toBeGreaterThan(0);
     expect(JSON.parse(readFileSync(state!.resultPath, 'utf8'))).toEqual({ outcome: 'passed' });
     expect(state!.resultPath).toContain(join(home, 'verification-workers', 'pan-2597'));
+  });
+
+  it('preserves strike checklist policy across the detached worker boundary', async () => {
+    useFixture();
+    process.env.VERIFICATION_FIXTURE_ECHO_OPTIONS = '1';
+
+    await expect(runSupervisedVerification(
+      'PAN-2864',
+      '/tmp/workspace',
+      { isRemote: false },
+      'test',
+      { syncTargetBranch: false, skipPlanChecklist: true },
+    )).resolves.toEqual({
+      outcome: 'passed',
+      options: { syncTargetBranch: false, skipPlanChecklist: true },
+    });
   });
 
   it('joins one live worker instead of starting duplicate verification', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { activeStrikeMerge, mergeCompletionStatus, normalMergeEligibility, parseStrikeMergeRequest, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
+import { activeStrikeMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, parseStrikeMergeRequest, validateStrikeMergeRequest, type StrikeMergeRequest } from '../../../../../src/dashboard/server/routes/workspaces/merge-strike.js';
 import type { ReviewStatus } from '../../../../../src/lib/review-status.js';
 
 const markerHead = 'a'.repeat(40);
@@ -40,6 +40,16 @@ describe('strike merge-door eligibility', () => {
   it('clears a queued strike marker at canonical merge completion', () => {
     expect(mergeCompletionStatus(request)).toEqual({ strikeLandingState: 'landed', strikeReadyHead: undefined, strikeReadyAt: undefined });
     expect(mergeCompletionStatus({ kind: 'normal' })).toEqual({});
+  });
+
+  it('skips only the nonexistent strike checklist during merge verification', () => {
+    expect(mergeVerificationOptions(request)).toEqual({
+      syncTargetBranch: false,
+      skipPlanChecklist: true,
+    });
+    expect(mergeVerificationOptions({ kind: 'normal' })).toEqual({
+      syncTargetBranch: false,
+    });
   });
 
   it('rejects duplicate active strike pipelines at the merge door', () => {
