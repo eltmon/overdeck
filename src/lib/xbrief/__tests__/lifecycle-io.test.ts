@@ -316,7 +316,7 @@ describe('promoteXBriefToProposed', () => {
     const result = promoteXBriefToProposed(workspacePath, TEST_DIR, 'PAN-2');
 
     expect(result.canonicalFilename).toMatch(
-      /^\d{4}-\d{2}-\d{2}-PAN-2-adopt-deft-vbrief-lifecycle-model\.vbrief\.json$/,
+      /^\d{4}-\d{2}-\d{2}-PAN-2-adopt-deft-vbrief-lifecycle-model\.xbrief\.json$/,
     );
     expect(existsSync(result.destXBrief)).toBe(true);
   });
