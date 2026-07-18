@@ -212,9 +212,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T16:01:31.248Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-18T16:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-18T16:06:32.106Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-18T16:06:32Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nReview manifest/head is stale: expected e257b1f2 covers 115 files, but current PR head 62c46a86 covers 164 files, leaving 49 files unreviewed.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -491,7 +504,7 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T16:06:31.539Z",
+  "updated": "2026-07-18T16:06:32.106Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "blocked",
