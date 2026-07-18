@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T20:18:09.173Z",
+  "updated": "2026-07-18T20:18:22.719Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,8 +114,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "run-binding-status": {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 2486628,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T20:18:22.719Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -259,6 +267,7 @@
     "lane-enforcement.lane-enforcement.ac1": "completed",
     "lane-enforcement.lane-enforcement.ac2": "completed",
     "lane-enforcement.lane-enforcement.ac3": "completed",
-    "lane-enforcement.lane-enforcement.ac4": "completed"
+    "lane-enforcement.lane-enforcement.ac4": "completed",
+    "run-binding-status": "running"
   }
 }
