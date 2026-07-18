@@ -3,7 +3,7 @@
  * (mockup §DAG, shared PAN-2400 renderer). Teal = done, blue = happening now.
  */
 
-import { PlanMapViewer } from '../../vbrief/PlanMapViewer'
+import { PlanMapViewer } from '../../xbrief/PlanMapViewer'
 
 export function PlanMapCard({ issueId }: { issueId: string }) {
   return (

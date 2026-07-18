@@ -1,14 +1,14 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { VBriefPlan } from './types';
+import type { XBriefPlan } from './types';
 
 const NARRATIVE_ORDER = ['Problem', 'Proposal', 'Constraint', 'Risk', 'Alternative'];
 
-interface VBriefNarrativesProps {
-  narratives: VBriefPlan['narratives'];
+interface XBriefNarrativesProps {
+  narratives: XBriefPlan['narratives'];
 }
 
-export function VBriefNarratives({ narratives }: VBriefNarrativesProps) {
+export function XBriefNarratives({ narratives }: XBriefNarrativesProps) {
   if (!narratives) return null;
 
   const sections = [

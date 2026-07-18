@@ -99,7 +99,7 @@ const ROLES: RoleDefinition[] = [
     id: 'plan',
     name: 'Plan',
     icon: DraftingCompass,
-    description: 'Researches the issue, writes the vBRIEF, and creates tasks.',
+    description: 'Researches the issue, writes the xBRIEF, and creates tasks.',
     defaultModel: 'workhorse:expensive',
   },
   {
@@ -130,7 +130,7 @@ const ROLES: RoleDefinition[] = [
       { id: 'security', name: 'Security', description: 'Security-focused code review.', defaultModel: 'workhorse:expensive' },
       { id: 'correctness', name: 'Correctness', description: 'Logic and behavior validation.', defaultModel: 'workhorse:mid' },
       { id: 'performance', name: 'Performance', description: 'Performance and scalability review.', defaultModel: 'workhorse:mid' },
-      { id: 'requirements', name: 'Requirements', description: 'Acceptance criteria and vBRIEF coverage.', defaultModel: 'workhorse:mid' },
+      { id: 'requirements', name: 'Requirements', description: 'Acceptance criteria and xBRIEF coverage.', defaultModel: 'workhorse:mid' },
       { id: 'synthesis', name: 'Synthesis', description: 'Combines reviewer findings into the final verdict.', defaultModel: 'workhorse:expensive' },
     ],
   },

@@ -1,35 +1,35 @@
 import { useState, useEffect } from 'react';
 import { List, GitBranch, Code2 } from 'lucide-react';
-import type { VBriefDocument, VBriefInspectionPolicy } from './types';
-import { VBriefHeader } from './VBriefHeader';
-import { VBriefNarratives } from './VBriefNarratives';
-import { VBriefReferences } from './VBriefReferences';
-import { VBriefItemList } from './VBriefItemList';
-import { VBriefReadinessPanel } from './VBriefReadinessPanel';
+import type { XBriefDocument, XBriefInspectionPolicy } from './types';
+import { XBriefHeader } from './XBriefHeader';
+import { XBriefNarratives } from './XBriefNarratives';
+import { XBriefReferences } from './XBriefReferences';
+import { XBriefItemList } from './XBriefItemList';
+import { XBriefReadinessPanel } from './XBriefReadinessPanel';
 
-export type VBriefViewTab = 'list' | 'dag' | 'raw';
+export type XBriefViewTab = 'list' | 'dag' | 'raw';
 
-const STORAGE_KEY = 'vbrief-viewer-tab';
+const STORAGE_KEY = 'xbrief-viewer-tab';
 
-const TABS: { id: VBriefViewTab; label: string; Icon: React.ElementType }[] = [
+const TABS: { id: XBriefViewTab; label: string; Icon: React.ElementType }[] = [
   { id: 'list', label: 'List', Icon: List },
   { id: 'dag', label: 'DAG', Icon: GitBranch },
   { id: 'raw', label: 'Raw JSON', Icon: Code2 },
 ];
 
-interface VBriefViewerProps {
-  doc: VBriefDocument | null;
+interface XBriefViewerProps {
+  doc: XBriefDocument | null;
   /** Optional override for active tab */
-  initialTab?: VBriefViewTab;
-  onInspectionPolicyChange?: (policy: VBriefInspectionPolicy) => void;
+  initialTab?: XBriefViewTab;
+  onInspectionPolicyChange?: (policy: XBriefInspectionPolicy) => void;
   isUpdatingInspectionPolicy?: boolean;
 }
 
-export function VBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpdatingInspectionPolicy = false }: VBriefViewerProps) {
-  const [tab, setTab] = useState<VBriefViewTab>(() => {
+export function XBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpdatingInspectionPolicy = false }: XBriefViewerProps) {
+  const [tab, setTab] = useState<XBriefViewTab>(() => {
     if (initialTab) return initialTab;
     const stored = localStorage.getItem(STORAGE_KEY);
-    return (stored as VBriefViewTab | null) ?? 'list';
+    return (stored as XBriefViewTab | null) ?? 'list';
   });
 
   useEffect(() => {
@@ -70,17 +70,17 @@ export function VBriefViewer({ doc, initialTab, onInspectionPolicyChange, isUpda
       <div className={`flex-1 ${tab === 'dag' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
         {tab === 'list' && (
           <>
-            <VBriefHeader
+            <XBriefHeader
               doc={doc}
               onInspectionPolicyChange={onInspectionPolicyChange}
               isUpdatingInspectionPolicy={isUpdatingInspectionPolicy}
             />
-            {doc.plan.narratives && <VBriefNarratives narratives={doc.plan.narratives} />}
+            {doc.plan.narratives && <XBriefNarratives narratives={doc.plan.narratives} />}
             {doc.plan.references && doc.plan.references.length > 0 && (
-              <VBriefReferences references={doc.plan.references} />
+              <XBriefReferences references={doc.plan.references} />
             )}
-            <VBriefReadinessPanel doc={doc} />
-            <VBriefItemList items={doc.plan.items} />
+            <XBriefReadinessPanel doc={doc} />
+            <XBriefItemList items={doc.plan.items} />
           </>
         )}
 

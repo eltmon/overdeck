@@ -1,11 +1,11 @@
 import { ExternalLink } from 'lucide-react';
-import type { VBriefReference } from './types';
+import type { XBriefReference } from './types';
 
-interface VBriefReferencesProps {
-  references: VBriefReference[];
+interface XBriefReferencesProps {
+  references: XBriefReference[];
 }
 
-export function VBriefReferences({ references }: VBriefReferencesProps) {
+export function XBriefReferences({ references }: XBriefReferencesProps) {
   if (references.length === 0) return null;
 
   return (

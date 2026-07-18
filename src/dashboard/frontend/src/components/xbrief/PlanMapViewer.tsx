@@ -5,7 +5,7 @@
  *
  * Same data contract as the component it replaces: react-query on
  * ['plan', issueId] against /api/workspaces/:issueId/plan, throttled
- * event-driven refetch, and onNodeClick returning the full vBRIEF ITEM so
+ * event-driven refetch, and onNodeClick returning the full xBRIEF ITEM so
  * existing detail panels keep working.
  */
 
@@ -13,16 +13,16 @@ import { useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useDashboardStore } from '../../lib/store';
 import DagRenderer, { type DagEdge, type DagNode } from './DagRenderer';
-import type { VBriefDocument, VBriefItem } from './types';
+import type { XBriefDocument, XBriefItem } from './types';
 
 export interface PlanMapViewerProps {
   issueId: string;
-  onNodeClick?: (item: VBriefItem) => void;
+  onNodeClick?: (item: XBriefItem) => void;
   className?: string;
   compact?: boolean;
 }
 
-function statusOf(item: VBriefItem): DagNode['status'] {
+function statusOf(item: XBriefItem): DagNode['status'] {
   switch (item.status) {
     case 'completed':
       return 'done';
@@ -37,7 +37,7 @@ function statusOf(item: VBriefItem): DagNode['status'] {
   }
 }
 
-function assigneeOf(item: VBriefItem): string | undefined {
+function assigneeOf(item: XBriefItem): string | undefined {
   const metadata = (item.metadata ?? {}) as { model?: string; difficulty?: string; kind?: string };
   const who = metadata.model ?? metadata.difficulty ?? metadata.kind;
   const acCount = (item.items ?? []).filter(
@@ -47,7 +47,7 @@ function assigneeOf(item: VBriefItem): string | undefined {
   return [who, checks].filter(Boolean).join(' · ') || undefined;
 }
 
-export function docToDag(doc: VBriefDocument): { nodes: DagNode[]; edges: DagEdge[] } {
+export function docToDag(doc: XBriefDocument): { nodes: DagNode[]; edges: DagEdge[] } {
   const nodes: DagNode[] = (doc.plan.items ?? []).map((item) => ({
     id: item.id,
     title: item.status === 'cancelled' ? `${item.title} (cancelled)` : item.title,
@@ -63,7 +63,7 @@ export function docToDag(doc: VBriefDocument): { nodes: DagNode[]; edges: DagEdg
 
 export function PlanMapViewer({ issueId, onNodeClick, className, compact }: PlanMapViewerProps) {
   const queryClient = useQueryClient();
-  const { data: doc, isLoading, isError } = useQuery<VBriefDocument>({
+  const { data: doc, isLoading, isError } = useQuery<XBriefDocument>({
     queryKey: ['plan', issueId],
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);

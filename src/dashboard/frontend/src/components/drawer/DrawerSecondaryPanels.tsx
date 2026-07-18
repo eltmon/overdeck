@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { cn } from '../../lib/utils';
-import { VBriefViewer } from '../vbrief/VBriefViewer';
-import type { VBriefDocument } from '../vbrief/types';
+import { XBriefViewer } from '../xbrief/XBriefViewer';
+import type { XBriefDocument } from '../xbrief/types';
 import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
 
 const DOT_CLASSES = { work: 'bg-primary', review: 'bg-signal-review', ship: 'bg-warning', done: 'bg-success', info: 'bg-info' } satisfies Record<DrawerActivityPhase, string>;
@@ -16,6 +16,6 @@ export function DrawerActivityPanel() {
 }
 
 export function DrawerPlanPanel({ issueId }: { issueId: string }) {
-  const { data, isLoading, isError } = useQuery<VBriefDocument | null>({ queryKey: ['drawer-vbrief-plan', issueId], queryFn: async () => { const res = await fetch(`/api/workspaces/${issueId}/plan`); return res.ok ? res.json() as Promise<VBriefDocument> : null; }, retry: false });
-  return <div data-testid="drawer-tab-panel-plan">{isLoading ? <div className="text-[12px] text-muted-foreground">Loading plan…</div> : isError ? <div className="text-[12px] text-muted-foreground">Failed to load plan</div> : <VBriefViewer doc={data ?? null} />}</div>;
+  const { data, isLoading, isError } = useQuery<XBriefDocument | null>({ queryKey: ['drawer-xbrief-plan', issueId], queryFn: async () => { const res = await fetch(`/api/workspaces/${issueId}/plan`); return res.ok ? res.json() as Promise<XBriefDocument> : null; }, retry: false });
+  return <div data-testid="drawer-tab-panel-plan">{isLoading ? <div className="text-[12px] text-muted-foreground">Loading plan…</div> : isError ? <div className="text-[12px] text-muted-foreground">Failed to load plan</div> : <XBriefViewer doc={data ?? null} />}</div>;
 }

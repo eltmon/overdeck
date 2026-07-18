@@ -1,21 +1,21 @@
 /**
- * vBRIEF frontend types — extended with all new fields
- * Used by VBriefViewer and related components.
+ * xBRIEF frontend types — extended with all new fields
+ * Used by XBriefViewer and related components.
  */
 
-export type VBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed' | 'in_progress';
-export type VBriefPriority = 'critical' | 'high' | 'medium' | 'low';
-export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
-export type VBriefInspectionPolicy = 'auto' | 'never' | 'fast' | 'deep';
+export type XBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed' | 'in_progress';
+export type XBriefPriority = 'critical' | 'high' | 'medium' | 'low';
+export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type XBriefInspectionPolicy = 'auto' | 'never' | 'fast' | 'deep';
 export type TieredExecutionSource = 'global' | 'issue-override' | 'plan-metadata';
 
-export interface VBriefReference {
+export interface XBriefReference {
   uri: string;
   label?: string;
   type?: string;
 }
 
-export interface VBriefSubItem {
+export interface XBriefSubItem {
   id: string;
   title: string;
   status: string;
@@ -24,26 +24,26 @@ export interface VBriefSubItem {
   metadata?: { kind?: string; [key: string]: unknown };
 }
 
-export interface VBriefItem {
+export interface XBriefItem {
   id: string;
   title: string;
-  status: VBriefItemStatus;
-  priority?: VBriefPriority;
+  status: XBriefItemStatus;
+  priority?: XBriefPriority;
   created?: string;
   completed?: string;
-  metadata?: { difficulty?: VBriefDifficulty; [key: string]: unknown };
+  metadata?: { difficulty?: XBriefDifficulty; [key: string]: unknown };
   narrative?: { Action?: string; [key: string]: string | undefined };
-  items?: VBriefSubItem[];
-  subItems?: VBriefSubItem[];
+  items?: XBriefSubItem[];
+  subItems?: XBriefSubItem[];
 }
 
-export interface VBriefEdge {
+export interface XBriefEdge {
   from: string;
   to: string;
   type: 'blocks' | 'informs' | 'invalidates' | 'suggests';
 }
 
-export interface VBriefPlan {
+export interface XBriefPlan {
   id: string;
   title: string;
   status: string;
@@ -54,7 +54,7 @@ export interface VBriefPlan {
   author?: string;
   uid?: string;
   sequence?: number;
-  references?: VBriefReference[];
+  references?: XBriefReference[];
   created?: string;
   updated?: string;
   tags?: string[];
@@ -66,19 +66,19 @@ export interface VBriefPlan {
     Alternative?: string;
     [key: string]: string | undefined;
   };
-  items: VBriefItem[];
-  edges: VBriefEdge[];
+  items: XBriefItem[];
+  edges: XBriefEdge[];
 }
 
-export interface VBriefDocument {
-  vBRIEFInfo: {
+export interface XBriefDocument {
+  xBRIEFInfo: {
     version: string;
     created: string;
     updated?: string;
     author?: string;
     description?: string;
-    inspectionPolicy?: VBriefInspectionPolicy;
+    inspectionPolicy?: XBriefInspectionPolicy;
   };
-  plan: VBriefPlan;
+  plan: XBriefPlan;
   criticalPath?: string[];
 }

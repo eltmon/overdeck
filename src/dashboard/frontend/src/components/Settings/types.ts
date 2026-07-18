@@ -6,8 +6,8 @@ export type Provider = 'anthropic' | 'openai' | 'google' | 'zai' | 'kimi' | 'min
 export type ModelId = string;
 export type Harness = 'claude-code' | 'ohmypi' | 'codex';
 export type HarnessOverride = Harness | '';
-export type VBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
-export type VBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
+export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'expert';
+export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
 
 export interface ProvidersConfig {
   anthropic: boolean;
@@ -164,7 +164,7 @@ export interface TieredExecutionConfig {
   tiers: Record<string, {
     model: ModelId;
     harness: Harness;
-    difficulties: VBriefDifficulty[];
+    difficulties: XBriefDifficulty[];
     /** PAN-2391: weighted entries this tier spreads tasks across. When
      * present, model/harness above are the max-weight representative. */
     distribution?: Array<{ model: ModelId; harness: Harness; weight: number }>;
@@ -175,8 +175,8 @@ export interface TieredExecutionConfig {
     subscribe: 'all' | 'flagged' | 'sampled';
     owns_inspection?: boolean;
   };
-  by_kind?: Partial<Record<VBriefItemKind, string>>;
-  byKind?: Partial<Record<VBriefItemKind, string>>;
+  by_kind?: Partial<Record<XBriefItemKind, string>>;
+  byKind?: Partial<Record<XBriefItemKind, string>>;
   feed?: {
     callouts: 'off' | 'notify' | 'corroborate';
     exclude: string[];
@@ -187,11 +187,11 @@ export interface TieredExecutionConfig {
     enabled: boolean;
     retries_at_tier: number;
     max_promotions: number;
-    flounder_budget_minutes: Partial<Record<VBriefDifficulty, number>>;
+    flounder_budget_minutes: Partial<Record<XBriefDifficulty, number>>;
   };
   compaction_reroute?: 'off' | 'on';
   replay_threshold: number;
-  difficultyToTier?: Partial<Record<VBriefDifficulty, string>>;
+  difficultyToTier?: Partial<Record<XBriefDifficulty, string>>;
 }
 
 export interface SettingsConfig {

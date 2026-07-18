@@ -1,5 +1,5 @@
 /**
- * PAN-2400 — the shared vBRIEF DAG renderer ("The plan, as a map").
+ * PAN-2400 — the shared xBRIEF DAG renderer ("The plan, as a map").
  *
  * One SVG component for every plan-graph surface. Replaces the broken
  * per-view DAG renderings (wrong zoom, missing arrows). Design contract:

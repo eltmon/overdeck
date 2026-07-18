@@ -1,20 +1,20 @@
 /**
- * Tests for VBriefViewer component suite
+ * Tests for XBriefViewer component suite
  *
  * Covers:
- * - VBriefHeader: title, status badge, uid, author, timestamps
- * - VBriefNarratives: markdown rendering
- * - VBriefReferences: clickable links
- * - VBriefItemCard: expand/collapse, AC checklist with status indicators
- * - VBriefViewer: tab switching (List/DAG/Raw JSON), missing plan fallback
+ * - XBriefHeader: title, status badge, uid, author, timestamps
+ * - XBriefNarratives: markdown rendering
+ * - XBriefReferences: clickable links
+ * - XBriefItemCard: expand/collapse, AC checklist with status indicators
+ * - XBriefViewer: tab switching (List/DAG/Raw JSON), missing plan fallback
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import type { VBriefDocument } from './types';
-import { VBriefViewer } from './VBriefViewer';
-import { VBriefHeader } from './VBriefHeader';
-import { VBriefItemCard } from './VBriefItemCard';
+import type { XBriefDocument } from './types';
+import { XBriefViewer } from './XBriefViewer';
+import { XBriefHeader } from './XBriefHeader';
+import { XBriefItemCard } from './XBriefItemCard';
 
 // Mock localStorage
 const localStorageMock: Record<string, string> = {};
@@ -45,9 +45,9 @@ vi.mock('react-markdown', () => ({
 
 vi.mock('remark-gfm', () => ({ default: () => {} }));
 
-function makeDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocument {
+function makeDoc(overrides: Partial<XBriefDocument['plan']> = {}): XBriefDocument {
   return {
-    vBRIEFInfo: {
+    xBRIEFInfo: {
       version: '0.5',
       created: '2026-01-01T00:00:00Z',
       author: 'overdeck/0.6.0',
@@ -89,20 +89,20 @@ function makeDoc(overrides: Partial<VBriefDocument['plan']> = {}): VBriefDocumen
   };
 }
 
-// ─── VBriefViewer: missing plan ───────────────────────────────────────────────
+// ─── XBriefViewer: missing plan ───────────────────────────────────────────────
 
-describe('VBriefViewer: missing plan', () => {
+describe('XBriefViewer: missing plan', () => {
   it('shows "No plan available" when doc is null', () => {
-    render(<VBriefViewer doc={null} />);
+    render(<XBriefViewer doc={null} />);
     expect(screen.getByText('No plan available')).toBeTruthy();
   });
 });
 
-// ─── VBriefReadinessPanel ────────────────────────────────────────────────────
+// ─── XBriefReadinessPanel ────────────────────────────────────────────────────
 
-describe('VBriefViewer: readiness panel', () => {
+describe('XBriefViewer: readiness panel', () => {
   it('renders dependency waves, overlap matrix, and conflict groups', () => {
-    render(<VBriefViewer doc={makeDoc({
+    render(<XBriefViewer doc={makeDoc({
       items: [
         {
           id: 'task-a',
@@ -152,27 +152,27 @@ describe('VBriefViewer: readiness panel', () => {
   });
 });
 
-// ─── VBriefViewer: tab switching ──────────────────────────────────────────────
+// ─── XBriefViewer: tab switching ──────────────────────────────────────────────
 
-describe('VBriefViewer: tab switching', () => {
+describe('XBriefViewer: tab switching', () => {
   beforeEach(() => {
     Object.keys(localStorageMock).forEach(k => delete localStorageMock[k]);
   });
 
   it('renders List tab by default', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     expect(screen.getByRole('tab', { name: /list/i })).toBeTruthy();
   });
 
   it('switches to Raw JSON tab and shows JSON content', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     const rawTab = screen.getByRole('tab', { name: /raw json/i });
     fireEvent.click(rawTab);
     expect(screen.getByText(/test-1/)).toBeTruthy(); // JSON contains plan.id
   });
 
   it('switches to DAG tab', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     const dagTab = screen.getByRole('tab', { name: /dag/i });
     fireEvent.click(dagTab);
     // DAG tab is selected
@@ -180,109 +180,109 @@ describe('VBriefViewer: tab switching', () => {
   });
 
   it('List tab is aria-selected when active', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     const listTab = screen.getByRole('tab', { name: /list/i });
     expect(listTab.getAttribute('aria-selected')).toBe('true');
   });
 });
 
-// ─── VBriefHeader ─────────────────────────────────────────────────────────────
+// ─── XBriefHeader ─────────────────────────────────────────────────────────────
 
-describe('VBriefHeader', () => {
+describe('XBriefHeader', () => {
   it('renders plan title', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     expect(screen.getByText('Test Issue Plan')).toBeTruthy();
   });
 
   it('renders status badge', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     expect(screen.getByText('approved')).toBeTruthy();
   });
 
   it('renders plan.uid', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     expect(screen.getByText('f47ac10b-58cc-4372-a567-0e02b2c3d479')).toBeTruthy();
   });
 
   it('renders plan.author', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     expect(screen.getByText('agent:claude-opus-4-6')).toBeTruthy();
   });
 
-  it('renders vBRIEFInfo.author as tool', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+  it('renders xBRIEFInfo.author as tool', () => {
+    render(<XBriefHeader doc={makeDoc()} />);
     expect(screen.getByText('overdeck/0.6.0')).toBeTruthy();
   });
 
   it('renders created timestamp', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     // Should render some formatted date for '2026-01-01T00:00:00Z'
     const createdLabel = screen.getByText('created');
     expect(createdLabel).toBeTruthy();
   });
 
   it('renders updated timestamp', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     const updatedLabel = screen.getByText('updated');
     expect(updatedLabel).toBeTruthy();
   });
 
   it('renders sequence number', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     expect(screen.getByText('3')).toBeTruthy();
   });
 
   it('renders default inspection policy', () => {
-    render(<VBriefHeader doc={makeDoc()} />);
+    render(<XBriefHeader doc={makeDoc()} />);
     expect(screen.getByText('inspection')).toBeTruthy();
     expect(screen.getByText('auto')).toBeTruthy();
   });
 
   it('allows editing inspection policy', () => {
     const onInspectionPolicyChange = vi.fn();
-    render(<VBriefHeader doc={makeDoc()} onInspectionPolicyChange={onInspectionPolicyChange} />);
+    render(<XBriefHeader doc={makeDoc()} onInspectionPolicyChange={onInspectionPolicyChange} />);
     fireEvent.change(screen.getByLabelText('Inspection policy'), { target: { value: 'never' } });
     expect(onInspectionPolicyChange).toHaveBeenCalledWith('never');
   });
 
   it('omits uid row when uid is absent', () => {
     const doc = makeDoc({ uid: undefined });
-    render(<VBriefHeader doc={doc} />);
+    render(<XBriefHeader doc={doc} />);
     expect(screen.queryByText(/f47ac10b/)).toBeNull();
   });
 });
 
-// ─── VBriefItemCard ───────────────────────────────────────────────────────────
+// ─── XBriefItemCard ───────────────────────────────────────────────────────────
 
-describe('VBriefItemCard', () => {
+describe('XBriefItemCard', () => {
   it('renders item title', () => {
     const item = makeDoc().plan.items[0];
-    render(<VBriefItemCard item={item} />);
+    render(<XBriefItemCard item={item} />);
     expect(screen.getByText('Implement feature X')).toBeTruthy();
   });
 
   it('renders priority badge', () => {
     const item = makeDoc().plan.items[0];
-    render(<VBriefItemCard item={item} />);
+    render(<XBriefItemCard item={item} />);
     expect(screen.getByText('high')).toBeTruthy();
   });
 
   it('renders difficulty badge', () => {
     const item = makeDoc().plan.items[0];
-    render(<VBriefItemCard item={item} />);
+    render(<XBriefItemCard item={item} />);
     expect(screen.getByText('medium')).toBeTruthy();
   });
 
   it('shows AC count when collapsed', () => {
     const item = makeDoc().plan.items[0];
-    render(<VBriefItemCard item={item} />);
+    render(<XBriefItemCard item={item} />);
     // 1 of 2 ACs completed
     expect(screen.getByText('1/2 AC')).toBeTruthy();
   });
 
   it('expands to show AC checklist on click', () => {
     const item = makeDoc().plan.items[0];
-    render(<VBriefItemCard item={item} />);
+    render(<XBriefItemCard item={item} />);
     const button = screen.getByRole('button');
     fireEvent.click(button);
     expect(screen.getByText('Feature X works')).toBeTruthy();
@@ -291,34 +291,34 @@ describe('VBriefItemCard', () => {
 
   it('shows completed AC text with strikethrough style', () => {
     const item = makeDoc().plan.items[0];
-    render(<VBriefItemCard item={item} />);
+    render(<XBriefItemCard item={item} />);
     fireEvent.click(screen.getByRole('button'));
     const completedAC = screen.getByText('Feature X works');
     expect(completedAC.className).toContain('line-through');
   });
 });
 
-// ─── VBriefViewer: list tab content ──────────────────────────────────────────
+// ─── XBriefViewer: list tab content ──────────────────────────────────────────
 
-describe('VBriefViewer: list tab renders full plan', () => {
+describe('XBriefViewer: list tab renders full plan', () => {
   it('renders header with plan title', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     expect(screen.getByText('Test Issue Plan')).toBeTruthy();
   });
 
   it('renders narrative sections', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     expect(screen.getByText('Problem')).toBeTruthy();
     expect(screen.getByText('Proposal')).toBeTruthy();
   });
 
   it('renders references', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     expect(screen.getByText('TEST-1')).toBeTruthy();
   });
 
   it('renders items list', () => {
-    render(<VBriefViewer doc={makeDoc()} initialTab="list" />);
+    render(<XBriefViewer doc={makeDoc()} initialTab="list" />);
     expect(screen.getByText('Implement feature X')).toBeTruthy();
   });
 });

@@ -224,9 +224,9 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'destroyWorkspace':
       return `Destroy the workspace for ${issueId}?\n\nThis removes workspace resources but leaves the issue record intact.`;
     case 'resetIssue':
-      return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and vBRIEF state, and moves the issue back to Todo.`;
+      return `Reset ${issueId}?\n\nThis stops any running agent, deletes the workspace and feature branch, clears tasks and xBRIEF state, and moves the issue back to Todo.`;
     case 'resetToPlanned':
-      return `Reset ${issueId} to planned?\n\nThis stops issue agents and clears task progress and claims, saved sessions, completion markers, pipeline verdicts, retries, and merge-queue state. It preserves the workspace, branch, commits, and finalized vBRIEF, returns the issue to open + planned, and does not start an agent.`;
+      return `Reset ${issueId} to planned?\n\nThis stops issue agents and clears task progress and claims, saved sessions, completion markers, pipeline verdicts, retries, and merge-queue state. It preserves the workspace, branch, commits, and finalized xBRIEF, returns the issue to open + planned, and does not start an agent.`;
     case 'cancel':
       return `Cancel ${issueId}?\n\nThis cancels the issue and wipes the workspace state for the abandoned run.`;
     case 'resetSession':
@@ -235,7 +235,7 @@ function destructiveMessage(action: IssueActionEntry, issueId: string) {
     case 'restartAgent':
       return `Restart work for ${issueId}?\n\nThis stops the current agent path and starts a replacement run from existing context.`;
     case 'completeWorkReset':
-      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, vBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
+      return `Complete work reset for ${issueId}?\n\nThis will delete the work agent's state (sessions, activity, logs) but keep the workspace, xBRIEF, tasks, and commit history. The agent will not be re-spawned — click Start when you're ready.`;
     case 'purgeReview':
       return `Remove review sessions and reset ${issueId}?\n\nThis kills and removes ALL review agents for the issue — the review agent plus any leftover sub-reviewers — and resets the review/test/merge status. Agent state and tmux sessions are removed; transcripts and work are untouched. A fresh review can then run clean.`;
     default:

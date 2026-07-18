@@ -142,10 +142,10 @@ export function AgentCard({ issueId }: { issueId: string }) {
     .find((v): v is IssueActionView => !!v && v.enabled && (v.action.key !== 'startAgent' || canShowStart))
   const readinessText = useMemo(() => {
     if (planningState.isLoading || planningStatus.isLoading) return 'Checking planning readiness...'
-    if (!hasPlan) return 'No finalized vBRIEF yet.'
+    if (!hasPlan) return 'No finalized xBRIEF yet.'
     if (!hasTasks && status?.hasCompletionMarker === true) return 'Planning is ready to finalize.'
-    if (!hasTasks) return 'Waiting for planning to produce a final vBRIEF.'
-    return 'vBRIEF and tasks are ready.'
+    if (!hasTasks) return 'Waiting for planning to produce a final xBRIEF.'
+    return 'xBRIEF and tasks are ready.'
   }, [hasTasks, hasPlan, planningState.isLoading, planningStatus.isLoading, status?.hasCompletionMarker])
 
   return (

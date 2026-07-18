@@ -155,7 +155,7 @@ function makeFeature(overrides?: Partial<ProjectFeature>): ProjectFeature {
       tmuxSessionCount: 0,
       tmuxSessionNames: [],
       prs: [],
-      hasVbrief: false,
+      hasXbrief: false,
       hasTasks: false,
       dockerContainerCount: 0,
       dockerContainerNames: [],
@@ -229,7 +229,7 @@ function renderReadyForMergeFeature() {
           remoteBranchCount: 0,
           tmuxSessionCount: 0,
           prs: [],
-          hasVbrief: false,
+          hasXbrief: false,
           hasTasks: false,
           dockerContainerCount: 2,
         },
@@ -974,7 +974,7 @@ describe('FeatureItem', () => {
                 isDraft: false,
               },
             ],
-            hasVbrief: true,
+            hasXbrief: true,
             hasTasks: true,
             dockerContainerCount: 2,
           },
@@ -994,7 +994,7 @@ describe('FeatureItem', () => {
     expect(screen.getByText('branch (local): feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('branch (remote): origin/feature/pan-821')).toBeInTheDocument();
     expect(screen.getByText('tmux: agent-pan-821')).toBeInTheDocument();
-    expect(screen.getByText('vBRIEF present')).toBeInTheDocument();
+    expect(screen.getByText('xBRIEF present')).toBeInTheDocument();
     expect(screen.getByText('tasks present')).toBeInTheDocument();
     expect(screen.getByText('PR: #123 Test PR (open)')).toBeInTheDocument();
     expect(screen.getByText('docker: pan-821-db')).toBeInTheDocument();
@@ -1054,7 +1054,7 @@ describe('FeatureItem', () => {
             remoteBranchCount: 0,
             tmuxSessionCount: 0,
             prs: [],
-            hasVbrief: false,
+            hasXbrief: false,
             hasTasks: false,
             dockerContainerCount: 2,
             conversations: [],
@@ -1107,7 +1107,7 @@ describe('FeatureItem', () => {
             remoteBranchCount: 0,
             tmuxSessionCount: 0,
             prs: [],
-            hasVbrief: false,
+            hasXbrief: false,
             hasTasks: false,
             dockerContainerCount: 2,
             conversations: [],
@@ -1259,7 +1259,7 @@ describe('FeatureItem', () => {
             remoteBranchCount: 0,
             tmuxSessionCount: 0,
             prs: [],
-            hasVbrief: false,
+            hasXbrief: false,
             hasTasks: false,
             dockerContainerCount: 0,
             conversations: [],
@@ -1294,7 +1294,7 @@ describe('FeatureItem', () => {
             remoteBranchCount: 0,
             tmuxSessionCount: 0,
             prs: [],
-            hasVbrief: false,
+            hasXbrief: false,
             hasTasks: false,
             dockerContainerCount: 0,
             conversations: [
@@ -1335,7 +1335,7 @@ describe('FeatureItem', () => {
             remoteBranchCount: 0,
             tmuxSessionCount: 0,
             prs: [],
-            hasVbrief: false,
+            hasXbrief: false,
             hasTasks: false,
             dockerContainerCount: 0,
             conversations: [{ id: 7, name: 'conv-pan-821', title: 'Only conv', status: 'active' }],

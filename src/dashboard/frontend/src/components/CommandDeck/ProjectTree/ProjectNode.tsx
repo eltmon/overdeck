@@ -19,7 +19,7 @@ export interface ProjectFeatureResourceDetails {
     state: string;
     isDraft: boolean;
   }>;
-  hasVbrief: boolean;
+  hasXbrief: boolean;
   hasTasks: boolean;
   dockerContainerCount: number;
   /** PAN-1523: actual HEAD of the agent's workspace, or null when workspace is missing. */

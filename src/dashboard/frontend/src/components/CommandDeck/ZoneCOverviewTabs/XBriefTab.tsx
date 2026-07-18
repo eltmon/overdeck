@@ -1,29 +1,29 @@
 /**
- * VBriefTab — embeds the existing VBriefViewer for the per-issue plan.
+ * XBriefTab — embeds the existing XBriefViewer for the per-issue plan.
  *
  * The plan is fetched from `/api/workspaces/:issueId/plan` (404 when no plan
- * exists); we render an empty state in that case. VBriefViewer itself owns
+ * exists); we render an empty state in that case. XBriefViewer itself owns
  * the inner List/DAG/Raw tab strip.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { VBriefViewer } from '../../vbrief/VBriefViewer';
-import type { VBriefDocument, VBriefInspectionPolicy } from '../../vbrief/types';
+import { XBriefViewer } from '../../xbrief/XBriefViewer';
+import type { XBriefDocument, XBriefInspectionPolicy } from '../../xbrief/types';
 
-interface VBriefTabProps {
+interface XBriefTabProps {
   issueId: string;
 }
 
-async function fetchPlan(issueId: string): Promise<VBriefDocument | null> {
+async function fetchPlan(issueId: string): Promise<XBriefDocument | null> {
   const res = await fetch(`/api/workspaces/${issueId}/plan`);
   if (res.status === 404) return null;
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText} — /api/workspaces/${issueId}/plan`);
   }
-  return res.json() as Promise<VBriefDocument>;
+  return res.json() as Promise<XBriefDocument>;
 }
 
-export function VBriefTab({ issueId }: VBriefTabProps) {
+export function XBriefTab({ issueId }: XBriefTabProps) {
   const queryClient = useQueryClient();
   const queryKey = ['workspace-plan', issueId];
   const { data, isLoading, isError } = useQuery({
@@ -32,14 +32,14 @@ export function VBriefTab({ issueId }: VBriefTabProps) {
     refetchInterval: 30_000,
   });
   const updateInspectionPolicy = useMutation({
-    mutationFn: async (inspectionPolicy: VBriefInspectionPolicy) => {
+    mutationFn: async (inspectionPolicy: XBriefInspectionPolicy) => {
       const res = await fetch(`/api/workspaces/${issueId}/plan/inspection-policy`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inspectionPolicy }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      return res.json() as Promise<VBriefDocument>;
+      return res.json() as Promise<XBriefDocument>;
     },
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKey, updated);
@@ -49,7 +49,7 @@ export function VBriefTab({ issueId }: VBriefTabProps) {
   if (isLoading) {
     return (
       <div
-        data-testid="vbrief-tab-loading"
+        data-testid="xbrief-tab-loading"
         style={{ padding: 16, fontSize: 12, color: 'var(--muted-foreground)' }}
       >
         Loading plan…
@@ -60,7 +60,7 @@ export function VBriefTab({ issueId }: VBriefTabProps) {
   if (isError) {
     return (
       <div
-        data-testid="vbrief-tab-error"
+        data-testid="xbrief-tab-error"
         style={{ padding: 16, fontSize: 12, color: 'var(--destructive)' }}
       >
         Failed to load plan.
@@ -69,8 +69,8 @@ export function VBriefTab({ issueId }: VBriefTabProps) {
   }
 
   return (
-    <div data-testid="vbrief-tab" style={{ padding: 16 }}>
-      <VBriefViewer
+    <div data-testid="xbrief-tab" style={{ padding: 16 }}>
+      <XBriefViewer
         doc={data ?? null}
         onInspectionPolicyChange={(policy) => updateInspectionPolicy.mutate(policy)}
         isUpdatingInspectionPolicy={updateInspectionPolicy.isPending}

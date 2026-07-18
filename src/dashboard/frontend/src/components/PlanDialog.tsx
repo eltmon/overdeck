@@ -362,7 +362,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
     onSuccess: async (data) => {
       await queryClient.invalidateQueries({ queryKey: ['planning-state', issue.identifier] });
       await statusQuery.refetch();
-      toast.success(`Generated ${data.count} task${data.count === 1 ? '' : 's'} from the vBRIEF plan.`);
+      toast.success(`Generated ${data.count} task${data.count === 1 ? '' : 's'} from the xBRIEF plan.`);
     },
     onError: (err: Error) => {
       toast.error(`Generate tasks failed: ${err.message}`);
@@ -980,7 +980,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     )}
                   </div>
 
-                  {/* Tasks-needed callout — shown when a vBRIEF plan exists but no tasks were created.
+                  {/* Tasks-needed callout — shown when a xBRIEF plan exists but no tasks were created.
                       Planning isn't truly "done" until tasks exist; this surfaces the action
                       directly in the planning dialog instead of forcing the user to find the
                       Generate Tasks chip on the kanban card. */}
@@ -990,7 +990,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-warning-foreground">Tasks not yet generated</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          A vBRIEF plan exists but no tasks have been created. Generate tasks to finish planning so the Done button unlocks.
+                          A xBRIEF plan exists but no tasks have been created. Generate tasks to finish planning so the Done button unlocks.
                         </p>
                       </div>
                       <button
@@ -1020,7 +1020,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                             ? 'badge-bg-signal-review text-signal-review-foreground hover:bg-signal-review/30'
                             : 'bg-popover hover:bg-card text-foreground'
                         }`}
-                        title={showTasksPanel ? 'Back to terminal' : 'View vBRIEF tasks and dependency graph'}
+                        title={showTasksPanel ? 'Back to terminal' : 'View xBRIEF tasks and dependency graph'}
                       >
                         <List className="w-4 h-4" />
                         {showTasksPanel ? 'Terminal' : 'Tasks'}

@@ -15,7 +15,7 @@ export function TasksKanban({ agentId }: TasksKanbanProps) {
   const { data } = useQuery({
     queryKey: ['tasks', agentId],
     queryFn: async () => {
-      // Task state derives from the vBRIEF checklist; fetch via the agent
+      // Task state derives from the xBRIEF checklist; fetch via the agent
       // activity timeline as a proxy here.
       const res = await fetch(`/api/agents/${agentId}/activity?limit=50`);
       if (!res.ok) return null;

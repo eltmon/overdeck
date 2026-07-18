@@ -1,34 +1,34 @@
 import { X, ScrollText } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { VBriefViewer } from './VBriefViewer';
-import type { VBriefDocument, VBriefInspectionPolicy } from './types';
+import { XBriefViewer } from './XBriefViewer';
+import type { XBriefDocument, XBriefInspectionPolicy } from './types';
 
-interface VBriefDialogProps {
+interface XBriefDialogProps {
   issueId: string;
   onClose: () => void;
 }
 
-export function VBriefDialog({ issueId, onClose }: VBriefDialogProps) {
+export function XBriefDialog({ issueId, onClose }: XBriefDialogProps) {
   const queryClient = useQueryClient();
-  const queryKey = ['vbrief-plan', issueId];
-  const { data: doc, isLoading, isError } = useQuery<VBriefDocument | null>({
+  const queryKey = ['xbrief-plan', issueId];
+  const { data: doc, isLoading, isError } = useQuery<XBriefDocument | null>({
     queryKey,
     queryFn: async () => {
       const res = await fetch(`/api/workspaces/${issueId}/plan`);
       if (!res.ok) return null;
-      return res.json() as Promise<VBriefDocument>;
+      return res.json() as Promise<XBriefDocument>;
     },
     retry: false,
   });
   const updateInspectionPolicy = useMutation({
-    mutationFn: async (inspectionPolicy: VBriefInspectionPolicy) => {
+    mutationFn: async (inspectionPolicy: XBriefInspectionPolicy) => {
       const res = await fetch(`/api/workspaces/${issueId}/plan/inspection-policy`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inspectionPolicy }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      return res.json() as Promise<VBriefDocument>;
+      return res.json() as Promise<XBriefDocument>;
     },
     onSuccess: (updated) => {
       queryClient.setQueryData(queryKey, updated);
@@ -43,7 +43,7 @@ export function VBriefDialog({ issueId, onClose }: VBriefDialogProps) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
             <ScrollText className="w-5 h-5 text-signal-review" />
-            <h2 className="font-semibold text-foreground">vBRIEF Plan: {issueId}</h2>
+            <h2 className="font-semibold text-foreground">xBRIEF Plan: {issueId}</h2>
           </div>
           <button
             onClick={onClose}
@@ -66,7 +66,7 @@ export function VBriefDialog({ issueId, onClose }: VBriefDialogProps) {
             </div>
           )}
           {!isLoading && !isError && (
-            <VBriefViewer
+            <XBriefViewer
               doc={doc ?? null}
               onInspectionPolicyChange={(policy) => updateInspectionPolicy.mutate(policy)}
               isUpdatingInspectionPolicy={updateInspectionPolicy.isPending}

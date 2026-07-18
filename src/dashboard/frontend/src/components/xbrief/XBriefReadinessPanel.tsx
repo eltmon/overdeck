@@ -1,38 +1,38 @@
-import type { VBriefDocument, VBriefItem } from './types';
+import type { XBriefDocument, XBriefItem } from './types';
 
-export interface VBriefReadinessOverlap {
+export interface XBriefReadinessOverlap {
   itemId: string;
   sharedFiles: string[];
 }
 
-export interface VBriefReadinessItemVerdict {
+export interface XBriefReadinessItemVerdict {
   id: string;
-  overlaps: VBriefReadinessOverlap[];
+  overlaps: XBriefReadinessOverlap[];
 }
 
-export interface VBriefReadinessConflictGroup {
+export interface XBriefReadinessConflictGroup {
   itemIds: string[];
   sharedFiles: string[];
   reason: 'file_overlap' | 'low_confidence';
 }
 
-export interface VBriefReadinessWave {
+export interface XBriefReadinessWave {
   index: number;
   items: Array<{ id: string; title: string }>;
 }
 
-export interface VBriefReadinessVerdict {
-  items: VBriefReadinessItemVerdict[];
-  waves: VBriefReadinessWave[];
-  conflictGroups: VBriefReadinessConflictGroup[];
+export interface XBriefReadinessVerdict {
+  items: XBriefReadinessItemVerdict[];
+  waves: XBriefReadinessWave[];
+  conflictGroups: XBriefReadinessConflictGroup[];
   overlapMatrix: Record<string, Record<string, string[]>>;
 }
 
-interface VBriefReadinessPanelProps {
-  doc: VBriefDocument & { readiness?: VBriefReadinessVerdict };
+interface XBriefReadinessPanelProps {
+  doc: XBriefDocument & { readiness?: XBriefReadinessVerdict };
 }
 
-export function VBriefReadinessPanel({ doc }: VBriefReadinessPanelProps) {
+export function XBriefReadinessPanel({ doc }: XBriefReadinessPanelProps) {
   const verdict = doc.readiness ?? buildReadinessVerdict(doc);
   const matrixRows = Object.entries(verdict.overlapMatrix).flatMap(([itemId, overlaps]) =>
     Object.entries(overlaps)
@@ -108,15 +108,15 @@ export function VBriefReadinessPanel({ doc }: VBriefReadinessPanelProps) {
   );
 }
 
-function buildReadinessVerdict(doc: VBriefDocument): VBriefReadinessVerdict {
+function buildReadinessVerdict(doc: XBriefDocument): XBriefReadinessVerdict {
   const waves = groupItemsByWave(doc);
   const overlapMatrix: Record<string, Record<string, string[]>> = Object.fromEntries(
     doc.plan.items.map(item => [item.id, {} as Record<string, string[]>]),
   );
-  const itemVerdicts = new Map<string, VBriefReadinessItemVerdict>(
+  const itemVerdicts = new Map<string, XBriefReadinessItemVerdict>(
     doc.plan.items.map(item => [item.id, { id: item.id, overlaps: [] }]),
   );
-  const conflictGroups: VBriefReadinessConflictGroup[] = [];
+  const conflictGroups: XBriefReadinessConflictGroup[] = [];
 
   for (let i = 0; i < doc.plan.items.length; i++) {
     for (let j = i + 1; j < doc.plan.items.length; j++) {
@@ -146,7 +146,7 @@ function buildReadinessVerdict(doc: VBriefDocument): VBriefReadinessVerdict {
   };
 }
 
-function groupItemsByWave(doc: VBriefDocument): VBriefReadinessWave[] {
+function groupItemsByWave(doc: XBriefDocument): XBriefReadinessWave[] {
   const actionable = doc.plan.items.filter(item => !['completed', 'cancelled', 'blocked', 'running'].includes(item.status));
   const actionableIds = new Set(actionable.map(item => item.id));
   const resolvedIds = new Set(doc.plan.items.filter(item => item.status === 'completed' || item.status === 'cancelled').map(item => item.id));
@@ -160,7 +160,7 @@ function groupItemsByWave(doc: VBriefDocument): VBriefReadinessWave[] {
   }
 
   const itemById = new Map(doc.plan.items.map(item => [item.id, item]));
-  const waves: VBriefReadinessWave[] = [];
+  const waves: XBriefReadinessWave[] = [];
   let current = actionable.map(item => item.id).filter(id => (inDegree.get(id) ?? 0) === 0);
   let index = 0;
   while (current.length > 0) {
@@ -185,7 +185,7 @@ function groupItemsByWave(doc: VBriefDocument): VBriefReadinessWave[] {
   return waves;
 }
 
-function sharedScopeFiles(left: VBriefItem, right: VBriefItem): string[] {
+function sharedScopeFiles(left: XBriefItem, right: XBriefItem): string[] {
   const leftScope = scopeOf(left);
   const rightScope = scopeOf(right);
   const shared = new Set<string>();
@@ -200,7 +200,7 @@ function sharedScopeFiles(left: VBriefItem, right: VBriefItem): string[] {
   return Array.from(shared).sort();
 }
 
-function scopeOf(item: VBriefItem): string[] {
+function scopeOf(item: XBriefItem): string[] {
   const scope = item.metadata?.files_scope;
   return Array.isArray(scope) ? scope.filter((entry): entry is string => typeof entry === 'string') : [];
 }

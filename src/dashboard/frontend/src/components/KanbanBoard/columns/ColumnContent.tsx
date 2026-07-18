@@ -18,7 +18,7 @@ export function ColumnContent({
   onOpenIssue,
   onPlan,
   onViewTasks,
-  onViewVBrief,
+  onViewXBrief,
   collapsedFeatures,
   onToggleFeature,
   bulkSelectedIds,
@@ -40,7 +40,7 @@ export function ColumnContent({
   onOpenIssue: (id: string) => void;
   onPlan: (issue: Issue, autoStart?: boolean) => void;
   onViewTasks: (issue: Issue) => void;
-  onViewVBrief?: (issue: Issue) => void;
+  onViewXBrief?: (issue: Issue) => void;
   collapsedFeatures: Set<string>;
   onToggleFeature: (featureId: string) => void;
   bulkSelectedIds?: Set<string>;
@@ -78,7 +78,7 @@ export function ColumnContent({
         onSelect={() => onOpenIssue(issue.identifier)}
         onPlan={(autoStart) => onPlan(issue, autoStart)}
         onViewTasks={(i) => onViewTasks(i)}
-        onViewVBrief={onViewVBrief ? (i) => onViewVBrief(i) : undefined}
+        onViewXBrief={onViewXBrief ? (i) => onViewXBrief(i) : undefined}
         isBulkSelected={bulkSelectedIds?.has(issue.identifier)}
         onBulkToggle={onBulkToggle ? () => onBulkToggle(issue.identifier) : undefined}
         planningState={planningStateById?.[issue.identifier]}
@@ -132,7 +132,7 @@ export function ColumnContent({
             )}
             onPlan={() => onPlan(feature)}
             onViewTasks={() => onViewTasks(feature)}
-            onViewVBrief={onViewVBrief ? () => onViewVBrief(feature) : undefined}
+            onViewXBrief={onViewXBrief ? () => onViewXBrief(feature) : undefined}
             planningState={planningStateById?.[feature.identifier]}
           >
             {group.children.map(child => (

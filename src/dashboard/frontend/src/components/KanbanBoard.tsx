@@ -12,7 +12,7 @@ import { Tag, X } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 // PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
-import { VBriefDialog } from './vbrief/VBriefDialog';
+import { XBriefDialog } from './xbrief/XBriefDialog';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 import { getIssueWorkAgentMap } from '../lib/workAgents';
@@ -123,7 +123,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
     onPlanDialogChange?.(planDialogIssue?.identifier ?? null);
   }, [planDialogIssue, onPlanDialogChange]);
   const [tasksDialogIssue, setTasksDialogIssue] = useState<Issue | null>(null); // Tasks viewer
-  const [vbriefDialogIssue, setVbriefDialogIssue] = useState<Issue | null>(null); // vBRIEF viewer
+  const [xbriefDialogIssue, setXbriefDialogIssue] = useState<Issue | null>(null); // xBRIEF viewer
   const [cycleFilter, setCycleFilter] = useState<CycleFilter>('current'); // Default to current cycle
   const [includeCompleted, setIncludeCompleted] = useState(false);
 
@@ -874,7 +874,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onOpenIssue={openIssue}
                     onPlan={openPlanDialog}
                     onViewTasks={setTasksDialogIssue}
-                    onViewVBrief={setVbriefDialogIssue}
+                    onViewXBrief={setXbriefDialogIssue}
                     collapsedFeatures={collapsedFeatures}
                     onToggleFeature={toggleFeature}
                     bulkSelectedIds={bulkSelection.selectedIds}
@@ -945,11 +945,11 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
         />
       )}
 
-      {/* vBRIEF Dialog - view plan for issue */}
-      {vbriefDialogIssue && (
-        <VBriefDialog
-          issueId={vbriefDialogIssue.identifier}
-          onClose={() => setVbriefDialogIssue(null)}
+      {/* xBRIEF Dialog - view plan for issue */}
+      {xbriefDialogIssue && (
+        <XBriefDialog
+          issueId={xbriefDialogIssue.identifier}
+          onClose={() => setXbriefDialogIssue(null)}
         />
       )}
 

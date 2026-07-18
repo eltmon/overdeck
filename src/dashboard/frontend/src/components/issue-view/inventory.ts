@@ -39,7 +39,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'DrawerVerificationGates', view: 'console', home: 'src/dashboard/frontend/src/components/issue-view/VerificationGates.tsx' },
   { section: 'DrawerReviewSpecialists', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerReviewSpecialists.tsx' },
   { section: 'DrawerTasksList', view: 'console', home: 'src/dashboard/frontend/src/components/TasksPanel.tsx' },
-  { section: 'DrawerPlanPanel / VBriefViewer', view: 'console', home: 'src/dashboard/frontend/src/components/vbrief/VBriefViewer.tsx' },
+  { section: 'DrawerPlanPanel / XBriefViewer', view: 'console', home: 'src/dashboard/frontend/src/components/xbrief/XBriefViewer.tsx' },
   { section: 'DrawerArtifactsPanel', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerArtifactsPanel.tsx' },
   { section: 'DrawerActivityRail / DrawerActivityPanel', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerActivityRail.tsx' },
   { section: 'DrawerAgentSession', view: 'console', home: 'src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx' },

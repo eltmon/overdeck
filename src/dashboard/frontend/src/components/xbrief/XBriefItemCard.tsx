@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, ChevronDown, CheckCircle2, Circle, XCircle, Clock } from 'lucide-react';
-import type { VBriefItem, VBriefSubItem } from './types';
+import type { XBriefItem, XBriefSubItem } from './types';
 
 const STATUS_COLORS: Record<string, string> = {
   completed: 'text-success border-success/50',
@@ -28,18 +28,18 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   expert: 'badge-bg-destructive text-destructive',
 };
 
-function ACIcon({ sub }: { sub: VBriefSubItem }) {
+function ACIcon({ sub }: { sub: XBriefSubItem }) {
   if (sub.status === 'completed') return <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />;
   if (sub.status === 'blocked' || sub.status === 'failed') return <XCircle className="w-3.5 h-3.5 text-destructive shrink-0" />;
   if (sub.status === 'running' || sub.status === 'in_progress') return <Clock className="w-3.5 h-3.5 text-primary shrink-0" />;
   return <Circle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />;
 }
 
-interface VBriefItemCardProps {
-  item: VBriefItem;
+interface XBriefItemCardProps {
+  item: XBriefItem;
 }
 
-export function VBriefItemCard({ item }: VBriefItemCardProps) {
+export function XBriefItemCard({ item }: XBriefItemCardProps) {
   const [expanded, setExpanded] = useState(false);
 
   const statusCls = STATUS_COLORS[item.status] ?? STATUS_COLORS.pending;
