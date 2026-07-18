@@ -167,6 +167,7 @@ describe('generateLauncherScript', () => {
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
       unset CLAUDE_CODE_AUTO_COMPACT_WINDOW
+      unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
       export ANTHROPIC_BASE_URL="http://proxy"
       export CAVEMAN_DEFAULT_MODE="active"
       prompt=$(cat '/tmp/prompt.md')
@@ -254,6 +255,7 @@ describe('generateLauncherScript', () => {
       unset API_TIMEOUT_MS
       unset CLAUDE_CODE_API_KEY_HELPER_TTL_MS
       unset CLAUDE_CODE_AUTO_COMPACT_WINDOW
+      unset CLAUDE_CODE_MAX_CONTEXT_TOKENS
       export ANTHROPIC_BASE_URL="http://proxy"
       prompt=$(cat '/tmp/identity.md')
       exec claude --dangerously-skip-permissions --permission-mode bypassPermissions --session-id 'sess-xyz' --model 'claude-sonnet-4-6' "$prompt"
