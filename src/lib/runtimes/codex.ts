@@ -36,6 +36,7 @@ import type {
 import { CODEX_BEHAVIOR } from './behavior.js'
 import { tmuxCreateSession, tmuxKillSession, tmuxSessionExists } from './tmux-cli.js'
 import { TmuxError, ProcessSpawnError, ProcessTimeoutError } from '../errors.js'
+import { prepareHarnessLaunch } from '../harness-binary.js'
 import { parseCodexSessionSync } from '../cost-parsers/codex-parser.js'
 
 const execAsync = promisify(exec)
@@ -750,6 +751,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
   }
 
   async spawnAgent(config: SpawnConfig & { codexHome?: string; codexSandboxMode?: string }): Promise<Agent> {
+    const harnessLaunch = await prepareHarnessLaunch('codex')
     const agentId = config.agentId
 
     // Per-agent CODEX_HOME: ~/.overdeck/agents/<id>/codex-home
@@ -760,7 +762,7 @@ export class CodexRuntimeSync implements AgentRuntimeSync {
 
     // 2. Build the codex exec command — shell-quote every interpolated value.
     const sandbox = toCodexSandboxValue(config.codexSandboxMode)
-    const tokens: string[] = ['codex', 'exec']
+    const tokens: string[] = [shellQuote(harnessLaunch.binaryPath), 'exec']
     if (config.model) tokens.push('-m', shellQuote(config.model))
     tokens.push('-c', 'approval_policy=never')
     tokens.push('-s', shellQuote(sandbox))
