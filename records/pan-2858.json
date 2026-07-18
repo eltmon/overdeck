@@ -674,7 +674,7 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:41:11.622Z",
+  "updated": "2026-07-18T20:41:46.278Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -684,14 +684,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:41:11.574Z",
+    "updatedAt": "2026-07-18T20:41:46.153Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Verification FAILED at test (488688ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2858\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-2858/src/dashboard/frontend\n\n ❯ |root| src/lib/acp/__tests__/host.test.ts (10 tests | 1 failed) 254ms\n     × writes one ordered completion boundary for each successful prompt 67ms (retry x1)\n\n Test Files  225 passed (225)\n      Tests  2185 passed (2185)\n   Start at  16:37:02\n   Duration  22.88s (transform 49.56s, setup 55.17s, import 158.23s, tests 70.83s, environment 133.12s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-GA4wV9/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to d\n…(302 chars elided)…\n-auto-resume-gating-sItr6h/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-sItr6h/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-sItr6h/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-sItr6h/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Found workspace: /tmp/pan-auto-resume-gating-sItr6h/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "5e304c614b5b5485270fed7f628d07d071367505",
-    "reviewRequestedAt": "2026-07-18T20:30:32.417Z",
+    "reviewRequestedAt": "2026-07-18T20:41:45.748Z",
     "reviewSpawnedAt": "2026-07-18T20:30:33.325Z"
   },
   "closeOut": {
@@ -723,9 +723,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 42092975,
-            "output": 1683481,
-            "cacheRead": 445734400,
+            "input": 42095567,
+            "output": 1684171,
+            "cacheRead": 446898688,
             "cacheWrite": 0
           }
         }
@@ -738,9 +738,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 74600791,
-          "output": 2483162,
-          "cacheRead": 612408832,
+          "input": 74603383,
+          "output": 2483852,
+          "cacheRead": 613573120,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -751,8 +751,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 768.404473,
-        "pricingAsOf": "2026-07-18T20:41:11.613Z"
+        "usd": 769.020277,
+        "pricingAsOf": "2026-07-18T20:41:46.197Z"
       }
     },
     "merges": [
