@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T04:07:54.363Z",
+  "updated": "2026-07-18T04:24:45.247Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "acp-runtime-adapter": {
-        "writerId": "agent-pan-2858",
-        "agentId": "agent-pan-2858",
-        "pid": 2049330,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T04:06:56.440Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -164,6 +156,16 @@
         "itemId": "acp-host",
         "outcome": "completed",
         "releasedAt": "2026-07-18T03:59:20.055Z"
+      },
+      {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 2049330,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T04:06:56.440Z",
+        "itemId": "acp-runtime-adapter",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T04:24:45.247Z"
       }
     ],
     "statusReasons": {
@@ -209,6 +211,10 @@
     "acp-host.acp-host.ac3": "completed",
     "acp-host.acp-host.ac4": "completed",
     "acp-host.acp-host.ac5": "completed",
-    "acp-runtime-adapter": "running"
+    "acp-runtime-adapter": "completed",
+    "acp-runtime-adapter.acp-runtime-adapter.ac1": "completed",
+    "acp-runtime-adapter.acp-runtime-adapter.ac2": "completed",
+    "acp-runtime-adapter.acp-runtime-adapter.ac3": "completed",
+    "acp-runtime-adapter.acp-runtime-adapter.ac4": "completed"
   }
 }
