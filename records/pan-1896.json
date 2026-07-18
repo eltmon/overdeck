@@ -130,16 +130,15 @@
   ],
   "feedback": [],
   "created": "2026-07-17T11:18:25.871Z",
-  "updated": "2026-07-18T16:15:36.226Z",
+  "updated": "2026-07-18T16:16:01.615Z",
   "pipeline": {
     "issueId": "PAN-1896",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
-    "mergeStatus": "failed",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T15:36:02.730Z",
+    "updatedAt": "2026-07-18T16:16:01.597Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
     "strikeReadyHead": "d7db109e4b89318f526e73e58fa3aa3f2b8bf08c",
@@ -154,7 +153,9 @@
         "outcome": "failed",
         "detail": "Post-rebase verification failed at incomplete-plan-items"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-18T16:16:01.597Z"
   },
   "closeOut": {
     "usage": {
@@ -196,7 +197,105 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-18T16:16:01.615Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-review",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-18T16:15:49.934Z"
+          }
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-tests",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-18T16:15:49.934Z"
+          }
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: failed",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-18T16:15:49.934Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Branch already cleaned up (squash-merged); PR #2834 MERGED at 2026-07-18T15:52:46Z",
+          "status": "pass",
+          "mergedAt": "2026-07-18T15:52:46Z",
+          "mergeCommit": "6e91fda6f6397d4d1ba821f1e214477ac002cb7d"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: todo; no running work/planning agents",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-post-merge",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-18T16:15:49.934Z"
+          }
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 6e91fda6f6397d4d1ba821f1e214477ac002cb7d",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-18T16:09:31.000Z, dist built 2026-07-18T16:09:01.816Z, merge 2026-07-18T15:52:46.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-1896 — not merged to main; Preserved remote branch strike/pan-1896 — not merged to main; Pruned 163 checkpoint ref(s) for agent-pan-1896, planning-pan-1896, strike-pan-1896; No specialist registry entries for PAN-1896"
+        }
+      ],
+      "accepted": [
+        "review",
+        "tests",
+        "verification",
+        "post-merge"
+      ]
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
