@@ -134,15 +134,25 @@ async function resolveIssuePullRequestRef(issueId: string): Promise<
     return { issueId: upper, repoArg: null, prNumber: null };
   }
 
-  const branchName = `feature/${issueId.toLowerCase()}`;
+  // A strike lands from strike/<id>, a normal work item from feature/<id>.
+  // Try feature/ first (the common case), then fall back to strike/ so a
+  // strike-landed issue can still resolve its merged PR — otherwise close-out's
+  // deploy row cannot resolve merge time/commit and every landed strike is
+  // permanently blocked from close-out (PAN-2883).
+  const branchCandidates = [
+    `feature/${issueId.toLowerCase()}`,
+    `strike/${issueId.toLowerCase()}`,
+  ];
   const repoArg = `${githubCheck.owner}/${githubCheck.repo}`;
 
   try {
-    const prNumber = await lookupPullRequestNumberForBranch(githubCheck.owner, githubCheck.repo, branchName);
-    if (prNumber == null) {
-      return { issueId: upper, repoArg: null, prNumber: null };
+    for (const branchName of branchCandidates) {
+      const prNumber = await lookupPullRequestNumberForBranch(githubCheck.owner, githubCheck.repo, branchName);
+      if (prNumber != null) {
+        return { issueId: upper, repoArg, prNumber: String(prNumber) };
+      }
     }
-    return { issueId: upper, repoArg, prNumber: String(prNumber) };
+    return { issueId: upper, repoArg: null, prNumber: null };
   } catch (err: any) {
     return { issueId: upper, repoArg: null, prNumber: null, error: `${githubPrLookupSource()} failed: ${err.message}` };
   }
