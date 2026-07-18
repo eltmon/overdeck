@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T03:39:47.196Z",
+  "updated": "2026-07-18T03:42:37.502Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "acp-host": {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 1829113,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T03:42:37.502Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -184,6 +192,7 @@
     "kimi-acp-support.kimi-acp-support.ac1": "completed",
     "kimi-acp-support.kimi-acp-support.ac2": "completed",
     "kimi-acp-support.kimi-acp-support.ac3": "completed",
-    "kimi-acp-support.kimi-acp-support.ac4": "completed"
+    "kimi-acp-support.kimi-acp-support.ac4": "completed",
+    "acp-host": "running"
   }
 }
