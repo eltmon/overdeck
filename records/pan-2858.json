@@ -556,18 +556,18 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T16:32:15.696Z",
+  "updated": "2026-07-18T16:45:31.070Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:32:14.585Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-2858-review",
+    "updatedAt": "2026-07-18T16:45:30.938Z",
+    "reviewNotes": "Completed ACP turns lack a durable completion record, so live conversation and activity state can remain streaming or working forever.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "275eb63b0984b0139f7f35ad59b686d0e681d51f",
     "reviewRequestedAt": "2026-07-18T16:31:59.843Z",
@@ -586,9 +586,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 23353122,
-            "output": 505170,
-            "cacheRead": 68975104,
+            "input": 25557064,
+            "output": 548658,
+            "cacheRead": 72359936,
             "cacheWrite": 0
           }
         },
@@ -617,9 +617,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 62003114,
-          "output": 1983717,
-          "cacheRead": 445168128,
+          "input": 64207056,
+          "output": 2027205,
+          "cacheRead": 448552960,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -630,8 +630,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 606.812386,
-        "pricingAsOf": "2026-07-18T16:32:14.666Z"
+        "usd": 620.829152,
+        "pricingAsOf": "2026-07-18T16:45:31.027Z"
       }
     },
     "merges": [
