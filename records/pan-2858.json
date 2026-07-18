@@ -751,10 +751,10 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T22:16:15.468Z",
+  "updated": "2026-07-18T22:30:27.488Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -762,8 +762,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-18T21:10:55.719Z",
-    "updatedAt": "2026-07-18T22:16:14.855Z",
-    "reviewNotes": "ACP live context strips embedded Claude project rules, but the dashboard ACP preview still renders them and misstates the effective prompt",
+    "updatedAt": "2026-07-18T22:30:27.446Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "a6fb883a5e140dfd8284a2bd5a349a1e07e4f075",
@@ -1110,9 +1109,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 40175489,
-            "output": 914539,
-            "cacheRead": 206067200,
+            "input": 40184030,
+            "output": 919837,
+            "cacheRead": 207351808,
             "cacheWrite": 0
           }
         },
@@ -1126,9 +1125,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 44097935,
-            "output": 1894667,
-            "cacheRead": 596809216,
+            "input": 44472479,
+            "output": 1939284,
+            "cacheRead": 614123008,
             "cacheWrite": 0
           }
         }
@@ -1141,9 +1140,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 84273424,
-          "output": 2809206,
-          "cacheRead": 802876416,
+          "input": 84656509,
+          "output": 2859121,
+          "cacheRead": 821474816,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1154,8 +1153,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 921.78275,
-        "pricingAsOf": "2026-07-18T22:16:14.876Z"
+        "usd": 934.494825,
+        "pricingAsOf": "2026-07-18T22:30:27.483Z"
       }
     },
     "merges": [
