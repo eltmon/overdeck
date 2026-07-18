@@ -589,18 +589,17 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T17:20:13.146Z",
+  "updated": "2026-07-18T17:30:09.783Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T17:20:12.583Z",
-    "reviewNotes": "ACP delivery waits for the full agent turn behind an 8-second client timeout, so normal prompts time out, retry, and kill the session.",
+    "updatedAt": "2026-07-18T17:30:09.752Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "1a2c3aaeed3ec5c14111f094513014ff45f0d654",
     "reviewRequestedAt": "2026-07-18T17:09:12.623Z",
@@ -619,9 +618,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 27504752,
-            "output": 673614,
-            "cacheRead": 125825536,
+            "input": 27512074,
+            "output": 673982,
+            "cacheRead": 127076864,
             "cacheWrite": 0
           }
         },
@@ -635,9 +634,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 40035050,
-            "output": 1539047,
-            "cacheRead": 387918848,
+            "input": 40551412,
+            "output": 1559664,
+            "cacheRead": 397058560,
             "cacheWrite": 0
           }
         }
@@ -650,9 +649,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 67539802,
-          "output": 2212661,
-          "cacheRead": 513744384,
+          "input": 68063486,
+          "output": 2233646,
+          "cacheRead": 524135424,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -663,8 +662,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 675.652274,
-        "pricingAsOf": "2026-07-18T17:20:12.609Z"
+        "usd": 684.095764,
+        "pricingAsOf": "2026-07-18T17:30:09.778Z"
       }
     },
     "merges": [
