@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T22:17:58.155Z",
+  "updated": "2026-07-18T22:18:06.813Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,8 +114,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 32,
-    "claims": {},
+    "sequence": 33,
+    "claims": {
+      "guard-rail-tests": {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 391911,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T22:18:06.813Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -421,6 +429,7 @@
     "readonly-projections": "completed",
     "readonly-projections.readonly-projections.ac1": "completed",
     "readonly-projections.readonly-projections.ac2": "completed",
-    "readonly-projections.readonly-projections.ac3": "completed"
+    "readonly-projections.readonly-projections.ac3": "completed",
+    "guard-rail-tests": "running"
   }
 }
