@@ -958,18 +958,18 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
       acpProvider: 'kimi',
       acpWorkspace: '/workspace/project',
       acpBinaryPath: '/opt/kimi code/bin/kimi',
+      acpContextFile: '/home/user/.overdeck/agents/agent-pan-2858/acp-context.md',
       model: 'kimi-for-coding',
       resumeSessionId: 'kimi-session-2858',
       overdeckEnv: { agentId: 'agent-pan-2858' },
       unsetProviderEnv: true,
-      appendSystemPromptFiles: ['/workspace/project/.overdeck/context/workspace.md'],
       useSupervisor: true,
       supervisorScriptPath: '/dist/pty-supervisor.js',
     });
 
     expect(script).toMatch(/export OVERDECK_AGENT_ID='agent-pan-2858'/);
     expect(script).toMatch(
-      /^exec node '.+\/dist\/acp-host\.js' --agent 'agent-pan-2858' --provider 'kimi' --workspace '\/workspace\/project' --binary-path '\/opt\/kimi code\/bin\/kimi' --resume 'kimi-session-2858' --model 'kimi-for-coding'$/m,
+      /^exec node '.+\/dist\/acp-host\.js' --agent 'agent-pan-2858' --provider 'kimi' --workspace '\/workspace\/project' --binary-path '\/opt\/kimi code\/bin\/kimi' --resume 'kimi-session-2858' --model 'kimi-for-coding' --context-file '\/home\/user\/\.overdeck\/agents\/agent-pan-2858\/acp-context\.md'$/m,
     );
     expect(script).toContain('unset ANTHROPIC_API_KEY');
     expect(script).toContain('unset ANTHROPIC_BASE_URL');

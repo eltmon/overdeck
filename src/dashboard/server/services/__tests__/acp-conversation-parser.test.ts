@@ -1,10 +1,13 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { parseAcpConversationMessages } from '../acp-conversation-parser.js';
+import {
+  acpParserReadStatsForTests,
+  parseAcpConversationMessages,
+} from '../acp-conversation-parser.js';
 
 let tempDir: string;
 
@@ -237,6 +240,51 @@ describe('parseAcpConversationMessages', () => {
     expect(result.workLog[0]?.detail).toHaveLength(501);
     expect(result.workLog[0]).not.toHaveProperty('toolInput');
     expect(result.pendingToolUse.get('tool-1')).toBe(result.workLog[0]);
+  });
+
+  it('reads and parses only newly appended transcript bytes', async () => {
+    const path = await writeTranscript([
+      { timestamp: '2026-07-18T10:00:00.000Z', role: 'user', content: 'First' },
+    ]);
+    await parseAcpConversationMessages(path);
+    const initialSize = (await stat(path)).size;
+    expect(acpParserReadStatsForTests(path)).toEqual({
+      byteOffset: initialSize,
+      bytesRead: initialSize,
+    });
+
+    await appendFile(path, `${JSON.stringify({
+      timestamp: '2026-07-18T10:00:01.000Z',
+      role: 'assistant',
+      content: 'Second',
+    })}\n`);
+    const result = await parseAcpConversationMessages(path);
+    const finalSize = (await stat(path)).size;
+
+    expect(result.messages.map((message) => message.text)).toEqual(['First', 'Second']);
+    expect(acpParserReadStatsForTests(path)).toEqual({
+      byteOffset: finalSize,
+      bytesRead: finalSize,
+    });
+
+    await parseAcpConversationMessages(path);
+    expect(acpParserReadStatsForTests(path)?.bytesRead).toBe(finalSize);
+
+    await appendFile(path, `${JSON.stringify({
+      timestamp: '2026-07-18T10:00:02.000Z',
+      role: 'assistant',
+      content: ' Third',
+    })}\n`);
+    await Promise.all([
+      parseAcpConversationMessages(path),
+      parseAcpConversationMessages(path),
+      parseAcpConversationMessages(path),
+    ]);
+    const concurrentSize = (await stat(path)).size;
+    expect(acpParserReadStatsForTests(path)).toEqual({
+      byteOffset: concurrentSize,
+      bytesRead: concurrentSize,
+    });
   });
 
   it('marks completed and failed tool updates terminal', async () => {

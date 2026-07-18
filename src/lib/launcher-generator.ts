@@ -79,6 +79,8 @@ export interface LauncherConfig {
   acpWorkspace?: string;
   /** Exact ACP provider executable validated by launch preflight. Required for harness='acp'. */
   acpBinaryPath?: string;
+  /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
+  acpContextFile?: string;
 
   // Command construction
   /**
@@ -741,6 +743,9 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
   if (config.model) {
     tokens.push('--model', shellQuoteModelIdSync(config.model));
+  }
+  if (config.acpContextFile) {
+    tokens.push('--context-file', shellQuote(config.acpContextFile));
   }
 
   const cmd = tokens.join(' ');

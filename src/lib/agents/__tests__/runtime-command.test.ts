@@ -47,7 +47,7 @@ describe('waitForAcpHostReady', () => {
     let settled = false;
     const pending = waitForAcpHostReady('agent-stale-acp', 2, {
       sessionExists: vi.fn(async () => true),
-      pathExists: vi.fn(() => true),
+      pathExists: vi.fn((path: string) => !path.endsWith('acp-launch-error')),
       readText: vi.fn((path: string) => {
         if (path.endsWith('acp-session-id')) {
           if (!readinessPublished) {
@@ -68,6 +68,16 @@ describe('waitForAcpHostReady', () => {
     await vi.advanceTimersByTimeAsync(500);
 
     await expect(pending).resolves.toBeUndefined();
+  });
+
+  it('surfaces persisted Kimi authentication guidance before the readiness timeout', async () => {
+    await expect(waitForAcpHostReady('agent-auth-failed', 30, {
+      sessionExists: vi.fn(async () => true),
+      pathExists: vi.fn((path: string) => path.endsWith('acp-launch-error')),
+      readText: vi.fn(() => 'Kimi authentication is required. Run `kimi`, then /login, and retry.\n'),
+    })).rejects.toThrow(
+      'ACP host agent-auth-failed failed to start: Kimi authentication is required. Run `kimi`, then /login, and retry.',
+    );
   });
 });
 

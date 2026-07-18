@@ -15,6 +15,7 @@ import type { RoleEffort } from '../config-yaml.js';
 import { ensureSessionContextBriefingFile } from '../briefing-freshness.js';
 import { getClaudeAuthStatus } from '../claude-auth.js';
 import { workspaceContextFile } from '../context-layers/layers.js';
+import { materializeAcpContextFile } from '../acp/context.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { initCodexHome } from '../runtimes/codex.js';
 import { createOhmypiFifo, ohmypiFifoPaths, OhmypiNotReady, writeOhmypiCommandSync } from '../runtimes/ohmypi-fifo.js';
@@ -228,9 +229,9 @@ export function getAcpLauncherFields(
   acpProvider: string;
   acpWorkspace: string;
   acpBinaryPath: string;
+  acpContextFile: string;
   model: string;
   unsetProviderEnv: true;
-  appendSystemPromptFiles: [];
 } {
   return {
     harness: 'acp',
@@ -238,9 +239,9 @@ export function getAcpLauncherFields(
     acpProvider: getProviderForModelSync(model).name,
     acpWorkspace: workspace,
     acpBinaryPath: binaryPath,
+    acpContextFile: materializeAcpContextFile(getAgentDir(agentId), workspace),
     model,
     unsetProviderEnv: true,
-    appendSystemPromptFiles: [],
   };
 }
 
@@ -504,11 +505,16 @@ export async function waitForAcpHostReady(
   const pathExists = deps.pathExists ?? existsSync;
   const agentDir = getAgentDir(agentId);
   const sessionIdPath = join(agentDir, 'acp-session-id');
+  const errorPath = join(agentDir, 'acp-launch-error');
   const tokenPath = join(agentDir, 'acp-token');
   const socketPath = join(getOverdeckHome(), 'sockets', `acp-${agentId}.sock`);
   const deadline = now() + timeoutSec * 1000;
 
   while (now() < deadline) {
+    if (pathExists(errorPath)) {
+      const launchError = readText(errorPath).trim();
+      if (launchError) throw new Error(`ACP host ${agentId} failed to start: ${launchError}`);
+    }
     if (!(await sessionExistsForAgent(agentId))) {
       throw new Error(`ACP host session ${agentId} exited before readiness.`);
     }

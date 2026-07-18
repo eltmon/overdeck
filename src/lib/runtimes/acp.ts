@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 
 import type { AgentState } from '../agents/agent-state.js'
+import { materializeAcpContextFile } from '../acp/context.js'
 import { listAgentStates } from '../agents/queries.js'
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js'
 import { prepareHarnessLaunch } from '../harness-binary.js'
@@ -169,6 +170,10 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   async spawnAgent(config: AcpSpawnConfig): Promise<Agent> {
     const provider = config.provider ?? this.provider
     const { binaryPath } = await this.prepareLaunch()
+    const contextFile = materializeAcpContextFile(
+      join(this.home(), 'agents', config.agentId),
+      config.workspace,
+    )
     const command = [
       'node',
       shellQuote(join(packageRoot, 'dist', 'acp-host.js')),
@@ -180,6 +185,8 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
       shellQuote(config.workspace),
       '--binary-path',
       shellQuote(binaryPath),
+      '--context-file',
+      shellQuote(contextFile),
     ]
     if (config.sessionId) command.push('--resume', shellQuote(config.sessionId))
     if (config.model) command.push('--model', shellQuote(config.model))

@@ -314,7 +314,7 @@ describe("AcpHost", () => {
       op: "message",
       content: "hello agent",
     });
-    expect(accepted).toEqual({ status: 202, body: { accepted: true } });
+    expect(accepted).toEqual({ status: 202, body: { accepted: true, promptId: expect.any(String) } });
     await host.waitForIdle();
 
     expect(stub.prompts).toEqual([[{ type: "text", text: "hello agent" }]]);
@@ -353,6 +353,36 @@ describe("AcpHost", () => {
     ]);
     expect(output.text()).toContain("[user] hello agent");
     expect(output.text()).toContain("[assistant] hello from kimi");
+  });
+
+  it("injects materialized Overdeck context into the first fresh prompt only", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-context",
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      context: "ACP guardrail: never bypass review.",
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-context");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-context.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+    await postSocket(socketPath, token, { op: "message", content: "first" });
+    await postSocket(socketPath, token, { op: "message", content: "second" });
+    await host.waitForIdle();
+
+    expect(stub.prompts).toEqual([
+      [{
+        type: "text",
+        text: "<overdeck-context>\nACP guardrail: never bypass review.\n</overdeck-context>\n\nfirst",
+      }],
+      [{ type: "text", text: "second" }],
+    ]);
   });
 
   it("rejects authenticated request bodies above the delivery limit", async () => {
@@ -404,7 +434,7 @@ describe("AcpHost", () => {
       content: "wait for the provider",
     });
 
-    await expect(response).resolves.toEqual({ status: 202, body: { accepted: true } });
+    await expect(response).resolves.toEqual({ status: 202, body: { accepted: true, promptId: expect.any(String) } });
     const afterAcceptance = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
     expect(afterAcceptance).toContain('"content":"wait for the provider"');
     expect(afterAcceptance).toContain('"event":"prompt_queued"');
@@ -433,9 +463,9 @@ describe("AcpHost", () => {
     const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
 
     await expect(postSocket(socketPath, token, { op: "message", content: "first" }))
-      .resolves.toEqual({ status: 202, body: { accepted: true } });
+      .resolves.toEqual({ status: 202, body: { accepted: true, promptId: expect.any(String) } });
     await expect(postSocket(socketPath, token, { op: "message", content: "second" }))
-      .resolves.toEqual({ status: 202, body: { accepted: true } });
+      .resolves.toEqual({ status: 202, body: { accepted: true, promptId: expect.any(String) } });
     await host.waitForIdle();
 
     const transcript = (await readFile(join(agentDir, "acp-session.jsonl"), "utf-8"))
@@ -488,12 +518,72 @@ describe("AcpHost", () => {
       content: "this will fail",
     });
 
-    expect(response).toEqual({ status: 202, body: { accepted: true } });
+    expect(response).toEqual({ status: 202, body: { accepted: true, promptId: expect.any(String) } });
     await host.waitForIdle();
     expect(output.text()).toContain("[error] provider rejected prompt");
     const transcript = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
     expect(transcript).toContain('"content":"provider rejected prompt"');
     expect(transcript).not.toContain('"event":"turn_completed"');
+  });
+
+  it("replays durable prompts that lack a terminal record when resuming", async () => {
+    const overdeckHome = await makeHome();
+    const agentId = "agent-replay-owed";
+    const agentDir = join(overdeckHome, "agents", agentId);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, "acp-session.jsonl"), [
+      JSON.stringify({
+        timestamp: "2026-07-18T10:00:00.000Z",
+        role: "system",
+        content: "already completed",
+        promptId: "prompt-complete",
+        event: "prompt_queued",
+      }),
+      JSON.stringify({
+        timestamp: "2026-07-18T10:00:01.000Z",
+        role: "system",
+        content: "",
+        promptId: "prompt-complete",
+        event: "turn_completed",
+      }),
+      JSON.stringify({
+        timestamp: "2026-07-18T10:00:02.000Z",
+        role: "system",
+        content: "still owed",
+        promptId: "prompt-owed",
+        event: "prompt_queued",
+      }),
+      JSON.stringify({
+        timestamp: "2026-07-18T10:00:03.000Z",
+        role: "user",
+        content: "still owed",
+        promptId: "prompt-owed",
+      }),
+    ].join("\n") + "\n");
+    const stub = await makeStubRuntime({ assistantResponse: "replayed" });
+    const host = new AcpHost({
+      agentId,
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      resumeSessionId: "persisted-session",
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+
+    await host.start();
+    await host.waitForIdle();
+
+    expect(stub.prompts).toEqual([[{ type: "text", text: "still owed" }]]);
+    const transcript = (await readFile(join(agentDir, "acp-session.jsonl"), "utf-8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(transcript.filter((entry) => entry.promptId === "prompt-owed")).toEqual([
+      expect.objectContaining({ event: "prompt_queued", content: "still owed" }),
+      expect.objectContaining({ role: "user", content: "still owed" }),
+      expect.objectContaining({ event: "turn_completed" }),
+    ]);
   });
 
   it("registers handlers and captures session updates before startup completes", async () => {
@@ -555,6 +645,10 @@ describe("AcpHost", () => {
     expect(stub.startCalls()).toBe(1);
     expect(output.text().toLowerCase()).toContain("kimi");
     expect(output.text()).toContain("/login");
+    await expect(readFile(
+      join(overdeckHome, "agents", "agent-auth", "acp-launch-error"),
+      "utf-8",
+    )).resolves.toContain("/login");
   });
 
   it("parses a persisted session ID for a resumed runtime", async () => {

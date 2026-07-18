@@ -1,4 +1,4 @@
-import { appendFile, mkdir } from "node:fs/promises";
+import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export type AcpTranscriptRole = "user" | "assistant" | "tool" | "system";
@@ -26,14 +26,71 @@ export interface AcpTranscriptEntry {
   readonly sessionId?: string;
   readonly toolCalls?: ReadonlyArray<AcpTranscriptToolCallState>;
   readonly source?: "orchestrator" | "agent";
-  /** Durable, non-display lifecycle record for queued and completed prompts. */
-  readonly event?: "prompt_queued" | "turn_completed";
+  readonly promptId?: string;
+  /** Durable lifecycle record for queued, failed, and completed prompts. */
+  readonly event?: "prompt_queued" | "prompt_failed" | "turn_completed";
   readonly stopReason?: AcpTranscriptStopReason;
 }
 
 export type AcpTranscriptEntryInput = Omit<AcpTranscriptEntry, "timestamp"> & {
   readonly timestamp?: string;
 };
+
+export interface OwedAcpPrompt {
+  readonly promptId: string;
+  readonly content: string;
+  readonly started: boolean;
+}
+
+export async function readOwedAcpPrompts(path: string): Promise<ReadonlyArray<OwedAcpPrompt>> {
+  let raw: string;
+  try {
+    raw = await readFile(path, "utf-8");
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw error;
+  }
+
+  const owed = new Map<string, OwedAcpPrompt>();
+  const legacyOrder: string[] = [];
+  let legacyIndex = 0;
+  for (const line of raw.split("\n")) {
+    if (!line.trim()) continue;
+    let entry: Partial<AcpTranscriptEntry>;
+    try {
+      entry = JSON.parse(line) as Partial<AcpTranscriptEntry>;
+    } catch {
+      continue;
+    }
+    if (entry.event === "prompt_queued" && typeof entry.content === "string") {
+      const promptId = entry.promptId
+        ?? `legacy:${entry.timestamp ?? "unknown"}:${legacyIndex++}`;
+      owed.set(promptId, { promptId, content: entry.content, started: false });
+      if (!entry.promptId) legacyOrder.push(promptId);
+      continue;
+    }
+    if (entry.role === "user") {
+      if (entry.promptId) {
+        const queued = owed.get(entry.promptId);
+        if (queued) owed.set(entry.promptId, { ...queued, started: true });
+      } else {
+        const promptId = legacyOrder.find((id) => owed.get(id)?.started === false);
+        const queued = promptId ? owed.get(promptId) : undefined;
+        if (promptId && queued) owed.set(promptId, { ...queued, started: true });
+      }
+      continue;
+    }
+    if (entry.event === "turn_completed" || entry.event === "prompt_failed") {
+      if (entry.promptId) {
+        owed.delete(entry.promptId);
+      } else {
+        const promptId = legacyOrder.shift();
+        if (promptId) owed.delete(promptId);
+      }
+    }
+  }
+  return [...owed.values()];
+}
 
 export class AcpTranscriptWriter {
   private pending: Promise<void> = Promise.resolve();
@@ -48,6 +105,7 @@ export class AcpTranscriptWriter {
       ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
       ...(entry.toolCalls ? { toolCalls: entry.toolCalls } : {}),
       ...(entry.source ? { source: entry.source } : {}),
+      ...(entry.promptId ? { promptId: entry.promptId } : {}),
       ...(entry.event ? { event: entry.event } : {}),
       ...(entry.stopReason ? { stopReason: entry.stopReason } : {}),
     };

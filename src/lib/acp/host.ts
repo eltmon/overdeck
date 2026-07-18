@@ -34,7 +34,7 @@ import {
   type AcpSessionRuntimeEvent,
   type AcpSessionRuntimeStartResult,
 } from "./session-runtime.js";
-import { AcpTranscriptWriter } from "./transcript.js";
+import { AcpTranscriptWriter, readOwedAcpPrompts } from "./transcript.js";
 
 const FILE_MODE = 0o600;
 type JsonRecord = Record<string, unknown>;
@@ -56,6 +56,8 @@ export interface AcpHostOptions {
   readonly provider: string;
   readonly workspace: string;
   readonly model?: string;
+  readonly resumeSessionId?: string;
+  readonly context?: string;
   readonly overdeckHome?: string;
   readonly runtime: AcpHostRuntime;
   readonly stdout?: Writable;
@@ -77,17 +79,20 @@ export class AcpHost {
   private promptQueue: Promise<void> = Promise.resolve();
   private state: "starting" | "ready" | "closed" = "starting";
   private observedSessionUpdates = 0;
+  private contextPending: string | undefined;
 
   constructor(private readonly options: AcpHostOptions) {
     this.overdeckHome =
       options.overdeckHome ?? process.env.OVERDECK_HOME ?? join(homedir(), ".overdeck");
     this.transcript = new AcpTranscriptWriter(this.transcriptPath());
+    this.contextPending = options.resumeSessionId ? undefined : options.context?.trim() || undefined;
   }
 
   async start(): Promise<void> {
     await mkdir(this.agentDir(), { recursive: true });
     await mkdir(this.socketDir(), { recursive: true });
     await rm(this.sessionIdPath(), { force: true });
+    await rm(this.errorPath(), { force: true });
     await rm(this.socketPath(), { force: true });
 
     this.token = randomUUID();
@@ -117,16 +122,22 @@ export class AcpHost {
       if (this.options.model) {
         await Effect.runPromise(this.options.runtime.setModel(this.options.model));
       }
+      if (this.options.resumeSessionId) {
+        for (const owed of await readOwedAcpPrompts(this.transcriptPath())) {
+          this.enqueuePrompt(owed.content, owed.promptId, !owed.started);
+        }
+      }
       await this.listen();
       this.state = "ready";
       await writeFile(this.sessionIdPath(), `${started.sessionId}\n`, { mode: FILE_MODE });
       await chmod(this.sessionIdPath(), FILE_MODE);
     } catch (error) {
-      if (this.options.provider === "kimi" && isAuthenticationFailure(error)) {
-        this.writePaneLine(
-          "[error] kimi authentication is required. Run /login in Kimi Code CLI, then retry.",
-        );
-      }
+      const launchError = this.options.provider === "kimi" && isAuthenticationFailure(error)
+        ? "Kimi authentication is required. Run `kimi`, then /login, and retry."
+        : errorMessage(error);
+      this.writePaneLine(`[error] ${launchError}`);
+      await writeFile(this.errorPath(), `${launchError}\n`, { mode: FILE_MODE });
+      await chmod(this.errorPath(), FILE_MODE);
       await this.stop();
       await rm(this.sessionIdPath(), { force: true });
       throw error;
@@ -182,24 +193,39 @@ export class AcpHost {
     if (!content) {
       return { status: 400, body: { error: "message content is required" } };
     }
+    const promptId = randomUUID();
     await this.transcript.append({
       role: "system",
       content,
       sessionId: this.sessionId,
       source: "orchestrator",
+      promptId,
       event: "prompt_queued",
     });
+    this.enqueuePrompt(content, promptId);
+    return { status: 202, body: { accepted: true, promptId } };
+  }
+
+  private enqueuePrompt(content: string, promptId: string, recordUser = true): void {
     const promptOperation = this.promptQueue.then(async () => {
       try {
-        await this.transcript.append({
-          role: "user",
-          content,
-          sessionId: this.sessionId,
-          source: "orchestrator",
-        });
+        if (recordUser) {
+          await this.transcript.append({
+            role: "user",
+            content,
+            sessionId: this.sessionId,
+            source: "orchestrator",
+            promptId,
+          });
+        }
         this.writePaneLine(`[user] ${content}`);
+        const context = this.contextPending;
+        this.contextPending = undefined;
+        const promptContent = context
+          ? `<overdeck-context>\n${context}\n</overdeck-context>\n\n${content}`
+          : content;
         const promptResult = await Effect.runPromise(
-          this.options.runtime.prompt({ prompt: [{ type: "text", text: content }] }),
+          this.options.runtime.prompt({ prompt: [{ type: "text", text: promptContent }] }),
         );
         await Effect.runPromise(this.options.runtime.drainEvents);
         await this.transcript.append({
@@ -207,6 +233,7 @@ export class AcpHost {
           content: "",
           sessionId: this.sessionId,
           source: "agent",
+          promptId,
           event: "turn_completed",
           stopReason: promptResult.stopReason,
         });
@@ -218,6 +245,8 @@ export class AcpHost {
           content: message,
           sessionId: this.sessionId,
           source: "agent",
+          promptId,
+          event: "prompt_failed",
         });
         throw error;
       }
@@ -226,7 +255,6 @@ export class AcpHost {
       () => undefined,
       () => undefined,
     );
-    return { status: 202, body: { accepted: true } };
   }
 
   private async handleInterruptOp(): Promise<HostOpResult> {
@@ -415,6 +443,10 @@ export class AcpHost {
     return join(this.agentDir(), "acp-session-id");
   }
 
+  private errorPath(): string {
+    return join(this.agentDir(), "acp-launch-error");
+  }
+
   private transcriptPath(): string {
     return join(this.agentDir(), "acp-session.jsonl");
   }
@@ -482,6 +514,7 @@ interface AcpHostArgs {
   readonly binaryPath: string;
   readonly resumeSessionId?: string;
   readonly model?: string;
+  readonly contextFile?: string;
 }
 
 export function parseAcpHostArgs(argv: ReadonlyArray<string>): AcpHostArgs {
@@ -510,6 +543,7 @@ export function parseAcpHostArgs(argv: ReadonlyArray<string>): AcpHostArgs {
     binaryPath,
     ...(values.get("--resume") ? { resumeSessionId: values.get("--resume") } : {}),
     ...(values.get("--model") ? { model: values.get("--model") } : {}),
+    ...(values.get("--context-file") ? { contextFile: values.get("--context-file") } : {}),
   };
 }
 
@@ -543,11 +577,16 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
         Effect.provide(NodeServices.layer),
       ),
     );
+    const context = args.contextFile
+      ? (await readFile(args.contextFile, "utf-8")).trim()
+      : undefined;
     const host = new AcpHost({
       agentId: args.agentId,
       provider: args.provider,
       workspace: args.workspace,
       model: args.model,
+      resumeSessionId: args.resumeSessionId,
+      context,
       runtime,
       stdout: process.stdout,
       disposeRuntime: closeScope,

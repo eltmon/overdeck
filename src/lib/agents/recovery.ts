@@ -60,7 +60,7 @@ export interface RestartAgentOptions {
 }
 
 export function resolveRecoveryResumeSessionId(agentId: string, harness: RuntimeName): string | undefined {
-  if (harness !== 'codex') return undefined;
+  if (harness !== 'codex' && harness !== 'acp') return undefined;
   return getLatestSessionIdSync(agentId) ?? undefined;
 }
 
@@ -370,12 +370,14 @@ export async function recoverAgent(
   }
 
   if (recoveryHarness === 'acp') {
+    const resumeSessionId = resolveRecoveryResumeSessionId(normalizedId, recoveryHarness);
     const { launcherContent, providerEnv: acpProviderEnv } = await buildAgentLaunchConfig({
       agentId: normalizedId,
       model: state.model,
       workspace: state.workspace,
       role: recoveryRole,
       isPlanning: recoveryRole === 'plan',
+      ...(resumeSessionId ? { spawnMode: 'resume' as const, resumeSessionId } : {}),
       harness: 'acp',
       harnessBinaryPath: harnessLaunch.binaryPath,
       extraEnvExports: [harnessLaunch.pathExport],

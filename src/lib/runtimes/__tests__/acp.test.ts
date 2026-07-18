@@ -135,6 +135,7 @@ describe('AcpRuntimeSync', () => {
     const command = tmuxMocks.createSession.mock.calls[0]?.[2]
     expect(command).toContain("--workspace '/tmp/work space'")
     expect(command).toContain("--binary-path '/opt/kimi code/bin/kimi'")
+    expect(command).toContain(`--context-file '${join(home, 'agents', 'agent-spawn', 'acp-context.md')}'`)
     expect(command).not.toContain('--model')
     expect(agent).toMatchObject({
       id: 'agent-spawn',
