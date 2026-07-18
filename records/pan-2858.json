@@ -219,15 +219,7 @@
       "timestamp": "2026-07-18T16:06:32.106Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-18T16:06:32Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nReview manifest/head is stale: expected e257b1f2 covers 115 files, but current PR head 62c46a86 covers 164 files, leaving 49 files unreviewed.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -554,21 +546,21 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T16:16:46.971Z",
+  "updated": "2026-07-18T16:17:04.799Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:16:46.926Z",
+    "updatedAt": "2026-07-18T16:17:04.763Z",
     "reviewNotes": "Review manifest/head is stale: expected e257b1f2 covers 115 files, but current PR head 62c46a86 covers 164 files, leaving 49 files unreviewed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "62c46a862fa70094b849d3c1d97245a3d3ee60c9",
-    "reviewSpawnedAt": "2026-07-18T16:01:29.677Z"
+    "reviewSpawnedAt": "2026-07-18T16:17:04.761Z"
   },
   "closeOut": {
     "usage": {
@@ -628,7 +620,7 @@
       },
       "costAtCloseOut": {
         "usd": 592.626367,
-        "pricingAsOf": "2026-07-18T16:16:46.955Z"
+        "pricingAsOf": "2026-07-18T16:17:04.778Z"
       }
     },
     "merges": [
