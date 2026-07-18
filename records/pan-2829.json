@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-18T19:33:29.006Z",
+  "updated": "2026-07-18T19:42:16.360Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "frontend-rename": {
-        "writerId": "agent-pan-2829",
-        "agentId": "agent-pan-2829",
-        "pid": 664669,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:33:29.006Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -188,6 +180,17 @@
         "outcome": "completed",
         "reason": "Added fixture-tested pan admin state migrate-xbrief with dry-run, single state-door commit, idempotence, migrated-state readers, and fresh-home lock handling; did not touch live state",
         "releasedAt": "2026-07-18T19:33:15.782Z"
+      },
+      {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 664669,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:33:29.006Z",
+        "itemId": "frontend-rename",
+        "outcome": "completed",
+        "reason": "Renamed dashboard xBRIEF component directory/files/symbols and visible copy, preserved legacy protocol/path values needed by existing backend contracts, and passed frontend tests/build/typecheck",
+        "releasedAt": "2026-07-18T19:42:16.360Z"
       }
     ],
     "statusReasons": {
@@ -202,6 +205,10 @@
       "state-migration-cmd": {
         "reason": "Added fixture-tested pan admin state migrate-xbrief with dry-run, single state-door commit, idempotence, migrated-state readers, and fresh-home lock handling; did not touch live state",
         "updatedAt": "2026-07-18T19:33:15.782Z"
+      },
+      "frontend-rename": {
+        "reason": "Renamed dashboard xBRIEF component directory/files/symbols and visible copy, preserved legacy protocol/path values needed by existing backend contracts, and passed frontend tests/build/typecheck",
+        "updatedAt": "2026-07-18T19:42:16.360Z"
       }
     }
   },
@@ -229,6 +236,9 @@
     "state-migration-cmd.state-migration-cmd.ac2": "completed",
     "state-migration-cmd.state-migration-cmd.ac3": "completed",
     "state-migration-cmd.state-migration-cmd.ac4": "completed",
-    "frontend-rename": "running"
+    "frontend-rename": "completed",
+    "frontend-rename.frontend-rename.ac1": "completed",
+    "frontend-rename.frontend-rename.ac2": "completed",
+    "frontend-rename.frontend-rename.ac3": "completed"
   }
 }
