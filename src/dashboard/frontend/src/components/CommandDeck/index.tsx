@@ -11,6 +11,7 @@ import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
 import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { ProjectMembershipBoundary } from './ProjectMembershipBoundary';
 import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
 import { ConversationList, type Conversation } from './ConversationList';
@@ -1358,17 +1359,15 @@ export function CommandDeck({
                   filter={treeFilter}
                   onFilterChange={setTreeFilter}
                 />
-                {!selectedProject ? (
-                  <div className={styles.emptyProject}>Select a project to see its issues</div>
-                ) : isLoading && !selectedProjectData ? (
-                  <div className={styles.skeletonList}>
-                    <div className={styles.skeletonItem} style={{ width: '60%' }} />
-                    <div className={styles.skeletonItem} style={{ width: '80%' }} />
-                    <div className={styles.skeletonItem} style={{ width: '45%' }} />
-                  </div>
-                ) : selectedProjectData ? (
-                  <ProjectNode
-                    key={selectedProjectData.path} projectKey={selectedProjectData.key}
+                <ProjectMembershipBoundary
+                  selectedProject={selectedProject} projectKey={selectedRegisteredProject?.key ?? selectedProjectData?.key}
+                  projectName={selectedProjectData?.name}
+                  loading={isLoading && !selectedProjectData}
+                  disabled={isProjectValidationPending || Boolean(registeredProjectsError) || showUnknownProject}
+                >
+                  {selectedProjectData ? (
+                    <ProjectNode
+                      key={selectedProjectData.path} projectKey={selectedProjectData.key}
                     name={selectedProjectData.name}
                     features={visibleFeatures}
                     selectedFeature={selectedFeature}
@@ -1394,9 +1393,10 @@ export function CommandDeck({
                     onNewConversation={handleNewProjectConversation}
                     containerStats={containerStats}
                   />
-                ) : (
-                  <div className={styles.emptyProject}>No issues for this project</div>
-                )}
+                  ) : (
+                    <div className={styles.emptyProject}>No issues for this project</div>
+                  )}
+                </ProjectMembershipBoundary>
               </div>
             )}
           </div>

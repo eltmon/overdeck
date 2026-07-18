@@ -183,6 +183,51 @@
   padding: 2px 0;
 }
 
+.membershipError {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px;
+  padding: 10px;
+  color: var(--destructive);
+  background: color-mix(in srgb, var(--destructive) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--destructive) 24%, transparent);
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.membershipError > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.membershipErrorContent p {
+  margin: 0;
+}
+
+.membershipErrorContent .membershipErrorDetail {
+  margin-top: 6px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+
+.membershipErrorRetry {
+  margin-top: 8px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--destructive) 32%, transparent);
+  border-radius: 4px;
+  color: var(--destructive);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.membershipErrorRetry:hover {
+  background: color-mix(in srgb, var(--destructive) 10%, transparent);
+}
+
 /* Project Node */
 .projectNode {
   margin-bottom: 4px;
