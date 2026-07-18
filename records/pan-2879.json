@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T13:36:29.113Z",
-  "updated": "2026-07-18T16:37:57.207Z",
+  "updated": "2026-07-18T16:38:56.358Z",
   "pipeline": {
     "issueId": "PAN-2879",
     "reviewStatus": "pending",
@@ -12,7 +12,7 @@
     "mergeStatus": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:37:57.176Z",
+    "updatedAt": "2026-07-18T16:38:56.330Z",
     "mergeNotes": "GitHub PR #2881 has failing required checks on HEAD caa83ba0. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/2881 for details.",
     "lastVerifiedCommit": "caa83ba09eb87af8636669f1ac5a5a958c2b23cf",
     "strikeReadyHead": "65b9b083bd42b1c8b9e6125921ab21383af9dc3d",
@@ -72,7 +72,7 @@
       },
       "costAtCloseOut": {
         "usd": 57.287868,
-        "pricingAsOf": "2026-07-18T16:37:57.186Z"
+        "pricingAsOf": "2026-07-18T16:38:56.353Z"
       }
     },
     "merges": [],
