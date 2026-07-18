@@ -111,7 +111,8 @@ describe("ACP provider registry", () => {
 describe("Kimi prerequisite", () => {
   it("probes kimi --version as an optional prerequisite", async () => {
     const probe = vi.fn(async (command: string) => `${command} 1.49.0`);
-    const report = await checkSystemPrerequisites(probe);
+    const resolver = vi.fn(async (command: string) => command);
+    const report = await checkSystemPrerequisites(probe, resolver);
     const kimi = report.checks.find((check) => check.id === "kimi");
 
     expect(kimi).toMatchObject({
@@ -119,24 +120,25 @@ describe("Kimi prerequisite", () => {
       required: false,
       version: "kimi 1.49.0",
     });
+    expect(resolver).toHaveBeenCalledWith("kimi");
     expect(probe).toHaveBeenCalledWith("kimi", ["--version"]);
     expect(PREREQUISITES.find((definition) => definition.id === "kimi")?.install.linux)
       .toContain("kimi-code-cli");
   });
 
   it("reports a missing kimi binary without failing required prerequisites", async () => {
-    const report = await checkSystemPrerequisites(async (command) => {
-      if (command === "kimi") {
-        throw Object.assign(new Error("spawn kimi ENOENT"), { code: "ENOENT" });
-      }
-      return `${command} 1.0.0`;
-    });
+    const resolver = vi.fn(async (command: string) => command === "kimi" ? null : command);
+    const report = await checkSystemPrerequisites(
+      async (command) => `${command} 1.0.0`,
+      resolver,
+    );
 
     expect(report.checks.find((check) => check.id === "kimi")).toMatchObject({
       found: false,
       required: false,
       version: null,
     });
+    expect(resolver).toHaveBeenCalledWith("kimi");
     expect(report.allRequiredFound).toBe(true);
   });
 });
