@@ -57,7 +57,7 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T12:50:29.311Z",
+  "updated": "2026-07-18T13:04:02.768Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "passed",
@@ -66,13 +66,13 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T12:50:29.287Z",
+    "updatedAt": "2026-07-18T13:04:02.730Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "mergeNotes": "Work agent did not push the rebased branch within 30 minutes",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
-    "reviewedAtCommit": "6099f450f24f6bc2d283cb666cdb039ee7672e28",
+    "reviewedAtCommit": "7d808edcd8dce3d63028b02b008f707563051a79",
     "lastVerifiedCommit": "6099f450f24f6bc2d283cb666cdb039ee7672e28",
     "reviewRequestedAt": "2026-07-18T02:07:59.253Z",
     "reviewSpawnedAt": "2026-07-18T02:09:21.872Z",
@@ -135,9 +135,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2322787,
-            "output": 86931,
-            "cacheRead": 27307008,
+            "input": 2335733,
+            "output": 102763,
+            "cacheRead": 28267520,
             "cacheWrite": 0
           }
         }
@@ -150,15 +150,15 @@
           "cacheWrite": 423465
         },
         "openai/gpt-5.6-sol": {
-          "input": 5135143,
-          "output": 162642,
-          "cacheRead": 39156224,
+          "input": 5148089,
+          "output": 178474,
+          "cacheRead": 40116736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 72.677043,
-        "pricingAsOf": "2026-07-18T12:50:29.304Z"
+        "usd": 73.696989,
+        "pricingAsOf": "2026-07-18T13:04:02.754Z"
       }
     },
     "merges": [
