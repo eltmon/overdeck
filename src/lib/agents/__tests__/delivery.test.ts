@@ -175,7 +175,7 @@ describe('acp delivery tier', () => {
     }
   });
 
-  it('falls through after the ACP host rejects an invalid token', async () => {
+  it('fails loudly when the ACP host rejects an invalid token', async () => {
     const agentId = 'agent-acp-unauthorized';
     writeAgentState(agentId, { harness: 'acp' });
     const host = new AcpHost({
@@ -189,45 +189,48 @@ describe('acp delivery tier', () => {
     writeAcpToken(agentId, 'wrong-token');
 
     try {
-      const result = await deliverAgentMessage(agentId, 'fallback', 'test-caller');
-      expect(result).toMatchObject({ ok: true, path: 'tmux' });
-      expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback');
+      await expect(
+        deliverAgentMessage(agentId, 'rejected', 'test-caller'),
+      ).rejects.toThrow(/ACP delivery failed.*status 401/);
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
       expect(existsSync(join(stateDir, agentId, 'acp-session.jsonl'))).toBe(false);
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
-        path: 'tmux',
-        acp: expect.stringContaining('status 401'),
+        path: 'acp',
+        reason: expect.stringContaining('status 401'),
       });
     } finally {
       await host.stop();
     }
   });
 
-  it('falls through when the ACP socket is absent', async () => {
+  it('fails loudly when the ACP socket is absent', async () => {
     const agentId = 'agent-acp-absent';
     writeAgentState(agentId, { harness: 'acp' });
     writeAcpToken(agentId);
 
-    const result = await deliverAgentMessage(agentId, 'fallback', 'test-caller');
-    expect(result).toMatchObject({ ok: true, path: 'tmux' });
-    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback');
+    await expect(
+      deliverAgentMessage(agentId, 'missing', 'test-caller'),
+    ).rejects.toThrow(/ACP delivery failed.*socket-missing/);
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
   });
 
-  it('falls through when a stale ACP socket path cannot accept connections', async () => {
+  it('fails loudly when a stale ACP socket path cannot accept connections', async () => {
     const agentId = 'agent-acp-stale';
     writeAgentState(agentId, { harness: 'acp' });
     writeAcpToken(agentId);
     writeFileSync(join(socketDir, `acp-${agentId}.sock`), 'stale');
 
-    const result = await deliverAgentMessage(agentId, 'fallback', 'test-caller');
-    expect(result).toMatchObject({ ok: true, path: 'tmux' });
-    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback');
+    await expect(
+      deliverAgentMessage(agentId, 'stale', 'test-caller'),
+    ).rejects.toThrow(/ACP delivery failed.*socket-post-failed/);
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
     expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
-      path: 'tmux',
-      acp: expect.stringContaining('socket-post-failed'),
+      path: 'acp',
+      reason: expect.stringContaining('socket-post-failed'),
     });
   });
 
-  it('falls through after the ACP request timeout using fake timers', async () => {
+  it('fails loudly after the ACP request timeout using fake timers', async () => {
     vi.useFakeTimers();
     const agentId = 'agent-acp-timeout';
     writeAgentState(agentId, { harness: 'acp' });
@@ -236,13 +239,25 @@ describe('acp delivery tier', () => {
 
     try {
       const delivered = deliverAgentMessage(agentId, 'timeout', 'test-caller');
+      const rejection = expect(delivered).rejects.toThrow(
+        /ACP delivery failed.*socket POST timeout/,
+      );
       await vi.advanceTimersByTimeAsync(8_100);
-      const result = await delivered;
-      expect(result).toMatchObject({ ok: true, path: 'tmux' });
-      expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'timeout');
+      await rejection;
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+
+  it('rejects explicit terminal delivery for ACP targets', async () => {
+    const agentId = 'agent-acp-explicit-tmux';
+    writeAgentState(agentId, { harness: 'acp' });
+
+    await expect(
+      deliverAgentMessage(agentId, 'bypass', 'test-caller', 'tmux'),
+    ).rejects.toThrow(/ACP requires authenticated host RPC delivery/);
+    expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
   });
 
   it('forces ACP agent and conversation delivery through auto mode', () => {

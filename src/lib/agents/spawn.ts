@@ -400,7 +400,10 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     if (shouldDeliverPromptViaAcp) {
       try {
         await waitForPromptReady(agentId, resolvedHarness, 30);
-        await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+        const delivery = await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
+        if (!delivery.ok) {
+          throw new Error(delivery.failure ?? `ACP delivery returned ok=false via ${delivery.path}`);
+        }
         if (tracksKickoffDelivery) {
           state.kickoffDelivered = true;
           await Effect.runPromise(saveAgentState(state));
@@ -777,7 +780,10 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   if (prompt && isAcp) {
     try {
       await waitForPromptReady(agentId, resolvedHarness, 30);
-      await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
+      const delivery = await deliverAgentMessage(agentId, prompt, 'spawnAgent:initial-prompt');
+      if (!delivery.ok) {
+        throw new Error(delivery.failure ?? `ACP delivery returned ok=false via ${delivery.path}`);
+      }
       if (tracksKickoffDelivery) {
         state.kickoffDelivered = true;
         saveAgentStateSync(state);

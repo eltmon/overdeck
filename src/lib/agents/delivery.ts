@@ -197,7 +197,8 @@ async function postUnixSocketJson(
 /**
  * Single delivery primitive for orchestrator-to-work-agent messages. Auto mode
  * tries persistent protocol hosts, the PTY supervisor socket, legacy Channels
- * MCP, then tmux. Explicit socket methods are strict and throw instead of falling back.
+ * MCP, then tmux. Explicit socket methods and ACP targets are strict: ACP prompts
+ * cannot fall back to terminal injection because only session/prompt reaches the agent.
  */
 export async function deliverAgentMessage(
   agentId: string,
@@ -218,6 +219,13 @@ export async function deliverAgentMessage(
     resolvedMethod ??= 'auto';
   }
 
+  const isAcpTarget = state?.harness === 'acp';
+  if (isAcpTarget && resolvedMethod !== 'auto') {
+    throw new Error(
+      `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ACP requires authenticated host RPC delivery`,
+    );
+  }
+
   if (resolvedMethod === 'tmux') {
     await assertTmuxTargetCanReceive(normalizedId, caller);
     await Effect.runPromise(sendKeys(normalizedId, message));
@@ -225,7 +233,7 @@ export async function deliverAgentMessage(
   }
 
   let appServerFailure: string | undefined;
-  if (resolvedMethod === 'auto') {
+  if (resolvedMethod === 'auto' && !isAcpTarget) {
     const appServerSocketPath = join(overdeckHomeForSockets(), 'sockets', `appserver-${normalizedId}.sock`);
     if (existsSync(appServerSocketPath)) {
       const appServerToken = readAppServerTokenSync(normalizedId);
@@ -254,9 +262,12 @@ export async function deliverAgentMessage(
   let acpFailure: string | undefined;
   if (resolvedMethod === 'auto') {
     const acpSocketPath = join(overdeckHomeForSockets(), 'sockets', `acp-${normalizedId}.sock`);
-    if (existsSync(acpSocketPath)) {
+    const acpSocketExists = existsSync(acpSocketPath);
+    if (isAcpTarget || acpSocketExists) {
       const acpToken = readAcpTokenSync(normalizedId);
-      if (!acpToken) {
+      if (!acpSocketExists) {
+        acpFailure = 'socket-missing';
+      } else if (!acpToken) {
         acpFailure = 'acp-token-missing';
       } else {
         try {
@@ -273,6 +284,18 @@ export async function deliverAgentMessage(
           acpFailure = `socket-post-failed: ${reason}`;
         }
       }
+
+      // ACP prompts only enter the agent through session/prompt on the host RPC
+      // socket. Terminal fallbacks can accept pasted text while bypassing the ACP
+      // session entirely, so an ACP transport failure must remain a loud failure.
+      await appendChannelDeliveryLog(normalizedId, {
+        path: 'acp',
+        reason: acpFailure,
+        caller,
+      });
+      throw new Error(
+        `MessageDeliveryFailed: ACP delivery failed for ${normalizedId} (${caller}): ${acpFailure}`,
+      );
     }
   }
 
