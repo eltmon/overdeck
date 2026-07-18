@@ -90,9 +90,8 @@ import { assertCanStartFreshSync, getWorkAgentLifecycleStateSync } from '../../l
 import { normalizeModelOverrideSync } from '../../lib/model-validation.js';
 import { resolvePlanningMode, type PlanningMode } from './planning-mode.js';
 import { requireAutomaticStateMigration } from '../../lib/state-auto-migrate.js';
-import { applyStartPolicyOptions } from './start-policy-overrides.js';
-interface IssueOptions {
-  model: string;
+import { applyStartPolicyOptions } from './start-policy-overrides.js'; import { enforceActiveOrderDispatch } from '../../lib/orders/dispatch-gate.js';
+interface IssueOptions { model: string;
   /** PAN-636 — explicit coding-agent harness override. Omit to use resolver defaults. */
   harness?: RuntimeName;
   /** Claude Code `--effort` level. Overrides roles.work.effort for this spawn. */
@@ -107,8 +106,7 @@ interface IssueOptions {
   plan?: string;
   /** Legacy auto-skip-planning flag; deprecated — use --plan skip instead. */
   auto?: boolean;
-  host?: boolean;
-  yes?: boolean;
+  host?: boolean; yes?: boolean; offBook?: boolean;
   force?: boolean;
   /** Drop the saved Claude session pointer (non-destructive) and start a brand-new
    *  session — the one-step "restart fresh" path, e.g. to switch a stopped agent's model. */
@@ -1205,6 +1203,8 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         },
       });
     }
+
+    await enforceActiveOrderDispatch(projectRoot, id, { offBook: options.offBook, recordOverride: !options.dryRun });
 
     prep.update('Building agent prompt with planning context...');
     const trackerContext = await runStartPrepStep(prep, spinner, 'tracker-context', (signal) => getTrackerContext(id, workspace, signal), '');

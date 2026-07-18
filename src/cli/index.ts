@@ -577,7 +577,7 @@ program
   .option('--force', 'Clear a paused agent gate and start anyway')
   .option('--fresh', 'Drop the saved Claude session (non-destructive) and start a new one — e.g. to switch a stopped agent\'s model')
   .option('--host', 'Bypass workspace docker stack-health gate and spawn on the host')
-  .option('--yes', 'Confirm --host in non-interactive contexts')
+  .option('--yes', 'Confirm --host in non-interactive contexts').option('--off-book', 'Allow one work-agent dispatch outside the active order book and log the override')
   .action(startCommand);
 
 program

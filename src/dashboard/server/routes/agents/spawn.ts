@@ -21,6 +21,7 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/type
 import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../../lib/remote/workspace-metadata.js';
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
+import { checkActiveOrderDispatch } from '../../../../lib/orders/dispatch-gate.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
 import { isStateMigrated } from '../../../../lib/state-home.js';
@@ -225,6 +226,7 @@ export const postAgentsRoute = HttpRouter.add(
     const { issueId, projectId } = body as any;
     const autoStart = (body as any).auto === true;
     const guardrailAcknowledged = (body as any).guardrailAcknowledged === true;
+    const offBook = (body as any).offBook === true;
     const requestedHostOverride = (body as any).host === true || (body as any).allowHost === true;
 
     if (!issueId) {
@@ -318,6 +320,14 @@ export const postAgentsRoute = HttpRouter.add(
     const resolvedProject = resolveProjectFromIssueSync(String(issueId));
     const projectConfig = resolvedProject ? getProjectSync(resolvedProject.projectKey) : null;
     const projectPath = projectConfig?.path ?? getProjectPath(projectId, issuePrefix);
+    const orderDispatch = yield* Effect.promise(() => checkActiveOrderDispatch(projectPath, issueId, { offBook }));
+    if (!orderDispatch.decision.eligible) {
+      return jsonResponse({
+        error: orderDispatch.decision.message,
+        code: orderDispatch.decision.code,
+        conditions: orderDispatch.decision.conditions,
+      }, { status: 409 });
+    }
 
     const workspacePath = join(projectPath, 'workspaces', `feature-${issueLower}`);
     if (!existsSync(workspacePath)) {
@@ -860,6 +870,7 @@ export const postAgentsRoute = HttpRouter.add(
           model: spawnModel,
           harness: effectiveHarness,
           allowHost,
+          offBook,
         }),
         workspacePath,
       ));

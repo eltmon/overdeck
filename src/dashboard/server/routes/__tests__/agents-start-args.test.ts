@@ -26,4 +26,12 @@ describe('agent start route pan start args', () => {
       allowHost: true,
     })).toEqual(['start', 'PAN-1787', '--local', '--model', 'gpt-5.5', '--host', '--yes']);
   });
+
+  it('forwards an explicit off-book override to the pan start subprocess', () => {
+    expect(buildPanStartArgs({
+      issueId: 'PAN-1787',
+      model: 'gpt-5.5',
+      offBook: true,
+    })).toEqual(['start', 'PAN-1787', '--local', '--model', 'gpt-5.5', '--off-book']);
+  });
 });
