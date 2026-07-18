@@ -28,7 +28,13 @@ vi.mock('../../paths.js', async (importOriginal) => ({
   encodeClaudeProjectDir: (p: string) => p,
 }))
 
-import { RuntimeRegistry, setGlobalRegistry, getGlobalRegistry, getHarnessBehavior } from '../index.js'
+import {
+  AcpRuntimeSync,
+  RuntimeRegistry,
+  setGlobalRegistry,
+  getGlobalRegistry,
+  getHarnessBehavior,
+} from '../index.js'
 import type { AgentRuntimeSync, HarnessBehavior } from '../types.js'
 
 function stubRuntime(name: 'claude-code' | 'ohmypi' | 'codex' | 'acp'): AgentRuntimeSync {
@@ -66,6 +72,12 @@ function writeAgentState(agentId: string, fields: Record<string, unknown>): void
     }),
   )
 }
+
+describe('global runtime registry', () => {
+  it('registers the real ACP runtime by default', () => {
+    expect(getGlobalRegistry().get('acp')).toBeInstanceOf(AcpRuntimeSync)
+  })
+})
 
 describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-636)', () => {
   let savedRegistry: ReturnType<typeof getGlobalRegistry> | null = null
