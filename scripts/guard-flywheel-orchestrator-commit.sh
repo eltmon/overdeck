@@ -6,6 +6,14 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Operator-directed escape hatch: mirrors OVERDECK_OPERATOR_PUSH=1 in
+# guard-agent-main-push.sh. PAN-2194 blocked the unsupervised flywheel
+# orchestrator from authoring repo artifacts, but left no door for
+# operator-authorized work landed through this guard. Opt in explicitly.
+if [[ "${OVERDECK_OPERATOR_COMMIT:-}" == "1" ]]; then
+  exit 0
+fi
+
 if [[ "${OVERDECK_AGENT_ID:-}" != "flywheel-orchestrator" ]]; then
   exit 0
 fi

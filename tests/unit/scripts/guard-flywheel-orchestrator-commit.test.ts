@@ -104,6 +104,19 @@ describe('guard-flywheel-orchestrator-commit.sh', () => {
     expect(result.output).toContain('src/foo.ts');
   });
 
+  it('allows OVERDECK_OPERATOR_COMMIT=1 to land an otherwise-blocked source path', () => {
+    const root = makeTempRepo();
+    installScript(root);
+    stageFile(root, 'src/lib/boot-gates.ts', 'export const x = true;\n');
+
+    const result = runGuard(root, {
+      OVERDECK_AGENT_ID: 'flywheel-orchestrator',
+      OVERDECK_OPERATOR_COMMIT: '1',
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
   it('no-ops for non-orchestrator contexts', () => {
     const root = makeTempRepo();
     installScript(root);
