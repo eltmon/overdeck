@@ -15,7 +15,8 @@ The package source tree was copied from the pinned commit without changing file 
 - `@effect/openapi-generator` and `vite-plus` were omitted. `scripts/generate.ts` is retained for provenance, but generation is not part of the vendored package's normal typecheck or test path.
 - `@types/node` uses Overdeck's existing Node type version because the root catalog does not define it.
 - `tsconfig.json` replaces the upstream repository-wide base configuration with the explicit strict `tsc` settings used by Overdeck's `packages/contracts` package. Its include path is limited to `src`, which contains the package tests and excludes the retained generator with its intentionally omitted dependency. `allowImportingTsExtensions` preserves the upstream `.ts` import specifiers under plain `tsc`.
-- The root Bun workspace list includes `packages/effect-acp`, and the root Vitest configuration includes `packages/effect-acp/src/**/*.test.ts` in normal and benchmark-enabled discovery.
+- The root Bun workspace list includes `packages/effect-acp`, the root package depends on it through `workspace:*`, and the root Vitest configuration includes `packages/effect-acp/src/**/*.test.ts` in normal and benchmark-enabled discovery.
+- The root TypeScript configuration enables `allowImportingTsExtensions` because the preserved package exports point directly at upstream source files whose imports retain their `.ts` suffixes.
 - `LICENSE` records the upstream MIT attribution locally.
 
 ## Effect 4.0.0-beta.73 compatibility edits
