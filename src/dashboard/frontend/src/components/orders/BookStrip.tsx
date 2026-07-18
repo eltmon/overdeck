@@ -2,14 +2,30 @@ import { useState } from 'react';
 import type { OrderBook } from '@overdeck/contracts';
 import { X } from 'lucide-react';
 
+export interface OrderBookProgressItemView {
+  issue: string;
+  closed: boolean;
+  parked: boolean;
+  terminal: boolean;
+}
+
 export interface OrderBookProgressView {
   total: number;
   landed: number;
   drained: boolean;
+  items?: OrderBookProgressItemView[];
+}
+
+export interface OrderBookFindingView {
+  code: string;
+  issue: string;
+  message: string;
 }
 
 export interface OrderBookView extends OrderBook {
   progress: OrderBookProgressView;
+  validation?: { blocks: OrderBookFindingView[]; warns: OrderBookFindingView[] };
+  itemReadiness?: Record<string, { hasPrd: boolean }>;
 }
 
 interface BookStripProps {

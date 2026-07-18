@@ -12,6 +12,8 @@ vi.mock('../../lib/wsTransport', () => ({ dashboardMutationJsonHeaders: mocks.mu
 
 interface BookFixture extends OrderBook {
   progress: { bookId: string; total: number; landed: number; drained: boolean; items: [] };
+  validation?: { blocks: Array<{ code: string; issue: string; message: string }>; warns: Array<{ code: string; issue: string; message: string }> };
+  itemReadiness?: Record<string, { hasPrd: boolean }>;
 }
 
 function book(overrides: Partial<BookFixture> & Pick<BookFixture, 'id' | 'name'>): BookFixture {
@@ -26,6 +28,8 @@ function book(overrides: Partial<BookFixture> & Pick<BookFixture, 'id' | 'name'>
     createdAt: overrides.createdAt ?? '2026-07-18T12:00:00.000Z',
     updatedAt: overrides.updatedAt ?? '2026-07-18T12:00:00.000Z',
     progress: overrides.progress ?? { bookId: overrides.id, total: 0, landed: 0, drained: status === 'complete', items: [] },
+    validation: overrides.validation,
+    itemReadiness: overrides.itemReadiness,
   };
 }
 
@@ -116,5 +120,27 @@ describe('OrderBookPage', () => {
     expect(posture).toHaveClass('border-border', 'bg-card');
     expect(posture).not.toHaveClass('border-warning/[0.32]');
     expect(screen.getByText(/no operator hold is active/)).toBeInTheDocument();
+  });
+
+  it('loads detail validation, previews the brief, and starts through order routes', async () => {
+    const warning = { code: 'missing-prd', issue: 'PAN-3', message: 'PAN-3 will be planned at pickup' };
+    const launchable = book({ id: '2026-07-18-launch', name: 'Launchable', status: 'ready', validation: { blocks: [], warns: [warning] } });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/preview-brief')) return Response.json({ brief: '# Special orders: Launchable' });
+      if (url.endsWith('/start') && init?.method === 'POST') return Response.json({ runId: 'RUN-9' });
+      if (url === '/api/orders/2026-07-18-launch') return Response.json(launchable);
+      return ordersResponse([launchable]);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<OrderBookPage />);
+
+    expect(await screen.findByText(warning.message)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Preview brief/ }));
+    expect(await screen.findByText('# Special orders: Launchable')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Start run/ }));
+    expect(await screen.findByText('Started RUN-9 from Launchable.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/orders/2026-07-18-launch/start', expect.objectContaining({ method: 'POST' }));
   });
 });

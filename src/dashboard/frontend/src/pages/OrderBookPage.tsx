@@ -2,7 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, Loader2 } from 'lucide-react';
 
 import { BookStrip, type OrderBookView } from '../components/orders/BookStrip';
+import { LaneEditor } from '../components/orders/LaneEditor';
 import { LifecycleStrip } from '../components/orders/LifecycleStrip';
+import { RunSettingsPanel } from '../components/orders/RunSettingsPanel';
+import { ValidationPanel } from '../components/orders/ValidationPanel';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
 
 interface OrdersPayload {
@@ -19,6 +22,9 @@ export function OrderBookPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
@@ -51,6 +57,23 @@ export function OrderBookPage() {
     [books, selectedId],
   );
 
+  const updateBook = useCallback((updated: OrderBookView) => {
+    setBooks((current) => current.map((book) => book.id === updated.id ? updated : book));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    let current = true;
+    void fetch(`/api/orders/${encodeURIComponent(selectedId)}`)
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await readError(response));
+        return response.json() as Promise<OrderBookView>;
+      })
+      .then((book) => { if (current) updateBook(book); })
+      .catch((cause) => { if (current) setActionMessage(cause instanceof Error ? cause.message : String(cause)); });
+    return () => { current = false; };
+  }, [selectedId, updateBook]);
+
   const createBook = async (name: string) => {
     const response = await fetch('/api/orders', {
       method: 'POST',
@@ -62,6 +85,47 @@ export function OrderBookPage() {
     const created = await response.json() as OrderBookView;
     setBooks((current) => [...current, created]);
     setSelectedId(created.id);
+  };
+
+  const patchSettings = async (patch: Partial<OrderBookView['settings']>) => {
+    if (!selected) return;
+    const response = await fetch(`/api/orders/${encodeURIComponent(selected.id)}`, {
+      method: 'PATCH', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
+      body: JSON.stringify({ settings: patch }),
+    });
+    if (!response.ok) throw new Error(await readError(response));
+    updateBook(await response.json() as OrderBookView);
+  };
+
+  const previewBrief = async () => {
+    if (!selected) return;
+    setActionMessage(null);
+    const response = await fetch(`/api/orders/${encodeURIComponent(selected.id)}/preview-brief`);
+    if (!response.ok) {
+      setActionMessage(await readError(response));
+      return;
+    }
+    const payload = await response.json() as { brief: string };
+    setPreview(payload.brief);
+  };
+
+  const startRun = async () => {
+    if (!selected) return;
+    setStarting(true);
+    setActionMessage(null);
+    try {
+      const response = await fetch(`/api/orders/${encodeURIComponent(selected.id)}/start`, {
+        method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const payload = await response.json() as { runId: string };
+      setActionMessage(`Started ${payload.runId} from ${selected.name}.`);
+      await loadBooks();
+    } catch (cause) {
+      setActionMessage(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setStarting(false);
+    }
   };
 
   return (
@@ -130,21 +194,29 @@ export function OrderBookPage() {
               </p>
             </section>
 
-            <section className="grid gap-3 sm:grid-cols-2" aria-label="Order book lanes">
-              {(['A', 'B'] as const).map((lane) => {
-                const items = selected.items.filter((item) => item.lane === lane);
-                return (
-                  <div key={lane} className="rounded-lg border border-border bg-card p-4">
-                    <div className="flex items-baseline gap-2">
-                      <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Lane {lane}</h2>
-                      <span className="text-[11px] text-muted-foreground">{lane === 'A' ? `parallel · up to ${selected.settings.laneAConcurrency}` : 'strictly serial · one in flight'}</span>
-                      <span className="ml-auto font-mono text-[11px] text-muted-foreground">{items.length} items</span>
-                    </div>
-                    <p className="mt-4 text-xs text-muted-foreground">Lane editing and eligibility controls appear in the book editor.</p>
-                  </div>
-                );
-              })}
+            <LaneEditor book={selected} onBookChange={updateBook} />
+
+            <section className="grid gap-3 lg:grid-cols-2">
+              <RunSettingsPanel settings={selected.settings} onChange={patchSettings} />
+              <ValidationPanel
+                blocks={selected.validation?.blocks ?? []}
+                warns={selected.validation?.warns ?? []}
+                starting={starting}
+                onPreview={() => void previewBrief()}
+                onStart={() => void startRun()}
+              />
             </section>
+
+            {actionMessage && <p className="text-xs text-muted-foreground" role="status">{actionMessage}</p>}
+            {preview && (
+              <section className="rounded-lg border border-border bg-card p-4" aria-label="Brief preview">
+                <div className="mb-2 flex items-center">
+                  <h2 className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Brief preview</h2>
+                  <button type="button" className="ml-auto text-xs text-muted-foreground hover:text-foreground" onClick={() => setPreview(null)}>Close</button>
+                </div>
+                <pre className="overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">{preview}</pre>
+              </section>
+            )}
           </div>
         )}
       </div>

@@ -10,7 +10,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { backlogCandidates, computeBookProgress, getBook, listBooks } from '../../../lib/orders/resolver.js';
 import type { OrderIssueLookup } from '../../../lib/orders/types.js';
-import { validateBookForStart } from '../../../lib/orders/validate.js';
+import { hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
   addItems,
   createBook,
@@ -176,9 +176,13 @@ function nextBookId(stateRoot: string, name: string, now: Date): string {
 }
 
 function enrichedBook(book: OrderBook, deps: OrdersRouteDeps) {
+  const stateRoot = stateRootFor(deps);
+  const hasPrd = deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
   return {
     ...book,
     progress: computeBookProgress(book, deps.issueLookup),
+    validation: validateBookForStart(stateRoot, book, { issueLookup: deps.issueLookup, hasPrd }),
+    itemReadiness: Object.fromEntries(book.items.map((item) => [item.issue, { hasPrd: hasPrd(item.issue) }])),
   };
 }
 

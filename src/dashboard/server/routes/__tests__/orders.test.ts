@@ -167,6 +167,13 @@ describe('/api/orders routes', () => {
             { issue: 'PAN-2', parked: true, terminal: true },
           ],
         },
+        validation: {
+          blocks: [
+            { code: 'issue-not-open', issue: 'PAN-1' },
+            { code: 'missing-prd', issue: 'PAN-2' },
+          ],
+        },
+        itemReadiness: { 'PAN-1': { hasPrd: false }, 'PAN-2': { hasPrd: false } },
       },
     });
 
