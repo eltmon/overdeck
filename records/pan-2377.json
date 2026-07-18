@@ -22,11 +22,16 @@
       "reason": "resume",
       "agentModel": "pending-work-spawn",
       "timestamp": "2026-07-18T01:51:31.918Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "pending-work-spawn",
+      "timestamp": "2026-07-18T01:52:32.595Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T01:51:31.919Z",
+  "updated": "2026-07-18T01:52:32.596Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
