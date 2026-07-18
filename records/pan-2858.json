@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T07:15:27.224Z",
+  "updated": "2026-07-18T07:22:29.016Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "acp-permissions": {
-        "writerId": "agent-pan-2858",
-        "agentId": "agent-pan-2858",
-        "pid": 4044565,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T07:15:27.224Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -214,6 +206,16 @@
         "itemId": "acp-config",
         "outcome": "completed",
         "releasedAt": "2026-07-18T07:15:21.190Z"
+      },
+      {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 4044565,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T07:15:27.224Z",
+        "itemId": "acp-permissions",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T07:22:29.016Z"
       }
     ],
     "statusReasons": {
@@ -280,6 +282,9 @@
     "acp-config.acp-config.ac1": "completed",
     "acp-config.acp-config.ac2": "completed",
     "acp-config.acp-config.ac3": "completed",
-    "acp-permissions": "running"
+    "acp-permissions": "completed",
+    "acp-permissions.acp-permissions.ac1": "completed",
+    "acp-permissions.acp-permissions.ac2": "completed",
+    "acp-permissions.acp-permissions.ac3": "completed"
   }
 }
