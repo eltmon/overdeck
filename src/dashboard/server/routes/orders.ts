@@ -239,13 +239,7 @@ function previewBrief(book: OrderBook): string {
 
 async function defaultStartOrderBook(book: OrderBook): Promise<StartOrderBookResult> {
   const { startFlywheelRun } = await import('../../../cli/commands/flywheel.js');
-  type OrdersStartOptions = Parameters<typeof startFlywheelRun>[0] & { orders: string };
-  const startWithOrders = startFlywheelRun as (options: OrdersStartOptions) => ReturnType<typeof startFlywheelRun>;
-  return startWithOrders({
-    cwd: process.cwd(),
-    orders: book.id,
-    brief: book.settings.briefOverlay,
-  });
+  return startFlywheelRun({ cwd: process.cwd(), orders: book.id });
 }
 
 export async function getOrdersPayload(deps: OrdersRouteDeps = {}): Promise<RouteResult> {

@@ -36,6 +36,11 @@ import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/intern
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
+import {
+  resolveFlywheelOrderStart,
+  setFlywheelOrderStatus,
+  type FlywheelOrderStartDeps,
+} from './flywheel-orders.js';
 import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
@@ -65,6 +70,17 @@ interface ConfigOptions {
 interface StartOptions {
   brief?: string;
   cwd?: string;
+  orders?: string;
+}
+
+export interface StartFlywheelRunDeps extends FlywheelOrderStartDeps {
+  resolvePrimaryRoot?: typeof resolvePrimaryWorktreeRoot;
+  requireBrief?: typeof requireFlywheelBrief;
+  nextRunId?: typeof nextFlywheelRunId;
+  writeLaunchMetadata?: typeof writeFlywheelLaunchMetadata;
+  resolveRoleConfig?: () => Promise<ResolvedFlywheelRoleConfig>;
+  spawn?: typeof spawnFlywheel;
+  writeStatus?: typeof writeLatestFlywheelStatus;
 }
 
 interface StartFlywheelRunResult {
@@ -320,41 +336,61 @@ export async function emitStatusCommand(options: EmitStatusOptions): Promise<voi
   }
 }
 
-export async function startFlywheelRun(options: StartOptions = {}): Promise<StartFlywheelRunResult> {
-  const cwd = options.cwd ?? await resolvePrimaryWorktreeRoot(process.cwd());
-  const brief = await requireFlywheelBrief(cwd, options.brief);
-  const runId = await nextFlywheelRunId();
+export async function startFlywheelRun(
+  options: StartOptions = {},
+  deps: StartFlywheelRunDeps = {},
+): Promise<StartFlywheelRunResult> {
+  const cwd = options.cwd ?? await (deps.resolvePrimaryRoot ?? resolvePrimaryWorktreeRoot)(process.cwd());
+  const brief = await (deps.requireBrief ?? requireFlywheelBrief)(cwd, options.brief);
+  const orderContext = options.orders ? resolveFlywheelOrderStart(cwd, options.orders, deps) : null;
+  const book = orderContext?.book ?? null;
+
+  const runId = await (deps.nextRunId ?? nextFlywheelRunId)();
   const startedAt = new Date().toISOString();
-  await writeFlywheelLaunchMetadata({
-    version: 1,
+  const launchMetadata = {
+    version: 1 as const,
     runId,
     workspace: cwd,
     briefPath: brief.absolutePath,
     briefDisplayPath: brief.displayPath,
-  });
-  const roleConfig = await resolveFlywheelRoleConfig();
-  const agent = await spawnFlywheel({
-    runId,
-    briefPath: brief.absolutePath,
-    workspace: cwd,
-    model: roleConfig.model,
-    harness: roleConfig.harness,
-    effort: roleConfig.effort,
-    minAgents: roleConfig.minAgents,
-    maxAgents: roleConfig.maxAgents,
-    scope: roleConfig.scope,
-    autoPickupBacklog: roleConfig.autoPickupBacklog,
-    requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
-  });
-  await writeLatestFlywheelStatus(await createInitialFlywheelStatus(
-    runId,
-    startedAt,
-    cwd,
-    agent.model,
-    agent.harness,
-    roleConfig,
-  ));
-  return { runId, briefDisplayPath: brief.displayPath, agentModel: agent.model };
+    ...(book ? { orders: { bookId: book.id } } : {}),
+  };
+  await (deps.writeLaunchMetadata ?? writeFlywheelLaunchMetadata)(launchMetadata);
+  const roleConfig = await (deps.resolveRoleConfig ?? resolveFlywheelRoleConfig)();
+  let statusAttempted = false;
+  try {
+    const agent = await (deps.spawn ?? spawnFlywheel)({
+      runId,
+      briefPath: brief.absolutePath,
+      workspace: cwd,
+      model: roleConfig.model,
+      harness: roleConfig.harness,
+      effort: roleConfig.effort,
+      minAgents: roleConfig.minAgents,
+      maxAgents: roleConfig.maxAgents,
+      scope: roleConfig.scope,
+      autoPickupBacklog: roleConfig.autoPickupBacklog,
+      requireUatBeforeMerge: roleConfig.requireUatBeforeMerge,
+    });
+    if (orderContext) {
+      statusAttempted = true;
+      await setFlywheelOrderStatus(orderContext, 'running', runId, deps);
+    }
+    await (deps.writeStatus ?? writeLatestFlywheelStatus)(await createInitialFlywheelStatus(
+      runId,
+      startedAt,
+      cwd,
+      agent.model,
+      agent.harness,
+      roleConfig,
+    ));
+    return { runId, briefDisplayPath: brief.displayPath, agentModel: agent.model };
+  } catch (error) {
+    if (orderContext && statusAttempted) {
+      await setFlywheelOrderStatus(orderContext, 'ready', undefined, deps).catch(() => {});
+    }
+    throw error;
+  }
 }
 
 export async function flywheelStartCommand(options: StartOptions = {}): Promise<void> {
@@ -907,6 +943,7 @@ export function registerFlywheelCommands(program: Command): void {
     .command('start')
     .description('Start the Flywheel orchestrator')
     .option('--brief <path>', 'Path to the Flywheel brief', DEFAULT_BRIEF_PATH)
+    .option('--orders <book-id>', 'Bind the run to a validated order book')
     .action(flywheelStartCommand);
 
   flywheel

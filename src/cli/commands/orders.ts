@@ -103,9 +103,7 @@ export function formatBookList(books: readonly OrderBook[]): string {
 
 async function defaultStartOrderBook(bookId: string): Promise<{ runId: string }> {
   const { startFlywheelRun } = await import('./flywheel.js');
-  type OrdersStartOptions = Parameters<typeof startFlywheelRun>[0] & { orders: string };
-  const startWithOrders = startFlywheelRun as (options: OrdersStartOptions) => ReturnType<typeof startFlywheelRun>;
-  return startWithOrders({ orders: bookId });
+  return startFlywheelRun({ orders: bookId });
 }
 
 export async function runOrdersCreate(name: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {

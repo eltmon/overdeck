@@ -24,6 +24,7 @@ The Flywheel is not an issue-scoped work agent. It runs as `flywheel-orchestrato
 ```bash
 pan flywheel start
 pan flywheel start --brief docs/flywheel-brief.md
+pan flywheel start --orders <book-id>
 pan flywheel config --get
 pan flywheel config --get flywheel.require_uat_before_merge
 pan flywheel config --set flywheel.auto_pickup_backlog=true
@@ -45,11 +46,14 @@ pan flywheel report
 ```bash
 pan flywheel start
 pan flywheel start --brief docs/flywheel-brief.md
+pan flywheel start --orders <book-id>
 ```
 
 Starts `flywheel-orchestrator` and opens a new run under `~/.overdeck/flywheel/runs/<runId>/`.
 
 Use the default brief unless the user gives a specific markdown brief. The default is `docs/flywheel-brief.md`. The command validates that the brief path stays inside the project root.
+
+`--orders <book-id>` validates a ready order book, stamps the book binding into the run launch metadata, and marks the book running only after the Flywheel start gate succeeds. Validation or gate failures leave the book ready.
 
 ### Config
 
