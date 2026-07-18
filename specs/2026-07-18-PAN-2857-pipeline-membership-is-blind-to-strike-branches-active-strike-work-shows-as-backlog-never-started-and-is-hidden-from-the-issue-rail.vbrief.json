@@ -4,17 +4,17 @@
     "created": "2026-07-18T00:42:59.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2857: Pipeline membership is blind to strike/ branches — active strike work shows as 'backlog, never started' and is hidden from the issue rail",
-    "updated": "2026-07-18T00:46:39.232Z"
+    "updated": "2026-07-18T13:27:11.704Z"
   },
   "plan": {
     "id": "pan-2857",
     "title": "Pipeline membership is blind to strike/ branches — active strike work shows as 'backlog, never started' and is hidden from the issue rail",
-    "status": "running",
+    "status": "completed",
     "uid": "ae4462ba-de63-44f9-b4c1-f58ce14071e2",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-18T00:42:59.000Z",
-    "updated": "2026-07-18T00:46:39.232Z",
+    "updated": "2026-07-18T13:27:11.704Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2857",
@@ -312,5 +312,5 @@
       "canonicalFilename": "2026-07-18-PAN-2857-pipeline-membership-is-blind-to-strike-branches-active-strike-work-shows-as-backlog-never-started-and-is-hidden-from-the-issue-rail.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
