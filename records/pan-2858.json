@@ -296,7 +296,7 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T09:20:08.951Z",
+  "updated": "2026-07-18T09:21:52.890Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -306,11 +306,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T09:20:08.930Z",
+    "updatedAt": "2026-07-18T09:21:52.845Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "inspectNotes": "All 5 ACs verified. AC1: tsdown entry emits dist/acp-host.js; host.test.ts binds sockets/acp-<id>.sock + writes 0600 acp-token/acp-session-id under a stubbed runtime. AC2: wrong token->401 with zero transcript/prompt writes; correct token+message forwards to runtime.prompt() and appends both turns to acp-session.jsonl. AC3: handleSessionUpdate/handleRequestPermission registered before runtime.start() (host.ts:79-96); test proves order + that an update fired during start() is captured (observedSessionUpdates:1), not dropped. AC4: kimi-scoped auth-failure catch writes '[error] kimi authentication is required... /login' to stdout, rethrows without retry (startCalls===1), main() sets process.exitCode=1. AC5: acp-session-id persisted 0600; --resume threads through main()->makeRuntime->session-runtime.ts's pre-existing resumeSessionId->session/load path (session-runtime.ts:567-640). Non-blocking flag for follow-up: src/lib/acp/host-render.ts's stripAcpPaneControl regex has literal raw control bytes instead of \\x escapes, making git treat the file as binary (breaks future diff/blame, likely trips eslint no-control-regex at verification) — doesn't affect any tested string here.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
-    "reviewRequestedAt": "2026-07-18T09:19:40.850Z",
+    "reviewRequestedAt": "2026-07-18T09:21:52.486Z",
     "reviewSpawnedAt": "2026-07-18T09:19:44.016Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -599,9 +599,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2234231,
-            "output": 46523,
-            "cacheRead": 8145408,
+            "input": 2393081,
+            "output": 57712,
+            "cacheRead": 9674752,
             "cacheWrite": 0
           }
         },
@@ -615,9 +615,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 22769230,
-            "output": 948667,
-            "cacheRead": 217610752,
+            "input": 22775751,
+            "output": 950079,
+            "cacheRead": 218381312,
             "cacheWrite": 0
           }
         }
@@ -630,9 +630,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 25003461,
-          "output": 995190,
-          "cacheRead": 225756160,
+          "input": 25168832,
+          "output": 1007791,
+          "cacheRead": 228056064,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -643,8 +643,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 282.452327,
-        "pricingAsOf": "2026-07-18T09:20:08.945Z"
+        "usd": 284.807164,
+        "pricingAsOf": "2026-07-18T09:21:52.849Z"
       }
     },
     "merges": [
