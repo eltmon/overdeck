@@ -94,6 +94,88 @@ describe('gatherProjectLensSignals', () => {
     ]);
   });
 
+  it('gathers local and remote strike branches as unmerged convention branches', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listIssueStates = vi.fn().mockResolvedValue([
+      { number: 20, state: 'open' },
+      { number: 21, state: 'closed' },
+    ]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (command, args) => {
+      if (command === 'git' && args.includes('--no-merged=main')) {
+        return 'strike/pan-20\norigin/strike/pan-21\n';
+      }
+      if (command === 'git') return 'strike/pan-20\norigin/strike/pan-21\n';
+      throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+    });
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(mocked.run).toHaveBeenCalledWith('git', [
+      'for-each-ref',
+      '--format=%(refname:short)',
+      'refs/heads/feature/*',
+      'refs/remotes/origin/feature/*',
+      'refs/heads/strike/*',
+      'refs/remotes/origin/strike/*',
+    ], project.path);
+    expect(mocked.run).toHaveBeenCalledWith('git', [
+      'for-each-ref',
+      '--no-merged=main',
+      '--format=%(refname:short)',
+      'refs/heads/feature/*',
+      'refs/remotes/origin/feature/*',
+      'refs/heads/strike/*',
+      'refs/remotes/origin/strike/*',
+    ], project.path);
+    expect(result).toEqual([
+      { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-21', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+    ]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'planned_backlog',
+      inPipeline: true,
+    });
+    expect(resolvePipelineMembership(result[1]!)).toMatchObject({
+      bucket: 'clean_terminal',
+      inPipeline: false,
+    });
+  });
+
+  it('classifies an open same-repository strike PR as in flight', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 22, labels: [] }]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([{
+      headRefName: 'strike/pan-22', headRepoFullName: 'eltmon/overdeck',
+    }]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockResolvedValue('');
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(result).toEqual([{
+      issueId: 'PAN-22',
+      issueOpen: true,
+      hasOpenPr: true,
+      hasMergedPr: false,
+      hasConventionBranch: false,
+      branchUnmerged: false,
+      phaseLabel: null,
+      hasVbriefSpec: false,
+      explicitlyReady: false,
+    }]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'in_flight',
+      inPipeline: true,
+    });
+  });
+
   it('lists all PRs through one paginated dependency regardless of candidate count', async () => {
     const mocked = deps();
     await gatherProjectLensSignals(project, mocked);
@@ -132,7 +214,7 @@ describe('gatherProjectLensSignals', () => {
       { headRefName: 'feature/krux-3', headRepoFullName: 'eltmon/overdeck' },
     ]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['KRUX-4']);
-    mocked.run = vi.fn().mockResolvedValue('feature/krux-5\n');
+    mocked.run = vi.fn().mockResolvedValue('feature/krux-5\nstrike/krux-9\n');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
   });
