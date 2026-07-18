@@ -1,5 +1,16 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { hideOverlay, isModuleLoadError, RootErrorBoundary, showOverlay } from './recovery';
+import {
+  hideOverlay,
+  isModuleLoadError,
+  recordRecoveryReload,
+  RootErrorBoundary,
+  sameOriginResourceUrl,
+  showOverlay,
+} from './recovery';
+
+const INDEX_HTML = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8');
 
 afterEach(() => {
   document.body.innerHTML = '';
@@ -27,6 +38,47 @@ describe('isModuleLoadError', () => {
     expect(isModuleLoadError(undefined)).toBe(false);
     expect(isModuleLoadError(null)).toBe(false);
     expect(isModuleLoadError({})).toBe(false);
+  });
+});
+
+describe('sameOriginResourceUrl', () => {
+  it('accepts same-origin scripts and stylesheets', () => {
+    const script = document.createElement('script');
+    script.src = '/assets/app.js';
+    const link = document.createElement('link');
+    link.href = `${window.location.origin}/assets/app.css`;
+
+    expect(sameOriginResourceUrl(script)).toBe(`${window.location.origin}/assets/app.js`);
+    expect(sameOriginResourceUrl(link)).toBe(`${window.location.origin}/assets/app.css`);
+  });
+
+  it('ignores blocked cross-origin scripts such as PostHog remote config', () => {
+    const script = document.createElement('script');
+    script.src = 'https://us-assets.i.posthog.com/array/key/config.js';
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=DM+Sans';
+
+    expect(sameOriginResourceUrl(script)).toBeNull();
+    expect(sameOriginResourceUrl(link)).toBeNull();
+  });
+});
+
+describe('recovery reload circuit breaker', () => {
+  it('stops after three consecutive reloads and resets outside the recovery window', () => {
+    expect(recordRecoveryReload(1_000)).toEqual({ count: 1, shouldReload: true });
+    expect(recordRecoveryReload(2_000)).toEqual({ count: 2, shouldReload: true });
+    expect(recordRecoveryReload(3_000)).toEqual({ count: 3, shouldReload: true });
+    expect(recordRecoveryReload(4_000)).toEqual({ count: 4, shouldReload: false });
+    expect(recordRecoveryReload(20_000)).toEqual({ count: 1, shouldReload: true });
+  });
+});
+
+describe('bundle-independent boot watchdog', () => {
+  it('shares the same-origin guard and reload circuit breaker', () => {
+    expect(INDEX_HTML).toContain("return url.origin === window.location.origin ? url.href : null;");
+    expect(INDEX_HTML).toContain("var reloadCountKey = 'pan.recovery.reloadCount';");
+    expect(INDEX_HTML).toContain('var maxConsecutiveReloads = 3;');
+    expect(INDEX_HTML).toContain('showManualRecovery();');
   });
 });
 
