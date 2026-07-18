@@ -706,19 +706,17 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:51:09.270Z",
+  "updated": "2026-07-18T21:09:49.978Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:51:08.440Z",
-    "reviewNotes": "ACP resume/recovery still ignores acp-session-id and owed queued prompts; auth errors, context delivery, and transcript parsing also remain blocking",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "updatedAt": "2026-07-18T21:09:49.929Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "5e304c614b5b5485270fed7f628d07d071367505",
@@ -1065,9 +1063,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 34097987,
-            "output": 812372,
-            "cacheRead": 175827968,
+            "input": 34662569,
+            "output": 816604,
+            "cacheRead": 176458752,
             "cacheWrite": 0
           }
         },
@@ -1081,9 +1079,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 42177961,
-            "output": 1694348,
-            "cacheRead": 457244672,
+            "input": 42493306,
+            "output": 1792132,
+            "cacheRead": 514427904,
             "cacheWrite": 0
           }
         }
@@ -1096,9 +1094,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 76275948,
-          "output": 2506720,
-          "cacheRead": 633072640,
+          "input": 77155875,
+          "output": 2608736,
+          "cacheRead": 690886656,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1109,8 +1107,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 787.818902,
-        "pricingAsOf": "2026-07-18T20:51:08.481Z"
+        "usd": 824.186025,
+        "pricingAsOf": "2026-07-18T21:09:49.969Z"
       }
     },
     "merges": [
