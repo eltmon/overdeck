@@ -4,10 +4,12 @@
  * Resolves specialist session state, token usage, and startup status.
  */
 
-import { basename } from 'path';
+import { readFileSync, existsSync } from 'fs';
+import { basename, join } from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
+import { AGENTS_DIR } from '../paths.js';
 import { getAllSessionFilesSync, parseClaudeSessionSync } from '../cost-parsers/jsonl-parser.js';
 import { listPaneValues, sessionExists } from '../tmux.js';
 import {
@@ -16,11 +18,45 @@ import {
   getTmuxSessionName,
   type LegacySpecialistRuntimeStatus,
   type SpecialistAgentName,
-  type SpecialistLifecycleState,
 } from './specialists-registry.js';
-import { readRecordedClaudeSessionId } from './specialists-spawn.js';
 
 const execAsync = promisify(exec);
+
+function readRecordedClaudeSessionId(tmuxSession: string): string | null {
+  const sessionFile = join(AGENTS_DIR, tmuxSession, 'session.id');
+  if (!existsSync(sessionFile)) return null;
+  try {
+    const sessionId = readFileSync(sessionFile, 'utf-8').trim();
+    return sessionId || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if a legacy specialist has a recorded Claude session.
+ *
+ * @param name - Specialist name
+ * @returns True if the specialist has a recorded session id in its agent directory
+ */
+export function isInitialized(name: SpecialistAgentName): boolean {
+  return readRecordedClaudeSessionId(getTmuxSessionName(name)) !== null;
+}
+
+/**
+ * Get the state of a specialist from recorded agent metadata.
+ *
+ * Note: This only checks whether a recorded Claude session exists, not if it's actually running.
+ * Use getSpecialistStatus() for runtime state.
+ *
+ * @param name - Specialist name
+ * @returns Specialist state
+ */
+export function getSpecialistState(
+  name: SpecialistAgentName
+): Exclude<LegacySpecialistRuntimeStatus['state'], 'active'> {
+  return isInitialized(name) ? 'sleeping' : 'uninitialized';
+}
 
 /**
  * Find JSONL file for a session ID
@@ -143,7 +179,7 @@ export async function getSpecialistStatus(
   const tmuxSession = getTmuxSessionName(name, projectKey);
   const runtimeState = getAgentRuntimeStateSync(tmuxSession);
 
-  let state: SpecialistLifecycleState;
+  let state: LegacySpecialistRuntimeStatus['state'];
   if (runtimeState) {
     // Map runtime state to specialist state
     switch (runtimeState.state) {

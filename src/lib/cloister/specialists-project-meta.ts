@@ -4,10 +4,7 @@
  * Manages per-project specialist run metadata and configuration.
  */
 
-import { existsSync, mkdirSync } from 'fs';
-import { join } from 'path';
 import {
-  SPECIALISTS_DIR,
   getAllSpecialists,
   getSpecialistMetadata,
   getTmuxSessionName,
@@ -27,29 +24,6 @@ import { isRunning } from './specialists-status.js';
  * Per-Project Specialist Functions
  * ===========================================================================
  */
-
-/**
- * Get the directory for a project's specialist
- */
-export function getProjectSpecialistDir(projectKey: string, specialistType: SpecialistAgentName): string {
-  return join(SPECIALISTS_DIR, projectKey, specialistType);
-}
-
-/**
- * Ensure per-project specialist directory structure exists
- */
-export function ensureProjectSpecialistDir(projectKey: string, specialistType: SpecialistAgentName): void {
-  const specialistDir = getProjectSpecialistDir(projectKey, specialistType);
-  const runsDir = join(specialistDir, 'runs');
-  const contextDir = join(specialistDir, 'context');
-
-  if (!existsSync(runsDir)) {
-    mkdirSync(runsDir, { recursive: true });
-  }
-  if (!existsSync(contextDir)) {
-    mkdirSync(contextDir, { recursive: true });
-  }
-}
 
 /**
  * Get metadata for a specific (projectKey, registryKey) pair.
