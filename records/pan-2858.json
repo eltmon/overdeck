@@ -2,7 +2,7 @@
   "issueId": "PAN-2858",
   "schemaVersion": 2,
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T01:08:14.744Z",
+  "updated": "2026-07-18T01:08:15.585Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-2858: Support Agent Client Protocol (ACP) harness — port t3code's effect-acp layer; first agent: Kimi Code CLI",
       "timestamp": "2026-07-18T01:08:14.744Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
