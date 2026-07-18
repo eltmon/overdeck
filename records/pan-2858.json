@@ -554,17 +554,17 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T16:13:22.489Z",
+  "updated": "2026-07-18T16:13:23.360Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:13:22.427Z",
+    "updatedAt": "2026-07-18T16:13:23.312Z",
     "reviewNotes": "Review manifest/head is stale: expected e257b1f2 covers 115 files, but current PR head 62c46a86 covers 164 files, leaving 49 files unreviewed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "62c46a862fa70094b849d3c1d97245a3d3ee60c9",
@@ -628,7 +628,7 @@
       },
       "costAtCloseOut": {
         "usd": 591.158401,
-        "pricingAsOf": "2026-07-18T16:13:22.483Z"
+        "pricingAsOf": "2026-07-18T16:13:23.351Z"
       }
     },
     "merges": [
