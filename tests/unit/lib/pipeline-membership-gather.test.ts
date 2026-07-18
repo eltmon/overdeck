@@ -132,6 +132,11 @@ describe('gatherProjectLensSignals', () => {
       'refs/heads/strike/*',
       'refs/remotes/origin/strike/*',
     ], project.path);
+    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
+      'eltmon',
+      'overdeck',
+      ['strike/pan-20', 'strike/pan-21'],
+    );
     expect(result).toEqual([
       { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
       { issueId: 'PAN-21', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
@@ -172,6 +177,39 @@ describe('gatherProjectLensSignals', () => {
     }]);
     expect(resolvePipelineMembership(result[0]!)).toMatchObject({
       bucket: 'in_flight',
+      inPipeline: true,
+    });
+  });
+
+  it('uses a merged strike PR as the oracle after its branch is deleted', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 23, labels: [] }]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue(['strike/pan-23']);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockResolvedValue('');
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
+      'eltmon',
+      'overdeck',
+      ['feature/pan-23', 'strike/pan-23'],
+    );
+    expect(result).toEqual([{
+      issueId: 'PAN-23',
+      issueOpen: true,
+      hasOpenPr: false,
+      hasMergedPr: true,
+      hasConventionBranch: false,
+      branchUnmerged: false,
+      phaseLabel: null,
+      hasVbriefSpec: false,
+      explicitlyReady: false,
+    }]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'post_merge_limbo',
       inPipeline: true,
     });
   });
@@ -256,7 +294,7 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
       'eltmon',
       'overdeck',
-      ['feature/pan-10', 'feature/pan-11'],
+      ['feature/pan-10', 'strike/pan-10', 'feature/pan-11', 'strike/pan-11'],
     );
   });
 
