@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T00:57:33.120Z",
+  "updated": "2026-07-18T00:58:15.666Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs-strike-convention": {
-        "writerId": "agent-pan-2857",
-        "agentId": "agent-pan-2857",
-        "pid": 2072650,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T00:57:33.120Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2857",
@@ -110,6 +102,17 @@
         "outcome": "completed",
         "reason": "Generalized branch-backed membership comments and reason text to feature/ and strike/, preserved the spec-only reason byte-for-byte, and passed 28 focused tests plus typecheck.",
         "releasedAt": "2026-07-18T00:57:14.343Z"
+      },
+      {
+        "writerId": "agent-pan-2857",
+        "agentId": "agent-pan-2857",
+        "pid": 2072650,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T00:57:33.120Z",
+        "itemId": "docs-strike-convention",
+        "outcome": "completed",
+        "reason": "Documented feature/ and strike/ as durable convention branches and explained that live strike work is planned_backlog before a PR opens; grep finds two strike references.",
+        "releasedAt": "2026-07-18T00:58:15.665Z"
       }
     ],
     "statusReasons": {
@@ -124,6 +127,10 @@
       "generalize-branch-reason-wording": {
         "reason": "Generalized branch-backed membership comments and reason text to feature/ and strike/, preserved the spec-only reason byte-for-byte, and passed 28 focused tests plus typecheck.",
         "updatedAt": "2026-07-18T00:57:14.343Z"
+      },
+      "docs-strike-convention": {
+        "reason": "Documented feature/ and strike/ as durable convention branches and explained that live strike work is planned_backlog before a PR opens; grep finds two strike references.",
+        "updatedAt": "2026-07-18T00:58:15.665Z"
       }
     }
   },
@@ -142,6 +149,8 @@
     "generalize-branch-reason-wording.generalize-branch-reason-wording.ac1": "completed",
     "generalize-branch-reason-wording.generalize-branch-reason-wording.ac2": "completed",
     "generalize-branch-reason-wording.generalize-branch-reason-wording.ac3": "completed",
-    "docs-strike-convention": "running"
+    "docs-strike-convention": "completed",
+    "docs-strike-convention.docs-strike-convention.ac1": "completed",
+    "docs-strike-convention.docs-strike-convention.ac2": "completed"
   }
 }
