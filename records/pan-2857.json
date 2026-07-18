@@ -47,19 +47,20 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T01:42:02.375Z",
+  "updated": "2026-07-18T01:45:23.051Z",
   "pipeline": {
     "issueId": "PAN-2857",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T01:41:00.830Z",
-    "reviewNotes": "Merged strike PRs are missed when another convention branch ref still exists, violating FR-3 and misclassifying post-merge issues.",
-    "verificationNotes": "Verification FAILED at test (612803ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2857/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2857\u001b[39m\n\nNo test files found, exiting with code 0\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22m\u001b[2mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22m\u001b[2mdecides supervisor eligibility from Docker and harness only\n\u001b[22m\u001b[39m[agent-pan-1405] supervisor:eligible\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:harness-pi\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2mhandoff fork handshake\u001b[2m > \u001b[22m\u001b[2muses the handoff document as the fork seed and records source/target metadata\n\u001b[22m\u001b[39m[summary-fork] Forking conv=conv-source launchModel=default summaryModel=default localOnly=false forkMode=handoff\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/done.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 4266\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m lists --test-waived in pan done --help (AC1) \u001b[33m 1954\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m rejects --test-waived without a reason (AC4) \u001b[33m 1783\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | tests/unit/lib/database/schema-safety-net.test.ts\u001b[2m > \u001b[22m\u001b[2mv54 → v55 migration safety net\u001b[2m > \u001b[22m\u001b[2msnapshots panopticon.db before altering agents data\n\u001b[22m\u001b[39m[schema] Snapshot created: /tmp/pan-safety-net-HlDMY7/panopticon.db.v54-backfill-snapshot\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2mhandoff fork handshake\u001b[2m > \u001b[22m\u001b[2mfalls back to summary fork when the source conversation has ended\n\u001b[22m\u001b[39m[summary-fork] Forking conv=conv-source launchModel=default summaryModel=default localOnly=true forkMode=han\n…(192275 chars elided)…\ntimestamp on repeated overflow detections\n\u001b[22m\u001b[39m[deacon] Agent agent-pan-9001 hit context-window overflow — compact-respawned (attempt 1)\n\n\u001b[90mstdout\u001b[2m | tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22m\u001b[2mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m\u001b[2m(c) settled harness /compact + overflow cleared → nudges continue and clears state\n\u001b[22m\u001b[39m[deacon] Agent agent-pan-9001 resumed after context-overflow compaction\n\n\u001b[90mstdout\u001b[2m | tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22m\u001b[2mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m\u001b[2m(d) settled compact respawn but overflow persists → compact-respawns again without /clear\n\u001b[22m\u001b[39m[deacon] Agent agent-pan-9001 hit context-window overflow — compact-respawned (attempt 2)\n\n\u001b[90mstdout\u001b[2m | tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22m\u001b[2mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m\u001b[2m(g) no overfl\n...(truncated)",
+    "updatedAt": "2026-07-18T01:45:22.979Z",
+    "reviewNotes": "Prior FR-3 blocker is fixed; all requirements are covered with no correctness, security, or performance blockers.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
+    "reviewedAtCommit": "6fed9834ad25193a679d0d40f5a8e5b7502e2b67",
     "reviewRequestedAt": "2026-07-18T01:19:52.588Z",
     "reviewSpawnedAt": "2026-07-18T01:41:00.829Z",
     "scopeDrift": {
@@ -89,10 +90,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 56,
-            "output": 23809,
-            "cacheRead": 6148313,
-            "cacheWrite": 222657
+            "input": 81,
+            "output": 32158,
+            "cacheRead": 9838372,
+            "cacheWrite": 265663
           }
         },
         "plan": {
@@ -105,9 +106,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 633078,
-            "output": 28419,
-            "cacheRead": 3698176,
+            "input": 1626900,
+            "output": 39941,
+            "cacheRead": 4918784,
             "cacheWrite": 0
           }
         },
@@ -130,21 +131,21 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 416,
-          "output": 49957,
-          "cacheRead": 8780662,
-          "cacheWrite": 373599
+          "input": 441,
+          "output": 58306,
+          "cacheRead": 12470721,
+          "cacheWrite": 416605
         },
         "openai/gpt-5.6-sol": {
-          "input": 2430874,
-          "output": 97320,
-          "cacheRead": 26406400,
+          "input": 3424696,
+          "output": 108842,
+          "cacheRead": 27627008,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 44.229841,
-        "pricingAsOf": "2026-07-18T01:41:00.905Z"
+        "usd": 54.800252,
+        "pricingAsOf": "2026-07-18T01:45:23.036Z"
       }
     },
     "merges": [
