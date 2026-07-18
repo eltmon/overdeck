@@ -37,11 +37,16 @@ vi.mock('../../services/codex-conversation-parser.js', () => ({
   parseCodexConversationMessages: vi.fn(),
 }));
 
+vi.mock('../../services/acp-conversation-parser.js', () => ({
+  parseAcpConversationMessages: vi.fn(),
+}));
+
 vi.mock('../jsonl-resolver.js', () => ({
   resolveAgentHarness: vi.fn(() => Promise.resolve(null)),
   readLauncherPinnedSessionId: vi.fn(() => Promise.resolve(null)),
   resolvePiSessionPath: vi.fn(() => Promise.resolve(null)),
   resolveCodexRolloutPath: vi.fn(() => Promise.resolve(null)),
+  resolveAcpTranscriptPath: vi.fn(() => Promise.resolve(null)),
   resolveClaudeSessionId: vi.fn(() => Promise.resolve(null)),
   resolveJsonlPath: vi.fn(() => Promise.resolve(null)),
 }));
@@ -60,7 +65,14 @@ import { parseEntireConversation } from '../../services/conversation-service.js'
 import { parsePiConversationMessages } from '../../services/pi-conversation-parser.js';
 import { parseOhmypiConversationMessages } from '../../services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from '../../services/codex-conversation-parser.js';
-import { resolveAgentHarness, readLauncherPinnedSessionId, resolvePiSessionPath, resolveCodexRolloutPath } from '../jsonl-resolver.js';
+import { parseAcpConversationMessages } from '../../services/acp-conversation-parser.js';
+import {
+  resolveAgentHarness,
+  readLauncherPinnedSessionId,
+  resolvePiSessionPath,
+  resolveCodexRolloutPath,
+  resolveAcpTranscriptPath,
+} from '../jsonl-resolver.js';
 import { existsSync } from 'node:fs';
 
 const mockGetAgentJsonlPath = vi.mocked(getAgentJsonlPath);
@@ -69,10 +81,12 @@ const mockParseEntireConversation = vi.mocked(parseEntireConversation);
 const mockParsePiConversationMessages = vi.mocked(parsePiConversationMessages);
 const mockParseOhmypiConversationMessages = vi.mocked(parseOhmypiConversationMessages);
 const mockParseCodexConversationMessages = vi.mocked(parseCodexConversationMessages);
+const mockParseAcpConversationMessages = vi.mocked(parseAcpConversationMessages);
 const mockResolveAgentHarness = vi.mocked(resolveAgentHarness);
 const mockReadLauncherPinnedSessionId = vi.mocked(readLauncherPinnedSessionId);
 const mockResolvePiSessionPath = vi.mocked(resolvePiSessionPath);
 const mockResolveCodexRolloutPath = vi.mocked(resolveCodexRolloutPath);
+const mockResolveAcpTranscriptPath = vi.mocked(resolveAcpTranscriptPath);
 const mockExistsSync = vi.mocked(existsSync);
 
 const EMPTY = { messages: [], workLog: [], streaming: false, totalCost: 0, byteOffset: 0 };
@@ -282,5 +296,46 @@ describe('buildConversationResponse', () => {
 
     expect(result).toEqual(EMPTY);
     expect(mockParseCodexConversationMessages).not.toHaveBeenCalled();
+  });
+
+  // ── ACP harness ───────────────────────────────────────────────────────────
+
+  it('routes ACP agents through the native parser and finalizes assistant messages', async () => {
+    const acpPath = '/home/testuser/.overdeck/agents/agent-PAN-473/acp-session.jsonl';
+    mockResolveAgentHarness.mockResolvedValue('acp');
+    mockResolveAcpTranscriptPath.mockResolvedValue(acpPath);
+    mockExistsSync.mockReturnValue(true);
+    mockParseAcpConversationMessages.mockResolvedValue({
+      messages: [{
+        id: 'acp-assistant-1',
+        role: 'assistant',
+        text: 'ACP response',
+        createdAt: '2026-07-18T00:00:00.000Z',
+        streaming: true,
+      }],
+      ...PARSE_RESULT_BASE,
+    } as never);
+
+    const result = await buildConversationResponse('agent-PAN-473');
+
+    expect(mockParseAcpConversationMessages).toHaveBeenCalledWith(acpPath);
+    expect(mockParseEntireConversation).not.toHaveBeenCalled();
+    expect(result.messages).toEqual([expect.objectContaining({
+      role: 'assistant',
+      text: 'ACP response',
+      completedAt: '2026-07-18T00:00:00.000Z',
+      streaming: false,
+    })]);
+    expect(result.streaming).toBe(false);
+  });
+
+  it('returns empty for ACP agent when transcript not found', async () => {
+    mockResolveAgentHarness.mockResolvedValue('acp');
+    mockResolveAcpTranscriptPath.mockResolvedValue(null);
+
+    const result = await buildConversationResponse('agent-PAN-473');
+
+    expect(result).toEqual(EMPTY);
+    expect(mockParseAcpConversationMessages).not.toHaveBeenCalled();
   });
 });

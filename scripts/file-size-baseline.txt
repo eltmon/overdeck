@@ -15,7 +15,7 @@
 1923 src/dashboard/server/routes/workspaces/merge-ops.ts
 1013 src/dashboard/server/routes/workspaces/workspace-data.ts
 1520 src/dashboard/server/services/issue-data-service.ts
-1310 src/dashboard/server/ws-rpc.ts
+1306 src/dashboard/server/ws-rpc.ts
 1031 src/lib/cloister/deacon-auto-resume.ts
 1148 src/lib/cloister/deacon-swarm.ts
 3631 src/lib/cloister/deacon.ts

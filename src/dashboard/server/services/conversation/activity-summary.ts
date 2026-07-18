@@ -1,5 +1,6 @@
 import { stat } from 'node:fs/promises';
 import { getHarnessBehavior } from '../../../../lib/runtimes/behavior.js';
+import { parseAcpConversationMessages } from '../acp-conversation-parser.js';
 import { parseCodexConversationMessages } from '../codex-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../ohmypi-conversation-parser.js';
 import { isPiSessionFile, parsePiConversationMessages } from '../pi-conversation-parser.js';
@@ -32,6 +33,7 @@ export async function summarizeConversationActivity(
   }
 
   const parsed = behavior.transcriptKind === 'codex-rollout-jsonl' ? await parseCodexConversationMessages(sessionFile)
+    : behavior.transcriptKind === 'acp-jsonl' ? await parseAcpConversationMessages(sessionFile)
     : behavior.transcriptKind === 'ohmypi-jsonl' || isOhmypiSessionFile(sessionFile) ? await parseOhmypiConversationMessages(sessionFile)
     : isPiSessionFile(sessionFile) ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids
@@ -59,6 +61,8 @@ export async function summarizeConversationActivity(
   // hook's activity event keeps the card "working" independently.
   const workingFileRecent = Date.now() - mtimeMs < WORKING_STALENESS_MS;
   const isWorking = workingFileRecent && (
+    streaming ||
+    pendingToolUse.size > 0 ||
     messages.length === 0 ||
     lastMsg?.role === 'user' ||
     (lastMsg?.role === 'assistant' && !lastMsg.completedAt));

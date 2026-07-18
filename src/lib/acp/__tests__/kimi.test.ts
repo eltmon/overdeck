@@ -120,7 +120,7 @@ describe("Kimi prerequisite", () => {
       required: false,
       version: "kimi 1.49.0",
     });
-    expect(resolver).toHaveBeenCalledWith("kimi");
+    expect(resolver).toHaveBeenCalledWith("kimi", { acpHarness: true });
     expect(probe).toHaveBeenCalledWith("kimi", ["--version"]);
     expect(PREREQUISITES.find((definition) => definition.id === "kimi")?.install.linux)
       .toContain("kimi-code-cli");
@@ -138,7 +138,7 @@ describe("Kimi prerequisite", () => {
       required: false,
       version: null,
     });
-    expect(resolver).toHaveBeenCalledWith("kimi");
+    expect(resolver).toHaveBeenCalledWith("kimi", { acpHarness: true });
     expect(report.allRequiredFound).toBe(true);
   });
 });

@@ -107,7 +107,7 @@ const runProbe = Effect.gen(function* () {
 
 describe.skipIf(!probeEnabled)("Kimi ACP CLI probe", () => {
   it(
-    "completes a real prompt round-trip and preserves the resume session id",
+    "completes a real prompt round-trip and returns a session id",
     { timeout: 120_000 },
     async () => {
       const result = await Effect.runPromise(

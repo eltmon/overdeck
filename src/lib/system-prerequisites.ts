@@ -17,7 +17,10 @@ import { execFile } from 'node:child_process';
 import { homedir } from 'node:os';
 import { promisify } from 'node:util';
 
-import { resolveExecutable } from './harness-binary.js';
+import {
+  resolveExecutable,
+  resolveHarnessBinary,
+} from './harness-binary.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -178,12 +181,38 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
 ];
 
 export type PrerequisiteProbe = (cmd: string, args: string[]) => Promise<string>;
-export type PrerequisiteResolver = (command: string) => Promise<string | null>;
+export type PrerequisiteResolver = (
+  command: string,
+  options?: { acpHarness?: boolean; pathValue?: string },
+) => Promise<string | null>;
 
 const defaultProbe: PrerequisiteProbe = async (cmd, args) => {
   const { stdout } = await execFileAsync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
   return stdout;
 };
+
+const defaultResolver: PrerequisiteResolver = async (command, options) => {
+  const resolutionOptions = options?.pathValue !== undefined
+    ? { pathValue: options.pathValue }
+    : undefined;
+  return options?.acpHarness
+    ? resolveHarnessBinary('acp', resolutionOptions)
+    : resolveExecutable(command, resolutionOptions);
+};
+
+function resolvePrerequisiteExecutable(
+  id: string,
+  resolver: PrerequisiteResolver,
+  pathValue?: string,
+): Promise<string | null> {
+  const options = {
+    ...(id === 'kimi' ? { acpHarness: true } : {}),
+    ...(pathValue !== undefined ? { pathValue } : {}),
+  };
+  return Object.keys(options).length > 0
+    ? resolver(id, options)
+    : resolver(id);
+}
 
 function firstLine(output: string): string | null {
   const line = output.split('\n')[0]?.trim();
@@ -205,20 +234,24 @@ function failureKind(error: unknown): string {
 }
 
 /** Build a bounded, secret-free support report from the dashboard process environment. */
-export async function collectSetupDiagnostics(overdeckVersion: string): Promise<SetupDiagnosticsReport> {
+export async function collectSetupDiagnostics(
+  overdeckVersion: string,
+  probe: PrerequisiteProbe = defaultProbe,
+  resolver: PrerequisiteResolver = defaultResolver,
+): Promise<SetupDiagnosticsReport> {
   const pathValue = process.env['PATH'] ?? '';
   const toolLines = await Promise.all(PREREQUISITES.map(async ({ id, versionArgs }) => {
-    const resolvedPath = await resolveExecutable(id, { pathValue });
+    const resolvedPath = await resolvePrerequisiteExecutable(id, resolver, pathValue);
     if (!resolvedPath) return `✗ ${id}: command not found`;
     try {
-      const output = await defaultProbe(resolvedPath, versionArgs);
+      const output = await probe(resolvedPath, versionArgs);
       return `✓ ${id}: ${firstLine(output) ?? 'version unavailable'} — ${redactHome(resolvedPath)}`;
     } catch (error) {
       return `✗ ${id}: ${failureKind(error)} — ${redactHome(resolvedPath)}`;
     }
   }));
 
-  const claudePath = await resolveExecutable('claude', { pathValue });
+  const claudePath = await resolvePrerequisiteExecutable('claude', resolver, pathValue);
   const likelyCause = claudePath
     ? 'Claude resolved to an executable path; conversation and agent launchers will prepend that directory to PATH.'
     : 'Claude was not found on the server PATH, in common user install locations, under the global npm prefix, or through the login shell.';
@@ -248,21 +281,33 @@ export async function collectSetupDiagnostics(overdeckVersion: string): Promise<
   return { schemaVersion: 1, markdown: markdown.slice(0, 16_384) };
 }
 
+export async function checkSystemPrerequisite(
+  id: string,
+  probe: PrerequisiteProbe = defaultProbe,
+  resolver: PrerequisiteResolver = defaultResolver,
+): Promise<PrerequisiteCheck> {
+  const definition = PREREQUISITES.find((candidate) => candidate.id === id);
+  if (!definition) {
+    throw new Error(`Unknown system prerequisite: ${id}`);
+  }
+
+  const { versionArgs, ...checkDefinition } = definition;
+  try {
+    const executable = await resolvePrerequisiteExecutable(id, resolver);
+    if (!executable) return { ...checkDefinition, found: false, version: null };
+    const output = await probe(executable, versionArgs);
+    return { ...checkDefinition, found: true, version: firstLine(output) };
+  } catch {
+    return { ...checkDefinition, found: false, version: null };
+  }
+}
+
 export async function checkSystemPrerequisites(
   probe: PrerequisiteProbe = defaultProbe,
-  resolver: PrerequisiteResolver = resolveExecutable,
+  resolver: PrerequisiteResolver = defaultResolver,
 ): Promise<PrerequisitesReport> {
   const checks = await Promise.all(
-    PREREQUISITES.map(async ({ versionArgs, ...definition }): Promise<PrerequisiteCheck> => {
-      try {
-        const executable = await resolver(definition.id);
-        if (!executable) return { ...definition, found: false, version: null };
-        const output = await probe(executable, versionArgs);
-        return { ...definition, found: true, version: firstLine(output) };
-      } catch {
-        return { ...definition, found: false, version: null };
-      }
-    }),
+    PREREQUISITES.map(({ id }) => checkSystemPrerequisite(id, probe, resolver)),
   );
   return {
     platform: process.platform,
