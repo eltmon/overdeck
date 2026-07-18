@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, Loader2 } from 'lucide-react';
 
+import { AddIssuesRail } from '../components/orders/AddIssuesRail';
+import { BacklogCandidatesRail } from '../components/orders/BacklogCandidatesRail';
 import { BookStrip, type OrderBookView } from '../components/orders/BookStrip';
 import { LaneEditor } from '../components/orders/LaneEditor';
 import { LifecycleStrip } from '../components/orders/LifecycleStrip';
@@ -195,6 +197,11 @@ export function OrderBookPage() {
             </section>
 
             <LaneEditor book={selected} onBookChange={updateBook} />
+
+            <section className="grid gap-3 lg:grid-cols-2" aria-label="Add issues to order book">
+              <AddIssuesRail book={selected} books={books} onBookChange={updateBook} />
+              <BacklogCandidatesRail book={selected} onBookChange={updateBook} />
+            </section>
 
             <section className="grid gap-3 lg:grid-cols-2">
               <RunSettingsPanel settings={selected.settings} onChange={patchSettings} />
