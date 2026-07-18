@@ -75,6 +75,8 @@ export async function parseAcpConversationMessages(sessionFile: string): Promise
   const pendingToolUse = new Map<string, WorkLogEntry>();
   let sequence = 0;
   let lastRole: AcpTranscriptEntry['role'] | null = null;
+  let currentTurnAssistantIndex: number | undefined;
+  let lastTurnCompletedAt: string | undefined;
 
   for (const line of raw.split('\n')) {
     if (!line.trim()) continue;
@@ -91,6 +93,22 @@ export async function parseAcpConversationMessages(sessionFile: string): Promise
 
     const entry = parsed;
     const createdAt = entry.timestamp;
+
+    if (entry.event === 'turn_completed') {
+      lastTurnCompletedAt = createdAt;
+      if (currentTurnAssistantIndex !== undefined) {
+        const assistant = messages[currentTurnAssistantIndex];
+        if (assistant?.role === 'assistant') {
+          messages[currentTurnAssistantIndex] = {
+            ...assistant,
+            completedAt: createdAt,
+            streaming: false,
+          };
+        }
+      }
+      pendingToolUse.clear();
+      continue;
+    }
 
     if (entry.role === 'assistant') {
       if (!entry.content) continue;
@@ -112,11 +130,16 @@ export async function parseAcpConversationMessages(sessionFile: string): Promise
           sequence,
         });
       }
+      currentTurnAssistantIndex = messages.length - 1;
       lastRole = entry.role;
       continue;
     }
 
     if (entry.role === 'user' || entry.role === 'system') {
+      if (entry.role === 'user') {
+        currentTurnAssistantIndex = undefined;
+        lastTurnCompletedAt = undefined;
+      }
       const text = entry.content.trim();
       if (!text) continue;
       sequence += 1;
@@ -162,10 +185,11 @@ export async function parseAcpConversationMessages(sessionFile: string): Promise
   }
 
   const lastMessage = messages[messages.length - 1];
-  const streaming = lastRole === 'assistant'
+  const streaming = lastTurnCompletedAt === undefined
+    && lastRole === 'assistant'
     && lastMessage?.role === 'assistant'
     && Date.now() - fileStats.mtimeMs < STREAMING_RECENCY_MS;
-  if (lastMessage?.role === 'assistant') {
+  if (lastMessage?.role === 'assistant' && lastTurnCompletedAt === undefined) {
     messages[messages.length - 1] = streaming
       ? { ...lastMessage, streaming: true }
       : { ...lastMessage, completedAt: lastMessage.createdAt };
@@ -176,6 +200,7 @@ export async function parseAcpConversationMessages(sessionFile: string): Promise
     workLog,
     byteOffset: fileStats.size,
     streaming,
+    ...(lastTurnCompletedAt ? { lastTurnCompletedAt } : {}),
     totalCost: 0,
     totalTokens: 0,
     latestAssistantUsage: null,

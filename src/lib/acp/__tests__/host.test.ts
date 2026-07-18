@@ -335,6 +335,14 @@ describe("AcpHost", () => {
         sessionId: "acp-session-1",
         source: "agent",
       }),
+      expect.objectContaining({
+        role: "system",
+        content: "",
+        sessionId: "acp-session-1",
+        source: "agent",
+        event: "turn_completed",
+        stopReason: "end_turn",
+      }),
     ]);
     expect(output.text()).toContain("[user] hello agent");
     expect(output.text()).toContain("[assistant] hello from kimi");
@@ -398,6 +406,46 @@ describe("AcpHost", () => {
     await expect(response).resolves.toEqual({ status: 200, body: { ok: true } });
   });
 
+  it("writes one ordered completion boundary for each successful prompt", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({ assistantResponse: "done" });
+    const host = new AcpHost({
+      agentId: "agent-multiple-turns",
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-multiple-turns");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-multiple-turns.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+
+    await expect(postSocket(socketPath, token, { op: "message", content: "first" }))
+      .resolves.toEqual({ status: 200, body: { ok: true } });
+    await expect(postSocket(socketPath, token, { op: "message", content: "second" }))
+      .resolves.toEqual({ status: 200, body: { ok: true } });
+
+    const transcript = (await readFile(join(agentDir, "acp-session.jsonl"), "utf-8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    expect(transcript.map((entry) => entry.role)).toEqual([
+      "user",
+      "assistant",
+      "system",
+      "user",
+      "assistant",
+      "system",
+    ]);
+    expect(transcript.filter((entry) => entry.event === "turn_completed")).toEqual([
+      expect.objectContaining({ stopReason: "end_turn" }),
+      expect.objectContaining({ stopReason: "end_turn" }),
+    ]);
+  });
+
   it("returns a caller-visible failure when session/prompt fails", async () => {
     const overdeckHome = await makeHome();
     const stub = await makeStubRuntime({ promptError: new Error("provider rejected prompt") });
@@ -428,6 +476,7 @@ describe("AcpHost", () => {
     expect(output.text()).toContain("[error] provider rejected prompt");
     const transcript = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
     expect(transcript).toContain('"content":"provider rejected prompt"');
+    expect(transcript).not.toContain('"event":"turn_completed"');
   });
 
   it("registers handlers and captures session updates before startup completes", async () => {

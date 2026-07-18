@@ -2,6 +2,12 @@ import { appendFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
 export type AcpTranscriptRole = "user" | "assistant" | "tool" | "system";
+export type AcpTranscriptStopReason =
+  | "end_turn"
+  | "max_tokens"
+  | "max_turn_requests"
+  | "refusal"
+  | "cancelled";
 
 export interface AcpTranscriptToolCallState {
   readonly toolCallId: string;
@@ -20,6 +26,9 @@ export interface AcpTranscriptEntry {
   readonly sessionId?: string;
   readonly toolCalls?: ReadonlyArray<AcpTranscriptToolCallState>;
   readonly source?: "orchestrator" | "agent";
+  /** Durable, non-display boundary written after all events for a successful prompt. */
+  readonly event?: "turn_completed";
+  readonly stopReason?: AcpTranscriptStopReason;
 }
 
 export type AcpTranscriptEntryInput = Omit<AcpTranscriptEntry, "timestamp"> & {
@@ -39,6 +48,8 @@ export class AcpTranscriptWriter {
       ...(entry.sessionId ? { sessionId: entry.sessionId } : {}),
       ...(entry.toolCalls ? { toolCalls: entry.toolCalls } : {}),
       ...(entry.source ? { source: entry.source } : {}),
+      ...(entry.event ? { event: entry.event } : {}),
+      ...(entry.stopReason ? { stopReason: entry.stopReason } : {}),
     };
     this.pending = this.pending.then(async () => {
       await mkdir(dirname(this.path), { recursive: true });

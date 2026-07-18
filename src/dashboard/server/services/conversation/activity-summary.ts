@@ -44,7 +44,7 @@ export async function summarizeConversationActivity(
           sessionFile,
           { pendingToolUse: new Map(), unresolvedResults: new Map(), lastSequence: 0 },
         );
-  const { messages, streaming, pendingToolUse, workLog, mtimeMs } = parsed;
+  const { messages, streaming, lastTurnCompletedAt, pendingToolUse, workLog, mtimeMs } = parsed;
   const lastMsg = messages[messages.length - 1];
   // Agent is idle only when the last message is an assistant message with a terminal
   // completedAt (stop_reason was end_turn/max_tokens/stop_sequence). Any other state
@@ -60,7 +60,7 @@ export async function summarizeConversationActivity(
   // nothing for a while); during a real in-progress compaction the PreCompact
   // hook's activity event keeps the card "working" independently.
   const workingFileRecent = Date.now() - mtimeMs < WORKING_STALENESS_MS;
-  const isWorking = workingFileRecent && (
+  const isWorking = workingFileRecent && !lastTurnCompletedAt && (
     streaming ||
     pendingToolUse.size > 0 ||
     messages.length === 0 ||

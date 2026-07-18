@@ -191,9 +191,18 @@ export class AcpHost {
     this.writePaneLine(`[user] ${content}`);
     const promptOperation = this.promptQueue.then(async () => {
       try {
-        await Effect.runPromise(
+        const promptResult = await Effect.runPromise(
           this.options.runtime.prompt({ prompt: [{ type: "text", text: content }] }),
         );
+        await Effect.runPromise(this.options.runtime.drainEvents);
+        await this.transcript.append({
+          role: "system",
+          content: "",
+          sessionId: this.sessionId,
+          source: "agent",
+          event: "turn_completed",
+          stopReason: promptResult.stopReason,
+        });
       } catch (error) {
         const message = errorMessage(error);
         this.writePaneLine(`[error] ${message}`);

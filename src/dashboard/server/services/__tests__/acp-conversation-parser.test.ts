@@ -75,6 +75,115 @@ describe('parseAcpConversationMessages', () => {
     expect(result.totalTokens).toBe(0);
   });
 
+  it('uses a durable completion boundary instead of recent-file streaming inference', async () => {
+    const path = await writeTranscript([
+      {
+        timestamp: '2026-07-18T10:00:00.000Z',
+        role: 'user',
+        content: 'Explain ACP',
+      },
+      {
+        timestamp: '2026-07-18T10:00:01.000Z',
+        role: 'assistant',
+        content: 'ACP is a protocol.',
+      },
+      {
+        timestamp: '2026-07-18T10:00:02.000Z',
+        role: 'system',
+        content: '',
+        event: 'turn_completed',
+        stopReason: 'end_turn',
+      },
+    ]);
+
+    const first = await parseAcpConversationMessages(path);
+    const second = await parseAcpConversationMessages(path);
+
+    for (const result of [first, second]) {
+      expect(result.streaming).toBe(false);
+      expect(result.lastTurnCompletedAt).toBe('2026-07-18T10:00:02.000Z');
+      expect(result.messages).toEqual([
+        expect.objectContaining({ role: 'user', text: 'Explain ACP' }),
+        expect.objectContaining({
+          role: 'assistant',
+          text: 'ACP is a protocol.',
+          completedAt: '2026-07-18T10:00:02.000Z',
+          streaming: false,
+        }),
+      ]);
+    }
+  });
+
+  it('applies completion boundaries to each assistant turn', async () => {
+    const path = await writeTranscript([
+      { timestamp: '2026-07-18T10:00:00.000Z', role: 'user', content: 'First' },
+      { timestamp: '2026-07-18T10:00:01.000Z', role: 'assistant', content: 'One' },
+      {
+        timestamp: '2026-07-18T10:00:02.000Z',
+        role: 'system',
+        content: '',
+        event: 'turn_completed',
+        stopReason: 'end_turn',
+      },
+      { timestamp: '2026-07-18T10:00:03.000Z', role: 'user', content: 'Second' },
+      { timestamp: '2026-07-18T10:00:04.000Z', role: 'assistant', content: 'Two' },
+      {
+        timestamp: '2026-07-18T10:00:05.000Z',
+        role: 'system',
+        content: '',
+        event: 'turn_completed',
+        stopReason: 'max_tokens',
+      },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.streaming).toBe(false);
+    expect(result.messages.filter((message) => message.role === 'assistant')).toEqual([
+      expect.objectContaining({ text: 'One', completedAt: '2026-07-18T10:00:02.000Z' }),
+      expect.objectContaining({ text: 'Two', completedAt: '2026-07-18T10:00:05.000Z' }),
+    ]);
+  });
+
+  it('treats a new user turn after a completion boundary as active', async () => {
+    const path = await writeTranscript([
+      { timestamp: '2026-07-18T10:00:00.000Z', role: 'user', content: 'First' },
+      { timestamp: '2026-07-18T10:00:01.000Z', role: 'assistant', content: 'Done' },
+      {
+        timestamp: '2026-07-18T10:00:02.000Z',
+        role: 'system',
+        content: '',
+        event: 'turn_completed',
+        stopReason: 'end_turn',
+      },
+      { timestamp: '2026-07-18T10:00:03.000Z', role: 'user', content: 'Follow up' },
+      { timestamp: '2026-07-18T10:00:04.000Z', role: 'assistant', content: 'Working' },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.streaming).toBe(true);
+    expect(result.lastTurnCompletedAt).toBeUndefined();
+    expect(result.messages.at(-1)).toEqual(expect.objectContaining({
+      role: 'assistant',
+      text: 'Working',
+      streaming: true,
+    }));
+  });
+
+  it('keeps the recent-file fallback for legacy transcripts without boundaries', async () => {
+    const path = await writeTranscript([
+      { timestamp: '2026-07-18T10:00:00.000Z', role: 'user', content: 'Legacy' },
+      { timestamp: '2026-07-18T10:00:01.000Z', role: 'assistant', content: 'Streaming' },
+    ]);
+
+    const result = await parseAcpConversationMessages(path);
+
+    expect(result.streaming).toBe(true);
+    expect(result.lastTurnCompletedAt).toBeUndefined();
+    expect(result.messages.at(-1)).toEqual(expect.objectContaining({ streaming: true }));
+  });
+
   it('deduplicates tool updates, retains pending state, and bounds display metadata', async () => {
     const longCommand = 'x'.repeat(700);
     const longDetail = 'y'.repeat(700);
