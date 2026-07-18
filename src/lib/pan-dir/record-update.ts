@@ -64,8 +64,8 @@ function gitFailureMessage(error: unknown): string {
   return String(error);
 }
 
-function isNonFastForwardPushError(message: string): boolean {
-  return /non-fast-forward|fetch first/i.test(message);
+function isRemoteRefRaceError(message: string): boolean {
+  return /non-fast-forward|fetch first|stale info|cannot lock ref.*expected|failed to update ref/i.test(message);
 }
 
 async function abortRebase(gitRoot: string): Promise<void> {
@@ -110,6 +110,52 @@ async function replayConflictedRecord(
   await git(gitRoot, ['-c', 'core.editor=true', 'rebase', '--continue']);
 }
 
+async function restoreRetryableRecord(
+  project: ProjectConfig,
+  issueId: string,
+  original: PanIssueRecord,
+  recordPath: string,
+): Promise<void> {
+  const stateHome = resolveStateReadHomeSync(project);
+  const gitRoot = stateHome.root;
+  const relativeRecordPath = relative(gitRoot, recordPath).replace(/\\/g, '/');
+  await abortRebase(gitRoot);
+
+  let restored = structuredClone(original);
+  const branch = stateHome.migrated
+    ? STATE_BRANCH
+    : await git(gitRoot, ['branch', '--show-current']);
+
+  try {
+    await git(gitRoot, ['fetch', 'origin', branch]);
+    restored = JSON.parse(
+      await git(gitRoot, ['show', `origin/${branch}:${relativeRecordPath}`]),
+    ) as PanIssueRecord;
+  } catch {
+    // Network and remote-read failures must not prevent local retryability. The
+    // pre-mutation snapshot is still safer than leaving terminal local state.
+  }
+
+  writeIssueRecordSync(project, issueId, restored);
+  await git(gitRoot, ['add', '--', relativeRecordPath]);
+
+  try {
+    await git(gitRoot, ['diff', '--cached', '--quiet', '--', relativeRecordPath]);
+    return;
+  } catch {
+    // A staged diff needs a compensating commit so HEAD, not only the worktree,
+    // is retryable. The failed mutation remains auditable in local history.
+  }
+
+  await git(gitRoot, [
+    'commit',
+    '-m',
+    `chore(records): restore ${issueId} after failed state push`,
+    '--',
+    relativeRecordPath,
+  ]);
+}
+
 async function reconcileStatePush(
   project: ProjectConfig,
   issueId: string,
@@ -141,7 +187,7 @@ async function reconcileStatePush(
       return record;
     } catch (error) {
       const message = gitFailureMessage(error);
-      if (!isNonFastForwardPushError(message)) {
+      if (!isRemoteRefRaceError(message)) {
         throw new Error(`Failed to push reconciled ${issueId} state: ${message}`, { cause: error });
       }
     }
@@ -161,6 +207,7 @@ export async function updateIssueRecord(
   const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
   return withRecordFsLock(project, normalizedIssueId, { writerId, recordPath }, async () => {
     const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
+    const original = structuredClone(current);
     const result = await mutator(current);
     const next = result ?? current;
     const path = writeIssueRecordSync(project, normalizedIssueId, next);
@@ -168,22 +215,34 @@ export async function updateIssueRecord(
       return readIssueRecordSync(project, normalizedIssueId) ?? next;
     }
 
-    const commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
-    // Start and await the explicit flush while the issue lock is held. No second
-    // writer may observe the local terminal state before its durability outcome
-    // is known, and the queue's zero-delay timer cannot consume this batch first.
-    const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
-    if (flushed.pushed === false) {
-      const stateHome = resolveStateReadHomeSync(project);
-      if (stateHome.migrated && isNonFastForwardPushError(flushed.reason ?? '')) {
-        return reconcileStatePush(project, normalizedIssueId, mutator, path);
+    try {
+      const commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
+      // Start and await the explicit flush while the issue lock is held. No second
+      // writer may observe the local terminal state before its durability outcome
+      // is known, and the queue's zero-delay timer cannot consume this batch first.
+      const flushed = await Effect.runPromise(flushAutoCommits(commitRoot));
+      if (flushed.pushed === false) {
+        const stateHome = resolveStateReadHomeSync(project);
+        if (stateHome.migrated && isRemoteRefRaceError(flushed.reason ?? '')) {
+          return await reconcileStatePush(project, normalizedIssueId, mutator, path);
+        }
+        throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
       }
-      throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
-    }
-    if (!flushed.committed && !['no diff', 'no pending'].includes(flushed.reason ?? '')) {
-      throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? 'unknown commit failure'}`);
-    }
+      if (!flushed.committed && !['no diff', 'no pending'].includes(flushed.reason ?? '')) {
+        throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? 'unknown commit failure'}`);
+      }
 
-    return readIssueRecordSync(project, normalizedIssueId) ?? next;
+      return readIssueRecordSync(project, normalizedIssueId) ?? next;
+    } catch (error) {
+      try {
+        await restoreRetryableRecord(project, normalizedIssueId, original, path);
+      } catch (restoreError) {
+        throw new Error(
+          `Failed to persist ${normalizedIssueId} state and restore retryability: ${gitFailureMessage(restoreError)}`,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
   });
 }

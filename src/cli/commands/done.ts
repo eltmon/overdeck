@@ -41,6 +41,7 @@ import { compileGlob } from '../../lib/vbrief/dag.js';
 import type { ScopeDriftRecord } from '../../lib/vbrief/continue-state.js';
 import type { VBriefDocument } from '../../lib/vbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
+import { persistDoneReviewIntent } from './done-review-intent.js';
 
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
@@ -729,39 +730,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
     let shadowModeActive = false;
     const isGitHubIssue = issueId.startsWith('PAN-');
 
-    // Step 1: Update status (either tracker or shadow)
-    const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId));
-
-    if (skipTrackerUpdate) {
-      shadowModeActive = true;
-      spinner.text = 'Updating shadow state...';
-      await Effect.runPromise(updateShadowState(issueId, 'in_review', 'pan done'));
-      console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
-    } else if (isGitHubIssue) {
-      // GitHub issue - update labels
-      spinner.text = 'Updating GitHub labels...';
-      trackerUpdated = await updateGitHubToInReview(issueId, options.comment);
-      if (trackerUpdated) {
-        console.log(chalk.green(`  ✓ Updated ${issueId} to In Review (GitHub)`));
-      } else {
-        console.log(chalk.yellow(`  ⚠ Failed to update GitHub labels`));
-      }
-    } else {
-      const apiKey = await Effect.runPromise(getLinearApiKey());
-      if (apiKey) {
-        spinner.text = 'Updating Linear to In Review...';
-        trackerUpdated = await updateLinearToInReview(apiKey, issueId, options.comment);
-        if (trackerUpdated) {
-          console.log(chalk.green(`  ✓ Updated ${issueId} to In Review`));
-        } else {
-          console.log(chalk.yellow(`  ⚠ Failed to update Linear status`));
-        }
-      } else {
-        console.log(chalk.dim('  LINEAR_API_KEY not set - skipping status update'));
-      }
-    }
-
-    // Step 2: Create review artifacts immediately and persist merge-set state.
+    // Step 1: Create review artifacts immediately and persist merge-set state.
     const { saveAgentStateSync } = await import('../../lib/agents.js');
     const { agentState: existingState, workspacePath } = await resolveDoneWorkspace(issueId, agentId);
 
@@ -798,13 +767,11 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
       if (!existingPrUrl) throw artifactErr;
       console.log(chalk.yellow(`  ⚠ Review artifact creation failed, but found existing PR via REST fallback: ${existingPrUrl}`));
-      setReviewStatusSync(issueId, { prUrl: existingPrUrl });
       artifactResult = { mergeSet: null, artifacts: [{ repoKey: 'primary', created: false, skipped: false, url: existingPrUrl }] };
     }
     const primaryArtifact = artifactResult.mergeSet?.repos.find(repo => !!repo.artifactUrl);
-    if (primaryArtifact?.artifactUrl) {
-      setReviewStatusSync(issueId, { prUrl: primaryArtifact.artifactUrl });
-    }
+    const reviewArtifactUrl = primaryArtifact?.artifactUrl
+      ?? artifactResult.artifacts.find(artifact => !artifact.skipped && artifact.url)?.url;
 
     const createdArtifacts = artifactResult.artifacts.filter(artifact => !artifact.skipped && artifact.url);
     if (createdArtifacts.length > 0) {
@@ -813,50 +780,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.yellow('  ⚠ No changed repos detected for review artifact creation'));
     }
 
-    // Step 3: Update agent state to stopped (so it appears in dashboard agents list).
-    // The completed marker and review artifact state represent standby/review handoff;
-    // state.json now keeps only stable role identity, not transient phases.
-    if (existingState) {
-      existingState.status = 'stopped';
-      existingState.stoppedByUser = true;
-      existingState.lastActivity = new Date().toISOString();
-      saveAgentStateSync(existingState);
-    }
-    // Also update runtime state to idle
-    saveAgentRuntimeState(agentId, {
-      state: 'idle',
-      lastActivity: new Date().toISOString(),
-    });
-
-    // Step 4: Write completion marker
-    mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
-    const completedFile = join(AGENTS_DIR, agentId, 'completed');
-    // Re-runs of `pan done` (e.g. after a review feedback round) must reset the
-    // cloister's processed-marker, otherwise checkCompletionMarkers() at
-    // service.ts:670 sees `completed.processed` exist and skips the new trigger.
-    const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
-    if (existsSync(processedMarker)) {
-      try { unlinkSync(processedMarker); } catch {}
-    }
-    writeFileSync(completedFile, JSON.stringify({
-      timestamp: new Date().toISOString(),
-      trackerUpdated,
-      comment: options.comment,
-    }));
-
-    // Append 'end' session entry to per-issue record.
-    try {
-      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-      appendSessionEntrySync(project, issueId, {
-        timestamp: new Date().toISOString(),
-        reason: 'end',
-        note: options.comment || 'Agent signaled work complete',
-      });
-    } catch (continueErr: any) {
-      console.warn(`[pan done] Failed to append end entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
-    }
-
-    // Step 4b: Guard against actually-merged issues (e.g. merge completed in
+    // Step 2: Guard against actually-merged issues (e.g. merge completed in
     // background while agent was finishing up). Review status is cached state and
     // can be stale after re-submission, so verify git ancestry before skipping.
     const { getReviewStatusSync } = await import('../../lib/review-status.js');
@@ -873,7 +797,7 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       console.log(chalk.yellow(`  ⚠ Stored merge status for ${issueId} was stale; re-running review pipeline.`));
     }
 
-    // Step 4c: Guard against no-op re-submission. If review already passed and
+    // Step 2b: Guard against no-op re-submission. If review already passed and
     // HEAD hasn't changed since the review snapshot, skip re-review entirely.
     // This prevents agents from accidentally cycling the pipeline after approval.
     if (currentStatus?.reviewStatus === 'passed' && currentStatus?.reviewedAtCommit) {
@@ -898,12 +822,52 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       }
     }
 
-    // Atomically initialize review status AND record the durable "review requested" intent so the
-    // pipeline can proceed even if the dashboard is offline. PAN-1988 auto-heal: `reviewRequestedAt`
-    // is journaled (always writable, even sandboxed) BEFORE the HTTP trigger below. If that trigger
-    // never lands (dashboard reloading, dropped event, frozen deacon), the host notices the
-    // un-serviced request on the next status read and dispatches review (reconcile-on-read). The
-    // HTTP trigger is the fast path; this intent is the durable backstop.
+    // Step 3: Persist the concrete review-request intent before any tracker,
+    // runtime, marker, cache, notification, or HTTP progression. If the state
+    // branch push loses a remote-ref race, updateIssueRecord reconciles it; if
+    // durability still fails, the command exits before all later pipeline progression.
+    const reviewRequestedAt = new Date().toISOString();
+    await persistDoneReviewIntent(issueId, workspacePath, {
+      reviewRequestedAt,
+      scopeDrift,
+      prUrl: reviewArtifactUrl,
+    });
+
+    // Step 4: Update status (either tracker or shadow) only after the canonical
+    // request is durable.
+    const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(issueId));
+
+    if (skipTrackerUpdate) {
+      shadowModeActive = true;
+      spinner.text = 'Updating shadow state...';
+      await Effect.runPromise(updateShadowState(issueId, 'in_review', 'pan done'));
+      console.log(chalk.cyan(`  👻 Shadow mode: status updated locally`));
+    } else if (isGitHubIssue) {
+      spinner.text = 'Updating GitHub labels...';
+      trackerUpdated = await updateGitHubToInReview(issueId, options.comment);
+      if (trackerUpdated) {
+        console.log(chalk.green(`  ✓ Updated ${issueId} to In Review (GitHub)`));
+      } else {
+        console.log(chalk.yellow(`  ⚠ Failed to update GitHub labels`));
+      }
+    } else {
+      const apiKey = await Effect.runPromise(getLinearApiKey());
+      if (apiKey) {
+        spinner.text = 'Updating Linear to In Review...';
+        trackerUpdated = await updateLinearToInReview(apiKey, issueId, options.comment);
+        if (trackerUpdated) {
+          console.log(chalk.green(`  ✓ Updated ${issueId} to In Review`));
+        } else {
+          console.log(chalk.yellow(`  ⚠ Failed to update Linear status`));
+        }
+      } else {
+        console.log(chalk.dim('  LINEAR_API_KEY not set - skipping status update'));
+      }
+    }
+
+    // Publish the already-durable intent to the rebuildable cache and pipeline
+    // event stream. The setter's redundant journal write is safe because its
+    // newer-wins merge cannot erase the request persisted above.
     setReviewStatusSync(issueId, {
       reviewStatus: 'pending',
       testStatus: 'pending',
@@ -912,10 +876,45 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       verificationStatus: 'pending',
       verificationCycleCount: 0,
       autoRequeueCount: 0,
-      reviewRequestedAt: new Date().toISOString(),
+      reviewRequestedAt,
       scopeDrift,
+      prUrl: reviewArtifactUrl,
     });
 
+    // Step 5: Update agent state and completion markers after durability.
+    if (existingState) {
+      existingState.status = 'stopped';
+      existingState.stoppedByUser = true;
+      existingState.lastActivity = new Date().toISOString();
+      saveAgentStateSync(existingState);
+    }
+    saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+
+    mkdirSync(join(AGENTS_DIR, agentId), { recursive: true });
+    const completedFile = join(AGENTS_DIR, agentId, 'completed');
+    const processedMarker = join(AGENTS_DIR, agentId, 'completed.processed');
+    if (existsSync(processedMarker)) {
+      try { unlinkSync(processedMarker); } catch {}
+    }
+    writeFileSync(completedFile, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      trackerUpdated,
+      comment: options.comment,
+    }));
+
+    try {
+      const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+      appendSessionEntrySync(project, issueId, {
+        timestamp: new Date().toISOString(),
+        reason: 'end',
+        note: options.comment || 'Agent signaled work complete',
+      });
+    } catch (continueErr: any) {
+      console.warn(`[pan done] Failed to append end entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
+    }
 
     spinner.succeed(`Work complete: ${issueId}`);
     emitActivityEntrySync({
