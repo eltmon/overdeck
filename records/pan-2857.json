@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T00:51:49.988Z",
+  "updated": "2026-07-18T00:54:31.474Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "pending",
@@ -67,16 +67,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "strike-merge-oracle-fallbacks": {
-        "writerId": "agent-pan-2857",
-        "agentId": "agent-pan-2857",
-        "pid": 1913179,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T00:51:49.988Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2857",
@@ -88,12 +80,27 @@
         "outcome": "completed",
         "reason": "Recognized local and origin strike refs, preserved feature behavior, and added focused gatherer/resolver coverage; 21 focused tests pass.",
         "releasedAt": "2026-07-18T00:51:23.581Z"
+      },
+      {
+        "writerId": "agent-pan-2857",
+        "agentId": "agent-pan-2857",
+        "pid": 1913179,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T00:51:49.988Z",
+        "itemId": "strike-merge-oracle-fallbacks",
+        "outcome": "completed",
+        "reason": "Added strike fallback heads to merged-PR lookup and deletion fallback; focused tests now prove exact live heads and merged deleted strike branches, with typecheck green.",
+        "releasedAt": "2026-07-18T00:54:31.473Z"
       }
     ],
     "statusReasons": {
       "gather-strike-refs": {
         "reason": "Recognized local and origin strike refs, preserved feature behavior, and added focused gatherer/resolver coverage; 21 focused tests pass.",
         "updatedAt": "2026-07-18T00:51:23.581Z"
+      },
+      "strike-merge-oracle-fallbacks": {
+        "reason": "Added strike fallback heads to merged-PR lookup and deletion fallback; focused tests now prove exact live heads and merged deleted strike branches, with typecheck green.",
+        "updatedAt": "2026-07-18T00:54:31.473Z"
       }
     }
   },
@@ -104,6 +111,9 @@
     "gather-strike-refs.gather-strike-refs.ac3": "completed",
     "gather-strike-refs.gather-strike-refs.ac4": "completed",
     "gather-strike-refs.gather-strike-refs.ac5": "completed",
-    "strike-merge-oracle-fallbacks": "running"
+    "strike-merge-oracle-fallbacks": "completed",
+    "strike-merge-oracle-fallbacks.strike-merge-oracle-fallbacks.ac1": "completed",
+    "strike-merge-oracle-fallbacks.strike-merge-oracle-fallbacks.ac2": "completed",
+    "strike-merge-oracle-fallbacks.strike-merge-oracle-fallbacks.ac3": "completed"
   }
 }
