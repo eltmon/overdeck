@@ -15,7 +15,7 @@ import { BEADS_REMOVAL_NO_LOSS_MATRIX } from '../overdeck/no-loss-matrix.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '..');
 const TEXT_EXTENSIONS = new Set(['.js', '.json', '.md', '.mdx', '.mjs', '.ts', '.tsx']);
-const SCAN_ROOTS = ['src', 'sync-sources', 'configuration', 'reference', 'package.json'];
+const SCAN_ROOTS = ['src', 'sync-sources', 'configuration', 'reference'];
 const LIVE_DOC_ROOTS = ['docs'];
 const EXCLUDED_DOC_PREFIXES = [
   'docs/history/',
@@ -41,7 +41,8 @@ function textFiles(path: string): string[] {
   });
 }
 
-function scan(pattern: RegExp, roots = [...SCAN_ROOTS, ...LIVE_DOC_ROOTS]): Finding[] {
+function scan(pattern: RegExp): Finding[] {
+  const roots = [...SCAN_ROOTS, ...LIVE_DOC_ROOTS, 'package.json'];
   const files = roots.flatMap(textFiles).filter((file) => {
     const path = relative(ROOT, file);
     return !EXCLUDED_DOC_PREFIXES.some((prefix) => path.startsWith(prefix));
@@ -74,11 +75,11 @@ describe('PAN-2648 Beads-removal no-loss audit', () => {
   });
 
   it('has no production Beads imports or process-lock/mutation dependencies', () => {
-    expect(scan(/BeadsResolver|runMutationBatch|withBdProcessLock/, SCAN_ROOTS)).toEqual([]);
+    expect(scan(/BeadsResolver|runMutationBatch|withBdProcessLock/)).toEqual([]);
   });
 
   it('has no Beads sync or rollup service dependencies', () => {
-    expect(scan(/BeadsRollup|beads-(?:rollup|sync)(?:-service|-singleton)?/i, SCAN_ROOTS)).toEqual([]);
+    expect(scan(/BeadsRollup|beads-(?:rollup|sync)(?:-service|-singleton)?/i)).toEqual([]);
   });
 
   it('has no live pan beads or bd ready instructions', () => {
