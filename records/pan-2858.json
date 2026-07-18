@@ -471,18 +471,18 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T13:59:12.420Z",
+  "updated": "2026-07-18T14:14:31.751Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T13:59:11.359Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
+    "updatedAt": "2026-07-18T14:14:31.703Z",
+    "reviewNotes": "ACP sessions are discoverable but dashboard transcript parsing is unwired, leaving live views in perpetual discovery and ended agent conversations empty.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 5 ACs verified. AC1: tsdown entry emits dist/acp-host.js; host.test.ts binds sockets/acp-<id>.sock + writes 0600 acp-token/acp-session-id under a stubbed runtime. AC2: wrong token->401 with zero transcript/prompt writes; correct token+message forwards to runtime.prompt() and appends both turns to acp-session.jsonl. AC3: handleSessionUpdate/handleRequestPermission registered before runtime.start() (host.ts:79-96); test proves order + that an update fired during start() is captured (observedSessionUpdates:1), not dropped. AC4: kimi-scoped auth-failure catch writes '[error] kimi authentication is required... /login' to stdout, rethrows without retry (startCalls===1), main() sets process.exitCode=1. AC5: acp-session-id persisted 0600; --resume threads through main()->makeRuntime->session-runtime.ts's pre-existing resumeSessionId->session/load path (session-runtime.ts:567-640). Non-blocking flag for follow-up: src/lib/acp/host-render.ts's stripAcpPaneControl regex has literal raw control bytes instead of \\x escapes, making git treat the file as binary (breaks future diff/blame, likely trips eslint no-control-regex at verification) — doesn't affect any tested string here.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
@@ -776,9 +776,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 15467034,
-            "output": 336357,
-            "cacheRead": 47303168,
+            "input": 17674615,
+            "output": 371429,
+            "cacheRead": 52124672,
             "cacheWrite": 0
           }
         },
@@ -807,9 +807,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 50355013,
-          "output": 1635956,
-          "cacheRead": 375257088,
+          "input": 52562594,
+          "output": 1671028,
+          "cacheRead": 380078592,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -820,8 +820,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 503.183531,
-        "pricingAsOf": "2026-07-18T13:59:11.385Z"
+        "usd": 517.684348,
+        "pricingAsOf": "2026-07-18T14:14:31.746Z"
       }
     },
     "merges": [
