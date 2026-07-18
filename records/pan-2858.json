@@ -324,15 +324,7 @@
       "timestamp": "2026-07-18T20:16:59.944Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-18T20:16:59Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nACP delivery waits for the entire model turn, leaving spawn, planning, and pan tell blocked indefinitely\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -659,24 +651,24 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:25:31.625Z",
+  "updated": "2026-07-18T20:25:36.366Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:25:31.588Z",
+    "updatedAt": "2026-07-18T20:25:36.328Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "reviewRequestedAt": "2026-07-18T20:25:31.263Z",
-    "reviewSpawnedAt": "2026-07-18T20:10:23.238Z"
+    "reviewSpawnedAt": "2026-07-18T20:25:36.327Z"
   },
   "closeOut": {
     "usage": {
@@ -736,7 +728,7 @@
       },
       "costAtCloseOut": {
         "usd": 737.116194,
-        "pricingAsOf": "2026-07-18T20:25:31.595Z"
+        "pricingAsOf": "2026-07-18T20:25:36.353Z"
       }
     },
     "merges": [
