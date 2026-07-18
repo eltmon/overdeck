@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T02:16:21.240Z",
+  "updated": "2026-07-18T02:38:39.541Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "acp-session-runtime-tests": {
-        "writerId": "agent-pan-2858",
-        "agentId": "agent-pan-2858",
-        "pid": 2427102,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T02:16:21.240Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -124,6 +116,16 @@
         "itemId": "port-acp-session-runtime",
         "outcome": "completed",
         "releasedAt": "2026-07-18T02:06:59.336Z"
+      },
+      {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 2427102,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T02:16:21.240Z",
+        "itemId": "acp-session-runtime-tests",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T02:38:39.541Z"
       }
     ],
     "statusReasons": {
@@ -149,6 +151,9 @@
     "port-acp-session-runtime.port-acp-session-runtime.ac3": "completed",
     "port-acp-session-runtime.port-acp-session-runtime.ac4": "completed",
     "port-acp-session-runtime.port-acp-session-runtime.ac5": "completed",
-    "acp-session-runtime-tests": "running"
+    "acp-session-runtime-tests": "completed",
+    "acp-session-runtime-tests.acp-session-runtime-tests.ac1": "completed",
+    "acp-session-runtime-tests.acp-session-runtime-tests.ac2": "completed",
+    "acp-session-runtime-tests.acp-session-runtime-tests.ac3": "completed"
   }
 }
