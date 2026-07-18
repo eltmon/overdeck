@@ -52,16 +52,17 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T02:00:49.174Z",
+  "updated": "2026-07-18T02:01:04.963Z",
   "pipeline": {
     "issueId": "PAN-2857",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T02:00:47.933Z",
+    "updatedAt": "2026-07-18T02:01:04.899Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
     "reviewRequestedAt": "2026-07-18T01:19:52.588Z",
@@ -109,9 +110,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1631481,
-            "output": 40811,
-            "cacheRead": 5227520,
+            "input": 1632357,
+            "output": 40910,
+            "cacheRead": 5331456,
             "cacheWrite": 0
           }
         },
@@ -125,9 +126,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1900694,
-            "output": 68738,
-            "cacheRead": 24466944,
+            "input": 1904891,
+            "output": 69980,
+            "cacheRead": 24797184,
             "cacheWrite": 0
           }
         }
@@ -140,15 +141,15 @@
           "cacheWrite": 423465
         },
         "openai/gpt-5.6-sol": {
-          "input": 3857802,
-          "output": 125862,
-          "cacheRead": 33398272,
+          "input": 3862875,
+          "output": 127203,
+          "cacheRead": 33832448,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 62.307962,
-        "pricingAsOf": "2026-07-18T02:00:47.964Z"
+        "usd": 62.590645,
+        "pricingAsOf": "2026-07-18T02:01:04.949Z"
       }
     },
     "merges": [
