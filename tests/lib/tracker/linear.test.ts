@@ -69,36 +69,31 @@ describe('LinearTracker', () => {
   });
 
   describe('listIssues', () => {
-    it('should return normalized issues', async () => {
-      const { LinearClient } = await import('@linear/sdk');
-      const mockClient = new LinearClient({ apiKey: 'test' });
-
-      const mockState = { type: 'started' };
-      const mockAssignee = { name: 'John Doe' };
-      const mockLabels = { nodes: [{ name: 'bug' }, { name: 'urgent' }] };
-
-      const mockIssue = {
-        id: 'issue-123',
-        identifier: 'MIN-42',
-        title: 'Test Issue',
-        description: 'Test description',
-        url: 'https://linear.app/issue/MIN-42',
-        priority: 2,
-        dueDate: new Date('2024-12-31'),
-        createdAt: new Date('2024-01-01'),
-        updatedAt: new Date('2024-01-02'),
-        state: Promise.resolve(mockState),
-        assignee: Promise.resolve(mockAssignee),
-        labels: () => Promise.resolve(mockLabels),
-      };
-
-      (mockClient.issues as any).mockResolvedValue({
-        nodes: [mockIssue],
+    it('should return normalized issues from one inlined-relations request (no lazy loads, PAN-2880)', async () => {
+      const rawRequest = vi.fn().mockResolvedValue({
+        data: {
+          issues: {
+            nodes: [{
+              id: 'issue-123',
+              identifier: 'MIN-42',
+              title: 'Test Issue',
+              description: 'Test description',
+              url: 'https://linear.app/issue/MIN-42',
+              priority: 2,
+              dueDate: '2024-12-31',
+              createdAt: '2024-01-01T00:00:00.000Z',
+              updatedAt: '2024-01-02T00:00:00.000Z',
+              state: { type: 'started' },
+              assignee: { name: 'John Doe' },
+              labels: { nodes: [{ name: 'bug' }, { name: 'urgent' }] },
+            }],
+            pageInfo: { hasNextPage: false, endCursor: null },
+          },
+        },
       });
 
       const tracker: any = wrap(new LinearTracker('test-api-key'));
-      // Replace internal client with mock
-      (tracker as any).client = mockClient;
+      (tracker as any).client = { client: { rawRequest } };
 
       const issues = await tracker.listIssues();
 
@@ -114,16 +109,17 @@ describe('LinearTracker', () => {
         tracker: 'linear',
         priority: 2,
       });
+      // The whole point: one request for the page, zero per-issue relation loads.
+      expect(rawRequest).toHaveBeenCalledOnce();
     });
 
     it('should apply filters correctly', async () => {
-      const { LinearClient } = await import('@linear/sdk');
-      const mockClient = new LinearClient({ apiKey: 'test' });
-
-      (mockClient.issues as any).mockResolvedValue({ nodes: [] });
+      const rawRequest = vi.fn().mockResolvedValue({
+        data: { issues: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } } },
+      });
 
       const tracker: any = wrap(new LinearTracker('test-api-key'));
-      (tracker as any).client = mockClient;
+      (tracker as any).client = { client: { rawRequest } };
 
       await tracker.listIssues({
         team: 'MIN',
@@ -133,8 +129,9 @@ describe('LinearTracker', () => {
         limit: 25,
       });
 
-      expect(mockClient.issues).toHaveBeenCalledWith({
+      expect(rawRequest).toHaveBeenCalledWith(expect.stringContaining('issues(filter: $filter'), {
         first: 25,
+        after: null,
         filter: expect.objectContaining({
           team: { key: { eq: 'MIN' } },
           state: { type: { eq: 'unstarted' } },
@@ -145,37 +142,33 @@ describe('LinearTracker', () => {
     });
 
     it('should fetch every page when no result limit is requested', async () => {
-      const { LinearClient } = await import('@linear/sdk');
-      const mockClient = new LinearClient({ apiKey: 'test' });
       const issue = (identifier: string) => ({
         id: identifier,
         identifier,
         title: identifier,
         description: '',
         url: `https://linear.app/issue/${identifier}`,
-        createdAt: new Date('2024-01-01'),
-        updatedAt: new Date('2024-01-02'),
-        state: Promise.resolve({ type: 'started' }),
-        assignee: Promise.resolve(null),
-        labels: () => Promise.resolve({ nodes: [] }),
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-01-02T00:00:00.000Z',
+        state: { type: 'started' },
+        assignee: null,
+        labels: { nodes: [] },
       });
-      const connection = {
-        nodes: [issue('MIN-1')],
-        pageInfo: { hasNextPage: true },
-        fetchNext: vi.fn(async function (this: typeof connection) {
-          this.nodes.push(issue('MIN-2'));
-          this.pageInfo.hasNextPage = false;
-          return this;
-        }),
-      };
-      (mockClient.issues as any).mockResolvedValue(connection);
+      const rawRequest = vi.fn()
+        .mockResolvedValueOnce({
+          data: { issues: { nodes: [issue('MIN-1')], pageInfo: { hasNextPage: true, endCursor: 'cursor-1' } } },
+        })
+        .mockResolvedValueOnce({
+          data: { issues: { nodes: [issue('MIN-2')], pageInfo: { hasNextPage: false, endCursor: null } } },
+        });
 
       const tracker: any = wrap(new LinearTracker('test-api-key'));
-      (tracker as any).client = mockClient;
+      (tracker as any).client = { client: { rawRequest } };
 
       await expect(tracker.listIssues({ team: 'MIN', includeClosed: true }))
         .resolves.toHaveLength(2);
-      expect(connection.fetchNext).toHaveBeenCalledOnce();
+      expect(rawRequest).toHaveBeenCalledTimes(2);
+      expect(rawRequest).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({ after: 'cursor-1' }));
     });
   });
 
