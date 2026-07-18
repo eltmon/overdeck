@@ -393,6 +393,7 @@
       "src/dashboard/server/services/acp-conversation-parser.ts",
       "src/dashboard/server/services/conversation/__tests__/activity-summary-acp.test.ts",
       "src/dashboard/server/services/conversation/activity-summary.ts",
+      "src/dashboard/server/services/conversation/types.ts",
       "src/dashboard/server/services/flywheel-actions.ts",
       "src/dashboard/server/ws-rpc.ts",
       "src/lib/__tests__/agents-spawn-supervisor.test.ts",
@@ -582,6 +583,7 @@
       "src/dashboard/server/services/acp-conversation-parser.ts",
       "src/dashboard/server/services/conversation/__tests__/activity-summary-acp.test.ts",
       "src/dashboard/server/services/conversation/activity-summary.ts",
+      "src/dashboard/server/services/conversation/types.ts",
       "src/dashboard/server/services/flywheel-actions.ts",
       "src/dashboard/server/ws-rpc.ts",
       "src/lib/__tests__/agents-spawn-supervisor.test.ts",
@@ -668,10 +670,10 @@
       "tsdown.config.ts",
       "vitest.config.ts"
     ],
-    "recordedAt": "2026-07-18T16:13:20.539Z"
+    "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:48:11.413Z",
+  "updated": "2026-07-18T20:48:20.424Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "reviewing",
