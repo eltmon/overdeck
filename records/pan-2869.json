@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T01:46:29.372Z",
-  "updated": "2026-07-18T03:02:41.221Z",
+  "updated": "2026-07-18T03:03:42.416Z",
   "pipeline": {
     "issueId": "PAN-2869",
     "reviewStatus": "pending",
@@ -11,7 +11,7 @@
     "mergeStatus": "queued",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T03:02:41.199Z",
+    "updatedAt": "2026-07-18T03:03:42.359Z",
     "strikeReadyHead": "e85765d03425fd672218e89ca13f5e3d23a9c6bd",
     "strikeReadyAt": "2026-07-18T02:59:51.844Z",
     "strikeLandingState": "landing",
@@ -23,10 +23,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 16,
-            "output": 3839,
-            "cacheRead": 2877418,
-            "cacheWrite": 7536
+            "input": 31,
+            "output": 6415,
+            "cacheRead": 5503842,
+            "cacheWrite": 15469
           }
         },
         "strike": {
@@ -40,10 +40,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 16,
-          "output": 3839,
-          "cacheRead": 2877418,
-          "cacheWrite": 7536
+          "input": 31,
+          "output": 6415,
+          "cacheRead": 5503842,
+          "cacheWrite": 15469
         },
         "openai/gpt-5.6-sol": {
           "input": 3539138,
@@ -53,8 +53,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 50.469818,
-        "pricingAsOf": "2026-07-18T03:02:41.215Z"
+        "usd": 53.324357,
+        "pricingAsOf": "2026-07-18T03:03:42.390Z"
       }
     },
     "merges": [],
