@@ -736,22 +736,22 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T21:58:11.535Z",
+  "updated": "2026-07-18T21:59:18.893Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-18T21:10:55.719Z",
-    "updatedAt": "2026-07-18T21:58:10.939Z",
+    "updatedAt": "2026-07-18T21:59:18.877Z",
     "reviewNotes": "ACP context de-duplication relies on exact text matching, so valid Markdown separators or project edits leave stale Claude-specific rules in ACP prompts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
-    "lastVerifiedCommit": "df831e4154b830584672a6386ea72fe7590cb012",
+    "lastVerifiedCommit": "28aa6ff9057335735b0659c28f13ca020ab361a1",
     "reviewRequestedAt": "2026-07-18T21:10:55.719Z",
     "reviewSpawnedAt": "2026-07-18T21:55:18.068Z",
     "scopeDrift": {
@@ -1095,9 +1095,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 38545618,
-            "output": 887077,
-            "cacheRead": 197900800,
+            "input": 38552912,
+            "output": 890123,
+            "cacheRead": 198801920,
             "cacheWrite": 0
           }
         },
@@ -1111,9 +1111,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 43588446,
-            "output": 1853721,
-            "cacheRead": 586806272,
+            "input": 43732436,
+            "output": 1854375,
+            "cacheRead": 587708416,
             "cacheWrite": 0
           }
         }
@@ -1126,9 +1126,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 82134064,
-          "output": 2740798,
-          "cacheRead": 784707072,
+          "input": 82285348,
+          "output": 2744498,
+          "cacheRead": 786510336,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1139,8 +1139,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 899.949038,
-        "pricingAsOf": "2026-07-18T21:58:10.979Z"
+        "usd": 901.71809,
+        "pricingAsOf": "2026-07-18T21:59:18.885Z"
       }
     },
     "merges": [
