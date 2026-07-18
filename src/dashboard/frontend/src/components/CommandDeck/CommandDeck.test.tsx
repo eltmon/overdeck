@@ -39,6 +39,10 @@ vi.mock('./styles/command-deck.module.css', () => ({
     skeletonList: 'skeletonList',
     skeletonItem: 'skeletonItem',
     emptyProject: 'emptyProject',
+    membershipError: 'membershipError',
+    membershipErrorContent: 'membershipErrorContent',
+    membershipErrorDetail: 'membershipErrorDetail',
+    membershipErrorRetry: 'membershipErrorRetry',
     sidebarFooter: 'sidebarFooter',
     versionLabel: 'versionLabel',
   },
@@ -79,6 +83,10 @@ let latestStageProps: any;
 let resourceProjectsResponse: unknown;
 let registeredProjectsResponse: unknown | Promise<unknown> = defaultRegisteredProjects;
 let registeredProjectsRequestError: Error | null = null;
+let pipelineMembershipResponse: { ok: boolean; body: unknown } = {
+  ok: true,
+  body: [],
+};
 let conversationCreateResponse: { ok: boolean; body: unknown } = {
   ok: true,
   body: { id: 3, name: 'created-conv', title: 'Agent' },
@@ -292,6 +300,12 @@ function renderCommandDeck(props?: Partial<React.ComponentProps<typeof CommandDe
           json: async () => registeredProjectsResponse,
         };
       }
+      if (url.startsWith('/api/pipeline/membership?project=')) {
+        return {
+          ok: pipelineMembershipResponse.ok,
+          json: async () => pipelineMembershipResponse.body,
+        };
+      }
       if (url === '/api/conversations') {
         return {
           ok: true,
@@ -430,6 +444,10 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     resourceProjectsResponse = undefined;
     registeredProjectsResponse = defaultRegisteredProjects;
     registeredProjectsRequestError = null;
+    pipelineMembershipResponse = {
+      ok: true,
+      body: [],
+    };
     conversationCreateResponse = {
       ok: true,
       body: { id: 3, name: 'created-conv', title: 'Agent' },
@@ -458,6 +476,28 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     const stage = screen.getByTestId('stage');
     expect(stage).toHaveAttribute('data-deck', 'test-project');
     expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
+  });
+
+  it('surfaces a selected project membership failure instead of a blank issue rail', async () => {
+    resourceProjectsResponse = [];
+    pipelineMembershipResponse = {
+      ok: false,
+      body: { error: 'Pipeline membership snapshot failed to load' },
+    };
+    renderCommandDeck({ selectedProject: 'test-project' });
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(
+      'Pipeline membership determines which issues appear here. It could not be loaded for test-project, so this issue list may be incomplete.',
+    );
+    expect(alert).toHaveTextContent('Pipeline membership snapshot failed to load');
+    expect(screen.queryByTestId('project-node')).not.toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith('/api/pipeline/membership?project=test-key');
+
+    pipelineMembershipResponse = { ok: true, body: [] };
+    fireEvent.click(screen.getByRole('button', { name: 'Retry membership' }));
+
+    expect(await screen.findByTestId('project-node')).toHaveAttribute('data-project-key', 'test-key');
   });
 
   it('toggles spec-only planned issues across the tree, count, and project home', async () => {
