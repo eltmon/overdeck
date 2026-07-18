@@ -591,6 +591,19 @@ export interface YamlConfig {
     transport?: 'app-server' | 'tui';
   };
 
+  /**
+   * Agent Client Protocol spawn behavior.
+   *
+   * 'auto' automatically selects advertised allow or reject outcomes. 'prompt'
+   * is reserved for the AskUserQuestion permission follow-up.
+   */
+  acp?: {
+    permissionMode?: 'auto';
+    kimi?: {
+      binaryPath?: string;
+    };
+  };
+
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
   remote?: RemoteConfig;
 }
@@ -887,6 +900,14 @@ export interface NormalizedConfig {
   codex: {
     permissionMode: 'read-only' | 'workspace' | 'auto-review' | 'full-access';
     transport: 'app-server' | 'tui';
+  };
+
+  /** ACP permission mode and provider-specific process settings. */
+  acp: {
+    permissionMode: 'auto';
+    kimi?: {
+      binaryPath?: string;
+    };
   };
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */

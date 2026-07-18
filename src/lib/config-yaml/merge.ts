@@ -206,6 +206,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       permissionMode: DEFAULT_CONFIG.codex.permissionMode,
       transport: DEFAULT_CONFIG.codex.transport,
     },
+    acp: {
+      permissionMode: DEFAULT_CONFIG.acp.permissionMode,
+    },
   };
 
   // Track providers explicitly disabled in models.providers so that legacy
@@ -701,6 +704,16 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     }
     if (config.codex && (config.codex.transport === 'app-server' || config.codex.transport === 'tui')) {
       result.codex.transport = config.codex.transport;
+    }
+
+    if (config.acp?.permissionMode === 'auto') {
+      result.acp.permissionMode = config.acp.permissionMode;
+    }
+    if (config.acp?.kimi?.binaryPath !== undefined) {
+      result.acp.kimi = {
+        ...result.acp.kimi,
+        binaryPath: config.acp.kimi.binaryPath,
+      };
     }
 
     // Merge remote work-agent provisioning settings
