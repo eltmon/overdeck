@@ -24,6 +24,10 @@ The kit currently owns these reusable pieces:
 
 `densitySections.ts` owns `DENSITY_SECTIONS`, the declarative membership map for `rail`, `cockpit`, and `console`. Density changes layout and section visibility; it does not create three component trees or three versions of status logic. A shell wraps its existing routing and interaction glue around `<IssueView density="…">`.
 
+### Cockpit layout
+
+The cockpit places its full-width detail-tab band between the header and body. The body has two columns: a collapsible agent spine and the issue context or directly selected agent conversation, whose transcript is centered and capped at 980px. The Tasks chip remains in the tab band and opens the canonical Tasks surface in a slide-over drawer. See the [full-width cockpit mockup](design/issue-cockpit-full-width-conversation.html).
+
 To add or move an issue-view section without losing an existing surface:
 
 1. Add the legacy or new section to `inventory.ts`, including its density and owning component. If it is a sub-section of a shared component, add it to that component's section constant and therefore `SECTION_INVENTORY`.

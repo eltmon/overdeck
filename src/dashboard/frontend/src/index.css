@@ -222,6 +222,9 @@ body::after {
   .badge-bg-primary {
     background: color-mix(in srgb, var(--primary) 8%, transparent);
   }
+  .bg-primary\/9 {
+    background: color-mix(in srgb, var(--primary) 9%, transparent);
+  }
   .badge-bg-muted {
     background: color-mix(in srgb, var(--foreground) 6%, transparent);
   }
