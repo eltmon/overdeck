@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T20:05:24.249Z",
+  "updated": "2026-07-18T20:18:09.173Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "lane-enforcement": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 1824962,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T20:05:24.249Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -190,6 +182,17 @@
         "outcome": "completed",
         "reason": "Made active order-book membership satisfy the release gate and threaded it into live sequence pickup, cohort snapshots, stats, waves, and lanes without store access in pickup.ts.",
         "releasedAt": "2026-07-18T20:05:14.857Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 1824962,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T20:05:24.249Z",
+        "itemId": "lane-enforcement",
+        "outcome": "completed",
+        "reason": "Added a pure eligibility predicate and shared active-run dispatch gate enforcing Lane B singleton, Lane A concurrency, prerequisites, and logged --off-book overrides across dashboard and CLI starts.",
+        "releasedAt": "2026-07-18T20:18:09.173Z"
       }
     ],
     "statusReasons": {
@@ -216,6 +219,10 @@
       "pickup-membership-release": {
         "reason": "Made active order-book membership satisfy the release gate and threaded it into live sequence pickup, cohort snapshots, stats, waves, and lanes without store access in pickup.ts.",
         "updatedAt": "2026-07-18T20:05:14.857Z"
+      },
+      "lane-enforcement": {
+        "reason": "Added a pure eligibility predicate and shared active-run dispatch gate enforcing Lane B singleton, Lane A concurrency, prerequisites, and logged --off-book overrides across dashboard and CLI starts.",
+        "updatedAt": "2026-07-18T20:18:09.173Z"
       }
     }
   },
@@ -248,6 +255,10 @@
     "pickup-membership-release.pickup-membership-release.ac1": "completed",
     "pickup-membership-release.pickup-membership-release.ac2": "completed",
     "pickup-membership-release.pickup-membership-release.ac3": "completed",
-    "lane-enforcement": "running"
+    "lane-enforcement": "completed",
+    "lane-enforcement.lane-enforcement.ac1": "completed",
+    "lane-enforcement.lane-enforcement.ac2": "completed",
+    "lane-enforcement.lane-enforcement.ac3": "completed",
+    "lane-enforcement.lane-enforcement.ac4": "completed"
   }
 }
