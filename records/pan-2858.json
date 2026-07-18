@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T06:46:50.547Z",
+  "updated": "2026-07-18T06:56:45.440Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "acp-delivery-tier": {
-        "writerId": "agent-pan-2858",
-        "agentId": "agent-pan-2858",
-        "pid": 3664467,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T06:46:50.547Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -184,6 +176,16 @@
         "itemId": "acp-launcher-spawn",
         "outcome": "completed",
         "releasedAt": "2026-07-18T06:46:35.533Z"
+      },
+      {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 3664467,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T06:46:50.547Z",
+        "itemId": "acp-delivery-tier",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T06:56:45.439Z"
       }
     ],
     "statusReasons": {
@@ -238,6 +240,9 @@
     "acp-launcher-spawn.acp-launcher-spawn.ac1": "completed",
     "acp-launcher-spawn.acp-launcher-spawn.ac2": "completed",
     "acp-launcher-spawn.acp-launcher-spawn.ac3": "completed",
-    "acp-delivery-tier": "running"
+    "acp-delivery-tier": "completed",
+    "acp-delivery-tier.acp-delivery-tier.ac1": "completed",
+    "acp-delivery-tier.acp-delivery-tier.ac2": "completed",
+    "acp-delivery-tier.acp-delivery-tier.ac3": "completed"
   }
 }
