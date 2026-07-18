@@ -314,7 +314,7 @@ describe("AcpHost", () => {
       op: "message",
       content: "hello agent",
     });
-    expect(accepted).toEqual({ status: 200, body: { ok: true } });
+    expect(accepted).toEqual({ status: 202, body: { accepted: true } });
     await host.waitForIdle();
 
     expect(stub.prompts).toEqual([[{ type: "text", text: "hello agent" }]]);
@@ -374,7 +374,7 @@ describe("AcpHost", () => {
     expect(stub.prompts).toEqual([]);
   });
 
-  it("withholds delivery success until session/prompt completes", async () => {
+  it("acknowledges queue acceptance before session/prompt completes", async () => {
     const overdeckHome = await makeHome();
     const promptStarted = await Effect.runPromise(Deferred.make<void>());
     const promptGate = await Effect.runPromise(Deferred.make<void>());
@@ -392,18 +392,18 @@ describe("AcpHost", () => {
     const agentDir = join(overdeckHome, "agents", "agent-prompt-pending");
     const socketPath = join(overdeckHome, "sockets", "acp-agent-prompt-pending.sock");
     const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
-    let settled = false;
     const response = postSocket(socketPath, token, {
       op: "message",
       content: "wait for the provider",
-    }).finally(() => {
-      settled = true;
     });
 
+    await expect(response).resolves.toEqual({ status: 202, body: { accepted: true } });
     await Effect.runPromise(Deferred.await(promptStarted));
-    expect(settled).toBe(false);
+    const beforeCompletion = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
+    expect(beforeCompletion).not.toContain('"event":"turn_completed"');
+
     await Effect.runPromise(Deferred.succeed(promptGate, undefined));
-    await expect(response).resolves.toEqual({ status: 200, body: { ok: true } });
+    await host.waitForIdle();
   });
 
   it("writes one ordered completion boundary for each successful prompt", async () => {
@@ -424,9 +424,10 @@ describe("AcpHost", () => {
     const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
 
     await expect(postSocket(socketPath, token, { op: "message", content: "first" }))
-      .resolves.toEqual({ status: 200, body: { ok: true } });
+      .resolves.toEqual({ status: 202, body: { accepted: true } });
     await expect(postSocket(socketPath, token, { op: "message", content: "second" }))
-      .resolves.toEqual({ status: 200, body: { ok: true } });
+      .resolves.toEqual({ status: 202, body: { accepted: true } });
+    await host.waitForIdle();
 
     const transcript = (await readFile(join(agentDir, "acp-session.jsonl"), "utf-8"))
       .trim()
@@ -446,7 +447,7 @@ describe("AcpHost", () => {
     ]);
   });
 
-  it("returns a caller-visible failure when session/prompt fails", async () => {
+  it("records an asynchronous session/prompt failure after accepting delivery", async () => {
     const overdeckHome = await makeHome();
     const stub = await makeStubRuntime({ promptError: new Error("provider rejected prompt") });
     const output = makeOutput();
@@ -469,10 +470,8 @@ describe("AcpHost", () => {
       content: "this will fail",
     });
 
-    expect(response).toEqual({
-      status: 500,
-      body: { error: "provider rejected prompt" },
-    });
+    expect(response).toEqual({ status: 202, body: { accepted: true } });
+    await host.waitForIdle();
     expect(output.text()).toContain("[error] provider rejected prompt");
     const transcript = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
     expect(transcript).toContain('"content":"provider rejected prompt"');

@@ -122,7 +122,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
     await postUnixSocketJson(socketPath, token, {
       op: 'message',
       content: message,
-    })
+    }, HOST_REQUEST_TIMEOUT_MS)
   }
 
   async killAgent(agentId: string): Promise<void> {
@@ -318,9 +318,11 @@ function postUnixSocketJson(
 ): Promise<AcpHostResponse> {
   return new Promise((resolve, reject) => {
     let settled = false
+    let timeout: NodeJS.Timeout | undefined
     const finish = (callback: () => void) => {
       if (settled) return
       settled = true
+      if (timeout) clearTimeout(timeout)
       callback()
     }
     const client = request(
@@ -348,9 +350,10 @@ function postUnixSocketJson(
       },
     )
     if (timeoutMs !== undefined) {
-      client.setTimeout(timeoutMs, () => {
+      timeout = setTimeout(() => {
         client.destroy(new Error(`ACP host request timed out after ${timeoutMs}ms`))
-      })
+      }, timeoutMs)
+      timeout.unref?.()
     }
     client.once('error', (error) => finish(() => reject(error)))
     client.end(JSON.stringify(body))

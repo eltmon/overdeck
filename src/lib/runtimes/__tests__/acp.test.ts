@@ -203,37 +203,30 @@ describe('AcpRuntimeSync', () => {
     )
   })
 
-  it('waits beyond the control-request timeout for a completed message turn', async () => {
+  it('times out when the host does not acknowledge queue acceptance', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     const home = makeHome()
-    const agentId = 'agent-long-turn'
+    const agentId = 'agent-timeout'
     const token = 'delivery-token'
     writeAgentFile(home, agentId, 'acp-token', token)
     const socketPath = join(home, 'sockets', `acp-${agentId}.sock`)
-    const received: unknown[] = []
     let markRequestReceived!: () => void
     const requestReceived = new Promise<void>((resolve) => {
       markRequestReceived = resolve
     })
-    await listenOnSocket(socketPath, (_headers, body) => {
-      received.push(body)
+    await listenOnSocket(socketPath, () => {
       markRequestReceived()
     }, 20_000)
     const runtime = new AcpRuntimeSync({ overdeckHome: home })
 
-    let settled = false
-    const delivery = runtime.sendMessage(agentId, 'long ACP turn').then(() => {
-      settled = true
-    })
+    const delivery = runtime.sendMessage(agentId, 'queued ACP turn')
+    const rejection = expect(delivery).rejects.toThrow(
+      'ACP host request timed out after 5000ms',
+    )
     await requestReceived
-
     await vi.advanceTimersByTimeAsync(5_100)
-    expect(settled).toBe(false)
 
-    await vi.advanceTimersByTimeAsync(14_900)
-    await new Promise<void>((resolve) => setImmediate(resolve))
-    await delivery
-    expect(received).toEqual([{ op: 'message', content: 'long ACP turn' }])
+    await rejection
   })
 
   it('enumerates ACP sessions from the canonical agent resolver', () => {

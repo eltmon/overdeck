@@ -182,15 +182,15 @@ export class AcpHost {
     if (!content) {
       return { status: 400, body: { error: "message content is required" } };
     }
-    await this.transcript.append({
-      role: "user",
-      content,
-      sessionId: this.sessionId,
-      source: "orchestrator",
-    });
-    this.writePaneLine(`[user] ${content}`);
     const promptOperation = this.promptQueue.then(async () => {
       try {
+        await this.transcript.append({
+          role: "user",
+          content,
+          sessionId: this.sessionId,
+          source: "orchestrator",
+        });
+        this.writePaneLine(`[user] ${content}`);
         const promptResult = await Effect.runPromise(
           this.options.runtime.prompt({ prompt: [{ type: "text", text: content }] }),
         );
@@ -219,8 +219,7 @@ export class AcpHost {
       () => undefined,
       () => undefined,
     );
-    await promptOperation;
-    return { status: 200, body: { ok: true } };
+    return { status: 202, body: { accepted: true } };
   }
 
   private async handleInterruptOp(): Promise<HostOpResult> {

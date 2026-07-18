@@ -272,13 +272,13 @@ export async function deliverAgentMessage(
         acpFailure = 'acp-token-missing';
       } else {
         try {
-          // ACP acknowledges only after the full model turn and durable transcript
-          // completion record land, so a fixed transport deadline would abort a
-          // healthy prompt and make kickoff retry or tear down the live session.
+          // The ACP host acknowledges queue acceptance rather than model-turn
+          // completion, so this bounds a wedged local host without constraining
+          // how long the provider may take to finish the queued turn.
           await postUnixSocketJson(
             acpSocketPath,
             { op: 'message', content: message, meta: { caller } },
-            undefined,
+            8_000,
             acpToken,
           );
           await appendChannelDeliveryLog(normalizedId, { path: 'acp', caller });

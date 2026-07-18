@@ -1,4 +1,4 @@
-import { Effect, Stream } from 'effect';
+import { Deferred, Effect, Stream } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server as NetServer } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -69,7 +69,9 @@ function writeAcpToken(agentId: string, token = 'token-123'): void {
   writeFileSync(join(dir, 'acp-token'), `${token}\n`);
 }
 
-function makeAcpHostRuntime(): AcpHostRuntime {
+function makeAcpHostRuntime(
+  prompt: AcpHostRuntime['prompt'] = () => Effect.succeed({ stopReason: 'end_turn' as const }),
+): AcpHostRuntime {
   return {
     handleSessionUpdate: () => Effect.void,
     handleRequestPermission: () => Effect.void,
@@ -81,7 +83,7 @@ function makeAcpHostRuntime(): AcpHostRuntime {
     }),
     getEvents: () => Stream.empty,
     drainEvents: Effect.void,
-    prompt: () => Effect.succeed({ stopReason: 'end_turn' as const }),
+    prompt,
     cancel: Effect.void,
     setModel: () => Effect.void,
   };
@@ -177,6 +179,44 @@ describe('acp delivery tier', () => {
     }
   });
 
+  it('returns after the ACP host queues a prompt while the model turn is still running', async () => {
+    const agentId = 'agent-acp-queued';
+    writeAgentState(agentId, { harness: 'acp' });
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const host = new AcpHost({
+      agentId,
+      provider: 'kimi',
+      workspace: '/tmp/workspace',
+      overdeckHome: tmpHome,
+      runtime: makeAcpHostRuntime(() => Effect.gen(function* () {
+        yield* Deferred.succeed(promptStarted, undefined);
+        yield* Deferred.await(promptGate);
+        return { stopReason: 'end_turn' as const };
+      })),
+    });
+    await host.start();
+
+    try {
+      let settled = false;
+      const delivered = deliverAgentMessage(agentId, 'queued turn', 'test-caller')
+        .then((result) => {
+          settled = true;
+          return result;
+        });
+      await Effect.runPromise(Deferred.await(promptStarted));
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(settled).toBe(true);
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'acp' });
+      await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+      await host.waitForIdle();
+    } finally {
+      await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+      await host.stop();
+    }
+  });
+
   it('fails loudly when the ACP host rejects an invalid token', async () => {
     const agentId = 'agent-acp-unauthorized';
     writeAgentState(agentId, { harness: 'acp' });
@@ -232,44 +272,29 @@ describe('acp delivery tier', () => {
     });
   });
 
-  it('waits beyond the former ACP request timeout for the completed turn', async () => {
+  it('fails loudly when the ACP host does not acknowledge queue acceptance', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
-    const agentId = 'agent-acp-long-turn';
+    const agentId = 'agent-acp-timeout';
     writeAgentState(agentId, { harness: 'acp' });
     writeAcpToken(agentId);
-    const capture: { lastBody?: string } = {};
     let markRequestReceived!: () => void;
     const requestReceived = new Promise<void>((resolve) => {
       markRequestReceived = resolve;
     });
     const server = await startFakeBridge(join(socketDir, `acp-${agentId}.sock`), {
       delayMs: 20_000,
-      capture,
       onRequest: markRequestReceived,
     });
 
     try {
-      let settled = false;
-      const delivered = deliverAgentMessage(agentId, 'long turn', 'test-caller')
-        .then((result) => {
-          settled = true;
-          return result;
-        });
+      const delivered = deliverAgentMessage(agentId, 'timeout', 'test-caller');
+      const rejection = expect(delivered).rejects.toThrow(
+        /ACP delivery failed.*socket POST timeout/,
+      );
       await requestReceived;
-
       await vi.advanceTimersByTimeAsync(8_100);
-      expect(settled).toBe(false);
-      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
 
-      await vi.advanceTimersByTimeAsync(11_900);
-      await new Promise<void>((resolve) => setImmediate(resolve));
-      await expect(delivered).resolves.toEqual({ ok: true, path: 'acp' });
-      expect(JSON.parse(capture.lastBody!)).toEqual({
-        op: 'message',
-        content: 'long turn',
-        meta: { caller: 'test-caller' },
-      });
-      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'acp' });
+      await rejection;
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
