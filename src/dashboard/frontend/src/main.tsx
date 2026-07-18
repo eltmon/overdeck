@@ -10,6 +10,7 @@ import './index.css';
 posthog.init(import.meta.env.VITE_PUBLIC_POSTHOG_KEY as string, {
   api_host: import.meta.env.VITE_PUBLIC_POSTHOG_HOST as string,
   person_profiles: 'identified_only',
+  capture_exceptions: true,
 });
 
 // Recover from asset/module load failures during a server restart (the blank

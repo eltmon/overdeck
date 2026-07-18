@@ -1,4 +1,6 @@
 import React from 'react';
+import posthog from 'posthog-js';
+import packageJson from '../../../../package.json';
 
 /**
  * Front-end self-recovery for dashboard restarts.
@@ -17,11 +19,72 @@ import React from 'react';
  * Strategy: on a module/asset load failure, show a "Reconnecting…" overlay,
  * poll the origin until it serves again, then reload once. A sessionStorage
  * guard prevents a reload storm if the reloaded page fails immediately too.
+ * Each recovery sends `frontend_recovery_reload` to PostHog immediately with
+ * trigger, asset, message, stackHead, reloadCount, and appVersion properties.
+ * The sixth and later recovery in a tab also sends
+ * `frontend_recovery_reload_loop` so reload storms are directly queryable.
  */
 
 const OVERLAY_ID = 'pan-recovery-overlay';
 const LAST_RELOAD_KEY = 'pan.recovery.lastReload';
+const RELOAD_COUNT_KEY = 'pan.recovery.reloadCount';
+const RELOAD_LOOP_THRESHOLD = 5;
 let reconnecting = false;
+
+export interface RecoveryTriggerDetails {
+  trigger: 'vite_preload_error' | 'asset_load_error' | 'window_module_error' | 'unhandled_rejection' | 'root_error_boundary';
+  asset?: string;
+  message?: string;
+  stackHead?: string;
+}
+
+function getErrorMessage(reasonOrError: unknown): string | undefined {
+  if (typeof reasonOrError === 'string') return reasonOrError;
+  if (reasonOrError && typeof reasonOrError === 'object' && 'message' in reasonOrError) {
+    return String((reasonOrError as { message?: unknown }).message ?? '') || undefined;
+  }
+  return undefined;
+}
+
+function getStackHead(reasonOrError: unknown): string | undefined {
+  if (!reasonOrError || typeof reasonOrError !== 'object' || !('stack' in reasonOrError)) return undefined;
+  const stack = String((reasonOrError as { stack?: unknown }).stack ?? '');
+  return stack ? stack.split('\n').slice(0, 5).join('\n') : undefined;
+}
+
+function getAssetFromMessage(message: string | undefined): string | undefined {
+  return message?.match(/(?:https?:\/\/|\/)[^\s'"<>]+/)?.[0].replace(/[),.;]+$/, '');
+}
+
+export function incrementRecoveryReloadCount(
+  storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
+): number {
+  const stored = Number.parseInt(storage.getItem(RELOAD_COUNT_KEY) ?? '', 10);
+  const reloadCount = Number.isFinite(stored) && stored >= 0 ? stored + 1 : 1;
+  storage.setItem(RELOAD_COUNT_KEY, String(reloadCount));
+  return reloadCount;
+}
+
+export function isRecoveryReloadLoop(reloadCount: number): boolean {
+  return reloadCount > RELOAD_LOOP_THRESHOLD;
+}
+
+export function captureRecoveryReload(
+  details: RecoveryTriggerDetails,
+  storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage,
+): number {
+  const reloadCount = incrementRecoveryReloadCount(storage);
+  const properties = {
+    ...details,
+    reloadCount,
+    appVersion: packageJson.version,
+  };
+  posthog.capture('frontend_recovery_reload', properties, { send_instantly: true });
+  if (isRecoveryReloadLoop(reloadCount)) {
+    posthog.capture('frontend_recovery_reload_loop', properties, { send_instantly: true });
+  }
+  return reloadCount;
+}
 
 /** Does this error/reason look like a failed dynamic-import / module-script load? */
 export function isModuleLoadError(reasonOrError: unknown): boolean {
@@ -83,9 +146,10 @@ export function hideOverlay(): void {
  * Poll the origin until it serves again, then reload. Idempotent: concurrent
  * triggers collapse into a single in-flight reconnect.
  */
-export async function waitForServerThenReload(): Promise<void> {
+export async function waitForServerThenReload(details: RecoveryTriggerDetails): Promise<void> {
   if (reconnecting) return;
   reconnecting = true;
+  captureRecoveryReload(details);
   showOverlay('Reconnecting to the dashboard…');
 
   const lastReload = Number(sessionStorage.getItem(LAST_RELOAD_KEY) || '0');
@@ -121,7 +185,14 @@ export function installRecovery(): void {
   // load (the canonical "asset 404 after restart/rebuild" signal).
   window.addEventListener('vite:preloadError', (event) => {
     event.preventDefault();
-    void waitForServerThenReload();
+    const error = (event as Event & { payload?: unknown }).payload;
+    const message = getErrorMessage(error);
+    void waitForServerThenReload({
+      trigger: 'vite_preload_error',
+      asset: getAssetFromMessage(message),
+      message,
+      stackHead: getStackHead(error),
+    });
   });
 
   // A failed <script type="module"> or <link> surfaces as a window 'error'
@@ -131,11 +202,25 @@ export function installRecovery(): void {
     (event) => {
       const target = event.target as HTMLElement | null;
       if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
-        void waitForServerThenReload();
+        const asset = target.tagName === 'SCRIPT'
+          ? (target as HTMLScriptElement).src
+          : (target as HTMLLinkElement).href;
+        void waitForServerThenReload({
+          trigger: 'asset_load_error',
+          asset: asset || undefined,
+          message: event.message || 'Module asset failed to load',
+        });
         return;
       }
-      if (isModuleLoadError(event.error ?? event.message)) {
-        void waitForServerThenReload();
+      const error = event.error ?? event.message;
+      if (isModuleLoadError(error)) {
+        const message = getErrorMessage(error);
+        void waitForServerThenReload({
+          trigger: 'window_module_error',
+          asset: getAssetFromMessage(message),
+          message,
+          stackHead: getStackHead(error),
+        });
       }
     },
     true,
@@ -144,7 +229,13 @@ export function installRecovery(): void {
   // Unhandled dynamic import() rejections.
   window.addEventListener('unhandledrejection', (event) => {
     if (isModuleLoadError(event.reason)) {
-      void waitForServerThenReload();
+      const message = getErrorMessage(event.reason);
+      void waitForServerThenReload({
+        trigger: 'unhandled_rejection',
+        asset: getAssetFromMessage(message),
+        message,
+        stackHead: getStackHead(event.reason),
+      });
     }
   });
 }
@@ -167,7 +258,13 @@ export class RootErrorBoundary extends React.Component<
 
   componentDidCatch(error: unknown): void {
     if (isModuleLoadError(error)) {
-      void waitForServerThenReload();
+      const message = getErrorMessage(error);
+      void waitForServerThenReload({
+        trigger: 'root_error_boundary',
+        asset: getAssetFromMessage(message),
+        message,
+        stackHead: getStackHead(error),
+      });
     }
   }
 
