@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T19:45:27.621Z",
+  "updated": "2026-07-18T19:58:14.965Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "cli-flywheel-start-orders": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 1068866,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:45:27.621Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -168,6 +160,17 @@
         "outcome": "completed",
         "reason": "Added pan orders create/list/show/add/remove/move/start commands, command registration, exact CLI skill documentation, and fixture-backed command tests.",
         "releasedAt": "2026-07-18T19:45:13.220Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 1068866,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:45:27.621Z",
+        "itemId": "cli-flywheel-start-orders",
+        "outcome": "completed",
+        "reason": "Added --orders validation and launch binding, post-gate running status with rollback, shared route/CLI start path, skill docs, and failure-path tests.",
+        "releasedAt": "2026-07-18T19:58:14.965Z"
       }
     ],
     "statusReasons": {
@@ -186,6 +189,10 @@
       "cli-pan-orders": {
         "reason": "Added pan orders create/list/show/add/remove/move/start commands, command registration, exact CLI skill documentation, and fixture-backed command tests.",
         "updatedAt": "2026-07-18T19:45:13.220Z"
+      },
+      "cli-flywheel-start-orders": {
+        "reason": "Added --orders validation and launch binding, post-gate running status with rollback, shared route/CLI start path, skill docs, and failure-path tests.",
+        "updatedAt": "2026-07-18T19:58:14.965Z"
       }
     }
   },
@@ -209,6 +216,10 @@
     "cli-pan-orders.cli-pan-orders.ac1": "completed",
     "cli-pan-orders.cli-pan-orders.ac2": "completed",
     "cli-pan-orders.cli-pan-orders.ac3": "completed",
-    "cli-flywheel-start-orders": "running"
+    "cli-flywheel-start-orders": "completed",
+    "cli-flywheel-start-orders.cli-flywheel-start-orders.ac1": "completed",
+    "cli-flywheel-start-orders.cli-flywheel-start-orders.ac2": "completed",
+    "cli-flywheel-start-orders.cli-flywheel-start-orders.ac3": "completed",
+    "cli-flywheel-start-orders.cli-flywheel-start-orders.ac4": "completed"
   }
 }
