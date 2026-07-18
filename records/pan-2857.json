@@ -2,7 +2,7 @@
   "issueId": "PAN-2857",
   "schemaVersion": 2,
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T00:38:48.580Z",
+  "updated": "2026-07-18T00:38:49.141Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "pending",
@@ -19,7 +19,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-fable-5",
   "sessionHistory": [
     {
       "reason": "planning",
