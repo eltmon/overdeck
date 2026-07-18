@@ -1,7 +1,7 @@
-import { Effect } from 'effect';
+import { Effect, Stream } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server as NetServer } from 'node:net';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -25,7 +25,10 @@ vi.mock('../../paths.js', async (importOriginal) => {
   };
 });
 
+import { AcpHost, type AcpHostRuntime } from '../../acp/host.js';
+import { resolveConversationDeliveryMethod } from '../../overdeck/conversation-delivery.js';
 import { deliverAgentMessage } from '../delivery.js';
+import { resolveAgentDeliveryMethod } from '../messaging.js';
 import { sendKeys } from '../../tmux.js';
 import type { AgentState } from '../agent-state.js';
 
@@ -57,6 +60,30 @@ function writeAppServerToken(agentId: string): void {
   const dir = join(stateDir, agentId);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, 'appserver-token'), 'token-123\n');
+}
+
+function writeAcpToken(agentId: string, token = 'token-123'): void {
+  const dir = join(stateDir, agentId);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'acp-token'), `${token}\n`);
+}
+
+function makeAcpHostRuntime(): AcpHostRuntime {
+  return {
+    handleSessionUpdate: () => Effect.void,
+    handleRequestPermission: () => Effect.void,
+    start: () => Effect.succeed({
+      sessionId: 'acp-session-1',
+      modes: [],
+      models: [],
+      mcpServers: [],
+    }),
+    getEvents: () => Stream.empty,
+    drainEvents: Effect.void,
+    prompt: () => Effect.succeed({ stopReason: 'end_turn' as const }),
+    cancel: Effect.void,
+    setModel: () => Effect.void,
+  };
 }
 
 function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<NetServer> {
@@ -98,6 +125,131 @@ function readDeliveryLog(agentId: string): Array<Record<string, unknown>> {
     .filter(Boolean)
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
+
+describe('acp delivery tier', () => {
+  beforeEach(() => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'pan-acp-delivery-'));
+    stateDir = join(tmpHome, 'agents');
+    socketDir = join(tmpHome, 'sockets');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true });
+    process.env.OVERDECK_HOME = tmpHome;
+    vi.mocked(sendKeys).mockClear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    delete process.env.OVERDECK_HOME;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it('returns acp and leaves transcript echo ownership with the host', async () => {
+    const agentId = 'agent-acp-success';
+    writeAgentState(agentId, { harness: 'acp' });
+    const host = new AcpHost({
+      agentId,
+      provider: 'kimi',
+      workspace: '/tmp/workspace',
+      overdeckHome: tmpHome,
+      runtime: makeAcpHostRuntime(),
+    });
+    await host.start();
+
+    try {
+      const result = await deliverAgentMessage(agentId, 'hello ACP', 'test-caller');
+      expect(result).toEqual({ ok: true, path: 'acp' });
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+      const transcript = readFileSync(join(stateDir, agentId, 'acp-session.jsonl'), 'utf8')
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, unknown>);
+      expect(transcript).toContainEqual(expect.objectContaining({
+        role: 'user',
+        content: 'hello ACP',
+        sessionId: 'acp-session-1',
+        source: 'orchestrator',
+      }));
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'acp' });
+    } finally {
+      await host.stop();
+    }
+  });
+
+  it('falls through after the ACP host rejects an invalid token', async () => {
+    const agentId = 'agent-acp-unauthorized';
+    writeAgentState(agentId, { harness: 'acp' });
+    const host = new AcpHost({
+      agentId,
+      provider: 'kimi',
+      workspace: '/tmp/workspace',
+      overdeckHome: tmpHome,
+      runtime: makeAcpHostRuntime(),
+    });
+    await host.start();
+    writeAcpToken(agentId, 'wrong-token');
+
+    try {
+      const result = await deliverAgentMessage(agentId, 'fallback', 'test-caller');
+      expect(result).toMatchObject({ ok: true, path: 'tmux' });
+      expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback');
+      expect(existsSync(join(stateDir, agentId, 'acp-session.jsonl'))).toBe(false);
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
+        path: 'tmux',
+        acp: expect.stringContaining('status 401'),
+      });
+    } finally {
+      await host.stop();
+    }
+  });
+
+  it('falls through when the ACP socket is absent', async () => {
+    const agentId = 'agent-acp-absent';
+    writeAgentState(agentId, { harness: 'acp' });
+    writeAcpToken(agentId);
+
+    const result = await deliverAgentMessage(agentId, 'fallback', 'test-caller');
+    expect(result).toMatchObject({ ok: true, path: 'tmux' });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback');
+  });
+
+  it('falls through when a stale ACP socket path cannot accept connections', async () => {
+    const agentId = 'agent-acp-stale';
+    writeAgentState(agentId, { harness: 'acp' });
+    writeAcpToken(agentId);
+    writeFileSync(join(socketDir, `acp-${agentId}.sock`), 'stale');
+
+    const result = await deliverAgentMessage(agentId, 'fallback', 'test-caller');
+    expect(result).toMatchObject({ ok: true, path: 'tmux' });
+    expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'fallback');
+    expect(readDeliveryLog(agentId).at(-1)).toMatchObject({
+      path: 'tmux',
+      acp: expect.stringContaining('socket-post-failed'),
+    });
+  });
+
+  it('falls through after the ACP request timeout using fake timers', async () => {
+    vi.useFakeTimers();
+    const agentId = 'agent-acp-timeout';
+    writeAgentState(agentId, { harness: 'acp' });
+    writeAcpToken(agentId);
+    const server = await startFakeBridge(join(socketDir, `acp-${agentId}.sock`), { delayMs: 20_000 });
+
+    try {
+      const delivered = deliverAgentMessage(agentId, 'timeout', 'test-caller');
+      await vi.advanceTimersByTimeAsync(8_100);
+      const result = await delivered;
+      expect(result).toMatchObject({ ok: true, path: 'tmux' });
+      expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'timeout');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  it('forces ACP agent and conversation delivery through auto mode', () => {
+    expect(resolveAgentDeliveryMethod({ harness: 'acp', deliveryMethod: 'tmux' })).toBe('auto');
+    expect(resolveConversationDeliveryMethod({ harness: 'acp', deliveryMethod: 'tmux' } as never)).toBe('auto');
+  });
+});
 
 describe('app-server delivery tier', () => {
   beforeEach(() => {

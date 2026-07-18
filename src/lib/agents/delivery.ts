@@ -30,7 +30,7 @@ import {
 
 export type DeliveryResult = {
   ok: boolean;
-  path: 'app-server' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
+  path: 'app-server' | 'acp' | 'supervisor' | 'channels' | 'tmux' | 'pi' | 'codex';
   failure?: string;
 };
 
@@ -66,10 +66,11 @@ function overdeckHomeForChannels(): string {
 async function appendChannelDeliveryLog(
   agentId: string,
   entry: {
-    path: 'app-server' | 'supervisor' | 'channel' | 'tmux';
+    path: 'app-server' | 'acp' | 'supervisor' | 'channel' | 'tmux';
     reason?: string;
     caller?: string;
     appServer?: string;
+    acp?: string;
     'pty-supervisor'?: string;
     channels?: string;
   },
@@ -93,15 +94,23 @@ async function appendChannelDeliveryLog(
   }
 }
 
-function readAppServerTokenSync(agentId: string): string | null {
+function readSocketTokenSync(agentId: string, filename: string): string | null {
   try {
-    const tokenPath = join(overdeckHomeForSockets(), 'agents', agentId, 'appserver-token');
+    const tokenPath = join(overdeckHomeForSockets(), 'agents', agentId, filename);
     if (!existsSync(tokenPath)) return null;
     const token = readFileSync(tokenPath, 'utf-8').trim();
     return token || null;
   } catch {
     return null;
   }
+}
+
+function readAppServerTokenSync(agentId: string): string | null {
+  return readSocketTokenSync(agentId, 'appserver-token');
+}
+
+function readAcpTokenSync(agentId: string): string | null {
+  return readSocketTokenSync(agentId, 'acp-token');
 }
 
 /**
@@ -187,8 +196,8 @@ async function postUnixSocketJson(
 
 /**
  * Single delivery primitive for orchestrator-to-work-agent messages. Auto mode
- * tries the PTY supervisor socket, then legacy Channels MCP, then tmux. Explicit
- * socket methods are strict and throw instead of falling back.
+ * tries persistent protocol hosts, the PTY supervisor socket, legacy Channels
+ * MCP, then tmux. Explicit socket methods are strict and throw instead of falling back.
  */
 export async function deliverAgentMessage(
   agentId: string,
@@ -237,6 +246,31 @@ export async function deliverAgentMessage(
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err);
           appServerFailure = `socket-post-failed: ${reason}`;
+        }
+      }
+    }
+  }
+
+  let acpFailure: string | undefined;
+  if (resolvedMethod === 'auto') {
+    const acpSocketPath = join(overdeckHomeForSockets(), 'sockets', `acp-${normalizedId}.sock`);
+    if (existsSync(acpSocketPath)) {
+      const acpToken = readAcpTokenSync(normalizedId);
+      if (!acpToken) {
+        acpFailure = 'acp-token-missing';
+      } else {
+        try {
+          await postUnixSocketJson(
+            acpSocketPath,
+            { op: 'message', content: message, meta: { caller } },
+            8_000,
+            acpToken,
+          );
+          await appendChannelDeliveryLog(normalizedId, { path: 'acp', caller });
+          return { ok: true, path: 'acp' };
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          acpFailure = `socket-post-failed: ${reason}`;
         }
       }
     }
@@ -317,6 +351,7 @@ export async function deliverAgentMessage(
       reason: channelFailure,
       caller,
       ...(appServerFailure ? { appServer: appServerFailure } : {}),
+      ...(acpFailure ? { acp: acpFailure } : {}),
       ...(supervisorFailure ? { 'pty-supervisor': supervisorFailure } : {}),
       ...(channelFailure ? { channels: channelFailure } : {}),
     });

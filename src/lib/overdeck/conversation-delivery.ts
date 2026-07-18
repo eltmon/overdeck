@@ -282,6 +282,7 @@ export function pickDeliverAs(bodyDeliverAs: unknown): ConversationControlDelive
 
 export function resolveConversationDeliveryMethod(conv: Pick<Conversation, 'harness' | 'deliveryMethod'>): 'auto' | 'channels' | 'tmux' {
   const harness = conv.harness ?? 'claude-code';
+  if (harness === 'acp') return 'auto';
   if (isPiControlChannelHarness(harness)) return 'auto';
   if (harness === 'codex' && loadConfigSync().config.codex?.transport !== 'tui') return 'auto';
   return conv.deliveryMethod ?? (getHarnessBehavior(harness).deliveryKind === 'rpc-fifo' ? 'tmux' : 'auto');
