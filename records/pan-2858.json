@@ -683,7 +683,7 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:49:18.092Z",
+  "updated": "2026-07-18T20:49:33.647Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -693,13 +693,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:49:18.062Z",
+    "updatedAt": "2026-07-18T20:49:33.592Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "5e304c614b5b5485270fed7f628d07d071367505",
-    "reviewRequestedAt": "2026-07-18T20:48:21.751Z",
+    "reviewRequestedAt": "2026-07-18T20:49:33.110Z",
     "reviewSpawnedAt": "2026-07-18T20:48:23.695Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -1042,9 +1042,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 34061689,
-            "output": 805357,
-            "cacheRead": 169718272,
+            "input": 34073461,
+            "output": 807425,
+            "cacheRead": 170871296,
             "cacheWrite": 0
           }
         },
@@ -1058,9 +1058,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 42139349,
-            "output": 1687798,
-            "cacheRead": 452663296,
+            "input": 42142127,
+            "output": 1687992,
+            "cacheRead": 453069824,
             "cacheWrite": 0
           }
         }
@@ -1073,9 +1073,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 76201038,
-          "output": 2493155,
-          "cacheRead": 622381568,
+          "input": 76215588,
+          "output": 2495417,
+          "cacheRead": 623941120,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1086,8 +1086,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 781.691866,
-        "pricingAsOf": "2026-07-18T20:49:18.084Z"
+        "usd": 782.612252,
+        "pricingAsOf": "2026-07-18T20:49:33.600Z"
       }
     },
     "merges": [
