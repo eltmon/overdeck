@@ -1325,7 +1325,7 @@
     "recordedAt": "2026-07-06T18:49:52.519Z"
   },
   "created": "2026-07-06T16:43:28.780Z",
-  "updated": "2026-07-18T16:56:05.712Z",
+  "updated": "2026-07-18T17:01:33.403Z",
   "pipeline": {
     "issueId": "PAN-2207",
     "reviewStatus": "failed",
@@ -2030,6 +2030,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-07-18T16:17:34.612Z"
+    },
+    {
+      "issue": "PAN-2207",
+      "recoveryPath": "operator-stopped-rework",
+      "obligationGeneration": "2026-07-18T16:56:05.756Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-07-18T17:01:33.399Z"
     }
   ]
 }
