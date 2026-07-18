@@ -415,7 +415,9 @@ export async function gatherProjectLensSignals(
     const issueStates = await deps.listIssueStates(owner, repo, unknownIssueIds.map(issueNumber));
     const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));
     for (const id of unknownIssueIds) {
-      knownStateByIssue.set(id, stateByNumber.get(issueNumber(id)) ?? 'closed');
+      const state = stateByNumber.get(issueNumber(id));
+      if (state) knownStateByIssue.set(id, state);
+      else candidates.delete(id);
     }
   }
 

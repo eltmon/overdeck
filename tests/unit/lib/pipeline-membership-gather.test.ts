@@ -152,6 +152,21 @@ describe('gatherProjectLensSignals', () => {
     });
   });
 
+  it('does not emit strike refs whose number belongs to a pull request', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listIssueStates = vi.fn().mockResolvedValue([{ number: 2879, state: 'open' }]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockResolvedValue('strike/pan-2879\nstrike/pan-2778\n');
+
+    await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([
+      { issueId: 'PAN-2879', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+    ]);
+  });
+
   it('classifies an open same-repository strike PR as in flight', async () => {
     const mocked = deps();
     mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 22, labels: [] }]);
