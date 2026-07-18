@@ -201,7 +201,7 @@ export async function runDestructiveIssueLifecycle(
 
   cleanupLog.push(...result.steps.flatMap((step: any) => step.details || [step.error].filter(Boolean)));
 
-  // vBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
+  // xBRIEF lifecycle transition for cancel (PAN-946): move to cancelled/ on main.
   if (mode === 'cancel') {
     try {
       const { transitionXBriefOnMain } = await import('../xbrief/lifecycle-io.js');
@@ -210,12 +210,12 @@ export async function runDestructiveIssueLifecycle(
         id,
         'cancelled',
         'cancelled',
-        `scope: cancel ${id.toUpperCase()} vBRIEF`,
+        `scope: cancel ${id.toUpperCase()} xBRIEF`,
       ));
-      if (tx.moved) cleanupLog.push(`vBRIEF moved ${tx.fromDir} → cancelled`);
-      if (tx.committed) cleanupLog.push(`Committed vBRIEF cancellation on main`);
+      if (tx.moved) cleanupLog.push(`xBRIEF moved ${tx.fromDir} → cancelled`);
+      if (tx.committed) cleanupLog.push(`Committed xBRIEF cancellation on main`);
     } catch (err: any) {
-      cleanupLog.push(`vBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`);
+      cleanupLog.push(`xBRIEF cancel transition failed (non-fatal): ${err?.message ?? err}`);
     }
   }
 

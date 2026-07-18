@@ -13,7 +13,7 @@ import type { XBriefDocument } from '../types.js';
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
 const ISSUE_ID = 'PAN-200';
-const SPEC_FILENAME = '2026-01-01-PAN-200-test-plan.vbrief.json';
+const SPEC_FILENAME = '2026-01-01-PAN-200-test-plan.xbrief.json';
 
 function makePlanWithAC(items: Array<{
   id: string;
@@ -52,7 +52,7 @@ function writePlan(doc: XBriefDocument): void {
 }
 
 beforeEach(() => {
-  PROJECT_ROOT = join(tmpdir(), `vbrief-ac-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  PROJECT_ROOT = join(tmpdir(), `xbrief-ac-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   WORKSPACE_PATH = join(PROJECT_ROOT, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
   mkdirSync(WORKSPACE_PATH, { recursive: true });
 });

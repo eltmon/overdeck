@@ -466,7 +466,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
   initHookSync(agentId);
 
   if (role !== 'strike' && role !== 'knowledge' && options.slotItemId === undefined && !readWorkspacePlanSync(options.workspace)) {
-    throw new Error(`The required vBRIEF checklist for ${options.issueId} is missing or unreadable. Run planning before spawning a work agent.`);
+    throw new Error(`The required xBRIEF checklist for ${options.issueId} is missing or unreadable. Run planning before spawning a work agent.`);
   }
 
   // Determine model based on role configuration
@@ -857,7 +857,7 @@ function buildRegisteredSlotPrompt(
   const doc = readWorkspacePlanSync(baseWorkspace);
   if (!doc) {
     throw new Error(
-      `Registered slot spawn for ${issueId} requires a readable vBRIEF plan in ${baseWorkspace}.`
+      `Registered slot spawn for ${issueId} requires a readable xBRIEF plan in ${baseWorkspace}.`
     );
   }
 
@@ -876,7 +876,7 @@ function buildRegisteredSlotPrompt(
     `Branch: ${slot.branch}`,
     `Workspace: ${slot.workspace}`,
     '',
-    'You are a registered slot work agent. Implement only the target vBRIEF item below, keep changes scoped to that item, and do not merge this slot branch yourself.',
+    'You are a registered slot work agent. Implement only the target xBRIEF item below, keep changes scoped to that item, and do not merge this slot branch yourself.',
     '',
     slice.prompt,
   ];

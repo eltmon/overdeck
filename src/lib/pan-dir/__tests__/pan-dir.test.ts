@@ -105,7 +105,7 @@ describe('spec helpers', () => {
   it.effect('writes and reads a pan spec document', () =>
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
-      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.vbrief.json')
+      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.xbrief.json')
       yield* writeSpec(path, asPanSpecDocument(makeDoc('PAN-967', 'Unified .pan Directory'), 'proposed'))
 
       const read = yield* readSpec(path)
@@ -117,7 +117,7 @@ describe('spec helpers', () => {
   it.effect('reads a v0.8 xBRIEFInfo pan spec document with top-level status', () =>
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
-      const path = join(paths.specsDir, '2026-06-30-PAN-2426-xbrief-v08.vbrief.json')
+      const path = join(paths.specsDir, '2026-06-30-PAN-2426-xbrief-v08.xbrief.json')
       writeFileSync(
         path,
         JSON.stringify(
@@ -149,11 +149,30 @@ describe('spec helpers', () => {
     }),
   )
 
+  it.effect('reads and normalizes a legacy vBRIEFInfo envelope', () =>
+    Effect.gen(function* () {
+      const paths = yield* ensurePanDirs(TEST_DIR)
+      const path = join(paths.specsDir, '2026-05-04-PAN-453-legacy-envelope.vbrief.json')
+      writeFileSync(
+        path,
+        JSON.stringify({
+          vBRIEFInfo: { version: '0.5', created: '2026-05-04T00:00:00Z' },
+          status: 'proposed',
+          plan: { id: 'PAN-453', title: 'Legacy envelope', status: 'proposed', items: [], edges: [] },
+        }),
+      )
+
+      const read = yield* readSpec(path)
+      expect(read.xBRIEFInfo.version).toBe('0.5')
+      expect(read).not.toHaveProperty('vBRIEFInfo')
+    }),
+  )
+
   it.effect('lists specs and filters by root status', () =>
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
       yield* writeSpec(
-        join(paths.specsDir, '2026-05-04-PAN-1-first.vbrief.json'),
+        join(paths.specsDir, '2026-05-04-PAN-1-first.xbrief.json'),
         asPanSpecDocument(makeDoc('PAN-1', 'First Plan'), 'proposed'),
       )
       yield* writeSpec(
@@ -171,11 +190,11 @@ describe('spec helpers', () => {
   it.effect('finds a spec by issue and updates root status in place', () =>
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
-      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.vbrief.json')
+      const path = join(paths.specsDir, '2026-05-04-PAN-967-unified-pan-directory.xbrief.json')
       yield* writeSpec(path, asPanSpecDocument(makeDoc('PAN-967', 'Unified .pan Directory'), 'proposed'))
 
       const found = yield* findSpecByIssue(TEST_DIR, 'pan-967')
-      expect(found?.filename).toBe('2026-05-04-PAN-967-unified-pan-directory.vbrief.json')
+      expect(found?.filename).toBe('2026-05-04-PAN-967-unified-pan-directory.xbrief.json')
 
       const updated = yield* updateSpecStatus(TEST_DIR, 'PAN-967', 'active')
       expect(updated?.status).toBe('active')
@@ -188,7 +207,7 @@ describe('spec helpers', () => {
     Effect.gen(function* () {
       const paths = yield* ensurePanDirs(TEST_DIR)
       yield* writeSpec(
-        join(paths.specsDir, '2026-05-04-PAN-1-target.vbrief.json'),
+        join(paths.specsDir, '2026-05-04-PAN-1-target.xbrief.json'),
         asPanSpecDocument(makeDoc('PAN-1', 'Target'), 'proposed'),
       )
       // A corrupt spec for a DIFFERENT issue: the old implementation parsed
@@ -196,7 +215,7 @@ describe('spec helpers', () => {
       // the filename-first implementation must never open it.
       const fs = yield* Effect.promise(() => import('fs/promises'))
       yield* Effect.promise(() =>
-        fs.writeFile(join(paths.specsDir, '2026-05-04-PAN-2-corrupt.vbrief.json'), 'not json{', 'utf-8'),
+        fs.writeFile(join(paths.specsDir, '2026-05-04-PAN-2-corrupt.xbrief.json'), 'not json{', 'utf-8'),
       )
       const warnings: string[] = []
       const originalWarn = console.warn
@@ -235,16 +254,16 @@ describe('spec helpers', () => {
       // Two specs for the same issue (e.g., a re-plan left a superseded file).
       // Order must match the old listSpecs()-based behavior: filename ascending.
       yield* writeSpec(
-        join(paths.specsDir, '2026-06-01-PAN-3-newer.vbrief.json'),
+        join(paths.specsDir, '2026-06-01-PAN-3-newer.xbrief.json'),
         asPanSpecDocument(makeDoc('PAN-3', 'Newer'), 'proposed'),
       )
       yield* writeSpec(
-        join(paths.specsDir, '2026-05-01-PAN-3-older.vbrief.json'),
+        join(paths.specsDir, '2026-05-01-PAN-3-older.xbrief.json'),
         asPanSpecDocument(makeDoc('PAN-3', 'Older'), 'proposed'),
       )
 
       const found = yield* findSpecByIssue(TEST_DIR, 'pan-3')
-      expect(found?.filename).toBe('2026-05-01-PAN-3-older.vbrief.json')
+      expect(found?.filename).toBe('2026-05-01-PAN-3-older.xbrief.json')
     }),
   )
 })

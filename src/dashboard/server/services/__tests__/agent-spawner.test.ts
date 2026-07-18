@@ -46,7 +46,7 @@ vi.mock('../../../../lib/lifecycle/workflows.js', () => ({
   deepWipe: mockDeepWipe,
 }));
 
-// ─── Mock vBRIEF plan reader ─────────────────────────────────────────────────
+// ─── Mock xBRIEF plan reader ─────────────────────────────────────────────────
 
 const mockReadWorkspacePlanSync = vi.fn();
 vi.mock('../../../../lib/xbrief/io.js', () => ({

@@ -111,7 +111,7 @@ describe('.gitattributes invariant', () => {
     const lines = raw.split('\n').filter(l => !l.trimStart().startsWith('#') && l.includes('merge='));
 
     // Patterns that must NOT carry content-merge drivers (union would corrupt them)
-    const singleJsonPatterns = ['.vbrief.json', '.pan/specs/', '.pan/continues/', '.pan/records/'];
+    const singleJsonPatterns = ['.xbrief.json', '.vbrief.json', '.pan/specs/', '.pan/continues/', '.pan/records/'];
     const contentMergeDrivers = new Set(['union', 'text']); // drivers that interleave hunks
 
     const violations: string[] = [];

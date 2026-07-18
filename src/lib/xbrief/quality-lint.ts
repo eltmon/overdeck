@@ -20,7 +20,7 @@ export interface QualityIssue {
 
 export class PlanQualityLintError extends Error {
   constructor(public readonly issues: QualityIssue[]) {
-    super(`vBRIEF quality lint failed with ${issues.length} issue${issues.length === 1 ? '' : 's'}`);
+    super(`xBRIEF quality lint failed with ${issues.length} issue${issues.length === 1 ? '' : 's'}`);
     this.name = 'PlanQualityLintError';
   }
 }

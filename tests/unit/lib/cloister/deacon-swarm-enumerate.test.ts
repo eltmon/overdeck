@@ -41,7 +41,7 @@ afterEach(async () => {
 function writeSpec(projectPath: string, issueId: string, doc: XBriefDocument): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `2026-07-01-${issueId}-test.vbrief.json`), JSON.stringify({
+  writeFileSync(join(specsDir, `2026-07-01-${issueId}-test.xbrief.json`), JSON.stringify({
     ...doc,
     status: 'active',
   }, null, 2));
@@ -96,7 +96,7 @@ describe('coordinateSwarmSlots enumerate-swarms', () => {
     ]);
   });
 
-  it('enumerates feature workspaces whose main-side vBRIEF is swarm eligible', async () => {
+  it('enumerates feature workspaces whose main-side xBRIEF is swarm eligible', async () => {
     const { coordinateSwarmSlots } = await import('../../../../src/lib/cloister/deacon-swarm.js');
     const projectPath = join(tempRoot, 'project');
     mkdirSync(join(projectPath, 'workspaces', 'feature-pan-100'), { recursive: true });

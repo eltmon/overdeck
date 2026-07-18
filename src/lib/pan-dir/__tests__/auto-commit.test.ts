@@ -57,7 +57,7 @@ describe('auto-commit', () => {
   it.effect('commits a queued .pan file change on main', () =>
     Effect.gen(function* () {
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-      const path = join(tmp, '.pan', 'continues', 'pan-1.vbrief.json');
+      const path = join(tmp, '.pan', 'continues', 'pan-1.xbrief.json');
       writeFileSync(path, '{"issue":"PAN-1"}');
 
       queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): update continue for PAN-1' });
@@ -91,7 +91,7 @@ describe('auto-commit', () => {
 
   it('makes an active flush visible to concurrent durability waiters', async () => {
     mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-    const path = join(tmp, '.pan', 'continues', 'pan-active.vbrief.json');
+    const path = join(tmp, '.pan', 'continues', 'pan-active.xbrief.json');
     writeFileSync(path, '{"issue":"PAN-ACTIVE"}');
 
     queueAutoCommit({
@@ -208,7 +208,7 @@ describe('auto-commit', () => {
     Effect.gen(function* () {
       execSync('git checkout -q -b feature/foo', { cwd: tmp });
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-      const path = join(tmp, '.pan', 'continues', 'pan-2.vbrief.json');
+      const path = join(tmp, '.pan', 'continues', 'pan-2.xbrief.json');
       writeFileSync(path, '{"issue":"PAN-2"}');
 
       queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): noop branch test' });
@@ -222,8 +222,8 @@ describe('auto-commit', () => {
   it.effect('coalesces a burst of writes into a single commit', () =>
     Effect.gen(function* () {
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-      const p1 = join(tmp, '.pan', 'continues', 'pan-3.vbrief.json');
-      const p2 = join(tmp, '.pan', 'continues', 'pan-4.vbrief.json');
+      const p1 = join(tmp, '.pan', 'continues', 'pan-3.xbrief.json');
+      const p2 = join(tmp, '.pan', 'continues', 'pan-4.xbrief.json');
       writeFileSync(p1, '{"issue":"PAN-3"}');
       writeFileSync(p2, '{"issue":"PAN-4"}');
 
@@ -242,7 +242,7 @@ describe('auto-commit', () => {
     vi.useFakeTimers();
     try {
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-      const p1 = join(tmp, '.pan', 'continues', 'pan-2375-a.vbrief.json');
+      const p1 = join(tmp, '.pan', 'continues', 'pan-2375-a.xbrief.json');
       writeFileSync(p1, '{"issue":"PAN-2375-A"}');
 
       queueAutoCommit({ projectRoot: tmp, paths: [p1], subject: 'chore(state): immediate write-through' });
@@ -269,7 +269,7 @@ describe('auto-commit', () => {
   it.effect('is a no-op when the staged diff is empty', () =>
     Effect.gen(function* () {
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-      const path = join(tmp, '.pan', 'continues', 'pan-5.vbrief.json');
+      const path = join(tmp, '.pan', 'continues', 'pan-5.xbrief.json');
       writeFileSync(path, '{"issue":"PAN-5"}');
       execSync('git add .pan/', { cwd: tmp });
       execSync('git commit -q -m "pre-commit"', { cwd: tmp });
@@ -550,7 +550,7 @@ describe('auto-commit', () => {
 
         const localBase = execSync('git rev-parse HEAD', { cwd: tmp, encoding: 'utf-8' }).trim();
         mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
-        const path = join(tmp, '.pan', 'continues', 'pan-2375.vbrief.json');
+        const path = join(tmp, '.pan', 'continues', 'pan-2375.xbrief.json');
         writeFileSync(path, '{"issue":"PAN-2375"}');
 
         queueAutoCommit({ projectRoot: tmp, paths: [path], subject: 'chore(state): update continue for PAN-2375' });
@@ -667,8 +667,8 @@ describe('auto-commit', () => {
 
         mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });
         mkdirSync(join(otherTmp, '.pan', 'continues'), { recursive: true });
-        const firstPath = join(tmp, '.pan', 'continues', 'pan-2375-first.vbrief.json');
-        const secondPath = join(otherTmp, '.pan', 'continues', 'pan-2375-second.vbrief.json');
+        const firstPath = join(tmp, '.pan', 'continues', 'pan-2375-first.xbrief.json');
+        const secondPath = join(otherTmp, '.pan', 'continues', 'pan-2375-second.xbrief.json');
         writeFileSync(firstPath, '{"issue":"PAN-2375-FIRST"}');
         writeFileSync(secondPath, '{"issue":"PAN-2375-SECOND"}');
 
@@ -693,7 +693,7 @@ describe('auto-commit', () => {
 
   it.effect('reconciles only pending spec and record drift from the primary worktree', () =>
     Effect.gen(function* () {
-      const spec = join(tmp, '.pan', 'specs', 'PAN-2516.vbrief.json');
+      const spec = join(tmp, '.pan', 'specs', 'PAN-2516.xbrief.json');
       const record = join(tmp, '.pan', 'records', 'pan-2516.json');
       const source = join(tmp, 'src', 'operator-change.ts');
       mkdirSync(dirname(spec), { recursive: true });
@@ -706,7 +706,7 @@ describe('auto-commit', () => {
       const result = yield* reconcileStatePlaneDrift(tmp);
       expect(result.committed).toBe(true);
       const committed = execSync('git show --name-only --format= HEAD', { cwd: tmp, encoding: 'utf-8' });
-      expect(committed).toContain('.pan/specs/PAN-2516.vbrief.json');
+      expect(committed).toContain('.pan/specs/PAN-2516.xbrief.json');
       expect(committed).toContain('.pan/records/pan-2516.json');
       expect(committed).not.toContain('src/operator-change.ts');
       expect(execSync('git status --short -- .pan/specs .pan/records', { cwd: tmp, encoding: 'utf-8' })).toBe('');
@@ -718,11 +718,11 @@ describe('auto-commit', () => {
 
 describe('deriveProjectRoot', () => {
   it('extracts project root from a .pan/specs/ path', () => {
-    expect(deriveProjectRoot('/work/myproj/.pan/specs/foo.vbrief.json')).toBe('/work/myproj');
+    expect(deriveProjectRoot('/work/myproj/.pan/specs/foo.xbrief.json')).toBe('/work/myproj');
   });
 
   it('extracts project root from a .pan/continues/ path', () => {
-    expect(deriveProjectRoot('/work/myproj/.pan/continues/pan-1.vbrief.json')).toBe('/work/myproj');
+    expect(deriveProjectRoot('/work/myproj/.pan/continues/pan-1.xbrief.json')).toBe('/work/myproj');
   });
 
 

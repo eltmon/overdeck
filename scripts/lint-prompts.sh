@@ -30,8 +30,8 @@ check_forbidden_strings() {
     && fail "forbidden-string: roles/plan.md contains 'legacy Done'"
   contains "src/lib/cloister/prompts/work.md" "node -e" \
     && fail "forbidden-string: work.md contains 'node -e'"
-  contains "src/lib/cloister/verification-runner.ts" "plan.vbrief.json subItem" \
-    && fail "forbidden-string: verification-runner.ts contains 'plan.vbrief.json subItem'"
+  contains "src/lib/cloister/verification-runner.ts" "plan.xbrief.json subItem" \
+    && fail "forbidden-string: verification-runner.ts contains 'plan.xbrief.json subItem'"
   return 0
 }
 

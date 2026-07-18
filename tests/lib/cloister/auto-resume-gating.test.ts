@@ -101,7 +101,7 @@ describe('auto-resume gates', () => {
 
   /** PAN-2407: `pan start` on an unplanned issue routes to dashboard planning.
    *  Auto-resume gating tests are not exercising that path, so give the
-   *  workspace a minimal vBRIEF so issueCommand falls through to spawn. */
+   *  workspace a minimal xBRIEF so issueCommand falls through to spawn. */
   function writeMinimalPlan(workspacePath: string, issueId: string): void {
     const panDir = join(workspacePath, '.pan');
     mkdirSync(panDir, { recursive: true });

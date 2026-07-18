@@ -85,7 +85,7 @@ describe('deacon-swarm ready-slot merge', () => {
     await cleanupGitRecordRoot(workspacePath);
   });
 
-  it('marks the vBRIEF item done through the write door when a slot merges', async () => {
+  it('marks the xBRIEF item done through the write door when a slot merges', async () => {
     const fakeDeps = deps({ merged: true, conflicts: false });
 
     await expect(mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps))

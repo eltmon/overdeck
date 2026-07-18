@@ -437,7 +437,7 @@ describe('lintPlanQuality documentation coverage', () => {
 
   it.each([
     ['a Mintlify page', 'configuration/harnesses.mdx'],
-    ['a developer doc', 'docs/VBRIEF.md'],
+    ['a developer doc', 'docs/XBRIEF.md'],
     ['a rule file', '.claude/rules/prd-authoring.md'],
     ['a docs glob', 'docs/*'],
   ])('accepts a vertical slice that also updates %s', (_label, docPath) => {
@@ -455,7 +455,7 @@ describe('lintPlanQuality documentation coverage', () => {
   it('ignores a cancelled docs item', () => {
     expect(rulesForPlan([
       item(),
-      item({ id: 'item-2', status: 'cancelled', metadata: { kind: 'docs', files_scope: ['docs/VBRIEF.md'] } }),
+      item({ id: 'item-2', status: 'cancelled', metadata: { kind: 'docs', files_scope: ['docs/XBRIEF.md'] } }),
     ])).toContain('docs-item-missing');
   });
 

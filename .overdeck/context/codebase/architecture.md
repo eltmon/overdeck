@@ -50,7 +50,7 @@ dashboard server, a React frontend, and a fleet of tmux-hosted coding agents.
 
 ## Agent pipeline
 
-Issue → `pan plan` (vBRIEF + beads) → `pan start` (work agent in a git worktree
+Issue → `pan plan` (xBRIEF plan + item checklist) → `pan start` (work agent in a git worktree
 `workspaces/feature-<issue>/`) → verification gate → review convoy → test/UAT →
 server-side rebase/merge → close-out. Spawned agents live in tmux sessions
 (`tmux -L overdeck`), with state in `~/.overdeck/agents/<id>/state.json`.

@@ -66,7 +66,7 @@ export interface AgentSpawnerShape {
    *
    * Pre-conditions:
    * - The workspace must exist (WorkspaceNotFound if not)
-   * - The merged vBRIEF must contain tasks (PlanEmpty if not)
+   * - The merged xBRIEF must contain tasks (PlanEmpty if not)
    * - No agent already running for this issue (AgentAlreadyRunning if so)
    */
   readonly startWork: (

@@ -151,7 +151,7 @@ export function close(
  *
  * 1. Verify branch merged (hard fail if not — must pass before any cleanup)
  * 2. Move PRD + archive workspace artifacts (hard fail if archiving fails)
- * 3. Mark vBRIEF completed
+ * 3. Mark xBRIEF completed
  * 4. Clean up workspace (tmux, TLDR, Docker, worktree)
  * 5. Clean up agent state
  * 6. Close issue on tracker
@@ -209,11 +209,11 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
-    // 3. Mark the vBRIEF completed on main before teardown removes local state.
-    const vbriefStep = yield* Effect.promise(() => completeXBriefStep(ctx));
-    allSteps.push(vbriefStep);
-    if (!vbriefStep.success && !vbriefStep.skipped) {
-      allSteps.push(stepFailed('close-out:abort', 'Stopped — vBRIEF completion failed, workspace preserved'));
+    // 3. Mark the xBRIEF completed on main before teardown removes local state.
+    const xbriefStep = yield* Effect.promise(() => completeXBriefStep(ctx));
+    allSteps.push(xbriefStep);
+    if (!xbriefStep.success && !xbriefStep.skipped) {
+      allSteps.push(stepFailed('close-out:abort', 'Stopped — xBRIEF completion failed, workspace preserved'));
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
@@ -441,21 +441,21 @@ async function completeXBriefStep(ctx: LifecycleContext): Promise<StepResult> {
       ctx.issueId,
       'completed',
       'completed',
-      `scope: complete ${ctx.issueId.toUpperCase()} vBRIEF`,
+      `scope: complete ${ctx.issueId.toUpperCase()} xBRIEF`,
     ));
     const details = [
-      result.moved ? 'Updated vBRIEF lifecycle to completed' : 'vBRIEF lifecycle already completed',
+      result.moved ? 'Updated xBRIEF lifecycle to completed' : 'xBRIEF lifecycle already completed',
       result.statusUpdated ? 'Updated plan.status to completed' : 'plan.status already completed',
     ];
-    if (result.committed) details.push('Committed vBRIEF completion on main');
+    if (result.committed) details.push('Committed xBRIEF completion on main');
     return stepOk(step, details);
   } catch (err) {
     const cause = (err as { cause?: unknown }).cause ?? err;
     const message = cause instanceof Error ? cause.message : String(cause);
-    if (message.includes('No vBRIEF found')) {
-      return stepSkipped(step, [`No vBRIEF found for ${ctx.issueId}`]);
+    if (message.includes('No xBRIEF found')) {
+      return stepSkipped(step, [`No xBRIEF found for ${ctx.issueId}`]);
     }
-    return stepFailed(step, `vBRIEF completion failed: ${message}`);
+    return stepFailed(step, `xBRIEF completion failed: ${message}`);
   }
 }
 

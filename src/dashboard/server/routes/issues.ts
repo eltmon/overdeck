@@ -683,7 +683,7 @@ const postIssueTaskInspectRoute = HttpRouter.add(
 //
 // Lightweight summary of an issue's planning artifacts:
 //   { hasPlan, hasTasks, tasksCount }
-// Used by kanban cards to color the vBRIEF/Tasks chips and decide whether to
+// Used by kanban cards to color the xBRIEF/Tasks chips and decide whether to
 // show "Generate Tasks" instead of "Tasks". Cheap so it can be polled per-card.
 
 const getIssuePlanningStateRoute = HttpRouter.add(
@@ -704,7 +704,7 @@ const getIssuePlanningStateRoute = HttpRouter.add(
 //
 // Runs createTasksFromXBrief() against the workspace. Same logic as
 // `pan plan finalize`, exposed so the
-// dashboard can offer a one-click "Generate Tasks" action when a vBRIEF plan
+// dashboard can offer a one-click "Generate Tasks" action when an xBRIEF plan
 // exists but tasks were never created (e.g. plans authored before the
 // agent-driven finalize flow shipped).
 

@@ -41,12 +41,12 @@ describe('Dispatch record override (PAN-2383)', () => {
 
     // Write base plan to .pan/spec.vbrief.json (where readWorkspacePlanSync looks)
     const specPath = join(workspacePath, '.pan', 'spec.vbrief.json');
-    const vbrief: XBriefDocument = {
+    const xbrief: XBriefDocument = {
       ...basePlan,
       xBRIEFInfo: { version: '0.5', created: new Date().toISOString(), updated: new Date().toISOString() },
       plan: { ...basePlan.plan, created: new Date().toISOString() },
     };
-    await writeFile(specPath, JSON.stringify(vbrief, null, 2));
+    await writeFile(specPath, JSON.stringify(xbrief, null, 2));
   });
 
   afterEach(async () => {
@@ -93,7 +93,7 @@ describe('Dispatch record override (PAN-2383)', () => {
   it('honors record override "off" even when plan-metadata and global are "on"', async () => {
     // Create a plan with tiered_execution: 'on'
     const specPath = join(workspacePath, '.pan', 'spec.vbrief.json');
-    const vbrief: XBriefDocument = {
+    const xbrief: XBriefDocument = {
       xBRIEFInfo: { version: '0.5', created: new Date().toISOString(), updated: new Date().toISOString() },
       plan: {
         ...basePlan.plan,
@@ -101,7 +101,7 @@ describe('Dispatch record override (PAN-2383)', () => {
         created: new Date().toISOString(),
       },
     };
-    await writeFile(specPath, JSON.stringify(vbrief, null, 2));
+    await writeFile(specPath, JSON.stringify(xbrief, null, 2));
 
     // Initialize record with override='off'
     const record = {

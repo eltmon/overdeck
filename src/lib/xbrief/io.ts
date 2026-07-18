@@ -1,10 +1,10 @@
 /**
- * vBRIEF File I/O Utilities
+ * xBRIEF File I/O Utilities
  *
- * Single-spec-on-main model (PAN-1124): the canonical vBRIEF spec lives in
- * `specs/<canonical>.vbrief.json` behind the project state read/write doors.
- * Work and task operations cannot mutate its structure; they may only advance
- * `plan.status` through
+ * Single-spec model (PAN-1124): the canonical xBRIEF spec lives in `specs/`
+ * on `overdeck-state` with a `.xbrief.json` filename behind the project state
+ * read/write doors. Work and task operations cannot mutate its structure; they
+ * may only advance `plan.status` through
  * `updateSpecStatus()` in `pan-dir/specs.ts`. A deliberate return to planning
  * may replace the full document at the same canonical path through
  * `writeSpecDocument()`, preserving stable item IDs so existing progress still
@@ -12,11 +12,11 @@
  *
  * Runtime item/subItem status is tracked as a flat `statusOverrides` map in
  * the workspace continue file (`<workspace>/.overdeck/continue.json`).
- * `readWorkspacePlan()` returns a merged view (main spec + overlay) so
+ * `readWorkspacePlan()` returns a merged view (canonical spec + overlay) so
  * callers never need to know about the overlay.
  *
  * `updateItemStatus` and `updateSubItemStatus` write ONLY to the workspace
- * continue file — they cannot mutate the spec on main.
+ * continue file — they cannot mutate the canonical spec.
  */
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
@@ -94,12 +94,12 @@ async function findSpecByIssueFromDisk(projectRoot: string, issueId: string): Pr
 
 // ─── Effect-channel typed errors ─────────────────────────────────────────────
 
-/** vBRIEF document on disk had unresolved git merge conflict markers. */
+/** xBRIEF document on disk had unresolved git merge conflict markers. */
 export class XBriefMergeConflictTaggedError extends Data.TaggedError('XBriefMergeConflictError')<{
   readonly planPath: string;
 }> {}
 
-/** vBRIEF document on disk does not match the supported spec shape. */
+/** xBRIEF document on disk does not match the supported spec shape. */
 export class XBriefInvalidFormatError extends Data.TaggedError('XBriefInvalidFormatError')<{
   readonly planPath: string;
   readonly reason: string;
@@ -167,7 +167,7 @@ export function findWorkspaceDraftPlanSync(workspacePath: string): string | null
 
 
 /**
- * Returns the path to this workspace's vBRIEF source. The canonical main-side
+ * Returns the path to this workspace's xBRIEF source. The canonical main-side
  * spec wins after promotion; before first promotion, the workspace draft is the
  * only valid source.
  *
@@ -186,7 +186,7 @@ export function findPlanSync(workspacePath: string): string | null {
 
 
 /**
- * Reads and parses plan.vbrief.json from the given path.
+ * Reads and parses an xBRIEF document from the given path.
  * Handles both standard format ({ xBRIEFInfo, plan: {...} }) and legacy
  * envelope format ({ vBRIEFInfo, plan: {...} }). Flat format
  * ({ issue, title, items, edges? }) produced by some planning prompts.
@@ -195,7 +195,7 @@ export function findPlanSync(workspacePath: string): string | null {
 export class XBriefMergeConflictError extends Error {
   constructor(planPath: string) {
     super(
-      `plan.vbrief.json at ${planPath} contains unresolved git merge conflict markers. ` +
+      `xBRIEF document at ${planPath} contains unresolved git merge conflict markers. ` +
       `Resolve all <<<<<<</=======/>>>>>>> markers in that file and commit the result before re-requesting review.`
     );
     this.name = 'XBriefMergeConflictError';
@@ -228,16 +228,16 @@ export function readPlanSync(planPath: string): XBriefDocument {
   }
   const parsed = normalizeXBriefEnvelope(JSON.parse(raw));
 
-  // vBRIEF/xBRIEF requires an info envelope and plan top-level key.
+  // xBRIEF requires an info envelope and plan top-level key.
   if (parsed.xBRIEFInfo && parsed.plan) {
     return parsed as XBriefDocument;
   }
 
   // Non-spec format — reject with helpful error
   throw new Error(
-    `Invalid vBRIEF format in ${planPath}: missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
-    `vBRIEF/xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
-    `See docs/VBRIEF.md for the correct format.`
+    `Invalid xBRIEF format in ${planPath}: missing 'xBRIEFInfo' or legacy 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+    `xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or legacy "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
+    `See docs/XBRIEF.md for the correct format.`
   );
 }
 
@@ -337,7 +337,7 @@ export function recordTierPromotion(
 }
 
 /**
- * Reads the vBRIEF plan for a workspace, returning a merged view with
+ * Reads the xBRIEF plan for a workspace, returning a merged view with
  * statusOverrides applied from the per-issue record.
  * Returns null if no plan exists on main or locally.
  */
@@ -369,7 +369,7 @@ export function readWorkspacePlanSync(workspacePath: string): XBriefDocument | n
 
 
 /**
- * vBRIEF lifecycle statuses that mean "planning has finished" — i.e., the
+ * xBRIEF lifecycle statuses that mean "planning has finished" — i.e., the
  * agent can pick up work or the plan is done. Excludes 'draft' (still being
  * written) and 'cancelled' (abandoned).
  */
@@ -474,7 +474,7 @@ export function updateSubItemStatus(
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
 // These wrap the existing async APIs in Effect with typed error channels so
-// callers can compose vBRIEF reads with other Effect-native code. They do NOT
+// callers can compose xBRIEF reads with other Effect-native code. They do NOT
 // replace the sync/Promise variants — CLI and legacy callers continue to use
 // those. Migrate callers individually as they move into Effect.
 

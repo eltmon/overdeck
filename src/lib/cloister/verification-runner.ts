@@ -338,7 +338,7 @@ function getSyncTargetBranch(
 
 /**
  * PAN-2179: detect a "plan-only" / zombie changeset — one whose only changes are
- * pipeline artifacts (.pan/, beads, vbrief) with no actual implementation. A work
+ * pipeline artifacts (.pan/, task state, xBRIEF) with no actual implementation. A work
  * agent that never received its kickoff produces exactly this. The verification
  * gate uses it to bounce the branch back instead of letting an empty "completion"
  * advance to review/merge. A legit non-code change (docs, rules under
@@ -654,13 +654,13 @@ async function runVerificationForIssuePromise(
     }
 
     // xBRIEF AC gate: check all acceptance criteria are completed (runs after quality gates)
-    // Wrap in try-catch to detect merge conflict markers in plan.vbrief.json and send
+    // Wrap in try-catch to detect merge conflict markers in the xBRIEF document and send
     // actionable feedback rather than falling through to a generic infrastructure error.
     let acStatus: ReturnType<typeof getXBriefACStatusSync>;
     try {
       acStatus = getXBriefACStatusSync(workspacePath);
-    } catch (vbriefErr: any) {
-      if (vbriefErr instanceof XBriefMergeConflictError) {
+    } catch (xbriefErr: any) {
+      if (xbriefErr instanceof XBriefMergeConflictError) {
         const newCycleCount = currentCycles + 1;
         const failedCheck = 'vbrief-conflicts';
         const summary = `xBRIEF spec has unresolved git merge conflict markers. Resolve all conflict markers in the spec file and commit before resubmitting.`;
@@ -683,7 +683,7 @@ async function runVerificationForIssuePromise(
           if (fileResult.success) {
             const msg = shouldEscalateVerificationFailure(currentStatus, failedCheck, newCycleCount)
               ? `VERIFICATION STUCK for ${issueId}.\nFailed check: ${failedCheck} after repeated attempts.\n\nMUST READ: ${fileResult.filePath}\n\nFix every reported failure, commit and push the corrections, then run pan done ${issueId} -c "<summary>" to reset verification and return the latest commit to the normal pipeline.`
-              : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — plan.vbrief.json has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
+              : `VERIFICATION FAILED for ${issueId}.\nFailed check: ${failedCheck} — the xBRIEF document has merge conflict markers.\n\nMUST READ: ${fileResult.filePath}\n\nUse your Read tool to open this file, read every line, resolve the merge conflict markers, commit and push the fix, then request a new review with pan review request. Do NOT stop at the prompt — keep working until pan review request completes successfully.`;
             await deliverVerificationFeedback(issueId, msg, {
               failedCheck,
               feedbackPath: fileResult.filePath,
@@ -694,7 +694,7 @@ async function runVerificationForIssuePromise(
         }
         return { outcome: 'failed', failedCheck, cycleCount: newCycleCount, maxCycles: VERIFICATION_MAX_CYCLES };
       }
-      throw vbriefErr;
+      throw xbriefErr;
     }
     if (acStatus && !acStatus.allCompleted) {
       const newCycleCount = currentCycles + 1;

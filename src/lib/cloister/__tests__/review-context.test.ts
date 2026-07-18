@@ -37,7 +37,7 @@ vi.mock('child_process', () => ({
   }),
 }));
 
-// ── vbrief / config mocks ──────────────────────────────────────────────────
+// ── xbrief / config mocks ──────────────────────────────────────────────────
 vi.mock('../../xbrief/io.js', () => ({
   findPlan: vi.fn(() => null),
   findPlanSync: vi.fn(() => null),

@@ -565,7 +565,7 @@ describe('workflows', () => {
       expect(result.steps.find(s => s.step === 'teardown:branches')).toBeDefined();
     });
 
-    it('should delete the workspace, complete vBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
+    it('should delete the workspace, complete xBRIEF, close GitHub, and swap verifying labels during configured close-out', async () => {
       writeFileSync(
         join(OVERDECK_HOME, 'cloister.toml'),
         '[close_out]\nremove_workspace = true\ndelete_feature_branch = false\nauto = false\nauto_delay_minutes = 60\n',
@@ -602,19 +602,19 @@ describe('workflows', () => {
       expect(commands.some(command => command.includes('--remove-label "needs-close-out"'))).toBe(true);
     });
 
-    it('should complete vBRIEF status and prune checkpoint refs during close-out', async () => {
+    it('should complete xBRIEF status and prune checkpoint refs during close-out', async () => {
       await writeSpecForIssue(testDir, makeXBrief('PAN-100'), 'active');
 
       const ctx = { issueId: 'PAN-100', projectPath: testDir };
       const result = await closeOut(ctx, { tracker: successfulTracker() });
 
-      const vbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
+      const xbriefIdx = result.steps.findIndex(s => s.step === 'close-out:vbrief-completed');
       const teardownIdx = result.steps.findIndex(s => s.step === 'teardown:checkpoint-refs');
       const closeIdx = result.steps.findIndex(s => s.step === 'close-issue:transition');
-      expect(vbriefIdx).toBeGreaterThanOrEqual(0);
+      expect(xbriefIdx).toBeGreaterThanOrEqual(0);
       expect(teardownIdx).toBeGreaterThanOrEqual(0);
       expect(closeIdx).toBeGreaterThanOrEqual(0);
-      expect(vbriefIdx).toBeLessThan(teardownIdx);
+      expect(xbriefIdx).toBeLessThan(teardownIdx);
       expect(teardownIdx).toBeLessThan(closeIdx);
 
       const commands = mockExecAsync.mock.calls.map(([command, args]) => ({ command: String(command), args }));

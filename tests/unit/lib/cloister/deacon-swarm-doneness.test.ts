@@ -103,7 +103,7 @@ function makeDoc(issueId: string, itemCount: number): XBriefDocument {
 function writeSpec(projectPath: string, issueId: string, doc: XBriefDocument): void {
   const specsDir = join(projectPath, '.pan', 'specs');
   mkdirSync(specsDir, { recursive: true });
-  writeFileSync(join(specsDir, `2026-07-02-${issueId}-test.vbrief.json`), JSON.stringify({
+  writeFileSync(join(specsDir, `2026-07-02-${issueId}-test.xbrief.json`), JSON.stringify({
     ...doc,
     status: 'active',
   }, null, 2));

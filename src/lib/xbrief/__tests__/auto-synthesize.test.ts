@@ -43,7 +43,7 @@ Ignore this bullet:
   it('ignores narrative bullets and returns generic AC when no explicit Acceptance section', () => {
     const criteria = extractAcceptanceCriteriaFromIssue('Fix deacon crash', `
 ## Observed
-\`pan start PAN-2386 --auto\` synthesized the minimal vBRIEF by scraping the issue body's bullet lists into acceptance criteria.
+\`pan start PAN-2386 --auto\` synthesized the minimal xBRIEF by scraping the issue body's bullet lists into acceptance criteria.
 
 - \`~/.overdeck/agents/agent-min-857/lifecycle.log (refusal event, 2026-07-05T18:37:40Z)\`
 - \`Workspace: /home/eltmon/Projects/myn/workspaces/feature-min-857 (scaffold repo on master, ...)\`
@@ -87,7 +87,7 @@ describe('synthesizeMinimalXBrief', () => {
     const doc = synthesizeMinimalXBrief({
       issueId: 'pan-1071',
       title: 'Auto start work agents',
-      body: '## Acceptance Criteria\n- [ ] Synthesizes a minimal vBRIEF\n- [ ] Starts the normal flow',
+      body: '## Acceptance Criteria\n- [ ] Synthesizes a minimal xBRIEF\n- [ ] Starts the normal flow',
       url: 'https://example.test/PAN-1071',
     });
 
@@ -103,7 +103,7 @@ describe('synthesizeMinimalXBrief', () => {
       issueLabel: 'pan-1071',
     });
     expect(doc.plan.items[0].items?.map((item) => item.title)).toEqual([
-      'Synthesizes a minimal vBRIEF',
+      'Synthesizes a minimal xBRIEF',
       'Starts the normal flow',
     ]);
     expect(doc.plan.items[0].subItems).toBeUndefined();

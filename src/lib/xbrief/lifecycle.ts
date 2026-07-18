@@ -1,19 +1,18 @@
 /**
  * xBRIEF Lifecycle Foundation
  *
- * Filesystem-as-state lifecycle model for scope xBRIEFs. Each registered
- * project gets a `./vbrief/` directory at its repo root with four lifecycle
- * subdirectories that act as the source of truth for plan status:
+ * Canonical xBRIEF documents live in `specs/` on `overdeck-state`, with
+ * lifecycle represented by `plan.status`. The `./vbrief/` directory helpers
+ * below remain only for legacy lifecycle compatibility:
  *
- *   ./vbrief/proposed/   — planning complete, awaiting approval
- *   ./vbrief/active/     — agent is working on it
- *   ./vbrief/completed/  — merged/closed, immutable archive
- *   ./vbrief/cancelled/  — abandoned, immutable archive
+ *   ./vbrief/proposed/
+ *   ./vbrief/active/
+ *   ./vbrief/completed/
+ *   ./vbrief/cancelled/
  *
- * Filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.xbrief.json` where
- * the date is the immutable creation date. Readers also accept the legacy
- * `.vbrief.json` extension. Issue ID gives Overdeck ergonomics (one xBRIEF per
- * issue) and slug gives human readability.
+ * Canonical filenames are issue-keyed: `YYYY-MM-DD-<ISSUE-ID>-<slug>.xbrief.json`,
+ * where the date is the immutable creation date. Readers also accept the legacy
+ * `.vbrief.json` extension.
  */
 
 import { mkdirSync } from 'fs';
@@ -22,11 +21,11 @@ import { join } from 'path';
 import { Effect } from 'effect';
 import { FsError } from '../errors.js';
 
-export const VBRIEF_ROOT_DIRNAME = 'vbrief';
+export const LEGACY_VBRIEF_ROOT_DIRNAME = 'vbrief';
 
-export const VBRIEF_LIFECYCLE_DIRS = ['proposed', 'active', 'completed', 'cancelled'] as const;
+export const LEGACY_VBRIEF_LIFECYCLE_DIRS = ['proposed', 'active', 'completed', 'cancelled'] as const;
 
-export type XBriefLifecycleDir = typeof VBRIEF_LIFECYCLE_DIRS[number];
+export type XBriefLifecycleDir = typeof LEGACY_VBRIEF_LIFECYCLE_DIRS[number];
 
 export const XBRIEF_FILENAME_SUFFIX = '.xbrief.json';
 export const LEGACY_VBRIEF_FILENAME_SUFFIX = '.vbrief.json';
@@ -35,7 +34,7 @@ export const XBRIEF_FILENAME_SUFFIXES = [XBRIEF_FILENAME_SUFFIX, LEGACY_VBRIEF_F
 const FILENAME_STEM_RE = /^(\d{4}-\d{2}-\d{2})-([A-Za-z][A-Za-z0-9]*-\d+)-([a-z0-9-]+)$/;
 
 /**
- * Slugify an arbitrary string for use in a vBRIEF filename. Lowercases,
+ * Slugify an arbitrary string for use in an xBRIEF filename. Lowercases,
  * replaces non-alphanumeric runs with single dashes, trims leading/trailing
  * dashes, and collapses repeats.
  */
@@ -117,32 +116,32 @@ export function parseXBriefFilename(filename: string): { issueId: string; slug: 
 
 /**
  * Resolve the absolute path of a specific lifecycle directory under a project's
- * vBRIEF root. Pure path math — does not check existence or create dirs.
+ * xBRIEF root. Pure path math — does not check existence or create dirs.
  *
- * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
+ * @param legacyRootDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function resolveXBriefDir(projectRoot: string, lifecycleDir: XBriefLifecycleDir, vbriefDirname?: string): string {
-  return join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME, lifecycleDir);
+export function resolveXBriefDir(projectRoot: string, lifecycleDir: XBriefLifecycleDir, legacyRootDirname?: string): string {
+  return join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME, lifecycleDir);
 }
 
 /**
- * Resolve the absolute path to a project's vBRIEF root directory (without a
+ * Resolve the absolute path to a project's xBRIEF root directory (without a
  * lifecycle subdirectory). Pure path math.
  */
-export function resolveXBriefRoot(projectRoot: string, vbriefDirname?: string): string {
-  return join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
+export function resolveXBriefRoot(projectRoot: string, legacyRootDirname?: string): string {
+  return join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
 }
 
 /**
- * Ensure the vBRIEF lifecycle directories exist under the given project root.
- * Returns the absolute path to the vBRIEF root. Idempotent.
+ * Ensure the xBRIEF lifecycle directories exist under the given project root.
+ * Returns the absolute path to the xBRIEF root. Idempotent.
  *
- * @param vbriefDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
+ * @param legacyRootDirname - Override the default "vbrief" dirname (from projects.yaml `vbrief_dir`).
  */
-export function ensureXBriefDirsSync(projectRoot: string, vbriefDirname?: string): string {
-  const root = join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
+export function ensureXBriefDirsSync(projectRoot: string, legacyRootDirname?: string): string {
+  const root = join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
   mkdirSync(root, { recursive: true });
-  for (const dir of VBRIEF_LIFECYCLE_DIRS) {
+  for (const dir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {
     mkdirSync(join(root, dir), { recursive: true });
   }
   return root;
@@ -152,20 +151,20 @@ export function ensureXBriefDirsSync(projectRoot: string, vbriefDirname?: string
 
 /**
  * Effect variant of `ensureXBriefDirs`. Uses fs/promises so dashboard server
- * routes can create the vBRIEF lifecycle directories without blocking the
+ * routes can create the xBRIEF lifecycle directories without blocking the
  * Node.js event loop. Idempotent.
  */
 export const ensureXBriefDirs = (
   projectRoot: string,
-  vbriefDirname?: string,
+  legacyRootDirname?: string,
 ): Effect.Effect<string, FsError> =>
   Effect.gen(function* () {
-    const root = join(projectRoot, vbriefDirname || VBRIEF_ROOT_DIRNAME);
+    const root = join(projectRoot, legacyRootDirname || LEGACY_VBRIEF_ROOT_DIRNAME);
     yield* Effect.tryPromise({
       try: () => mkdir(root, { recursive: true }),
       catch: (cause) => new FsError({ path: root, operation: 'mkdir', cause }),
     });
-    for (const dir of VBRIEF_LIFECYCLE_DIRS) {
+    for (const dir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {
       const lifecycleDir = join(root, dir);
       yield* Effect.tryPromise({
         try: () => mkdir(lifecycleDir, { recursive: true }),

@@ -149,7 +149,7 @@ describe('pan swarm command', () => {
       ]);
       mkdirSync(join(projectPath, '.pan', 'specs'), { recursive: true });
       writeFileSync(
-        join(projectPath, '.pan', 'specs', '2026-07-01-PAN-2203-test.vbrief.json'),
+        join(projectPath, '.pan', 'specs', '2026-07-01-PAN-2203-test.xbrief.json'),
         JSON.stringify({ ...doc, status: 'active' }, null, 2),
       );
       const workspacePath = join(projectPath, 'workspaces', 'feature-pan-2203');

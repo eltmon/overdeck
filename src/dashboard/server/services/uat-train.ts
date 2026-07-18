@@ -230,7 +230,7 @@ export interface UatGenerationMemberPayload {
   pr?: number;
   prUrl?: string;
   mergeOrder: number;
-  /** What-to-UAT checklist from the issue's vBRIEF spec (shared extractor). */
+  /** What-to-UAT checklist from the issue's xBRIEF spec (shared extractor). */
   acceptanceCriteria: Array<{ title: string; status: string }>;
 }
 

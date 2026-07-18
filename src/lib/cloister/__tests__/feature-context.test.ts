@@ -130,7 +130,7 @@ describe('writeStoryFeatureContext', () => {
     const specsDir = join(tmpDir, '.pan', 'specs');
     mkdirSync(specsDir, { recursive: true });
     writeFileSync(
-      join(specsDir, '2024-01-01-F-456-feature-plan.vbrief.json'),
+      join(specsDir, '2024-01-01-F-456-feature-plan.xbrief.json'),
       JSON.stringify(planDoc, null, 2),
       'utf-8',
     );

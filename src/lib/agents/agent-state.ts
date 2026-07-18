@@ -141,7 +141,7 @@ export interface AgentState {
 
   /** Registered swarm slot index for per-item work agents. */
   slotIndex?: number;
-  /** vBRIEF item id explicitly assigned to this registered swarm slot. */
+  /** xBRIEF item id explicitly assigned to this registered swarm slot. */
   slotItemId?: string;
 }
 
@@ -160,7 +160,7 @@ export function getAgentStateFilePath(agentId: string): string {
  * PAN-1985: wipe agent state directories for an issue, optionally scoped to
  * a role prefix. Used by the restart-fresh and review-restart paths to clean
  * state before respawning — the new agent then reads `.pan/continue.json`,
- * the vBRIEF, the beads, and the branch to pick up where the prior run left
+ * the xBRIEF, the beads, and the branch to pick up where the prior run left
  * off. Refuses to run against an empty or unsafe id.
  *
  * - `rolePrefix` omitted: wipes only the work agent dir (`agent-<id>`).

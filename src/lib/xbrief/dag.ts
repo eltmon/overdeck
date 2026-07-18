@@ -1,5 +1,5 @@
 /**
- * vBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
+ * xBRIEF DAG utilities — critical path, graph analysis, wave scheduling, per-item dispatch
  */
 import { existsSync } from 'fs';
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'fs/promises';
@@ -26,7 +26,7 @@ export interface Wave {
 }
 
 /**
- * Groups actionable vBRIEF items into dependency waves using Kahn's algorithm.
+ * Groups actionable xBRIEF items into dependency waves using Kahn's algorithm.
  *
  * Wave 0 = items with no unresolved blockers (ready to start).
  * Wave N = items whose blockers all resolve in waves < N.
@@ -116,7 +116,7 @@ export function groupItemsByWave(doc: XBriefDocument): Wave[] {
 }
 
 /**
- * Computes the critical path of a vBRIEF plan using the longest-path
+ * Computes the critical path of an xBRIEF plan using the longest-path
  * algorithm on 'blocks' edges.
  *
  * All edges have weight 1 (one step). Returns an ordered list of item IDs
@@ -442,7 +442,7 @@ function renderItemLine(item: XBriefItem): string {
 
 /**
  * Build the bounded active slice that work-agent prompts should receive by
- * default instead of the full vBRIEF. The slice includes the target/current work
+ * default instead of the full xBRIEF. The slice includes the target/current work
  * set, direct blockers, unlocks, nearby context, global constraints, acceptance
  * criteria, and optional persisted synthesis output for convergence points.
  */
@@ -501,7 +501,7 @@ export function createActiveSlice(doc: XBriefDocument, options: ActiveSliceOptio
 
 export function renderActiveSlicePrompt(slice: Omit<ActiveSlice, 'prompt'>): string {
   const lines = [
-    `# Active vBRIEF Slice: ${slice.issueId}`,
+    `# Active xBRIEF Slice: ${slice.issueId}`,
     `Plan: ${slice.planTitle} (${slice.planId}) @ sequence ${slice.planSequence}`,
   ];
   if (slice.objective) lines.push(``, `## Issue Objective`, slice.objective);
@@ -569,7 +569,7 @@ function statusForOperation(type: TaskOperationType): XBriefItemStatus {
     case 'cancel': return 'cancelled';
     default: {
       const exhaustive: never = type;
-      throw new Error(`Unsupported vBRIEF task operation: ${String(exhaustive)}`);
+      throw new Error(`Unsupported xBRIEF task operation: ${String(exhaustive)}`);
     }
   }
 }
@@ -579,17 +579,17 @@ function cloneDoc(doc: XBriefDocument): XBriefDocument {
 }
 
 /**
- * Apply a Overdeck-native task operation to the vBRIEF itself. This is the
+ * Apply a Overdeck-native task operation to the xBRIEF itself. This is the
  * single mutation authority for swarm task status: legacy stores can mirror state during
  * migration, but the plan document wins and receives the sequence bump.
  */
 export function applyTaskOperation(doc: XBriefDocument, operation: TaskOperation): TaskOperationResult {
   if (!isTaskOperationType(String(operation.type))) {
-    throw new Error(`Unsupported vBRIEF task operation: ${String(operation.type)}`);
+    throw new Error(`Unsupported xBRIEF task operation: ${String(operation.type)}`);
   }
   const currentSequence = doc.plan.sequence ?? 0;
   if (operation.expectedSequence !== undefined && operation.expectedSequence !== currentSequence) {
-    throw new Error(`vBRIEF sequence conflict: expected ${operation.expectedSequence}, found ${currentSequence}`);
+    throw new Error(`xBRIEF sequence conflict: expected ${operation.expectedSequence}, found ${currentSequence}`);
   }
   const next = cloneDoc(doc);
   const item = next.plan.items.find(i => i.id === operation.itemId);
@@ -667,7 +667,7 @@ export function actionableDoc(doc: XBriefDocument): XBriefDocument {
   };
 }
 
-/** Canonical vBRIEF task graph view; no secondary task store is consulted here. */
+/** Canonical xBRIEF task graph view; no secondary task store is consulted here. */
 export function getTaskGraphView(doc: XBriefDocument, mergedItemIds: Set<string> = new Set()): TaskGraphView {
   const filtered = actionableDoc(doc);
   return {

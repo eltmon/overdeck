@@ -95,7 +95,7 @@ describe('buildIssueRecord', () => {
   it('projects durable continue subset and folds in runtime fields (PAN-1919)', async () => {
     mkdirSync(join(projectRoot, '.pan', 'continues'), { recursive: true });
     writeFileSync(
-      join(projectRoot, '.pan', 'continues', 'pan-1908.vbrief.json'),
+      join(projectRoot, '.pan', 'continues', 'pan-1908.xbrief.json'),
       JSON.stringify({
         issueId: 'PAN-1908',
         gitState: { branch: 'feature/pan-1908', sha: 'abc123', dirty: false },

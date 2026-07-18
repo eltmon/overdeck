@@ -26,7 +26,7 @@ const LIVE_TASK_SURFACES = [
 ] as const;
 
 describe('PAN-2671 legacy task-engine audit', () => {
-  it.each(LIVE_TASK_SURFACES)('%s uses canonical vBRIEF task terminology', (relativePath) => {
+  it.each(LIVE_TASK_SURFACES)('%s uses canonical xBRIEF task terminology', (relativePath) => {
     const contents = readFileSync(resolve(process.cwd(), relativePath), 'utf8');
     expect(contents).not.toMatch(/\b(?:beads?|bd)\b/i);
   });

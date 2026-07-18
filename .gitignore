@@ -52,7 +52,7 @@ src/dashboard/restart.sh
 # Workspace-specific generated files
 CLAUDE.md
 
-# Workspace-only vBRIEF + continue state (per the five-artifact model in CLAUDE.md).
+# Workspace-only xBRIEF + continue state (per the five-artifact model in CLAUDE.md).
 # These files are mutated by the work agent and must never reach main — otherwise
 # every new worktree inherits the last-committed workspace's spec and pan start
 # refuses with "Workspace planning artifacts are for PAN-XXXX". See PAN-1073.

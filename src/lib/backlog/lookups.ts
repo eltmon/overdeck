@@ -5,7 +5,7 @@ import type { ClassifyLookups } from './pickup.js';
 
 /**
  * Build the {@link ClassifyLookups} the shared pickup module needs from live project
- * state: labels (in-memory issue service), planned (readable vBRIEF spec), and
+ * state: labels (in-memory issue service), planned (readable xBRIEF spec), and
  * in-pipeline (review status / live workspace). Shared by the dashboard forecast
  * route and the Flywheel run-cohort snapshot so both classify issues identically
  * (PAN-2006 single source of truth). The issue service is lazy-required to avoid a

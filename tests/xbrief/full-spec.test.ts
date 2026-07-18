@@ -1,5 +1,5 @@
 /**
- * vBRIEF v0.5 Full Spec Compliance Tests
+ * xBRIEF v0.5 Full Spec Compliance Tests
  *
  * Verifies that all v0.5 fields are properly handled:
  * - uid, sequence, references, created, updated on XBriefPlan
@@ -25,11 +25,11 @@ function makeFullSpecDoc(overrides: Partial<XBriefDocument['plan']> = {}): XBrie
       version: '0.5',
       created: '2026-01-01T00:00:00Z',
       author: 'overdeck/0.6.0',
-      description: 'Plan for PAN-453: Full vBRIEF v0.5 Spec Support',
+      description: 'Plan for PAN-453: Full xBRIEF v0.5 Spec Support',
     },
     plan: {
       id: 'pan-453',
-      title: 'Full vBRIEF v0.5 Spec Support',
+      title: 'Full xBRIEF v0.5 Spec Support',
       status: 'active',
       uid: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
       sequence: 1,
@@ -43,7 +43,7 @@ function makeFullSpecDoc(overrides: Partial<XBriefDocument['plan']> = {}): XBrie
       items: [
         {
           id: 'update-types',
-          title: 'Update vBRIEF types',
+          title: 'Update xBRIEF types',
           status: 'pending',
           created: '2026-01-01T00:00:00Z',
           subItems: [
@@ -92,7 +92,7 @@ function readRecordStatusOverrides(workspacePath: string): Record<string, string
 }
 
 beforeEach(() => {
-  PROJECT_ROOT = join(tmpdir(), `vbrief-project-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  PROJECT_ROOT = join(tmpdir(), `xbrief-project-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   TEST_DIR = join(PROJECT_ROOT, 'workspaces', 'feature-pan-453');
   mkdirSync(TEST_DIR, { recursive: true });
 });
@@ -115,7 +115,7 @@ describe('xBRIEFInfo v0.5 fields', () => {
     const doc = makeFullSpecDoc();
     const planPath = writePlanDoc(TEST_DIR, doc);
     const result = readPlanSync(planPath);
-    expect(result.xBRIEFInfo.description).toBe('Plan for PAN-453: Full vBRIEF v0.5 Spec Support');
+    expect(result.xBRIEFInfo.description).toBe('Plan for PAN-453: Full xBRIEF v0.5 Spec Support');
   });
 });
 

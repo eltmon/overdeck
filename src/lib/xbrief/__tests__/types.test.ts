@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { resolveXBriefItemKind } from '../types.js';
 import type { FilesScopeConfidence, ItemReadiness, XBriefItemKind, XBriefItemMetadata } from '../types.js';
 
-describe('vBRIEF item metadata types', () => {
+describe('xBRIEF item metadata types', () => {
   it('exposes swarm-contract metadata fields', () => {
     const metadata = {
       files_scope: ['src/lib/xbrief/types.ts'],

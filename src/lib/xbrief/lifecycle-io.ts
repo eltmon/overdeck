@@ -1,10 +1,9 @@
 /**
- * vBRIEF Lifecycle IO
+ * xBRIEF Lifecycle IO
  *
- * PAN-967 finished the migration: `.pan/specs/` is the canonical store for scope
- * specs and `.pan/continues/` is the canonical store for project-side continue
- * files. Legacy `vbrief/<lifecycle>/` directories remain as read-only fallback
- * for legacy spec files only (no continue files — those are at `.pan/continues/`).
+ * Canonical scope specs and project-side continue files live in `specs/` and
+ * `continues/` on `overdeck-state`. Legacy `vbrief/<lifecycle>/` directories
+ * remain a read-only fallback for legacy spec files.
  */
 
 import { basename, join } from 'path';
@@ -14,7 +13,9 @@ import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/index.js';
 
 import type { ContinueFeedbackEntry, ContinueSessionEntry, ContinueState } from './continue-state.js';
 import {
-  VBRIEF_LIFECYCLE_DIRS,
+  LEGACY_VBRIEF_FILENAME_SUFFIX,
+  LEGACY_VBRIEF_LIFECYCLE_DIRS,
+  XBRIEF_FILENAME_SUFFIX,
   ensureXBriefDirsSync,
   generateXBriefFilename,
   parseXBriefFilename,
@@ -166,7 +167,7 @@ function specEntryToFound(entry: PanSpecEntry): FoundXBrief {
 }
 
 function findLegacyXBriefByIssue(projectRoot: string, issueId: string): FoundXBrief | null {
-  for (const lifecycleDir of VBRIEF_LIFECYCLE_DIRS) {
+  for (const lifecycleDir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {
     const dirPath = resolveXBriefDir(projectRoot, lifecycleDir);
     if (!existsSync(dirPath)) continue;
     let entries: string[];
@@ -243,7 +244,7 @@ async function moveXBriefPromise(
 ): Promise<{ from: FoundXBrief; toPath: string }> {
   const found = findXBriefByIssueSync(projectRoot, issueId);
   if (!found) {
-    throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
+    throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
   ensureXBriefDirsSync(projectRoot);
@@ -279,7 +280,7 @@ export function moveXBriefFilesOnly(
 ): { from: FoundXBrief; toPath: string } {
   const found = findXBriefByIssueSync(projectRoot, issueId);
   if (!found) {
-    throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
+    throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
   ensureXBriefDirsSync(projectRoot);
@@ -329,7 +330,7 @@ async function transitionXBriefOnMainPromise(
 ): Promise<XBriefTransitionResult> {
   const found = findXBriefByIssueSync(projectRoot, issueId);
   if (!found) {
-    throw new Error(`No vBRIEF found for issue ${issueId} under ${projectRoot}`);
+    throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
   }
 
   ensureXBriefDirsSync(projectRoot);
@@ -404,7 +405,9 @@ export function promoteXBriefToProposed(
   const upperIssueId = issueId.toUpperCase();
   const existingFilename = planDoc.plan.metadata?.canonicalFilename;
   const canonicalFilename = (existingFilename && typeof existingFilename === 'string')
-    ? existingFilename
+    ? existingFilename.endsWith(LEGACY_VBRIEF_FILENAME_SUFFIX)
+      ? `${existingFilename.slice(0, -LEGACY_VBRIEF_FILENAME_SUFFIX.length)}${XBRIEF_FILENAME_SUFFIX}`
+      : existingFilename
     : generateXBriefFilename(upperIssueId, slugify(planDoc.plan.title || planDoc.plan.id || upperIssueId));
 
   const promoted = writeSpecForIssueSync(projectRoot, planDoc, 'proposed', canonicalFilename);
@@ -462,7 +465,7 @@ export function clearFeedbackForIssue(
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 //
 // Effect-channel adapters around the existing sync/Promise helpers so callers
-// composing vBRIEF lifecycle ops with other Effect code can stay on the
+// composing xBRIEF lifecycle ops with other Effect code can stay on the
 // channel. Follows the additive-variant pattern established for io.ts /
 // xbrief-index.ts / auto-synthesize.ts in commit 3783c7003.
 

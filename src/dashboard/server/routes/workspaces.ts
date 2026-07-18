@@ -97,7 +97,7 @@ import { getCostsForIssueSync } from '../../../lib/costs/index.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
 import { readPlan, isPlanningComplete } from '../../../lib/xbrief/io.js';
-import { VBRIEF_INSPECTION_POLICIES } from '../../../lib/xbrief/types.js';
+import { XBRIEF_INSPECTION_POLICIES } from '../../../lib/xbrief/types.js';
 import type { XBriefDocument, XBriefInspectionPolicy } from '../../../lib/xbrief/types.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { criticalPath, actionableDoc } from '../../../lib/xbrief/dag.js';

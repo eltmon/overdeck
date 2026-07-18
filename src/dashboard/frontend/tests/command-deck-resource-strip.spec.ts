@@ -28,7 +28,7 @@ interface ResourceIssue {
       state: string;
       isDraft: boolean;
     }>;
-    hasVbrief: boolean;
+    hasXbrief: boolean;
     hasTasks: boolean;
     dockerContainerCount: number;
   };
@@ -82,7 +82,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
           isDraft: true,
         },
       ],
-      hasVbrief: true,
+      hasXbrief: true,
       hasTasks: true,
       dockerContainerCount: 1,
     },
@@ -108,7 +108,7 @@ const RESOURCE_ISSUES: ResourceIssue[] = [
       remoteBranchCount: 0,
       tmuxSessionCount: 0,
       prs: [],
-      hasVbrief: false,
+      hasXbrief: false,
       hasTasks: false,
       dockerContainerCount: 0,
     },
@@ -273,7 +273,7 @@ test.describe('Command Deck resource strip', () => {
     const workspaceIcon = await expectResourceChip('workspace: allocated', 'workspace');
     await expectResourceChip('branch: local 1 · remote 1', 'branch local 1 · remote 1');
     await expectResourceChip('tmux: 2 sessions', 'tmux');
-    await expectResourceChip('vBRIEF: present', 'vBRIEF');
+    await expectResourceChip('xBRIEF: present', 'xBRIEF');
     await expectResourceChip('tasks: present', 'tasks');
     await expectResourceChip('PR: #862 (open) · #863 (open, draft)', '#862');
     await expectResourceChip('docker: 1 container', 'stack 1');
@@ -284,7 +284,7 @@ test.describe('Command Deck resource strip', () => {
     await expect(pan862Item.getByText('branch (remote): origin/feature/pan-862', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('tmux: agent-pan-862', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('tmux: review-pan-862', { exact: true })).toBeVisible();
-    await expect(pan862Item.getByText('vBRIEF present', { exact: true })).toBeVisible();
+    await expect(pan862Item.getByText('xBRIEF present', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('tasks present', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('PR: #862 PAN-862 main PR (open)', { exact: true })).toBeVisible();
     await expect(pan862Item.getByText('PR: #863 PAN-862 draft PR (open, draft)', { exact: true })).toBeVisible();

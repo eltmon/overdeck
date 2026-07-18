@@ -980,7 +980,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                     )}
                   </div>
 
-                  {/* Tasks-needed callout — shown when a xBRIEF plan exists but no tasks were created.
+                  {/* Tasks-needed callout — shown when an xBRIEF plan exists but no tasks were created.
                       Planning isn't truly "done" until tasks exist; this surfaces the action
                       directly in the planning dialog instead of forcing the user to find the
                       Generate Tasks chip on the kanban card. */}
@@ -990,7 +990,7 @@ export function PlanDialog({ issue, isOpen, onClose, onComplete, onTerminalRelea
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-warning-foreground">Tasks not yet generated</p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          A xBRIEF plan exists but no tasks have been created. Generate tasks to finish planning so the Done button unlocks.
+                          An xBRIEF plan exists but no tasks have been created. Generate tasks to finish planning so the Done button unlocks.
                         </p>
                       </div>
                       <button

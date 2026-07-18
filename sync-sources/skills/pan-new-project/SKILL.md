@@ -3,7 +3,7 @@ name: pan-new-project
 description: >
   Complete setup for registering a new project with Overdeck. Handles
   project registration, issue prefix, workspace config, trust setup,
-  vBRIEF tasks init, tracker config, and validates against working projects.
+  xBRIEF task support init, tracker config, and validates against working projects.
 triggers:
   - new project
   - add new project
@@ -31,7 +31,7 @@ license: "MIT"
 Sets up a new project for Overdeck management. This is the ONLY correct
 way to add a new project. Do NOT just run `pan project add` alone — it
 creates a skeleton entry that breaks planning agents, workspace creation,
-issue routing, and vBRIEF tasks.
+issue routing, and xBRIEF task support.
 
 ---
 
@@ -185,15 +185,13 @@ extra config needed beyond `issue_prefix` in projects.yaml.
 
 For **GitLab** projects, TBD — not yet supported in dashboard polling.
 
-### Step 5: Initialize vBRIEF tasks
+### Step 5: Verify xBRIEF Task Support
+
+No per-project task database initialization is required. xBRIEF plan items become the executable checklist after planning, and `pan task` reads and updates their state through the canonical state door.
 
 ```bash
-cd <project-path>
-git config vBRIEF tasks.role agent
+pan task --help >/dev/null && echo "PASS: pan task available"
 ```
-
-New worktrees inherit this automatically since Overdeck now sets it during
-workspace creation (`workspace-manager.ts` and `worktree.ts`).
 
 ### Step 6: Create workspaces/ Directory
 
@@ -250,8 +248,8 @@ console.log(d.projects?.['<path>']?.hasTrustDialogAccepted
 grep 'GITHUB_REPOS' ~/.overdeck.env | grep -q '<PREFIX>' && \
   echo "PASS: in GITHUB_REPOS" || echo "FAIL: not in GITHUB_REPOS"
 
-# 5. vBRIEF tasks configured
-cd <path> && git config vBRIEF tasks.role && echo "PASS" || echo "FAIL: vBRIEF tasks.role not set"
+# 5. xBRIEF task command available
+pan task --help >/dev/null && echo "PASS" || echo "FAIL: pan task unavailable"
 
 # 6. workspaces/ exists
 test -d <path>/workspaces && echo "PASS" || echo "FAIL: no workspaces/"
@@ -278,7 +276,7 @@ Tracker:        GitHub (<owner/repo>)
 Workspace type: <type>
 Tests:          <command>
 Trusted:        Yes
-vBRIEF tasks:          Configured
+xBRIEF task support:   Available through pan task
 Dashboard:      Issues visible
 
 Validation: 8/8 checks passed

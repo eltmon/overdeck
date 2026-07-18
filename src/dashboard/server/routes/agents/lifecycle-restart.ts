@@ -392,7 +392,7 @@ export const postAgentRestartRoute = HttpRouter.add(
 //                                       'completeWorkReset' issue action)
 //
 // Refuses (409) if a live tmux session is alive — same gate as reset-session.
-// Workspace, vBRIEF, tasks, .pan/continue.json, .pan/feedback/, the branch,
+// Workspace, xBRIEF, tasks, .pan/continue.json, .pan/feedback/, the branch,
 // and the commit history are all left untouched. The new agent (whether
 // auto-spawned or manually started) reads .pan/continue.json + branch state
 // to pick up where the prior run left off.
@@ -715,7 +715,7 @@ async function buildRestartConfigChangeList(): Promise<RestartConfigChangeItem[]
       continue;
     }
 
-    // Compute new staffing from current config by reading the real vBRIEF work item
+    // Compute new staffing from current config by reading the real xBRIEF work item
     const staffingResult = await resolveCurrentStaffing(agent.id, agent, agent.issueId);
 
     if (staffingResult.error) {
@@ -773,7 +773,7 @@ async function resolveCurrentStaffing(agentId: string, agentState: any, issueId:
   }
 
   try {
-    // Read the actual vBRIEF plan
+    // Read the actual xBRIEF plan
     const plan = readWorkspacePlanSync(workspacePath);
     if (!plan || !plan.plan.items) {
       return { newModel: agentState.model, newHarness: agentState.harness ?? 'claude-code', error: 'Invalid plan structure' };

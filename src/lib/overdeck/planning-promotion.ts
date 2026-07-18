@@ -152,17 +152,17 @@ export async function completePlanningArtifacts(options: {
     return (yield* findWorkspaceDraftPlan(workspacePath)) ?? (yield* findPlan(workspacePath));
   }));
   if (!workspacePlanPath) {
-    throw new Error(`No workspace vBRIEF found for ${upperIssueId} at ${workspacePath}/.overdeck/spec.vbrief.json`);
+    throw new Error(`No workspace xBRIEF found for ${upperIssueId} at ${workspacePath}/.overdeck/spec.vbrief.json`);
   }
 
   const workspaceDoc = await Effect.runPromise(readPlan(workspacePlanPath));
   const workspaceIssueId = workspaceDoc.plan?.id;
   if (workspaceIssueId && workspaceIssueId.toLowerCase() !== issueLower) {
-    throw new Error(`Workspace vBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
+    throw new Error(`Workspace xBRIEF is for ${workspaceIssueId.toUpperCase()}, not ${upperIssueId}`);
   }
   assertPlanQuality(workspaceDoc);
 
-  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed vBRIEF spec', { projectPath });
+  emitCompletePlanningPhase(upperIssueId, 'specWrite', 'start', 'writing proposed xBRIEF spec', { projectPath });
   const existingSpec = await Effect.runPromise(findSpecByIssue(projectPath, upperIssueId));
   let proposed: { path: string; filename: string };
   try {
@@ -173,7 +173,7 @@ export async function completePlanningArtifacts(options: {
           return { path: existingSpec.path, filename: existingSpec.filename };
         })()
       : await Effect.runPromise(writeSpecForIssue(projectPath, workspaceDoc, 'proposed')).then((e) => ({ path: e.path, filename: e.filename }));
-    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'success', 'proposed vBRIEF spec written', {
+    emitCompletePlanningPhase(upperIssueId, 'specWrite', 'success', 'proposed xBRIEF spec written', {
       path: proposed.path,
       filename: proposed.filename,
     });
@@ -184,7 +184,7 @@ export async function completePlanningArtifacts(options: {
   }
 
   const planItemCount = workspaceDoc.plan.items?.length ?? 0;
-  if (planItemCount === 0) throw new Error(`The vBRIEF for ${upperIssueId} contains no implementation items.`);
+  if (planItemCount === 0) throw new Error(`The xBRIEF for ${upperIssueId} contains no implementation items.`);
   return { proposed, taskCount: planItemCount, taskWarning: null };
 }
 
@@ -552,7 +552,7 @@ export async function completePlanningForIssue(options: {
     const workspacePath = projectPath ? join(projectPath, 'workspaces', `feature-${issueLower}`) : '';
     if (workspacePath) {
       // PRD-first gate (PAN-2234): refuse promotion without a non-trivial PRD
-      // draft. Runs before the vBRIEF quality-lint pre-check so a missing PRD
+      // draft. Runs before the xBRIEF quality-lint pre-check so a missing PRD
       // short-circuits before any spec read. noPrd bypass is loud (phase event).
       if (noPrd) {
         emitCompletePlanningPhase(id, 'prdGate', 'skipped', 'noPrd bypass requested');
@@ -574,7 +574,7 @@ export async function completePlanningForIssue(options: {
           assertPlanQuality(workspaceDoc);
         } catch (error) {
           if (error instanceof PlanQualityLintError) {
-            return jsonResponse({ error: 'vBRIEF quality lint failed', qualityIssues: error.issues }, { status: 422 });
+            return jsonResponse({ error: 'xBRIEF quality lint failed', qualityIssues: error.issues }, { status: 422 });
           }
           throw error;
         }
@@ -592,7 +592,7 @@ export async function completePlanningForIssue(options: {
       const artifacts = await completePlanningArtifacts({ projectPath, workspacePath, issueId: id });
       const { proposed, taskCount, taskWarning } = artifacts;
       console.log(`[complete-planning] Wrote pan spec to ${proposed.path}`);
-      console.log(`[complete-planning] Finalized ${taskCount} vBRIEF tasks for ${upperIssueId}`);
+      console.log(`[complete-planning] Finalized ${taskCount} xBRIEF tasks for ${upperIssueId}`);
 
       const project = findProjectByPathSync(projectPath);
       const migrated = project ? await isStateMigrated(project) : false;
@@ -619,7 +619,7 @@ export async function completePlanningForIssue(options: {
           } catch {
             await execFileAsync(
               'git',
-              ['commit', '-m', `chore(scope): propose ${upperIssueId} vBRIEF`, '--no-verify', '--', ...filesToStage],
+              ['commit', '-m', `chore(scope): propose ${upperIssueId} xBRIEF`, '--no-verify', '--', ...filesToStage],
               { cwd: projectPath, encoding: 'utf-8' },
             );
             console.log(`[complete-planning] Committed pan spec on main for ${upperIssueId}`);

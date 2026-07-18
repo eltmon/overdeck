@@ -90,10 +90,10 @@ describe('POST /api/specialists/done inspect item attribution', () => {
     expect(result).toEqual({ status: 400, body: { error: 'itemId is required for a passed inspect verdict' } });
   });
 
-  it('rejects an itemId that is not in the issue vBRIEF', async () => {
+  it('rejects an itemId that is not in the issue xBRIEF', async () => {
     const result = await postDone({ specialist: 'inspect', issueId: 'PAN-2724', itemId: 'by', status: 'passed' });
 
-    expect(result).toEqual({ status: 400, body: { error: 'Item "by" does not exist in the vBRIEF for PAN-2724' } });
+    expect(result).toEqual({ status: 400, body: { error: 'Item "by" does not exist in the xBRIEF for PAN-2724' } });
     expect(mocks.readWorkspacePlan).toHaveBeenCalledWith(join(projectPath, 'workspaces', 'feature-pan-2724'));
   });
 

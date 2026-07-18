@@ -1,8 +1,8 @@
 /**
- * vBRIEF Acceptance Criteria Extraction & Validation
+ * xBRIEF Acceptance Criteria Extraction & Validation
  *
  * Shared utilities for extracting, formatting, and validating acceptance
- * criteria from vBRIEF plan documents. Used by specialist prompts,
+ * criteria from xBRIEF plan documents. Used by specialist prompts,
  * verification gates, and completion checks.
  */
 
@@ -70,9 +70,9 @@ export function getXBriefACStatusSync(workspacePath: string): XBriefACStatus | n
 }
 
 /**
- * Extract all acceptance criteria from a vBRIEF plan.
+ * Extract all acceptance criteria from an xBRIEF plan.
  *
- * Reads plan.vbrief.json from the workspace and returns all child items
+ * Reads the merged xBRIEF plan and returns all child items
  * where metadata.kind === 'acceptance_criterion', enriched with parent
  * task context.
  *
@@ -121,8 +121,8 @@ export function extractACFromDocument(doc: XBriefDocument): AcceptanceCriterion[
  *
  * Output example:
  * ```
- * ### Create vBRIEF acceptance criteria extraction module
- * - [x] extractAcceptanceCriteria reads plan.vbrief.json and returns AC child items
+ * ### Create xBRIEF acceptance criteria extraction module
+ * - [x] extractAcceptanceCriteria reads the merged xBRIEF and returns AC child items
  * - [ ] formatAcceptanceCriteria produces markdown checklist grouped by parent task
  * ```
  *

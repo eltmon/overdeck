@@ -116,9 +116,9 @@ describe('criticalPath', () => {
 
 describe('readPlanFile', () => {
   it('preserves xBRIEFInfo v0.8 documents as the canonical envelope', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'vbrief-dag-'));
+    const dir = mkdtempSync(join(tmpdir(), 'xbrief-dag-'));
     try {
-      const path = join(dir, 'plan.vbrief.json');
+      const path = join(dir, 'plan.xbrief.json');
       writeFileSync(
         path,
         JSON.stringify(

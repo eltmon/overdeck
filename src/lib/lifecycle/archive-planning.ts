@@ -135,7 +135,7 @@ async function movePrdImpl(
 
   const formatLabel = source.format === 'subdir' ? 'PRD subdirectory' : 'PRD';
 
-  // For the legacy `flat` format the PRD is a single `.md` file, but the vBRIEF
+  // For the legacy `flat` format the PRD is a single `.md` file, but the xBRIEF
   // JSON sidecar (`<id>-plan.vbrief.json`) lives next to it and was historically
   // left behind in active/ after merge (PAN-487). Detect it here so we can move
   // it alongside the `.md`. The `subdir` format already moves both files because
@@ -168,7 +168,7 @@ async function movePrdImpl(
     if (pushToRemote) {
       await execAsync('git push', { cwd: ctx.projectPath });
     }
-    const sidecarNote = resolvedSidecarSource ? ' (with vBRIEF sidecar)' : '';
+    const sidecarNote = resolvedSidecarSource ? ' (with xBRIEF sidecar)' : '';
     return stepOk(step, [`Moved ${formatLabel} from active/ to completed/ via git mv${sidecarNote}`]);
   } catch {
     // git mv failed — fall back to plain copy. cp handles both file and directory.

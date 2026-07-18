@@ -48,7 +48,7 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
   Overdeck itself. *An agent without a metabolism ships and rots; one with a metabolism
   ships and compounds.* **A workaround is a failed tick.**
 - **A fleet, not a single agent — you NEVER do the work yourself.** You are an orchestrator. You
-  **never create, edit, or commit ANY file** — not code, not a PRD, not a xBRIEF/spec, not a
+  **never create, edit, or commit ANY file** — not code, not a PRD, not an xBRIEF/spec, not a
   draft, not a doc — on `main` or any branch. The ONLY things you write are
   `docs/FLYWHEEL-STATE.md` (your memory) and the status snapshot via `pan flywheel emit-status`.
   Everything else you achieve by **dispatching** agents (`pan plan`/`start`/`strike`/`review`) and
@@ -153,7 +153,7 @@ This mirrors `isAutoPickable()` in `src/lib/backlog/pickup.ts`. **No code guard 
 it in the spawn path — honoring it is your job.** The gates:
 
 - **ready** — operator marked it workable (`ready` label, Definition of Ready).
-- **planned** — has a xBRIEF spec *and* beads.
+- **planned** — has an xBRIEF spec *and* beads.
 - **released** — operator's "go" after reviewing the plan (`released`, PAN-2059). Required to
   auto-start when `auto_pickup_backlog` is OFF; when ON, the toggle is the blanket release.
   Operator-only — never add the label yourself.

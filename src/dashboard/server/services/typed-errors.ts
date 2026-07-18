@@ -52,7 +52,7 @@ export class AgentAlreadyRunning extends Data.TaggedError('AgentAlreadyRunning')
   readonly id: string;
 }> {}
 
-/** The planning vBRIEF has no items — nothing to implement. */
+/** The planning xBRIEF has no items — nothing to implement. */
 export class PlanEmpty extends Data.TaggedError('PlanEmpty')<{
   readonly id: string;
 }> {}

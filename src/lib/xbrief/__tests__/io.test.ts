@@ -13,7 +13,7 @@ import { subItemsOf, type XBriefDocument, type XBriefSubItem } from '../types.js
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
 const ISSUE_ID = 'PAN-100';
-const SPEC_FILENAME = '2026-01-01-PAN-100-test-plan.vbrief.json';
+const SPEC_FILENAME = '2026-01-01-PAN-100-test-plan.xbrief.json';
 const LEGACY_FIXTURE_PATH = join(
   dirname(fileURLToPath(import.meta.url)),
   'fixtures',
@@ -95,7 +95,7 @@ function writeRecord(statusOverrides: Record<string, string>): void {
 }
 
 beforeEach(() => {
-  PROJECT_ROOT = join(tmpdir(), `vbrief-io-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  PROJECT_ROOT = join(tmpdir(), `xbrief-io-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   WORKSPACE_PATH = join(PROJECT_ROOT, 'workspaces', `feature-${ISSUE_ID.toLowerCase()}`);
   mkdirSync(WORKSPACE_PATH, { recursive: true });
 });

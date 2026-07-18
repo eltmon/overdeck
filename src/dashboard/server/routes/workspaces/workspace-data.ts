@@ -47,7 +47,7 @@ import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/type
 import { getWorkspacePathForIssue } from '../../workspace-paths.js';
 import { criticalPath, actionableDoc } from '../../../../lib/xbrief/dag.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../../lib/xbrief/xbrief-index.js';
-import { VBRIEF_INSPECTION_POLICIES } from '../../../../lib/xbrief/types.js';
+import { XBRIEF_INSPECTION_POLICIES } from '../../../../lib/xbrief/types.js';
 import type { XBriefDocument, XBriefInspectionPolicy } from '../../../../lib/xbrief/types.js';
 import { getChangedFiles, getDiffBase, getDiffStat } from '../../../../lib/cloister/review-context.js';
 import type { ChangedFile } from '../../../../lib/cloister/review-context.js';
@@ -781,7 +781,7 @@ const getWorkspacePlanRoute = HttpRouter.add(
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
-        { error: 'No vBRIEF plan found for this workspace' },
+        { error: 'No xBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
@@ -841,7 +841,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
 
     const body = yield* readJsonBody;
     const policy = (body as { inspectionPolicy?: unknown }).inspectionPolicy;
-    if (!VBRIEF_INSPECTION_POLICIES.includes(policy as XBriefInspectionPolicy)) {
+    if (!XBRIEF_INSPECTION_POLICIES.includes(policy as XBriefInspectionPolicy)) {
       return jsonResponse({ error: 'Invalid inspection policy' }, { status: 400 });
     }
 
@@ -850,7 +850,7 @@ const patchWorkspacePlanInspectionPolicyRoute = HttpRouter.add(
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
-        { error: 'No vBRIEF plan found for this workspace' },
+        { error: 'No xBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }
@@ -960,7 +960,7 @@ const patchWorkspaceTieredExecutionRoute = HttpRouter.add(
     const location = yield* resolvePlanLocation(projectPath, issueId);
     if (!location) {
       return jsonResponse(
-        { error: 'No vBRIEF plan found for this workspace' },
+        { error: 'No xBRIEF plan found for this workspace' },
         { status: 404 }
       );
     }

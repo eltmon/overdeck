@@ -52,7 +52,7 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
     expect(r.inPipeline).toBe(false);
   });
 
-  it('planned_backlog: open issue with a vBRIEF spec but no branch or PR', () => {
+  it('planned_backlog: open issue with an xBRIEF spec but no branch or PR', () => {
     const r = resolvePipelineMembership(sig({ issueOpen: true, hasXbriefSpec: true }));
     expect(r.bucket).toBe('planned_backlog');
     expect(r.inPipeline).toBe(true);
@@ -64,7 +64,7 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
     expect(r.inPipeline).toBe(true);
   });
 
-  it('clean_terminal: closed issue with a vBRIEF spec and no open PR remains terminal', () => {
+  it('clean_terminal: closed issue with an xBRIEF spec and no open PR remains terminal', () => {
     const r = resolvePipelineMembership(sig({ issueOpen: false, hasXbriefSpec: true }));
     expect(r.bucket).toBe('clean_terminal');
     expect(r.inPipeline).toBe(false);

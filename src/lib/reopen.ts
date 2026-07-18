@@ -78,7 +78,7 @@ export interface ReopenOptions {
   });
   result.specialistStatesReset = true;
 
-  // 2. Append a reopen breadcrumb to the scope vBRIEF's continue file.
+  // 2. Append a reopen breadcrumb to the scope xBRIEF's continue file.
   const resolved = resolveProjectFromIssueSync(issueId);
   if (resolved) {
     try {

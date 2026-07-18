@@ -79,7 +79,7 @@ describe('pipeline membership no-loss audit', () => {
     expect(membership.bucket).toBe('planned_backlog');
     expect(membership.reasons).toContain(PLANNED_BACKLOG_SPEC_ONLY_REASON);
     expect(PLANNED_BACKLOG_SPEC_ONLY_REASON).toBe(
-      'open issue with a vBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
+      'open issue with an xBRIEF spec but no branch/PR — planned work whose plan encodes code paths that age; needs starting or re-planning',
     );
   });
 

@@ -108,7 +108,7 @@ describe('assembleUatContextPlanFields', () => {
     ]);
   });
 
-  it('returns empty plan fields when no vBRIEF document is available', () => {
+  it('returns empty plan fields when no xBRIEF document is available', () => {
     expect(assembleUatContextPlanFields(null)).toEqual({
       acceptanceCriteria: [],
       deliverables: [],

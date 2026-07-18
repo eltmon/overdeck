@@ -1,5 +1,5 @@
 /**
- * vBRIEF Index — async, cached issue→vBRIEF lookups for server hot paths.
+ * xBRIEF Index — async, cached issue→xBRIEF lookups for server hot paths.
  *
  * PAN-967 Phase 2 makes `.pan/specs/` the canonical spec store. During the
  * migration window, legacy `vbrief/<lifecycle>/` directories remain as fallback
@@ -11,7 +11,7 @@ import { join } from 'path';
 import { Effect } from 'effect';
 
 import {
-  VBRIEF_LIFECYCLE_DIRS,
+  LEGACY_VBRIEF_LIFECYCLE_DIRS,
   parseXBriefFilename,
   resolveXBriefDir,
   type XBriefLifecycleDir,
@@ -92,7 +92,7 @@ async function buildProjectIndex(projectRoot: string): Promise<ProjectIndex> {
     }
   }
 
-  for (const lifecycleDir of VBRIEF_LIFECYCLE_DIRS) {
+  for (const lifecycleDir of LEGACY_VBRIEF_LIFECYCLE_DIRS) {
     const dirPath = resolveXBriefDir(projectRoot, lifecycleDir);
     if (!existsSync(dirPath)) continue;
     let names: string[];

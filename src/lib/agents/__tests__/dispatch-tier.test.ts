@@ -272,7 +272,7 @@ describe('resolveSingleWorkTierSpawnParams', () => {
     expect(resolveSingleWorkTierSpawnParams('/ws')).toEqual(IMPLICIT_PARAMS);
   });
 
-  it('leaves ordinary single work-agent starts untouched when no vBRIEF plan is readable', () => {
+  it('leaves ordinary single work-agent starts untouched when no xBRIEF plan is readable', () => {
     mockConfig(TIER_CONFIG);
     vi.mocked(readWorkspacePlanSync).mockReturnValue(null);
 

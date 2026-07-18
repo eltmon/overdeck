@@ -152,13 +152,13 @@ describe('specialists done command', () => {
     expect(exit).toHaveBeenCalledWith(0);
   });
 
-  it('requires an exact vBRIEF item for inspect verdicts', async () => {
+  it('requires an exact xBRIEF item for inspect verdicts', async () => {
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await expect(doneCommand('inspect', 'pan-1059', { status: 'passed' }))
       .rejects.toThrow('--item is required for inspect verdicts');
     await expect(doneCommand('inspect', 'pan-1059', { status: 'passed', item: 'missing' }))
-      .rejects.toThrow('Item "missing" does not exist in the vBRIEF for PAN-1059');
+      .rejects.toThrow('Item "missing" does not exist in the xBRIEF for PAN-1059');
 
     await doneCommand('inspect', 'pan-1059', {
       status: 'passed',

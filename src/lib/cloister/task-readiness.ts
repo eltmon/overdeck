@@ -2,10 +2,10 @@
  * DAG-aware task readiness module for Cloister scheduling (PAN-388 Phase 4)
  *
  * Provides:
- * - isTaskReady(): checks if a xBRIEF item's hard dependencies are all done
+ * - isTaskReady(): checks if an xBRIEF item's hard dependencies are all done
  * - getUnblockedItems(): returns items newly unblocked after a task completes
  *
- * Gracefully degrades when no plan.vbrief.json exists — all tasks are ready.
+ * Gracefully degrades when no xBRIEF plan exists — all tasks are ready.
  */
 
 import { Effect } from 'effect';

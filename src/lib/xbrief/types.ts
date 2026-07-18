@@ -1,7 +1,7 @@
 /**
- * vBRIEF Type Definitions
+ * xBRIEF Type Definitions
  *
- * Conforms to vBRIEF v0.6 specification (https://github.com/deftai/vBRIEF).
+ * Conforms to xBRIEF v0.8 specification (https://github.com/deftai/xBRIEF).
  * Structured plan format produced by the planning agent and consumed by
  * Cloister for programmatic task execution and DAG visualization.
  *
@@ -22,7 +22,7 @@
 
 export type XBriefEdgeType = 'blocks' | 'informs' | 'invalidates' | 'suggests';
 
-// vBRIEF status enum
+// xBRIEF status enum
 export type XBriefItemStatus = 'draft' | 'proposed' | 'approved' | 'pending' | 'running' | 'completed' | 'blocked' | 'cancelled' | 'failed';
 
 export type XBriefPriority = 'critical' | 'high' | 'medium' | 'low';
@@ -31,7 +31,7 @@ export type XBriefDifficulty = 'trivial' | 'simple' | 'medium' | 'complex' | 'ex
 
 export type XBriefItemKind = 'docs' | 'api' | 'backend' | 'frontend' | 'infra' | 'test' | 'refactor' | 'design' | 'spike';
 
-export const DEFAULT_VBRIEF_ITEM_KIND: XBriefItemKind = 'backend';
+export const DEFAULT_XBRIEF_ITEM_KIND: XBriefItemKind = 'backend';
 
 export type FilesScopeConfidence = 'high' | 'medium' | 'low';
 
@@ -93,9 +93,9 @@ export interface XBriefItem {
     Action?: string;
     [key: string]: string | undefined;
   };
-  /** vBRIEF v0.6 child items. v0.5 documents used subItems for the same structure. */
+  /** xBRIEF v0.6 child items. v0.5 documents used subItems for the same structure. */
   items?: XBriefSubItem[];
-  /** Legacy vBRIEF v0.5 child items. Kept as a read alias for compatibility. */
+  /** Legacy xBRIEF v0.5 child items. Kept as a read alias for compatibility. */
   subItems?: XBriefSubItem[];
 }
 
@@ -140,7 +140,7 @@ export interface XBriefPlan {
    * filename convention).
    */
   metadata?: {
-    /** Issue-keyed filename used in `./vbrief/<lifecycle>/`. Set by plan-finalize. */
+    /** Issue-keyed `.xbrief.json` filename used in `specs/` on `overdeck-state`. Set by plan finalization. */
     canonicalFilename?: string;
     /** Why the plan carries no documentation item. Set only when the change alters no documented surface; waives the docs-item-missing quality gate. */
     docsJustification?: string;
@@ -150,8 +150,8 @@ export interface XBriefPlan {
   edges: XBriefEdge[];
 }
 
-export const VBRIEF_INSPECTION_POLICIES = ['auto', 'never', 'fast', 'deep'] as const;
-export type XBriefInspectionPolicy = typeof VBRIEF_INSPECTION_POLICIES[number];
+export const XBRIEF_INSPECTION_POLICIES = ['auto', 'never', 'fast', 'deep'] as const;
+export type XBriefInspectionPolicy = typeof XBRIEF_INSPECTION_POLICIES[number];
 
 export interface XBriefInfo {
   version: string;
@@ -178,7 +178,7 @@ export function subItemsOf(item: XBriefItem): XBriefSubItem[] {
 }
 
 export function resolveXBriefItemKind(metadata?: Pick<XBriefItemMetadata, 'kind'>): XBriefItemKind {
-  return metadata?.kind ?? DEFAULT_VBRIEF_ITEM_KIND;
+  return metadata?.kind ?? DEFAULT_XBRIEF_ITEM_KIND;
 }
 
 /**

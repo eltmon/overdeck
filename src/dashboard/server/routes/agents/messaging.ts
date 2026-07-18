@@ -85,7 +85,7 @@ export const postAgentPokeRoute = HttpRouter.add(
     const { message } = body as any;
     const defaultPokeMessage =
       "You seem to have been inactive for a while. If you're stuck:\n" +
-      '1. Check your current task in continue.vbrief.json\n' +
+      '1. Check your current xBRIEF task with `pan task show <issue> <item-id>`\n' +
       '2. Try an alternative approach if blocked\n' +
       '3. Ask for help if needed\n\n' +
       "What's your current status?";

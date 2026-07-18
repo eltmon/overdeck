@@ -101,7 +101,7 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
   // every issue in the project (PAN-1015 spec on main → review feedback
   // for PAN-977 silently dropped). Derive root status from plan.status
   // when missing rather than throwing.
-  // Also map vBRIEF legacy statuses (approved, running) → active.
+  // Also map xBRIEF legacy statuses (approved, running) → active.
   if (!isPanSpecStatus(doc.status)) {
     const plan = doc.plan as Record<string, unknown> | undefined
     const mapped = mapXBriefPlanStatusToPanSpec(plan?.status)
@@ -112,13 +112,17 @@ function parsePanSpecDocumentFromString(raw: string, path: string): PanSpecDocum
     }
   }
 
-  // Validate required vBRIEF shape
-  if (!doc.xBRIEFInfo || !doc.plan) {
+  // Validate required xBRIEF shape and normalize the legacy envelope on read.
+  if ((!doc.xBRIEFInfo && !doc.vBRIEFInfo) || !doc.plan) {
     throw new Error(
-      `Invalid vBRIEF format in ${path}: missing 'xBRIEFInfo' or 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
-        `vBRIEF/xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
-        `See docs/VBRIEF.md for the correct format.`,
+      `Invalid xBRIEF format in ${path}: missing 'xBRIEFInfo' or legacy 'vBRIEFInfo' and/or 'plan' top-level keys. ` +
+        `xBRIEF v0.5-v0.8 requires { "xBRIEFInfo" or legacy "vBRIEFInfo": { "version": "0.5" through "0.8" }, "plan": { ... } }. ` +
+        `See docs/XBRIEF.md for the correct format.`,
     )
+  }
+  if (!doc.xBRIEFInfo && doc.vBRIEFInfo) {
+    doc.xBRIEFInfo = doc.vBRIEFInfo;
+    delete doc.vBRIEFInfo;
   }
 
   return doc as unknown as PanSpecDocument

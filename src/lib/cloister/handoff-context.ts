@@ -255,7 +255,7 @@ export function serializeHandoffContext(context: HandoffContext): string {
 
   // Continue file content (structured planning state)
   if (context.continueState) {
-    lines.push('## Current State (continue.vbrief.json)');
+    lines.push('## Current State (.overdeck/continue.json)');
     lines.push('');
     lines.push('```json');
     lines.push(JSON.stringify(context.continueState, null, 2));

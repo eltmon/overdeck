@@ -7,7 +7,7 @@ const files = [
   'docs/STATE-PLANE-COMMIT-POLICY.md',
   'docs/CONTEXT-LAYERS.md',
   'configuration/context-layers.mdx',
-  'docs/VBRIEF.md',
+  'docs/XBRIEF.md',
   'sync-sources/rules/prd-folder-placement.md',
   'sync-sources/rules/prd-authoring.md',
   'sync-sources/rules/rule-authoring.md',
@@ -25,10 +25,11 @@ describe('state-plane documentation', () => {
     expect(text).not.toMatch(/`overdeck-state:(drafts|specs|records|continues)\//);
   });
 
-  it('preserves the PAN-967 historical transition and states the current spec home separately', () => {
-    const text = readFileSync('docs/VBRIEF.md', 'utf8');
-    expect(text).toContain('PAN-967 replaced `.planning/plan.vbrief.json` with workspace-local `.pan/spec.vbrief.json`');
-    expect(text).toContain('current canonical spec is `specs/<file>` on `overdeck-state`');
+  it('documents the canonical xBRIEF state home and legacy workspace compatibility separately', () => {
+    const text = readFileSync('docs/XBRIEF.md', 'utf8');
+    expect(text).toContain('current canonical spec and continue writers use `*.xbrief.json`');
+    expect(text).toContain('workspace-only `spec.vbrief.json` compatibility filename');
+    expect(text).toContain('New writes target `specs/` on `overdeck-state`');
   });
 
   it('allows legacy permanent paths only in explicitly historical top-level docs', () => {

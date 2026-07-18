@@ -27,7 +27,7 @@ export interface IssueRoutingRule {
 }
 
 /**
- * PAN-1908: where per-issue permanent records (vBRIEF continue + pipeline +
+ * PAN-1908: where per-issue permanent records (xBRIEF continue + pipeline +
  * close-out + owner lease) are committed in git.
  */
 export interface PanRecordsConfig {
@@ -183,7 +183,7 @@ export interface ProjectConfig {
   /** Local workspace packages that need building before quality gates (e.g., @overdeck/contracts) */
   workspace_packages?: Array<{ path: string; build_command: string }>;
   /**
-   * Directory name for vBRIEF lifecycle directories (proposed/active/completed/cancelled).
+   * Directory name for xBRIEF lifecycle directories (proposed/active/completed/cancelled).
    * Defaults to "vbrief". Relative to the project root.
    */
   vbrief_dir?: string;

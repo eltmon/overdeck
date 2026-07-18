@@ -146,7 +146,7 @@ function mapRallyStateToCanonical(issueState: string): string {
 /**
  * Compute planning-state for an issue via cheap filesystem checks.
  *
- * `isPlanningComplete()` reads and JSON-parses the workspace's plan.vbrief.json
+ * `isPlanningComplete()` resolves and parses the workspace's xBRIEF plan
  * file. Calling it for every issue on every getSnapshot — which happens once
  * per WS-RPC bootstrap and then every emitted snapshot — would do 870+ sync
  * disk reads per call and starve the dashboard event loop until WS clients

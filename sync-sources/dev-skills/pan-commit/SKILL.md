@@ -29,7 +29,7 @@ Current expectations in this repo:
   - `workspace`
   - `cli`
   - `review`
-  - `vBRIEF tasks`
+  - `beads`
   - `db`
   - `specialists`
   - `terminal`

@@ -569,7 +569,7 @@ When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm 
 
 Overdeck emits **xBRIEF v0.8** for machine-readable work plans (readers accept v0.5–v0.8; see `docs/XBRIEF.md`). Key references:
 
-- **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from vBRIEF at v0.7.0; spec now v0.8)
+- **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from xBRIEF at v0.7.0; spec now v0.8)
 - **Our fork:** [github.com/eltmon/xBRIEF](https://github.com/eltmon/xBRIEF)
 - **Extension proposal:** [deftai/xBRIEF#40](https://github.com/deftai/xBRIEF/issues/40) (supersedes #1)
 - **Overdeck docs:** [docs/XBRIEF.md](docs/XBRIEF.md) — full schema, lifecycle, and migration notes

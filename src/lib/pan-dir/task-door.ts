@@ -1,4 +1,4 @@
-/** Single task-mutation write door over the immutable vBRIEF specification. */
+/** Single task-mutation write door over the immutable xBRIEF specification. */
 import { hostname } from 'node:os';
 import { join } from 'node:path';
 
@@ -110,10 +110,10 @@ export async function applyTaskStatusChange(
   await updateIssueRecord(project, normalizedIssueId, (record) => {
     const workspacePath = join(project.path, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`);
     const planPath = findPlanSync(workspacePath);
-    if (!planPath) throw new Error(`The vBRIEF for ${normalizedIssueId} is missing or unreadable. Return the issue to planning before changing task state.`);
+    if (!planPath) throw new Error(`The xBRIEF for ${normalizedIssueId} is missing or unreadable. Return the issue to planning before changing task state.`);
     const doc = applyStatusOverrides(readPlanSync(planPath), record.statusOverrides ?? {});
     const item = doc.plan.items.find(({ id }) => id === operation.itemId);
-    if (!item) throw new Error(`Task ${operation.itemId} does not exist in the immutable vBRIEF for ${normalizedIssueId}. Return the issue to planning to change scope.`);
+    if (!item) throw new Error(`Task ${operation.itemId} does not exist in the immutable xBRIEF for ${normalizedIssueId}. Return the issue to planning to change scope.`);
 
     const currentStatus = item.status;
     const currentSequence = record.tasks?.sequence ?? 0;

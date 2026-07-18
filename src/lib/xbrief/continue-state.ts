@@ -41,7 +41,7 @@ export interface ContinueHazard {
 export interface ContinueResumePoint {
   /** Free-form description of what the next agent should do. */
   description: string;
-  /** Optional vBRIEF item ID the next agent should pick up. */
+  /** Optional xBRIEF item ID the next agent should pick up. */
   itemId?: string;
   /** Optional file paths the next agent should read first. */
   filesToRead?: string[];
@@ -60,7 +60,7 @@ export interface ContinueFeedbackEntry {
   markdownBody: string;
 }
 
-/** Scope prediction drift recorded when actual changed files differ from vBRIEF metadata.files_scope. */
+/** Scope prediction drift recorded when actual changed files differ from xBRIEF metadata.files_scope. */
 export interface ScopeDriftRecord {
   /** Files changed by the branch that did not match any declared files_scope entry. */
   outsideDeclaredScope: string[];

@@ -109,3 +109,4 @@ workspace-add-repo
 workspace-status
 write-spec
 write-vbrief
+write-xbrief

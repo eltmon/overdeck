@@ -1,8 +1,8 @@
 /**
- * vBRIEF Module
+ * xBRIEF Module
  *
- * Overdeck's structured planning format based on the vBRIEF v0.6 spec.
- * See: https://github.com/deftai/vBRIEF
+ * Overdeck's structured planning format based on the xBRIEF v0.8 spec.
+ * See: https://github.com/deftai/xBRIEF
  *
  * All date fields MUST use RFC 3339 date-time format ("2025-09-01T00:00:00Z"),
  * NOT plain dates ("2025-09-01"). Use toRFC3339() to convert if needed.
@@ -23,7 +23,7 @@ export type {
 } from './types.js';
 
 // Date helpers
-export { DEFAULT_VBRIEF_ITEM_KIND, isRFC3339DateTime, resolveXBriefItemKind, toRFC3339 } from './types.js';
+export { DEFAULT_XBRIEF_ITEM_KIND, isRFC3339DateTime, resolveXBriefItemKind, toRFC3339 } from './types.js';
 
 // Builder
 export { PlanBuilder, planBuilder } from './builder.js';

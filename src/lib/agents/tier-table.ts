@@ -171,7 +171,7 @@ export function resolveTieredExecutionBlock(
  * Per-issue tiered_execution opt-in/out (PAN-1791 FR-9, PAN-2383 FR-1). Resolves with precedence:
  * record override > plan.metadata.tiered_execution > config.enabled.
  *
- * An issue's vBRIEF may set `tiered_execution: 'on' | 'off'` in plan.metadata; a record
+ * An issue's xBRIEF may set `tiered_execution: 'on' | 'off'` in plan.metadata; a record
  * override takes precedence; an explicit value wins over the global `tiered_execution.enabled`
  * flag, and an unset value inherits it — zero behavior change when no overrides exist.
  * Any invalid value is a config error (fail-loud, no silent inherit on typos).

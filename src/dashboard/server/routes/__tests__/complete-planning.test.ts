@@ -51,7 +51,7 @@ function makeDoc(issueId: string): XBriefDocument {
       title: 'First run promotion',
       status: 'draft',
       metadata: {
-        canonicalFilename: '../../outside.vbrief.json',
+        canonicalFilename: '../../outside.xbrief.json',
         docsJustification: 'Promotion-mechanics fixture; documentation coverage is exercised in the quality-lint suite',
       } as Record<string, unknown>,
       items: [
@@ -69,13 +69,13 @@ function makeDoc(issueId: string): XBriefDocument {
           subItems: [
             {
               id: 'item-1.ac1',
-              title: 'The project spec directory stores the promoted vBRIEF',
+              title: 'The project spec directory stores the promoted xBRIEF',
               status: 'pending',
               metadata: { kind: 'acceptance_criterion' },
             },
             {
               id: 'item-1.ac2',
-              title: 'The promoted vBRIEF persists proposed status',
+              title: 'The promoted xBRIEF persists proposed status',
               status: 'pending',
               metadata: { kind: 'acceptance_criterion' },
             },
@@ -223,7 +223,7 @@ describe('completePlanningArtifacts', () => {
       '',
     ].join('\n'));
     writeFileSync(join(workspacePath, '.pan', 'drafts', 'PAN-1931.md'), '# Draft\n');
-    writeFileSync(join(workspacePath, '.pan', 'specs', 'PAN-1931.vbrief.json'), '{}\n');
+    writeFileSync(join(workspacePath, '.pan', 'specs', 'PAN-1931.xbrief.json'), '{}\n');
     writeFileSync(join(workspacePath, '.pan', 'continue.json'), '{}\n');
     writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), '{}\n');
 
@@ -257,13 +257,13 @@ describe('completePlanningArtifacts', () => {
       '',
     ].join('\n'));
 
-    expect(completePlanningFilesToStage(projectPath, '2026-06-12-PAN-1150-plan.vbrief.json')).toEqual([
-      '.pan/specs/2026-06-12-PAN-1150-plan.vbrief.json',
+    expect(completePlanningFilesToStage(projectPath, '2026-06-12-PAN-1150-plan.xbrief.json')).toEqual([
+      '.pan/specs/2026-06-12-PAN-1150-plan.xbrief.json',
       '.pan/context/codebase/',
     ]);
   });
 
-  it('promotes a first-run workspace draft and reports one vBRIEF task per plan item', async () => {
+  it('promotes a first-run workspace draft and reports one xBRIEF task per plan item', async () => {
     const issueId = 'PAN-1143';
     const { projectPath, workspacePath } = makeProject(issueId);
     await mkdir(join(workspacePath, '.pan'), { recursive: true });
@@ -277,7 +277,7 @@ describe('completePlanningArtifacts', () => {
 
     const specFiles = readdirSync(join(projectPath, '.pan', 'specs'));
     expect(specFiles).toEqual([result.proposed.filename]);
-    expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.vbrief\.json$/);
+    expect(result.proposed.filename).toMatch(/^\d{4}-\d{2}-\d{2}-PAN-1143-first-run-promotion\.xbrief\.json$/);
     expect(result.proposed.path).toBe(join(projectPath, '.pan', 'specs', result.proposed.filename));
     expect(result.taskCount).toBe(2);
 
@@ -333,7 +333,7 @@ describe('completePlanningArtifacts', () => {
       mkdir(workspacePanDir, { recursive: true }),
     ]);
 
-    const canonicalFilename = '2026-07-16-PAN-2232-extract-specialist-spawn-seam.vbrief.json';
+    const canonicalFilename = '2026-07-16-PAN-2232-extract-specialist-spawn-seam.xbrief.json';
     const canonicalPath = join(specsDir, canonicalFilename);
     const blockedDoc = makeFileSizeRatchetDoc(issueId, 'npm run lint');
     writeFileSync(canonicalPath, JSON.stringify({

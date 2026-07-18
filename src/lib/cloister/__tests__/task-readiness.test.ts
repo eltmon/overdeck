@@ -8,7 +8,7 @@ import type { XBriefDocument } from '../../xbrief/types.js';
 let PROJECT_ROOT: string;
 let WORKSPACE_PATH: string;
 const ISSUE_ID = 'PAN-300';
-const SPEC_FILENAME = '2026-01-01-PAN-300-test.vbrief.json';
+const SPEC_FILENAME = '2026-01-01-PAN-300-test.xbrief.json';
 
 function writePlan(doc: XBriefDocument): void {
   const specsDir = join(PROJECT_ROOT, '.pan', 'specs');

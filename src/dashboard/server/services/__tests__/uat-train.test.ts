@@ -169,12 +169,12 @@ describe('getUatGenerationsPayload', () => {
     expect(mocks.findXBriefByIssue).not.toHaveBeenCalled();
   });
 
-  it('bounds member vBRIEF reads and reuses unchanged checklist summaries', async () => {
+  it('bounds member xBRIEF reads and reuses unchanged checklist summaries', async () => {
     tmp = await mkdtemp(join(tmpdir(), 'pan-uat-train-'));
     const pathByIssue = new Map<string, string>();
     const members = await Promise.all(Array.from({ length: 8 }, async (_, index) => {
       const issueId = `PAN-${index + 1}`;
-      const path = join(tmp!, `${issueId}.vbrief.json`);
+      const path = join(tmp!, `${issueId}.xbrief.json`);
       await writeFile(path, '{}');
       pathByIssue.set(issueId, path);
       return { issueId, title: issueId, branch: `feature/pan-${index + 1}`, headSha: `h${index + 1}`, mergeOrder: index + 1 };
@@ -190,7 +190,7 @@ describe('getUatGenerationsPayload', () => {
       issueId,
       slug: issueId.toLowerCase(),
       date: '2026-06-10',
-      filename: `${issueId}.vbrief.json`,
+      filename: `${issueId}.xbrief.json`,
     }));
     mocks.readXBriefDocument.mockImplementation((path: string) => Effect.promise(async () => {
       activeReads += 1;

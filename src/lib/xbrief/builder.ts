@@ -1,7 +1,7 @@
 /**
- * vBRIEF Plan Builder
+ * xBRIEF Plan Builder
  *
- * Fluent API for constructing vBRIEF documents programmatically.
+ * Fluent API for constructing xBRIEF documents programmatically.
  * All date fields use RFC 3339 date-time format.
  */
 

@@ -172,7 +172,7 @@ const execFileAsync = promisify(execFile);
 /** One commit-review event as delivered to the standing supervisor. */
 export interface SupervisorReviewEvent {
   issueId: string;
-  /** vBRIEF item id receiving the verdict. */
+  /** xBRIEF item id receiving the verdict. */
   itemId: string;
   itemTitle: string;
   /** Full commit sha being reviewed. */
@@ -188,7 +188,7 @@ export interface SupervisorReviewEvent {
 }
 
 export interface SupervisorVerdict {
-  /** vBRIEF item id receiving the verdict. */
+  /** xBRIEF item id receiving the verdict. */
   itemId: string;
   /** Supervisor ack clears prior blocking findings; failed/blocked records one. */
   status: 'passed' | 'ack' | 'failed' | 'blocked';
@@ -200,10 +200,10 @@ export interface DeliverCommitForReviewOptions {
   /** Workspace the commit lives in (git worktree on the feature branch). */
   workspacePath: string;
   issueId: string;
-  /** The vBRIEF item the commit implements. */
+  /** The xBRIEF item the commit implements. */
   item: XBriefItem;
   sha: string;
-  /** Item id receiving the verdict; defaults to the vBRIEF item id. */
+  /** Item id receiving the verdict; defaults to the xBRIEF item id. */
   itemId?: string;
   /**
    * PRD draft markdown to source traced FR text from. When omitted and the
@@ -282,13 +282,13 @@ function dependencyClosure(itemId: string, edges: readonly XBriefEdge[]): Set<st
 }
 
 function childItems(item: XBriefItem): XBriefSubItem[] {
-  // vBRIEF v0.6 uses `items`; v0.5 documents used `subItems` for the same
+  // xBRIEF v0.6 uses `items`; v0.5 documents used `subItems` for the same
   // structure and are still read as a compatibility alias.
   return item.items ?? item.subItems ?? [];
 }
 
 /**
- * Pull the bead's acceptance-criterion titles from its vBRIEF child items
+ * Pull the bead's acceptance-criterion titles from its xBRIEF child items
  * (child metadata.kind === 'acceptance_criterion').
  */
 export function extractAcceptanceCriteria(item: XBriefItem): string[] {
@@ -414,7 +414,7 @@ async function getCommitDiff(workspacePath: string, sha: string): Promise<string
 
 /**
  * Deliver one subscribed commit to the standing supervisor for review:
- * resolve the diff, pull the bead's acceptance criteria from its vBRIEF item
+ * resolve the diff, pull the bead's acceptance criteria from its xBRIEF item
  * (plus traced FR text when metadata.traces is present and a PRD draft was
  * provided), and send the composed review request via deliverAgentMessage.
  */
