@@ -88,6 +88,11 @@ describe('canUseHarness', () => {
     expect(canUseHarnessSync('codex', MODEL_BY_PROVIDER.anthropic, undefined)).toEqual({ allowed: true })
   })
 
+  it('allows ACP + Kimi under API-key and subscription-backed OAuth auth', () => {
+    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('acp', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
+  })
+
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
     for (const harness of HARNESSES) {
       const decision = canUseHarnessSync(harness, 'gpt-5.5', 'api-key')

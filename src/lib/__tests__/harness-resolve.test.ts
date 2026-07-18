@@ -9,6 +9,7 @@ const providerMocks = vi.hoisted(() => ({
   getProviderForModelSync: vi.fn(),
 }));
 const configMock = vi.hoisted(() => ({ loadConfigSync: vi.fn(() => ({ config: {} })) }));
+const binaryMocks = vi.hoisted(() => ({ available: new Set(['omp', 'codex', 'kimi']) }));
 
 vi.mock('../harness-policy.js', () => ({
   canUseHarnessSync: policyMocks.canUseHarnessSync,
@@ -20,14 +21,24 @@ vi.mock('../providers.js', () => ({
 }));
 vi.mock('../config-yaml.js', () => ({ loadConfigSync: configMock.loadConfigSync }));
 vi.mock('../agents.js', () => ({ getProviderAuthMode: vi.fn(async () => 'apikey') }));
-// Make the harness-binary probe succeed so hasHarnessBinary('ohmypi') returns
-// true in all tests regardless of what is installed on the host/CI runner.
-// Tests that never reach the binary check (they throw earlier) are unaffected.
+
+beforeEach(() => {
+  binaryMocks.available.clear();
+  binaryMocks.available.add('omp');
+  binaryMocks.available.add('codex');
+  binaryMocks.available.add('kimi');
+});
+
+// Control shared harness-binary resolution so binary-gated harnesses can be
+// tested without depending on the developer machine's installed CLIs.
 vi.mock('../harness-binary.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../harness-binary.js')>();
   return {
     ...actual,
-    resolveHarnessBinary: vi.fn(async (harness) => `/usr/local/bin/${actual.harnessBinaryName(harness)}`),
+    resolveHarnessBinary: vi.fn(async (harness) => {
+      const binary = actual.harnessBinaryName(harness);
+      return binaryMocks.available.has(binary) ? `/usr/local/bin/${binary}` : null;
+    }),
   };
 });
 
@@ -50,6 +61,28 @@ describe('resolveHarness — PAN-1871: no silent CLIProxy fallback for non-nativ
     const { resolveHarness } = await import('../harness-resolve.js');
     await expect(resolveHarness({ model: 'kimi-k2.7-code', role: 'work' }))
       .rejects.toThrow(/not native to claude-code/);
+  });
+
+  it('fails loudly when Kimi is configured for ACP but the kimi binary is missing', async () => {
+    providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
+    providerMocks.getBuiltInDefaultHarness.mockReturnValue('claude-code');
+    configMock.loadConfigSync.mockReturnValue({ config: { providerHarnesses: { kimi: 'acp' } } });
+    policyMocks.canUseHarnessSync.mockReturnValue({ allowed: true });
+    binaryMocks.available.delete('kimi');
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    await expect(resolveHarness({ model: 'kimi-k2.7-code', role: 'work' }))
+      .rejects.toThrow(/Harness acp.*no installed kimi binary.*refusing to silently fall back/);
+  });
+
+  it('returns ACP when Kimi is configured for ACP and the kimi binary is present', async () => {
+    providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
+    providerMocks.getBuiltInDefaultHarness.mockReturnValue('claude-code');
+    configMock.loadConfigSync.mockReturnValue({ config: { providerHarnesses: { kimi: 'acp' } } });
+    policyMocks.canUseHarnessSync.mockReturnValue({ allowed: true });
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    await expect(resolveHarness({ model: 'kimi-k2.7-code', role: 'work' })).resolves.toBe('acp');
   });
 
   it('still falls back to claude-code when a native (Anthropic) model has its resolved harness denied', async () => {

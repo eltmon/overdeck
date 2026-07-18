@@ -86,6 +86,10 @@ export function canUseHarnessSync(
     return ALLOWED
   }
 
+  if (harness === 'acp') {
+    return ALLOWED
+  }
+
   if (harness === 'ohmypi') {
     const provider = getProviderForModelSync(model)
     if (provider.name === 'anthropic' && authMode === 'subscription') {
