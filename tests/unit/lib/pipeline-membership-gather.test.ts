@@ -45,6 +45,7 @@ function deps(): PipelineMembershipGatherDeps {
     listMergedPullRequestHeads: vi.fn().mockResolvedValue(['feature/pan-1']),
     listIssueStates: vi.fn().mockImplementation(async (_owner, _repo, numbers: number[]) =>
       numbers.map((number) => ({ number, state: number === 4 ? 'open' as const : 'closed' as const }))),
+    listTrackerIssues: vi.fn().mockResolvedValue([]),
     listSpecIssueIds: vi.fn().mockResolvedValue(['PAN-4']),
     run: vi.fn().mockImplementation(async (command, args) => {
       if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-1\norigin/feature/pan-3\n';
@@ -264,15 +265,46 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.run).not.toHaveBeenCalledWith('gh', expect.anything(), expect.anything());
   });
 
-  it('returns no membership for a non-GitHub project without probing GitHub or git', async () => {
+  it('gathers tracker, branch, and spec lenses for a non-GitHub polyrepo', async () => {
     const mocked = deps();
-    const mixedTrackerProject = { ...project, github_repo: undefined };
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-1', state: 'open', labels: ['in-progress'] },
+      { issueId: 'MIN-2', state: 'closed', labels: [] },
+      { issueId: 'MIN-3', state: 'closed', labels: [] },
+    ]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['MIN-3']);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) => {
+      if (cwd === '/myn/frontend') {
+        return args.includes('--no-merged=main') ? 'feature/min-2\n' : 'feature/min-2\n';
+      }
+      if (cwd === '/myn/api') return '';
+      throw new Error(`Unexpected repository: ${cwd}`);
+    });
+    const mixedTrackerProject: ProjectConfig = {
+      name: 'mind-your-now',
+      path: '/myn',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'eltmon/mind-your-now',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
 
-    await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([]);
+    await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([
+      { issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: 'in-progress', hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-2', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
+    ]);
+    expect(mocked.listTrackerIssues).toHaveBeenCalledWith(mixedTrackerProject);
     expect(mocked.listOpenIssues).not.toHaveBeenCalled();
     expect(mocked.listOpenPullRequests).not.toHaveBeenCalled();
     expect(mocked.listMergedPullRequestHeads).not.toHaveBeenCalled();
-    expect(mocked.run).not.toHaveBeenCalled();
+    expect(mocked.listIssueStates).not.toHaveBeenCalled();
+    expect(mocked.run).toHaveBeenCalledTimes(4);
   });
 
   it('rejects GitHub projects without an issue prefix', async () => {

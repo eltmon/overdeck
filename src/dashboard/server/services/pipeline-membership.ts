@@ -16,11 +16,9 @@ export function createPipelineMembershipService(
   deps: PipelineMembershipServiceDeps = { gather: gatherProjectLensSignals, now: Date.now },
 ) {
   const cachedGather = createSettledTtlPromiseCache<string, PipelineMembership[]>(PIPELINE_MEMBERSHIP_TTL_MS, deps.now);
-  return async (project: ProjectConfig): Promise<PipelineMembership[]> => {
-    if (!project.github_repo) return [];
-    return cachedGather(project.path, () =>
+  return async (project: ProjectConfig): Promise<PipelineMembership[]> =>
+    cachedGather(project.path, () =>
       deps.gather(project).then((signals) => signals.map(resolvePipelineMembership)));
-  };
 }
 
 export const getProjectPipelineMembership = createPipelineMembershipService();
@@ -86,7 +84,6 @@ export function getPipelineMembershipSnapshotsForProjects(
   now = Date.now,
 ): ProjectPipelineMembershipResult[] {
   return projects.map((project) => {
-    if (!project.github_repo) return { project, error: new Error('Pipeline membership unavailable: missing github_repo') };
     const snapshot = membershipSnapshots.get(project.path);
     if (!snapshot?.refresh && (!snapshot || now() - snapshot.refreshedAt >= PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS)) {
       const current = snapshot ?? { value: [], refreshedAt: 0 };
@@ -106,7 +103,6 @@ export async function getPipelineMembershipSnapshotsForResourceDiscovery(
   now = Date.now,
 ): Promise<ProjectPipelineMembershipResult[]> {
   return Promise.all(projects.map(async (project) => {
-    if (!project.github_repo) return { project, error: new Error('Pipeline membership unavailable: missing github_repo') };
     const existing = membershipSnapshots.get(project.path);
     if (existing?.refreshedAt) {
       if (now() - existing.refreshedAt >= PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS) {

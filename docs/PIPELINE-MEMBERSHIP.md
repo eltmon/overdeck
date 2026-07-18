@@ -13,9 +13,9 @@ Pipeline membership is an exception queue: an issue is in the pipeline when its 
 5. The current pipeline phase label, when present.
 6. A durable vBRIEF spec on `overdeck-state`.
 
-A vBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. An open issue with a live `strike/` branch and no PR also surfaces as `planned_backlog`, so active strike work enters the pipeline before its PR opens. A `planned` label is only a phase hint; it never substitutes for the durable spec lens.
+A vBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. An open issue with a live `strike/` branch and no PR also surfaces as `planned_backlog`, so active strike work enters the pipeline before its PR opens. A `planned` label is only a phase hint; it never substitutes for the durable spec lens. Pull-request lenses are capability-gated: projects without `github_repo` still gather tracker state, configured repository branches, and vBRIEF specs instead of resolving to an empty membership set.
 
-Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness annotations. They never decide membership. This is why the resolver returns the same answer with a fresh, empty `overdeck.db`.
+Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness annotations. They never decide membership. This is why the resolver returns the same answer with a fresh, empty `overdeck.db`. Resource discovery may temporarily retain a live-resource row when a project's durable membership lookup is unavailable; it leaves membership annotations unset and does not treat a successful empty result as unavailable.
 
 ## Buckets
 
