@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T01:46:29.372Z",
-  "updated": "2026-07-18T03:32:06.990Z",
+  "updated": "2026-07-18T03:43:08.622Z",
   "pipeline": {
     "issueId": "PAN-2869",
     "reviewStatus": "pending",
@@ -12,7 +12,7 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T03:32:06.968Z",
+    "updatedAt": "2026-07-18T03:43:08.614Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
     "strikeReadyHead": "c895b36ec47232dd35acd8b98f984cb44b9e5dfc",
@@ -41,38 +41,38 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 51,
-            "output": 11316,
-            "cacheRead": 9352039,
-            "cacheWrite": 53136
+            "input": 72,
+            "output": 17257,
+            "cacheRead": 13461822,
+            "cacheWrite": 62318
           }
         },
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 3792790,
-            "output": 294409,
-            "cacheRead": 53286912,
+            "input": 4004744,
+            "output": 297687,
+            "cacheRead": 54979584,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 51,
-          "output": 11316,
-          "cacheRead": 9352039,
-          "cacheWrite": 53136
+          "input": 72,
+          "output": 17257,
+          "cacheRead": 13461822,
+          "cacheWrite": 62318
         },
         "openai/gpt-5.6-sol": {
-          "input": 3792790,
-          "output": 294409,
-          "cacheRead": 53286912,
+          "input": 4004744,
+          "output": 297687,
+          "cacheRead": 54979584,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 65.022231,
-        "pricingAsOf": "2026-07-18T03:32:06.971Z"
+        "usd": 71.548496,
+        "pricingAsOf": "2026-07-18T03:43:08.618Z"
       }
     },
     "merges": [],
