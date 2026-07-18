@@ -291,19 +291,18 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T09:18:53.116Z",
+  "updated": "2026-07-18T09:18:53.930Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T09:10:35.912Z",
+    "updatedAt": "2026-07-18T09:18:53.899Z",
     "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (401936ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2858/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2858\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/CommandDeck/ZoneCOverviewTabs/__tests__/PrDiffTab.test.tsx \u001b[2m(\u001b[22m\u001b[2m10 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 551\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders a 5k-line diff within a full-suite jsdom budget (smoke test) \u001b[33m 435\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mrenders terminal container with settings button\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mkeeps padding off the measured terminal host (PAN-2619)\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mkeeps padding off the measured terminal host (PAN-2619)\n\u001b[22m\u001b[39mXTerminal: WebSocket opened\nXTerminal: Sending attach dimensions: \u001b[33m100\u001b[39m x \u001b[33m30\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/IssuePolicyStrip.test.tsx \u001b[2m(\u001b[22m\u001b[2m18 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 533\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mloads auto-copy setting from localStorage\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2muses default auto-copy value when localStorage is empty\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mshows settings panel when settings button is clicked\n\u001b[22m\u001b[39mXTerminal: Creat\n…(542882 chars elided)…\n[49m\u001b[39m src/cli/commands/__tests__/release-state-snapshot.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/remote/__tests__/remote-state-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cli/commands/start-conflicting-work.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/config.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 2\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/dashboard/settings-api-model-ids.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/migrated-workspace-commit-gates.test.ts \u001b[\n...(truncated)",
     "inspectNotes": "All 5 ACs verified. AC1: tsdown entry emits dist/acp-host.js; host.test.ts binds sockets/acp-<id>.sock + writes 0600 acp-token/acp-session-id under a stubbed runtime. AC2: wrong token->401 with zero transcript/prompt writes; correct token+message forwards to runtime.prompt() and appends both turns to acp-session.jsonl. AC3: handleSessionUpdate/handleRequestPermission registered before runtime.start() (host.ts:79-96); test proves order + that an update fired during start() is captured (observedSessionUpdates:1), not dropped. AC4: kimi-scoped auth-failure catch writes '[error] kimi authentication is required... /login' to stdout, rethrows without retry (startCalls===1), main() sets process.exitCode=1. AC5: acp-session-id persisted 0600; --resume threads through main()->makeRuntime->session-runtime.ts's pre-existing resumeSessionId->session/load path (session-runtime.ts:567-640). Non-blocking flag for follow-up: src/lib/acp/host-render.ts's stripAcpPaneControl regex has literal raw control bytes instead of \\x escapes, making git treat the file as binary (breaks future diff/blame, likely trips eslint no-control-regex at verification) — doesn't affect any tested string here.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewRequestedAt": "2026-07-18T09:01:19.132Z",
@@ -595,9 +594,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1274276,
-            "output": 33662,
-            "cacheRead": 5768704,
+            "input": 1663967,
+            "output": 40034,
+            "cacheRead": 7471616,
             "cacheWrite": 0
           }
         },
@@ -611,9 +610,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 22565438,
-            "output": 942613,
-            "cacheRead": 213538304,
+            "input": 22755216,
+            "output": 947319,
+            "cacheRead": 216092160,
             "cacheWrite": 0
           }
         }
@@ -626,9 +625,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 23839714,
-          "output": 976275,
-          "cacheRead": 219307008,
+          "input": 24419183,
+          "output": 987353,
+          "cacheRead": 223563776,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -639,8 +638,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 272.841566,
-        "pricingAsOf": "2026-07-18T09:10:35.933Z"
+        "usd": 278.199635,
+        "pricingAsOf": "2026-07-18T09:18:53.923Z"
       }
     },
     "merges": [
