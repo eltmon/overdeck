@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T01:19:38.560Z",
+  "updated": "2026-07-18T01:19:49.478Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "pending",
@@ -152,5 +152,26 @@
     "docs-strike-convention": "completed",
     "docs-strike-convention.docs-strike-convention.ac1": "completed",
     "docs-strike-convention.docs-strike-convention.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/pipeline-membership-gather.ts",
+      "src/lib/pipeline-membership.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+      "tests/unit/lib/pipeline-membership-audit.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/lib/pipeline-membership-gather.ts",
+      "src/lib/pipeline-membership.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts",
+      "tests/unit/lib/pipeline-membership-audit.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-07-18T01:19:49.476Z"
   }
 }
