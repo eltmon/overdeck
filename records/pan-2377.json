@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T20:18:22.719Z",
+  "updated": "2026-07-18T20:27:49.265Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "run-binding-status": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 2486628,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T20:18:22.719Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -201,6 +193,17 @@
         "outcome": "completed",
         "reason": "Added a pure eligibility predicate and shared active-run dispatch gate enforcing Lane B singleton, Lane A concurrency, prerequisites, and logged --off-book overrides across dashboard and CLI starts.",
         "releasedAt": "2026-07-18T20:18:09.173Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 2486628,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T20:18:22.719Z",
+        "itemId": "run-binding-status",
+        "outcome": "completed",
+        "reason": "Typed launch order bindings, mechanically enrich status and run detail from canonical book progress, strip spoofed bookless status, and expose lane positions/drain state with parked-terminal coverage.",
+        "releasedAt": "2026-07-18T20:27:49.265Z"
       }
     ],
     "statusReasons": {
@@ -231,6 +234,10 @@
       "lane-enforcement": {
         "reason": "Added a pure eligibility predicate and shared active-run dispatch gate enforcing Lane B singleton, Lane A concurrency, prerequisites, and logged --off-book overrides across dashboard and CLI starts.",
         "updatedAt": "2026-07-18T20:18:09.173Z"
+      },
+      "run-binding-status": {
+        "reason": "Typed launch order bindings, mechanically enrich status and run detail from canonical book progress, strip spoofed bookless status, and expose lane positions/drain state with parked-terminal coverage.",
+        "updatedAt": "2026-07-18T20:27:49.265Z"
       }
     }
   },
@@ -268,6 +275,9 @@
     "lane-enforcement.lane-enforcement.ac2": "completed",
     "lane-enforcement.lane-enforcement.ac3": "completed",
     "lane-enforcement.lane-enforcement.ac4": "completed",
-    "run-binding-status": "running"
+    "run-binding-status": "completed",
+    "run-binding-status.run-binding-status.ac1": "completed",
+    "run-binding-status.run-binding-status.ac2": "completed",
+    "run-binding-status.run-binding-status.ac3": "completed"
   }
 }
