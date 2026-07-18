@@ -70,6 +70,20 @@ export function groupProjects(issues: ProjectFeature[]): ProjectData[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export async function fetchProjectPipelineMembership(projectKey: string): Promise<true> {
+  const response = await fetch(`/api/pipeline/membership?project=${encodeURIComponent(projectKey)}`);
+  if (response.ok) return true;
+
+  let message = 'Pipeline membership could not be loaded';
+  try {
+    const body = await response.json() as { error?: unknown };
+    if (typeof body.error === 'string') message = body.error;
+  } catch {
+    // Keep the operator-facing fallback when the server returns a non-JSON error.
+  }
+  throw new Error(message);
+}
+
 export async function fetchProjects(): Promise<ProjectData[]> {
   const [issuesRes, registeredRes] = await Promise.all([
     fetch('/api/issues/resource-allocated'),
