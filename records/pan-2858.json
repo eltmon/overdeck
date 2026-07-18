@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T07:47:00.724Z",
+  "updated": "2026-07-18T07:47:12.436Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -83,8 +83,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 30,
-    "claims": {},
+    "sequence": 31,
+    "claims": {
+      "acp-docs": {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 229500,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T07:47:12.436Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -312,6 +320,7 @@
     "acp-transcript-discovery.acp-transcript-discovery.ac3": "completed",
     "acp-frontend-feed": "completed",
     "acp-frontend-feed.acp-frontend-feed.ac1": "completed",
-    "acp-frontend-feed.acp-frontend-feed.ac2": "completed"
+    "acp-frontend-feed.acp-frontend-feed.ac2": "completed",
+    "acp-docs": "running"
   }
 }
