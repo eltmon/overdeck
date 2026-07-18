@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-18T19:06:41.371Z",
+  "updated": "2026-07-18T19:14:54.574Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "extension-convention": {
-        "writerId": "agent-pan-2829",
-        "agentId": "agent-pan-2829",
-        "pid": 4110062,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:06:41.371Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -166,6 +158,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-2829 dead)",
         "releasedAt": "2026-07-18T00:10:14.486Z"
+      },
+      {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 4110062,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:06:41.371Z",
+        "itemId": "extension-convention",
+        "outcome": "completed",
+        "reason": "New specs and continues use .xbrief.json, all state readers accept both extensions, canonical files win duplicate resolution, and targeted compatibility tests pass",
+        "releasedAt": "2026-07-18T19:14:54.574Z"
       }
     ],
     "statusReasons": {
@@ -174,8 +177,8 @@
         "updatedAt": "2026-07-17T13:43:03.813Z"
       },
       "extension-convention": {
-        "reason": "stale claim released (agent-pan-2829 dead)",
-        "updatedAt": "2026-07-18T00:10:14.486Z"
+        "reason": "New specs and continues use .xbrief.json, all state readers accept both extensions, canonical files win duplicate resolution, and targeted compatibility tests pass",
+        "updatedAt": "2026-07-18T19:14:54.574Z"
       }
     }
   },
@@ -193,6 +196,10 @@
     "identifier-rename.identifier-rename.ac1": "completed",
     "identifier-rename.identifier-rename.ac2": "completed",
     "identifier-rename.identifier-rename.ac3": "completed",
-    "extension-convention": "running"
+    "extension-convention": "completed",
+    "extension-convention.extension-convention.ac1": "completed",
+    "extension-convention.extension-convention.ac2": "completed",
+    "extension-convention.extension-convention.ac3": "completed",
+    "extension-convention.extension-convention.ac4": "completed"
   }
 }
