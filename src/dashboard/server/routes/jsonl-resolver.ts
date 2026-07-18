@@ -393,8 +393,10 @@ export async function resolveJsonlPath(
     return null;
   }
 
+  const recordedWorkspace = (await readRecordedState(agentId, opts)).workspace;
+  const effectiveWorkspacePath = recordedWorkspace ?? workspacePath;
   const projectsRoot = opts.claudeProjectsDirOverride ?? join(homedir(), '.claude', 'projects');
-  const encodedDir = encodeClaudeProjectDir(workspacePath);
+  const encodedDir = encodeClaudeProjectDir(effectiveWorkspacePath);
   const jsonlPath = join(projectsRoot, encodedDir, `${claudeSessionId}.jsonl`);
   if (await pathExists(jsonlPath)) {
     logTranscriptResolution(
@@ -409,7 +411,7 @@ export async function resolveJsonlPath(
     agentId,
     `missing-jsonl:${jsonlPath}`,
     `failed harness=${harness ?? 'claude-code'} reason=jsonl-missing sessionId=${claudeSessionId} `
-      + `workspace=${workspacePath} expectedPath=${jsonlPath}`,
+      + `workspace=${effectiveWorkspacePath} expectedPath=${jsonlPath}`,
     opts,
   );
   return null;
