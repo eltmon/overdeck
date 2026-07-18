@@ -569,18 +569,17 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T16:45:31.862Z",
+  "updated": "2026-07-18T16:47:51.344Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:45:30.938Z",
-    "reviewNotes": "Completed ACP turns lack a durable completion record, so live conversation and activity state can remain streaming or working forever.",
+    "updatedAt": "2026-07-18T16:47:51.282Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "275eb63b0984b0139f7f35ad59b686d0e681d51f",
     "reviewRequestedAt": "2026-07-18T16:31:59.843Z",
@@ -599,9 +598,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 25557064,
-            "output": 548658,
-            "cacheRead": 72359936,
+            "input": 25564252,
+            "output": 548826,
+            "cacheRead": 72561664,
             "cacheWrite": 0
           }
         },
@@ -615,9 +614,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 38649992,
-            "output": 1478547,
-            "cacheRead": 376193024,
+            "input": 38656659,
+            "output": 1481590,
+            "cacheRead": 376976896,
             "cacheWrite": 0
           }
         }
@@ -630,9 +629,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 64207056,
-          "output": 2027205,
-          "cacheRead": 448552960,
+          "input": 64220911,
+          "output": 2030416,
+          "cacheRead": 449538560,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -643,8 +642,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 620.829152,
-        "pricingAsOf": "2026-07-18T16:45:31.027Z"
+        "usd": 621.487557,
+        "pricingAsOf": "2026-07-18T16:47:51.336Z"
       }
     },
     "merges": [
