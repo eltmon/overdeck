@@ -392,9 +392,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T21:55:19.431Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-18T21:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-18T21:58:11.535Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-18T21:58:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nACP context de-duplication relies on exact text matching, so valid Markdown separators or project edits leave stale Claude-specific rules in ACP prompts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -723,7 +736,7 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T21:58:11.010Z",
+  "updated": "2026-07-18T21:58:11.535Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "blocked",
