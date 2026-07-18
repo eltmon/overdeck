@@ -272,20 +272,19 @@ export async function gatherProjectLensSignals(
   }
   for (const id of specIssues) candidates.add(id);
 
-  const candidateHeads = [...new Set([...candidates].flatMap((id) =>
-    [...(headRefsByIssue.get(id) ?? new Set([
+  const candidateHeads = [...new Set([...candidates].flatMap((id) => [
+    ...(headRefsByIssue.get(id) ?? []),
+    `feature/${id.toLowerCase()}`,
+    `strike/${id.toLowerCase()}`,
+  ]))];
+  const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
+  for (const id of candidates) {
+    const possibleHeads = [
+      ...(headRefsByIssue.get(id) ?? []),
       `feature/${id.toLowerCase()}`,
       `strike/${id.toLowerCase()}`,
-    ]))]))];
-  const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
-  for (const [id, heads] of headRefsByIssue) {
-    if ([...heads].some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
-  }
-  for (const id of candidates) {
-    if (!headRefsByIssue.has(id) && (
-      mergedHeads.has(`feature/${id.toLowerCase()}`)
-      || mergedHeads.has(`strike/${id.toLowerCase()}`)
-    )) mergedPrIssues.add(id);
+    ];
+    if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
   }
 
   const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));

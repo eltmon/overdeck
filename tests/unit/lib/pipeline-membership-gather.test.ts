@@ -135,7 +135,7 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
       'eltmon',
       'overdeck',
-      ['strike/pan-20', 'strike/pan-21'],
+      ['strike/pan-20', 'feature/pan-20', 'strike/pan-21', 'feature/pan-21'],
     );
     expect(result).toEqual([
       { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
@@ -204,6 +204,43 @@ describe('gatherProjectLensSignals', () => {
       hasMergedPr: true,
       hasConventionBranch: false,
       branchUnmerged: false,
+      phaseLabel: null,
+      hasVbriefSpec: false,
+      explicitlyReady: false,
+    }]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'post_merge_limbo',
+      inPipeline: true,
+    });
+  });
+
+  it('finds a merged strike PR when a feature branch ref still exists', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 24, labels: [] }]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue(['strike/pan-24']);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (command, args) => {
+      if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-24\n';
+      if (command === 'git') return 'feature/pan-24\n';
+      throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+    });
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
+      'eltmon',
+      'overdeck',
+      ['feature/pan-24', 'strike/pan-24'],
+    );
+    expect(result).toEqual([{
+      issueId: 'PAN-24',
+      issueOpen: true,
+      hasOpenPr: false,
+      hasMergedPr: true,
+      hasConventionBranch: true,
+      branchUnmerged: true,
       phaseLabel: null,
       hasVbriefSpec: false,
       explicitlyReady: false,
