@@ -32,9 +32,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T09:40:42.231Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-18T09:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-18T09:45:35.864Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-18T09:45:35Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nFailed ACP RPC delivery is reported as successful tmux delivery, so messages can bypass session/prompt and kickoff can be falsely marked delivered.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -311,7 +324,7 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T09:45:35.209Z",
+  "updated": "2026-07-18T09:45:35.864Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "blocked",
