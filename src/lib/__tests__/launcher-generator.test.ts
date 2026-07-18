@@ -949,6 +949,36 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     expect(script).toMatch(/^exec node '.+\/dist\/codex-app-server-host\.js' --resume '019ee5e7-thread-abc'$/m);
   });
 
+  it('acp mode launches the authenticated host in an isolated provider environment', () => {
+    const script = generateLauncherScriptSync({
+      ...DEFAULT_CONFIG,
+      role: 'work',
+      harness: 'acp',
+      acpAgentId: 'agent-pan-2858',
+      acpProvider: 'kimi',
+      acpWorkspace: '/workspace/project',
+      model: 'kimi-for-coding',
+      resumeSessionId: 'kimi-session-2858',
+      overdeckEnv: { agentId: 'agent-pan-2858' },
+      unsetProviderEnv: true,
+      appendSystemPromptFiles: ['/workspace/project/.overdeck/context/workspace.md'],
+      useSupervisor: true,
+      supervisorScriptPath: '/dist/pty-supervisor.js',
+    });
+
+    expect(script).toMatch(/export OVERDECK_AGENT_ID='agent-pan-2858'/);
+    expect(script).toMatch(
+      /^exec node '.+\/dist\/acp-host\.js' --agent 'agent-pan-2858' --provider 'kimi' --workspace '\/workspace\/project' --resume 'kimi-session-2858' --model 'kimi-for-coding'$/m,
+    );
+    expect(script).toContain('unset ANTHROPIC_API_KEY');
+    expect(script).toContain('unset ANTHROPIC_BASE_URL');
+    expect(script).toContain('unset ANTHROPIC_AUTH_TOKEN');
+    expect(script).not.toMatch(/export ANTHROPIC_(?:API_KEY|BASE_URL|AUTH_TOKEN)=/);
+    expect(script).not.toContain('initial-prompt');
+    expect(script).not.toContain('--append-system-prompt-file');
+    expect(script).not.toContain('pty-supervisor');
+  });
+
   it('codex tui escape hatch preserves the previous conversation command byte-for-byte', () => {
     const legacy = generateLauncherScriptSync({
       ...DEFAULT_CONFIG,

@@ -20,6 +20,7 @@ import { prepareHarnessLaunch } from '../harness-binary.js';
 import { assertCodexNativeAuthForSpawn } from '../codex-auth.js';
 import type { ModelId } from '../settings.js';
 import type { RuntimeName } from '../runtimes/types.js';
+import { getRuntime } from '../runtimes/index.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { writeBridgeTokenSync } from '../bridge-token.js';
 import { createSession, exactPaneTarget, sessionExists, setOption } from '../tmux.js';
@@ -41,6 +42,7 @@ import { deliverAgentMessage, deliverInitialPromptWithRetry } from './delivery.j
 import { determineModel, getProviderEnvForModel, getProviderExportsForModel } from './provider-env.js';
 import {
   claudeSystemPromptFiles,
+  getAcpLauncherFields,
   getCodexLauncherFields,
   getOhmypiLauncherFields,
   getProviderAuthMode,
@@ -165,6 +167,8 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     role,
     model: selectedModel,
   });
+  const harnessBehavior = getHarnessBehavior(resolvedHarness);
+  const isAcp = harnessBehavior.launchCommandKind === 'acp-host';
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
   // PAN-2285: never launch a fresh Codex agent when native Codex auth is
   // missing/expired/burned — it would wedge silently in a 401 loop.
@@ -213,6 +217,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
+  const shouldDeliverPromptViaAcp = resolvedHarness === 'acp';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
         prompt: options.prompt,
@@ -226,24 +231,26 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
 
   let promptFile: string | undefined;
   const tracksKickoffDelivery = role === 'flywheel';
-  if (prompt && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui))) {
+  if (prompt && !shouldDeliverPromptViaAcp && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui))) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, prompt);
-    if (tracksKickoffDelivery) {
-      state.kickoffDelivered = false;
-      await Effect.runPromise(saveAgentState(state));
+  }
+  if (prompt && tracksKickoffDelivery) {
+    state.kickoffDelivered = false;
+    await Effect.runPromise(saveAgentState(state));
+  }
+
+  if (!isAcp) {
+    const provider = getProviderForModelSync(selectedModel as ModelId);
+    if (provider.authType === 'credential-file') {
+      setupCredentialFileAuthSync(provider, workspace);
+    } else {
+      clearCredentialFileAuthSync(workspace);
     }
   }
 
-  const provider = getProviderForModelSync(selectedModel as ModelId);
-  if (provider.authType === 'credential-file') {
-    setupCredentialFileAuthSync(provider, workspace);
-  } else {
-    clearCredentialFileAuthSync(workspace);
-  }
-
-  const providerExports = await getProviderExportsForModel(selectedModel);
-  const providerEnv = await getProviderEnvForModel(selectedModel);
+  const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel);
+  const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel);
 
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
@@ -256,6 +263,9 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     : {};
   const codexLauncherFields = resolvedHarness === 'codex'
     ? getCodexLauncherFields(agentId, selectedModel, workspace, role)
+    : {};
+  const acpLauncherFields = isAcp
+    ? getAcpLauncherFields(agentId, selectedModel, workspace, role)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -270,18 +280,20 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   let sessionId: string | undefined;
   let rawSessionId: string | undefined;
   if (shouldRegisterConversation) {
-    // When resuming, reuse the prior JSONL session so `claude --resume` reloads conversation history.
-    // When starting fresh, generate a new UUID and use `claude --session-id`.
-    rawSessionId = options.resumeSessionId ?? randomUUID();
+    // Claude-style harnesses own their session id at launcher construction time.
+    // ACP creates its session during host startup and persists acp-session-id itself.
+    rawSessionId = isAcp ? options.resumeSessionId : (options.resumeSessionId ?? randomUUID());
 
-    // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
-    // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
-    try {
-      const agentDir = getAgentDir(agentId);
-      await mkdir(agentDir, { recursive: true });
-      await writeFile(join(agentDir, 'session.id'), rawSessionId, 'utf-8');
-    } catch (err) {
-      console.warn(`[spawnRun] Failed to persist session.id for ${agentId}:`, err instanceof Error ? err.message : String(err));
+    if (!isAcp && rawSessionId) {
+      // Persist the session ID to <agentDir>/session.id so resolveClaudeSessionId can locate the
+      // JSONL after the specialist exits. Works for both fresh (--session-id) and resumed (--resume).
+      try {
+        const agentDir = getAgentDir(agentId);
+        await mkdir(agentDir, { recursive: true });
+        await writeFile(join(agentDir, 'session.id'), rawSessionId, 'utf-8');
+      } catch (err) {
+        console.warn(`[spawnRun] Failed to persist session.id for ${agentId}:`, err instanceof Error ? err.message : String(err));
+      }
     }
 
     try {
@@ -343,6 +355,7 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     trapHup: undefined,
     ...piLauncherFields,
     ...codexLauncherFields,
+    ...acpLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -385,7 +398,25 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
   await Effect.runPromise(setOption(exactPaneTarget(agentId), 'remain-on-exit', 'on'));
 
   if (prompt) {
-    if (shouldDeliverPromptViaPi) {
+    if (shouldDeliverPromptViaAcp) {
+      try {
+        await waitForPromptReady(agentId, resolvedHarness, 30);
+        const runtime = getRuntime('acp');
+        if (!runtime) throw new Error('ACP runtime is not registered.');
+        await runtime.sendMessage(agentId, prompt);
+        if (tracksKickoffDelivery) {
+          state.kickoffDelivered = true;
+          await Effect.runPromise(saveAgentState(state));
+        }
+      } catch (err) {
+        console.error(`[${agentId}] ACP prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+        if (tracksKickoffDelivery) {
+          await recordKickoffDeliveryFailure(state, issueId, role);
+          await Effect.runPromise(stopAgent(agentId));
+          throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+    } else if (shouldDeliverPromptViaPi) {
       try {
         await writeOhmypiAgentPrompt(agentId, prompt);
         if (tracksKickoffDelivery) {
@@ -501,6 +532,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     role,
     model: selectedModel,
   });
+  const isAcp = getHarnessBehavior(resolvedHarness).launchCommandKind === 'acp-host';
   const harnessLaunch = await prepareHarnessLaunch(resolvedHarness);
   // PAN-2285: never launch a fresh Codex agent when native Codex auth is
   // missing/expired/burned — it would wedge silently in a 401 loop.
@@ -619,15 +651,15 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     });
   }
 
-  // Write prompt to file for complex prompts (avoids shell escaping issues)
+  // ACP receives the initial prompt only after its authenticated host socket is ready.
   const promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
   const tracksKickoffDelivery = role === 'work' || role === 'strike';
-  if (prompt) {
+  if (prompt && !isAcp) {
     await writeFileAsync(promptFile, prompt);
-    if (tracksKickoffDelivery) {
-      state.kickoffDelivered = false;
-      saveAgentStateSync(state);
-    }
+  }
+  if (prompt && tracksKickoffDelivery) {
+    state.kickoffDelivered = false;
+    saveAgentStateSync(state);
   }
 
   // Ensure TLDR daemon is running for the workspace (non-blocking, non-fatal).
@@ -744,8 +776,26 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     ? dismissDevChannelsDialog(agentId).catch(() => undefined)
     : null;
 
-  // Send the initial prompt after the interactive prompt is ready.
-  if (prompt && resolvedHarness === 'ohmypi') {
+  // Send the initial prompt after the harness-specific readiness signal.
+  if (prompt && isAcp) {
+    try {
+      await waitForPromptReady(agentId, resolvedHarness, 30);
+      const runtime = getRuntime('acp');
+      if (!runtime) throw new Error('ACP runtime is not registered.');
+      await runtime.sendMessage(agentId, prompt);
+      if (tracksKickoffDelivery) {
+        state.kickoffDelivered = true;
+        saveAgentStateSync(state);
+      }
+    } catch (err) {
+      console.error(`[${agentId}] ACP prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      if (tracksKickoffDelivery) {
+        await recordKickoffDeliveryFailure(state, options.issueId, role);
+        await Effect.runPromise(stopAgent(agentId));
+        throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  } else if (prompt && resolvedHarness === 'ohmypi') {
     try {
       await writeOhmypiAgentPrompt(agentId, prompt);
       if (tracksKickoffDelivery) {

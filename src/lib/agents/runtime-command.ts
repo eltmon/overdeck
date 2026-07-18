@@ -84,6 +84,11 @@ export async function writeLauncherScriptAtomic(launcherScript: string, content:
 }
 
 export async function claudeSystemPromptFiles(workspace: string, harness: RuntimeName | undefined): Promise<string[]> {
+  const behavior = getHarnessBehavior(harness);
+  if (behavior.contextLayerKind === 'acp') {
+    return [];
+  }
+
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspace);
   try {
@@ -95,7 +100,6 @@ export async function claudeSystemPromptFiles(workspace: string, harness: Runtim
   files.push(await ensureSessionContextBriefingFile());
 
   // PAN-1566: ohmypi also receives the rendered global context layer.
-  const behavior = getHarnessBehavior(harness);
   if (behavior.contextLayerKind === 'pi') {
     const { piGlobalContextFile } = await import('../context-layers/index.js');
     const globalFile = piGlobalContextFile();
@@ -209,6 +213,31 @@ export async function getOhmypiLauncherFields(agentId: string, model: string): P
     piFifoPath: await Effect.runPromise(createOhmypiFifo(agentId)),
     piSessionDir: paths.agentDir,
     model,
+  };
+}
+
+export function getAcpLauncherFields(
+  agentId: string,
+  model: string,
+  workspace: string,
+  _role?: Role,
+): {
+  harness: 'acp';
+  acpAgentId: string;
+  acpProvider: string;
+  acpWorkspace: string;
+  model: string;
+  unsetProviderEnv: true;
+  appendSystemPromptFiles: [];
+} {
+  return {
+    harness: 'acp',
+    acpAgentId: agentId,
+    acpProvider: getProviderForModelSync(model).name,
+    acpWorkspace: workspace,
+    model,
+    unsetProviderEnv: true,
+    appendSystemPromptFiles: [],
   };
 }
 
@@ -452,6 +481,49 @@ export async function waitForCodexAppServerReady(
   throw new Error(`Timed out waiting for Codex app-server readiness for ${agentId}.${detail}`);
 }
 
+export interface AcpHostReadyDeps {
+  now?: () => number;
+  sleep?: (ms: number) => Promise<void>;
+  sessionExists?: (agentId: string) => Promise<boolean>;
+  readText?: (path: string) => string;
+  pathExists?: (path: string) => boolean;
+}
+
+export async function waitForAcpHostReady(
+  agentId: string,
+  timeoutSec = 30,
+  deps: AcpHostReadyDeps = {},
+): Promise<void> {
+  const now = deps.now ?? (() => Date.now());
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolveSleep) => setTimeout(resolveSleep, ms)));
+  const sessionExistsForAgent = deps.sessionExists ?? (async (id: string) => Effect.runPromise(sessionExists(id)));
+  const readText = deps.readText ?? ((path: string) => readFileSync(path, 'utf8'));
+  const pathExists = deps.pathExists ?? existsSync;
+  const agentDir = getAgentDir(agentId);
+  const sessionIdPath = join(agentDir, 'acp-session-id');
+  const tokenPath = join(agentDir, 'acp-token');
+  const socketPath = join(getOverdeckHome(), 'sockets', `acp-${agentId}.sock`);
+  const deadline = now() + timeoutSec * 1000;
+
+  while (now() < deadline) {
+    if (!(await sessionExistsForAgent(agentId))) {
+      throw new Error(`ACP host session ${agentId} exited before readiness.`);
+    }
+
+    try {
+      const sessionId = readText(sessionIdPath).trim();
+      const token = readText(tokenPath).trim();
+      if (sessionId && token && pathExists(socketPath)) return;
+    } catch (error) {
+      if (!isNodeNotFound(error)) throw error;
+    }
+
+    await sleep(500);
+  }
+
+  throw new Error(`Timed out waiting for ACP host readiness for ${agentId}.`);
+}
+
 export async function waitForPromptReady(agentId: string, harness: RuntimeName | undefined, timeoutSec = 30): Promise<boolean> {
   const readinessKind =
     harness === 'codex' && loadYamlConfig().config.codex?.transport !== 'tui'
@@ -459,6 +531,10 @@ export async function waitForPromptReady(agentId: string, harness: RuntimeName |
       : getHarnessBehavior(harness).readinessKind;
   if (readinessKind === 'codex-app-server-ready') {
     await waitForCodexAppServerReady(agentId, timeoutSec);
+    return true;
+  }
+  if (readinessKind === 'acp-host-ready') {
+    await waitForAcpHostReady(agentId, timeoutSec);
     return true;
   }
   if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
@@ -635,6 +711,9 @@ export async function getAgentRuntimeBaseCommand(
     // buildCodexCommand in launcher-generator builds the full Codex command;
     // return a stub base command so the launcher generator can short-circuit.
     return `codex`;
+  }
+  if (behavior.launchCommandKind === 'acp-host') {
+    return 'acp-host';
   }
 
   // Integration tests can inject a harmless harness command so a leaked or
@@ -820,6 +899,9 @@ export async function getRoleRuntimeBaseCommand(
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {
     return `codex`;
+  }
+  if (behavior.launchCommandKind === 'acp-host') {
+    return 'acp-host';
   }
 
   // Integration tests can inject a harmless harness command so a leaked or

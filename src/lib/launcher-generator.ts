@@ -71,6 +71,13 @@ export interface LauncherConfig {
    */
   codexSandboxMode?: string;
 
+  /** Agent identity passed to the persistent ACP host. Required for harness='acp'. */
+  acpAgentId?: string;
+  /** ACP provider name (for example, 'kimi'). Required for harness='acp'. */
+  acpProvider?: string;
+  /** Workspace exposed to the ACP agent. Required for harness='acp'. */
+  acpWorkspace?: string;
+
   // Command construction
   /**
    * Base command to run (e.g. 'claude', 'claude --model gpt-5.4').
@@ -427,7 +434,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (behavior.launchCommandKind === 'codex-work-tui') {
       return buildCodexCommand(config, false);
     }
-
+    if (behavior.launchCommandKind === 'acp-host') {
+      return buildAcpCommand(config, false);
+    }
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
@@ -515,6 +524,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   }
   if (behavior.launchCommandKind === 'codex-work-tui') {
     return buildCodexCommand(config, useExec);
+  }
+  if (behavior.launchCommandKind === 'acp-host') {
+    return buildAcpCommand(config, useExec);
   }
 
   const parts: string[] = [];
@@ -693,6 +705,39 @@ function systemPromptFiles(config: LauncherConfig): string[] {
     ...(config.appendSystemPromptFile ? [config.appendSystemPromptFile] : []),
     ...(config.appendSystemPromptFiles ?? []),
   ];
+}
+
+function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.acpAgentId) {
+    throw new Error('acp launcher requires acpAgentId');
+  }
+  if (!config.acpProvider) {
+    throw new Error('acp launcher requires acpProvider');
+  }
+  if (!config.acpWorkspace) {
+    throw new Error('acp launcher requires acpWorkspace');
+  }
+
+  const hostPath = join(packageRoot, 'dist', 'acp-host.js');
+  const tokens = [
+    'node',
+    shellQuote(hostPath),
+    '--agent',
+    shellQuote(config.acpAgentId),
+    '--provider',
+    shellQuote(config.acpProvider),
+    '--workspace',
+    shellQuote(config.acpWorkspace),
+  ];
+  if (config.resumeSessionId) {
+    tokens.push('--resume', shellQuote(config.resumeSessionId));
+  }
+  if (config.model) {
+    tokens.push('--model', shellQuoteModelIdSync(config.model));
+  }
+
+  const cmd = tokens.join(' ');
+  return [useExec ? `exec ${cmd}` : cmd];
 }
 
 function buildCodexCommand(config: LauncherConfig, useExec: boolean): string[] {
