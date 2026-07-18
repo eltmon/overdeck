@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-17T14:53:57.524Z",
+  "updated": "2026-07-18T00:10:14.509Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -94,16 +94,8 @@
   "model": "claude-sonnet-5",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "extension-convention": {
-        "writerId": "agent-pan-2829",
-        "agentId": "agent-pan-2829",
-        "pid": 2799180,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-17T14:53:57.523Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -135,12 +127,27 @@
         "itemId": "identifier-rename",
         "outcome": "completed",
         "releasedAt": "2026-07-17T14:53:39.764Z"
+      },
+      {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 2799180,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-17T14:53:57.523Z",
+        "itemId": "extension-convention",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2829 dead)",
+        "releasedAt": "2026-07-18T00:10:14.486Z"
       }
     ],
     "statusReasons": {
       "module-move": {
         "reason": "Moved src/lib/vbrief to src/lib/xbrief, renamed xbrief-index, and updated repository imports without behavior changes",
         "updatedAt": "2026-07-17T13:43:03.813Z"
+      },
+      "extension-convention": {
+        "reason": "stale claim released (agent-pan-2829 dead)",
+        "updatedAt": "2026-07-18T00:10:14.486Z"
       }
     }
   },
@@ -158,6 +165,6 @@
     "identifier-rename.identifier-rename.ac1": "completed",
     "identifier-rename.identifier-rename.ac2": "completed",
     "identifier-rename.identifier-rename.ac3": "completed",
-    "extension-convention": "running"
+    "extension-convention": "pending"
   }
 }
