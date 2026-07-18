@@ -37,11 +37,11 @@ export interface IssueLensSignals {
   issueId: string;
   /** L3 — the GitHub issue state is open. */
   issueOpen: boolean;
-  /** L1 — an open PR whose head branch is `feature/<id>`. */
+  /** L1 — an open PR whose head branch is `feature/<id>` or `strike/<id>`. */
   hasOpenPr: boolean;
   /** L1-merged — a merged PR exists for this issue/branch (the squash-merge oracle). */
   hasMergedPr: boolean;
-  /** A `feature/<id-lowercase>` convention branch exists (local or remote). */
+  /** A `feature/<id-lowercase>` or `strike/<id-lowercase>` convention branch exists (local or remote). */
   hasConventionBranch: boolean;
   /**
    * L2 — `git merge-tree` reports the branch is NOT in main (commit lineage).
@@ -136,7 +136,7 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     return result('post_merge_limbo', 'open issue with a merged PR — merged but never closed out; run close-out');
   }
   if (branchLive) {
-    return result('planned_backlog', 'open issue with an unmerged feature branch but no PR — needs a PR or disposition');
+    return result('planned_backlog', 'open issue with an unmerged convention branch (feature/ or strike/) but no PR — needs a PR or disposition');
   }
   if (s.hasConventionBranch) {
     // Branch exists, L2 says it is already in main, but no merged PR was found —

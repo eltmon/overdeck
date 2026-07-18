@@ -94,6 +94,163 @@ describe('gatherProjectLensSignals', () => {
     ]);
   });
 
+  it('gathers local and remote strike branches as unmerged convention branches', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listIssueStates = vi.fn().mockResolvedValue([
+      { number: 20, state: 'open' },
+      { number: 21, state: 'closed' },
+    ]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (command, args) => {
+      if (command === 'git' && args.includes('--no-merged=main')) {
+        return 'strike/pan-20\norigin/strike/pan-21\n';
+      }
+      if (command === 'git') return 'strike/pan-20\norigin/strike/pan-21\n';
+      throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+    });
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(mocked.run).toHaveBeenCalledWith('git', [
+      'for-each-ref',
+      '--format=%(refname:short)',
+      'refs/heads/feature/*',
+      'refs/remotes/origin/feature/*',
+      'refs/heads/strike/*',
+      'refs/remotes/origin/strike/*',
+    ], project.path);
+    expect(mocked.run).toHaveBeenCalledWith('git', [
+      'for-each-ref',
+      '--no-merged=main',
+      '--format=%(refname:short)',
+      'refs/heads/feature/*',
+      'refs/remotes/origin/feature/*',
+      'refs/heads/strike/*',
+      'refs/remotes/origin/strike/*',
+    ], project.path);
+    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
+      'eltmon',
+      'overdeck',
+      ['strike/pan-20', 'feature/pan-20', 'strike/pan-21', 'feature/pan-21'],
+    );
+    expect(result).toEqual([
+      { issueId: 'PAN-20', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'PAN-21', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+    ]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'planned_backlog',
+      inPipeline: true,
+    });
+    expect(resolvePipelineMembership(result[1]!)).toMatchObject({
+      bucket: 'clean_terminal',
+      inPipeline: false,
+    });
+  });
+
+  it('classifies an open same-repository strike PR as in flight', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 22, labels: [] }]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([{
+      headRefName: 'strike/pan-22', headRepoFullName: 'eltmon/overdeck',
+    }]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockResolvedValue('');
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(result).toEqual([{
+      issueId: 'PAN-22',
+      issueOpen: true,
+      hasOpenPr: true,
+      hasMergedPr: false,
+      hasConventionBranch: false,
+      branchUnmerged: false,
+      phaseLabel: null,
+      hasVbriefSpec: false,
+      explicitlyReady: false,
+    }]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'in_flight',
+      inPipeline: true,
+    });
+  });
+
+  it('uses a merged strike PR as the oracle after its branch is deleted', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 23, labels: [] }]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue(['strike/pan-23']);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockResolvedValue('');
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
+      'eltmon',
+      'overdeck',
+      ['feature/pan-23', 'strike/pan-23'],
+    );
+    expect(result).toEqual([{
+      issueId: 'PAN-23',
+      issueOpen: true,
+      hasOpenPr: false,
+      hasMergedPr: true,
+      hasConventionBranch: false,
+      branchUnmerged: false,
+      phaseLabel: null,
+      hasVbriefSpec: false,
+      explicitlyReady: false,
+    }]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'post_merge_limbo',
+      inPipeline: true,
+    });
+  });
+
+  it('finds a merged strike PR when a feature branch ref still exists', async () => {
+    const mocked = deps();
+    mocked.listOpenIssues = vi.fn().mockResolvedValue([{ number: 24, labels: [] }]);
+    mocked.listPhaseLabeledIssues = vi.fn().mockResolvedValue([]);
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue(['strike/pan-24']);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (command, args) => {
+      if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-24\n';
+      if (command === 'git') return 'feature/pan-24\n';
+      throw new Error(`Unexpected command: ${command} ${args.join(' ')}`);
+    });
+
+    const result = await gatherProjectLensSignals(project, mocked);
+
+    expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
+      'eltmon',
+      'overdeck',
+      ['feature/pan-24', 'strike/pan-24'],
+    );
+    expect(result).toEqual([{
+      issueId: 'PAN-24',
+      issueOpen: true,
+      hasOpenPr: false,
+      hasMergedPr: true,
+      hasConventionBranch: true,
+      branchUnmerged: true,
+      phaseLabel: null,
+      hasVbriefSpec: false,
+      explicitlyReady: false,
+    }]);
+    expect(resolvePipelineMembership(result[0]!)).toMatchObject({
+      bucket: 'post_merge_limbo',
+      inPipeline: true,
+    });
+  });
+
   it('lists all PRs through one paginated dependency regardless of candidate count', async () => {
     const mocked = deps();
     await gatherProjectLensSignals(project, mocked);
@@ -132,7 +289,7 @@ describe('gatherProjectLensSignals', () => {
       { headRefName: 'feature/krux-3', headRepoFullName: 'eltmon/overdeck' },
     ]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['KRUX-4']);
-    mocked.run = vi.fn().mockResolvedValue('feature/krux-5\n');
+    mocked.run = vi.fn().mockResolvedValue('feature/krux-5\nstrike/krux-9\n');
 
     await expect(gatherProjectLensSignals(project, mocked)).resolves.toEqual([]);
   });
@@ -174,7 +331,7 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.listMergedPullRequestHeads).toHaveBeenCalledWith(
       'eltmon',
       'overdeck',
-      ['feature/pan-10', 'feature/pan-11'],
+      ['feature/pan-10', 'strike/pan-10', 'feature/pan-11', 'strike/pan-11'],
     );
   });
 

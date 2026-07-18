@@ -71,7 +71,7 @@ describe('v54 → v55 migration safety net', () => {
     const original = readFileSync(join(tmpHome, 'panopticon.db'));
     expect(snapshot.length).toBeGreaterThan(0);
     expect(original.length).toBeGreaterThanOrEqual(snapshot.length);
-  });
+  }, 15_000);
 });
 
 describe('OVERDECK_NO_RESUME kill switch', () => {

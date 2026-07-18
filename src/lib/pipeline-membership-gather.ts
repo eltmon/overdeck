@@ -187,7 +187,7 @@ function issueNumber(issueId: string): number {
 }
 
 function issueIdFromRef(ref: string, issuePrefix: string): string | null {
-  if (!/(?:^|\/)feature\//.test(ref)) return null;
+  if (!/(?:^|\/)(?:feature|strike)\//.test(ref)) return null;
   const issueId = parseIssueIdFromTextSync(ref);
   return issueId?.startsWith(`${issuePrefix}-`) ? issueId : null;
 }
@@ -207,8 +207,23 @@ export async function gatherProjectLensSignals(
     deps.listOpenIssues(owner, repo),
     deps.listPhaseLabeledIssues(owner, repo),
     deps.listOpenPullRequests(owner, repo),
-    deps.run('git', ['for-each-ref', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
-    deps.run('git', ['for-each-ref', '--no-merged=main', '--format=%(refname:short)', 'refs/heads/feature/*', 'refs/remotes/origin/feature/*'], project.path),
+    deps.run('git', [
+      'for-each-ref',
+      '--format=%(refname:short)',
+      'refs/heads/feature/*',
+      'refs/remotes/origin/feature/*',
+      'refs/heads/strike/*',
+      'refs/remotes/origin/strike/*',
+    ], project.path),
+    deps.run('git', [
+      'for-each-ref',
+      '--no-merged=main',
+      '--format=%(refname:short)',
+      'refs/heads/feature/*',
+      'refs/remotes/origin/feature/*',
+      'refs/heads/strike/*',
+      'refs/remotes/origin/strike/*',
+    ], project.path),
     deps.listSpecIssueIds(project.path),
   ]);
 
@@ -257,14 +272,19 @@ export async function gatherProjectLensSignals(
   }
   for (const id of specIssues) candidates.add(id);
 
-  const candidateHeads = [...new Set([...candidates].flatMap((id) =>
-    [...(headRefsByIssue.get(id) ?? new Set([`feature/${id.toLowerCase()}`]))]))];
+  const candidateHeads = [...new Set([...candidates].flatMap((id) => [
+    ...(headRefsByIssue.get(id) ?? []),
+    `feature/${id.toLowerCase()}`,
+    `strike/${id.toLowerCase()}`,
+  ]))];
   const mergedHeads = new Set(await deps.listMergedPullRequestHeads(owner, repo, candidateHeads));
-  for (const [id, heads] of headRefsByIssue) {
-    if ([...heads].some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
-  }
   for (const id of candidates) {
-    if (!headRefsByIssue.has(id) && mergedHeads.has(`feature/${id.toLowerCase()}`)) mergedPrIssues.add(id);
+    const possibleHeads = [
+      ...(headRefsByIssue.get(id) ?? []),
+      `feature/${id.toLowerCase()}`,
+      `strike/${id.toLowerCase()}`,
+    ];
+    if (possibleHeads.some((head) => mergedHeads.has(head))) mergedPrIssues.add(id);
   }
 
   const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));

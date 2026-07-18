@@ -400,7 +400,7 @@ describe('resource-discovery planned backlog annotation', () => {
     mocks.getPipelineMembershipForProjects.mockResolvedValue([
       membership('PAN-2822', 'planned_backlog', [PLANNED_BACKLOG_SPEC_ONLY_REASON]),
       membership('PAN-2823', 'planned_backlog', [
-        'open issue with an unmerged feature branch but no PR — needs a PR or disposition',
+        'open issue with an unmerged convention branch (feature/ or strike/) but no PR — needs a PR or disposition',
       ]),
       membership('PAN-2824', 'in_flight', ['open issue with an open PR — active work']),
     ]);

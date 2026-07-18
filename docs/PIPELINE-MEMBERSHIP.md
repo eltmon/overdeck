@@ -4,7 +4,7 @@ Pipeline membership is an exception queue: an issue is in the pipeline when its 
 
 ## Durable lenses
 
-`gatherProjectLensSignals()` builds membership from six durable signals:
+`gatherProjectLensSignals()` builds membership from six durable signals. For the pull-request and branch lenses, a convention branch is either `feature/<id>` or `strike/<id>`:
 
 1. An open pull request for the convention branch.
 2. A merged pull request, which is the merge oracle for squash merges.
@@ -13,7 +13,7 @@ Pipeline membership is an exception queue: an issue is in the pipeline when its 
 5. The current pipeline phase label, when present.
 6. A durable vBRIEF spec on `overdeck-state`.
 
-A vBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. A `planned` label is only a phase hint; it never substitutes for the durable spec lens.
+A vBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. An open issue with a live `strike/` branch and no PR also surfaces as `planned_backlog`, so active strike work enters the pipeline before its PR opens. A `planned` label is only a phase hint; it never substitutes for the durable spec lens.
 
 Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness annotations. They never decide membership. This is why the resolver returns the same answer with a fresh, empty `overdeck.db`.
 
