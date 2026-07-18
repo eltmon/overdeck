@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T19:04:28.409Z",
+  "updated": "2026-07-18T19:32:47.986Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "orders-routes": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 4086855,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:04:28.408Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -146,6 +138,17 @@
         "outcome": "completed",
         "reason": "Implemented order-book parse, state-worktree I/O, canonical resolver and writer doors, queue persistence, progress/drain calculation, start validation, and Git-backed tests; focused tests, typecheck, and lint pass.",
         "releasedAt": "2026-07-17T13:45:04.739Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 4086855,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:04:28.408Z",
+        "itemId": "orders-routes",
+        "outcome": "completed",
+        "reason": "Added authenticated Effect /api/orders CRUD, candidates, validation/start, preview routes with resolver/writer-only access; registered the layer and added fixture-backed route tests.",
+        "releasedAt": "2026-07-18T19:32:47.986Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "orders-domain-lib": {
         "reason": "Implemented order-book parse, state-worktree I/O, canonical resolver and writer doors, queue persistence, progress/drain calculation, start validation, and Git-backed tests; focused tests, typecheck, and lint pass.",
         "updatedAt": "2026-07-17T13:45:04.739Z"
+      },
+      "orders-routes": {
+        "reason": "Added authenticated Effect /api/orders CRUD, candidates, validation/start, preview routes with resolver/writer-only access; registered the layer and added fixture-backed route tests.",
+        "updatedAt": "2026-07-18T19:32:47.986Z"
       }
     }
   },
@@ -170,6 +177,10 @@
     "orders-domain-lib.orders-domain-lib.ac3": "completed",
     "orders-domain-lib.orders-domain-lib.ac4": "completed",
     "orders-domain-lib.orders-domain-lib.ac5": "completed",
-    "orders-routes": "running"
+    "orders-routes": "completed",
+    "orders-routes.orders-routes.ac1": "completed",
+    "orders-routes.orders-routes.ac2": "completed",
+    "orders-routes.orders-routes.ac3": "completed",
+    "orders-routes.orders-routes.ac4": "completed"
   }
 }
