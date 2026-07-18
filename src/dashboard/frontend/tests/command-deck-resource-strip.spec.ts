@@ -174,6 +174,13 @@ test.describe('Command Deck resource strip', () => {
         body: JSON.stringify([{ key: 'overdeck', name: 'overdeck', path: '/tmp/overdeck' }]),
       });
     });
+    await page.route('**/api/pipeline/membership**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
     await page.route('**/api/issues/*/resource-details', async (route) => {
       const url = new URL(route.request().url());
       const issueId = url.pathname.split('/').at(-2)?.toUpperCase();
