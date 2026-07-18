@@ -50,17 +50,18 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T01:28:55.118Z",
+  "updated": "2026-07-18T01:39:37.465Z",
   "pipeline": {
     "issueId": "PAN-2857",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T01:28:54.415Z",
+    "updatedAt": "2026-07-18T01:39:37.011Z",
     "reviewNotes": "Merged strike PRs are missed when another convention branch ref still exists, violating FR-3 and misclassifying post-merge issues.",
+    "verificationNotes": "Verification FAILED at test (612803ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2857/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-2857\u001b[39m\n\nNo test files found, exiting with code 0\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22m\u001b[2mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22m\u001b[2mdecides supervisor eligibility from Docker and harness only\n\u001b[22m\u001b[39m[agent-pan-1405] supervisor:eligible\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:harness-pi\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2mhandoff fork handshake\u001b[2m > \u001b[22m\u001b[2muses the handoff document as the fork seed and records source/target metadata\n\u001b[22m\u001b[39m[summary-fork] Forking conv=conv-source launchModel=default summaryModel=default localOnly=false forkMode=handoff\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/done.test.ts \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 4266\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m lists --test-waived in pan done --help (AC1) \u001b[33m 1954\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m rejects --test-waived without a reason (AC4) \u001b[33m 1783\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | tests/unit/lib/database/schema-safety-net.test.ts\u001b[2m > \u001b[22m\u001b[2mv54 → v55 migration safety net\u001b[2m > \u001b[22m\u001b[2msnapshots panopticon.db before altering agents data\n\u001b[22m\u001b[39m[schema] Snapshot created: /tmp/pan-safety-net-HlDMY7/panopticon.db.v54-backfill-snapshot\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2mhandoff fork handshake\u001b[2m > \u001b[22m\u001b[2mfalls back to summary fork when the source conversation has ended\n\u001b[22m\u001b[39m[summary-fork] Forking conv=conv-source launchModel=default summaryModel=default localOnly=true forkMode=han\n…(192275 chars elided)…\ntimestamp on repeated overflow detections\n\u001b[22m\u001b[39m[deacon] Agent agent-pan-9001 hit context-window overflow — compact-respawned (attempt 1)\n\n\u001b[90mstdout\u001b[2m | tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22m\u001b[2mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m\u001b[2m(c) settled harness /compact + overflow cleared → nudges continue and clears state\n\u001b[22m\u001b[39m[deacon] Agent agent-pan-9001 resumed after context-overflow compaction\n\n\u001b[90mstdout\u001b[2m | tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22m\u001b[2mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m\u001b[2m(d) settled compact respawn but overflow persists → compact-respawns again without /clear\n\u001b[22m\u001b[39m[deacon] Agent agent-pan-9001 hit context-window overflow — compact-respawned (attempt 2)\n\n\u001b[90mstdout\u001b[2m | tests/lib/cloister/deacon-context-overflow.test.ts\u001b[2m > \u001b[22m\u001b[2mcheckApiErrorAgents — context-window overflow recovery\u001b[2m > \u001b[22m\u001b[2m(g) no overfl\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
     "reviewRequestedAt": "2026-07-18T01:19:52.588Z",
     "reviewSpawnedAt": "2026-07-18T01:19:56.419Z",
@@ -91,10 +92,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 32,
-            "output": 13934,
-            "cacheRead": 3257218,
-            "cacheWrite": 203880
+            "input": 52,
+            "output": 22474,
+            "cacheRead": 5687343,
+            "cacheWrite": 220292
           }
         },
         "plan": {
@@ -123,30 +124,30 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1318294,
-            "output": 46787,
-            "cacheRead": 16669696,
+            "input": 1456041,
+            "output": 51358,
+            "cacheRead": 18357248,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 392,
-          "output": 40082,
-          "cacheRead": 5889567,
-          "cacheWrite": 354822
+          "input": 412,
+          "output": 48622,
+          "cacheRead": 8319692,
+          "cacheWrite": 371234
         },
         "openai/gpt-5.6-sol": {
-          "input": 2276999,
-          "output": 91519,
-          "cacheRead": 24071680,
+          "input": 2414746,
+          "output": 96090,
+          "cacheRead": 25759232,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 38.499275,
-        "pricingAsOf": "2026-07-18T01:28:54.579Z"
+        "usd": 43.231394,
+        "pricingAsOf": "2026-07-18T01:39:37.438Z"
       }
     },
     "merges": [
