@@ -479,17 +479,16 @@
     "recordedAt": "2026-07-16T06:59:35.993Z"
   },
   "created": "2026-07-16T05:46:13.495Z",
-  "updated": "2026-07-18T18:22:46.595Z",
+  "updated": "2026-07-18T18:57:54.140Z",
   "pipeline": {
     "issueId": "PAN-2255",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T18:22:46.531Z",
+    "updatedAt": "2026-07-18T18:57:54.116Z",
     "testNotes": "Skipped: issue is already merged",
     "inspectNotes": "Commit 309d306e only deletes .pan/drafts/PAN-2255.md and .pan/records/pan-2255.json (infra state-migration cleanup); it contains no changes to writeFeedbackFile(), no mailbox reader/writer module, and no create/list/mark-delivered/mark-acknowledged API. None of the 4 ACs are addressed. Required: land the actual mailbox-contract implementation (writeFeedbackFile metadata, pending-item reader, idempotent mark-delivered/mark-acknowledged, issueId+role public API) in a commit scoped to this bead.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2783",
@@ -497,7 +496,9 @@
     "lastVerifiedCommit": "6ff696806c07ad0ff3be94bb5cccc156bf89afb2",
     "reviewRequestedAt": "2026-07-16T11:39:59.401Z",
     "reviewSpawnedAt": "2026-07-16T11:50:24.022Z",
-    "strikeRecoveryCount": 0
+    "strikeRecoveryCount": 0,
+    "closedOut": true,
+    "closedOutAt": "2026-07-18T18:57:54.116Z"
   },
   "closeOut": {
     "usage": {
@@ -575,7 +576,87 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2783"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-18T18:57:54.134Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: pending at 6ff696806c07ad0ff3be94bb5cccc156bf89afb2",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-18T18:57:48.163Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2783 MERGED at 2026-07-16T12:05:24Z",
+          "status": "pass",
+          "mergedAt": "2026-07-16T12:05:24Z",
+          "mergeCommit": "f7268f62a4f1542a47a25c5bd630088990a69cc3"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on f7268f62a4f1542a47a25c5bd630088990a69cc3",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-18T17:59:58.000Z, dist built 2026-07-18T17:59:34.492Z, merge 2026-07-16T12:05:24.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 8 agent state directories; No strike branch strike/pan-2255 found; Pruned 7 checkpoint ref(s) for agent-pan-2255, planning-pan-2255, strike-pan-2255; No specialist registry entries for PAN-2255"
+        }
+      ],
+      "accepted": [
+        "verification"
+      ]
+    }
   },
   "harness": "codex",
   "model": "gpt-5.6-sol",
