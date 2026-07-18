@@ -98,6 +98,51 @@ describe('resolveExecutable', () => {
       runCommand,
     })).resolves.toBeNull();
   });
+
+  it('uses an explicit absolute executable without searching fallback locations', async () => {
+    const accessExecutable = executableAccess(['/opt/kimi code/bin/kimi']);
+    const runCommand = vi.fn(async () => '/usr/local/bin/kimi\n');
+
+    await expect(resolveExecutable('kimi', {
+      executablePath: '/opt/kimi code/bin/kimi',
+      pathValue: '/usr/local/bin',
+      accessExecutable,
+      runCommand,
+    })).resolves.toBe('/opt/kimi code/bin/kimi');
+
+    expect(accessExecutable).toHaveBeenCalledTimes(1);
+    expect(runCommand).not.toHaveBeenCalled();
+  });
+
+  it('returns null for a non-executable explicit path without falling back to PATH', async () => {
+    const accessExecutable = executableAccess(['/usr/local/bin/kimi']);
+    const runCommand = vi.fn(async () => '/usr/local/bin/kimi\n');
+
+    await expect(resolveExecutable('kimi', {
+      executablePath: '/configured/kimi',
+      pathValue: '/usr/local/bin',
+      accessExecutable,
+      runCommand,
+    })).resolves.toBeNull();
+
+    expect(accessExecutable).toHaveBeenCalledTimes(1);
+    expect(accessExecutable).toHaveBeenCalledWith('/configured/kimi');
+    expect(runCommand).not.toHaveBeenCalled();
+  });
+
+  it('rejects a relative configured executable path', async () => {
+    await expect(resolveExecutable('kimi', {
+      executablePath: './bin/kimi',
+    })).rejects.toThrow('Configured executable path must be absolute: ./bin/kimi');
+  });
+
+  it('keeps bare-name discovery when no explicit executable is configured', async () => {
+    await expect(resolveExecutable('kimi', {
+      pathValue: '/opt/default/bin',
+      accessExecutable: executableAccess(['/opt/default/bin/kimi']),
+      allowLoginShell: false,
+    })).resolves.toBe('/opt/default/bin/kimi');
+  });
 });
 
 describe('prepareHarnessLaunch', () => {
@@ -112,6 +157,15 @@ describe('prepareHarnessLaunch', () => {
       binaryPath: '/home/test/.local/bin/claude',
       pathExport: "export PATH='/home/test/.local/bin':\"$PATH\"",
     });
+  });
+
+  it('names a configured ACP executable that is missing or not executable', async () => {
+    await expect(prepareHarnessLaunch('acp', {
+      executablePath: '/configured/missing-kimi',
+      accessExecutable: executableAccess([]),
+    })).rejects.toThrow(
+      'Kimi Code CLI configured executable "/configured/missing-kimi" was not found or is not executable',
+    );
   });
 
   it('throws an actionable error without raw exec output when the harness is absent', async () => {

@@ -77,6 +77,8 @@ export interface LauncherConfig {
   acpProvider?: string;
   /** Workspace exposed to the ACP agent. Required for harness='acp'. */
   acpWorkspace?: string;
+  /** Exact ACP provider executable validated by launch preflight. Required for harness='acp'. */
+  acpBinaryPath?: string;
 
   // Command construction
   /**
@@ -717,6 +719,9 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   if (!config.acpWorkspace) {
     throw new Error('acp launcher requires acpWorkspace');
   }
+  if (!config.acpBinaryPath) {
+    throw new Error('acp launcher requires acpBinaryPath');
+  }
 
   const hostPath = join(packageRoot, 'dist', 'acp-host.js');
   const tokens = [
@@ -728,6 +733,8 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
     shellQuote(config.acpProvider),
     '--workspace',
     shellQuote(config.acpWorkspace),
+    '--binary-path',
+    shellQuote(config.acpBinaryPath),
   ];
   if (config.resumeSessionId) {
     tokens.push('--resume', shellQuote(config.resumeSessionId));

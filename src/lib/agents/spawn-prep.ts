@@ -434,6 +434,8 @@ export async function buildAgentLaunchConfig(opts: {
    * no agent-definition system.
    */
   harness?: RuntimeName;
+  /** Exact harness executable validated by the shared launch preflight. */
+  harnessBinaryPath?: string;
   extraEnvExports?: string[];
   /** Claude Code `--effort` level threaded into the launcher command. */
   effort?: RoleEffort;
@@ -484,8 +486,17 @@ export async function buildAgentLaunchConfig(opts: {
   const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
     : {};
-  const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
-    ? getAcpLauncherFields(opts.agentId, model, opts.workspace, launchRole)
+  if (isAcp && !opts.harnessBinaryPath) {
+    throw new Error('ACP launch requires the executable path resolved by preflight');
+  }
+  const acpLauncherFields = isAcp
+    ? getAcpLauncherFields(
+        opts.agentId,
+        model,
+        opts.workspace,
+        opts.harnessBinaryPath!,
+        launchRole,
+      )
     : {};
 
   if (opts.spawnMode === 'resume' && opts.resumeSessionId) {

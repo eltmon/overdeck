@@ -25,6 +25,9 @@ interface StubRuntimeOptions {
   readonly assistantResponse?: string;
   readonly updateDuringStart?: string;
   readonly startError?: Error;
+  readonly promptError?: Error;
+  readonly promptStarted?: Deferred.Deferred<void>;
+  readonly promptGate?: Deferred.Deferred<void>;
 }
 
 interface StubRuntime {
@@ -97,6 +100,15 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
     prompt: (payload) =>
       Effect.gen(function* () {
         prompts.push(payload.prompt);
+        if (options.promptStarted) {
+          yield* Deferred.succeed(options.promptStarted, undefined);
+        }
+        if (options.promptGate) {
+          yield* Deferred.await(options.promptGate);
+        }
+        if (options.promptError) {
+          return yield* Effect.fail(options.promptError);
+        }
         if (options.assistantResponse) {
           yield* Queue.offer(events, {
             _tag: "ContentDelta",
@@ -239,7 +251,7 @@ describe("AcpHost", () => {
       op: "message",
       content: "hello agent",
     });
-    expect(accepted).toEqual({ status: 202, body: { ok: true, queued: true } });
+    expect(accepted).toEqual({ status: 200, body: { ok: true } });
     await host.waitForIdle();
 
     expect(stub.prompts).toEqual([[{ type: "text", text: "hello agent" }]]);
@@ -263,6 +275,70 @@ describe("AcpHost", () => {
     ]);
     expect(output.text()).toContain("[user] hello agent");
     expect(output.text()).toContain("[assistant] hello from kimi");
+  });
+
+  it("withholds delivery success until session/prompt completes", async () => {
+    const overdeckHome = await makeHome();
+    const promptStarted = await Effect.runPromise(Deferred.make<void>());
+    const promptGate = await Effect.runPromise(Deferred.make<void>());
+    const stub = await makeStubRuntime({ promptStarted, promptGate });
+    const host = new AcpHost({
+      agentId: "agent-prompt-pending",
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-prompt-pending");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-prompt-pending.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+    let settled = false;
+    const response = postSocket(socketPath, token, {
+      op: "message",
+      content: "wait for the provider",
+    }).finally(() => {
+      settled = true;
+    });
+
+    await Effect.runPromise(Deferred.await(promptStarted));
+    expect(settled).toBe(false);
+    await Effect.runPromise(Deferred.succeed(promptGate, undefined));
+    await expect(response).resolves.toEqual({ status: 200, body: { ok: true } });
+  });
+
+  it("returns a caller-visible failure when session/prompt fails", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime({ promptError: new Error("provider rejected prompt") });
+    const output = makeOutput();
+    const host = new AcpHost({
+      agentId: "agent-prompt-failure",
+      provider: "kimi",
+      workspace: process.cwd(),
+      overdeckHome,
+      runtime: stub.runtime,
+      stdout: output.writable,
+    });
+    hosts.push(host);
+    await host.start();
+
+    const agentDir = join(overdeckHome, "agents", "agent-prompt-failure");
+    const socketPath = join(overdeckHome, "sockets", "acp-agent-prompt-failure.sock");
+    const token = (await readFile(join(agentDir, "acp-token"), "utf-8")).trim();
+    const response = await postSocket(socketPath, token, {
+      op: "message",
+      content: "this will fail",
+    });
+
+    expect(response).toEqual({
+      status: 500,
+      body: { error: "provider rejected prompt" },
+    });
+    expect(output.text()).toContain("[error] provider rejected prompt");
+    const transcript = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
+    expect(transcript).toContain('"content":"provider rejected prompt"');
   });
 
   it("registers handlers and captures session updates before startup completes", async () => {
@@ -349,9 +425,14 @@ describe("AcpHost", () => {
         "kimi",
         "--workspace",
         process.cwd(),
+        "--binary-path",
+        "/opt/kimi/bin/kimi",
         "--resume",
         persisted!,
       ]),
-    ).toMatchObject({ resumeSessionId: "persisted-session" });
+    ).toMatchObject({
+      binaryPath: "/opt/kimi/bin/kimi",
+      resumeSessionId: "persisted-session",
+    });
   });
 });

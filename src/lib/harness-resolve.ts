@@ -1,11 +1,15 @@
 import { canUseHarnessSync, canUseModelWithAuthSync } from './harness-policy.js';
-import { harnessBinaryName, resolveHarnessBinary } from './harness-binary.js';
+import {
+  configuredHarnessBinaryPath,
+  harnessBinaryName,
+  resolveHarnessBinary,
+} from './harness-binary.js';
 import { getBuiltInDefaultHarness, getProviderForModelSync } from './providers.js';
 import type { RuntimeName } from './runtimes/types.js';
 import type { Role } from './agents.js';
 import { loadConfigSync as loadYamlConfig } from './config-yaml.js';
 
-const harnessAvailabilityCache = new Map<RuntimeName, Promise<boolean>>();
+const harnessAvailabilityCache = new Map<string, Promise<boolean>>();
 const builtInDefaultNoticeProviders = new Set<string>();
 
 export function resetHarnessResolveCachesForTests(): void {
@@ -43,11 +47,16 @@ async function hasHarnessBinary(harness: RuntimeName): Promise<boolean> {
   // the native fallback decision here independent of whether Claude is installed.
   if (harness === 'claude-code') return true;
 
-  const cached = harnessAvailabilityCache.get(harness);
+  const executablePath = configuredHarnessBinaryPath(harness);
+  const cacheKey = `${harness}\0${executablePath ?? ''}`;
+  const cached = harnessAvailabilityCache.get(cacheKey);
   if (cached) return cached;
 
-  const check = resolveHarnessBinary(harness).then((resolved) => resolved !== null);
-  harnessAvailabilityCache.set(harness, check);
+  const check = resolveHarnessBinary(
+    harness,
+    executablePath ? { executablePath } : undefined,
+  ).then((resolved) => resolved !== null);
+  harnessAvailabilityCache.set(cacheKey, check);
   return check;
 }
 
@@ -108,14 +117,17 @@ export async function resolveHarness(input: ResolveHarnessInput): Promise<Runtim
   assertHarnessProviderSupported(winner, provider);
 
   if (!(await hasHarnessBinary(winner))) {
-    const binary = harnessBinaryName(winner);
+    const binary = configuredHarnessBinaryPath(winner) ?? harnessBinaryName(winner);
     // PAN-1871 — never silently fall back to claude-code from a non-native
     // (CLIProxy) model whose own binary is missing at spawn. An explicitly
     // configured ACP harness has the same fail-loud contract: falling back
     // would silently ignore the operator's transport choice.
     if (winner === 'acp' || (builtInHarness && builtInHarness !== 'claude-code')) {
+      const remediation = configuredHarnessBinaryPath(winner)
+        ? `Fix the configured executable path ${binary} and retry.`
+        : `Install ${binary} (check its PATH) and retry.`;
       throw new HarnessResolutionError(
-        `Harness ${winner} for ${input.model} has no installed ${binary} binary at spawn — refusing to silently fall back to claude-code. Install ${binary} (check its PATH) and retry.`,
+        `Harness ${winner} for ${input.model} has no installed ${binary} binary at spawn — refusing to silently fall back to claude-code. ${remediation}`,
       );
     }
     console.warn(`harness ${winner} requested for ${provider}, but ${binary} is not installed — falling back to native claude-code`);

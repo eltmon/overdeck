@@ -18,7 +18,9 @@ vi.mock('../tmux-cli.js', () => ({
   tmuxSessionExists: tmuxMocks.sessionExists,
 }))
 
+import type { AgentState } from '../../agents/agent-state.js'
 import { BRIDGE_TOKEN_HEADER } from '../../bridge-token.js'
+import { packageRoot } from '../../paths.js'
 import { AcpRuntimeSync } from '../acp.js'
 
 const tempHomes: string[] = []
@@ -92,14 +94,22 @@ describe('AcpRuntimeSync', () => {
     expect(runtime.getSessionCost('agent-activity')).toBeNull()
   })
 
-  it('spawns the persistent host in tmux and reports tmux liveness', async () => {
+  it('spawns the package host with the preflight-resolved binary and fresh readiness', async () => {
     const home = makeHome()
+    const staleSessionPath = writeAgentFile(home, 'agent-spawn', 'acp-session-id', 'stale-session\n')
     tmuxMocks.createSession.mockImplementation(async (agentId: string) => {
+      expect(existsSync(staleSessionPath)).toBe(false)
       writeAgentFile(home, agentId, 'acp-session-id', 'session-2858\n')
       writeAgentFile(home, agentId, 'acp-token', 'secret\n')
     })
     tmuxMocks.sessionExists.mockResolvedValue(true)
-    const runtime = new AcpRuntimeSync({ overdeckHome: home })
+    const runtime = new AcpRuntimeSync({
+      overdeckHome: home,
+      prepareLaunch: async () => ({
+        binaryPath: '/opt/kimi code/bin/kimi',
+        pathExport: 'export PATH=/opt/kimi-code/bin:"$PATH"',
+      }),
+    })
 
     const agent = await runtime.spawnAgent({
       agentId: 'agent-spawn',
@@ -111,14 +121,16 @@ describe('AcpRuntimeSync', () => {
     expect(tmuxMocks.createSession).toHaveBeenCalledWith(
       'agent-spawn',
       '/tmp/work space',
-      expect.stringContaining("node dist/acp-host.js --agent 'agent-spawn' --provider 'kimi'"),
+      expect.stringContaining(`node '${join(packageRoot, 'dist', 'acp-host.js')}' --agent 'agent-spawn' --provider 'kimi'`),
       {
         EXTRA: 'value',
         OVERDECK_AGENT_ID: 'agent-spawn',
       },
     )
-    expect(tmuxMocks.createSession.mock.calls[0]?.[2]).toContain("--workspace '/tmp/work space'")
-    expect(tmuxMocks.createSession.mock.calls[0]?.[2]).not.toContain('--model')
+    const command = tmuxMocks.createSession.mock.calls[0]?.[2]
+    expect(command).toContain("--workspace '/tmp/work space'")
+    expect(command).toContain("--binary-path '/opt/kimi code/bin/kimi'")
+    expect(command).not.toContain('--model')
     expect(agent).toMatchObject({
       id: 'agent-spawn',
       sessionId: 'session-2858',
@@ -128,7 +140,35 @@ describe('AcpRuntimeSync', () => {
     await expect(runtime.isRunning('agent-spawn')).resolves.toBe(true)
   })
 
-  it('posts authenticated messages and treats a missing socket as a normal failure', async () => {
+  it('kills a host that never produces fresh readiness', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    const home = makeHome()
+    writeAgentFile(home, 'agent-timeout', 'acp-session-id', 'stale-session\n')
+    tmuxMocks.createSession.mockResolvedValue(undefined)
+    tmuxMocks.sessionExists.mockResolvedValue(true)
+    const runtime = new AcpRuntimeSync({
+      overdeckHome: home,
+      prepareLaunch: async () => ({
+        binaryPath: '/opt/kimi/bin/kimi',
+        pathExport: 'export PATH=/opt/kimi/bin:"$PATH"',
+      }),
+    })
+
+    const spawn = runtime.spawnAgent({
+      agentId: 'agent-timeout',
+      workspace: '/tmp/workspace',
+      runtime: 'acp',
+    })
+    const rejection = expect(spawn).rejects.toThrow(
+      'ACP agent agent-timeout did not write acp-session-id',
+    )
+    await vi.advanceTimersByTimeAsync(30_000)
+
+    await rejection
+    expect(tmuxMocks.killSession).toHaveBeenCalledWith('agent-timeout')
+  })
+
+  it('posts authenticated messages and surfaces missing protocol artifacts', async () => {
     const home = makeHome()
     const agentId = 'agent-delivery'
     const token = 'delivery-token'
@@ -146,7 +186,61 @@ describe('AcpRuntimeSync', () => {
         body: { op: 'message', content: 'hello over ACP' },
       },
     ])
-    await expect(runtime.sendMessage('agent-missing', 'hello')).resolves.toBeUndefined()
+    await expect(runtime.sendMessage('agent-missing', 'hello')).rejects.toThrow(
+      'ACP agent agent-missing: host socket is not available',
+    )
+
+    const missingTokenId = 'agent-missing-token'
+    const missingTokenSocket = join(home, 'sockets', `acp-${missingTokenId}.sock`)
+    await listenOnSocket(missingTokenSocket, () => undefined)
+    await expect(runtime.sendMessage(missingTokenId, 'hello')).rejects.toThrow(
+      'ACP agent agent-missing-token: missing acp-token',
+    )
+  })
+
+  it('enumerates ACP sessions from the canonical agent resolver', () => {
+    const home = makeHome()
+    writeAgentFile(home, 'agent-acp', 'acp-session-id', 'session-acp\n')
+    writeAgentFile(home, 'agent-acp', 'acp-session.jsonl', '{"role":"assistant"}\n')
+    const states: AgentState[] = [
+      {
+        id: 'agent-acp',
+        issueId: 'PAN-2858',
+        workspace: '/tmp/acp-workspace',
+        harness: 'acp',
+        role: 'work',
+        model: 'kimi-for-coding',
+        status: 'running',
+        startedAt: '2026-07-17T10:00:00.000Z',
+      },
+      {
+        id: 'agent-claude',
+        issueId: 'PAN-1',
+        workspace: '/tmp/acp-workspace',
+        harness: 'claude-code',
+        role: 'work',
+        model: 'claude-sonnet-4-6',
+        status: 'running',
+        startedAt: '2026-07-17T10:00:00.000Z',
+      },
+    ]
+    const runtime = new AcpRuntimeSync({
+      overdeckHome: home,
+      listAgentStates: () => states,
+    })
+
+    expect(runtime.listSessions('/tmp/acp-workspace')).toEqual([
+      {
+        id: 'session-acp',
+        agentId: 'agent-acp',
+        workspace: '/tmp/acp-workspace',
+        model: 'kimi-for-coding',
+        startedAt: new Date('2026-07-17T10:00:00.000Z'),
+        lastActivity: expect.any(Date),
+        tokenUsage: { inputTokens: 0, outputTokens: 0 },
+      },
+    ])
+    expect(runtime.listSessions('/tmp/other-workspace')).toEqual([])
   })
 
   it('interrupts before the signal ladder and preserves the transcript', async () => {

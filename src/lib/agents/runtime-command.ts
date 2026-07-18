@@ -220,12 +220,14 @@ export function getAcpLauncherFields(
   agentId: string,
   model: string,
   workspace: string,
+  binaryPath: string,
   _role?: Role,
 ): {
   harness: 'acp';
   acpAgentId: string;
   acpProvider: string;
   acpWorkspace: string;
+  acpBinaryPath: string;
   model: string;
   unsetProviderEnv: true;
   appendSystemPromptFiles: [];
@@ -235,6 +237,7 @@ export function getAcpLauncherFields(
     acpAgentId: agentId,
     acpProvider: getProviderForModelSync(model).name,
     acpWorkspace: workspace,
+    acpBinaryPath: binaryPath,
     model,
     unsetProviderEnv: true,
     appendSystemPromptFiles: [],

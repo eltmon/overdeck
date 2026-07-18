@@ -1,11 +1,14 @@
 import { exec } from 'node:child_process'
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { request } from 'node:http'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
+import type { AgentState } from '../agents/agent-state.js'
+import { listAgentStates } from '../agents/queries.js'
 import { BRIDGE_TOKEN_HEADER } from '../bridge-token.js'
-import { getOverdeckHome } from '../paths.js'
+import { prepareHarnessLaunch } from '../harness-binary.js'
+import { getOverdeckHome, packageRoot } from '../paths.js'
 import { getRuntimeBehavior } from './behavior.js'
 import {
   tmuxCreateSession,
@@ -41,6 +44,8 @@ export interface AcpRuntimeOptions {
   readonly provider?: string
   readonly overdeckHome?: string
   readonly execCommand?: (command: string) => Promise<{ readonly stdout: string }>
+  readonly prepareLaunch?: () => Promise<{ readonly binaryPath: string; readonly pathExport: string }>
+  readonly listAgentStates?: () => AgentState[]
 }
 
 export class AcpSpawnTimeout extends Error {
@@ -57,11 +62,15 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
   private readonly provider: string
   private readonly overdeckHome: string | undefined
   private readonly execCommand: (command: string) => Promise<{ readonly stdout: string }>
+  private readonly prepareLaunch: () => Promise<{ readonly binaryPath: string; readonly pathExport: string }>
+  private readonly resolveAgentStates: () => AgentState[]
 
   constructor(options: AcpRuntimeOptions = {}) {
     this.provider = options.provider ?? 'kimi'
     this.overdeckHome = options.overdeckHome
     this.execCommand = options.execCommand ?? execAsync
+    this.prepareLaunch = options.prepareLaunch ?? (() => prepareHarnessLaunch('acp'))
+    this.resolveAgentStates = options.listAgentStates ?? (() => listAgentStates())
   }
 
   getHarnessBehavior(): HarnessBehavior {
@@ -102,18 +111,18 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
 
   async sendMessage(agentId: string, message: string): Promise<void> {
     const socketPath = this.socketPath(agentId)
-    const token = this.readToken(agentId)
-    if (!existsSync(socketPath) || !token) return
-
-    try {
-      await postUnixSocketJson(socketPath, token, {
-        op: 'message',
-        content: message,
-      })
-    } catch (error) {
-      if (isUnavailableSocket(error)) return
-      throw error
+    if (!existsSync(socketPath)) {
+      throw new Error(`ACP agent ${agentId}: host socket is not available`)
     }
+    const token = this.readToken(agentId)
+    if (!token) {
+      throw new Error(`ACP agent ${agentId}: missing acp-token`)
+    }
+
+    await postUnixSocketJson(socketPath, token, {
+      op: 'message',
+      content: message,
+    })
   }
 
   async killAgent(agentId: string): Promise<void> {
@@ -159,18 +168,23 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
 
   async spawnAgent(config: AcpSpawnConfig): Promise<Agent> {
     const provider = config.provider ?? this.provider
+    const { binaryPath } = await this.prepareLaunch()
     const command = [
       'node',
-      'dist/acp-host.js',
+      shellQuote(join(packageRoot, 'dist', 'acp-host.js')),
       '--agent',
       shellQuote(config.agentId),
       '--provider',
       shellQuote(provider),
       '--workspace',
       shellQuote(config.workspace),
+      '--binary-path',
+      shellQuote(binaryPath),
     ]
     if (config.sessionId) command.push('--resume', shellQuote(config.sessionId))
     if (config.model) command.push('--model', shellQuote(config.model))
+
+    rmSync(this.agentPath(config.agentId, 'acp-session-id'), { force: true })
 
     await tmuxCreateSession(
       config.agentId,
@@ -182,30 +196,58 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
       },
     )
 
-    const sessionId = await this.waitForSessionId(config.agentId)
-    if (!sessionId) throw new AcpSpawnTimeout(config.agentId)
+    try {
+      const sessionId = await this.waitForSessionId(config.agentId)
+      if (!sessionId) throw new AcpSpawnTimeout(config.agentId)
 
-    if (config.prompt) {
-      const token = this.readToken(config.agentId)
-      if (!token) throw new Error(`ACP agent ${config.agentId}: missing acp-token after startup`)
-      await postUnixSocketJson(this.socketPath(config.agentId), token, {
-        op: 'message',
-        content: config.prompt,
-      })
-    }
+      if (config.prompt) await this.sendMessage(config.agentId, config.prompt)
 
-    return {
-      id: config.agentId,
-      sessionId,
-      runtime: 'acp',
-      model: config.model ?? '',
-      workspace: config.workspace,
-      startedAt: new Date(),
+      return {
+        id: config.agentId,
+        sessionId,
+        runtime: 'acp',
+        model: config.model ?? '',
+        workspace: config.workspace,
+        startedAt: new Date(),
+      }
+    } catch (error) {
+      if (await tmuxSessionExists(config.agentId)) await tmuxKillSession(config.agentId)
+      throw error
     }
   }
 
-  listSessions(_workspace?: string): Session[] {
-    return []
+  listSessions(workspace?: string): Session[] {
+    const sessions: Session[] = []
+    for (const state of this.resolveAgentStates()) {
+      if (state.harness !== 'acp') continue
+      if (workspace && state.workspace !== workspace) continue
+
+      const sessionId = this.readSessionId(state.id)
+      if (!sessionId) continue
+
+      const sessionPath = this.getSessionPath(state.id)
+      let lastActivity: Date
+      try {
+        lastActivity = statSync(sessionPath).mtime
+      } catch {
+        try {
+          lastActivity = statSync(this.agentPath(state.id, 'acp-session-id')).mtime
+        } catch {
+          continue
+        }
+      }
+
+      sessions.push({
+        id: sessionId,
+        agentId: state.id,
+        workspace: state.workspace,
+        model: state.model ?? '',
+        startedAt: new Date(state.startedAt),
+        lastActivity,
+        tokenUsage: { inputTokens: 0, outputTokens: 0 },
+      })
+    }
+    return sessions
   }
 
   async isRunning(agentId: string): Promise<boolean> {
@@ -310,11 +352,6 @@ function postUnixSocketJson(
     client.once('error', (error) => finish(() => reject(error)))
     client.end(JSON.stringify(body))
   })
-}
-
-function isUnavailableSocket(error: unknown): boolean {
-  const code = (error as NodeJS.ErrnoException | undefined)?.code
-  return code === 'ENOENT' || code === 'ECONNREFUSED'
 }
 
 export function createAcpRuntimeSync(options: AcpRuntimeOptions = {}): AcpRuntimeSync {

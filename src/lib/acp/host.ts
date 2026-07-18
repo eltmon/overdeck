@@ -184,13 +184,12 @@ export class AcpHost {
       source: "orchestrator",
     });
     this.writePaneLine(`[user] ${content}`);
-    this.promptQueue = this.promptQueue
-      .then(async () => {
+    const promptOperation = this.promptQueue.then(async () => {
+      try {
         await Effect.runPromise(
           this.options.runtime.prompt({ prompt: [{ type: "text", text: content }] }),
         );
-      })
-      .catch(async (error) => {
+      } catch (error) {
         const message = errorMessage(error);
         this.writePaneLine(`[error] ${message}`);
         await this.transcript.append({
@@ -199,8 +198,15 @@ export class AcpHost {
           sessionId: this.sessionId,
           source: "agent",
         });
-      });
-    return { status: 202, body: { ok: true, queued: true } };
+        throw error;
+      }
+    });
+    this.promptQueue = promptOperation.then(
+      () => undefined,
+      () => undefined,
+    );
+    await promptOperation;
+    return { status: 200, body: { ok: true } };
   }
 
   private async handleInterruptOp(): Promise<HostOpResult> {
@@ -419,6 +425,7 @@ interface AcpHostArgs {
   readonly agentId: string;
   readonly provider: string;
   readonly workspace: string;
+  readonly binaryPath: string;
   readonly resumeSessionId?: string;
   readonly model?: string;
 }
@@ -438,13 +445,15 @@ export function parseAcpHostArgs(argv: ReadonlyArray<string>): AcpHostArgs {
   const agentId = values.get("--agent");
   const provider = values.get("--provider");
   const workspace = values.get("--workspace");
-  if (!agentId || !provider || !workspace) {
-    throw new Error("ACP host requires --agent, --provider, and --workspace");
+  const binaryPath = values.get("--binary-path");
+  if (!agentId || !provider || !workspace || !binaryPath) {
+    throw new Error("ACP host requires --agent, --provider, --workspace, and --binary-path");
   }
   return {
     agentId,
     provider,
     workspace,
+    binaryPath,
     ...(values.get("--resume") ? { resumeSessionId: values.get("--resume") } : {}),
     ...(values.get("--model") ? { model: values.get("--model") } : {}),
   };
@@ -468,6 +477,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
           childProcessSpawner,
           cwd: args.workspace,
           resumeSessionId: args.resumeSessionId,
+          kimiSettings: { binaryPath: args.binaryPath },
           clientInfo: {
             name: "overdeck",
             version: process.env.npm_package_version ?? "development",

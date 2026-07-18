@@ -29,7 +29,7 @@ import {
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
-import { getCodexLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
+import { getAcpLauncherFields, getCodexLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -665,8 +665,19 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     const codexLauncherFields = behavior.usesCodexHome
       ? getCodexLauncherFields(sessionName, planningModel, workspacePath, 'plan')
       : {};
+    const acpLauncherFields = behavior.launchCommandKind === 'acp-host'
+      ? getAcpLauncherFields(
+          sessionName,
+          planningModel,
+          workspacePath,
+          harnessLaunch.binaryPath,
+          'plan',
+        )
+      : {};
 
-    const providerExports = await getProviderExportsForModel(planningModel);
+    const providerExports = behavior.launchCommandKind === 'acp-host'
+      ? undefined
+      : await getProviderExportsForModel(planningModel);
 
     // ── Write launcher script ──────────────────────────────────────────────
     const recordFilePath = getIssueRecordPath(recordProject, issue.identifier);
@@ -684,7 +695,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
         extraEnvExports: [harnessLaunch.pathExport],
-        promptFile,
+        promptFile: behavior.launchCommandKind === 'acp-host' ? undefined : promptFile,
         baseCommand: cmdWithArgs,
         appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
         trapHup: true,
@@ -692,6 +703,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         keepAlive: true,
         ...piLauncherFields,
         ...codexLauncherFields,
+        ...acpLauncherFields,
       }),
       { mode: 0o755 },
     );
@@ -722,14 +734,14 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     // 200×50 caused a dimension cascade (200→120→actual) that garbled output.
     // See PAN-417 for the full forensic timeline.
 
-    // ── Update agent state to running ──────────────────────────────────────
+    // Keep the launch non-healthy until every protocol-owned kickoff has completed.
     // PAN-1048 R2: legacy `runtime` field removed; AgentState carries `harness`.
     {
       const baseState = getAgentStateSync(sessionName);
       saveAgentStateSync({
         ...(baseState ?? { id: sessionName, issueId: issue.identifier, workspace: workspacePath, startedAt: new Date().toISOString() }),
         model: planningModel,
-        status: 'running',
+        status: 'starting',
         role: 'plan',
         harness: effectiveHarness,
         auto: auto === true,
@@ -742,14 +754,14 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       }
     }
 
-    if (behavior.usesCodexHome) {
+    if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host') {
       const delivery = await deliverInitialPromptWithRetry(
         sessionName,
         initMessage,
         'spawnPlanningSession:initial-prompt',
       );
       if (!delivery.ok) {
-        const errorMsg = `Codex planning kickoff prompt delivery failed: ${delivery.failure ?? 'unknown error'}`;
+        const errorMsg = `${behavior.displayName} planning kickoff prompt delivery failed: ${delivery.failure ?? 'unknown error'}`;
         console.error(`[start-planning] ${errorMsg}`);
         await Effect.runPromise(killSession(sessionName)).catch(() => {});
         const existingErrState = getAgentStateSync(sessionName);
@@ -759,6 +771,8 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       }
     }
 
+    const runningState = getAgentStateSync(sessionName);
+    if (runningState) saveAgentStateSync({ ...runningState, status: 'running' });
     progress(5, 'Launching planning session', 'Agent running', 'complete');
 
     console.log(`[start-planning] Started local planning agent ${sessionName}`);

@@ -264,7 +264,13 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
     ? getCodexLauncherFields(agentId, selectedModel, workspace, role)
     : {};
   const acpLauncherFields = isAcp
-    ? getAcpLauncherFields(agentId, selectedModel, workspace, role)
+    ? getAcpLauncherFields(
+        agentId,
+        selectedModel,
+        workspace,
+        harnessLaunch.binaryPath,
+        role,
+      )
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -409,12 +415,13 @@ export async function spawnRun(issueId: string, role: Role, options: SpawnRunOpt
           await Effect.runPromise(saveAgentState(state));
         }
       } catch (err) {
-        console.error(`[${agentId}] ACP prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[${agentId}] ACP prompt delivery failed:`, message);
         if (tracksKickoffDelivery) {
           await recordKickoffDeliveryFailure(state, issueId, role);
-          await Effect.runPromise(stopAgent(agentId));
-          throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
         }
+        await Effect.runPromise(stopAgent(agentId));
+        throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
       }
     } else if (shouldDeliverPromptViaPi) {
       try {
@@ -711,6 +718,7 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
     useSupervisor: supervisorLaunch.useSupervisor,
     supervisorScriptPath: supervisorLaunch.supervisorScriptPath,
     harness: state.harness ?? 'claude-code',
+    harnessBinaryPath: harnessLaunch.binaryPath,
     sessionId: state.sessionId,
     extraEnvExports: [harnessLaunch.pathExport, ...flywheelEnvExports(flywheelEnv)],
     effort: options.effort,
@@ -789,12 +797,13 @@ export async function spawnAgent(options: SpawnOptions): Promise<AgentState> {
         saveAgentStateSync(state);
       }
     } catch (err) {
-      console.error(`[${agentId}] ACP prompt delivery failed:`, err instanceof Error ? err.message : String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`[${agentId}] ACP prompt delivery failed:`, message);
       if (tracksKickoffDelivery) {
         await recordKickoffDeliveryFailure(state, options.issueId, role);
-        await Effect.runPromise(stopAgent(agentId));
-        throw new Error(`Agent ${agentId} kickoff delivery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
+      await Effect.runPromise(stopAgent(agentId));
+      throw new Error(`Agent ${agentId} kickoff delivery failed: ${message}`);
     }
   } else if (prompt && resolvedHarness === 'ohmypi') {
     try {

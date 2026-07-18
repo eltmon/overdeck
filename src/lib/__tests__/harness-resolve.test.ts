@@ -9,7 +9,11 @@ const providerMocks = vi.hoisted(() => ({
   getProviderForModelSync: vi.fn(),
 }));
 const configMock = vi.hoisted(() => ({ loadConfigSync: vi.fn(() => ({ config: {} })) }));
-const binaryMocks = vi.hoisted(() => ({ available: new Set(['omp', 'codex', 'kimi']) }));
+const binaryMocks = vi.hoisted(() => ({
+  available: new Set(['omp', 'codex', 'kimi']),
+  availablePaths: new Set<string>(),
+  resolutions: [] as Array<{ harness: string; executablePath?: string }>,
+}));
 
 vi.mock('../harness-policy.js', () => ({
   canUseHarnessSync: policyMocks.canUseHarnessSync,
@@ -27,6 +31,8 @@ beforeEach(() => {
   binaryMocks.available.add('omp');
   binaryMocks.available.add('codex');
   binaryMocks.available.add('kimi');
+  binaryMocks.availablePaths.clear();
+  binaryMocks.resolutions.length = 0;
 });
 
 // Control shared harness-binary resolution so binary-gated harnesses can be
@@ -35,7 +41,12 @@ vi.mock('../harness-binary.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../harness-binary.js')>();
   return {
     ...actual,
-    resolveHarnessBinary: vi.fn(async (harness) => {
+    resolveHarnessBinary: vi.fn(async (harness, options) => {
+      const executablePath = options?.executablePath;
+      binaryMocks.resolutions.push({ harness, executablePath });
+      if (executablePath) {
+        return binaryMocks.availablePaths.has(executablePath) ? executablePath : null;
+      }
       const binary = actual.harnessBinaryName(harness);
       return binaryMocks.available.has(binary) ? `/usr/local/bin/${binary}` : null;
     }),
@@ -83,6 +94,37 @@ describe('resolveHarness — PAN-1871: no silent CLIProxy fallback for non-nativ
 
     const { resolveHarness } = await import('../harness-resolve.js');
     await expect(resolveHarness({ model: 'kimi-k2.7-code', role: 'work' })).resolves.toBe('acp');
+  });
+
+  it('isolates ACP availability cache entries by configured executable path', async () => {
+    providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
+    providerMocks.getBuiltInDefaultHarness.mockReturnValue('claude-code');
+    policyMocks.canUseHarnessSync.mockReturnValue({ allowed: true });
+    binaryMocks.availablePaths.add('/opt/kimi-a/bin/kimi');
+    configMock.loadConfigSync.mockReturnValue({
+      config: {
+        providerHarnesses: { kimi: 'acp' },
+        acp: { kimi: { binaryPath: '/opt/kimi-a/bin/kimi' } },
+      },
+    });
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    await expect(resolveHarness({ model: 'kimi-k2.7-code', role: 'work' })).resolves.toBe('acp');
+
+    configMock.loadConfigSync.mockReturnValue({
+      config: {
+        providerHarnesses: { kimi: 'acp' },
+        acp: { kimi: { binaryPath: '/opt/kimi-b/bin/kimi' } },
+      },
+    });
+    await expect(resolveHarness({ model: 'kimi-k2.7-code', role: 'work' })).rejects.toThrow(
+      'Fix the configured executable path /opt/kimi-b/bin/kimi and retry',
+    );
+
+    expect(binaryMocks.resolutions).toEqual([
+      { harness: 'acp', executablePath: '/opt/kimi-a/bin/kimi' },
+      { harness: 'acp', executablePath: '/opt/kimi-b/bin/kimi' },
+    ]);
   });
 
   it('still falls back to claude-code when a native (Anthropic) model has its resolved harness denied', async () => {
