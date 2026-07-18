@@ -23,6 +23,10 @@ import type * as EffectAcpSchema from "effect-acp/schema";
 
 import { BRIDGE_TOKEN_HEADER } from "../bridge-token.js";
 import { renderAcpHostEvent, stripAcpPaneControl } from "./host-render.js";
+import {
+  isRejectPermissionOption,
+  selectAutoPermissionOutcome,
+} from "./permissions.js";
 import { resolveAcpProviderSupport } from "./providers.js";
 import {
   AcpSessionRuntime,
@@ -96,7 +100,7 @@ export class AcpHost {
     );
     await Effect.runPromise(
       this.options.runtime.handleRequestPermission((request) =>
-        Effect.succeed(selectAutomaticPermission(request)),
+        Effect.promise(() => this.handlePermissionRequest(request)),
       ),
     );
     this.startEventPump();
@@ -202,6 +206,62 @@ export class AcpHost {
   private async handleInterruptOp(): Promise<HostOpResult> {
     await Effect.runPromise(this.options.runtime.cancel);
     return { status: 200, body: { ok: true } };
+  }
+
+  private async handlePermissionRequest(
+    request: EffectAcpSchema.RequestPermissionRequest,
+  ): Promise<EffectAcpSchema.RequestPermissionResponse> {
+    const offeredOptionIds = request.options.map((option) => option.optionId);
+    await this.transcript.append({
+      role: "system",
+      content: JSON.stringify({
+        type: "permission_request",
+        toolCallId: request.toolCall.toolCallId,
+        offeredOptionIds,
+      }),
+      sessionId: request.sessionId,
+      source: "agent",
+    });
+
+    const selected = selectAutoPermissionOutcome(request);
+    if (!selected) {
+      this.writePaneLine(
+        "[warning] ACP permission request cancelled because no allow or reject option was offered.",
+      );
+      await this.transcript.append({
+        role: "system",
+        content: JSON.stringify({
+          type: "permission_outcome",
+          outcome: "cancelled",
+          offeredOptionIds,
+          chosenOptionId: null,
+        }),
+        sessionId: request.sessionId,
+        source: "agent",
+      });
+      return { outcome: { outcome: "cancelled" } };
+    }
+
+    const selectedOption = request.options.find(
+      (option) => option.optionId === selected.optionId,
+    );
+    if (selectedOption && isRejectPermissionOption(selectedOption)) {
+      this.writePaneLine(
+        `[warning] ACP permission declined with option ${selected.optionId}.`,
+      );
+    }
+    await this.transcript.append({
+      role: "system",
+      content: JSON.stringify({
+        type: "permission_outcome",
+        outcome: "selected",
+        offeredOptionIds,
+        chosenOptionId: selected.optionId,
+      }),
+      sessionId: request.sessionId,
+      source: "agent",
+    });
+    return { outcome: selected };
   }
 
   private startEventPump(): void {
@@ -332,17 +392,6 @@ export class AcpHost {
   private transcriptPath(): string {
     return join(this.agentDir(), "acp-session.jsonl");
   }
-}
-
-function selectAutomaticPermission(
-  request: EffectAcpSchema.RequestPermissionRequest,
-): EffectAcpSchema.RequestPermissionResponse {
-  const selected =
-    request.options.find((option) => option.kind === "allow_always") ??
-    request.options.find((option) => option.kind === "allow_once");
-  return selected
-    ? { outcome: { outcome: "selected", optionId: selected.optionId } }
-    : { outcome: { outcome: "cancelled" } };
 }
 
 function sendJson(response: ServerResponse, status: number, body: JsonRecord): void {
