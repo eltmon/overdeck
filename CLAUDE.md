@@ -113,7 +113,7 @@ Overdeck's issue pipeline is expressed as four spawned **roles** plus a server-s
 
 | Role | Purpose | Instruction source |
 | --- | --- | --- |
-| `plan` | Discover requirements and produce vBRIEF/tasks artifacts | `roles/plan.md` |
+| `plan` | Discover requirements and produce xBRIEF/tasks artifacts | `roles/plan.md` |
 | `work` | Implement one task at a time in the workspace | `roles/work.md` |
 | `review` | Synthesize code review and transition approved/blocked work | `roles/review.md` |
 | `test` | Run automated verification and required browser UAT | `roles/test.md` |
@@ -149,7 +149,7 @@ See [docs/SKILLS-CONVENTION.md](docs/SKILLS-CONVENTION.md) for the full rules, s
 `pan start <id>` is the single paved-road entry point: it takes an issue from whatever state it is in to running work.
 
 - **No plan exists** → `pan start` auto-plans (non-interactive), materializes tasks, and starts the work agent when planning finalizes.
-- **Plan exists** → `pan start` spawns the work agent from the existing vBRIEF and tasks.
+- **Plan exists** → `pan start` spawns the work agent from the existing xBRIEF and tasks.
 - **Already running** → `pan start` exits 0 with a no-op message and guidance on messaging/attaching the agent.
 
 Planning depth is one optional dial:
@@ -158,7 +158,7 @@ Planning depth is one optional dial:
 pan start PAN-1071                    # default: config planning.default_mode, or auto if unset
 pan start PAN-1071 --plan interactive # Q&A planning session first, then work on approval
 pan start PAN-1071 --plan auto        # non-interactive planning, then work (same as default)
-pan start PAN-1071 --plan skip        # synthesize a minimal vBRIEF and tasks, then work
+pan start PAN-1071 --plan skip        # synthesize a minimal xBRIEF and tasks, then work
 ```
 
 `planning.default_mode` in `~/.overdeck/config.yaml` sets the default for unplanned issues:
@@ -168,7 +168,7 @@ planning:
   default_mode: auto   # interactive | auto | skip; unset = auto
 ```
 
-`pan plan <id>` remains the plan-ONLY verb for producing or refreshing the PRD and vBRIEF without starting work.
+`pan plan <id>` remains the plan-ONLY verb for producing or refreshing the PRD and xBRIEF without starting work.
 
 The legacy aliases below are deprecated but still functional through the deprecation window:
 
@@ -451,11 +451,11 @@ ensure the project key (uppercased, hyphens removed) matches the issue prefix yo
 
 ## Task Enforcement
 
-Work agents require a readable, implementation-ready vBRIEF. The start-agent endpoint returns 422
+Work agents require a readable, implementation-ready xBRIEF. The start-agent endpoint returns 422
 when the plan is missing, unreadable, belongs to another issue, or contains no implementation items.
-Planning writes the vBRIEF checklist directly; it does not materialize an external task store.
+Planning writes the xBRIEF checklist directly; it does not materialize an external task store.
 
-Completion and verification are also gated by the vBRIEF checklist. `runVerificationForIssue()` in
+Completion and verification are also gated by the xBRIEF checklist. `runVerificationForIssue()` in
 `src/lib/cloister/verification-runner.ts` calls `checkIncompletePlanItemsPromise()` and reports
 `failedCheck: 'incomplete-plan-items'` while any item or sub-item is not terminal. Agents update that
 checklist through `pan task`; there is no separate tracker to reconcile at merge or close-out.
@@ -487,7 +487,7 @@ idempotent and the test stays green.
 
 `postMergeLifecycle()` in `merge-agent.ts` is a non-destructive merge handoff. After
 merge it marks the issue `verifying_on_main`, applies the `verifying-on-main` label,
-pauses the work/planning agents, preserves workspace/state/vBRIEF/branches, and stops
+pauses the work/planning agents, preserves workspace/state/xBRIEF/branches, and stops
 Docker containers and networks.
 
 Docker cleanup still happens at merge time because orphaned networks from merged
@@ -503,7 +503,7 @@ issue's leaked stack by name. The single `rebuildWorkspaceStack` chokepoint no-o
 closed/merged issues, so patrols never recreate a terminal stack.
 
 The destructive/non-reversible completion steps are owned by close-out, not merge:
-`pan close <id>` / dashboard Close Out completes the vBRIEF, archives planning artifacts,
+`pan close <id>` / dashboard Close Out completes the xBRIEF, archives planning artifacts,
 optionally tears down the workspace or deletes feature branches according to `close_out`
 config, closes the tracker issue, and clears review status.
 
@@ -514,13 +514,13 @@ The deep-wipe endpoint (`POST /api/agents/:id/deep-wipe`) with `deleteWorkspace:
 1. **tmux sessions** — all agent sessions killed
 2. **Agent state directories** — `~/.overdeck/agents/<id>/` removed
 3. **Entire workspace directory** — this includes:
-   - `.overdeck/spec.vbrief.json` — the **workspace-specific vBRIEF plan**
+   - `.overdeck/spec.vbrief.json` — the **workspace-specific xBRIEF plan**
    - `.beads/` — all task tracking tasks
    - Any implementation work in progress
 4. **Git branches** — both local AND remote `feature/<issue-id>` branches deleted
 5. **Linear/GitHub status** — issue status reset to Todo/Open
 
-**The scope vBRIEF** in `specs/` on `overdeck-state` survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives also survive; the Overdeck-managed PRD at `drafts/<issue>.md` on `overdeck-state` survives too (on disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`). The workspace `.overdeck/` runtime directory and `.beads/` redirect are disposable.
+**The scope xBRIEF** in `specs/` on `overdeck-state` survives deep-wipe — it's committed to the project repo independently of the workspace. Project-level PRD archives also survive; the Overdeck-managed PRD at `drafts/<issue>.md` on `overdeck-state` survives too (on disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`). The workspace `.overdeck/` runtime directory and `.beads/` redirect are disposable.
 
 **Rules:**
 - **NEVER call deep-wipe programmatically** without the user explicitly requesting it
@@ -565,14 +565,14 @@ When TLDR is available, you'll have these MCP tools:
 
 When `agents.rtk.enabled` is true, Bash outputs the agent sees (git status, npm output, etc.) may be compressed by RTK. Re-run with `OVERDECK_RTK_ENABLED=0` to regenerate raw command output.
 
-## vBRIEF Plans & Lifecycle
+## xBRIEF Plans & Lifecycle
 
-Overdeck emits **xBRIEF v0.8** for machine-readable work plans (readers accept v0.5–v0.8; see `docs/VBRIEF.md`). Key references:
+Overdeck emits **xBRIEF v0.8** for machine-readable work plans (readers accept v0.5–v0.8; see `docs/XBRIEF.md`). Key references:
 
 - **Canonical spec:** [github.com/deftai/xBRIEF](https://github.com/deftai/xBRIEF) (renamed from vBRIEF at v0.7.0; spec now v0.8)
 - **Our fork:** [github.com/eltmon/xBRIEF](https://github.com/eltmon/xBRIEF)
 - **Extension proposal:** [deftai/xBRIEF#40](https://github.com/deftai/xBRIEF/issues/40) (supersedes #1)
-- **Overdeck docs:** [docs/VBRIEF.md](docs/VBRIEF.md) — full schema, lifecycle, and migration notes
+- **Overdeck docs:** [docs/XBRIEF.md](docs/XBRIEF.md) — full schema, lifecycle, and migration notes
 
 ### The four-artifact model (PAN-1124: single-spec-on-main)
 
@@ -581,8 +581,8 @@ There are four artifacts. They are distinct — do not conflate them.
 | Artifact | Location | Writer | Mutability |
 | --- | --- | --- | --- |
 | **PRD draft** (`.md`) | `drafts/<issue>.md` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/drafts/<issue>.md`) | Human or planning agent | Free-form narrative, human-mutable |
-| **vBRIEF spec** (`.json`) | `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.vbrief.json` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/specs/<file>`) | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
-| **Project-side continue state** (`.json`) | `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.vbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
+| **xBRIEF spec** (`.json`) | `specs/<YYYY-MM-DD>-<ISSUE>-<slug>.xbrief.json` on `overdeck-state` (disk: `${OVERDECK_HOME}/state/<project>/specs/<file>`) | Pipeline only (single writer) | Immutable after planning — only `plan.status` changes via `updateSpecStatus()` |
+| **Project-side continue state** (`.json`) | `${OVERDECK_HOME}/state/<project>/continues/<issue-lowercase>.xbrief.json` | Pipeline | Session resume point, decisions, hazards, sessionHistory, feedback — one canonical file per issue, never moves |
 | **Workspace-side continue state** (`.json`) | `<workspace>/.overdeck/continue.json` | Pipeline + work agent | Session state + `statusOverrides` map tracking item/subItem completion |
 
 **The PAN-1124 invariant — the canonical spec is immutable after planning.** `findPlan()` resolves the canonical spec on `overdeck-state` via `findSpecByIssue()`. `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` from workspace continue.json. `updateItemStatus()` and `updateSubItemStatus()` write ONLY to the workspace continue file's `statusOverrides` map — they cannot mutate the spec. The only legal spec mutation is `plan.status` via `updateSpecStatus()` in `pan-dir/specs.ts`. This replaces the old PAN-946 invariant (workspace-spec isolation) with a stronger guarantee: there is no workspace spec to isolate.
@@ -602,7 +602,7 @@ draft (in `drafts/*.md` on `overdeck-state`) ──► proposed ──► approv
 | Transition | Trigger | What changes |
 | --- | --- | --- |
 | (new) → draft | `pan plan` starts | Markdown PRD written to `drafts/<issue>.md` |
-| draft → proposed | Planning completes | vBRIEF created in `specs/...` with `plan.status: "proposed"` |
+| draft → proposed | Planning completes | xBRIEF created in `specs/...` with `plan.status: "proposed"` |
 | proposed → approved/running | `pan start` | Status field flipped on `overdeck-state`; work agent reads spec from main via `findPlan()` |
 | running → completed | PR merges | Status field flipped to `"completed"` on main |
 | any → cancelled | Issue closed | Status field flipped to `"cancelled"` on main |
@@ -613,24 +613,24 @@ PAN-967 unified everything under `.pan/`. The following are gone or read-only le
 
 - `.planning/plan.vbrief.json` — **DELETED.** PAN-967 replaced it with `.pan/spec.vbrief.json`; PAN-1124 later retired new workspace copies. PAN-2541 uses `.overdeck/spec.vbrief.json` only as the renamed workspace-runtime compatibility path. The current canonical spec is `specs/<file>` on `overdeck-state`.
 - `docs/prds/planned/`, `docs/prds/active/` — no longer a Overdeck convention. PRD drafts live in `drafts/`. Projects may keep their own `docs/prds/` for human archival, but Overdeck does not read or write it.
-- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyVBriefByIssue` for backward compatibility during migration; pipeline writes target `specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
+- `vbrief/{proposed,active,completed,cancelled}/` at the project root — still read by `findLegacyXBriefByIssue` for backward compatibility during migration; pipeline writes target `specs/` only. Legacy spec files (non-continue) remain at these paths as read-only fallback.
 
-If you see an agent referencing `.planning/`, `docs/prds/planned/*.vbrief.json`, or planning a "copy PRD vBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/VBRIEF.md`.
+If you see an agent referencing `.planning/`, `docs/prds/planned/*.xbrief.json`, or planning a "copy PRD xBRIEF into workspace .planning" step, the agent is reading a pre-PAN-967 problem statement and needs to be redirected at `docs/XBRIEF.md`.
 
 ### Auto-Behaviors
 
 - `io.ts` (`updateItemStatus`/`updateSubItemStatus`) write to workspace continue.json `statusOverrides` map — they do NOT mutate the spec.
 - `readWorkspacePlan()` returns a merged view: canonical spec + `statusOverrides` overlay from workspace continue.json.
-- `complete-planning` writes the vBRIEF to `specs/...` with `plan.status: "proposed"`.
+- `complete-planning` writes the xBRIEF to `specs/...` with `plan.status: "proposed"`.
 - `start-agent` flips the main-side status field. Work agents read the spec from main via `findPlan()`.
-- `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the vBRIEF in its running/active state.
+- `postMergeLifecycle` marks merged work as `verifying_on_main` and preserves the xBRIEF in its running/active state.
 - `closeOut` flips the main-side `plan.status` to `"completed"` after post-merge verification, and runs verified Docker stack + `_devnet` network teardown (with the closed-issue reaper as a backstop).
 - `findPlan(workspacePath)` resolves `specs/<file>` on `overdeck-state` via `findSpecByIssue(projectRoot, issueId)`, with fallback to workspace-local `.overdeck/spec.vbrief.json` for migration compatibility.
 
 ### Dashboard Viewer
 
-VBriefViewer components at `src/dashboard/frontend/src/components/vbrief/`:
-- Accessible via **vBRIEF button** on kanban issue cards and InspectorPanel
+XBriefViewer components at `src/dashboard/frontend/src/components/xbrief/`:
+- Accessible via **xBRIEF button** on kanban issue cards and InspectorPanel
 - List / DAG / Raw JSON tabs
 - Fetches from `GET /api/workspaces/:issueId/plan` (resolves from `specs/` on `overdeck-state` via `findSpecByIssue`, with workspace fallback for migration compat)
 

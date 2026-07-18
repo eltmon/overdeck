@@ -79,7 +79,7 @@ check_schema_key_agreement() {
   local files=(
     "src/lib/cloister/prompts/planning.md"
     "sync-sources/skills/write-xbrief/SKILL.md"
-    "docs/VBRIEF.md"
+    "docs/XBRIEF.md"
   )
   local keys=(
     "requiresInspection"
@@ -237,7 +237,7 @@ EOF
   cat > "$root/src/lib/cloister/verification-runner.ts" <<'EOF'
 Complete every finished item with pan task done.
 EOF
-  for file in "$root/sync-sources/skills/write-xbrief/SKILL.md" "$root/docs/VBRIEF.md"; do
+  for file in "$root/sync-sources/skills/write-xbrief/SKILL.md" "$root/docs/XBRIEF.md"; do
     cat > "$file" <<'EOF'
 requiresInspection inspectionDepth issueLabel difficulty foundationFor acceptance_criterion NonGoals traces
 EOF
@@ -272,7 +272,7 @@ PY"
   expect_self_test_failure "single-workflow-copy" \
     "printf '%s\n' '## MANDATORY: One Item At A Time' >> \"\$tmp/src/lib/cloister/prompts/work.md\""
   expect_self_test_failure "schema-key-agreement" \
-    "python3 - <<'PY' \"\$tmp/docs/VBRIEF.md\"
+    "python3 - <<'PY' \"\$tmp/docs/XBRIEF.md\"
 from pathlib import Path
 import sys
 p = Path(sys.argv[1])

@@ -134,7 +134,7 @@ past the cap), and invalidation/promotion always tear a generation's stack down
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/flywheel/uat-generations` | The generation chain, newest first: per generation the members (with PR links and **per-member acceptance criteria** from the shared vBRIEF extractor `src/lib/vbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. Returns `[]` when no flywheel run is active. |
+| `GET /api/flywheel/uat-generations` | The generation chain, newest first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl}`. Returns `[]` when no flywheel run is active. |
 | `POST /api/flywheel/uat-generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
 | `POST /api/flywheel/uat-generations/:name/promote` | Promote (merge) the tested generation to main. |
 | `POST /api/flywheel/assemble-uat` | Force a reconcile/rebuild of the current generation (repurposed from the PAN-1691 one-shot assemble). |

@@ -11,9 +11,9 @@ Pipeline membership is an exception queue: an issue is in the pipeline when its 
 3. A convention branch plus its unmerged relationship to `main`, evaluated with git.
 4. Whether the tracker issue is open.
 5. The current pipeline phase label, when present.
-6. A durable vBRIEF spec on `overdeck-state`.
+6. A durable xBRIEF spec on `overdeck-state`.
 
-A vBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. An open issue with a live `strike/` branch and no PR also surfaces as `planned_backlog`, so active strike work enters the pipeline before its PR opens. Landing detection requires positive evidence (PAN-2887): a branch contained in `main` counts as landed only when its tip sits off `main`'s first-parent line (its unique commits arrived via a merge). A freshly-created branch pointing at a `main` commit has zero unique work and is `planned_backlog` — every `pan start` passes through that state until the first commit. Known blind spot: a fast-forward-landed branch is indistinguishable from a fresh pointer and classifies as backlog (visible and safe) rather than limbo. A `planned` label is only a phase hint; it never substitutes for the durable spec lens. Pull-request lenses are capability-gated: projects without `github_repo` still gather tracker state, configured repository branches, and vBRIEF specs instead of resolving to an empty membership set.
+An xBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. An open issue with a live `strike/` branch and no PR also surfaces as `planned_backlog`, so active strike work enters the pipeline before its PR opens. Landing detection requires positive evidence (PAN-2887): a branch contained in `main` counts as landed only when its tip sits off `main`'s first-parent line (its unique commits arrived via a merge). A freshly-created branch pointing at a `main` commit has zero unique work and is `planned_backlog` — every `pan start` passes through that state until the first commit. Known blind spot: a fast-forward-landed branch is indistinguishable from a fresh pointer and classifies as backlog (visible and safe) rather than limbo. A `planned` label is only a phase hint; it never substitutes for the durable spec lens. Pull-request lenses are capability-gated: projects without `github_repo` still gather tracker state, configured repository branches, and xBRIEF specs instead of resolving to an empty membership set.
 
 Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness annotations. They never decide membership. This is why the resolver returns the same answer with a fresh, empty `overdeck.db`. Resource discovery may temporarily retain a live-resource row when a project's durable membership lookup is unavailable; it leaves membership annotations unset and does not treat a successful empty result as unavailable.
 
@@ -24,7 +24,7 @@ Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness anno
 | `in_flight` | The issue is open and has an open PR. |
 | `zombie_pr` | The issue is closed but its PR remains open and needs reconciliation. |
 | `post_merge_limbo` | Work is merged — a merged PR exists, or the branch's unique commits are contained in `main` via merge lineage (positive non-PR evidence, PAN-2887) — but the issue remains open. |
-| `planned_backlog` | An open issue has a convention branch (unmerged work, or a fresh zero-ahead branch with no unique commits yet — PAN-2887) or a durable vBRIEF but no open PR. |
+| `planned_backlog` | An open issue has a convention branch (unmerged work, or a fresh zero-ahead branch with no unique commits yet — PAN-2887) or a durable xBRIEF but no open PR. |
 | `clean_terminal` | The issue is closed with no open PR, or it is open but has never started and has no durable plan. It is outside the pipeline. |
 
 ### Display filtering (PAN-2822)

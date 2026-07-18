@@ -40,7 +40,7 @@ export const issues = sqliteTable("issues", {
   verificationOutcome: text("verification_outcome"),             // pending|passed|failed
   verdictCommit: text("verdict_commit"),                         // sha a passing verdict applies to
   blockers: text("blockers", { mode: "json" }).$type<Blocker[]>(), // typed; replaces blocker_reasons + labels
-  planRef: text("plan_ref"),                                     // path to vBRIEF spec in git .pan/specs
+  planRef: text("plan_ref"),                                     // path to xBRIEF spec in git .pan/specs
   prUrl: text("pr_url"),
   prNumber: integer("pr_number"),
   prHeadSha: text("pr_head_sha"),

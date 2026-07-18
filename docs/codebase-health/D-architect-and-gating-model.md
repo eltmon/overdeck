@@ -74,7 +74,7 @@ which is far easier to reason about than the 8-term boolean.
 
 - New pipeline role `architect` alongside plan/work/review/test; `roles/architect.md`.
 - **Its own model + harness setting** in Settings (new picker row) — route it to the strongest model.
-- **Position:** post-Planned, pre-Released. Reviews the vBRIEF/PRD: assumptions, alternatives
+- **Position:** post-Planned, pre-Released. Reviews the xBRIEF/PRD: assumptions, alternatives
   considered, blast radius, rollback, and alignment with our tenets (deep modules, two-door state).
 - **Verdict:** APPROVE → issue becomes **Designed** (eligible for operator Release). BLOCK → sets the
   hold (the artifact formerly known as "objection") with written reasons; operator can **Override →

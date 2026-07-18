@@ -12,8 +12,8 @@ See [PAN-1048](./prds/planned/PAN-1048-role-primitive.md) for the migration's mo
 
 | Role | File | Purpose |
 |------|------|---------|
-| `plan` | `roles/plan.md` | Read issue, research codebase, write vBRIEF, create vBRIEF tasks |
-| `work` | `roles/work.md` | Claim vBRIEF tasks, write code, commit per bead, self-inspect (Jidoka) |
+| `plan` | `roles/plan.md` | Read issue, research codebase, write xBRIEF, create xBRIEF tasks |
+| `work` | `roles/work.md` | Claim xBRIEF tasks, write code, commit per bead, self-inspect (Jidoka) |
 | `strike` | `roles/strike.md` | Precision drop-in. Implements an isolated fix on `strike/<id>`, pushes the branch, and signals the spawner to review and land it. Bypasses the plan/work/review/test pipeline and server-side shipping. |
 | `review` | `roles/review.md` | Read manifest, gather convoy findings, approve or request changes |
 | `test` | `roles/test.md` | Run project test suite + Playwright UAT, report failures |
@@ -59,10 +59,10 @@ Role responsibilities during this phase:
 | Role | Behavior |
 |------|----------|
 | server-side shipping | `rebaseFeatureBranch()` prepares the branch and PAN-1650's review-status gate derives `readyForMerge` for the human Merge button. No agent is spawned. |
-| merge handoff | `postMergeLifecycle()` marks `mergeStatus: "merged"`, applies `verifying-on-main`, frees runtime resources, and preserves workspace/state/vBRIEF/branches. |
+| merge handoff | `postMergeLifecycle()` marks `mergeStatus: "merged"`, applies `verifying-on-main`, frees runtime resources, and preserves workspace/state/xBRIEF/branches. |
 | `work` / `plan` | Remain paused so the operator can unpause for regression follow-up if verification fails. |
 | `review` / `test` | Their sessions may be killed after merge; the merged code is now evaluated on `main`, not by reusing pre-merge role sessions. |
-| close-out | `pan close <id>` or the dashboard Close Out action performs the final vBRIEF completion, archival, optional teardown/branch deletion, tracker close, and review-status clearing. |
+| close-out | `pan close <id>` or the dashboard Close Out action performs the final xBRIEF completion, archival, optional teardown/branch deletion, tracker close, and review-status clearing. |
 
 If `close_out.auto=true`, Deacon may run close-out automatically after `close_out.auto_delay_minutes`; otherwise close-out is an explicit operator ceremony.
 

@@ -79,7 +79,7 @@ npm install -g @overdeck/core && pan install && pan up
 
 - **mkcert** - For HTTPS certificates (recommended)
 - **Linear API key** - For issue tracking integration
-- **Task commands (`pan task`)** - Read and update the vBRIEF checklist through Overdeck's built-in task state door.
+- **Task commands (`pan task`)** - Read and update the xBRIEF checklist through Overdeck's built-in task state door.
 - **Google Stitch MCP** - For AI-powered UI design integration
 
 ### Platform Support

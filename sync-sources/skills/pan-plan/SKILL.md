@@ -112,5 +112,5 @@ This promotes the workspace xBRIEF to `<projectRoot>/.pan/specs/`, syncs xBRIEF 
 ## See also
 
 - `roles/plan.md` — planning role prompt.
-- `docs/VBRIEF.md` — xBRIEF schema, artifact locations, lifecycle states.
+- `docs/XBRIEF.md` — xBRIEF schema, artifact locations, lifecycle states.
 - `docs/SKILLS-CONVENTION.md` — skill/CLI naming convention.

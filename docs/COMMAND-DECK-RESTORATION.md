@@ -50,7 +50,7 @@ just unmounted/unreachable in the new Stage/pane architecture.
 | `CommandDeck/ProjectOverview.tsx` — hero billboard, stuck callout, pipeline kanban, issue cost-cards | `CommandDeck/IssueWorkbench.tsx` — 3-zone shell |
 | `CommandDeck/ZoneB.tsx` — agent context strip | `CommandDeck/ZoneA.tsx` — issue header + action strip |
 | `CommandDeck/SessionView/SessionPanel.tsx` + `ReviewSummary.tsx` + `IssueHeader.tsx` | `CommandDeck/ZoneCOverview.tsx` — 10-tab orchestrator |
-| **All 10** `CommandDeck/ZoneCOverviewTabs/*` (Overview, Activity, Costs, MarkdownTab[PRD/STATE/INFERENCE], vBRIEF, Beads, PrDiff, Discussions, ReviewPipelineSection, StatusHistory, ContainerSection) | `CommandDeck/ZoneCConversation.tsx` — SessionPanel wrapper |
+| **All 10** `CommandDeck/ZoneCOverviewTabs/*` (Overview, Activity, Costs, MarkdownTab[PRD/STATE/INFERENCE], xBRIEF, Beads, PrDiff, Discussions, ReviewPipelineSection, StatusHistory, ContainerSection) | `CommandDeck/ZoneCConversation.tsx` — SessionPanel wrapper |
 | `PlanDAG.tsx`, `CommandDeck/RoundCard.tsx`, `CommandDeck/ActivitySparkline.tsx`, `BeadsTasksPanel.tsx` | |
 
 **Implication:** restoration ≈ re-mount surviving components into the new
@@ -83,10 +83,10 @@ risk and effort than a rewrite.
 ### ② ISSUE view (click an issue) — content in `ZoneCOverviewTabs/*` + `ZoneA` (mostly dormant)
 - **Lost:** issue header + **action strip** (plan, swarm, tell, pause/unpause, switch-model, recover, inspect beads, resume/stop); **10-tab overview**:
   - *Overview:* status billboard; **Plan DAG**; tile grid (Agent / Cost / By-Stage / Services / Attach / Actions / Workspace); **pipeline stepper** (Verify→Review→Test→Merge w/ retry/stale chips); **reviewer grid** ×4 (correctness/security/performance/requirements w/ round cards); tests section; PR + diffstat + review decision; cost sparkline; recent activity feed; quick links.
-  - *Activity, Costs, PRD, STATE, INFERENCE, vBRIEF, Beads, PR/Diff, Discussions.*
+  - *Activity, Costs, PRD, STATE, INFERENCE, xBRIEF, Beads, PR/Diff, Discussions.*
   - spawn-and-send composer.
 - **Current (keep):** `Launcher`, `AgentDock`, `ActionDock` (Files/Commits/Plan/Docs/terminal/browser), `Timeline`, collapsible `HomePaneSections`.
-- **Weave:** issue tab = new header/launcher/dock **+** reachable Overview/DAG/pipeline-stepper/reviewer-grid/costs/PRD/vBRIEF/Beads/PR-diff **+** issue action strip — but re-refined (§6), not all-tabs-always.
+- **Weave:** issue tab = new header/launcher/dock **+** reachable Overview/DAG/pipeline-stepper/reviewer-grid/costs/PRD/xBRIEF/Beads/PR-diff **+** issue action strip — but re-refined (§6), not all-tabs-always.
 
 ### ③ ISSUE-CHILD view (click a work/review/planning **session**) — content in `SessionPanel.tsx` + `ReviewSummary.tsx` + `ZoneB.tsx` (dormant & UNREACHABLE)
 - **Lost / unreachable today:** the entire session view. `SessionPanel` (conversation ⊕ findings ⊕ terminal toggle, branch chip, delivery-method toggle); `ReviewSummary` (verdict banner, per-reviewer strip, synthesis); `ZoneB` agent context strip (model, status dot, branch chip, phase/tool flash, $/hr, last-output preview, round history, idle/thinking/waiting ribbons). Clicking a session today just opens the **issue** tab.
@@ -150,7 +150,7 @@ component status noted inline (✓ present / ✗ deleted / mounted).
 | 3 **God View** | `0ef6a3287` | 03-18 | `GodView`✓**mounted** (**richest session/agent view ever**) — multi-agent grid, **live canvas terminals**, **cost donut by phase**, infra gauges, activity feed, click-through focus modal (Beads kanban, file-activity tree, agent timeline) | PAN-341, socket.io realtime |
 | 4 Inspector+terminals | `12fcada09` | 04-14 | InspectorPanel + `TerminalTabs` (phase-contextual terminal, auto-follow/pin) | PAN-509 |
 | 5 Three-zone deck | `29e43a0c2` | 04-26 | `IssueWorkbench`✗ + `ZoneA`✗/`ZoneB`✓/`ZoneCOverview`✗ + `ZoneCConversation`✗ → `SessionPanel`✓ | PAN-830 |
-| 6 ZoneCOverview tabs | `d850764b4` | 04-26 | the 10 issue tabs (`ZoneCOverviewTabs/*`✓) — Overview/Activity/Costs/PRD/STATE/INFERENCE/vBRIEF/Beads/PR-Diff/Discussions | — |
+| 6 ZoneCOverview tabs | `d850764b4` | 04-26 | the 10 issue tabs (`ZoneCOverviewTabs/*`✓) — Overview/Activity/Costs/PRD/STATE/INFERENCE/xBRIEF/Beads/PR-Diff/Discussions | — |
 | 7 ProjectOverview | `463394a9b` | 05-10 | `ProjectOverview`✓ — hero billboard, stuck callout, **8-stage pipeline swimlanes**, per-issue cost-cards w/ model/stage hover | the project view "pipeline" later eclipsed |
 | 8 PAN-1148 | `5a44fda35` | 05-19 | Zone architecture stabilized; tab state in URL | — |
 | 9 Drawer | `194c98643` | 05-28 | `drawer/IssueDrawer`✓ + `DrawerAgentSession`✓ — conversation/terminal/findings/activity/plan/beads tabs, `PhaseTimeline` | intermediate; present, likely dormant |
@@ -193,8 +193,8 @@ the existing primitives, and demote anything historically shown-but-rarely-actio
 
 ### ② ISSUE — glance-question: *"What's the state, and what can I do next?"*
 - **Glance:** header (id · title · phase glyph · cost chip · branch) + **action strip** (the primary next-actions: plan/start/tell/review/merge, context-gated) + blocker banner if stuck.
-- **Scan:** compact status row — pipeline stepper (Verify→Review→Test→Merge) · reviewer grid (4, collapsed to dots+verdict) · tests · PR/diffstat. vBRIEF/Plan-DAG behind one tab/expand, not always-on.
-- **Dig:** tabs/panes for PRD/STATE/INFERENCE, full vBRIEF DAG, Beads graph, PR diff, Discussions, full cost breakdown, activity feed.
+- **Scan:** compact status row — pipeline stepper (Verify→Review→Test→Merge) · reviewer grid (4, collapsed to dots+verdict) · tests · PR/diffstat. xBRIEF/Plan-DAG behind one tab/expand, not always-on.
+- **Dig:** tabs/panes for PRD/STATE/INFERENCE, full xBRIEF DAG, Beads graph, PR diff, Discussions, full cost breakdown, activity feed.
 - **Drop/Demote:** the always-on Plan DAG (520px) and the 7-tile grid → move to dig; INFERENCE raw → dig-only.
 
 ### ③ SESSION (work/review/planning/reviewer) — glance-question: *"What is this agent doing/saying now, and is it healthy?"*
@@ -238,7 +238,7 @@ several of these (flagged ✗MISSED below).**
 - **Action set (~41, `lib/issueActions.ts`):** plan · autoPlan · watchPlanning · donePlanning · startAgent · startSkipPlanning · swarm · tell · doneWork · stop · pause/unpause · untroubled · recoverAgent · resumeSession · switchModel · requestReview · restartReview · recoverReview · syncMain · createWorkspace · copySettings · beads · inference · discussions · transcripts · upload · syncDiscussions · statusReview · open · viewPr · reopen · closeOut · wipe · destroyWorkspace · resetIssue · cancel · resetSession · restartFromPlan · restartAgent · reviewTest · inspectBead. (phase-primary subset surfaces inline; rest in overflow.)
 - **Progress/state:** ✗MISSED **PhaseTimeline** (6: triaged/planned/implemented/reviewed/shipping/merged) · **PipelineStepper** (Verify→Review→Test→Merge) · ✗MISSED **VerificationGates** (typecheck/lint/test/uat, distinct from "tests") · cycle counter + auto-requeue · status-history tree.
 - **Review:** reviewer grid ×4 (correctness/security/performance/requirements) w/ round cards · ReviewSpecialists rows.
-- **Work artifacts:** Plan DAG · vBRIEF · Beads (list+graph) · PRD/STATE/INFERENCE markdown · ✗MISSED **Artifacts panel** (list/filter/sort).
+- **Work artifacts:** Plan DAG · xBRIEF · Beads (list+graph) · PRD/STATE/INFERENCE markdown · ✗MISSED **Artifacts panel** (list/filter/sort).
 - **Code:** PR + diffstat + review decision · diff viewer.
 - **Cost:** total · by-model · by-stage · per-session · sparkline/trend.
 - **Workspace/infra:** ✗MISSED **WorkspaceSection** (path · containers start/stop/restart · services URLs · tmux attach · sync-main · containerize · Postgres refresh DB) · stack-health alert.

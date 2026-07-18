@@ -12,7 +12,7 @@ Read this with:
 
 ## Awaiting Merge UAT context
 
-The Awaiting Merge page is the operator's human UAT gate. Each merge-ready card includes a collapsed **What to test / Expected changes** section sourced from `GET /api/workspaces/:issueId/uat-context`: vBRIEF acceptance criteria become the UAT checklist, vBRIEF deliverables describe the expected behavior change, and the workspace git diff supplies the changed-file summary. If vBRIEF or git data is unavailable, the card falls back to the issue description and a subtle "No file changes available" note instead of blanking the gate.
+The Awaiting Merge page is the operator's human UAT gate. Each merge-ready card includes a collapsed **What to test / Expected changes** section sourced from `GET /api/workspaces/:issueId/uat-context`: xBRIEF acceptance criteria become the UAT checklist, xBRIEF deliverables describe the expected behavior change, and the workspace git diff supplies the changed-file summary. If xBRIEF or git data is unavailable, the card falls back to the issue description and a subtle "No file changes available" note instead of blanking the gate.
 
 ## Status vs State
 

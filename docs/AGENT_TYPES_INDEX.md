@@ -27,7 +27,7 @@ These are the roles a new Overdeck user is most likely to care about first.
 | Role | Status | When it runs | Instruction basis |
 |---|---|---|---|
 | `plan` | Active | Turns an issue or request into an execution plan | `roles/plan.md` plus the planning template in `src/lib/cloister/prompts/planning.md` |
-| `work` | Active | Implements beads in the issue workspace | `roles/work.md`, `.pan/continue.json`, and the active vBRIEF |
+| `work` | Active | Implements beads in the issue workspace | `roles/work.md`, `.pan/continue.json`, and the active xBRIEF |
 | `review` | Active | Reviews the completed branch and decides approve vs changes requested | `roles/review.md` plus review convoy subagents |
 | `test` | Active | Runs automated checks and required browser UAT | `roles/test.md` |
 | server-side shipping | Active | Rebases approved work and derives `readyForMerge` for the human Merge button | `rebaseFeatureBranch()` + review-status gates; no spawned role file |
@@ -43,7 +43,7 @@ Sub-roles are not standalone Overdeck pipeline stages. They are model and instru
 | `review.security` | `review` | Security-focused review lens |
 | `review.correctness` | `review` | Correctness and edge-case review lens |
 | `review.performance` | `review` | Performance and scalability review lens |
-| `review.requirements` | `review` | Acceptance-criteria and vBRIEF fulfillment review lens |
+| `review.requirements` | `review` | Acceptance-criteria and xBRIEF fulfillment review lens |
 
 A useful mental model is: lifecycle roles move the issue forward; sub-roles help one lifecycle role do its job.
 
@@ -51,7 +51,7 @@ A useful mental model is: lifecycle roles move the issue forward; sub-roles help
 
 A newcomer-friendly way to think about the normal flow is:
 
-1. **`plan`** turns the issue into a vBRIEF plan and beads.
+1. **`plan`** turns the issue into an xBRIEF plan and beads.
 2. **`work`** implements the planned beads.
 3. **`work.inspect` / `work.inspect-deep`** verify flagged beads during implementation.
 4. **`review`** performs code review and synthesizes the convoy findings.

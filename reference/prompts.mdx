@@ -7,7 +7,7 @@ description: How Overdeck builds the prompts it sends to Claude — the Mustache
 
 Every prompt that Overdeck sends to Claude — the work agent that implements a
 feature, the review specialist that audits the diff, the merge agent that lands
-a PR, the planning agent that generates a vBRIEF — is built from a versioned
+a PR, the planning agent that generates an xBRIEF — is built from a versioned
 Markdown template under `src/lib/cloister/prompts/`.
 
 A single loader, [`renderPrompt`](#the-renderprompt-api) at
@@ -149,7 +149,7 @@ module. Typical messages:
 
 ```
 Prompt "work" (.../prompts/work.md) requires variables that are missing: BRANCH, DIFFICULTY.
-Provided: ISSUE_ID, VBRIEF_PATH
+Provided: ISSUE_ID, XBRIEF_PATH
 
 Prompt "review" (.../prompts/review.md) was passed unknown variables: DEBUG_MODE.
 Declare them in the template's "requires" or "optional" frontmatter, or remove them from the call site.
@@ -198,7 +198,7 @@ requires:
   - ISSUE_ID
   - ISSUE_TITLE
   - BRANCH
-  - VBRIEF_PATH
+  - XBRIEF_PATH
   - DIFFICULTY
 optional:
   - SPEC_SECTION
@@ -322,21 +322,21 @@ The ten templates currently under `src/lib/cloister/prompts/`, grouped by the ro
 
 ### Work agent templates
 
-Templates that drive the **work agent** — the specialist that implements vBRIEF checklist items.
+Templates that drive the **work agent** — the specialist that implements xBRIEF checklist items.
 
 | Template | Used by | Purpose |
 |----------|---------|---------|
-| `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: per-task loop, commit + update STATE.md + `pan task close`, quality gates, finalization. |
-| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent via `claude --resume` when a work agent is woken up from a stopped session. Includes STATE.md snapshot, open tasks, pending feedback, and next-step instructions. |
-| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps a serialized `HandoffContext` (git state, tasks, STATE.md, AI summaries) with a preamble explaining who took over and why. |
+| `work.md` | Work agent (`spawnSpecialist`, `buildWorkAgentPrompt`) | Implementation instructions: claim one xBRIEF item, implement it, commit and push, run `pan task done`, then continue through quality gates and finalization. |
+| `resume-work.md` | `buildResumePrompt` | Context-rich restart message sent when a stopped work agent resumes. Includes continue state, open xBRIEF items, pending feedback, and next-step instructions. |
+| `handoff-to-work.md` | `buildHandoffPrompt` | Model-to-model handoff: wraps serialized git state, xBRIEF item state, continue state, and summaries with a preamble explaining who took over and why. |
 
 ### Planning agent templates
 
-Templates for the **planning agent**, the discovery-phase agent that converts a PRD or raw issue into a vBRIEF plan.
+Templates for the **planning agent**, the discovery-phase agent that converts a PRD or raw issue into an xBRIEF plan.
 
 | Template | Used by | Purpose |
 |----------|---------|---------|
-| `planning.md` | Planning agent (`buildPlanningPrompt`) | Discovery session: explore codebase, ask questions via AskUserQuestion, generate `plan.vbrief.json` + STATE.md, run `pan plan-finalize`. NEVER implements code. |
+| `planning.md` | Planning agent (`buildPlanningPrompt`) | Discovery session: explore the codebase, ask questions through AskUserQuestion, write the legacy-compatible workspace draft named by `PAN_SPEC_FILENAME` plus `.pan/continue.json`, then run `pan plan finalize` to create the canonical `specs/*.xbrief.json`. Never implements code. |
 
 ### Specialist agent templates
 
@@ -344,7 +344,7 @@ Templates for the **post-work pipeline specialists** (review → test → merge)
 
 | Template | Used by | Purpose |
 |----------|---------|---------|
-| `review.md` | Review specialist (wake path) | Strict code review against vBRIEF acceptance criteria; pass/fail decision posted back to the dashboard. |
+| `review.md` | Review specialist (wake path) | Strict code review against xBRIEF acceptance criteria; pass/fail decision posted back to the dashboard. |
 | `test.md` | Test specialist (wake path) | Runs the project's test suite, compares against baseline, posts pass/fail with structured markers. |
 | `merge.md` | Merge specialist (wake path) and `spawnMergeAgentForBranches` (full push flow) | Unified merge template. `DO_PUSH`/`DO_BUILD`/`SKIP_DONE_REPORT` booleans toggle between validation-only and full push + build + report flows. |
 | `sync-main.md` | `syncMainIntoWorkspace` (via merge specialist) | Sync latest main into the workspace's feature branch; abort on conflict and hand back to work agent. |

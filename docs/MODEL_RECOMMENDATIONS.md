@@ -257,7 +257,7 @@ These are order-of-magnitude planning numbers, not contracts. Actual cost depend
 ## Optimization strategies
 
 ### 1. Prompt caching
-Anthropic and Google both offer 90% cache-read discounts; MiniMax auto-caches at $0.06/1M with no config. The flywheel orchestrator, planning runs that re-load the same vBRIEF, and review agents that re-read the same diff are all near-ideal cache candidates.
+Anthropic and Google both offer 90% cache-read discounts; MiniMax auto-caches at $0.06/1M with no config. The flywheel orchestrator, planning runs that re-load the same xBRIEF, and review agents that re-read the same diff are all near-ideal cache candidates.
 
 ### 2. Batch processing
 50% off for non-urgent work across most vendors. Documentation generation, bulk test generation, and overnight review batches are obvious fits.
