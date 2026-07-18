@@ -11,6 +11,8 @@ import { getAgentDir, spawnRun, stopAgent } from '../agents.js';
 import { parseSequenceMd } from '../backlog/sequence-io.js';
 import { computePredictedConflictSignals, declaredIssueFootprint, pickFromSequence, type IssueFileFootprint } from '../flywheel-merge-order.js';
 import { findProjectByPathSync, getProjectSwarmHotspots } from '../projects.js';
+import { membership as orderBookMembership } from '../orders/resolver.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import {
   getFlywheelActiveRunId,
@@ -31,6 +33,12 @@ export function isIssueInResolvedPipeline(issueId: string, memberships: Pipeline
   return memberships.some((membership) =>
     membership.issueId.toUpperCase() === issueId.toUpperCase() && membership.inPipeline,
   );
+}
+
+export function activeOrderBookIssues(projectRoot: string): ReadonlySet<string> {
+  const project = findProjectByPathSync(projectRoot);
+  if (!project) return new Set();
+  return new Set(orderBookMembership(resolveStateReadHomeSync(project).root).keys());
 }
 
 const FlywheelRunIdSchema = Schema.String.check(Schema.isPattern(/^RUN-\d+$/));
@@ -121,8 +129,10 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
   ].filter(Boolean).join('\n');
 
   let sequenceSection = '';
-  if (options.autoPickupBacklog) {
-    const seqPath = join(process.cwd(), '.pan', 'backlog', 'sequence.md');
+  const projectRoot = process.cwd();
+  const orderBookIssues = activeOrderBookIssues(projectRoot);
+  if (options.autoPickupBacklog || orderBookIssues.size > 0) {
+    const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
     if (existsSync(seqPath)) {
       try {
         const md = readFileSync(seqPath, 'utf-8');
@@ -148,7 +158,6 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
             return assigneeName === 'eltmon';
           };
 
-          const projectRoot = process.cwd();
           const specsDir = join(projectRoot, '.pan', 'specs');
           const issuesWithSpecs = new Set<string>();
           const declaredFootprints: IssueFileFootprint[] = [];
@@ -186,7 +195,16 @@ async function flywheelRunConfigurationSection(options: FlywheelLifecycleOptions
           const top10 = parsed.doc.nodes.slice(0, 10).map((n) =>
             `  #${n.rank} ${n.issue}: ${n.why.slice(0, 100)} [gate:${n.gate}]`,
           );
-          const nextPick = pickFromSequence(parsed.doc.nodes, { issueLabels: issueLabelsLookup, isAuthorizedIssue, isReadyOrHasPrd, isInPipeline, requireReady: true, autoPickupBacklog: options.autoPickupBacklog, predictedConflictSignals });
+          const nextPick = pickFromSequence(parsed.doc.nodes, {
+            issueLabels: issueLabelsLookup,
+            isAuthorizedIssue,
+            isReadyOrHasPrd,
+            isInPipeline,
+            requireReady: true,
+            autoPickupBacklog: options.autoPickupBacklog,
+            activeBookMembership: orderBookIssues,
+            predictedConflictSignals,
+          });
           let nextLine: string;
           let pickInstruction: string;
           if (!membershipAvailable) {
@@ -335,7 +353,13 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
     if (existsSync(seqPath)) {
       const parsed = parseSequenceMd(readFileSync(seqPath, 'utf-8'));
       if (parsed.ok) {
-        saveRunCohort(runId, computeCohort(parsed.doc.nodes, buildClassifyLookups(workspace), options.maxAgents ?? 5, options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog()));
+        saveRunCohort(runId, computeCohort(
+          parsed.doc.nodes,
+          buildClassifyLookups(workspace),
+          options.maxAgents ?? 5,
+          options.autoPickupBacklog ?? isFlywheelAutoPickupBacklog(),
+          activeOrderBookIssues(workspace),
+        ));
       }
     }
   } catch { /* cohort snapshot is best-effort */ }

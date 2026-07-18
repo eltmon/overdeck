@@ -365,6 +365,8 @@ export function pickFromSequence(
      *  satisfies the per-issue `released` gate for the whole backlog. The live Flywheel
      *  passes its auto_pickup_backlog setting; legacy callers omit it (default OFF). */
     autoPickupBacklog?: boolean;
+    /** Operator-released scope supplied by the active order book. */
+    activeBookMembership?: ReadonlySet<string>;
     /**
      * Advisory pre-branch conflict signal. When present, lower predicted-conflict
      * counts sort first among otherwise pickable issues; no issue is filtered out.
@@ -393,7 +395,8 @@ export function pickFromSequence(
       const state = classifyIssue(node, lookups);
       // DoR is conditional: when not required, treat readiness as satisfied so the
       // remaining gates (planned / parked / vetoed / in-pipeline) still apply.
-      if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true }, opts?.autoPickupBacklog ?? false)) return false;
+      const activeBookMember = opts?.activeBookMembership?.has(node.issue.toUpperCase()) ?? false;
+      if (!isAutoPickable(opts?.requireReady ? state : { ...state, ready: true }, opts?.autoPickupBacklog ?? false, activeBookMember)) return false;
       if (opts?.excludeIssueIds?.has(node.issue)) return false;
       if (opts?.isAuthorizedIssue && !opts.isAuthorizedIssue(node.issue)) return false;
       return true;
