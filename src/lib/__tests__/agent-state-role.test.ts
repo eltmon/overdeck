@@ -5,6 +5,23 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Effect } from 'effect';
 import type { AgentState } from '../agents.js';
 
+// Spawn/resume flows preflight the harness binary; CI runners have no claude/omp
+// installed, so stub the filesystem probes while keeping the pure helpers real.
+vi.mock('../harness-binary.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../harness-binary.js')>();
+  const fakePath = (harness: Parameters<typeof actual.harnessBinaryName>[0]) =>
+    `/home/test/.local/bin/${actual.harnessBinaryName(harness)}`;
+  return {
+    ...actual,
+    resolveHarnessBinary: vi.fn(async (harness) => fakePath(harness)),
+    requireHarnessBinary: vi.fn(async (harness) => fakePath(harness)),
+    prepareHarnessLaunch: vi.fn(async (harness) => ({
+      binaryPath: fakePath(harness),
+      pathExport: `export PATH='/home/test/.local/bin':"$PATH"`,
+    })),
+  };
+});
+
 let tempHome: string;
 
 function ensurePtySupervisorArtifact(): void {
