@@ -24,8 +24,10 @@ import { loadWorkspaceMetadataSync as loadWorkspaceMetadataFn } from '../../../.
 import { getWorkAgentLifecycleState } from '../../../../lib/work-agent-lifecycle.js';
 import { validateProviderHealth } from '../../../../lib/provider-health.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/projects.js';
+import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
 import { isStateMigrated } from '../../../../lib/state-home.js';
 import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
+import { parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartVBrief } from '../../../../lib/vbrief/auto-synthesize.js';
 import { findPlan, readPlan } from '../../../../lib/vbrief/io.js';
@@ -80,6 +82,31 @@ export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: st
       }),
     });
   } catch { /* non-fatal — activity emit should not block the response */ }
+}
+
+const LEGACY_WORKSPACE_RUNTIME_FILES = new Set([
+  '.pan/continue.json',
+  '.pan/spec.vbrief.json',
+  '.pan/kickoff.md',
+  '.pan/sessions.jsonl',
+  '.pan/pipeline-verdict.json',
+  '.pan/verification-latest.json',
+  '.pan/agent-mcp.json',
+]);
+
+function isOverdeckWorkspaceRuntimePath(path: string): boolean {
+  if (path === '.overdeck' || path.startsWith('.overdeck/')) return true;
+  if (path === '.pan' || path === '.pan/') return true;
+  if (LEGACY_WORKSPACE_RUNTIME_FILES.has(path)) return true;
+  return path.startsWith('.pan/feedback/')
+    || path.startsWith('.pan/review/')
+    || path.startsWith('.pan/test/')
+    || path.startsWith('.pan/handoff-');
+}
+
+/** True when git porcelain contains only Overdeck-owned workspace runtime files. */
+export function isOnlyOverdeckRuntimeWorkspaceChanges(porcelain: string): boolean {
+  return parsePorcelainStatusPaths(porcelain).every(isOverdeckWorkspaceRuntimePath);
 }
 
 export function spawnGuardrailResourcesHint(hint?: string): string {
@@ -531,63 +558,6 @@ export const postAgentsRoute = HttpRouter.add(
       }).pipe(Effect.catch(() => Effect.void));
     }
 
-    // Approval transition (PAN-946): move the scope vBRIEF on main from
-    // proposed/ → active/ and stamp plan.status='approved'. Idempotent: if the
-    // vBRIEF is already in active/ with status approved, this is a no-op. The
-    // commit only happens when projectPath is on main; otherwise the on-disk
-    // move still applies and a later sync will pick it up. Failure is non-fatal
-    // — agent spawn proceeds even if the lifecycle move fails.
-    // transitionVBriefOnMain is Effect-returning — match on it directly (PAN-1768).
-    yield* transitionVBriefOnMain(
-      projectPath,
-      issueId,
-      'active',
-      'approved',
-      `scope: approve ${issueId.toUpperCase()} vBRIEF`,
-    ).pipe(
-      Effect.match({
-        onSuccess: (result) => {
-          if (result.moved) {
-            console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
-          }
-          if (result.committed) {
-            console.log(`[start-agent] Committed approval transition on main for ${issueId}`);
-          }
-        },
-        onFailure: (err) => {
-          console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
-        },
-      }),
-    );
-
-    // Running transition (PAN-946): set workspace plan.status to 'running'.
-    // This is the worktree-side state — the workspace vBRIEF resolved by
-    // findPlan() is updated directly, and the planning artifacts commit below
-    // will pick it up. Non-fatal: agent starts even if the write fails.
-    if (existsSync(planPath)) {
-      try {
-        updatePlanStatus(planPath, 'running');
-        console.log(`[start-agent] Set plan.status=running for ${issueId}`);
-      } catch (planStatusErr: any) {
-        console.warn(`[start-agent] Failed to set plan.status=running (non-fatal): ${planStatusErr?.message ?? planStatusErr}`);
-      }
-    }
-
-    // Write start session entry to per-issue record (PAN-1919)
-    try {
-      const { appendSessionEntry, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
-        yield* Effect.promise(() => import('../../../../lib/pan-dir/record.js'));
-      const recordProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
-      yield* Effect.promise(() => appendSessionEntry(recordProject, issueId, {
-        timestamp: new Date().toISOString(),
-        reason: 'start',
-        agentModel: spawnModel,
-      }));
-      console.log(`[start-agent] Wrote start session entry to record for ${issueId}`);
-    } catch (continueErr: any) {
-      console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
-    }
-
     let gatesCommitted = false;
     const commitClearedGates = async (): Promise<void> => {
       if (!startGateBlock || gatesCommitted) return;
@@ -603,6 +573,62 @@ export const postAgentsRoute = HttpRouter.add(
         paused: startGateBlock.paused,
         troubled: startGateBlock.troubled,
       });
+    };
+
+    let workStartAccepted = false;
+    const markWorkStartAccepted = async (): Promise<void> => {
+      if (workStartAccepted) return;
+      workStartAccepted = true;
+
+      await Effect.runPromise(transitionVBriefOnMain(
+        projectPath,
+        issueId,
+        'active',
+        'approved',
+        `scope: approve ${issueId.toUpperCase()} vBRIEF`,
+      ).pipe(
+        Effect.match({
+          onSuccess: (result) => {
+            if (result.moved) {
+              console.log(`[start-agent] vBRIEF moved ${result.fromDir} → active for ${issueId}`);
+            }
+            if (result.committed) {
+              console.log(`[start-agent] Committed approval transition for ${issueId}`);
+            }
+          },
+          onFailure: (err) => {
+            console.warn(`[start-agent] vBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
+          },
+        }),
+      ));
+
+      if (existsSync(planPath)) {
+        try {
+          updatePlanStatus(planPath, 'running');
+          console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+        } catch (planStatusErr: any) {
+          console.warn(`[start-agent] Failed to set plan.status=running (non-fatal): ${planStatusErr?.message ?? planStatusErr}`);
+        }
+      }
+
+      try {
+        const { appendSessionEntry, getProjectConfigFromWorkspacePath, resolveProjectForIssue } =
+          await import('../../../../lib/pan-dir/record.js');
+        const recordProject = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(workspacePath);
+        await appendSessionEntry(recordProject, issueId, {
+          timestamp: new Date().toISOString(),
+          reason: 'start',
+          agentModel: spawnModel,
+        });
+        console.log(`[start-agent] Wrote start session entry to record for ${issueId}`);
+      } catch (continueErr: any) {
+        console.warn(`[start-agent] Failed to write start entry to record (non-fatal): ${continueErr?.message ?? continueErr}`);
+      }
+
+      const pipelineStatus = getReviewStatusSync(issueId);
+      if (pipelineStatus?.stuckReason === 'planning_auto_handoff_failed') {
+        clearWorkspaceStuck(issueId);
+      }
     };
 
     if (isRemote && workspaceMetadata) {
@@ -623,6 +649,7 @@ export const postAgentsRoute = HttpRouter.add(
       }));
       if (response.status < 200 || response.status >= 300) return response;
       yield* Effect.promise(commitClearedGates);
+      yield* Effect.promise(markWorkStartAccepted);
       return response;
     }
 
@@ -670,11 +697,11 @@ export const postAgentsRoute = HttpRouter.add(
     const acknowledgeDirtyWorkspace = (body as any).acknowledgeDirtyWorkspace === true;
     if (!acknowledgeDirtyWorkspace) {
       try {
-        const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain', {
+        const { stdout: statusOut } = yield* Effect.promise(() => execAsync('git status --porcelain --untracked-files=all', {
           cwd: workspacePath,
           encoding: 'utf-8',
         }));
-        if (statusOut.trim()) {
+        if (statusOut.trim() && !isOnlyOverdeckRuntimeWorkspaceChanges(statusOut)) {
           const { stdout: diffOut } = yield* Effect.promise(() => execAsync('git diff HEAD --stat', {
             cwd: workspacePath,
             encoding: 'utf-8',
@@ -756,7 +783,12 @@ export const postAgentsRoute = HttpRouter.add(
       spawnPanCommand,
       updateIssueStatus,
     });
-    if (containerResponse) return containerResponse;
+    if (containerResponse) {
+      if (containerResponse.status >= 200 && containerResponse.status < 300) {
+        yield* Effect.promise(markWorkStartAccepted);
+      }
+      return containerResponse;
+    }
 
     // Containers already ready or no containers needed
     yield* Effect.promise(() => appendAgentLifecycleLog(agentSessionName, 'agent.work_spawn_requested', {
@@ -776,6 +808,7 @@ export const postAgentsRoute = HttpRouter.add(
         }),
         workspacePath,
       ));
+      yield* Effect.promise(markWorkStartAccepted);
       emitStartAgentPhase(issueId, 'spawn', 'success', 'local work agent spawn requested', {
         workspacePath,
         activityId,

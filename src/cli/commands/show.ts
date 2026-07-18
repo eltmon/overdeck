@@ -22,6 +22,7 @@ import { pingAgent } from '../../lib/health.js';
 import { readAgentCVSync } from '../../lib/cv.js';
 import { getAgentRuntimeStateSync, getAgentStateSync } from '../../lib/agents.js';
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
+import { getReviewStatusSync } from '../../lib/review-status.js';
 
 interface ShowOptions {
   shadow?: boolean;
@@ -79,6 +80,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
     )
     : null;
   const cvData = readAgentCVSync(agentId);
+  const pipelineStatus = getReviewStatusSync(issueId);
 
   if (json) {
     console.log(JSON.stringify({
@@ -87,6 +89,7 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
       shadow: shadowState,
       health: healthData,
       cv: cvData,
+      pipeline: pipelineStatus,
     }, null, 2));
     return;
   }
@@ -102,6 +105,15 @@ export async function showCommand(id: string, options: ShowOptions = {}): Promis
     console.log(`  ${chalk.dim('shadow')}   ${shadowState.shadowStatus}${driftMarker}  ${chalk.dim('·')} shadowed ${relativeTime(shadowState.shadowedAt)}`);
   } else {
     console.log(`  ${chalk.dim('shadow')}   ${chalk.dim('(not shadowed)')}`);
+  }
+
+  if (pipelineStatus?.stuck) {
+    let detail = '';
+    try {
+      const parsed = JSON.parse(pipelineStatus.stuckDetails ?? '{}') as { workAgentError?: unknown };
+      if (typeof parsed.workAgentError === 'string') detail = `  ${chalk.dim('·')} ${parsed.workAgentError}`;
+    } catch { /* malformed legacy details are non-fatal */ }
+    console.log(`  ${chalk.dim('pipeline')} ${chalk.red('blocked')}  ${chalk.dim('·')} ${pipelineStatus.stuckReason ?? 'stuck'}${detail}`);
   }
 
   // Health line
