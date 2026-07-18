@@ -683,18 +683,18 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:48:25.327Z",
+  "updated": "2026-07-18T20:49:18.092Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:48:24.464Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-07-18T20:49:18.062Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
@@ -1042,9 +1042,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 32507816,
-            "output": 799681,
-            "cacheRead": 166674432,
+            "input": 34061689,
+            "output": 805357,
+            "cacheRead": 169718272,
             "cacheWrite": 0
           }
         },
@@ -1058,9 +1058,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 42126617,
-            "output": 1686536,
-            "cacheRead": 450649088,
+            "input": 42139349,
+            "output": 1687798,
+            "cacheRead": 452663296,
             "cacheWrite": 0
           }
         }
@@ -1073,9 +1073,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 74634433,
-          "output": 2486217,
-          "cacheRead": 617323520,
+          "input": 76201038,
+          "output": 2493155,
+          "cacheRead": 622381568,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1086,8 +1086,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 771.121677,
-        "pricingAsOf": "2026-07-18T20:48:24.491Z"
+        "usd": 781.691866,
+        "pricingAsOf": "2026-07-18T20:49:18.084Z"
       }
     },
     "merges": [
