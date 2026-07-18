@@ -42,15 +42,23 @@ describe('boot gate env resolution', () => {
     });
   });
 
-  it('defaults agent auto-resume to OFF when nothing opts in (PAN-1963)', () => {
-    // No flag, no env → resume is off by default (deacon unaffected, stays on).
+  it('defaults agent auto-resume to ON when nothing opts in (operator decision 2026-07-18, reversing PAN-1963)', () => {
+    // No flag, no env → resume is on by default (deacon unaffected, stays on).
     expect(resolveBootGates({}, {})).toEqual({
       deacon: { enabled: true, source: 'default' },
-      resume: { enabled: false, source: 'default' },
+      resume: { enabled: true, source: 'default' },
     });
     const env = applyBootGateEnv({});
-    expect(env.OVERDECK_NO_RESUME).toBe('1');
+    expect(env.OVERDECK_NO_RESUME).toBeUndefined();
+    expect(env.OVERDECK_RESUME).toBe('1');
     expect(env[RESUME_GATE_SOURCE_ENV]).toBe('default');
+  });
+
+  it('lets --no-resume opt out of the default-on auto-resume', () => {
+    expect(resolveBootGates({ noResume: true }, {}).resume).toEqual({ enabled: false, source: 'flag' });
+    const env = applyBootGateEnv({}, { noResume: true });
+    expect(env.OVERDECK_NO_RESUME).toBe('1');
+    expect(env.OVERDECK_RESUME).toBeUndefined();
   });
 
   it('opts back into auto-resume via --resume', () => {

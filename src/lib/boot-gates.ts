@@ -46,11 +46,15 @@ export function resolveBootGates(
           source: deaconSource ?? (deaconEnvDisabled ? 'env' as const : 'default' as const),
         };
 
-  // PAN-1963: agent auto-resume is OFF by default. A normal dashboard restart
-  // leaves agent tmux sessions alive (nothing to resume); after an abnormal
-  // restart we stay safe and leave agents stopped for the operator to resume
-  // explicitly (dashboard "Resume all"). Opt back in with `--resume` /
-  // OVERDECK_RESUME=1.
+  // Agent auto-resume is ON by default (operator decision 2026-07-18, reversing
+  // the PAN-1963 default-off). A dashboard restart never touches live agents —
+  // running tmux sessions survive and are not reconciliation candidates. Stopped
+  // agents are still gated at boot by the operator popup (boot reconciliation
+  // opens the grace window in `pending`; a timeout with no answer resolves to
+  // `hold_all`, so nothing floods unattended). With resume on, the steady-state
+  // deacon patrols also auto-resume crashed/stopped agents mid-run. Opt out with
+  // `--no-resume` / OVERDECK_NO_RESUME=1 (an explicit no-resume still fast-paths
+  // boot reconciliation to hold_all).
   const resume = options.resume === true
     ? { enabled: true, source: 'flag' as const }
     : explicitNoResume
@@ -59,7 +63,7 @@ export function resolveBootGates(
         ? { enabled: false, source: resumeSource ?? 'env' as const }
         : resumeEnvEnabled
           ? { enabled: true, source: resumeSource ?? 'env' as const }
-          : { enabled: false, source: resumeSource ?? 'default' as const };
+          : { enabled: true, source: resumeSource ?? 'default' as const };
 
   return { deacon, resume };
 }
@@ -78,8 +82,9 @@ export function applyBootGateEnv(
   env[DEACON_GATE_SOURCE_ENV] = gates.deacon.source;
 
   if (gates.resume.enabled) {
-    // Default is now OFF (PAN-1963), so "on" must be encoded explicitly — deleting
-    // OVERDECK_NO_RESUME is no longer enough (absence means off).
+    // Default is ON, so absence already means on — but stamp OVERDECK_RESUME=1
+    // explicitly (and clear any inherited OVERDECK_NO_RESUME) so child processes
+    // and code that reads the raw env resolve resume unambiguously.
     delete env.OVERDECK_NO_RESUME;
     env.OVERDECK_RESUME = '1';
   } else {

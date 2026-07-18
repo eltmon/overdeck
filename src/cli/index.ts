@@ -641,7 +641,7 @@ program
   .description('Start dashboard in development mode with Vite HMR')
   .option('--skip-traefik', 'Skip Traefik startup')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
-  .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
+  .option('--no-resume', 'Disable agent auto-resume (opt out of the default-on auto-resume)')
   .action(devCommand);
 
 program
@@ -651,8 +651,8 @@ program
   .option('--skip-traefik', 'Skip Traefik startup')
   .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start (escape hatch when deacon\'s startup scan is starving the event loop)')
-  .option('--resume', 'Enable agent auto-resume on boot — auto-resume is OFF by default (PAN-1963)')
-  .option('--no-resume', 'Disable agent auto-resume (now the default; flag kept for explicitness)')
+  .option('--resume', 'Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)')
+  .option('--no-resume', 'Disable agent auto-resume (opt out of the default-on auto-resume)')
   .option('--no-open', 'Do not open the dashboard app/browser after startup')
   .option('--seed-from-legacy', 'Seed a fresh local database from the legacy database (copy conversations + reconstruct in-flight agents/issues). Default is an empty local database.')
   .action(async (options) => { const restartModule = await import('./commands/restart.js'); if (restartModule.refuseNonPrimaryDashboardCwd(process.cwd(), 'start')) return;
@@ -1301,8 +1301,8 @@ program
   .option('--health-timeout <ms>', 'Dashboard /api/health wait budget in ms (default 15000)')
   .option('--deacon', 'Force Cloister/Deacon auto-start even if the shell inherited OVERDECK_DISABLE_DEACON')
   .option('--no-deacon', 'Skip Cloister/Deacon auto-start on restart (escape hatch when deacon\'s startup scan is starving the event loop)')
-  .option('--resume', 'Enable agent auto-resume on boot — auto-resume is OFF by default (PAN-1963)')
-  .option('--no-resume', 'Disable agent auto-resume on restart (now the default; flag kept for explicitness)')
+  .option('--resume', 'Enable agent auto-resume on boot — auto-resume is ON by default (flag kept for explicitness)')
+  .option('--no-resume', 'Disable agent auto-resume on restart (opt out of the default-on auto-resume)')
   .action(restartCommand);
 
 // Project management commands
