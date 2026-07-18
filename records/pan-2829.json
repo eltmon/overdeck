@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-18T19:50:29.218Z",
+  "updated": "2026-07-18T19:50:47.893Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -114,8 +114,16 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 16,
-    "claims": {},
+    "sequence": 17,
+    "claims": {
+      "prompts-cli-sweep": {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 1270189,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:50:47.893Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -258,6 +266,7 @@
     "skill-rename": "completed",
     "skill-rename.skill-rename.ac1": "completed",
     "skill-rename.skill-rename.ac2": "completed",
-    "skill-rename.skill-rename.ac3": "completed"
+    "skill-rename.skill-rename.ac3": "completed",
+    "prompts-cli-sweep": "running"
   }
 }
