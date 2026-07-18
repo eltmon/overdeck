@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-18T19:50:47.893Z",
+  "updated": "2026-07-18T19:58:55.458Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "prompts-cli-sweep": {
-        "writerId": "agent-pan-2829",
-        "agentId": "agent-pan-2829",
-        "pid": 1270189,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:50:47.893Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -210,6 +202,17 @@
         "outcome": "completed",
         "reason": "Added canonical write-xbrief guidance with .xbrief.json outputs and explicit legacy workspace path, retained a write-vbrief redirect stub, and retargeted prompt schema lint; full lint passes",
         "releasedAt": "2026-07-18T19:50:29.218Z"
+      },
+      {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 1270189,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:50:47.893Z",
+        "itemId": "prompts-cli-sweep",
+        "outcome": "completed",
+        "reason": "Updated role, Cloister, synced-agent, rule, CLI help/output, and wrapper-skill wording to xBRIEF; preserved explicit legacy workspace paths and passed lint/typecheck/help checks",
+        "releasedAt": "2026-07-18T19:58:55.458Z"
       }
     ],
     "statusReasons": {
@@ -232,6 +235,10 @@
       "skill-rename": {
         "reason": "Added canonical write-xbrief guidance with .xbrief.json outputs and explicit legacy workspace path, retained a write-vbrief redirect stub, and retargeted prompt schema lint; full lint passes",
         "updatedAt": "2026-07-18T19:50:29.218Z"
+      },
+      "prompts-cli-sweep": {
+        "reason": "Updated role, Cloister, synced-agent, rule, CLI help/output, and wrapper-skill wording to xBRIEF; preserved explicit legacy workspace paths and passed lint/typecheck/help checks",
+        "updatedAt": "2026-07-18T19:58:55.458Z"
       }
     }
   },
@@ -267,6 +274,9 @@
     "skill-rename.skill-rename.ac1": "completed",
     "skill-rename.skill-rename.ac2": "completed",
     "skill-rename.skill-rename.ac3": "completed",
-    "prompts-cli-sweep": "running"
+    "prompts-cli-sweep": "completed",
+    "prompts-cli-sweep.prompts-cli-sweep.ac1": "completed",
+    "prompts-cli-sweep.prompts-cli-sweep.ac2": "completed",
+    "prompts-cli-sweep.prompts-cli-sweep.ac3": "completed"
   }
 }
