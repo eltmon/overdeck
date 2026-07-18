@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T21:28:02.233Z",
+  "updated": "2026-07-18T21:41:44.080Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "frontend-progress-view": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 2298571,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T21:28:02.232Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -267,6 +259,17 @@
         "outcome": "completed",
         "reason": "Added open-issue search across id/title/labels with owning-book disabled states and authenticated add-only mutations, top-10 backlog candidates sorted by muted sequencer rank and filtered against current membership, page integration, tests proving no dispatch request, and isolated browser verification of candidate POST/update behavior.",
         "releasedAt": "2026-07-18T21:27:35.780Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 2298571,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T21:28:02.232Z",
+        "itemId": "frontend-progress-view",
+        "outcome": "completed",
+        "reason": "Added Setup/Progress switching, WS/current-status live checklist with queued/planning/working/review/merged/closed tones, four mechanically-derived eligibility conditions per held item, drained report/retro action, and closed the underlying dispatch gap by enforcing DRAIN posture and pending PRD re-verification in the shared eligibility predicate.",
+        "releasedAt": "2026-07-18T21:41:44.080Z"
       }
     ],
     "statusReasons": {
@@ -321,6 +324,10 @@
       "frontend-add-rails": {
         "reason": "Added open-issue search across id/title/labels with owning-book disabled states and authenticated add-only mutations, top-10 backlog candidates sorted by muted sequencer rank and filtered against current membership, page integration, tests proving no dispatch request, and isolated browser verification of candidate POST/update behavior.",
         "updatedAt": "2026-07-18T21:27:35.780Z"
+      },
+      "frontend-progress-view": {
+        "reason": "Added Setup/Progress switching, WS/current-status live checklist with queued/planning/working/review/merged/closed tones, four mechanically-derived eligibility conditions per held item, drained report/retro action, and closed the underlying dispatch gap by enforcing DRAIN posture and pending PRD re-verification in the shared eligibility predicate.",
+        "updatedAt": "2026-07-18T21:41:44.080Z"
       }
     }
   },
@@ -383,6 +390,9 @@
     "frontend-add-rails.frontend-add-rails.ac1": "completed",
     "frontend-add-rails.frontend-add-rails.ac2": "completed",
     "frontend-add-rails.frontend-add-rails.ac3": "completed",
-    "frontend-progress-view": "running"
+    "frontend-progress-view": "completed",
+    "frontend-progress-view.frontend-progress-view.ac1": "completed",
+    "frontend-progress-view.frontend-progress-view.ac2": "completed",
+    "frontend-progress-view.frontend-progress-view.ac3": "completed"
   }
 }
