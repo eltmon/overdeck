@@ -1,16 +1,24 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import type { AcpToolCallState } from "./runtime-model.js";
-
 export type AcpTranscriptRole = "user" | "assistant" | "tool" | "system";
+
+export interface AcpTranscriptToolCallState {
+  readonly toolCallId: string;
+  readonly kind?: string;
+  readonly title?: string;
+  readonly status?: "pending" | "inProgress" | "completed" | "failed";
+  readonly command?: string;
+  readonly detail?: string;
+  readonly data: Record<string, unknown>;
+}
 
 export interface AcpTranscriptEntry {
   readonly timestamp: string;
   readonly role: AcpTranscriptRole;
   readonly content: string;
   readonly sessionId?: string;
-  readonly toolCalls?: ReadonlyArray<AcpToolCallState>;
+  readonly toolCalls?: ReadonlyArray<AcpTranscriptToolCallState>;
   readonly source?: "orchestrator" | "agent";
 }
 
