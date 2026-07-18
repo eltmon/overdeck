@@ -45,6 +45,7 @@ function deps(): PipelineMembershipGatherDeps {
     listMergedPullRequestHeads: vi.fn().mockResolvedValue(['feature/pan-1']),
     listIssueStates: vi.fn().mockImplementation(async (_owner, _repo, numbers: number[]) =>
       numbers.map((number) => ({ number, state: number === 4 ? 'open' as const : 'closed' as const }))),
+    listTrackerIssues: vi.fn().mockResolvedValue([]),
     listSpecIssueIds: vi.fn().mockResolvedValue(['PAN-4']),
     run: vi.fn().mockImplementation(async (command, args) => {
       if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-1\norigin/feature/pan-3\n';
@@ -264,15 +265,46 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.run).not.toHaveBeenCalledWith('gh', expect.anything(), expect.anything());
   });
 
-  it('returns no membership for a non-GitHub project without probing GitHub or git', async () => {
+  it('gathers tracker, branch, and spec lenses for a non-GitHub polyrepo', async () => {
     const mocked = deps();
-    const mixedTrackerProject = { ...project, github_repo: undefined };
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'MIN-1', state: 'open', labels: ['in-progress'] },
+      { issueId: 'MIN-2', state: 'closed', labels: [] },
+      { issueId: 'MIN-3', state: 'closed', labels: [] },
+    ]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue(['MIN-3']);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) => {
+      if (cwd === '/myn/frontend') {
+        return args.includes('--no-merged=main') ? 'feature/min-2\n' : 'feature/min-2\n';
+      }
+      if (cwd === '/myn/api') return '';
+      throw new Error(`Unexpected repository: ${cwd}`);
+    });
+    const mixedTrackerProject: ProjectConfig = {
+      name: 'mind-your-now',
+      path: '/myn',
+      issue_prefix: 'MIN',
+      gitlab_repo: 'eltmon/mind-your-now',
+      workspace: {
+        type: 'polyrepo',
+        repos: [
+          { name: 'fe', path: 'frontend' },
+          { name: 'api', path: 'api' },
+        ],
+      },
+    };
 
-    await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([]);
+    await expect(gatherProjectLensSignals(mixedTrackerProject, mocked)).resolves.toEqual([
+      { issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: 'in-progress', hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-2', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: true, branchUnmerged: true, phaseLabel: null, hasVbriefSpec: false, explicitlyReady: false },
+      { issueId: 'MIN-3', issueOpen: false, hasOpenPr: false, hasMergedPr: false, hasConventionBranch: false, branchUnmerged: false, phaseLabel: null, hasVbriefSpec: true, explicitlyReady: false },
+    ]);
+    expect(mocked.listTrackerIssues).toHaveBeenCalledWith(mixedTrackerProject);
     expect(mocked.listOpenIssues).not.toHaveBeenCalled();
     expect(mocked.listOpenPullRequests).not.toHaveBeenCalled();
     expect(mocked.listMergedPullRequestHeads).not.toHaveBeenCalled();
-    expect(mocked.run).not.toHaveBeenCalled();
+    expect(mocked.listIssueStates).not.toHaveBeenCalled();
+    expect(mocked.run).toHaveBeenCalledTimes(4);
   });
 
   it('rejects GitHub projects without an issue prefix', async () => {
@@ -391,6 +423,20 @@ describe('gatherProjectLensSignals', () => {
     expect(runGraphql).toHaveBeenCalledOnce();
   });
 
+  it('skips numbers that are not issues instead of failing the batch (PR-numbered strike branch)', async () => {
+    // strike/pan-2778 pointed at a PR number: GraphQL resolves that alias to
+    // null and reports a per-field error, but the other aliases stay usable.
+    // One bad number must not zero out membership for the whole project.
+    const runGraphql = vi.fn().mockResolvedValue(JSON.stringify({
+      data: { repository: { i0: { state: 'OPEN' }, i1: null } },
+      errors: [{ message: 'Could not resolve to an Issue with the number of 2778.' }],
+    }));
+
+    await expect(listIssueStatesBatched('eltmon', 'overdeck', [10, 2778], runGraphql)).resolves.toEqual([
+      { number: 10, state: 'open' },
+    ]);
+  });
+
   it('resolves issue states in fixed-size project-scoped GraphQL chunks', async () => {
     const numbers = Array.from({ length: 101 }, (_, index) => index + 1);
     const runGraphql = vi.fn().mockImplementation(async (query: string) => JSON.stringify({
@@ -447,8 +493,11 @@ describe('gatherProjectLensSignals', () => {
     await expect(listMergedPullRequestHeadsBatched(
       'eltmon', 'overdeck', ['feature/pan-1'], partial,
     )).rejects.toThrow('Incomplete merged-PR GraphQL response');
+    // Per-field errors with data present are tolerated (see the PR-numbered
+    // strike-branch test), but an alias absent from the response still rejects —
+    // a missing answer is never synthesized into a negative signal.
     await expect(listIssueStatesBatched('eltmon', 'overdeck', [1], partial))
-      .rejects.toThrow('Incomplete issue-state GraphQL response');
+      .rejects.toThrow('Missing issue-state alias i0');
   });
 
   it('accepts an explicit null issue alias but rejects an omitted alias', async () => {

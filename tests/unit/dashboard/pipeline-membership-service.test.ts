@@ -61,16 +61,25 @@ describe('pipeline membership service', () => {
     await expect(Promise.all([first, second])).resolves.toEqual([[], []]);
   });
 
-  it('treats non-GitHub projects as empty without invoking the GitHub gatherer', async () => {
-    const gather = vi.fn();
+  it('resolves non-GitHub projects through the capability-aware gatherer', async () => {
+    const signals = [{
+      issueId: 'MIN-1', issueOpen: true, hasOpenPr: false, hasMergedPr: false,
+      hasConventionBranch: true, branchUnmerged: true, phaseLabel: null,
+      hasVbriefSpec: false, explicitlyReady: false,
+    }];
+    const gather = vi.fn().mockResolvedValue(signals);
     const getMembership = createPipelineMembershipService({ gather, now: Date.now });
-
-    await expect(getMembership({
+    const project = {
       name: 'linear-project',
       path: '/linear-project',
       issue_prefix: 'MIN',
-    })).resolves.toEqual([]);
-    expect(gather).not.toHaveBeenCalled();
+      gitlab_repo: 'owner/project',
+    };
+
+    await expect(getMembership(project)).resolves.toEqual([
+      expect.objectContaining({ issueId: 'MIN-1', inPipeline: true }),
+    ]);
+    expect(gather).toHaveBeenCalledWith(project);
   });
 
   it('collects mixed-project membership for the issues route without rejecting non-GitHub projects', async () => {
