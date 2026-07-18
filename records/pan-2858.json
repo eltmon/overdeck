@@ -576,18 +576,18 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T17:15:07.695Z",
+  "updated": "2026-07-18T17:20:12.624Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T17:15:07.585Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-18T17:20:12.583Z",
+    "reviewNotes": "ACP delivery waits for the full agent turn behind an 8-second client timeout, so normal prompts time out, retry, and kill the session.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "1a2c3aaeed3ec5c14111f094513014ff45f0d654",
     "reviewRequestedAt": "2026-07-18T17:09:12.623Z",
@@ -606,9 +606,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26645886,
-            "output": 614421,
-            "cacheRead": 96587264,
+            "input": 27504752,
+            "output": 673614,
+            "cacheRead": 125825536,
             "cacheWrite": 0
           }
         },
@@ -637,9 +637,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 66680936,
-          "output": 2153468,
-          "cacheRead": 484506112,
+          "input": 67539802,
+          "output": 2212661,
+          "cacheRead": 513744384,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -650,8 +650,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 654.963018,
-        "pricingAsOf": "2026-07-18T17:15:07.640Z"
+        "usd": 675.652274,
+        "pricingAsOf": "2026-07-18T17:20:12.609Z"
       }
     },
     "merges": [
