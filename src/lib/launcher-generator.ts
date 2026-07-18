@@ -413,6 +413,7 @@ const PROVIDER_ENV_UNSETS = [
   'API_TIMEOUT_MS',
   'CLAUDE_CODE_API_KEY_HELPER_TTL_MS',
   'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+  'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
 ];
 
 function buildCommand(config: LauncherConfig): string[] {

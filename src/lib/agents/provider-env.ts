@@ -94,6 +94,7 @@ const PROVIDER_ENV_KEYS = [
   'ANTHROPIC_SMALL_FAST_MODEL',
   'CLAUDE_CODE_SUBAGENT_MODEL',
   'CLAUDE_CODE_AUTO_COMPACT_WINDOW',
+  'CLAUDE_CODE_MAX_CONTEXT_TOKENS',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'API_TIMEOUT_MS',
@@ -108,23 +109,43 @@ const PROVIDER_ENV_KEYS = [
   'DASHSCOPE_API_KEY',
 ] as const;
 
-function getClaudeCodeAutoCompactWindowForModel(model: string): number | undefined {
+// The ChatGPT/Codex subscription route reports 372K for GPT-5.6. Keep this
+// harness policy separate from generic model capabilities, whose 150K value is
+// still consumed by dashboard usage, model-switch safety, and Deacon compaction.
+const GPT_56_CODEX_CLIENT_CONTEXT_WINDOW = 372_000;
+const GPT_56_MODELS = new Set(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
+
+interface ClaudeCodeContextPolicy {
+  autoCompactWindow?: number;
+  maxContextTokens?: number;
+}
+
+function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPolicy {
   const provider = getProviderForModelSync(model);
-  if (provider.name === 'anthropic') return undefined;
+  if (provider.name === 'anthropic') return {};
 
   const resolvedModel = resolveModelIdSync(model);
-  if (!hasModelCapabilitySync(resolvedModel)) return undefined;
-  return getModelCapabilitySync(resolvedModel).contextWindow;
+  if (GPT_56_MODELS.has(resolvedModel)) {
+    return {
+      autoCompactWindow: GPT_56_CODEX_CLIENT_CONTEXT_WINDOW,
+      maxContextTokens: GPT_56_CODEX_CLIENT_CONTEXT_WINDOW,
+    };
+  }
+  if (!hasModelCapabilitySync(resolvedModel)) return {};
+  return { autoCompactWindow: getModelCapabilitySync(resolvedModel).contextWindow };
 }
 
 export async function getProviderExportsForModel(model: string): Promise<string> {
   const envVars = await getProviderEnvForModel(model);
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
-  const autoCompactWindow = getClaudeCodeAutoCompactWindowForModel(model);
+  const contextPolicy = getClaudeCodeContextPolicyForModel(model);
   const exportLines = Object.entries(envVars)
     .map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`);
-  if (autoCompactWindow !== undefined) {
-    exportLines.push(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${autoCompactWindow}"`);
+  if (contextPolicy.maxContextTokens !== undefined) {
+    exportLines.push(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextPolicy.maxContextTokens}"`);
+  }
+  if (contextPolicy.autoCompactWindow !== undefined) {
+    exportLines.push(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextPolicy.autoCompactWindow}"`);
   }
 
   return [...unsetLines, ...exportLines].join('\n') + '\n';
@@ -152,11 +173,12 @@ export async function buildSpawnEnvForModel(
     sanitized[k] = v;
   }
   const providerEnv = await getProviderEnvForModel(model);
-  const autoCompactWindow = getClaudeCodeAutoCompactWindowForModel(model);
+  const contextPolicy = getClaudeCodeContextPolicyForModel(model);
   return {
     ...sanitized,
     ...providerEnv,
-    ...(autoCompactWindow !== undefined ? { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(autoCompactWindow) } : {}),
+    ...(contextPolicy.maxContextTokens !== undefined ? { CLAUDE_CODE_MAX_CONTEXT_TOKENS: String(contextPolicy.maxContextTokens) } : {}),
+    ...(contextPolicy.autoCompactWindow !== undefined ? { CLAUDE_CODE_AUTO_COMPACT_WINDOW: String(contextPolicy.autoCompactWindow) } : {}),
   };
 }
 
