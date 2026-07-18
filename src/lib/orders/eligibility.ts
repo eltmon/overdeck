@@ -4,8 +4,10 @@ import type { OrderBookProgress } from './types.js';
 
 export type OrderEligibilityConditionKey =
   | 'book-membership'
+  | 'pickup-posture'
   | 'lane-slot'
-  | 'prerequisites';
+  | 'prerequisites'
+  | 'prd-reverified';
 
 export interface OrderEligibilityCondition {
   key: OrderEligibilityConditionKey;
@@ -16,7 +18,7 @@ export interface OrderEligibilityCondition {
 export interface OrderDispatchEligibility {
   eligible: boolean;
   overrideUsed: boolean;
-  code?: 'off-book' | 'lane-b-busy' | 'lane-a-full' | 'prerequisite-unmet';
+  code?: 'off-book' | 'book-draining' | 'lane-b-busy' | 'lane-a-full' | 'prerequisite-unmet' | 'reverify-required';
   message?: string;
   conditions: OrderEligibilityCondition[];
 }
@@ -66,8 +68,15 @@ export function evaluateOrderDispatchEligibility(input: EvaluateOrderDispatchInp
     ? laneBBlocker === undefined
     : laneAInFlight < input.book.settings.laneAConcurrency;
 
+  const postureOpen = input.book.settings.posture === 'open';
+  const prdReverified = !item.reVerify;
   const conditions: OrderEligibilityCondition[] = [
     { key: 'book-membership', met: true, detail: `${issueId} is a member of ${input.book.id}.` },
+    {
+      key: 'pickup-posture',
+      met: postureOpen,
+      detail: postureOpen ? 'Order-book pickup posture is OPEN.' : 'Order-book pickup posture is DRAIN.',
+    },
     {
       key: 'lane-slot',
       met: laneSlotFree,
@@ -80,14 +89,37 @@ export function evaluateOrderDispatchEligibility(input: EvaluateOrderDispatchInp
       met: prereqsMet,
       detail: unmetPrereq ? `Prerequisite ${unmetPrereq.toUpperCase()} is not terminal.` : 'Every prerequisite is landed or parked.',
     },
+    {
+      key: 'prd-reverified',
+      met: prdReverified,
+      detail: prdReverified ? 'No PRD re-verification is pending.' : `${issueId} requires PRD re-verification before dispatch.`,
+    },
   ];
 
+  if (!postureOpen) {
+    return {
+      eligible: false,
+      overrideUsed: false,
+      code: 'book-draining',
+      message: `Issue ${issueId} cannot start because order book ${input.book.id} is in DRAIN posture; no new book items may dispatch.`,
+      conditions,
+    };
+  }
   if (unmetPrereq) {
     return {
       eligible: false,
       overrideUsed: false,
       code: 'prerequisite-unmet',
       message: `Issue ${issueId} cannot start because prerequisite ${unmetPrereq.toUpperCase()} has not landed or been parked.`,
+      conditions,
+    };
+  }
+  if (!prdReverified) {
+    return {
+      eligible: false,
+      overrideUsed: false,
+      code: 'reverify-required',
+      message: `Issue ${issueId} cannot start until its PRD has been re-verified against current main.`,
       conditions,
     };
   }

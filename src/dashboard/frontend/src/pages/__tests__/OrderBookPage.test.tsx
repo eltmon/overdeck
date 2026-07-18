@@ -6,9 +6,13 @@ import { OrderBookPage } from '../OrderBookPage';
 
 const mocks = vi.hoisted(() => ({
   mutationHeaders: vi.fn(async () => ({ 'content-type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
+  subscribe: vi.fn(() => vi.fn()),
 }));
 
-vi.mock('../../lib/wsTransport', () => ({ dashboardMutationJsonHeaders: mocks.mutationHeaders }));
+vi.mock('../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: mocks.mutationHeaders,
+  subscribeFlywheelStatus: mocks.subscribe,
+}));
 
 interface BookFixture extends OrderBook {
   progress: { bookId: string; total: number; landed: number; drained: boolean; items: [] };
@@ -120,6 +124,21 @@ describe('OrderBookPage', () => {
     expect(posture).toHaveClass('border-border', 'bg-card');
     expect(posture).not.toHaveClass('border-warning/[0.32]');
     expect(screen.getByText(/no operator hold is active/)).toBeInTheDocument();
+  });
+
+  it('toggles from setup controls to the live progress checklist', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/flywheel/current') return Response.json(null);
+      if (String(input) === '/api/orders/2026-07-18-active') return Response.json(running);
+      return ordersResponse([running]);
+    }));
+    render(<OrderBookPage />);
+
+    expect(await screen.findByText('Active campaign')).toBeInTheDocument();
+    expect(screen.getByLabelText('Run settings')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'progress' }));
+    expect(screen.getByLabelText('Order book progress')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Run settings')).not.toBeInTheDocument();
   });
 
   it('loads detail validation, previews the brief, and starts through order routes', async () => {

@@ -6,6 +6,7 @@ import { BacklogCandidatesRail } from '../components/orders/BacklogCandidatesRai
 import { BookStrip, type OrderBookView } from '../components/orders/BookStrip';
 import { LaneEditor } from '../components/orders/LaneEditor';
 import { LifecycleStrip } from '../components/orders/LifecycleStrip';
+import { ProgressPanel } from '../components/orders/ProgressPanel';
 import { RunSettingsPanel } from '../components/orders/RunSettingsPanel';
 import { ValidationPanel } from '../components/orders/ValidationPanel';
 import { dashboardMutationJsonHeaders } from '../lib/wsTransport';
@@ -25,6 +26,7 @@ export function OrderBookPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [view, setView] = useState<'setup' | 'progress'>('setup');
   const [starting, setStarting] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
@@ -111,6 +113,14 @@ export function OrderBookPage() {
     setPreview(payload.brief);
   };
 
+  const openRunReport = async (runId: string) => {
+    const response = await fetch('/api/flywheel/report/open', {
+      method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
+      body: JSON.stringify({ runId }),
+    });
+    if (!response.ok) setActionMessage(await readError(response));
+  };
+
   const startRun = async () => {
     if (!selected) return;
     setStarting(true);
@@ -142,8 +152,13 @@ export function OrderBookPage() {
           <>
             <span className="ml-2 border-l border-border pl-3 font-mono text-[11px] text-muted-foreground">{selected.id}</span>
             <span className="rounded-sm border border-border bg-muted/40 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">{selected.status}</span>
-            <span className="ml-auto text-[11px] text-muted-foreground">
-              <span className="font-mono text-foreground">{selected.progress.landed}</span>/<span className="font-mono text-foreground">{selected.progress.total}</span> landed
+            <div className="ml-auto flex rounded-md border border-border p-0.5 text-[10px]" aria-label="Order book view">
+              {(['setup', 'progress'] as const).map((value) => (
+                <button key={value} type="button" aria-pressed={view === value} onClick={() => setView(value)} className={`rounded-sm px-2.5 py-1 capitalize ${view === value ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}>{value}</button>
+              ))}
+            </div>
+            <span className="text-[11px] text-muted-foreground">
+              {view === 'setup' ? <><span className="font-mono text-foreground">{selected.progress.landed}</span>/<span className="font-mono text-foreground">{selected.progress.total}</span> landed</> : 'Live progress below'}
               {selected.runId && <> · run <span className="font-mono text-foreground">{selected.runId}</span></>}
             </span>
           </>
@@ -173,6 +188,7 @@ export function OrderBookPage() {
           <div className="mx-auto flex max-w-6xl flex-col gap-4">
             <LifecycleStrip status={selected.status} />
 
+            {view === 'setup' ? <>
             <section
               data-testid="order-book-posture"
               data-posture={selected.settings.posture}
@@ -224,6 +240,7 @@ export function OrderBookPage() {
                 <pre className="overflow-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground">{preview}</pre>
               </section>
             )}
+            </> : <ProgressPanel book={selected} onOpenReport={(runId) => void openRunReport(runId)} />}
           </div>
         )}
       </div>

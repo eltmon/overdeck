@@ -67,6 +67,31 @@ describe('order-book dispatch eligibility', () => {
     });
   });
 
+  it('blocks DRAIN posture and pending PRD re-verification before dispatch', () => {
+    const draining = book();
+    draining.settings.posture = 'drain';
+    expect(evaluateOrderDispatchEligibility({
+      book: draining,
+      progress: progress(),
+      issueId: 'PAN-3',
+      inFlightIssues: new Set(),
+    })).toMatchObject({ eligible: false, code: 'book-draining' });
+
+    const stalePrd = book();
+    stalePrd.items = stalePrd.items.map((item) => item.issue === 'PAN-3' ? { ...item, reVerify: true } : item);
+    const decision = evaluateOrderDispatchEligibility({
+      book: stalePrd,
+      progress: progress(),
+      issueId: 'PAN-3',
+      inFlightIssues: new Set(),
+    });
+    expect(decision).toMatchObject({ eligible: false, code: 'reverify-required' });
+    expect(decision.conditions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ key: 'pickup-posture', met: true }),
+      expect.objectContaining({ key: 'prd-reverified', met: false }),
+    ]));
+  });
+
   it('blocks an unmet prerequisite, then admits the same issue after it becomes terminal', () => {
     const blocked = evaluateOrderDispatchEligibility({
       book: book(),
