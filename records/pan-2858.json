@@ -399,15 +399,7 @@
       "timestamp": "2026-07-18T21:58:11.535Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-18T21:58:11Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nACP context de-duplication relies on exact text matching, so valid Markdown separators or project edits leave stale Claude-specific rules in ACP prompts\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -736,10 +728,10 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T21:59:21.592Z",
+  "updated": "2026-07-18T21:59:23.267Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -747,13 +739,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-18T21:10:55.719Z",
-    "updatedAt": "2026-07-18T21:59:21.572Z",
+    "updatedAt": "2026-07-18T21:59:22.365Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "28aa6ff9057335735b0659c28f13ca020ab361a1",
     "reviewRequestedAt": "2026-07-18T21:10:55.719Z",
-    "reviewSpawnedAt": "2026-07-18T21:55:18.068Z",
+    "reviewSpawnedAt": "2026-07-18T21:59:22.363Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "bun.lock",
@@ -1140,7 +1132,7 @@
       },
       "costAtCloseOut": {
         "usd": 901.71809,
-        "pricingAsOf": "2026-07-18T21:59:21.588Z"
+        "pricingAsOf": "2026-07-18T21:59:22.411Z"
       }
     },
     "merges": [
