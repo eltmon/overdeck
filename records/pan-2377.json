@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T22:18:06.813Z",
+  "updated": "2026-07-18T23:09:31.830Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 33,
-    "claims": {
-      "guard-rail-tests": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 391911,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T22:18:06.813Z"
-      }
-    },
+    "sequence": 34,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -298,6 +290,17 @@
         "itemId": "readonly-projections",
         "outcome": "completed",
         "releasedAt": "2026-07-18T22:17:58.155Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 391911,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T22:18:06.813Z",
+        "itemId": "guard-rail-tests",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-2377 dead)",
+        "releasedAt": "2026-07-18T23:09:31.797Z"
       }
     ],
     "statusReasons": {
@@ -356,6 +359,10 @@
       "frontend-progress-view": {
         "reason": "Added Setup/Progress switching, WS/current-status live checklist with queued/planning/working/review/merged/closed tones, four mechanically-derived eligibility conditions per held item, drained report/retro action, and closed the underlying dispatch gap by enforcing DRAIN posture and pending PRD re-verification in the shared eligibility predicate.",
         "updatedAt": "2026-07-18T21:41:44.080Z"
+      },
+      "guard-rail-tests": {
+        "reason": "stale claim released (agent-pan-2377 dead)",
+        "updatedAt": "2026-07-18T23:09:31.797Z"
       }
     }
   },
@@ -430,6 +437,6 @@
     "readonly-projections.readonly-projections.ac1": "completed",
     "readonly-projections.readonly-projections.ac2": "completed",
     "readonly-projections.readonly-projections.ac3": "completed",
-    "guard-rail-tests": "running"
+    "guard-rail-tests": "pending"
   }
 }
