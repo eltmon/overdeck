@@ -4,6 +4,8 @@ import { mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { Effect } from 'effect';
+
 const internalTokenMocks = vi.hoisted(() => ({
   getInternalTokenSync: vi.fn(() => 'test-internal-token'),
 }));
@@ -21,6 +23,7 @@ import {
   completePlanningAutoSpawnAndKill,
   completePlanningFilesToStage,
   completePlanningWorkspaceGitAddCommands,
+  recordPlanningAutoHandoffFailure,
   resolveCompletePlanningTerminalStatus,
 } from '../../../../lib/overdeck/planning-promotion.js';
 import { applyStatusOverrides } from '../../../../lib/vbrief/io.js';
@@ -432,6 +435,47 @@ describe('completePlanningArtifacts', () => {
       workAgentSkipReason: 'unauthorized',
     });
     expect(resolveCompletePlanningTerminalStatus(true, result)).toBe('failure');
+  });
+
+  it('records a refused auto-handoff as planning failure and pipeline stuck state', async () => {
+    const append = vi.fn(() => Effect.succeed(undefined));
+    const markStuck = vi.fn();
+    const emitActivity = vi.fn();
+
+    await expect(recordPlanningAutoHandoffFailure({
+      issueId: 'PAN-2860',
+      result: {
+        workAgentSpawned: false,
+        workAgentSkipReason: 'guardrails',
+        workAgentError: 'Workspace has uncommitted changes',
+      },
+      eventStore: { append },
+      now: () => '2026-07-17T00:00:00.000Z',
+      markStuck,
+      emitActivity,
+    })).resolves.toBe('Workspace has uncommitted changes');
+
+    expect(append).toHaveBeenCalledWith({
+      type: 'planning.failed',
+      timestamp: '2026-07-17T00:00:00.000Z',
+      payload: {
+        issueId: 'PAN-2860',
+        error: 'Workspace has uncommitted changes',
+        stage: 'auto-handoff',
+        workAgentSkipReason: 'guardrails',
+        workAgentError: 'Workspace has uncommitted changes',
+      },
+    });
+    expect(markStuck).toHaveBeenCalledWith('PAN-2860', 'planning_auto_handoff_failed', {
+      workAgentSkipReason: 'guardrails',
+      workAgentError: 'Workspace has uncommitted changes',
+    });
+    expect(emitActivity).toHaveBeenCalledWith(expect.objectContaining({
+      source: 'plan',
+      level: 'error',
+      issueId: 'PAN-2860',
+      message: expect.stringContaining('work-agent startup failed'),
+    }));
   });
 
   it('rebuilds the stack and starts work when the initial auto-spawn finds no healthy stack', async () => {

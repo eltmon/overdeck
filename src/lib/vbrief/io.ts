@@ -1,16 +1,17 @@
 /**
  * vBRIEF File I/O Utilities
  *
- * Single-spec-on-main model (PAN-1124): the canonical vBRIEF spec lives at
- * `<projectRoot>/.pan/specs/<canonical>.vbrief.json`. Work and task operations
- * cannot mutate its structure; they may only advance `plan.status` through
+ * Single-spec-on-main model (PAN-1124): the canonical vBRIEF spec lives in
+ * `specs/<canonical>.vbrief.json` behind the project state read/write doors.
+ * Work and task operations cannot mutate its structure; they may only advance
+ * `plan.status` through
  * `updateSpecStatus()` in `pan-dir/specs.ts`. A deliberate return to planning
  * may replace the full document at the same canonical path through
  * `writeSpecDocument()`, preserving stable item IDs so existing progress still
  * applies.
  *
  * Runtime item/subItem status is tracked as a flat `statusOverrides` map in
- * the workspace continue file (`<workspace>/.pan/continue.json`).
+ * the workspace continue file (`<workspace>/.overdeck/continue.json`).
  * `readWorkspacePlan()` returns a merged view (main spec + overlay) so
  * callers never need to know about the overlay.
  *
@@ -22,6 +23,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { readFile, readdir } from 'fs/promises';
 import { basename, join, resolve } from 'path';
 import { Data, Effect } from 'effect';
+import { getLegacyWorkspacePanPaths, getWorkspacePanPaths } from '../pan-dir/continue.js';
 import { getProjectPanPaths } from '../pan-dir/specs.js';
 import {
   getProjectConfigFromWorkspacePath,
@@ -31,7 +33,6 @@ import {
   writeStatusOverrideSync,
 } from '../pan-dir/record.js';
 import type { ProjectConfig } from '../projects.js';
-import { PAN_DIRNAME, PAN_SPEC_FILENAME } from '../pan-dir/types.js';
 import { parseVBriefFilename } from './lifecycle.js';
 import { FsError } from '../errors.js';
 import { subItemsOf, type VBriefDifficulty, type VBriefDocument, type VBriefItemStatus } from './types.js';
@@ -125,16 +126,30 @@ function projectRootFromWorkspace(workspacePath: string): string {
 }
 
 function workspaceDraftPath(workspacePath: string): string {
-  return join(workspacePath, PAN_DIRNAME, PAN_SPEC_FILENAME);
+  return getWorkspacePanPaths(workspacePath).specPath;
+}
+
+function readableWorkspaceDraftPath(workspacePath: string): string | null {
+  const canonicalPath = workspaceDraftPath(workspacePath);
+  if (existsSync(canonicalPath)) return canonicalPath;
+  const legacyPath = getLegacyWorkspacePanPaths(workspacePath).specPath;
+  return existsSync(legacyPath) ? legacyPath : null;
 }
 
 function workspaceContinuePath(workspacePath: string): string {
-  return join(workspacePath, PAN_DIRNAME, 'continue.json');
+  return getWorkspacePanPaths(workspacePath).continuePath;
+}
+
+function readableWorkspaceContinuePath(workspacePath: string): string {
+  const canonicalPath = workspaceContinuePath(workspacePath);
+  if (existsSync(canonicalPath)) return canonicalPath;
+  const legacyPath = getLegacyWorkspacePanPaths(workspacePath).continuePath;
+  return existsSync(legacyPath) ? legacyPath : canonicalPath;
 }
 
 export function findWorkspaceDraftPlanSync(workspacePath: string): string | null {
-  const path = workspaceDraftPath(workspacePath);
-  if (!existsSync(path)) return null;
+  const path = readableWorkspaceDraftPath(workspacePath);
+  if (!path) return null;
 
   const issueId = issueIdFromWorkspacePath(workspacePath);
   if (!issueId) return path;
@@ -275,7 +290,7 @@ function readStatusOverridesSync(workspacePath: string): Record<string, string> 
 }
 
 export function readTierOverrides(workspacePath: string): TierOverridesMap {
-  const path = workspaceContinuePath(workspacePath);
+  const path = readableWorkspaceContinuePath(workspacePath);
   try {
     const raw = readFileSync(path, 'utf-8');
     const parsed = JSON.parse(raw) as { tierOverrides?: TierOverridesMap };
@@ -293,9 +308,10 @@ export function recordTierPromotion(
   reason: string,
 ): void {
   const path = workspaceContinuePath(workspacePath);
+  const readablePath = readableWorkspaceContinuePath(workspacePath);
   let state: Record<string, unknown> = {};
   try {
-    state = JSON.parse(readFileSync(path, 'utf-8')) as Record<string, unknown>;
+    state = JSON.parse(readFileSync(readablePath, 'utf-8')) as Record<string, unknown>;
   } catch {
     state = {};
   }
@@ -316,7 +332,7 @@ export function recordTierPromotion(
     },
   };
 
-  mkdirSync(join(workspacePath, PAN_DIRNAME), { recursive: true });
+  mkdirSync(getWorkspacePanPaths(workspacePath).panDir, { recursive: true });
   writeFileSync(path, JSON.stringify({ ...state, tierOverrides: nextOverrides }, null, 2), 'utf-8');
 }
 
@@ -501,20 +517,30 @@ export const findWorkspaceDraftPlan = (
   workspacePath: string,
 ): Effect.Effect<string | null, FsError> =>
   Effect.gen(function* () {
-    const path = workspaceDraftPath(workspacePath);
-    const exists = yield* Effect.tryPromise({
-      try: async () => {
-        try {
-          await readFile(path, 'utf-8');
-          return true;
-        } catch (error: any) {
-          if (error?.code === 'ENOENT') return false;
-          throw error;
-        }
-      },
-      catch: (cause) => new FsError({ path, operation: 'readFile', cause }),
-    });
-    if (!exists) return null;
+    const paths = [
+      workspaceDraftPath(workspacePath),
+      getLegacyWorkspacePanPaths(workspacePath).specPath,
+    ];
+    let path: string | null = null;
+    for (const candidate of paths) {
+      const exists = yield* Effect.tryPromise({
+        try: async () => {
+          try {
+            await readFile(candidate, 'utf-8');
+            return true;
+          } catch (error: any) {
+            if (error?.code === 'ENOENT') return false;
+            throw error;
+          }
+        },
+        catch: (cause) => new FsError({ path: candidate, operation: 'readFile', cause }),
+      });
+      if (exists) {
+        path = candidate;
+        break;
+      }
+    }
+    if (!path) return null;
 
     const issueId = issueIdFromWorkspacePath(workspacePath);
     if (!issueId) return path;
