@@ -57,16 +57,15 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T13:14:14.315Z",
+  "updated": "2026-07-18T13:27:22.468Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "passed",
     "mergeStatus": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T13:14:13.874Z",
+    "updatedAt": "2026-07-18T13:27:22.450Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
@@ -94,7 +93,9 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-07-18T01:19:49.476Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-18T13:27:22.450Z"
   },
   "closeOut": {
     "usage": {
@@ -162,7 +163,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/2866"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-18T13:27:22.467Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: passed at 7d808edcd8dce3d63028b02b008f707563051a79",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Merge specialist confirmed merge completed; PR #2866 MERGED at 2026-07-18T13:13:58Z",
+          "status": "pass",
+          "mergedAt": "2026-07-18T13:13:58Z",
+          "mergeCommit": "7ace4a0f933d06ab60a8fad7a6ddbbafff7da5b8"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 7ace4a0f933d06ab60a8fad7a6ddbbafff7da5b8",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "best-effort — build commit not exposed (PAN-2713): server started 2026-07-18T13:20:55.000Z, dist built 2026-07-18T13:20:07.896Z, merge 2026-07-18T13:13:58.000Z",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed git worktree; Removed 6 agent state directories; Deleted local branch strike/pan-2857; Pruned 104 checkpoint ref(s) for agent-pan-2857, planning-pan-2857, strike-pan-2857; No specialist registry entries for PAN-2857"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
