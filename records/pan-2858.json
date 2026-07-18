@@ -352,9 +352,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-18T20:48:25.327Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-18T20:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-18T20:50:53.324Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-18T20:50:53Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nACP resume/recovery still discards persisted sessions and queued prompts; auth diagnostics, context delivery, and transcript streaming also remain blocked\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -683,18 +696,18 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:50:34.592Z",
+  "updated": "2026-07-18T20:50:53.324Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:50:34.544Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-18T20:50:52.637Z",
+    "reviewNotes": "ACP resume/recovery still discards persisted sessions and queued prompts; auth diagnostics, context delivery, and transcript streaming also remain blocked",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
@@ -1042,9 +1055,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 34095499,
-            "output": 812054,
-            "cacheRead": 175241216,
+            "input": 34097987,
+            "output": 812372,
+            "cacheRead": 175827968,
             "cacheWrite": 0
           }
         },
@@ -1073,9 +1086,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 76259664,
-          "output": 2502810,
-          "cacheRead": 630806528,
+          "input": 76262152,
+          "output": 2503128,
+          "cacheRead": 631393280,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1086,8 +1099,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 786.487126,
-        "pricingAsOf": "2026-07-18T20:50:34.555Z"
+        "usd": 786.802482,
+        "pricingAsOf": "2026-07-18T20:50:52.731Z"
       }
     },
     "merges": [
