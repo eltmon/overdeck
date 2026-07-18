@@ -234,15 +234,7 @@
       "timestamp": "2026-07-18T16:45:31.862Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-18T16:45:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nCompleted ACP turns lack a durable completion record, so live conversation and activity state can remain streaming or working forever.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -569,21 +561,21 @@
     "recordedAt": "2026-07-18T16:13:20.539Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T16:47:53.306Z",
+  "updated": "2026-07-18T16:47:54.937Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T16:47:53.254Z",
+    "updatedAt": "2026-07-18T16:47:54.831Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "275eb63b0984b0139f7f35ad59b686d0e681d51f",
     "reviewRequestedAt": "2026-07-18T16:47:52.896Z",
-    "reviewSpawnedAt": "2026-07-18T16:32:14.584Z"
+    "reviewSpawnedAt": "2026-07-18T16:47:54.830Z"
   },
   "closeOut": {
     "usage": {
@@ -643,7 +635,7 @@
       },
       "costAtCloseOut": {
         "usd": 621.487557,
-        "pricingAsOf": "2026-07-18T16:47:53.269Z"
+        "pricingAsOf": "2026-07-18T16:47:54.910Z"
       }
     },
     "merges": [
