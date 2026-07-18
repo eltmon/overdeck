@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T01:46:29.372Z",
-  "updated": "2026-07-18T03:53:12.894Z",
+  "updated": "2026-07-18T04:04:08.408Z",
   "pipeline": {
     "issueId": "PAN-2869",
     "reviewStatus": "pending",
@@ -12,7 +12,7 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T03:53:12.872Z",
+    "updatedAt": "2026-07-18T04:04:08.365Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
     "strikeReadyHead": "c895b36ec47232dd35acd8b98f984cb44b9e5dfc",
@@ -41,10 +41,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 80,
-            "output": 18670,
-            "cacheRead": 14981129,
-            "cacheWrite": 64757
+            "input": 89,
+            "output": 20456,
+            "cacheRead": 16891855,
+            "cacheWrite": 67780
           }
         },
         "strike": {
@@ -58,10 +58,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 80,
-          "output": 18670,
-          "cacheRead": 14981129,
-          "cacheWrite": 64757
+          "input": 89,
+          "output": 20456,
+          "cacheRead": 16891855,
+          "cacheWrite": 67780
         },
         "openai/gpt-5.6-sol": {
           "input": 4004744,
@@ -71,8 +71,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 73.169021,
-        "pricingAsOf": "2026-07-18T03:53:12.877Z"
+        "usd": 75.206925,
+        "pricingAsOf": "2026-07-18T04:04:08.371Z"
       }
     },
     "merges": [],
