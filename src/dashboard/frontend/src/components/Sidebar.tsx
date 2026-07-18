@@ -82,6 +82,7 @@ interface NavGroup {
 const PRIMARY_ITEMS: NavItem[] = [
   { id: 'home' as Tab, label: 'Home', icon: Home },
   { id: 'flywheel' as Tab, label: 'Flywheel', icon: Loader2, badge: 'flywheel-live' },
+  { id: 'orders' as Tab, label: 'Order Book', icon: BookOpen },
 ];
 
 const MORE_GROUPS: NavGroup[] = [
