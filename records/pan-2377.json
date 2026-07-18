@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T20:27:59.170Z",
+  "updated": "2026-07-18T20:37:17.098Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "doctrine-order-books": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 2977806,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T20:27:59.170Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -212,6 +204,17 @@
         "outcome": "completed",
         "reason": "Typed launch order bindings, mechanically enrich status and run detail from canonical book progress, strip spoofed bookless status, and expose lane positions/drain state with parked-terminal coverage.",
         "releasedAt": "2026-07-18T20:27:49.265Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 2977806,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T20:27:59.170Z",
+        "itemId": "doctrine-order-books",
+        "outcome": "completed",
+        "reason": "Added active-book release and mechanical dispatch doctrine, documented drained-run retro/complete/end-turn semantics for orders-bound runs while preserving bookless behavior, and added live-model regression cases for retro gating and completion.",
+        "releasedAt": "2026-07-18T20:37:17.098Z"
       }
     ],
     "statusReasons": {
@@ -246,6 +249,10 @@
       "run-binding-status": {
         "reason": "Typed launch order bindings, mechanically enrich status and run detail from canonical book progress, strip spoofed bookless status, and expose lane positions/drain state with parked-terminal coverage.",
         "updatedAt": "2026-07-18T20:27:49.265Z"
+      },
+      "doctrine-order-books": {
+        "reason": "Added active-book release and mechanical dispatch doctrine, documented drained-run retro/complete/end-turn semantics for orders-bound runs while preserving bookless behavior, and added live-model regression cases for retro gating and completion.",
+        "updatedAt": "2026-07-18T20:37:17.098Z"
       }
     }
   },
@@ -287,6 +294,8 @@
     "run-binding-status.run-binding-status.ac1": "completed",
     "run-binding-status.run-binding-status.ac2": "completed",
     "run-binding-status.run-binding-status.ac3": "completed",
-    "doctrine-order-books": "running"
+    "doctrine-order-books": "completed",
+    "doctrine-order-books.doctrine-order-books.ac1": "completed",
+    "doctrine-order-books.doctrine-order-books.ac2": "completed"
   }
 }
