@@ -13,6 +13,7 @@ import { STATE_BRANCH, MIGRATION_COMPLETE_MARKER, clearStateMigrationCache, stat
 import { STATE_BRANCH_PATHS } from '../../../lib/state-plane.js';
 import { acquireStateMigrationLock } from '../../../lib/state-migration-lock.js';
 import { manifestEntry, verifyStateMigrationManifest, type StateMigrationManifestEntry } from '../../../lib/state-migration-manifest.js';
+import { migrateProjectXBriefState } from './xbrief-state-migrate.js';
 
 const GIT_COMMAND_TIMEOUT_MS = 30_000;
 
@@ -531,10 +532,18 @@ export const __testInternals = {
 };
 
 export function registerStateMigrationCommand(admin: Command): void {
-  admin.command('state')
-    .description('Permanent state administration')
-    .command('migrate <project>')
+  const state = admin.command('state')
+    .description('Permanent state administration');
+
+  state.command('migrate <project>')
     .description('Move permanent state to the orphan overdeck-state branch')
     .option('--dry-run', 'Print the exact migration plan without mutating anything')
     .action((project: string, options: { dryRun?: boolean }) => migrateProjectState(project, options));
+
+  state.command('migrate-xbrief <project>')
+    .description('Rename state documents to .xbrief.json and migrate legacy envelopes')
+    .option('--dry-run', 'Print the exact xBRIEF migration plan without mutating anything')
+    .action(async (project: string, options: { dryRun?: boolean }) => {
+      await migrateProjectXBriefState(project, options);
+    });
 }

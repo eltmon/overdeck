@@ -13,6 +13,7 @@ import { readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
 import { getAllReviewStatusesFromDb } from '../overdeck/review-status-sync.js';
+import { resolveStateReadHomeSync } from '../state-read-home.js';
 import { isXBriefFilename, XBRIEF_FILENAME_SUFFIXES } from '../xbrief/lifecycle.js';
 import {
   getProjectSync,
@@ -53,7 +54,10 @@ function getProjectRoot(project: ProjectConfig): string {
 
 async function collectContinueIssueIds(project: ProjectConfig): Promise<Set<string>> {
   const ids = new Set<string>();
-  const continuesDir = join(getProjectRoot(project), '.pan', 'continues');
+  const stateHome = resolveStateReadHomeSync(project);
+  const continuesDir = stateHome.migrated
+    ? join(stateHome.root, 'continues')
+    : join(stateHome.root, '.pan', 'continues');
   if (!existsSync(continuesDir)) return ids;
 
   try {
