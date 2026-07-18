@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T21:42:05.074Z",
+  "updated": "2026-07-18T22:03:22.670Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "cross-surface-add-actions": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 3160553,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T21:42:05.074Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -278,6 +270,16 @@
         "outcome": "completed",
         "reason": "Added Setup/Progress switching, WS/current-status live checklist with queued/planning/working/review/merged/closed tones, four mechanically-derived eligibility conditions per held item, drained report/retro action, and closed the underlying dispatch gap by enforcing DRAIN posture and pending PRD re-verification in the shared eligibility predicate.",
         "releasedAt": "2026-07-18T21:41:44.080Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 3160553,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T21:42:05.074Z",
+        "itemId": "cross-surface-add-actions",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T22:03:22.670Z"
       }
     ],
     "statusReasons": {
@@ -402,6 +404,9 @@
     "frontend-progress-view.frontend-progress-view.ac1": "completed",
     "frontend-progress-view.frontend-progress-view.ac2": "completed",
     "frontend-progress-view.frontend-progress-view.ac3": "completed",
-    "cross-surface-add-actions": "running"
+    "cross-surface-add-actions": "completed",
+    "cross-surface-add-actions.cross-surface-add-actions.ac1": "completed",
+    "cross-surface-add-actions.cross-surface-add-actions.ac2": "completed",
+    "cross-surface-add-actions.cross-surface-add-actions.ac3": "completed"
   }
 }
