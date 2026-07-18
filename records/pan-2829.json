@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-18T19:17:47.591Z",
+  "updated": "2026-07-18T19:33:15.782Z",
   "pipeline": {
     "issueId": "PAN-2829",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "state-migration-cmd": {
-        "writerId": "agent-pan-2829",
-        "agentId": "agent-pan-2829",
-        "pid": 188843,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:17:47.591Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2829",
@@ -177,6 +169,17 @@
         "outcome": "completed",
         "reason": "New specs and continues use .xbrief.json, all state readers accept both extensions, canonical files win duplicate resolution, and targeted compatibility tests pass",
         "releasedAt": "2026-07-18T19:14:54.574Z"
+      },
+      {
+        "writerId": "agent-pan-2829",
+        "agentId": "agent-pan-2829",
+        "pid": 188843,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:17:47.591Z",
+        "itemId": "state-migration-cmd",
+        "outcome": "completed",
+        "reason": "Added fixture-tested pan admin state migrate-xbrief with dry-run, single state-door commit, idempotence, migrated-state readers, and fresh-home lock handling; did not touch live state",
+        "releasedAt": "2026-07-18T19:33:15.782Z"
       }
     ],
     "statusReasons": {
@@ -187,6 +190,10 @@
       "extension-convention": {
         "reason": "New specs and continues use .xbrief.json, all state readers accept both extensions, canonical files win duplicate resolution, and targeted compatibility tests pass",
         "updatedAt": "2026-07-18T19:14:54.574Z"
+      },
+      "state-migration-cmd": {
+        "reason": "Added fixture-tested pan admin state migrate-xbrief with dry-run, single state-door commit, idempotence, migrated-state readers, and fresh-home lock handling; did not touch live state",
+        "updatedAt": "2026-07-18T19:33:15.782Z"
       }
     }
   },
@@ -209,6 +216,10 @@
     "extension-convention.extension-convention.ac2": "completed",
     "extension-convention.extension-convention.ac3": "completed",
     "extension-convention.extension-convention.ac4": "completed",
-    "state-migration-cmd": "running"
+    "state-migration-cmd": "completed",
+    "state-migration-cmd.state-migration-cmd.ac1": "completed",
+    "state-migration-cmd.state-migration-cmd.ac2": "completed",
+    "state-migration-cmd.state-migration-cmd.ac3": "completed",
+    "state-migration-cmd.state-migration-cmd.ac4": "completed"
   }
 }
