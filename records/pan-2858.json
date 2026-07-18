@@ -357,17 +357,14 @@
       "reason": "feedback",
       "note": "[2026-07-18T20:50Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-18T20:50:53.324Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-18T20:50:53Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2858\n\nACP resume/recovery still discards persisted sessions and queued prompts; auth diagnostics, context delivery, and transcript streaming also remain blocked\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2858 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-18T20:50:55.273Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "bun.lock",
@@ -696,24 +693,24 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T20:50:53.324Z",
+  "updated": "2026-07-18T20:50:55.274Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T20:50:52.637Z",
+    "updatedAt": "2026-07-18T20:50:53.619Z",
     "reviewNotes": "ACP resume/recovery still discards persisted sessions and queued prompts; auth diagnostics, context delivery, and transcript streaming also remain blocked",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "reviewRequestedAt": "2026-07-18T20:50:34.037Z",
-    "reviewSpawnedAt": "2026-07-18T20:48:23.695Z",
+    "reviewSpawnedAt": "2026-07-18T20:50:53.617Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "bun.lock",
@@ -1100,7 +1097,7 @@
       },
       "costAtCloseOut": {
         "usd": 786.802482,
-        "pricingAsOf": "2026-07-18T20:50:52.731Z"
+        "pricingAsOf": "2026-07-18T20:50:53.633Z"
       }
     },
     "merges": [
