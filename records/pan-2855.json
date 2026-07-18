@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T00:19:33.037Z",
-  "updated": "2026-07-18T03:05:39.780Z",
+  "updated": "2026-07-18T03:12:58.143Z",
   "pipeline": {
     "issueId": "PAN-2855",
     "reviewStatus": "pending",
@@ -12,7 +12,7 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T03:05:39.763Z",
+    "updatedAt": "2026-07-18T03:12:58.120Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
     "strikeReadyHead": "8bea7b50b427c7363f87f232eb21136012cb5127",
@@ -34,24 +34,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 975887,
-            "output": 72130,
-            "cacheRead": 19261440,
+            "input": 979212,
+            "output": 72359,
+            "cacheRead": 19781120,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 975887,
-          "output": 72130,
-          "cacheRead": 19261440,
+          "input": 979212,
+          "output": 72359,
+          "cacheRead": 19781120,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 16.674055,
-        "pricingAsOf": "2026-07-18T03:05:39.775Z"
+        "usd": 16.95739,
+        "pricingAsOf": "2026-07-18T03:12:58.124Z"
       }
     },
     "merges": [],
