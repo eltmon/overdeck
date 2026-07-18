@@ -391,6 +391,20 @@ describe('gatherProjectLensSignals', () => {
     expect(runGraphql).toHaveBeenCalledOnce();
   });
 
+  it('skips numbers that are not issues instead of failing the batch (PR-numbered strike branch)', async () => {
+    // strike/pan-2778 pointed at a PR number: GraphQL resolves that alias to
+    // null and reports a per-field error, but the other aliases stay usable.
+    // One bad number must not zero out membership for the whole project.
+    const runGraphql = vi.fn().mockResolvedValue(JSON.stringify({
+      data: { repository: { i0: { state: 'OPEN' }, i1: null } },
+      errors: [{ message: 'Could not resolve to an Issue with the number of 2778.' }],
+    }));
+
+    await expect(listIssueStatesBatched('eltmon', 'overdeck', [10, 2778], runGraphql)).resolves.toEqual([
+      { number: 10, state: 'open' },
+    ]);
+  });
+
   it('resolves issue states in fixed-size project-scoped GraphQL chunks', async () => {
     const numbers = Array.from({ length: 101 }, (_, index) => index + 1);
     const runGraphql = vi.fn().mockImplementation(async (query: string) => JSON.stringify({
@@ -447,8 +461,11 @@ describe('gatherProjectLensSignals', () => {
     await expect(listMergedPullRequestHeadsBatched(
       'eltmon', 'overdeck', ['feature/pan-1'], partial,
     )).rejects.toThrow('Incomplete merged-PR GraphQL response');
+    // Per-field errors with data present are tolerated (see the PR-numbered
+    // strike-branch test), but an alias absent from the response still rejects —
+    // a missing answer is never synthesized into a negative signal.
     await expect(listIssueStatesBatched('eltmon', 'overdeck', [1], partial))
-      .rejects.toThrow('Incomplete issue-state GraphQL response');
+      .rejects.toThrow('Missing issue-state alias i0');
   });
 
   it('accepts an explicit null issue alias but rejects an omitted alias', async () => {

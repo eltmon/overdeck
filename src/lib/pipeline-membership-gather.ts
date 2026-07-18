@@ -78,12 +78,30 @@ interface MergedHeadGraphqlResponse {
 }
 
 async function runGitHubGraphql(query: string): Promise<string> {
-  const { stdout } = await execFileAsync('gh', ['api', 'graphql', '-f', `query=${query}`], {
-    encoding: 'utf-8',
-    timeout: 30_000,
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  return stdout;
+  try {
+    const { stdout } = await execFileAsync('gh', ['api', 'graphql', '-f', `query=${query}`], {
+      encoding: 'utf-8',
+      timeout: 30_000,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    return stdout;
+  } catch (error) {
+    // gh exits non-zero when the GraphQL envelope carries per-field errors
+    // (e.g. `issue(number: N)` where N is a PR — strike branches can point at
+    // PR numbers), but it still prints the full response with partial data to
+    // stdout. Surface that envelope so callers can use the resolvable fields
+    // instead of failing the whole gather (the zero-membership regression).
+    const stdout = (error as { stdout?: string }).stdout;
+    if (typeof stdout === 'string' && stdout.length > 0) {
+      try {
+        const parsed = JSON.parse(stdout) as { data?: unknown };
+        if (parsed.data !== undefined && parsed.data !== null) return stdout;
+      } catch {
+        // stdout is not a GraphQL envelope — fall through to the original error
+      }
+    }
+    throw error;
+  }
 }
 
 export async function listMergedPullRequestHeadsBatched(
@@ -131,7 +149,10 @@ export async function listIssueStatesBatched(
     const query = `query { repository(owner: ${JSON.stringify(owner)}, name: ${JSON.stringify(repo)}) { ${fields.join(' ')} } }`;
     const response = JSON.parse(await runGraphql(query)) as IssueStateGraphqlResponse;
     const repository = response.data?.repository;
-    if (response.errors?.length || !repository) throw new Error('Incomplete issue-state GraphQL response');
+    // Per-field errors (a number that resolves to a PR or deleted issue) leave
+    // usable partial data: the unresolvable alias comes back null and is skipped
+    // below. Only a response with no repository data at all is fatal.
+    if (!repository) throw new Error('Incomplete issue-state GraphQL response');
     for (let index = 0; index < numberChunk.length; index++) {
       const alias = `i${index}`;
       if (!Object.prototype.hasOwnProperty.call(repository, alias)) throw new Error(`Missing issue-state alias ${alias}`);
