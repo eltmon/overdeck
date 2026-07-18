@@ -34,6 +34,7 @@
   "workspaces": {
     "packages": [
       "packages/contracts",
+      "packages/effect-acp",
       "packages/moonshine-linux-x64",
       "packages/qwen-tts-linux-x64",
       "packages/pi-extension",
