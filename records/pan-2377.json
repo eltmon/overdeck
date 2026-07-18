@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-18T19:58:23.758Z",
+  "updated": "2026-07-18T20:05:14.857Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
@@ -114,16 +114,8 @@
   "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "pickup-membership-release": {
-        "writerId": "agent-pan-2377",
-        "agentId": "agent-pan-2377",
-        "pid": 1472065,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T19:58:23.758Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2377",
@@ -179,6 +171,17 @@
         "outcome": "completed",
         "reason": "Added --orders validation and launch binding, post-gate running status with rollback, shared route/CLI start path, skill docs, and failure-path tests.",
         "releasedAt": "2026-07-18T19:58:14.965Z"
+      },
+      {
+        "writerId": "agent-pan-2377",
+        "agentId": "agent-pan-2377",
+        "pid": 1472065,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T19:58:23.758Z",
+        "itemId": "pickup-membership-release",
+        "outcome": "completed",
+        "reason": "Made active order-book membership satisfy the release gate and threaded it into live sequence pickup, cohort snapshots, stats, waves, and lanes without store access in pickup.ts.",
+        "releasedAt": "2026-07-18T20:05:14.857Z"
       }
     ],
     "statusReasons": {
@@ -201,6 +204,10 @@
       "cli-flywheel-start-orders": {
         "reason": "Added --orders validation and launch binding, post-gate running status with rollback, shared route/CLI start path, skill docs, and failure-path tests.",
         "updatedAt": "2026-07-18T19:58:14.965Z"
+      },
+      "pickup-membership-release": {
+        "reason": "Made active order-book membership satisfy the release gate and threaded it into live sequence pickup, cohort snapshots, stats, waves, and lanes without store access in pickup.ts.",
+        "updatedAt": "2026-07-18T20:05:14.857Z"
       }
     }
   },
@@ -229,6 +236,9 @@
     "cli-flywheel-start-orders.cli-flywheel-start-orders.ac2": "completed",
     "cli-flywheel-start-orders.cli-flywheel-start-orders.ac3": "completed",
     "cli-flywheel-start-orders.cli-flywheel-start-orders.ac4": "completed",
-    "pickup-membership-release": "running"
+    "pickup-membership-release": "completed",
+    "pickup-membership-release.pickup-membership-release.ac1": "completed",
+    "pickup-membership-release.pickup-membership-release.ac2": "completed",
+    "pickup-membership-release.pickup-membership-release.ac3": "completed"
   }
 }
