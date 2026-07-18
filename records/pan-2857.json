@@ -57,7 +57,7 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T12:20:17.265Z",
+  "updated": "2026-07-18T12:20:18.451Z",
   "pipeline": {
     "issueId": "PAN-2857",
     "reviewStatus": "passed",
@@ -66,7 +66,7 @@
     "mergeStatus": "merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T12:20:17.237Z",
+    "updatedAt": "2026-07-18T12:20:18.407Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed test",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -157,7 +157,7 @@
       },
       "costAtCloseOut": {
         "usd": 69.481995,
-        "pricingAsOf": "2026-07-18T12:20:17.261Z"
+        "pricingAsOf": "2026-07-18T12:20:18.429Z"
       }
     },
     "merges": [
