@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T13:36:29.113Z",
-  "updated": "2026-07-18T15:21:33.889Z",
+  "updated": "2026-07-18T15:26:41.750Z",
   "pipeline": {
     "issueId": "PAN-2879",
     "reviewStatus": "pending",
@@ -12,13 +12,14 @@
     "mergeStatus": "merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T15:21:33.756Z",
+    "updatedAt": "2026-07-18T15:26:41.738Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "mergeNotes": "Strike merge request failed: fetch failed",
     "lastVerifiedCommit": "ae46b21f3c7cb1d7fa351ba24fe7046d14141c56",
     "strikeReadyHead": "524164b3ae7f4d261726f83c1cf498ed1318a455",
     "strikeReadyAt": "2026-07-18T15:15:16.443Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-18T14:45:06.449Z",
@@ -33,6 +34,13 @@
         "mainHead": "20138f2583ba8ce46f7cbf33743c6f56a71c786f",
         "outcome": "failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-18T15:26:33.980Z",
+        "strikeHead": "524164b3ae7f4d261726f83c1cf498ed1318a455",
+        "mainHead": "7e8fac9f3411b9f6f187e83cddf17d315177168a",
+        "outcome": "failed",
+        "detail": "Strike merge request failed: fetch failed"
       }
     ]
   },
@@ -41,24 +49,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 2645786,
-            "output": 157102,
-            "cacheRead": 45428224,
+            "input": 2653588,
+            "output": 157810,
+            "cacheRead": 46181376,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2645786,
-          "output": 157102,
-          "cacheRead": 45428224,
+          "input": 2653588,
+          "output": 157810,
+          "cacheRead": 46181376,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 40.656102,
-        "pricingAsOf": "2026-07-18T15:21:33.817Z"
+        "usd": 41.092928,
+        "pricingAsOf": "2026-07-18T15:26:41.741Z"
       }
     },
     "merges": [],
