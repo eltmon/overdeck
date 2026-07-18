@@ -1,6 +1,6 @@
 ---
 name: pan-flywheel
-description: "pan flywheel — start, pause, resume, stop, inspect, emit, and report on the singleton Fix-All Flywheel orchestrator"
+description: "pan flywheel — start, pause, resume, complete, stop, inspect, emit, and report on the singleton Fix-All Flywheel orchestrator"
 triggers:
   - pan flywheel
   - flywheel orchestrator
@@ -33,6 +33,8 @@ pan flywheel status
 pan flywheel status --json
 pan flywheel pause
 pan flywheel resume
+pan flywheel complete
+pan flywheel complete --force
 pan flywheel stop
 pan flywheel abort
 pan flywheel emit-status --file latest.json
@@ -87,6 +89,17 @@ pan flywheel resume
 `pause` flips the Flywheel gate and stops active orchestration without clearing the active run id. `resume` clears the gate and restarts the singleton if needed.
 
 If the Flywheel is already paused or already running, these commands report the current gate state and exit successfully.
+
+### Complete
+
+```bash
+pan flywheel complete
+pan flywheel complete --force
+```
+
+Completes an orders-bound run after every book item is closed or parked. The command refuses a non-drained book and names each remaining issue unless `--force` is passed. It writes `report.md`, adds `## Retrospective` from the run's `retro.md` when present or the exact no-findings line otherwise, commits any `docs/FLYWHEEL-STATE.md` change, clears the active-run gate, and marks the book complete.
+
+Continuation is mechanical: the next ready book in queue order starts in-process; when no book is ready and `flywheel.auto_pickup_backlog=true`, a bookless backlog run starts; otherwise the command stays stopped and emits `needs-you: pipeline idle — no order book queued and auto-pickup is off`.
 
 ### Stop
 

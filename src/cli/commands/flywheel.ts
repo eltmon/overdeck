@@ -36,11 +36,8 @@ import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/intern
 import { computeMergeQueue, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
-import {
-  resolveFlywheelOrderStart,
-  setFlywheelOrderStatus,
-  type FlywheelOrderStartDeps,
-} from './flywheel-orders.js';
+import { resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
+import { createFlywheelCompleteCommand } from './flywheel-complete.js';
 import { registerFlywheelSurfaceCommands } from './flywheel-surfaces.js';
 
 type InputStream = AsyncIterable<string | Buffer | Uint8Array>;
@@ -67,11 +64,7 @@ interface ConfigOptions {
   set?: string;
 }
 
-interface StartOptions {
-  brief?: string;
-  cwd?: string;
-  orders?: string;
-}
+interface StartOptions { brief?: string; cwd?: string; orders?: string }
 
 export interface StartFlywheelRunDeps extends FlywheelOrderStartDeps {
   resolvePrimaryRoot?: typeof resolvePrimaryWorktreeRoot;
@@ -89,10 +82,7 @@ interface StartFlywheelRunResult {
   agentModel?: string;
 }
 
-interface ReportOptions {
-  cwd?: string;
-  force?: boolean;
-}
+interface ReportOptions { cwd?: string; force?: boolean }
 
 interface ReportOpenOptions {
   runId?: string;
@@ -826,6 +816,25 @@ export async function flywheelStopCommand(options: Pick<ReportOptions, 'cwd'> = 
   }
 }
 
+async function buildFlywheelStateReport(status: FlywheelStatus, cwd: string): Promise<string> {
+  const mergeQueue = await Effect.runPromise(
+    computeMergeQueue(status.activePipeline, cwd).pipe(Effect.provide(nodeServicesLayer)),
+  );
+  return formatFlywheelStateReport(status, mergeQueue);
+}
+
+async function persistFlywheelStateReport(status: FlywheelStatus, cwd: string, report: string): Promise<void> {
+  const runNumber = runNumberFromRunId(status.runId);
+  await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), report, 'utf8');
+  const stateChanged = await isFlywheelStateDirty(cwd);
+  if (stateChanged) {
+    await commitFlywheelStateChanges(cwd, runNumber);
+    console.log(`Wrote per-run report and committed FLYWHEEL-STATE.md changes for run ${runNumber}.`);
+  } else {
+    console.log(`Wrote per-run report for run ${runNumber}. No FLYWHEEL-STATE.md changes to commit.`);
+  }
+}
+
 export async function flywheelReportCommand(options: ReportOptions = {}): Promise<void> {
   try {
     const cwd = options.cwd ?? process.cwd();
@@ -847,22 +856,8 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
       return;
     }
 
-    const runNumber = runNumberFromRunId(status.runId);
-    const mergeQueue = await Effect.runPromise(
-      computeMergeQueue(status.activePipeline, cwd).pipe(Effect.provide(nodeServicesLayer)),
-    );
-    const runReport = formatFlywheelStateReport(status, mergeQueue);
-    await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), runReport, 'utf8');
-
-    // PAN-1245: clear the gate after writing report.md even if commit fails.
     try {
-      const stateChanged = await isFlywheelStateDirty(cwd);
-      if (stateChanged) {
-        await commitFlywheelStateChanges(cwd, runNumber);
-        console.log(`Wrote per-run report and committed FLYWHEEL-STATE.md changes for run ${runNumber}.`);
-      } else {
-        console.log(`Wrote per-run report for run ${runNumber}. No FLYWHEEL-STATE.md changes to commit.`);
-      }
+      await persistFlywheelStateReport(status, cwd, await buildFlywheelStateReport(status, cwd));
     } finally {
       clearFlywheelRunGate(status.runId);
     }
@@ -872,6 +867,7 @@ export async function flywheelReportCommand(options: ReportOptions = {}): Promis
   }
 }
 
+const flywheelCompleteCommand = createFlywheelCompleteCommand({ loadStatus: loadReportFlywheelStatus, buildReport: buildFlywheelStateReport, persistReport: persistFlywheelStateReport, clearGate: clearFlywheelRunGate, start: startFlywheelRun });
 function getPlatformOpenCommand(): string {
   switch (process.platform) {
     case 'linux': return 'xdg-open';
@@ -987,6 +983,10 @@ export function registerFlywheelCommands(program: Command): void {
     .description('Finalize the active Flywheel run: write report.md, commit FLYWHEEL-STATE.md changes, and clear the active-run gate. Refuses to run while the orchestrator session is alive (pause or abort first).')
     .option('--force', 'Bypass the orchestrator-alive guard. Intended for the orchestrator role\'s own end-of-run call.')
     .action(flywheelReportCommand);
+
+  flywheel.command('complete')
+    .description('Complete a drained order-book run, write its report and retrospective, then continue mechanically')
+    .option('--force', 'Complete even when the order book still has non-terminal items').action(flywheelCompleteCommand);
 
   flywheel
     .command('stop')
