@@ -24,7 +24,7 @@ import { useConvoDock } from '../../../lib/convoDock';
 import { PROJECT_TREE_CONTEXT_ACTIONS, type NonIssueActionContext } from '../../../lib/issueActions';
 import { parseContainerServiceName } from '../../../lib/resource-utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MergeButton } from '../../MergeButton';
+import { MergeButton } from '../../MergeButton'; import { OrderBookIssueChip } from '../../orders/OrderBookModule';
 import { TroubledBadges } from './TroubledBadges';
 import { IssueView, IssueViewFullscreenButton, RailShipProgress } from '../../issue-view/IssueView';
 import { StartAgentCta } from '../../issue-view/StartAgentCta';
@@ -34,7 +34,6 @@ import { useDashboardStore } from '../../../lib/store';
 import { computeDominantStatus, sessionsNeedAttention } from './sessionAggregates';
 import styles from '../styles/command-deck.module.css';
 export type TreeSessionFilter = 'all' | 'alive' | 'failed';
-
 interface FeatureItemProps {
   feature: ProjectFeature;
   isSelected: boolean;
@@ -1028,6 +1027,7 @@ export function FeatureItem({ feature, isSelected, onSelect, selectedSessionId, 
             <span className={styles.featureItemCaretPlaceholder} />
           )}
           {expanded && <IssueViewFullscreenButton className={styles.featureItemCaret} onClick={() => openIssue(feature.issueId)} />}
+          <OrderBookIssueChip issueId={feature.issueId} />
           <ContextMenuTrigger asChild>
             <button
               className={`${styles.featureItem} ${isSelected ? styles.featureItemSelected : ''}`}

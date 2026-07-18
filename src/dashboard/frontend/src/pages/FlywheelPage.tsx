@@ -8,6 +8,7 @@ import { FlywheelStatsPanel } from '../components/flywheel/FlywheelStatsPanel';
 import { FlywheelStatusDetails } from '../components/flywheel/FlywheelStatusDetails';
 import { MergeQueueCard } from '../components/flywheel/MergeQueueCard';
 import { RailCard } from '../components/flywheel/RailCard';
+import { OrderBookModule } from '../components/orders/OrderBookModule';
 import { MergePolicySection } from '../components/MergePolicySection';
 import { consumePendingReveal, subscribeRevealOpenQuestions } from '../lib/flywheelReveal';
 import { subscribeFlywheelStatus } from '../lib/wsTransport';
@@ -477,6 +478,7 @@ export function FlywheelPage({ onOpenSettings, onNavigateAgent, onNavigateIssue 
           <MergeQueueCard active={!!effectiveStatus || isPaused} onNavigateIssue={onNavigateIssue} />
           <MergePolicySection onNavigateIssue={onNavigateIssue} />
           <PendingAutoMergesBanner onNavigateIssue={onNavigateIssue} />
+          {effectiveStatus?.orders ? <OrderBookModule status={effectiveStatus} /> : null}
 
           <RailCard icon={<Activity className="h-3.5 w-3.5 text-primary" />} label="Run status" ariaLabel="Flywheel run status">
             <div className="mb-3" role="tablist" aria-label="Flywheel left-pane tabs">

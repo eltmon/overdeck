@@ -147,6 +147,7 @@ describe('FlywheelPage', () => {
     expect(screen.getByText(/No active run/)).toBeInTheDocument();
     expect(screen.getByText('pan flywheel start')).toBeInTheDocument();
     expect(screen.queryByTestId('status-details')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Active order book')).not.toBeInTheDocument();
   });
 
   it('shows a paused message (not "No active run") when the latest run is paused', async () => {
@@ -330,6 +331,32 @@ describe('FlywheelPage', () => {
     expect(mocks.statusDetails).toHaveBeenCalledWith(expect.objectContaining({ status, onNavigateAgent, onNavigateIssue }));
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it('renders the read-only order-book module only for an orders-bound run', async () => {
+    const ordersStatus: FlywheelStatus = {
+      ...status,
+      orders: { bookId: 'active-book', bookName: 'Active campaign', landed: 0, total: 1, laneAInFlight: [], laneBInFlight: null, drained: false },
+    };
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/flywheel/current') return Response.json(ordersStatus);
+      if (url === '/api/orders/active-book') return Response.json({
+        id: 'active-book', name: 'Active campaign', status: 'running',
+        settings: { laneAConcurrency: 2, posture: 'open' },
+        items: [{ issue: 'PAN-7', lane: 'B', order: 11, prereqs: [], reVerify: false, addedAt: status.startedAt, addedBy: 'operator' }],
+        createdAt: status.startedAt, updatedAt: status.startedAt,
+        progress: { total: 1, landed: 0, drained: false, items: [{ issue: 'PAN-7', terminal: false }] },
+      });
+      if (url.includes('/api/flywheel/runs') || url === '/api/flywheel/auto-merge/pending') return Response.json([]);
+      if (url === '/api/flywheel/config') return Response.json({ auto_pickup_backlog: false, require_uat_before_merge: true, merge_train_enabled: false });
+      return Response.json(null);
+    }));
+    renderFlywheelPage(<FlywheelPage />);
+
+    expect(await screen.findByLabelText('Active order book')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Active campaign/ })).toHaveAttribute('href', '/orders');
+    expect(await screen.findByText('B11 · book')).toBeInTheDocument();
   });
 
   it('updates the last tick freshness chip across live, aging, and stalled states', async () => {

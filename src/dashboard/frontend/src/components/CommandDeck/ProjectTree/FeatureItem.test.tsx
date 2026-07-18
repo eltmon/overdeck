@@ -320,6 +320,25 @@ describe('FeatureItem', () => {
     vi.unstubAllGlobals();
   });
 
+  it('shows the read-only order-book position before the issue id only for members', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/orders') return Response.json({ books: [{
+        id: 'active-book', name: 'Active campaign', status: 'running',
+        settings: { laneAConcurrency: 2, posture: 'open' },
+        items: [{ issue: 'PAN-821', lane: 'B', order: 11, prereqs: [], reVerify: false, addedAt: '2026-07-18T00:00:00.000Z', addedBy: 'operator' }],
+        createdAt: '2026-07-18T00:00:00.000Z', updatedAt: '2026-07-18T00:00:00.000Z',
+      }] });
+      return Response.json({ workspacePaths: [], localBranchNames: [], remoteBranchNames: [], tmuxSessionNames: [], prs: [], dockerContainerNames: [] });
+    }));
+    const { container } = renderFeature(<FeatureItem feature={makeFeature()} isSelected={false} onSelect={() => {}} />);
+
+    const chip = await screen.findByRole('link', { name: 'B11 · book · Active campaign' });
+    const issueId = screen.getByText('PAN-821');
+    expect(chip).toHaveAttribute('href', '/orders');
+    expect(chip.compareDocumentPosition(issueId) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector('[data-section="OrderBookIssueChip"]')).toBe(chip);
+  });
+
   it('shows paused badge with age + reason and fires unpause (PAN-1779)', () => {
     const onUnpauseSession = vi.fn();
     const view = renderFeature(
@@ -1367,6 +1386,7 @@ describe('FeatureItem needs-attention shading', () => {
       if (method !== 'GET') return undefined;
       if (url === '/api/settings/available-models') return Response.json({ models: [] });
       if (url === '/api/flywheel/uat-generations') return Response.json([]);
+      if (url === '/api/orders') return Response.json({ books: [] });
       if (url === '/api/workspaces/PAN-821') return Response.json({});
       if (url.startsWith('/api/review/PAN-821/') || url.startsWith('/api/issues/PAN-821/')) {
         return Response.json({});
