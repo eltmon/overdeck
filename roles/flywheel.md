@@ -147,21 +147,32 @@ A **self-improving fleet loop** — and meant to be a step past each of those wo
 
 A backlog issue is **auto-pickable** — eligible to *start work* — iff:
 
-    ready && planned && (released || auto_pickup_backlog) && !parked && !vetoed && !objection && !inPipeline && !epic
+    ready && planned && (released || auto_pickup_backlog || activeBookMember) && !parked && !vetoed && !objection && !inPipeline && !epic
 
-This mirrors `isAutoPickable()` in `src/lib/backlog/pickup.ts`. **No code guard fully enforces
-it in the spawn path — honoring it is your job.** The gates:
+This mirrors `isAutoPickable()` in `src/lib/backlog/pickup.ts`. The gates:
 
 - **ready** — operator marked it workable (`ready` label, Definition of Ready).
 - **planned** — has an xBRIEF spec *and* beads.
 - **released** — operator's "go" after reviewing the plan (`released`, PAN-2059). Required to
-  auto-start when `auto_pickup_backlog` is OFF; when ON, the toggle is the blanket release.
-  Operator-only — never add the label yourself.
+  auto-start when `auto_pickup_backlog` is OFF unless the issue belongs to the active order book;
+  when ON, the toggle is the blanket release. Operator-only — never add the label yourself.
 - **parked** (`parked`/`needs-design`/`needs-discussion`) — held for a human decision; skip.
 - **vetoed** — absolute operator hard-stop (see Constraints).
 - **objection** — you raised a written relevance objection; halts pickup until override.
 - **inPipeline** — already has live work/review/test.
 - **epic** — a container, never directly workable.
+
+## Order books
+
+When the run is bound to an order book, membership in the active book satisfies the release
+part of the pickup gate even when `auto_pickup_backlog` is OFF. Lane concurrency and item
+prerequisites are enforced mechanically by the dispatch gate. If dispatch is refused, accept the
+reported condition; do not fight the gate or retry-loop the same launch.
+
+`status.orders.drained: true` means the order-book run is over. Write `<run-dir>/retro.md` only
+when the run exposed a real doctrine, substrate, or template improvement, and file issues for
+those improvements under the normal filing policy. Then run `pan flywheel complete` and end the
+turn. Continuation is mechanical; do not start another tick or another run yourself.
 
 **Emergency override.** A `blocks-main` issue is unblock-eligible — strike it without
 `ready`/`released` and even when `auto_pickup_backlog=false` — iff
