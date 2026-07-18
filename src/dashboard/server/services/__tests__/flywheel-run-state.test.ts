@@ -2,7 +2,8 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { FlywheelStatus } from '@overdeck/contracts';
+import type { FlywheelStatus, OrderBook } from '@overdeck/contracts';
+import type { OrderBookProgress } from '../../../../lib/orders/types.js';
 
 // PAN-1245: resolver reads SQLite via app-settings. Mock the gate so we can
 // exercise self-healing without touching the real ~/.overdeck/state.db.
@@ -33,6 +34,7 @@ vi.mock('../../../../lib/overdeck/agents.js', () => ({
 
 import {
   abortFlywheelRun,
+  enrichFlywheelStatusWithOrders,
   getFlywheelRunDetail,
   listFlywheelRuns,
   nextFlywheelRunId,
@@ -78,6 +80,31 @@ function makeStatus(runId: string, startedAt: string): FlywheelStatus {
   };
 }
 
+function orderBook(): OrderBook {
+  return {
+    id: '2026-07-18-campaign', name: 'Campaign', status: 'running', runId: 'RUN-1',
+    settings: { laneAConcurrency: 2, posture: 'open' },
+    items: [
+      { issue: 'PAN-1', lane: 'A', order: 1, prereqs: [], reVerify: false, addedAt: '2026-07-18T12:00:00.000Z', addedBy: 'operator' },
+      { issue: 'PAN-2', lane: 'B', order: 1, prereqs: [], reVerify: false, addedAt: '2026-07-18T12:00:00.000Z', addedBy: 'operator' },
+      { issue: 'PAN-3', lane: 'A', order: 2, prereqs: [], reVerify: false, addedAt: '2026-07-18T12:00:00.000Z', addedBy: 'operator' },
+    ],
+    createdAt: '2026-07-18T12:00:00.000Z', updatedAt: '2026-07-18T12:00:00.000Z',
+  };
+}
+
+function orderProgress(
+  terminals: ReadonlySet<string> = new Set(),
+  parked: ReadonlySet<string> = new Set(),
+): OrderBookProgress {
+  const items = orderBook().items.map((item) => ({
+    issue: item.issue, lane: item.lane, order: item.order,
+    closed: terminals.has(item.issue) && !parked.has(item.issue), parked: parked.has(item.issue),
+    terminal: terminals.has(item.issue),
+  }));
+  return { bookId: orderBook().id, total: items.length, landed: items.filter((item) => item.closed).length, items, drained: items.every((item) => item.terminal) };
+}
+
 describe('flywheel run state', () => {
   let overdeckHome: string;
 
@@ -90,6 +117,41 @@ describe('flywheel run state', () => {
 
   afterEach(async () => {
     await rm(overdeckHome, { recursive: true, force: true });
+  });
+
+  it('mechanically populates order progress and current lane positions', () => {
+    const status = makeStatus('RUN-1', '2026-05-18T10:00:00.000Z');
+    status.activePipeline = [
+      { issueId: 'PAN-1', title: 'A', verb: 'working', status: 'running' },
+      { issueId: 'PAN-2', title: 'B', verb: 'reviewing', status: 'passed' },
+      { issueId: 'PAN-3', title: 'Done', verb: 'shipping', status: 'merged' },
+    ];
+    expect(enrichFlywheelStatusWithOrders(status, orderBook(), orderProgress(new Set(['PAN-3']))).orders).toEqual({
+      bookId: '2026-07-18-campaign', bookName: 'Campaign', landed: 1, total: 3,
+      laneAInFlight: ['PAN-1'], laneBInFlight: 'PAN-2', drained: false,
+    });
+  });
+
+  it('derives drained from closed or parked progress rather than the emitted payload', () => {
+    const status = { ...makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), orders: {
+      bookId: 'spoofed', bookName: 'Spoofed', landed: 0, total: 99,
+      laneAInFlight: [], drained: false,
+    } };
+    const enriched = enrichFlywheelStatusWithOrders(
+      status,
+      orderBook(),
+      orderProgress(new Set(['PAN-1', 'PAN-2', 'PAN-3']), new Set(['PAN-3'])),
+    );
+    expect(enriched.orders).toMatchObject({ bookId: orderBook().id, landed: 2, total: 3, drained: true });
+  });
+
+  it('removes a self-reported orders block from a bookless run', async () => {
+    const status = { ...makeStatus('RUN-1', '2026-05-18T10:00:00.000Z'), orders: {
+      bookId: 'spoofed', bookName: 'Spoofed', landed: 0, total: 1,
+      laneAInFlight: [], drained: false,
+    } };
+    await writeLatestFlywheelStatus(status, { overdeckHome });
+    expect((await getFlywheelRunDetail('RUN-1', { overdeckHome }))?.latest?.orders).toBeUndefined();
   });
 
   it('writes and reads latest.json atomically', async () => {

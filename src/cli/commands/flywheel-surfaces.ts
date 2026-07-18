@@ -15,6 +15,7 @@ import {
 } from '../../lib/backlog/pickup.js';
 import { isFlywheelAutoPickupBacklog } from '../../lib/overdeck/control-settings.js';
 import { getMergeBlockersPayload } from '../../lib/cloister/merge-blockers.js';
+import { activeOrderBookIssues } from '../../lib/cloister/flywheel.js';
 import { listSubstrateBugWeights, type WeightedSubstrateBug } from '../../lib/overdeck/substrate-bug-weights-service.js';
 import { isGitHubAppConfigured, listOpenIssuesWithLabels } from '../../lib/github-app.js';
 
@@ -108,9 +109,10 @@ export async function backlogForecastCommand(opts: { n?: string } = {}): Promise
     .sort((a, b) => a.rank - b.rank)
     .map((x) => x.issue);
   const needsPlanning = selectNeedsPlanning(nodes, lk, { cap: n * 2 }).map((x) => x.issue);
-  const waves = computeWaves(nodes, lk, n, autoPickupBacklog).map((w) => w.map((x) => x.issue));
-  const cohort = computeCohort(nodes, lk, n, autoPickupBacklog);
-  const stats = computeStats(nodes, lk, autoPickupBacklog);
+  const orderBookIssues = activeOrderBookIssues(projectRoot);
+  const waves = computeWaves(nodes, lk, n, autoPickupBacklog, orderBookIssues).map((w) => w.map((x) => x.issue));
+  const cohort = computeCohort(nodes, lk, n, autoPickupBacklog, orderBookIssues);
+  const stats = computeStats(nodes, lk, autoPickupBacklog, orderBookIssues);
   console.log(JSON.stringify({ n, autoPickupBacklog, stats, inFlight, needsPlanning, waves, cohort }, null, 2));
 }
 
