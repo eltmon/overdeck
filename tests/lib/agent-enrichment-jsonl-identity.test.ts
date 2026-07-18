@@ -20,6 +20,8 @@ const fakeHome = mkdtempSync(join(tmpdir(), 'pan-jsonl-identity-'));
 
 /** Agent id → its own pinned session id, as `session.id` on disk would report. */
 const ownSessionIds = new Map<string, string>();
+const recordedWorkspaces = new Map<string, string | null>();
+const PROJECT_ROOT = join(fakeHome, 'Projects', 'overdeck');
 
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>();
@@ -30,7 +32,21 @@ vi.mock('os', async (importOriginal) => {
 // whole two-door state stack, which this test says nothing about.
 vi.mock('../../src/lib/agents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/lib/agents.js')>();
-  return { ...actual, getAgentStateSync: (id: string) => ({ id, workspace: WORKSPACE }) };
+  return {
+    ...actual,
+    getAgentStateSync: (id: string) => {
+      const workspace = recordedWorkspaces.has(id) ? recordedWorkspaces.get(id) : WORKSPACE;
+      return workspace ? { id, workspace } : null;
+    },
+  };
+});
+
+vi.mock('../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/lib/projects.js')>();
+  return {
+    ...actual,
+    resolveProjectFromIssueSync: () => ({ projectPath: PROJECT_ROOT }),
+  };
 });
 
 vi.mock('../../src/lib/agents/activity.js', async (importOriginal) => {
@@ -42,7 +58,7 @@ const WORKSPACE = '/home/eltmon/Projects/overdeck';
 const OWN_SESSION = '5f5168f3-7e17-4aed-9fe2-2bbb622e4acd';
 const OTHER_SESSION = 'ceba1402-1e09-436f-aa3d-6dd2b6a4c202';
 
-const { getAgentJsonlPath, getClaudeProjectDir } = await import('../../src/lib/agent-enrichment.js');
+const { getAgentJsonlPath, getAgentWorkspace, getClaudeProjectDir } = await import('../../src/lib/agent-enrichment.js');
 const { Effect } = await import('effect');
 
 /** Populate the shared project dir; `newest` gets the latest mtime. */
@@ -59,10 +75,24 @@ beforeEach(() => {
   rmSync(fakeHome, { recursive: true, force: true });
   mkdirSync(fakeHome, { recursive: true });
   ownSessionIds.clear();
+  recordedWorkspaces.clear();
 });
 
 afterEach(() => {
   rmSync(fakeHome, { recursive: true, force: true });
+});
+
+describe('getAgentWorkspace()', () => {
+  it('derives the strike layout when recorded state and tmux are unavailable', async () => {
+    const strikeWorkspace = join(PROJECT_ROOT, 'workspaces', 'feature-pan-2857-strike');
+    mkdirSync(join(PROJECT_ROOT, 'workspaces', 'feature-pan-2857'), { recursive: true });
+    mkdirSync(strikeWorkspace, { recursive: true });
+    recordedWorkspaces.set('strike-pan-2857', null);
+
+    const resolved = await Effect.runPromise(getAgentWorkspace('strike-pan-2857'));
+
+    expect(resolved).toBe(strikeWorkspace);
+  });
 });
 
 describe('getAgentJsonlPath()', () => {

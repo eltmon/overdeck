@@ -15,6 +15,8 @@ import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
 
 const AGENT_ID = 'agent-pan-830';
 const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';
+const STRIKE_AGENT_ID = 'strike-pan-2857';
+const STRIKE_WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-2857-strike';
 const CLAUDE_SESSION_ID = '9d08794c-3973-4f83-92cf-234ae618258a';
 
 let testDir: string;
@@ -182,6 +184,32 @@ describe('resolveJsonlPath (PAN-830)', () => {
     });
 
     expect(path).toBe(join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`));
+  });
+
+  it('prefers a stopped strike agent recorded workspace over the caller convention path', async () => {
+    const diagnostics: string[] = [];
+    const strikeAgentDir = join(agentsDir, STRIKE_AGENT_ID);
+    const projectDir = join(claudeProjectsDir, encodeClaudeProjectDir(STRIKE_WORKSPACE_PATH));
+    const jsonlPath = join(projectDir, `${CLAUDE_SESSION_ID}.jsonl`);
+    await mkdir(strikeAgentDir, { recursive: true });
+    await mkdir(projectDir, { recursive: true });
+    await writeFile(join(strikeAgentDir, 'state.json'), JSON.stringify({
+      harness: 'claude-code',
+      status: 'stopped',
+      workspace: STRIKE_WORKSPACE_PATH,
+    }));
+    await writeFile(join(strikeAgentDir, 'session.id'), CLAUDE_SESSION_ID);
+    await writeFile(jsonlPath, '{"type":"event"}\n');
+
+    const path = await resolveJsonlPath(STRIKE_AGENT_ID, '/home/testuser/Projects/overdeck/workspaces/feature-pan-2857', {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      logDiagnostic: (_agentId, message) => diagnostics.push(message),
+    });
+
+    expect(path).toBe(jsonlPath);
+    expect(diagnostics).toEqual([expect.stringContaining(`resolved harness=claude-code sessionId=${CLAUDE_SESSION_ID}`)]);
+    expect(diagnostics.join('\n')).not.toContain('jsonl-missing');
   });
 
   it('returns null when claudeSessionId resolves but file does not exist', async () => {

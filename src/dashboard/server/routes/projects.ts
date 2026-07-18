@@ -150,9 +150,9 @@ export function getSessionTreeWorkspacePath(
   projectPath: string,
   sessionId: string,
 ): string {
+  if (sessionId.toLowerCase() === `strike-${issueLower.toLowerCase()}`) return join(projectPath, 'workspaces', `feature-${issueLower}-strike`);
   const slotNumber = getSlotWorkSessionNumber(sessionId, issueLower);
-  if (slotNumber === null) return baseWorkspacePath;
-  return join(projectPath, 'workspaces', `feature-${issueLower}-slot-${slotNumber}`);
+  return slotNumber === null ? baseWorkspacePath : join(projectPath, 'workspaces', `feature-${issueLower}-slot-${slotNumber}`);
 }
 
 export function compareSessionTreeSessionIds(a: string, b: string, issueLower: string): number {
