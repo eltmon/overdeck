@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T01:46:49.476Z",
+  "updated": "2026-07-18T02:02:29.446Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "port-acp-runtime-model": {
-        "writerId": "agent-pan-2858",
-        "agentId": "agent-pan-2858",
-        "pid": 318436,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-18T01:46:15.948Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2858",
@@ -74,6 +66,16 @@
         "outcome": "completed",
         "reason": "Vendored T3 Code effect-acp at pinned SHA 5ca32661, adapted Schema.Defect for Effect beta.73, added strict tsc/Vitest workspace wiring, provenance, and MIT attribution; 30 tests and package typecheck pass.",
         "releasedAt": "2026-07-18T01:45:46.463Z"
+      },
+      {
+        "writerId": "agent-pan-2858",
+        "agentId": "agent-pan-2858",
+        "pid": 318436,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-18T01:46:15.948Z",
+        "itemId": "port-acp-runtime-model",
+        "outcome": "completed",
+        "releasedAt": "2026-07-18T02:02:29.446Z"
       }
     ],
     "statusReasons": {
@@ -89,6 +91,9 @@
     "vendor-effect-acp.vendor-effect-acp.ac2": "completed",
     "vendor-effect-acp.vendor-effect-acp.ac3": "completed",
     "vendor-effect-acp.vendor-effect-acp.ac4": "completed",
-    "port-acp-runtime-model": "running"
+    "port-acp-runtime-model": "completed",
+    "port-acp-runtime-model.port-acp-runtime-model.ac1": "completed",
+    "port-acp-runtime-model.port-acp-runtime-model.ac2": "completed",
+    "port-acp-runtime-model.port-acp-runtime-model.ac3": "completed"
   }
 }
