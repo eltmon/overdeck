@@ -26,8 +26,8 @@ export interface AcpTranscriptEntry {
   readonly sessionId?: string;
   readonly toolCalls?: ReadonlyArray<AcpTranscriptToolCallState>;
   readonly source?: "orchestrator" | "agent";
-  /** Durable, non-display boundary written after all events for a successful prompt. */
-  readonly event?: "turn_completed";
+  /** Durable, non-display lifecycle record for queued and completed prompts. */
+  readonly event?: "prompt_queued" | "turn_completed";
   readonly stopReason?: AcpTranscriptStopReason;
 }
 

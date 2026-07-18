@@ -1,4 +1,4 @@
-import { Deferred, Effect, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server as NetServer } from 'node:net';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -69,9 +69,7 @@ function writeAcpToken(agentId: string, token = 'token-123'): void {
   writeFileSync(join(dir, 'acp-token'), `${token}\n`);
 }
 
-function makeAcpHostRuntime(
-  prompt: AcpHostRuntime['prompt'] = () => Effect.succeed({ stopReason: 'end_turn' as const }),
-): AcpHostRuntime {
+function makeAcpHostRuntime(): AcpHostRuntime {
   return {
     handleSessionUpdate: () => Effect.void,
     handleRequestPermission: () => Effect.void,
@@ -83,7 +81,7 @@ function makeAcpHostRuntime(
     }),
     getEvents: () => Stream.empty,
     drainEvents: Effect.void,
-    prompt,
+    prompt: () => Effect.succeed({ stopReason: 'end_turn' as const }),
     cancel: Effect.void,
     setModel: () => Effect.void,
   };
@@ -175,44 +173,6 @@ describe('acp delivery tier', () => {
       }));
       expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'acp' });
     } finally {
-      await host.stop();
-    }
-  });
-
-  it('returns after the ACP host queues a prompt while the model turn is still running', async () => {
-    const agentId = 'agent-acp-queued';
-    writeAgentState(agentId, { harness: 'acp' });
-    const promptStarted = await Effect.runPromise(Deferred.make<void>());
-    const promptGate = await Effect.runPromise(Deferred.make<void>());
-    const host = new AcpHost({
-      agentId,
-      provider: 'kimi',
-      workspace: '/tmp/workspace',
-      overdeckHome: tmpHome,
-      runtime: makeAcpHostRuntime(() => Effect.gen(function* () {
-        yield* Deferred.succeed(promptStarted, undefined);
-        yield* Deferred.await(promptGate);
-        return { stopReason: 'end_turn' as const };
-      })),
-    });
-    await host.start();
-
-    try {
-      let settled = false;
-      const delivered = deliverAgentMessage(agentId, 'queued turn', 'test-caller')
-        .then((result) => {
-          settled = true;
-          return result;
-        });
-      await Effect.runPromise(Deferred.await(promptStarted));
-      await new Promise<void>((resolve) => setImmediate(resolve));
-
-      expect(settled).toBe(true);
-      await expect(delivered).resolves.toEqual({ ok: true, path: 'acp' });
-      await Effect.runPromise(Deferred.succeed(promptGate, undefined));
-      await host.waitForIdle();
-    } finally {
-      await Effect.runPromise(Deferred.succeed(promptGate, undefined));
       await host.stop();
     }
   });

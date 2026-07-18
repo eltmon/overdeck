@@ -78,6 +78,12 @@ describe('parseAcpConversationMessages', () => {
   it('uses a durable completion boundary instead of recent-file streaming inference', async () => {
     const path = await writeTranscript([
       {
+        timestamp: '2026-07-18T09:59:59.000Z',
+        role: 'system',
+        content: 'Explain ACP',
+        event: 'prompt_queued',
+      },
+      {
         timestamp: '2026-07-18T10:00:00.000Z',
         role: 'user',
         content: 'Explain ACP',

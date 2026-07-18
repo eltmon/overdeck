@@ -94,6 +94,10 @@ export async function parseAcpConversationMessages(sessionFile: string): Promise
     const entry = parsed;
     const createdAt = entry.timestamp;
 
+    if (entry.event === 'prompt_queued') {
+      continue;
+    }
+
     if (entry.event === 'turn_completed') {
       lastTurnCompletedAt = createdAt;
       if (currentTurnAssistantIndex !== undefined) {

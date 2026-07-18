@@ -182,6 +182,13 @@ export class AcpHost {
     if (!content) {
       return { status: 400, body: { error: "message content is required" } };
     }
+    await this.transcript.append({
+      role: "system",
+      content,
+      sessionId: this.sessionId,
+      source: "orchestrator",
+      event: "prompt_queued",
+    });
     const promptOperation = this.promptQueue.then(async () => {
       try {
         await this.transcript.append({

@@ -324,6 +324,13 @@ describe("AcpHost", () => {
       .map((line) => JSON.parse(line));
     expect(transcript).toEqual([
       expect.objectContaining({
+        role: "system",
+        content: "hello agent",
+        sessionId: "acp-session-1",
+        source: "orchestrator",
+        event: "prompt_queued",
+      }),
+      expect.objectContaining({
         role: "user",
         content: "hello agent",
         sessionId: "acp-session-1",
@@ -398,9 +405,11 @@ describe("AcpHost", () => {
     });
 
     await expect(response).resolves.toEqual({ status: 202, body: { accepted: true } });
+    const afterAcceptance = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
+    expect(afterAcceptance).toContain('"content":"wait for the provider"');
+    expect(afterAcceptance).toContain('"event":"prompt_queued"');
+    expect(afterAcceptance).not.toContain('"event":"turn_completed"');
     await Effect.runPromise(Deferred.await(promptStarted));
-    const beforeCompletion = await readFile(join(agentDir, "acp-session.jsonl"), "utf-8");
-    expect(beforeCompletion).not.toContain('"event":"turn_completed"');
 
     await Effect.runPromise(Deferred.succeed(promptGate, undefined));
     await host.waitForIdle();
@@ -433,14 +442,23 @@ describe("AcpHost", () => {
       .trim()
       .split("\n")
       .map((line) => JSON.parse(line));
-    expect(transcript.map((entry) => entry.role)).toEqual([
-      "user",
-      "assistant",
-      "system",
-      "user",
-      "assistant",
-      "system",
+    expect(
+      transcript
+        .filter((entry) => entry.event !== "prompt_queued")
+        .map((entry) => [entry.role, entry.event]),
+    ).toEqual([
+      ["user", undefined],
+      ["assistant", undefined],
+      ["system", "turn_completed"],
+      ["user", undefined],
+      ["assistant", undefined],
+      ["system", "turn_completed"],
     ]);
+    expect(
+      transcript
+        .filter((entry) => entry.event === "prompt_queued")
+        .map((entry) => entry.content),
+    ).toEqual(["first", "second"]);
     expect(transcript.filter((entry) => entry.event === "turn_completed")).toEqual([
       expect.objectContaining({ stopReason: "end_turn" }),
       expect.objectContaining({ stopReason: "end_turn" }),
