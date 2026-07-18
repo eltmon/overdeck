@@ -726,10 +726,10 @@
     "recordedAt": "2026-07-18T20:48:20.399Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T21:37:13.276Z",
+  "updated": "2026-07-18T21:51:09.377Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -737,8 +737,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-18T21:10:55.719Z",
-    "updatedAt": "2026-07-18T21:37:12.699Z",
-    "reviewNotes": "ACP context can diverge from the preview or disappear after first-turn failure, and transcript caches retain every opened session forever",
+    "updatedAt": "2026-07-18T21:51:09.333Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "df831e4154b830584672a6386ea72fe7590cb012",
@@ -1085,9 +1084,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 37466028,
-            "output": 855828,
-            "cacheRead": 190624256,
+            "input": 37474210,
+            "output": 862455,
+            "cacheRead": 191545344,
             "cacheWrite": 0
           }
         },
@@ -1101,9 +1100,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 43401070,
-            "output": 1812345,
-            "cacheRead": 544859648,
+            "input": 43546708,
+            "output": 1849459,
+            "cacheRead": 576811008,
             "cacheWrite": 0
           }
         }
@@ -1116,9 +1115,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 80867098,
-          "output": 2668173,
-          "cacheRead": 735483904,
+          "input": 81020918,
+          "output": 2711914,
+          "cacheRead": 768356352,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1129,8 +1128,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 866.823874,
-        "pricingAsOf": "2026-07-18T21:37:12.732Z"
+        "usd": 885.341428,
+        "pricingAsOf": "2026-07-18T21:51:09.370Z"
       }
     },
     "merges": [
