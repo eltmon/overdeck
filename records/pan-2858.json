@@ -451,7 +451,7 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T13:11:40.872Z",
+  "updated": "2026-07-18T13:12:06.204Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -461,11 +461,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T13:11:40.826Z",
+    "updatedAt": "2026-07-18T13:12:06.149Z",
     "inspectNotes": "All 5 ACs verified. AC1: tsdown entry emits dist/acp-host.js; host.test.ts binds sockets/acp-<id>.sock + writes 0600 acp-token/acp-session-id under a stubbed runtime. AC2: wrong token->401 with zero transcript/prompt writes; correct token+message forwards to runtime.prompt() and appends both turns to acp-session.jsonl. AC3: handleSessionUpdate/handleRequestPermission registered before runtime.start() (host.ts:79-96); test proves order + that an update fired during start() is captured (observedSessionUpdates:1), not dropped. AC4: kimi-scoped auth-failure catch writes '[error] kimi authentication is required... /login' to stdout, rethrows without retry (startCalls===1), main() sets process.exitCode=1. AC5: acp-session-id persisted 0600; --resume threads through main()->makeRuntime->session-runtime.ts's pre-existing resumeSessionId->session/load path (session-runtime.ts:567-640). Non-blocking flag for follow-up: src/lib/acp/host-render.ts's stripAcpPaneControl regex has literal raw control bytes instead of \\x escapes, making git treat the file as binary (breaks future diff/blame, likely trips eslint no-control-regex at verification) — doesn't affect any tested string here.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "d6057f12ee72122b9fe31c87f91eac9fe9b790e4",
-    "reviewRequestedAt": "2026-07-18T12:55:07.418Z",
+    "reviewRequestedAt": "2026-07-18T13:12:05.831Z",
     "reviewSpawnedAt": "2026-07-18T12:55:10.916Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -799,7 +799,7 @@
       },
       "costAtCloseOut": {
         "usd": 471.757297,
-        "pricingAsOf": "2026-07-18T13:11:40.842Z"
+        "pricingAsOf": "2026-07-18T13:12:06.154Z"
       }
     },
     "merges": [
