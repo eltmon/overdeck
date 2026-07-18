@@ -107,7 +107,7 @@ import { createCostCommand } from './commands/cost.js';
 import { createMemoryCommand } from './commands/memory.js';
 import { createBriefingCommand } from './commands/briefing.js';
 import { createComplianceCommand } from './commands/compliance.js';
-import { createRegistryCommand } from './commands/registry.js';
+import { createRegistryCommand } from './commands/registry.js'; import { createOrdersCommand } from './commands/orders.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
 import { strikeCommand } from './commands/strike.js'; import { registerStrikeReadyCommand } from './commands/strike-ready.js';
@@ -601,7 +601,7 @@ registerRolloutCommands(program);
 program.addCommand(createMemoryCommand());
 program.addCommand(createBriefingCommand());
 program.addCommand(createComplianceCommand());
-program.addCommand(createRegistryCommand());
+program.addCommand(createRegistryCommand()); program.addCommand(createOrdersCommand());
 program.addCommand(createDocsCommand());
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)

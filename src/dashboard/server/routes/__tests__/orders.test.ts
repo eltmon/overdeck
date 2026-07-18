@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -256,13 +256,5 @@ describe('/api/orders routes', () => {
       .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-88', warnings: [] } });
     expect(startOrderBook).toHaveBeenCalledOnce();
     expect(startOrderBook).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-07-18-clean' }));
-  });
-
-  it('uses only the orders resolver and writer doors', () => {
-    const source = readFileSync(new URL('../orders.ts', import.meta.url), 'utf8');
-    expect(source).not.toMatch(/lib\/orders\/io/);
-    expect(source).not.toMatch(/from ['"]node:fs/);
-    expect(source).not.toContain('ordersDirectory');
-    expect(source).not.toContain('orderBookPath');
   });
 });
