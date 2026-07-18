@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T00:19:25.976Z",
-  "updated": "2026-07-18T02:19:07.020Z",
+  "updated": "2026-07-18T02:24:11.202Z",
   "pipeline": {
     "issueId": "PAN-2853",
     "reviewStatus": "pending",
@@ -12,13 +12,13 @@
     "mergeStatus": "failed",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T02:19:06.906Z",
+    "updatedAt": "2026-07-18T02:24:11.177Z",
     "verificationNotes": "Checklist completion check FAILED — 0 incomplete item(s) remain:\n\n  The required vBRIEF checklist is missing or unreadable; return the issue to planning before completion.",
     "mergeNotes": "Post-rebase verification failed at incomplete-plan-items",
-    "strikeReadyHead": "0ddd52836ba8799d53b1768b275efe69720f5772",
-    "strikeReadyAt": "2026-07-18T01:07:42.696Z",
-    "strikeLandingState": "recovering",
-    "strikeRecoveryCount": 1,
+    "strikeReadyHead": "be82f63ed12b4c3e8443e6fd35b6de64a9e80dfa",
+    "strikeReadyAt": "2026-07-18T02:24:11.176Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-18T01:18:43.178Z",
@@ -34,24 +34,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 784284,
-            "output": 62719,
-            "cacheRead": 23755776,
+            "input": 936062,
+            "output": 63339,
+            "cacheRead": 24349696,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 784284,
-          "output": 62719,
-          "cacheRead": 23755776,
+          "input": 936062,
+          "output": 63339,
+          "cacheRead": 24349696,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 17.680878,
-        "pricingAsOf": "2026-07-18T02:19:06.954Z"
+        "usd": 18.755328,
+        "pricingAsOf": "2026-07-18T02:24:11.197Z"
       }
     },
     "merges": [],
