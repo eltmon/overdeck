@@ -354,18 +354,17 @@
     "recordedAt": "2026-07-18T09:18:53.108Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-18T10:23:42.376Z",
+  "updated": "2026-07-18T10:36:39.183Z",
   "pipeline": {
     "issueId": "PAN-2858",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T10:23:41.513Z",
-    "reviewNotes": "ACP delivery can still report or preserve a healthy launch when session/prompt fails, while configured Kimi paths and the registered runtime lifecycle remain incomplete",
+    "updatedAt": "2026-07-18T10:36:39.130Z",
     "inspectNotes": "All 5 ACs verified. AC1: tsdown entry emits dist/acp-host.js; host.test.ts binds sockets/acp-<id>.sock + writes 0600 acp-token/acp-session-id under a stubbed runtime. AC2: wrong token->401 with zero transcript/prompt writes; correct token+message forwards to runtime.prompt() and appends both turns to acp-session.jsonl. AC3: handleSessionUpdate/handleRequestPermission registered before runtime.start() (host.ts:79-96); test proves order + that an update fired during start() is captured (observedSessionUpdates:1), not dropped. AC4: kimi-scoped auth-failure catch writes '[error] kimi authentication is required... /login' to stdout, rethrows without retry (startCalls===1), main() sets process.exitCode=1. AC5: acp-session-id persisted 0600; --resume threads through main()->makeRuntime->session-runtime.ts's pre-existing resumeSessionId->session/load path (session-runtime.ts:567-640). Non-blocking flag for follow-up: src/lib/acp/host-render.ts's stripAcpPaneControl regex has literal raw control bytes instead of \\x escapes, making git treat the file as binary (breaks future diff/blame, likely trips eslint no-control-regex at verification) — doesn't affect any tested string here.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "lastVerifiedCommit": "92326bebc47695e82be48aed87f1f5f5bb0a7ccb",
@@ -658,9 +657,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 8123157,
-            "output": 202447,
-            "cacheRead": 25738240,
+            "input": 8125211,
+            "output": 202627,
+            "cacheRead": 25942016,
             "cacheWrite": 0
           }
         },
@@ -674,9 +673,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 24022594,
-            "output": 990252,
-            "cacheRead": 235894272,
+            "input": 25030888,
+            "output": 1024281,
+            "cacheRead": 244480512,
             "cacheWrite": 0
           }
         }
@@ -689,9 +688,9 @@
           "cacheWrite": 213417
         },
         "openai/gpt-5.6-sol": {
-          "input": 32145751,
-          "output": 1192699,
-          "cacheRead": 261632512,
+          "input": 33156099,
+          "output": 1226908,
+          "cacheRead": 270422528,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -702,8 +701,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 342.027223,
-        "pricingAsOf": "2026-07-18T10:23:41.532Z"
+        "usd": 352.500241,
+        "pricingAsOf": "2026-07-18T10:36:39.179Z"
       }
     },
     "merges": [
