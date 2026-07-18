@@ -37,6 +37,7 @@ interface FakeBridgeOptions {
   body?: string;
   delayMs?: number;
   capture?: { lastBody?: string };
+  onRequest?: () => void;
 }
 
 function writeAgentState(agentId: string, partial: Partial<AgentState> = {}): void {
@@ -101,6 +102,7 @@ function startFakeBridge(socketPath: string, opts: FakeBridgeOptions): Promise<N
         if (Buffer.byteLength(text.slice(headerEnd + 4)) < len) return;
         const body = text.slice(headerEnd + 4, headerEnd + 4 + len);
         if (opts.capture) opts.capture.lastBody = body;
+        opts.onRequest?.();
         const respond = () => {
           const status = opts.status ?? 200;
           const responseBody = opts.body ?? '{}';
@@ -230,20 +232,44 @@ describe('acp delivery tier', () => {
     });
   });
 
-  it('fails loudly after the ACP request timeout using fake timers', async () => {
-    vi.useFakeTimers();
-    const agentId = 'agent-acp-timeout';
+  it('waits beyond the former ACP request timeout for the completed turn', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    const agentId = 'agent-acp-long-turn';
     writeAgentState(agentId, { harness: 'acp' });
     writeAcpToken(agentId);
-    const server = await startFakeBridge(join(socketDir, `acp-${agentId}.sock`), { delayMs: 20_000 });
+    const capture: { lastBody?: string } = {};
+    let markRequestReceived!: () => void;
+    const requestReceived = new Promise<void>((resolve) => {
+      markRequestReceived = resolve;
+    });
+    const server = await startFakeBridge(join(socketDir, `acp-${agentId}.sock`), {
+      delayMs: 20_000,
+      capture,
+      onRequest: markRequestReceived,
+    });
 
     try {
-      const delivered = deliverAgentMessage(agentId, 'timeout', 'test-caller');
-      const rejection = expect(delivered).rejects.toThrow(
-        /ACP delivery failed.*socket POST timeout/,
-      );
+      let settled = false;
+      const delivered = deliverAgentMessage(agentId, 'long turn', 'test-caller')
+        .then((result) => {
+          settled = true;
+          return result;
+        });
+      await requestReceived;
+
       await vi.advanceTimersByTimeAsync(8_100);
-      await rejection;
+      expect(settled).toBe(false);
+      expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(11_900);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      await expect(delivered).resolves.toEqual({ ok: true, path: 'acp' });
+      expect(JSON.parse(capture.lastBody!)).toEqual({
+        op: 'message',
+        content: 'long turn',
+        meta: { caller: 'test-caller' },
+      });
+      expect(readDeliveryLog(agentId).at(-1)).toMatchObject({ path: 'acp' });
       expect(vi.mocked(sendKeys)).not.toHaveBeenCalled();
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));

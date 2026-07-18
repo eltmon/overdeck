@@ -43,6 +43,7 @@ function writeAgentFile(home: string, agentId: string, file: string, content: st
 async function listenOnSocket(
   socketPath: string,
   handle: (headers: Record<string, string | string[] | undefined>, body: unknown) => void,
+  delayMs = 0,
 ): Promise<void> {
   mkdirSync(join(socketPath, '..'), { recursive: true })
   const server = createServer((request, response) => {
@@ -50,8 +51,12 @@ async function listenOnSocket(
     request.on('data', (chunk: Buffer) => chunks.push(chunk))
     request.on('end', () => {
       handle(request.headers, JSON.parse(Buffer.concat(chunks).toString('utf8')))
-      response.writeHead(202, { 'content-type': 'application/json' })
-      response.end(JSON.stringify({ ok: true }))
+      const respond = () => {
+        response.writeHead(202, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ ok: true }))
+      }
+      if (delayMs > 0) setTimeout(respond, delayMs)
+      else respond()
     })
   })
   servers.push(server)
@@ -196,6 +201,39 @@ describe('AcpRuntimeSync', () => {
     await expect(runtime.sendMessage(missingTokenId, 'hello')).rejects.toThrow(
       'ACP agent agent-missing-token: missing acp-token',
     )
+  })
+
+  it('waits beyond the control-request timeout for a completed message turn', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    const home = makeHome()
+    const agentId = 'agent-long-turn'
+    const token = 'delivery-token'
+    writeAgentFile(home, agentId, 'acp-token', token)
+    const socketPath = join(home, 'sockets', `acp-${agentId}.sock`)
+    const received: unknown[] = []
+    let markRequestReceived!: () => void
+    const requestReceived = new Promise<void>((resolve) => {
+      markRequestReceived = resolve
+    })
+    await listenOnSocket(socketPath, (_headers, body) => {
+      received.push(body)
+      markRequestReceived()
+    }, 20_000)
+    const runtime = new AcpRuntimeSync({ overdeckHome: home })
+
+    let settled = false
+    const delivery = runtime.sendMessage(agentId, 'long ACP turn').then(() => {
+      settled = true
+    })
+    await requestReceived
+
+    await vi.advanceTimersByTimeAsync(5_100)
+    expect(settled).toBe(false)
+
+    await vi.advanceTimersByTimeAsync(14_900)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    await delivery
+    expect(received).toEqual([{ op: 'message', content: 'long ACP turn' }])
   })
 
   it('enumerates ACP sessions from the canonical agent resolver', () => {

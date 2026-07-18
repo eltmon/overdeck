@@ -130,7 +130,7 @@ export class AcpRuntimeSync implements AgentRuntimeSync {
     const token = this.readToken(agentId)
     if (existsSync(socketPath) && token) {
       try {
-        await postUnixSocketJson(socketPath, token, { op: 'interrupt' })
+        await postUnixSocketJson(socketPath, token, { op: 'interrupt' }, HOST_REQUEST_TIMEOUT_MS)
       } catch {
         // Best effort: the process signal ladder below still tears down the host.
       }
@@ -314,6 +314,7 @@ function postUnixSocketJson(
   socketPath: string,
   token: string,
   body: unknown,
+  timeoutMs?: number,
 ): Promise<AcpHostResponse> {
   return new Promise((resolve, reject) => {
     let settled = false
@@ -346,9 +347,11 @@ function postUnixSocketJson(
         })
       },
     )
-    client.setTimeout(HOST_REQUEST_TIMEOUT_MS, () => {
-      client.destroy(new Error(`ACP host request timed out after ${HOST_REQUEST_TIMEOUT_MS}ms`))
-    })
+    if (timeoutMs !== undefined) {
+      client.setTimeout(timeoutMs, () => {
+        client.destroy(new Error(`ACP host request timed out after ${timeoutMs}ms`))
+      })
+    }
     client.once('error', (error) => finish(() => reject(error)))
     client.end(JSON.stringify(body))
   })

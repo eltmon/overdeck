@@ -116,15 +116,14 @@ function readAcpTokenSync(agentId: string): string | null {
 /**
  * POST a JSON body to a Unix-domain socket using node:net + a hand-rolled
  * minimal HTTP/1.1 request. Resolves on a 200-class response, rejects on any
- * error including socket-not-found, connection refused, write timeout, or
- * non-2xx status. Kept tiny on purpose: this is a hot path, only one caller,
- * and the whole point of a fallback to tmux is that we do not need a robust
- * HTTP client here.
+ * error including socket-not-found, connection refused, an optional client
+ * timeout, or non-2xx status. Kept tiny on purpose because this is a hot path
+ * and these local protocol hosts need only a narrow HTTP client.
  */
 async function postUnixSocketJson(
   socketPath: string,
   body: unknown,
-  timeoutMs: number,
+  timeoutMs: number | undefined,
   token: string,
   tokenHeader: string = BRIDGE_TOKEN_HEADER,
 ): Promise<{ status: number; body: string }> {
@@ -182,10 +181,12 @@ async function postUnixSocketJson(
       },
     );
 
-    timeout = setTimeout(() => {
-      req.destroy(new Error('socket POST timeout'));
-    }, timeoutMs);
-    timeout.unref?.();
+    if (timeoutMs !== undefined) {
+      timeout = setTimeout(() => {
+        req.destroy(new Error('socket POST timeout'));
+      }, timeoutMs);
+      timeout.unref?.();
+    }
     req.on('error', (err: Error) => {
       finishErr(err);
     });
@@ -271,10 +272,13 @@ export async function deliverAgentMessage(
         acpFailure = 'acp-token-missing';
       } else {
         try {
+          // ACP acknowledges only after the full model turn and durable transcript
+          // completion record land, so a fixed transport deadline would abort a
+          // healthy prompt and make kickoff retry or tear down the live session.
           await postUnixSocketJson(
             acpSocketPath,
             { op: 'message', content: message, meta: { caller } },
-            8_000,
+            undefined,
             acpToken,
           );
           await appendChannelDeliveryLog(normalizedId, { path: 'acp', caller });
