@@ -32,6 +32,7 @@ import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderE
 import { getCodexLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
+import { prepareHarnessLaunch } from '../harness-binary.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { generateLauncherScriptSync } from '../launcher-generator.js';
@@ -605,6 +606,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
     }
     const planningModel = modelOverride || settingsModel;
     const effectiveHarness = await resolvePlanningSessionHarness(planningModel, opts.harness);
+    const harnessLaunch = await prepareHarnessLaunch(effectiveHarness);
     console.log(`[start-planning] Final planning model: ${planningModel} (override=${modelOverride || '(none)'} settings=${settingsModel} source=${modelSource}) harness=${effectiveHarness}`);
 
     // Discover and copy PRD files to workspace
@@ -681,6 +683,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         setTerminalEnv: true,
         overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
+        extraEnvExports: [harnessLaunch.pathExport],
         promptFile,
         baseCommand: cmdWithArgs,
         appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),

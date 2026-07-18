@@ -10,6 +10,7 @@ import { getClaudePermissionFlagsStringSync } from '../../../../lib/claude-permi
 import { loadConfigSync as loadYamlConfig, resolveModel } from '../../../../lib/config-yaml.js';
 import { workspaceContextFile } from '../../../../lib/context-layers/layers.js';
 import { extractPrefixSync } from '../../../../lib/issue-id.js';
+import { prepareHarnessLaunch } from '../../../../lib/harness-binary.js';
 import { generateLauncherScriptSync } from '../../../../lib/launcher-generator.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME } from '../../../../lib/pan-dir/types.js';
 import { extractTeamPrefix, findProjectByTeamSync } from '../../../../lib/projects.js';
@@ -271,6 +272,7 @@ Continue the PLANNING session. Do NOT implement anything.
         await writeFile(continuationPromptPath, continuationPrompt);
 
         const agentCwd = workspacePath;
+        const harnessLaunch = await prepareHarnessLaunch('claude-code');
 
         if (existsSync(outputFile)) {
           const backupPath = join(planningDir, `output-${Date.now()}.jsonl`);
@@ -298,6 +300,7 @@ Continue the PLANNING session. Do NOT implement anything.
             role: 'plan',
             workingDir: agentCwd,
             baseCommand: msgCmdWithArgs,
+            extraEnvExports: [harnessLaunch.pathExport],
             appendSystemPromptFiles: await claudePlanningSystemPromptFiles(agentCwd),
             promptInline: `Please read the continuation prompt at ${continuationPromptPath} and continue the planning session.`,
           }),
