@@ -12,9 +12,22 @@
       "timestamp": "2026-07-18T01:19:52.569Z",
       "reason": "end",
       "note": "Anomaly: the first full-suite run timed out in four unrelated database/cost tests under parallel load; all four passed when rerun sequentially, and the second full suite passed 9,790 root tests plus 49 frontend tests. Strike branches now enter canonical durable pipeline membership before PR creation, survive deleted-branch merged-PR lookup, preserve feature behavior and all six canonical consumers, with typecheck and lint passing."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-18T01:22Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-18T01:22:43.714Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-18T01:22:43Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-2857\n\nMerged strike PRs are missed when another convention branch ref still exists, violating FR-3 and misclassifying post-merge issues.\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2857 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -37,16 +50,17 @@
     "recordedAt": "2026-07-18T01:19:49.476Z"
   },
   "created": "2026-07-18T00:34:46.468Z",
-  "updated": "2026-07-18T01:19:58.963Z",
+  "updated": "2026-07-18T01:22:43.714Z",
   "pipeline": {
     "issueId": "PAN-2857",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-18T01:19:57.896Z",
+    "updatedAt": "2026-07-18T01:22:43.062Z",
+    "reviewNotes": "Merged strike PRs are missed when another convention branch ref still exists, violating FR-3 and misclassifying post-merge issues.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2866",
     "reviewRequestedAt": "2026-07-18T01:19:52.588Z",
     "reviewSpawnedAt": "2026-07-18T01:19:56.419Z",
@@ -91,6 +105,14 @@
             "cacheWrite": 150942
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 627459,
+            "output": 25334,
+            "cacheRead": 3155968,
+            "cacheWrite": 0
+          }
+        },
         "strike": {
           "openai/gpt-5.6-sol": {
             "input": 325627,
@@ -101,9 +123,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1253373,
-            "output": 36265,
-            "cacheRead": 13962752,
+            "input": 1265507,
+            "output": 37173,
+            "cacheRead": 14325248,
             "cacheWrite": 0
           }
         }
@@ -116,15 +138,15 @@
           "cacheWrite": 351333
         },
         "openai/gpt-5.6-sol": {
-          "input": 1579000,
-          "output": 52578,
-          "cacheRead": 17666560,
+          "input": 2218593,
+          "output": 78820,
+          "cacheRead": 21185024,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 29.806585,
-        "pricingAsOf": "2026-07-18T01:19:57.085Z"
+        "usd": 35.551042,
+        "pricingAsOf": "2026-07-18T01:22:43.141Z"
       }
     },
     "merges": [
