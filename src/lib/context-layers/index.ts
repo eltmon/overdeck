@@ -63,7 +63,13 @@ export {
   renderProjectLayer,
 } from './render.js';
 
-export { type WorkspaceContextInput, assembleWorkspaceContext } from './assemble.js';
+export {
+  type WorkspaceContextInput,
+  PROJECT_LAYER_START,
+  PROJECT_LAYER_END,
+  assembleWorkspaceContext,
+  workspaceContextWithoutProjectLayer,
+} from './assemble.js';
 export { type LegacyBeadsCleanup, cleanLegacyBeadsTargetSync } from './legacy-beads-cleanup.js';
 
 export {

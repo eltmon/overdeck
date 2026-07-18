@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
+import { workspaceContextWithoutProjectLayer } from '../context-layers/assemble.js';
 import { renderForHarness } from '../context-layers/harness.js';
 import { resolveWorkspaceContextFile } from '../context-layers/layers.js';
 import { renderGlobalLayer, renderProjectLayer } from '../context-layers/render.js';
@@ -8,25 +9,6 @@ import { isDevMode } from '../paths.js';
 import { findProjectByPathSync } from '../projects.js';
 
 const SECTION_SEPARATOR = '\n\n---\n\n';
-
-export function removeEmbeddedProjectLayer(
-  workspaceContent: string,
-  embeddedProjectLayer: string,
-): string {
-  const project = embeddedProjectLayer.trim();
-  if (!project) return workspaceContent;
-  let removed = false;
-  return workspaceContent
-    .split(SECTION_SEPARATOR)
-    .filter((section) => {
-      if (!removed && section.trim() === project) {
-        removed = true;
-        return false;
-      }
-      return true;
-    })
-    .join(SECTION_SEPARATOR);
-}
 
 export function materializeAcpContextFile(
   agentDir: string,
@@ -39,10 +21,7 @@ export function materializeAcpContextFile(
   if (existsSync(workspaceFile)) {
     const workspaceContent = readFileSync(workspaceFile, 'utf8');
     const workspaceOnly = project
-      ? removeEmbeddedProjectLayer(
-          workspaceContent,
-          renderProjectLayer(project.path, 'claude-code'),
-        )
+      ? workspaceContextWithoutProjectLayer(workspaceContent)
       : workspaceContent;
     sections.push(renderForHarness(workspaceOnly, 'acp').trim());
   }

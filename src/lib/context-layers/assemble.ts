@@ -17,6 +17,49 @@
 import type { Harness } from '@overdeck/contracts';
 import { renderProjectLayer } from './render.js';
 
+const SECTION_SEPARATOR = '\n\n---\n\n';
+export const PROJECT_LAYER_START = '<!-- overdeck:project-layer:start -->';
+export const PROJECT_LAYER_END = '<!-- overdeck:project-layer:end -->';
+
+function markedProjectLayer(content: string): string {
+  return [PROJECT_LAYER_START, content, PROJECT_LAYER_END].join('\n');
+}
+
+function removeMarkedProjectLayer(content: string): string | null {
+  const start = content.indexOf(PROJECT_LAYER_START);
+  if (start < 0) return null;
+  const end = content.indexOf(PROJECT_LAYER_END, start + PROJECT_LAYER_START.length);
+  if (end < 0) return null;
+
+  let before = content.slice(0, start);
+  let after = content.slice(end + PROJECT_LAYER_END.length);
+  if (before.endsWith(SECTION_SEPARATOR) && after.startsWith(SECTION_SEPARATOR)) {
+    before = before.slice(0, -SECTION_SEPARATOR.length);
+  } else if (before.endsWith(SECTION_SEPARATOR)) {
+    before = before.slice(0, -SECTION_SEPARATOR.length);
+  } else if (after.startsWith(SECTION_SEPARATOR)) {
+    after = after.slice(SECTION_SEPARATOR.length);
+  }
+  return `${before}${after}`.trim();
+}
+
+/**
+ * Remove the project layer embedded in a workspace bundle.
+ *
+ * New bundles carry reserved structural markers, so project Markdown can contain
+ * horizontal rules without becoming ambiguous. Legacy bundles predate those
+ * markers; their only safely identifiable workspace-owned section is the
+ * generated header before the first top-level separator. Keeping that header is
+ * preferable to forwarding an unknown amount of stale, harness-specific text.
+ */
+export function workspaceContextWithoutProjectLayer(content: string): string {
+  const marked = removeMarkedProjectLayer(content);
+  if (marked !== null) return marked;
+
+  const firstSeparator = content.indexOf(SECTION_SEPARATOR);
+  return (firstSeparator < 0 ? content : content.slice(0, firstSeparator)).trim();
+}
+
 /** Inputs for {@link assembleWorkspaceContext}. */
 export interface WorkspaceContextInput {
   /** Absolute path to the parent project's root. */
@@ -64,7 +107,7 @@ export function assembleWorkspaceContext(input: WorkspaceContextInput): string {
 
   // 2. Parent project layer, rendered for this harness.
   const projectLayer = renderProjectLayer(input.projectRoot, input.harness);
-  if (projectLayer) sections.push(projectLayer);
+  if (projectLayer) sections.push(markedProjectLayer(projectLayer));
 
   // 3. Injected memory (PAN-1052).
   if (input.memoryContext && input.memoryContext.trim()) {
@@ -76,5 +119,5 @@ export function assembleWorkspaceContext(input: WorkspaceContextInput): string {
     sections.push(['## Workspace Status', '', input.statusSummary.trim()].join('\n'));
   }
 
-  return sections.join('\n\n---\n\n').replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
+  return sections.join(SECTION_SEPARATOR).replace(/\n{3,}/g, '\n\n').trimEnd() + '\n';
 }
