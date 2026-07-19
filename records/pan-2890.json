@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:31:55.437Z",
+  "updated": "2026-07-19T00:32:04.069Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "stopped-popover-enrichment": {
+        "writerId": "agent-pan-2890",
+        "agentId": "agent-pan-2890",
+        "pid": 551590,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T00:32:04.069Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2890",
@@ -133,6 +141,7 @@
     "running-agents-pill.running-agents-pill.ac2": "completed",
     "running-agents-pill.running-agents-pill.ac3": "completed",
     "running-agents-pill.running-agents-pill.ac4": "completed",
-    "running-agents-pill.running-agents-pill.ac5": "completed"
+    "running-agents-pill.running-agents-pill.ac5": "completed",
+    "stopped-popover-enrichment": "running"
   }
 }
