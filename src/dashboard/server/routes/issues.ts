@@ -68,7 +68,7 @@ import { CacheService } from '../services/cache-service.js';
 import { EventStoreService } from '../services/domain-services.js';
 import { resolveIssueHeadlineCost } from '../services/issue-cost-resolver.js';
 import { getCachedRunningAgents } from '../services/running-agents-cache.js';
-import { getPipelineMembershipResultsForProjects, getPipelineMembershipSnapshotsForProjects, getProjectPipelineMembership, summarizePipelineMembership, unavailablePipelineMembership } from '../services/pipeline-membership.js';
+import { getLastGoodMembershipSnapshot, getPipelineMembershipResultsForProjects, getPipelineMembershipSnapshotsForProjects, getProjectPipelineMembership, summarizePipelineMembership, unavailablePipelineMembership } from '../services/pipeline-membership.js';
 import { invalidateAgentsCache } from './agents.js';
 import { IssueLifecycle, type IssueState } from '../services/issue-lifecycle.js';
 import { LinearClient } from '../services/linear-client.js';
@@ -909,7 +909,21 @@ const getPipelineMembershipRoute = HttpRouter.add(
     if (!projectKey) return jsonResponse({ error: 'project query parameter is required' }, { status: 400 });
     const project = getProjectSync(projectKey);
     if (!project) return jsonResponse({ error: `Project not found: ${projectKey}` }, { status: 404 });
-    return jsonResponse(yield* Effect.promise(() => getProjectPipelineMembership(project)));
+    // PAN-2893: a transient tracker failure (e.g. a Linear 503) must not blank
+    // the issues pane — serve the last successful snapshot instead. Only a cold
+    // start with no snapshot at all still surfaces the error to the client.
+    return jsonResponse(yield* Effect.promise(async () => {
+      try {
+        return await getProjectPipelineMembership(project);
+      } catch (error) {
+        const lastGood = getLastGoodMembershipSnapshot(project.path);
+        if (lastGood) {
+          console.warn(`[pipeline-membership] live gather failed for ${projectKey}; serving last-good snapshot:`, error instanceof Error ? error.message : String(error));
+          return lastGood;
+        }
+        throw error;
+      }
+    }));
   })),
 );
 

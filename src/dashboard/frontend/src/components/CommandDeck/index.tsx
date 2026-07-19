@@ -22,6 +22,7 @@ import { ModelPicker, loadStoredHarness, loadStoredModel, saveStoredHarness, sav
 import type { Harness } from '../shared/ModelPicker';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgents } from '../../lib/store';
+import { useAgentSetInvalidation } from '../../lib/useAgentSetInvalidation';
 import { useCommandDeckSelection } from '../../lib/commandDeckSelection';
 import { getTransport, type PanRpcProtocolClient } from '../../lib/wsTransport';
 import { refreshDashboardState } from '../../lib/refresh-dashboard-state';
@@ -234,6 +235,8 @@ export function CommandDeck({
   const startWidth = useRef(0);
   const currentWidth = useRef(sidebarWidth);
   const queryClient = useQueryClient();
+  // PAN-2893: agent spawn/stop events refetch the projects pane immediately.
+  useAgentSetInvalidation(queryClient);
 
   const { data: projects = [], isLoading, isFetched: projectsFetched } = useQuery({
     queryKey: ['command-deck-projects', projectQueryEpoch],

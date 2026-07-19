@@ -43,10 +43,16 @@ interface SettledTtlEntry<T> {
   settledAt: number | null;
 }
 
+export interface SettledTtlPromiseCache<K, V> {
+  (key: K, load: () => Promise<V>): Promise<V>;
+  /** Drop one key's settled value (or every key when omitted) so the next read reloads. In-flight loads are untouched. */
+  invalidate(key?: K): void;
+}
+
 /** Cache settled values for a TTL while preserving single-flight for pending work regardless of age. */
-export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => number = Date.now) {
+export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => number = Date.now): SettledTtlPromiseCache<K, V> {
   const entries = new Map<K, SettledTtlEntry<V>>();
-  return (key: K, load: () => Promise<V>): Promise<V> => {
+  const get = (key: K, load: () => Promise<V>): Promise<V> => {
     const cached = entries.get(key);
     if (cached && (cached.settledAt === null || now() - cached.settledAt < ttlMs)) return cached.promise;
 
@@ -58,6 +64,16 @@ export function createSettledTtlPromiseCache<K, V>(ttlMs: number, now: () => num
     );
     return entry.promise;
   };
+  get.invalidate = (key?: K): void => {
+    if (key === undefined) {
+      for (const [k, entry] of entries) {
+        if (entry.settledAt !== null) entries.delete(k);
+      }
+      return;
+    }
+    if (entries.get(key)?.settledAt !== null) entries.delete(key);
+  };
+  return get;
 }
 
 /** Schedule promise work through one limiter shared by every caller of the returned function. */

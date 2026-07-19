@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createPipelineMembershipService,
+  getLastGoodMembershipSnapshot,
   getPipelineMembershipForProjects,
   getPipelineMembershipResultsForProjects,
   getPipelineMembershipSnapshotsForProjects,
   getPipelineMembershipSnapshotsForResourceDiscovery,
   PIPELINE_MEMBERSHIP_TTL_MS,
   PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS,
+  refreshMembershipSnapshotsForProjects,
   summarizePipelineMembership,
 } from '../../../src/dashboard/server/services/pipeline-membership.js';
 import { PIPELINE_PROJECT_CONCURRENCY } from '../../../src/lib/pipeline-membership-gather.js';
@@ -138,6 +140,53 @@ describe('pipeline membership service', () => {
     await getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership);
 
     expect(getMembership).toHaveBeenCalledOnce();
+  });
+
+  it('PAN-2893: invalidate() drops the settled TTL entry so the next call re-gathers immediately', async () => {
+    const gather = vi.fn().mockResolvedValue([]);
+    const getMembership = createPipelineMembershipService({ gather, now: Date.now });
+    const project = { name: 'inval', path: '/inval', github_repo: 'owner/inval', issue_prefix: 'PAN' };
+
+    await getMembership(project);
+    await getMembership(project);
+    expect(gather).toHaveBeenCalledTimes(1);
+
+    getMembership.invalidate(project.path);
+    await getMembership(project);
+    expect(gather).toHaveBeenCalledTimes(2);
+  });
+
+  it('PAN-2893: refreshMembershipSnapshotsForProjects re-gathers now, bypassing both TTLs', async () => {
+    const project = { name: 'event-refresh', path: '/event-refresh', github_repo: 'owner/event-refresh', issue_prefix: 'PAN' };
+    const gather = vi.fn().mockResolvedValue([]);
+    const getMembership = createPipelineMembershipService({ gather, now: Date.now });
+
+    await getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership);
+    expect(gather).toHaveBeenCalledTimes(1);
+
+    // Well inside both TTLs — a plain snapshot read must NOT re-gather…
+    await getPipelineMembershipSnapshotsForResourceDiscovery([project], getMembership);
+    expect(gather).toHaveBeenCalledTimes(1);
+
+    // …but the event-driven refresh must.
+    await refreshMembershipSnapshotsForProjects([project], getMembership);
+    expect(gather).toHaveBeenCalledTimes(2);
+  });
+
+  it('PAN-2893: getLastGoodMembershipSnapshot serves the previous success and null when cold', async () => {
+    expect(getLastGoodMembershipSnapshot('/never-gathered')).toBeNull();
+
+    const project = { name: 'last-good', path: '/last-good', github_repo: 'owner/last-good', issue_prefix: 'PAN' };
+    const memberships = [{ issueId: 'PAN-9' }];
+    const getMembership = Object.assign(vi.fn().mockResolvedValue(memberships), { invalidate: vi.fn() });
+
+    await refreshMembershipSnapshotsForProjects([project], getMembership);
+    expect(getLastGoodMembershipSnapshot(project.path)).toEqual(memberships);
+
+    // A later failing refresh keeps the last good value.
+    getMembership.mockRejectedValueOnce(new Error('Linear 503'));
+    await refreshMembershipSnapshotsForProjects([project], getMembership);
+    expect(getLastGoodMembershipSnapshot(project.path)).toEqual(memberships);
   });
 
   it.each([

@@ -14,6 +14,7 @@ import { runServer } from './server.js';
 import { startSharedIssueService, getSharedIssueService } from './services/issue-service-singleton.js';
 import { startAgentEnrichmentService, stopAgentEnrichmentService } from './services/agent-enrichment-service.js';
 import { startMergeBlockerReconcileService } from './services/merge-blocker-reconcile-service.js';
+import { startResourceRefreshTriggers } from './services/resource-refresh-triggers.js';
 import {
   shouldStartStaleCheckRetriggerService,
   startStaleCheckRetriggerService,
@@ -175,6 +176,12 @@ console.log('[overdeck] AgentOutputService started');
 // Awaiting-Merge queue (and its live MERGE button) before any click.
 startMergeBlockerReconcileService();
 console.log('[overdeck] MergeBlockerReconcileService started');
+
+// PAN-2893: agent lifecycle events refresh the membership + resource-discovery
+// caches immediately, so `pan start` reaches the issues pane in seconds instead
+// of waiting out the 30s/5m TTLs.
+startResourceRefreshTriggers();
+console.log('[overdeck] ResourceRefreshTriggers started (event-driven cache refresh)');
 if (shouldStartStaleCheckRetriggerService()) {
   startStaleCheckRetriggerService();
   console.log('[overdeck] StaleCheckRetriggerService started');

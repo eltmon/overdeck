@@ -864,6 +864,18 @@ export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocat
   return getCachedResourceAllocatedIssues();
 }
 
+/**
+ * PAN-2893 — event-driven refresh: recompute the resource-allocated snapshot
+ * NOW instead of waiting out the TTL. If a refresh is already in flight (it may
+ * predate the triggering event and carry stale membership), chain a second one
+ * behind it so the post-event state is always captured.
+ */
+export function triggerResourceDiscoveryRefresh(): Promise<ResourceAllocatedIssue[]> {
+  const inFlight = resourceIssuesRefreshPromise;
+  if (inFlight) return inFlight.then(() => refreshResourceAllocatedIssues());
+  return refreshResourceAllocatedIssues();
+}
+
 export async function discoverResourceAllocatedIssuesFresh(): Promise<ResourceAllocatedIssue[]> {
   return (await computeResourceAllocatedIssues()).map(toPublicResourceIssue);
 }
