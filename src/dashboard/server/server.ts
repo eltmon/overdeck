@@ -77,6 +77,7 @@ import { internalEventsRouteLayer } from './routes/internal-events.js';
 import { dashboardCsrfToken, dashboardSessionCookieHeader, rejectUnauthorizedDashboardRequest, rejectUnauthorizedDashboardSessionMintRequest } from './routes/dashboard-auth.js';
 import { validateOrigin } from './routes/origin-validation.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../../lib/activity-logger.js';
+import { retryDashboardBind } from './server-bind.js';
 
 // ─── Dual-runtime layers ──────────────────────────────────────────────────────
 
@@ -92,14 +93,22 @@ const HttpServerLive = Layer.unwrap(
       Effect.promise(() => import('@effect/platform-node/NodeHttpServer')),
       Effect.promise(() => import('node:http')),
     ]);
-    const nodeServer = NodeHttp.createServer();
-    setupTerminalWebSocket(nodeServer);
-    setupVoiceWebSocket(nodeServer);
-    setupAutoPresoWebSocket(nodeServer);
-    return NodeHttpServer.layer(() => nodeServer, {
+    const bind = retryDashboardBind(NodeHttpServer.make(() => {
+      const nodeServer = NodeHttp.createServer();
+      setupTerminalWebSocket(nodeServer);
+      setupVoiceWebSocket(nodeServer);
+      setupAutoPresoWebSocket(nodeServer);
+      return nodeServer;
+    }, {
       host: config.host,
       port: config.port,
+    }), (attempt, delayMs) => {
+      console.warn(`[overdeck] HTTP bind failed with EADDRINUSE; retry ${attempt}/3 in ${delayMs}ms`);
     });
+    return Layer.mergeAll(
+      Layer.effect(HttpServer.HttpServer)(bind),
+      NodeHttpServer.layerHttpServices,
+    );
   }),
 );
 

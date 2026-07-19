@@ -295,20 +295,42 @@ export interface RestartResult {
   stage: 'traefik' | 'cliproxy' | 'dashboard' | 'full';
   success: boolean;
   failure?: StageFailure;
-}async function restartDashboardPromise(
+}
+
+export interface DashboardSpawnHandle {
+  stop: () => Promise<void> | void;
+}
+
+async function restartDashboardPromise(
   config: PlatformConfig,
-  startDashboardFn: () => Promise<void> | void,
+  startDashboardFn: () => Promise<DashboardSpawnHandle | void> | DashboardSpawnHandle | void,
   opts: {
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
   } = {},
 ): Promise<void> {
   await Effect.runPromise(stopDashboard(config));
-  await startDashboardFn();
-  await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
-    timeoutMs: opts.healthTimeoutMs,
-    expectedIdentity: opts.expectedIdentity,
-  }));
+  const spawned = await startDashboardFn();
+  try {
+    await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
+      timeoutMs: opts.healthTimeoutMs,
+      expectedIdentity: opts.expectedIdentity,
+    }));
+  } catch (error) {
+    if (spawned) {
+      try {
+        await spawned.stop();
+      } catch (stopError) {
+        const healthFailure = error instanceof Error ? error.message : String(error);
+        const stopFailure = stopError instanceof Error ? stopError.message : String(stopError);
+        throw new StageError({
+          stage: 'dashboard',
+          reason: `${healthFailure}; failed to reap unhealthy dashboard: ${stopFailure}`,
+        });
+      }
+    }
+    throw error;
+  }
 }async function restartCliproxyPromise(
   cliproxy: {
     stopCliproxy: () => void;
@@ -417,7 +439,7 @@ export const stopTraefik = (config: PlatformConfig): Effect.Effect<void, never> 
 /** Effect variant of {@link restartDashboard}. */
 export const restartDashboard = (
   config: PlatformConfig,
-  startDashboardFn: () => Promise<void> | void,
+  startDashboardFn: () => Promise<DashboardSpawnHandle | void> | DashboardSpawnHandle | void,
   opts: {
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
