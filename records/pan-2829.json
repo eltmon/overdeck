@@ -67,6 +67,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-19T02:36:35.712Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-19T02:54:12.056Z"
+    },
+    {
+      "timestamp": "2026-07-19T02:54:12.481Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -726,28 +736,21 @@
     "recordedAt": "2026-07-19T02:54:08.900Z"
   },
   "created": "2026-07-17T12:54:46.866Z",
-  "updated": "2026-07-19T02:54:10.547Z",
+  "updated": "2026-07-19T02:54:12.481Z",
   "pipeline": {
     "issueId": "PAN-2829",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T02:54:09.764Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-19T02:51:31.508Z"
-      }
-    ],
+    "updatedAt": "2026-07-19T02:54:10.591Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2889",
     "reviewedAtCommit": "1359980d3998eca6ddfbc1d0c9e41d00320a6248",
-    "reviewSpawnedAt": "2026-07-19T02:36:34.515Z",
     "reviewRequestedAt": "2026-07-19T02:54:09.764Z",
+    "reviewSpawnedAt": "2026-07-19T02:54:10.588Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".claude/rules/prd-authoring.md",
@@ -1425,9 +1428,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 9387840,
-            "output": 878987,
-            "cacheRead": 404297216,
+            "input": 9404583,
+            "output": 880129,
+            "cacheRead": 405469184,
             "cacheWrite": 0
           }
         }
@@ -1446,15 +1449,15 @@
           "cacheWrite": 106835
         },
         "openai/gpt-5.6-sol": {
-          "input": 9387840,
-          "output": 878987,
-          "cacheRead": 404297216,
+          "input": 9404583,
+          "output": 880129,
+          "cacheRead": 405469184,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 285.797478,
-        "pricingAsOf": "2026-07-19T02:51:58.032Z"
+        "usd": 286.501437,
+        "pricingAsOf": "2026-07-19T02:54:10.676Z"
       }
     },
     "merges": [
