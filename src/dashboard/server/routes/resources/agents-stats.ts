@@ -177,6 +177,24 @@ export function getAgentStatsSnapshotEffect(
   });
 }
 
+/** Compatibility parser retained for route consumers and focused tests. */
+export function parseProcessTable(psTable: string): AgentProcessRecord[] {
+  return psTable
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const match = line.match(/^(\d+)\s+(\d+)\s+([0-9.]+)\s+(\d+)$/);
+      if (!match) return [];
+      return [{
+        pid: Number(match[1]),
+        ppid: Number(match[2]),
+        cpuPercent: Number(match[3]),
+        rssBytes: Number(match[4]) * 1024,
+      }];
+    });
+}
+
 async function readBatchedProcessTable(): Promise<AgentProcessRecord[]> {
   const census = await getRuntimeCensus();
   return [...census.processesByPid.values()].map((process) => ({
