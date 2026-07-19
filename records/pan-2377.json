@@ -97,22 +97,9 @@
       "reason": "feedback",
       "note": "[2026-07-19T02:51Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-19T02:51:14.303Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-19T03:05Z] verification-gate → FAILED — seq 1",
-      "timestamp": "2026-07-19T03:05:46.951Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-07-19T03:05:46Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-2377 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/flywheel.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-2377 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "configuration/state-branch.mdx",
@@ -317,24 +304,25 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T03:05:46.951Z",
+  "updated": "2026-07-19T03:05:48.065Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T03:05:45.289Z",
+    "updatedAt": "2026-07-19T03:05:46.921Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/flywheel.ts",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "lastVerifiedCommit": "1efab25bdb7b55b494dffc64f858401acec57b05",
     "reviewRequestedAt": "2026-07-19T00:54:56.018Z",
-    "reviewSpawnedAt": "2026-07-19T02:49:25.790Z",
+    "reviewSpawnedAt": "2026-07-19T03:05:46.521Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "configuration/state-branch.mdx",
@@ -597,7 +585,7 @@
       },
       "costAtCloseOut": {
         "usd": 551.609183,
-        "pricingAsOf": "2026-07-19T03:05:45.371Z"
+        "pricingAsOf": "2026-07-19T03:05:47.001Z"
       }
     },
     "merges": [
