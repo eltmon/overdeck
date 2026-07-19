@@ -117,6 +117,23 @@ describe('verifyStrikeBranchMergedIntoMain', () => {
     );
   });
 
+  it('accepts a squash-merged strike branch with equivalent commits on origin/main', async () => {
+    const { projectPath } = await createStrikeRepo();
+
+    await git(projectPath, ['checkout', 'strike/pan-2013']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'squash merged\n');
+    await git(projectPath, ['add', 'strike.txt']);
+    await git(projectPath, ['commit', '-m', 'strike work']);
+    await git(projectPath, ['checkout', 'main']);
+    await git(projectPath, ['merge', '--squash', 'strike/pan-2013']);
+    await git(projectPath, ['commit', '-m', 'squash strike work']);
+    await git(projectPath, ['push', 'origin', 'main']);
+
+    await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).resolves.toBe(
+      'strike/pan-2013 has no commits missing from origin/main',
+    );
+  });
+
   it('rejects a strike branch that has not landed on origin/main', async () => {
     const { projectPath } = await createStrikeRepo();
 
