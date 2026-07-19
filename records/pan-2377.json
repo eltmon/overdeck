@@ -94,15 +94,7 @@
       "timestamp": "2026-07-19T02:45:13.693Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-19T02:45:13Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-2377\n\nAutomatic recovery resolves the persisted order-book overlay from the dashboard cwd instead of the launch workspace\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-2377 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "configuration/state-branch.mdx",
@@ -307,10 +299,10 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T02:49:24.964Z",
+  "updated": "2026-07-19T02:49:28.185Z",
   "pipeline": {
     "issueId": "PAN-2377",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
@@ -318,13 +310,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T02:49:24.919Z",
+    "updatedAt": "2026-07-19T02:49:25.792Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "lastVerifiedCommit": "1efab25bdb7b55b494dffc64f858401acec57b05",
     "reviewRequestedAt": "2026-07-19T00:54:56.018Z",
-    "reviewSpawnedAt": "2026-07-19T02:38:55.037Z",
+    "reviewSpawnedAt": "2026-07-19T02:49:25.790Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "configuration/state-branch.mdx",
@@ -587,7 +579,7 @@
       },
       "costAtCloseOut": {
         "usd": 543.497067,
-        "pricingAsOf": "2026-07-19T02:49:24.955Z"
+        "pricingAsOf": "2026-07-19T02:49:25.982Z"
       }
     },
     "merges": [
