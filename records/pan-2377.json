@@ -264,7 +264,7 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T01:02:46.065Z",
+  "updated": "2026-07-19T01:02:57.227Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "blocked",
@@ -275,13 +275,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T01:02:44.111Z",
-    "reviewNotes": "Order-book release includes draft/queued books and lane admission is raceable",
+    "updatedAt": "2026-07-19T01:02:57.182Z",
+    "reviewNotes": "Order-book membership releases draft/queued work during bookless runs, and lane admission is raceable.",
     "inspectNotes": "AC1-AC4 met: orders-writer.test.ts covers createBook/addItems/moveItem/setStatus round-trip + index.json queue order; orders-resolver.test.ts covers backlogCandidates rank/exclusion and computeBookProgress drained semantics (running=false, parked-only=true); orders-validate.test.ts covers all five validateBookForStart finding types incl. planAtPickup downgrade. AC5 partially met: the writer-commit half is covered (git rev-list count check in orders-writer.test.ts). The parseOrderBookJson half is NOT covered — AC5 names src/lib/orders/types.ts parseOrderBookJson specifically, but tests/unit/lib/orders/orders-io.test.ts 'returns a descriptive error for malformed order book JSON' (line ~36) writes syntactically-invalid JSON ('{bad json'), which throws inside readOrderBook's own JSON.parse try/catch (io.ts ~line 30) BEFORE parseOrderBookJson (types.ts) is ever called. No test exercises parseOrderBookJson's own catch branch (types.ts, 'Invalid order book: ...' prefix) against syntactically-valid JSON that fails Schema decode (e.g. a well-formed OrderBook object with an item missing 'issue' or lane 'C'). Fix: add a case — either import parseOrderBookJson directly and assert its ok:false error string, or have readOrderBook fed a schema-invalid-but-JSON-valid fixture — to prove the descriptive-error path named in AC5 actually executes.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
     "lastVerifiedCommit": "fec625329d05f986cb439ce100a0be2391cac054",
     "reviewRequestedAt": "2026-07-19T00:54:56.018Z",
-    "reviewSpawnedAt": "2026-07-19T00:54:24.660Z",
+    "reviewSpawnedAt": "2026-07-19T01:02:44.933Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "configuration/state-branch.mdx",
@@ -515,9 +515,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 11027710,
-            "output": 1146575,
-            "cacheRead": 456949248,
+            "input": 11049529,
+            "output": 1148588,
+            "cacheRead": 459070464,
             "cacheWrite": 0
           }
         }
@@ -530,9 +530,9 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 12423833,
-          "output": 1266791,
-          "cacheRead": 481993728,
+          "input": 12445652,
+          "output": 1268804,
+          "cacheRead": 484114944,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -543,8 +543,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 350.00415,
-        "pricingAsOf": "2026-07-19T01:02:44.164Z"
+        "usd": 351.234243,
+        "pricingAsOf": "2026-07-19T01:02:57.208Z"
       }
     },
     "merges": [
