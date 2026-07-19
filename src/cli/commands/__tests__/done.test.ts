@@ -4,7 +4,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { augmentCommentWithWaiver, recordTestWaiver, verifyStrikeBranchMergedIntoMain } from '../done.js';
+import { augmentCommentWithWaiver, recordTestWaiver } from '../done.js';
+import { verifyStrikeBranchMergedIntoMain } from '../strike-merge-verification.js';
 import { getProjectConfigFromWorkspacePath, readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
 
 const execFileAsync = promisify(execFile);
