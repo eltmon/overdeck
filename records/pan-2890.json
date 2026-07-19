@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:46:57.524Z",
+  "updated": "2026-07-19T00:47:00.029Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
@@ -21,8 +21,43 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T00:19:35.923Z",
-    "inspectNotes": "All 4 ACs met: describeAgentStop covers all 5 branches incl. troubled-failures plural; click navigates via pushState+popstate then onNavigate in order; font-mono ID + truncate/title fallback rendered; relativeTime verified fully under fake timers (5m/3h/2d)."
+    "updatedAt": "2026-07-19T00:47:00.028Z",
+    "inspectNotes": "All 4 ACs met: describeAgentStop covers all 5 branches incl. troubled-failures plural; click navigates via pushState+popstate then onNavigate in order; font-mono ID + truncate/title fallback rendered; relativeTime verified fully under fake timers (5m/3h/2d).",
+    "reviewRequestedAt": "2026-07-19T00:47:00.028Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
+      ],
+      "declaredScopeUntouched": [
+        "docs/design/mockups/agent-pills-pan-2890.html",
+        "src/dashboard/frontend/src/components/StoppedAgentsBanner.test.tsx"
+      ],
+      "declaredScope": [
+        "docs/COMMAND-DECK-RESTORATION.md",
+        "docs/design/mockups/agent-pills-pan-2890.html",
+        "src/dashboard/frontend/src/App.tsx",
+        "src/dashboard/frontend/src/App/AppChrome.tsx",
+        "src/dashboard/frontend/src/components/AgentPillPopoverRow.test.tsx",
+        "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
+        "src/dashboard/frontend/src/components/RunningAgentsPill.test.tsx",
+        "src/dashboard/frontend/src/components/RunningAgentsPill.tsx",
+        "src/dashboard/frontend/src/components/StoppedAgentsBanner.test.tsx",
+        "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx"
+      ],
+      "actualChangedFiles": [
+        "docs/COMMAND-DECK-RESTORATION.md",
+        "src/dashboard/frontend/src/App.tsx",
+        "src/dashboard/frontend/src/App/AppChrome.tsx",
+        "src/dashboard/frontend/src/components/AgentPillPopoverRow.test.tsx",
+        "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
+        "src/dashboard/frontend/src/components/RunningAgentsPill.test.tsx",
+        "src/dashboard/frontend/src/components/RunningAgentsPill.tsx",
+        "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx",
+        "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
+      ],
+      "recordedAt": "2026-07-19T00:46:57.524Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2892"
   },
   "closeOut": {
     "usage": {
