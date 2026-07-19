@@ -11,6 +11,7 @@ function staleness(status: BuildStaleness['status']): BuildStaleness {
     behindTotal: status === 'fresh' ? 0 : 2,
     behindBuildInputs: status === 'fresh' ? 0 : 1,
     originMainLastCommitAt: 1_710_000_000_000,
+    originMainLastBuildInputCommitAt: 1_710_000_000_000,
     computedAt: 1_752_580_800_000,
     ...(status === 'unknown' ? { reason: 'legacy unstamped build' } : {}),
   };

@@ -13,6 +13,8 @@ const BUILD_COMMIT = 'build-sha';
 function createExec(options: {
   behindTotal?: number;
   behindBuildInputs?: number;
+  lastCommitAt?: number;
+  lastBuildInputCommitAt?: number;
   fetchError?: Error;
   unknownBuild?: boolean;
 } = {}) {
@@ -28,7 +30,10 @@ function createExec(options: {
       return { stdout: `${options.behindBuildInputs ?? 0}\n` };
     }
     if (args[0] === 'rev-list') return { stdout: `${options.behindTotal ?? 0}\n` };
-    if (args[0] === 'log') return { stdout: '1710000000\n' };
+    if (args[0] === 'log' && args.includes('--')) {
+      return { stdout: `${options.lastBuildInputCommitAt ?? 1_709_999_400}\n` };
+    }
+    if (args[0] === 'log') return { stdout: `${options.lastCommitAt ?? 1_710_000_000}\n` };
     return { stdout: `${BUILD_COMMIT}\n` };
   };
   return { exec, calls };
@@ -50,9 +55,17 @@ describe('computeBuildStaleness', () => {
 
     const result = await computeBuildStaleness({ repoRoot: REPO_ROOT, buildCommit: BUILD_COMMIT, exec });
 
-    expect(result).toMatchObject({ status: 'stale', behindTotal: 5, behindBuildInputs: 2 });
+    expect(result).toMatchObject({
+      status: 'stale',
+      behindTotal: 5,
+      behindBuildInputs: 2,
+      originMainLastBuildInputCommitAt: 1_709_999_400_000,
+    });
     expect(calls).toContainEqual([
       'rev-list', '--count', `${BUILD_COMMIT}..origin/main`, '--', ...BUILD_INPUT_PATHS,
+    ]);
+    expect(calls).toContainEqual([
+      'log', '-1', '--format=%ct', 'origin/main', '--', ...BUILD_INPUT_PATHS,
     ]);
   });
 
@@ -66,6 +79,7 @@ describe('computeBuildStaleness', () => {
         behindTotal: 3,
         behindBuildInputs: 0,
         originMainLastCommitAt: 1_710_000_000_000,
+        originMainLastBuildInputCommitAt: 1_709_999_400_000,
       });
   });
 

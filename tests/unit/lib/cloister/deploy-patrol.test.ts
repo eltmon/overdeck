@@ -18,6 +18,7 @@ function stale(overrides: Partial<BuildStaleness> = {}): BuildStaleness {
     behindTotal: 4,
     behindBuildInputs: 2,
     originMainLastCommitAt: NOW - 10 * 60 * 1000,
+    originMainLastBuildInputCommitAt: NOW - 10 * 60 * 1000,
     computedAt: NOW,
     ...overrides,
   };
@@ -77,14 +78,27 @@ describe('runDeployPatrol', () => {
     expect(ctx.emitEntry.mock.calls.filter(([entry]) => entry.message.includes('verification'))).toHaveLength(1);
   });
 
-  it('waits for the merge debounce interval under fake timers', async () => {
-    const ctx = context(stale({ originMainLastCommitAt: NOW - 4 * 60 * 1000 }));
+  it('waits for the build-input debounce interval under fake timers', async () => {
+    const ctx = context(stale({
+      originMainLastBuildInputCommitAt: NOW - 4 * 60 * 1000,
+    }));
 
     await runDeployPatrol(ctx);
     expect(ctx.spawnReload).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(60_000);
     await runDeployPatrol(ctx);
+    expect(ctx.spawnReload).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores recent non-build commits when the build-input debounce is clear', async () => {
+    const ctx = context(stale({
+      originMainLastCommitAt: NOW - 1 * 60 * 1000,
+      originMainLastBuildInputCommitAt: NOW - 10 * 60 * 1000,
+    }));
+
+    await runDeployPatrol(ctx);
+
     expect(ctx.spawnReload).toHaveBeenCalledTimes(1);
   });
 
