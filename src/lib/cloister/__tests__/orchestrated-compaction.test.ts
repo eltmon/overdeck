@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
+  COMPACTION_CONTINUE_MAX_WAIT_MS,
   COMPACTION_CONTINUE_MIN_SETTLE_MS,
   ORCHESTRATED_COMPACTION_CONTINUE_MESSAGE,
   deliverOrchestratedCompact,
@@ -68,6 +69,20 @@ describe('orchestrated compaction continuation', () => {
     })).toBe(false);
     expect(send).not.toHaveBeenCalled();
     expect(orchestratedCompactionContinuations.has('agent-pan-2899')).toBe(true);
+  });
+
+  it('releases overflow recovery when compaction never clears the error', async () => {
+    const send = vi.fn().mockResolvedValue(undefined);
+    const requestedAt = Date.parse('2026-07-19T02:25:56.000Z');
+    scheduleOrchestratedCompactionContinuation('agent-pan-2899', requestedAt);
+
+    expect(await maybeContinueOrchestratedCompaction({
+      sessionName: 'agent-pan-2899',
+      tmuxOutput: 'API Error: 400 Your input exceeds the context window of this model.\n❯',
+      now: requestedAt + COMPACTION_CONTINUE_MAX_WAIT_MS,
+      send,
+    })).toBe(false);
+    expect(orchestratedCompactionContinuations.has('agent-pan-2899')).toBe(false);
   });
 
   it('cancels the continuation when slash-command delivery fails', async () => {

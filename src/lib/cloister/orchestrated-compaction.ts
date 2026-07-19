@@ -1,6 +1,7 @@
 import { isContextOverflowTail } from '../context-overflow.js';
 
 export const COMPACTION_CONTINUE_MIN_SETTLE_MS = 30_000;
+export const COMPACTION_CONTINUE_MAX_WAIT_MS = 150_000;
 
 export const ORCHESTRATED_COMPACTION_CONTINUE_MESSAGE =
   'Compaction complete. Continue from the compacted summary now. ' +
@@ -53,15 +54,24 @@ export async function maybeContinueOrchestratedCompaction(args: {
   const pending = orchestratedCompactionContinuations.get(args.sessionName);
   if (!pending) return false;
 
+  const now = args.now ?? Date.now();
+  const elapsed = now - pending.requestedAt;
   const hasPrompt = args.tmuxOutput.includes('❯');
   if (!hasPrompt) {
     pending.observedBusy = true;
+    if (elapsed >= COMPACTION_CONTINUE_MAX_WAIT_MS) {
+      orchestratedCompactionContinuations.delete(args.sessionName);
+    }
     return false;
   }
-  if (isContextOverflowTail(args.tmuxOutput)) return false;
+  if (isContextOverflowTail(args.tmuxOutput)) {
+    if (elapsed >= COMPACTION_CONTINUE_MAX_WAIT_MS) {
+      orchestratedCompactionContinuations.delete(args.sessionName);
+    }
+    return false;
+  }
 
-  const now = args.now ?? Date.now();
-  if (!pending.observedBusy && (now - pending.requestedAt) < COMPACTION_CONTINUE_MIN_SETTLE_MS) {
+  if (!pending.observedBusy && elapsed < COMPACTION_CONTINUE_MIN_SETTLE_MS) {
     return false;
   }
 

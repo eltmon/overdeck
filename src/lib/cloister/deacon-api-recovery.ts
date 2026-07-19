@@ -275,11 +275,14 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         if (continuedAfterCompaction) {
           contextOverflowRecoveryState.delete(sessionName);
           actions.push(`Context compaction recovery: resumed ${sessionName} after compaction`);
+          continue;
         }
       } catch (err) {
         console.error(`[deacon] Failed to resume ${sessionName} after orchestrated compaction:`, err);
       }
-      continue;
+      if (hasOrchestratedCompactionContinuation(sessionName)) {
+        continue;
+      }
     }
 
     const hasPrompt = tmuxOutput.includes('❯');
