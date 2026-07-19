@@ -13,13 +13,15 @@ interface PlaceholderReconciliationDeps {
   logAgent: (agentId: string, message: string) => void;
 }
 
-const defaultDeps: PlaceholderReconciliationDeps = {
-  readPinnedLaunch: readPinnedAgentLaunchSync,
-  markRunning: markAgentRunningState,
-  saveState: (state) => Effect.runPromise(saveAgentState(state)),
-  logDeacon: logDeaconEventSync,
-  logAgent: logAgentLifecycleSync,
-};
+function defaultPlaceholderReconciliationDeps(): PlaceholderReconciliationDeps {
+  return {
+    readPinnedLaunch: readPinnedAgentLaunchSync,
+    markRunning: markAgentRunningState,
+    saveState: (state) => Effect.runPromise(saveAgentState(state)),
+    logDeacon: logDeaconEventSync,
+    logAgent: logAgentLifecycleSync,
+  };
+}
 
 export async function reconcileLiveWorkSpawnPlaceholder(
   state: AgentState,
@@ -28,22 +30,23 @@ export async function reconcileLiveWorkSpawnPlaceholder(
     previousStatus?: AgentState['status'],
     hasLiveTmuxSession?: boolean,
   ) => void,
-  deps: PlaceholderReconciliationDeps = defaultDeps,
+  deps?: PlaceholderReconciliationDeps,
 ): Promise<string | null> {
   if (state.model !== 'pending-work-spawn') return null;
-  const pinnedLaunch = deps.readPinnedLaunch(state.id);
+  const resolvedDeps = deps ?? defaultPlaceholderReconciliationDeps();
+  const pinnedLaunch = resolvedDeps.readPinnedLaunch(state.id);
   if (!pinnedLaunch) return null;
 
   const previousStatus = state.status;
   state.model = pinnedLaunch.model;
   state.harness = pinnedLaunch.harness;
   state.sessionId = pinnedLaunch.sessionId;
-  deps.markRunning(state);
-  await deps.saveState(state);
+  resolvedDeps.markRunning(state);
+  await resolvedDeps.saveState(state);
   notifyStatusChanged(state, previousStatus, true);
 
   const message = `Reconciled ${state.id} placeholder to running (${pinnedLaunch.harness}/${pinnedLaunch.model})`;
-  deps.logDeacon(`handleAgentHeartbeatDeadEvent: ${message}`);
-  deps.logAgent(state.id, message);
+  resolvedDeps.logDeacon(`handleAgentHeartbeatDeadEvent: ${message}`);
+  resolvedDeps.logAgent(state.id, message);
   return message;
 }
