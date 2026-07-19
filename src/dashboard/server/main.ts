@@ -101,8 +101,6 @@ initDashboardLogFile();
 // spawn→listen window attributable. See server.ts for the matching listen mark.
 console.log(`[boot-timing] module graph loaded at +${Math.round(performance.now())}ms (since process start)`);
 console.log(`[overdeck] Boot gates: ${formatBootGateState(resolveBootGates())}`);
-startEventLoopMonitor();
-console.log('[overdeck] Event loop delay monitor started');
 
 // Ensure OVERDECK_HOME exists before any service that needs it (e.g. CacheService opening cache.db)
 await mkdir(getOverdeckHome(), { recursive: true });
@@ -111,9 +109,6 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalTokenSync();
-
-void warnIfAutonomousMergeBackendUnavailable();
-void warnIfAppCannotMerge();
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and
@@ -125,6 +120,37 @@ await ensureManagedTmuxContextOnce();
 await initTrackerConfigCache().catch(err => {
   console.log('[tracker-config] Warning: failed to cache .overdeck.env:', err.message);
 });
+
+// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). There is
+// NO legacy seed / db↔db migration — overdeck state is JSON/git-backed (PAN-1983).
+try {
+  const overdeckDbPath = getOverdeckDatabasePath();
+  if (!existsSync(overdeckDbPath)) {
+    createOverdeckDatabase({ dbPath: overdeckDbPath });
+    console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
+  }
+} catch (err) {
+  // Non-fatal: dashboard continues with whatever data is in overdeck.db.
+  console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
+}
+
+// Bind the HTTP socket before starting any background service or the Deacon.
+// A bind failure is retried by server.ts and then terminates this process through
+// Effect's Node runtime; no headless orchestrator is allowed to survive it.
+const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
+if (typeof Bun !== 'undefined') {
+  const { runMain } = await import('@effect/platform-bun/BunRuntime');
+  runMain(main as never);
+} else {
+  const { runMain } = await import('@effect/platform-node/NodeRuntime');
+  runMain(main as never);
+}
+await whenDashboardListening();
+
+startEventLoopMonitor();
+console.log('[overdeck] Event loop delay monitor started');
+void warnIfAutonomousMergeBackendUnavailable();
+void warnIfAppCannotMerge();
 
 // Start the shared IssueDataService — fire and forget.
 // It loads SQLite-cached data instantly and pushes an initial snapshot,
@@ -826,30 +852,4 @@ async function pruneClosedIssueReviewStatuses(): Promise<void> {
   if (removed > 0) {
     console.log(`[overdeck] Pruned ${removed} stale review-status entr${removed === 1 ? 'y' : 'ies'} for closed issues`);
   }
-}
-
-// ── Overdeck boot: create overdeck.db if needed ──────────────────────────────
-// A normal boot creates an EMPTY overdeck.db (fresh-install semantics). There is
-// NO legacy seed / db↔db migration — overdeck state is JSON/git-backed (PAN-1983).
-await (async () => {
-  try {
-    const overdeckDbPath = getOverdeckDatabasePath();
-    if (!existsSync(overdeckDbPath)) {
-      createOverdeckDatabase({ dbPath: overdeckDbPath });
-      console.log(`[overdeck] Created overdeck.db at ${overdeckDbPath}`);
-    }
-  } catch (err) {
-    // Non-fatal: dashboard continues with whatever data is in overdeck.db.
-    console.warn('[overdeck] Overdeck db init failed (non-fatal):', err);
-  }
-})();
-
-const main = runServer.pipe(Effect.provide(ServerConfigLayer)) as Effect.Effect<never, unknown>;
-
-if (typeof Bun !== 'undefined') {
-  const { runMain } = await import('@effect/platform-bun/BunRuntime');
-  runMain(main as never);
-} else {
-  const { runMain } = await import('@effect/platform-node/NodeRuntime');
-  runMain(main as never);
 }
