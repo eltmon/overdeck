@@ -80,20 +80,21 @@
     "recordedAt": "2026-07-19T22:32:41.050Z"
   },
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T22:32:48.896Z",
+  "updated": "2026-07-19T22:32:49.849Z",
   "pipeline": {
     "issueId": "PAN-2066",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T22:32:47.536Z",
+    "updatedAt": "2026-07-19T22:32:49.427Z",
     "inspectNotes": "AC3 not fully guaranteed: knowledge-viewer.ts:161-169 stopEntry awaits stop(entry.bundlePath) with no timeout before reaching the kill('SIGTERM') fallback at line 168; the default stop impl stopOpenKnowledgeWithSpawn (lines 226-235) spawns a separate 'ok stop' process and awaits its exit event with no timeout — if that helper hangs instead of rejecting, the tracked ok server process is never killed, risking an orphan on shutdown. Fix: wrap the stop() call in a bounded race/timeout so entry.process.kill('SIGTERM') always fires within bounded time. AC1, AC2, AC4 verified as met.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2942",
     "reviewRequestedAt": "2026-07-19T22:32:43.888Z",
+    "reviewSpawnedAt": "2026-07-19T22:32:49.087Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs.json",
@@ -214,7 +215,7 @@
       },
       "costAtCloseOut": {
         "usd": 127.610353,
-        "pricingAsOf": "2026-07-19T22:32:47.588Z"
+        "pricingAsOf": "2026-07-19T22:32:49.587Z"
       }
     },
     "merges": [
