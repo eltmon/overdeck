@@ -42,6 +42,7 @@ import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
+import { verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
 
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
   Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
@@ -67,10 +68,6 @@ interface SlotCompletionContext {
   slotIndex: number;
   slotItemId?: string;
   workspacePath: string | null;
-}
-
-function shellQuote(value: string): string {
-  return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
 function parseSlotAgentId(input: string): { issueId: string; agentId: string; slotIndex: number } | null {
@@ -335,30 +332,6 @@ async function isMergeSetMergedIntoTargets(
   }
 
   return true;
-}
-
-export async function verifyStrikeBranchMergedIntoMain(issueId: string, projectPath: string): Promise<string> {
-  const branchName = `strike/${issueId.toLowerCase()}`;
-
-  await execAsync('git fetch origin main', {
-    cwd: projectPath,
-    encoding: 'utf-8',
-    timeout: 60000,
-  });
-
-  await execAsync(`git rev-parse --verify ${shellQuote(branchName)}`, {
-    cwd: projectPath,
-    encoding: 'utf-8',
-    timeout: 10000,
-  });
-
-  await execAsync(`git merge-base --is-ancestor ${shellQuote(branchName)} origin/main`, {
-    cwd: projectPath,
-    encoding: 'utf-8',
-    timeout: 10000,
-  });
-
-  return `${branchName} is contained in origin/main`;
 }
 
 async function resolveDoneWorkspace(

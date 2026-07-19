@@ -4,7 +4,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { join } from 'path';
 import { existsSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { augmentCommentWithWaiver, recordTestWaiver, verifyStrikeBranchMergedIntoMain } from '../done.js';
+import { augmentCommentWithWaiver, recordTestWaiver } from '../done.js';
+import { verifyStrikeBranchMergedIntoMain } from '../strike-merge-verification.js';
 import { getProjectConfigFromWorkspacePath, readIssueRecordSync, writeIssueRecordSync } from '../../../lib/pan-dir/record.js';
 
 const execFileAsync = promisify(execFile);
@@ -114,6 +115,23 @@ describe('verifyStrikeBranchMergedIntoMain', () => {
 
     await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).resolves.toBe(
       'strike/pan-2013 is contained in origin/main',
+    );
+  });
+
+  it('accepts a squash-merged strike branch with equivalent commits on origin/main', async () => {
+    const { projectPath } = await createStrikeRepo();
+
+    await git(projectPath, ['checkout', 'strike/pan-2013']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'squash merged\n');
+    await git(projectPath, ['add', 'strike.txt']);
+    await git(projectPath, ['commit', '-m', 'strike work']);
+    await git(projectPath, ['checkout', 'main']);
+    await git(projectPath, ['merge', '--squash', 'strike/pan-2013']);
+    await git(projectPath, ['commit', '-m', 'squash strike work']);
+    await git(projectPath, ['push', 'origin', 'main']);
+
+    await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).resolves.toBe(
+      'strike/pan-2013 has no commits missing from origin/main',
     );
   });
 
