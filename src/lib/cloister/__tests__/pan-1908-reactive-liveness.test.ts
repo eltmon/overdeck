@@ -23,6 +23,7 @@ const mockKillSession = vi.fn();
 const mockListPaneValues = vi.fn();
 const mockGetReviewStatusSync = vi.fn();
 const mockGetAgentRuntimeStateSync = vi.fn();
+const mockReconcileLiveWorkSpawnPlaceholder = vi.fn();
 const mockWorkResumeSlotsAvailable = vi.fn();
 const mockCountRunningAgents = vi.fn();
 const mockGetConcurrencyLimits = vi.fn();
@@ -78,6 +79,10 @@ vi.mock('../../../lib/tmux.js', () => ({
   killSession: (...args: unknown[]) => Effect.succeed(mockKillSession(...args)),
   killSessionSync: (...args: unknown[]) => mockKillSession(...args),
   listPaneValues: (...args: unknown[]) => Effect.succeed(mockListPaneValues(...args)),
+}));
+
+vi.mock('../../../lib/agents/placeholder-reconciliation.js', () => ({
+  reconcileLiveWorkSpawnPlaceholder: (...args: unknown[]) => mockReconcileLiveWorkSpawnPlaceholder(...args),
 }));
 
 vi.mock('../../../lib/review-status.js', () => ({
@@ -161,6 +166,7 @@ describe('PAN-1908 reactive liveness handlers', () => {
     mockListPaneValues.mockResolvedValue(['0']);
     mockGetReviewStatusSync.mockReturnValue(undefined);
     mockGetAgentRuntimeStateSync.mockReturnValue(null);
+    mockReconcileLiveWorkSpawnPlaceholder.mockResolvedValue(null);
     mockWorkResumeSlotsAvailable.mockReturnValue(6);
     mockCountRunningAgents.mockReturnValue({ work: 0, advancing: 0, total: 0 });
     mockGetConcurrencyLimits.mockReturnValue({ maxWorkAgents: 6, reservedAdvancingSlots: 3, totalCeiling: 9 });
@@ -402,6 +408,26 @@ describe('PAN-1908 reactive liveness handlers', () => {
 
       expect(actions).toEqual([]);
       expect(mockSaveAgentState).not.toHaveBeenCalled();
+    });
+
+    it('self-heals a live pending-work-spawn placeholder from its pinned launcher', async () => {
+      const state = makeState({ status: 'starting', model: 'pending-work-spawn' });
+      mockGetAgentStateSync.mockReturnValue(state);
+      mockSessionExistsSync.mockReturnValue(true);
+      mockQuerySessionSync.mockReturnValue({ status: 'exists' });
+      mockReconcileLiveWorkSpawnPlaceholder.mockResolvedValue(
+        'Reconciled agent-pan-1908 placeholder to running (claude-code/gpt-5.6-sol)',
+      );
+
+      const actions = await handleAgentHeartbeatDeadEvent('agent-pan-1908');
+
+      expect(actions).toEqual([
+        'Reconciled agent-pan-1908 placeholder to running (claude-code/gpt-5.6-sol)',
+      ]);
+      expect(mockReconcileLiveWorkSpawnPlaceholder).toHaveBeenCalledWith(
+        state,
+        expect.any(Function),
+      );
     });
 
     it('skips running agents with a live tmux session', async () => {
