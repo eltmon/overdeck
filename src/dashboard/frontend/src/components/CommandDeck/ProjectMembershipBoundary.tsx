@@ -26,14 +26,13 @@ export function ProjectMembershipBoundary({
     queryFn: () => fetchProjectPipelineMembership(projectKey!),
     enabled: Boolean(projectKey && selectedProject !== NO_PROJECT_KEY && !disabled),
     retry: false,
-    refetchInterval: 30000,
   });
 
   if (!selectedProject) {
     return <div className={styles.emptyProject}>Select a project to see its issues</div>;
   }
 
-  if (loading || membership.isLoading) {
+  if (loading) {
     return (
       <div className={styles.skeletonList}>
         <div className={styles.skeletonItem} style={{ width: '60%' }} />
@@ -43,31 +42,37 @@ export function ProjectMembershipBoundary({
     );
   }
 
-  if (membership.isError) {
-    return (
-      <div className={styles.membershipError} role="alert">
-        <CircleAlert size={16} aria-hidden="true" />
-        <div className={styles.membershipErrorContent}>
-          <p>
-            Pipeline membership determines which issues appear here. It could not be loaded for{' '}
-            <strong>{projectName ?? selectedProject}</strong>, so this issue list may be incomplete.
-          </p>
-          <p className={styles.membershipErrorDetail}>
-            {membership.error instanceof Error
-              ? membership.error.message
-              : 'Pipeline membership could not be loaded'}
-          </p>
-          <button
-            type="button"
-            className={styles.membershipErrorRetry}
-            onClick={() => void membership.refetch()}
-          >
-            Retry membership
-          </button>
+  return (
+    <>
+      {membership.isLoading && (
+        <div className={styles.membershipStatus} role="status">
+          Refreshing pipeline membership…
         </div>
-      </div>
-    );
-  }
-
-  return children;
+      )}
+      {membership.isError && (
+        <div className={styles.membershipError} role="alert">
+          <CircleAlert size={16} aria-hidden="true" />
+          <div className={styles.membershipErrorContent}>
+            <p>
+              Pipeline membership determines which issues appear here. It could not be loaded for{' '}
+              <strong>{projectName ?? selectedProject}</strong>, so this issue list may be incomplete.
+            </p>
+            <p className={styles.membershipErrorDetail}>
+              {membership.error instanceof Error
+                ? membership.error.message
+                : 'Pipeline membership could not be loaded'}
+            </p>
+            <button
+              type="button"
+              className={styles.membershipErrorRetry}
+              onClick={() => void membership.refetch()}
+            >
+              Retry membership
+            </button>
+          </div>
+        </div>
+      )}
+      {children}
+    </>
+  );
 }

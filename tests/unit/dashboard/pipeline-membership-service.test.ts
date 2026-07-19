@@ -7,6 +7,7 @@ import {
   getPipelineMembershipResultsForProjects,
   getPipelineMembershipSnapshotsForProjects,
   getPipelineMembershipSnapshotsForResourceDiscovery,
+  readPipelineMembershipSnapshotsForProjects,
   PIPELINE_MEMBERSHIP_TTL_MS,
   PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS,
   refreshMembershipSnapshotsForProjects,
@@ -113,6 +114,18 @@ describe('pipeline membership service', () => {
 
     expect(results[0]).toMatchObject({ project: projects[0], memberships: [{ issueId: 'PAN-1' }] });
     expect(results[1]).toMatchObject({ project: projects[1], error: failure });
+  });
+
+  it('keeps request-side snapshot reads free of tracker and git discovery', async () => {
+    const project = { name: 'snapshot-read', path: '/snapshot-read', github_repo: 'owner/repo' };
+    const getMembership = Object.assign(vi.fn().mockResolvedValue([{ issueId: 'PAN-1' }]), { invalidate: vi.fn() });
+
+    expect(readPipelineMembershipSnapshotsForProjects([project])[0]?.error).toBeInstanceOf(Error);
+    expect(getMembership).not.toHaveBeenCalled();
+
+    await refreshMembershipSnapshotsForProjects([project], getMembership);
+    expect(readPipelineMembershipSnapshotsForProjects([project])[0]?.memberships).toEqual([{ issueId: 'PAN-1' }]);
+    expect(getMembership).toHaveBeenCalledOnce();
   });
 
   it('returns unavailable on a cold read, then serves the successful snapshot while refreshing', async () => {

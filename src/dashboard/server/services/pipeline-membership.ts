@@ -87,23 +87,34 @@ function refreshMembershipSnapshot(
   return snapshot.refresh;
 }
 
+/** Read the latest successful snapshots without scheduling tracker or git work. */
+export function readPipelineMembershipSnapshotsForProjects(
+  projects: ProjectConfig[],
+): ProjectPipelineMembershipResult[] {
+  return projects.map((project) => {
+    const snapshot = membershipSnapshots.get(project.path);
+    return snapshot?.refreshedAt
+      ? { project, memberships: snapshot.value }
+      : { project, error: new Error('Pipeline membership snapshot is loading') };
+  });
+}
+
 /** Return the latest successful snapshot immediately and refresh stale/missing projects in the background. */
 export function getPipelineMembershipSnapshotsForProjects(
   projects: ProjectConfig[],
   getMembership: MembershipLookup = getProjectPipelineMembership,
   now = Date.now,
 ): ProjectPipelineMembershipResult[] {
-  return projects.map((project) => {
+  const results = readPipelineMembershipSnapshotsForProjects(projects);
+  for (const project of projects) {
     const snapshot = membershipSnapshots.get(project.path);
     if (!snapshot?.refresh && (!snapshot || now() - snapshot.refreshedAt >= PIPELINE_MEMBERSHIP_SNAPSHOT_TTL_MS)) {
       const current = snapshot ?? { value: [], refreshedAt: 0 };
       membershipSnapshots.set(project.path, current);
       void refreshMembershipSnapshot(project, current, getMembership, now);
     }
-    return snapshot?.refreshedAt
-      ? { project, memberships: snapshot.value }
-      : { project, error: new Error('Pipeline membership snapshot is loading') };
-  });
+  }
+  return results;
 }
 
 /** Await only the first snapshot; later resource refreshes consume stale data while revalidating. */

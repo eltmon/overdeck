@@ -39,6 +39,7 @@ vi.mock('./styles/command-deck.module.css', () => ({
     skeletonList: 'skeletonList',
     skeletonItem: 'skeletonItem',
     emptyProject: 'emptyProject',
+    membershipStatus: 'membershipStatus',
     membershipError: 'membershipError',
     membershipErrorContent: 'membershipErrorContent',
     membershipErrorDetail: 'membershipErrorDetail',
@@ -478,7 +479,7 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     expect(screen.getByTestId('activity-feed')).toHaveAttribute('data-issues', 'PAN-821');
   });
 
-  it('surfaces a selected project membership failure instead of a blank issue rail', async () => {
+  it('keeps the issue rail rendered while selected-project membership is unavailable', async () => {
     resourceProjectsResponse = [];
     pipelineMembershipResponse = {
       ok: false,
@@ -486,18 +487,19 @@ describe('CommandDeck — project-scoped deck (PAN-1561)', () => {
     };
     renderCommandDeck({ selectedProject: 'test-project' });
 
+    expect(await screen.findByTestId('project-node')).toHaveAttribute('data-project-key', 'test-key');
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(
       'Pipeline membership determines which issues appear here. It could not be loaded for test-project, so this issue list may be incomplete.',
     );
     expect(alert).toHaveTextContent('Pipeline membership snapshot failed to load');
-    expect(screen.queryByTestId('project-node')).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/pipeline/membership?project=test-key');
 
     pipelineMembershipResponse = { ok: true, body: [] };
     fireEvent.click(screen.getByRole('button', { name: 'Retry membership' }));
 
-    expect(await screen.findByTestId('project-node')).toHaveAttribute('data-project-key', 'test-key');
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(screen.getByTestId('project-node')).toHaveAttribute('data-project-key', 'test-key');
   });
 
   it('toggles spec-only planned issues across the tree, count, and project home', async () => {
