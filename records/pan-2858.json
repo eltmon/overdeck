@@ -798,7 +798,7 @@
     "recordedAt": "2026-07-19T13:30:33.731Z"
   },
   "created": "2026-07-18T01:08:14.744Z",
-  "updated": "2026-07-19T13:38:56.502Z",
+  "updated": "2026-07-19T13:39:02.189Z",
   "pipeline": {
     "issueId": "PAN-2858",
     "reviewStatus": "pending",
@@ -813,7 +813,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/2875",
     "reviewedAtCommit": "5e304c614b5b5485270fed7f628d07d071367505",
     "lastVerifiedCommit": "6f652e74da859163c9f316e1ee7ac85a4955d59b",
-    "reviewRequestedAt": "2026-07-19T13:30:34.522Z",
+    "reviewRequestedAt": "2026-07-19T13:39:01.809Z",
     "reviewSpawnedAt": "2026-07-19T13:30:38.831Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -1161,7 +1161,8 @@
         "vitest.config.ts"
       ],
       "recordedAt": "2026-07-19T13:30:33.731Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-19T13:39:01.809Z"
   },
   "closeOut": {
     "usage": {
