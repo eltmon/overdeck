@@ -82,8 +82,9 @@ running `buildCommit`; the app header shows `build stale ×N` when newer build-i
 
 The post-merge lifecycle and Deacon share the same deploy safety window. They defer while
 verification, merging, another restart, a pending post-merge lifecycle, or `pan dev` is active.
-Deacon also waits for the merge debounce interval, so a merge train produces one rebuild and
-restart instead of one per merge.
+Deacon also requires the `CI` workflow for the exact `origin/main` tip to complete successfully;
+pending, failed, or unreadable CI state defers deployment. It then waits for the merge debounce interval,
+so a merge train produces one rebuild and restart instead of one per merge.
 
 Configure the behavior in Cloister config:
 
@@ -96,8 +97,9 @@ deploy:
 Set `deploy.auto_deploy: false` for signal-only mode. Staleness remains visible in system health
 and the header, but Deacon does not start a deployment. On Linux, Deacon runs the reload in a
 transient systemd user unit with rate-limited failure recovery, so stopping the old dashboard cannot
-kill the reload through the dashboard's cgroup. Deployment output and retry failures are appended
-to `~/.overdeck/logs/auto-deploy.log`.
+kill the reload through the dashboard's cgroup. Patrol reloads stamp `deploy-patrol` as the restart
+initiator instead of inheriting the identity that launched the current dashboard. Deployment output
+and retry failures are appended to `~/.overdeck/logs/auto-deploy.log`.
 
 `pan reload` remains the manual deployment door. It builds first, preserves the running dashboard
 when the build fails, restarts the Node 22 bundle after a successful build, and waits for health.
