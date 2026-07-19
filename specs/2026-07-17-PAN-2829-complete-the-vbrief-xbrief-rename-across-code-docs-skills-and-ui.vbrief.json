@@ -4,17 +4,17 @@
     "created": "2026-07-17T13:00:24.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-2829: Complete the vBRIEF → xBRIEF rename across code, docs, skills, and UI",
-    "updated": "2026-07-18T19:06:14.488Z"
+    "updated": "2026-07-19T03:17:11.072Z"
   },
   "plan": {
     "id": "pan-2829",
     "title": "Complete the vBRIEF → xBRIEF rename across code, docs, skills, and UI",
-    "status": "running",
+    "status": "completed",
     "uid": "16348049-1142-4625-ae9b-dace022b1548",
     "author": "agent:claude-fable-5",
-    "sequence": 9,
+    "sequence": 10,
     "created": "2026-07-17T13:00:24.000Z",
-    "updated": "2026-07-18T19:06:14.488Z",
+    "updated": "2026-07-19T03:17:11.072Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/2829",
@@ -842,5 +842,5 @@
       "canonicalFilename": "2026-07-17-PAN-2829-complete-the-vbrief-xbrief-rename-across-code-docs-skills-and-ui.vbrief.json"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
