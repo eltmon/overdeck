@@ -75,11 +75,11 @@ describe('resolveStaffing (PAN-2397 W1 — Always Tiered)', () => {
     expect(staffing.model).toBe('claude-sonnet-5');
   });
 
-  it('per-task metadata.model override wins inside the explicit table', () => {
-    const staffing = resolveStaffing(item('task', { difficulty: 'trivial', model: 'kimi-k2.7-code' }), {
+  it.each(['kimi-k2.7-code', 'k3', 'k3[1m]'])('per-task metadata.model override %s wins inside the explicit table', (model) => {
+    const staffing = resolveStaffing(item('task', { difficulty: 'trivial', model }), {
       config: { roles: WORK_ROLES, tieredExecution: explicitTiered() } as never,
     });
-    expect(staffing.model).toBe('kimi-k2.7-code');
+    expect(staffing.model).toBe(model);
     expect(staffing.implicit).toBe(false);
   });
 

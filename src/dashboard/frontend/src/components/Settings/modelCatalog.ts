@@ -78,6 +78,8 @@ export const MODELS_BY_PROVIDER: Record<string, ProviderDef> = {
   kimi: {
     name: 'Kimi (Moonshot)',
     models: [
+      { id: 'k3' as ModelId, name: 'Kimi K3', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi flagship coding model (July 2026). Always-thinking 2.8T MoE, 256K context.' },
+      { id: 'k3[1m]' as ModelId, name: 'Kimi K3 (1M)', icon: Gem, tier: 'premium', costPer1MTokens: 9, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi K3 coding endpoint with the full 1,048,576-token context window.' },
       { id: 'kimi-k2.7-code' as ModelId, name: 'Kimi K2.7 Code', icon: Layers, tier: 'premium', costPer1MTokens: 2.5, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi coding-first flagship (June 2026). 1T MoE, multimodal, 262K context.' },
       { id: 'kimi-k2.6' as ModelId, name: 'Kimi K2.6', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Kimi smartest model (April 2026). Native multimodal, superior agentic coding.' },
       { id: 'kimi-k2.5' as ModelId, name: 'Kimi K2.5', icon: Layers, tier: 'premium', costPer1MTokens: 1.6, capabilities: ['reasoning', 'code', 'agentic', 'large-context'], description: 'Best open-source coding, 256K context, 76.8% SWE-bench' },
