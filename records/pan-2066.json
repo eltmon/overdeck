@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T20:57:46.700Z",
+  "updated": "2026-07-19T20:57:56.824Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -69,8 +69,16 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "okf-open-skill": {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 2384774,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T20:57:56.824Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -134,6 +142,7 @@
     "knowledge-open-cli.knowledge-open-cli.ac1": "completed",
     "knowledge-open-cli.knowledge-open-cli.ac2": "completed",
     "knowledge-open-cli.knowledge-open-cli.ac3": "completed",
-    "knowledge-open-cli.knowledge-open-cli.ac4": "completed"
+    "knowledge-open-cli.knowledge-open-cli.ac4": "completed",
+    "okf-open-skill": "running"
   }
 }
