@@ -109,6 +109,14 @@ describe('resolveHarness — PAN-1984: provider-default-only (explicit/role over
     await expect(resolveHarness({ model: 'claude-sonnet-4-6', explicit: 'pi', role: 'work' })).resolves.toBe('claude-code');
   });
 
+  it.each(['k3', 'k3[1m]'])('routes Kimi %s through the claude-code provider default', async (model) => {
+    providerMocks.getProviderForModelSync.mockReturnValue({ name: 'kimi' });
+    providerMocks.getBuiltInDefaultHarness.mockReturnValue('claude-code');
+
+    const { resolveHarness } = await import('../harness-resolve.js');
+    await expect(resolveHarness({ model, role: 'work' })).resolves.toBe('claude-code');
+  });
+
   it('AC(PAN-1989): provider that previously defaulted to pi now resolves to ohmypi via built-in default', async () => {
     // Mechanism test: resolveHarness returns whatever getBuiltInDefaultHarness gives.
     // The built-in default is mocked here, so this exercises the flow-through, not a
