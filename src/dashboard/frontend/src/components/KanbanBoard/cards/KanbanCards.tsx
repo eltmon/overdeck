@@ -5,6 +5,9 @@ import { useDashboardStore, selectReviewStatus } from '../../../lib/store';
 import { Issue, Agent, STATUS_LABELS } from '../../../types';
 import { getFriendlyModelName } from '../../../lib/dashboard-utils';
 import { deriveIssueActionPhase, type PipelinePhase } from '../../../lib/issueActions';
+import { derivePipelineState } from '../../../lib/issuePipelineState';
+import { phaseRailState } from '../../../lib/simple/phases';
+import { PhaseDots } from '../../issue-detail/PhaseDots';
 import { hasActualPendingQuestion } from '../../../lib/pipeline-state';
 import { cn } from '../../../lib/utils';
 import { getIssueWorkAgentMap, isAgentSessionAttachable } from '../../../lib/workAgents';
@@ -591,6 +594,15 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
     isMerged,
     hasPendingInput,
   });
+  // PAN-2908 C-VOCAB: the card's mini phase rail, from the same classifier.
+  const phaseRail = phaseRailState(derivePipelineState({
+    reviewStatus,
+    agent: activeAgent,
+    hasPlan: planningState?.hasPlan ?? issue.hasPlan ?? false,
+    hasTasks: planningState?.hasTasks ?? issue.hasTasks ?? false,
+    issueCanonicalState: canonical,
+    isMerged,
+  }));
   const isPipelineStuck = issueActionPhase === 'STUCK';
   const pinActionRow = isRunning || issueActionPhase === 'STUCK' || issueActionPhase === 'INPUT' || issueActionPhase === 'READY_TO_MERGE';
   const cardVerb = CARD_VERB_BY_PHASE[issueActionPhase];
@@ -781,6 +793,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
 
         {/* Foot */}
         <div className="flex items-center gap-2 pt-2 mt-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <PhaseDots rail={phaseRail} className="mr-0.5" />
           <div className="flex flex-col min-w-0 gap-0.5 flex-1">
             {activeAgent ? (
               <>

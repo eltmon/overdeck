@@ -186,6 +186,8 @@ The 43-action registry **stays**. Everything wrong is in presentation and rot, n
 
 ### 3.6 Board rebuilt around attention (contract C-BOARD)
 
+> **Implementation status (2026-07-19): v1 shipped.** Backlog column rolls up by project above 30 issues (`KanbanBoard/BacklogRollup.tsx` — count + top-3 by priority, per-group expand to full cards); "Needs you" strip above the columns (`KanbanBoard/NeedsYouStrip.tsx` — same derivation as simple home: questions with inline answer, problems with fix-them, stuck with unstick, advanced targets open the drawer); mini phase dots on every card (`issue-detail/PhaseDots.tsx` on the shared classifier); column titles now speak the vocabulary (Backlog · Work · Review · Ship · Done). Still open: the Plan column (needs grouping by derived phase, not tracker status), virtualized rendering in active columns, drag-and-drop simplification, and Done collapsed to recent-N.
+
 - **Backlog is a rollup, not a column of 701 cards.** The leftmost column groups backlog by project (count + top 3 by priority each), with "Show all N →" opening a virtualized, filterable list. The Board's job is WIP, not storage.
 - **Columns = the vocabulary:** `Backlog · Plan · Work · Review · Ship · Done` (Test renders as the fourth pip on cards in Review/Ship; a column per phase was rejected — six columns don't fit, and Test is convoy-fast).
 - **Card anatomy (fixed):** priority left-border · ID + one verb badge · title (2-line clamp) · neutral labels · mini phase dots · agent line (name·model·runtime, or "no agent yet") · **one** state-appropriate primary action + `⋯`. No configuration controls, no five-action footers, no "41 more" text.

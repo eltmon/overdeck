@@ -8,7 +8,7 @@ import {
   useDroppable,
 } from '@dnd-kit/core';
 import { Issue, Agent, LinearProject, STATUS_ORDER, STATUS_LABELS, CanonicalState } from '../types';
-import { Tag, X } from 'lucide-react';
+import { Tag } from 'lucide-react';
 import { PlanDialog } from './PlanDialog';
 // PAN-1048 — SpecialistAgent type retired; specialist-style indicators now
 // derive directly from role-tagged AgentSnapshots (review / test / ship).
@@ -29,6 +29,8 @@ import {
 } from './KanbanBoard/dialogs';
 import { DragOverlayCard, ListIssueRow } from './KanbanBoard/cards';
 import { ColumnContent } from './KanbanBoard/columns';
+import { CanceledListView } from './KanbanBoard/CanceledListView';
+import { NeedsYouStrip } from './KanbanBoard/NeedsYouStrip';
 import { useDragDrop } from './KanbanBoard/hooks/useDragDrop';
 import { KanbanFilterBar } from './KanbanBoard/views';
 import {
@@ -778,44 +780,22 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
           )}
         </div>
       ) : cycleFilter === 'canceled' ? (
-        /* Canceled - List View (grouped by cancellation type) */
-        <div className="space-y-6 overflow-y-auto pb-4">
-          {groupedByCanceledType.map((group) => (
-            <div key={group.name} className="bg-card rounded-lg">
-              <div className="px-4 py-3 border-b border-border">
-                <div className="flex items-center gap-2">
-                  <X className="w-4 h-4 text-destructive-foreground" />
-                  <h3 className="font-semibold text-foreground">{group.name}</h3>
-                  <span className="text-sm text-muted-foreground">({group.issues.length})</span>
-                </div>
-              </div>
-              <div className="divide-y divide-divider">
-                {group.issues.map((issue) => (
-                  <ListIssueRow
-                    key={issue.id}
-                    issue={issue}
-                    issueWorkAgentsById={issueWorkAgentsById}
-                    agents={agents}
-                    specialists={specialists}
-                    issueCosts={issueCosts}
-                    costsLoading={costsLoading}
-                    selectedIssue={selectedIssue}
-                    onSelectIssue={onSelectIssue}
-                    onPlan={openPlanDialog}
-                    isBulkSelected={bulkSelection.isSelected(issue.identifier)}
-                    onBulkToggle={() => bulkSelection.toggle(issue.identifier)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          {groupedByCanceledType.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              No canceled issues
-            </div>
-          )}
-        </div>
+        <CanceledListView
+          groups={groupedByCanceledType}
+          issueWorkAgentsById={issueWorkAgentsById}
+          agents={agents}
+          specialists={specialists}
+          issueCosts={issueCosts}
+          costsLoading={costsLoading}
+          selectedIssue={selectedIssue}
+          onSelectIssue={onSelectIssue}
+          onPlan={openPlanDialog}
+          isBulkSelected={bulkSelection.isSelected}
+          onBulkToggle={bulkSelection.toggle}
+        />
       ) : (
+        <>
+        <NeedsYouStrip onOpenIssue={openIssue} />
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}
@@ -881,6 +861,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
                     onBulkToggle={bulkSelection.toggle}
                     planningStateById={planningStateById}
                     workspaceByIssueId={stackHealthByIssue}
+                    rollup={status === 'todo'}
                   />
                   {/* TODO(PAN-1242): + New issue column footer button — see PRD §4.7.6 */}
                   </div>
@@ -893,6 +874,7 @@ export function KanbanBoard({ selectedIssue: externalSelectedIssue, onSelectIssu
             {activeDragIssue ? <DragOverlayCard issue={activeDragIssue} /> : null}
           </DragOverlay>
         </DndContext>
+        </>
       )}
 
       {/* Undo Toast */}
