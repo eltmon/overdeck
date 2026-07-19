@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:37:59.635Z",
+  "updated": "2026-07-19T00:38:34.844Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {
-      "save-session-investigation": {
-        "writerId": "agent-pan-2890",
-        "agentId": "agent-pan-2890",
-        "pid": 634768,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T00:37:59.634Z"
-      }
-    },
+    "sequence": 11,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2890",
@@ -123,6 +115,17 @@
         "outcome": "completed",
         "reason": "Reused the shared row for stopped agents, added title/stop reason/time context, scoped the header, preserved filters and restart-all behavior, and browser-verified issue navigation.",
         "releasedAt": "2026-07-19T00:37:47.943Z"
+      },
+      {
+        "writerId": "agent-pan-2890",
+        "agentId": "agent-pan-2890",
+        "pid": 634768,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T00:37:59.634Z",
+        "itemId": "save-session-investigation",
+        "outcome": "completed",
+        "reason": "No screenshot was attached and the string is absent from dashboard code; recorded the planned not-reproduced outcome on the issue with repository-search evidence.",
+        "releasedAt": "2026-07-19T00:38:34.844Z"
       }
     ],
     "statusReasons": {
@@ -131,8 +134,8 @@
         "updatedAt": "2026-07-19T00:18:49.400Z"
       },
       "save-session-investigation": {
-        "reason": "All implementation items are complete; apply the planned no-screenshot fallback now.",
-        "updatedAt": "2026-07-19T00:37:57.423Z"
+        "reason": "No screenshot was attached and the string is absent from dashboard code; recorded the planned not-reproduced outcome on the issue with repository-search evidence.",
+        "updatedAt": "2026-07-19T00:38:34.844Z"
       },
       "running-agents-pill": {
         "reason": "Added a store-backed running-agents popover with shared status predicate, scoped count, sorted contextual rows, URL-door navigation, and browser-verified system-agent fallback.",
@@ -150,7 +153,7 @@
     "shared-row-component.shared-row-component.ac2": "completed",
     "shared-row-component.shared-row-component.ac3": "completed",
     "shared-row-component.shared-row-component.ac4": "completed",
-    "save-session-investigation": "running",
+    "save-session-investigation": "completed",
     "running-agents-pill": "completed",
     "running-agents-pill.running-agents-pill.ac1": "completed",
     "running-agents-pill.running-agents-pill.ac2": "completed",
@@ -162,6 +165,8 @@
     "stopped-popover-enrichment.stopped-popover-enrichment.ac2": "completed",
     "stopped-popover-enrichment.stopped-popover-enrichment.ac3": "completed",
     "stopped-popover-enrichment.stopped-popover-enrichment.ac4": "completed",
-    "stopped-popover-enrichment.stopped-popover-enrichment.ac5": "completed"
+    "stopped-popover-enrichment.stopped-popover-enrichment.ac5": "completed",
+    "save-session-investigation.save-session-investigation.ac1": "completed",
+    "save-session-investigation.save-session-investigation.ac2": "completed"
   }
 }
