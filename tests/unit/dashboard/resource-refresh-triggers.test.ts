@@ -74,6 +74,45 @@ describe('createResourceRefreshTriggers (PAN-2893)', () => {
     expect(deps.refreshResources).not.toHaveBeenCalled();
   });
 
+  it('rate-limits: a burst arriving within the 30s floor of the last flush waits for the floor', async () => {
+    const { deps, emit } = makeDeps();
+    createResourceRefreshTriggers({ ...deps, minIntervalMs: 30_000 });
+
+    emit({ type: 'agent.started', payload: { issueId: 'PAN-1' } });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(deps.refreshMemberships).toHaveBeenCalledTimes(1);
+
+    // Events 2s after the first flush must NOT trigger a second refresh yet…
+    emit({ type: 'agent.stopped', payload: { issueId: 'PAN-2' } });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(deps.refreshMemberships).toHaveBeenCalledTimes(1);
+
+    // …only once the 30s floor from the last flush has elapsed.
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(deps.refreshMemberships).toHaveBeenCalledTimes(2);
+  });
+
+  it('never queues a second compute behind a running one — re-arms instead', async () => {
+    const { deps, emit } = makeDeps();
+    let releaseRefresh!: () => void;
+    deps.refreshMemberships = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { releaseRefresh = resolve; }));
+    createResourceRefreshTriggers({ ...deps, minIntervalMs: 30_000 });
+
+    emit({ type: 'agent.started', payload: { issueId: 'PAN-1' } });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(deps.refreshMemberships).toHaveBeenCalledTimes(1);
+
+    // While the first refresh is STILL RUNNING, more events + the floor elapsing
+    // must not start an overlapping compute.
+    emit({ type: 'agent.started', payload: { issueId: 'PAN-2' } });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(deps.refreshMemberships).toHaveBeenCalledTimes(1);
+
+    releaseRefresh();
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(deps.refreshMemberships).toHaveBeenCalledTimes(2);
+  });
+
   it('stops firing after dispose', async () => {
     const { deps, emit } = makeDeps();
     const dispose = createResourceRefreshTriggers(deps);

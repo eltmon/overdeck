@@ -909,10 +909,18 @@ const getPipelineMembershipRoute = HttpRouter.add(
     if (!projectKey) return jsonResponse({ error: 'project query parameter is required' }, { status: 400 });
     const project = getProjectSync(projectKey);
     if (!project) return jsonResponse({ error: `Project not found: ${projectKey}` }, { status: 404 });
-    // PAN-2893: a transient tracker failure (e.g. a Linear 503) must not blank
-    // the issues pane — serve the last successful snapshot instead. Only a cold
-    // start with no snapshot at all still surfaces the error to the client.
+    // ProjectMembershipBoundary gates the issues-pane render on this response,
+    // so it must be instant. Serve the membership SNAPSHOT (5-minute TTL,
+    // background-refreshed by getPipelineMembershipSnapshotsForProjects, agent
+    // lifecycle events, and the boot warm) instead of blocking on a live
+    // gather — the pre-snapshot behavior blocked every click 30s+ after the
+    // last gather on a multi-second GitHub/Linear/git crawl (the PAN-2879
+    // skeleton regression). Only a truly cold snapshot (nothing gathered since
+    // boot) blocks once, with the last-good fallback for transient tracker
+    // failures (e.g. a Linear 503) so the pane never blanks (PAN-2893).
     return jsonResponse(yield* Effect.promise(async () => {
+      const snapshot = getPipelineMembershipSnapshotsForProjects([project])[0];
+      if (snapshot?.memberships) return snapshot.memberships;
       try {
         return await getProjectPipelineMembership(project);
       } catch (error) {

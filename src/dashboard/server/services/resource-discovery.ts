@@ -188,6 +188,7 @@ interface ResourceDiscoveryCacheEntry {
 let cachedResourceIssues: ResourceDiscoveryCacheEntry | null = null;
 let cachedDetailedResourceIssues: InternalDiscoveredIssue[] | null = null;
 let resourceIssuesRefreshPromise: Promise<ResourceAllocatedIssue[]> | null = null;
+let pendingResourceRefreshFollowUp: Promise<ResourceAllocatedIssue[]> | null = null;
 
 function projectPrefixes(project: ProjectRef): string[] {
   const prefixes = new Set<string>();
@@ -872,8 +873,18 @@ export async function discoverResourceAllocatedIssues(): Promise<ResourceAllocat
  */
 export function triggerResourceDiscoveryRefresh(): Promise<ResourceAllocatedIssue[]> {
   const inFlight = resourceIssuesRefreshPromise;
-  if (inFlight) return inFlight.then(() => refreshResourceAllocatedIssues());
-  return refreshResourceAllocatedIssues();
+  if (!inFlight) return refreshResourceAllocatedIssues();
+  // Coalesce: all callers arriving during an in-flight compute share ONE
+  // follow-up compute. One chained follow-up per caller compounds into a
+  // continuous compute loop under event churn (2026-07-19: 100% CPU).
+  if (!pendingResourceRefreshFollowUp) {
+    pendingResourceRefreshFollowUp = inFlight
+      .then(() => refreshResourceAllocatedIssues())
+      .finally(() => {
+        pendingResourceRefreshFollowUp = null;
+      });
+  }
+  return pendingResourceRefreshFollowUp;
 }
 
 export async function discoverResourceAllocatedIssuesFresh(): Promise<ResourceAllocatedIssue[]> {
