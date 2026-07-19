@@ -11,6 +11,11 @@ import { getReviewStatusSync } from '../review-status.js';
 import { capturePane, listSessionNames, sendKeys } from '../tmux.js';
 import { isAgentIdleForNudge } from './agent-idle.js';
 import { handleKnownAgentModal, paneShowsModelSwitch } from './modal-detector.js';
+import {
+  deliverOrchestratedCompact,
+  hasOrchestratedCompactionContinuation,
+  maybeContinueOrchestratedCompaction,
+} from './orchestrated-compaction.js';
 
 // ============================================================================
 // API Error Recovery
@@ -149,7 +154,10 @@ async function maybeProactivelyCompactContext(sessionName: string, now: number):
   }
   if (!usage || usage.percentUsed < CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT) return null;
 
-  await Effect.runPromise(sendKeys(sessionName, '/compact'));
+  await deliverOrchestratedCompact(
+    sessionName,
+    () => Effect.runPromise(sendKeys(sessionName, '/compact')),
+  );
   contextProactiveCompactState.set(sessionName, { lastAttempt: now });
   try {
     await writeFile(join(getAgentDir(sessionName), PROACTIVE_COMPACT_STAMP_FILE), new Date(now).toISOString(), 'utf-8');
@@ -191,11 +199,12 @@ export async function checkApiErrorAgents(): Promise<string[]> {
   // are owned exclusively by monitorReviewConvoySignals(). checkApiErrorAgents
   // derives a garbage issueId from these names and would apply work-agent
   // compact-respawn, racing the monitor. Skip them here.
-  const nonReviewerSessions = agentSessions.filter(
-    name => !/^agent-.*-review-(?:security|correctness|performance|requirements)$/.test(name),
+  const sessionsToInspect = agentSessions.filter(
+    name => !/^agent-.*-review-(?:security|correctness|performance|requirements)$/.test(name)
+      || hasOrchestratedCompactionContinuation(name),
   );
 
-  for (const sessionName of nonReviewerSessions) {
+  for (const sessionName of sessionsToInspect) {
     const recovery = apiErrorRecoveryState.get(sessionName);
     if (recovery && (now - recovery.lastAttempt) < API_ERROR_RECOVERY_COOLDOWN_MS) {
       continue;
@@ -252,6 +261,25 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         actions.push(`Usage-limit halt: ${sessionName} kept its configured model${modal === 'needs-you' ? ' — needs-you' : ''}`);
         continue;
       }
+    }
+
+    const compactionPending = hasOrchestratedCompactionContinuation(sessionName);
+    if (compactionPending) {
+      try {
+        const continuedAfterCompaction = await maybeContinueOrchestratedCompaction({
+          sessionName,
+          tmuxOutput,
+          now,
+          send: (target, message) => Effect.runPromise(sendKeys(target, message)),
+        });
+        if (continuedAfterCompaction) {
+          contextOverflowRecoveryState.delete(sessionName);
+          actions.push(`Context compaction recovery: resumed ${sessionName} after compaction`);
+        }
+      } catch (err) {
+        console.error(`[deacon] Failed to resume ${sessionName} after orchestrated compaction:`, err);
+      }
+      continue;
     }
 
     const hasPrompt = tmuxOutput.includes('❯');
@@ -468,7 +496,10 @@ export async function checkApiErrorAgents(): Promise<string[]> {
           // Non-agent (specialist/planning) sessions are not registered agents,
           // so the respawn path doesn't apply — keep the harness /compact tier.
           try {
-            await Effect.runPromise(sendKeys(sessionName, '/compact'));
+            await deliverOrchestratedCompact(
+              sessionName,
+              () => Effect.runPromise(sendKeys(sessionName, '/compact')),
+            );
             contextOverflowRecoveryState.set(sessionName, {
               lastAttempt: now,
               compactAttempts,
