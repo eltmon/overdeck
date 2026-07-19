@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T20:57:56.824Z",
+  "updated": "2026-07-19T21:00:08.668Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "okf-open-skill": {
-        "writerId": "agent-pan-2066",
-        "agentId": "agent-pan-2066",
-        "pid": 2384774,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T20:57:56.824Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -112,6 +104,17 @@
         "outcome": "completed",
         "reason": "Added pan knowledge open with --no-install/--no-browser, canonical bundle resolution, progressive ensure/start, URL/browser handling, pan install first-use pointer, and matching pan-knowledge skill docs. Knowledge tests, CLI help, skills lint, typecheck, and targeted ESLint pass.",
         "releasedAt": "2026-07-19T20:57:46.700Z"
+      },
+      {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 2384774,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T20:57:56.824Z",
+        "itemId": "okf-open-skill",
+        "outcome": "completed",
+        "reason": "Documented /okf open in the command table, dedicated SKILL.md section, and USAGE.md with bundle resolution, pan knowledge delegation, --no-install/--no-browser, and the arm's-length GPL subprocess boundary. Skills lint passes.",
+        "releasedAt": "2026-07-19T21:00:08.668Z"
       }
     ],
     "statusReasons": {
@@ -126,6 +129,10 @@
       "knowledge-open-cli": {
         "reason": "Added pan knowledge open with --no-install/--no-browser, canonical bundle resolution, progressive ensure/start, URL/browser handling, pan install first-use pointer, and matching pan-knowledge skill docs. Knowledge tests, CLI help, skills lint, typecheck, and targeted ESLint pass.",
         "updatedAt": "2026-07-19T20:57:46.700Z"
+      },
+      "okf-open-skill": {
+        "reason": "Documented /okf open in the command table, dedicated SKILL.md section, and USAGE.md with bundle resolution, pan knowledge delegation, --no-install/--no-browser, and the arm's-length GPL subprocess boundary. Skills lint passes.",
+        "updatedAt": "2026-07-19T21:00:08.668Z"
       }
     }
   },
@@ -143,6 +150,8 @@
     "knowledge-open-cli.knowledge-open-cli.ac2": "completed",
     "knowledge-open-cli.knowledge-open-cli.ac3": "completed",
     "knowledge-open-cli.knowledge-open-cli.ac4": "completed",
-    "okf-open-skill": "running"
+    "okf-open-skill": "completed",
+    "okf-open-skill.okf-open-skill.ac1": "completed",
+    "okf-open-skill.okf-open-skill.ac2": "completed"
   }
 }
