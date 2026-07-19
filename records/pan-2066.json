@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-19T20:18:40.159Z",
-  "updated": "2026-07-19T21:37:42.006Z",
+  "updated": "2026-07-19T21:46:59.961Z",
   "pipeline": {
     "issueId": "PAN-2066",
     "reviewStatus": "pending",
@@ -83,16 +83,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "knowledge-page-states": {
-        "writerId": "agent-pan-2066",
-        "agentId": "agent-pan-2066",
-        "pid": 2796430,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-19T21:37:42.005Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-2066",
@@ -159,6 +151,17 @@
         "outcome": "completed",
         "reason": "Added status/install/start APIs and same-origin /knowledge-viewer/* HTTP + WebSocket proxying with origin validation, active viewer targeting, path/redirect rewriting, and framing-header preservation. Route tests, typecheck, lint, server build, and throwaway Node 22 boot pass; the first boot exposed and fixed a duplicate wildcard/root route registration.",
         "releasedAt": "2026-07-19T21:37:30.776Z"
+      },
+      {
+        "writerId": "agent-pan-2066",
+        "agentId": "agent-pan-2066",
+        "pid": 2796430,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-19T21:37:42.005Z",
+        "itemId": "knowledge-page-states",
+        "outcome": "completed",
+        "reason": "Added the /knowledge tab through the current Sidebar/AppRoutes navigation surfaces, with project resolution and no-project, no-bundle, not-installed/installing, starting, ready, and error states. The page uses the recorded lossy-spike read-only copy. Component/no-loss tests, typecheck, lint, frontend build, and isolated Playwright screenshots of no-bundle plus pending install states pass.",
+        "releasedAt": "2026-07-19T21:46:59.961Z"
       }
     ],
     "statusReasons": {
@@ -185,6 +188,10 @@
       "viewer-routes-proxy": {
         "reason": "Added status/install/start APIs and same-origin /knowledge-viewer/* HTTP + WebSocket proxying with origin validation, active viewer targeting, path/redirect rewriting, and framing-header preservation. Route tests, typecheck, lint, server build, and throwaway Node 22 boot pass; the first boot exposed and fixed a duplicate wildcard/root route registration.",
         "updatedAt": "2026-07-19T21:37:30.776Z"
+      },
+      "knowledge-page-states": {
+        "reason": "Added the /knowledge tab through the current Sidebar/AppRoutes navigation surfaces, with project resolution and no-project, no-bundle, not-installed/installing, starting, ready, and error states. The page uses the recorded lossy-spike read-only copy. Component/no-loss tests, typecheck, lint, frontend build, and isolated Playwright screenshots of no-bundle plus pending install states pass.",
+        "updatedAt": "2026-07-19T21:46:59.961Z"
       }
     }
   },
@@ -215,6 +222,11 @@
     "viewer-routes-proxy.viewer-routes-proxy.ac2": "completed",
     "viewer-routes-proxy.viewer-routes-proxy.ac3": "completed",
     "viewer-routes-proxy.viewer-routes-proxy.ac4": "completed",
-    "knowledge-page-states": "running"
+    "knowledge-page-states": "completed",
+    "knowledge-page-states.knowledge-page-states.ac1": "completed",
+    "knowledge-page-states.knowledge-page-states.ac2": "completed",
+    "knowledge-page-states.knowledge-page-states.ac3": "completed",
+    "knowledge-page-states.knowledge-page-states.ac4": "completed",
+    "knowledge-page-states.knowledge-page-states.ac5": "completed"
   }
 }
