@@ -5,21 +5,11 @@
   "settings": {
     "laneAConcurrency": 1,
     "posture": "drain",
-    "postureReason": "Operator paused new pickup.",
     "postureSetAt": "2026-07-19T07:20:26.659Z",
-    "postureSetBy": "dashboard"
+    "postureSetBy": "dashboard",
+    "postureReason": "Operator paused new pickup."
   },
-  "items": [
-    {
-      "issue": "PAN-2858",
-      "lane": "A",
-      "order": 1,
-      "prereqs": [],
-      "reVerify": false,
-      "addedAt": "2026-07-19T07:19:48.862Z",
-      "addedBy": "dashboard"
-    }
-  ],
+  "items": [],
   "createdAt": "2026-07-19T07:18:44.092Z",
-  "updatedAt": "2026-07-19T07:20:26.659Z"
+  "updatedAt": "2026-07-19T07:21:38.778Z"
 }
