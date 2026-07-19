@@ -2,7 +2,7 @@
 
 > **Note:** Universal and dev-scope engineering rules — async tmux, no execSync in server, fake timers for retry tests, worktree discipline, work-agents-via-pan, stash discipline, dashboard-Node22-only, single-deacon invariant, no-destructive-requests, file-path references, Karpathy rules — live in [`sync-sources/rules/`](sync-sources/rules/) and are folded into `~/.claude/CLAUDE.md` automatically via `pan sync`. This file holds **project-specific** guidance that doesn't apply outside this repo.
 
-> **Knowledge bundle (OKF):** Project knowledge lives in the OKF bundle at [`../overdeck-knowledge`](../overdeck-knowledge) (remote `eltmon/overdeck-knowledge`), pointed to by [`.okf.yml`](.okf.yml). Use `/okf extract "<query>"` to pull cited context, `/okf author`/`/okf sync`/`/okf study` to maintain it.
+> **Knowledge bundle (OKF):** Project knowledge lives in the OKF bundle at [`../overdeck-knowledge`](../overdeck-knowledge) (remote `eltmon/overdeck-knowledge`), pointed to by [`.okf.yml`](.okf.yml). Use `/okf extract "<query>"` to pull cited context and `/okf author`/`/okf sync`/`/okf study` to maintain it. `/okf open` and the dashboard **Knowledge** page provide a read-only OpenKnowledge viewer; edit through `/okf author` because the upstream v0.34 editor does not preserve YAML source formatting losslessly.
 
 ## Engineering Philosophy: No Bandaids
 
