@@ -765,7 +765,7 @@ if (process.env.OVERDECK_DISABLE_DEACON === '1') {
       console.error(`[overdeck] ${summary}`);
       emitActivityEntrySync({ source: 'dashboard', level: 'error', message: summary });
     }
-    const reconciliation = startBootReconciliation({ onGraceExpired: applyBootReconciliationDecision });
+    const reconciliation = startBootReconciliation({ onGraceExpired: async () => { await applyBootReconciliationDecision(); } });
     if (reconciliation.decision !== 'pending') {
       void applyBootReconciliationDecision();
     }
