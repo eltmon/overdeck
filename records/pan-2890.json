@@ -10,8 +10,41 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
+    ],
+    "declaredScopeUntouched": [
+      "docs/design/mockups/agent-pills-pan-2890.html",
+      "src/dashboard/frontend/src/components/StoppedAgentsBanner.test.tsx"
+    ],
+    "declaredScope": [
+      "docs/COMMAND-DECK-RESTORATION.md",
+      "docs/design/mockups/agent-pills-pan-2890.html",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/AgentPillPopoverRow.test.tsx",
+      "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
+      "src/dashboard/frontend/src/components/RunningAgentsPill.test.tsx",
+      "src/dashboard/frontend/src/components/RunningAgentsPill.tsx",
+      "src/dashboard/frontend/src/components/StoppedAgentsBanner.test.tsx",
+      "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/COMMAND-DECK-RESTORATION.md",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/App/AppChrome.tsx",
+      "src/dashboard/frontend/src/components/AgentPillPopoverRow.test.tsx",
+      "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
+      "src/dashboard/frontend/src/components/RunningAgentsPill.test.tsx",
+      "src/dashboard/frontend/src/components/RunningAgentsPill.tsx",
+      "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx",
+      "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
+    ],
+    "recordedAt": "2026-07-19T00:46:57.524Z"
+  },
   "created": "2026-07-19T00:10:08.481Z",
-  "updated": "2026-07-19T00:47:00.029Z",
+  "updated": "2026-07-19T00:47:03.283Z",
   "pipeline": {
     "issueId": "PAN-2890",
     "reviewStatus": "pending",
@@ -21,8 +54,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T00:47:00.028Z",
+    "updatedAt": "2026-07-19T00:47:03.247Z",
     "inspectNotes": "All 4 ACs met: describeAgentStop covers all 5 branches incl. troubled-failures plural; click navigates via pushState+popstate then onNavigate in order; font-mono ID + truncate/title fallback rendered; relativeTime verified fully under fake timers (5m/3h/2d).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/2892",
     "reviewRequestedAt": "2026-07-19T00:47:00.028Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -56,8 +90,7 @@
         "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
       ],
       "recordedAt": "2026-07-19T00:46:57.524Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/2892"
+    }
   },
   "closeOut": {
     "usage": {
@@ -70,11 +103,19 @@
             "cacheWrite": 268614
           }
         },
+        "review.supervisor": {
+          "anthropic/claude-sonnet-5": {
+            "input": 2,
+            "output": 104,
+            "cacheRead": 0,
+            "cacheWrite": 123454
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 681422,
-            "output": 32045,
-            "cacheRead": 7947264,
+            "input": 2051773,
+            "output": 136214,
+            "cacheRead": 54236672,
             "cacheWrite": 0
           }
         }
@@ -86,19 +127,27 @@
           "cacheRead": 2320967,
           "cacheWrite": 268614
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 2,
+          "output": 104,
+          "cacheRead": 0,
+          "cacheWrite": 123454
+        },
         "openai/gpt-5.6-sol": {
-          "input": 681422,
-          "output": 32045,
-          "cacheRead": 7947264,
+          "input": 2051773,
+          "output": 136214,
+          "cacheRead": 54236672,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 15.121139,
-        "pricingAsOf": "2026-07-19T00:19:35.955Z"
+        "usd": 48.552347,
+        "pricingAsOf": "2026-07-19T00:47:03.279Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/2892"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -221,38 +270,5 @@
     "docs-app-bar-update": "completed",
     "docs-app-bar-update.docs-app-bar-update.ac1": "completed",
     "docs-app-bar-update.docs-app-bar-update.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
-    ],
-    "declaredScopeUntouched": [
-      "docs/design/mockups/agent-pills-pan-2890.html",
-      "src/dashboard/frontend/src/components/StoppedAgentsBanner.test.tsx"
-    ],
-    "declaredScope": [
-      "docs/COMMAND-DECK-RESTORATION.md",
-      "docs/design/mockups/agent-pills-pan-2890.html",
-      "src/dashboard/frontend/src/App.tsx",
-      "src/dashboard/frontend/src/App/AppChrome.tsx",
-      "src/dashboard/frontend/src/components/AgentPillPopoverRow.test.tsx",
-      "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
-      "src/dashboard/frontend/src/components/RunningAgentsPill.test.tsx",
-      "src/dashboard/frontend/src/components/RunningAgentsPill.tsx",
-      "src/dashboard/frontend/src/components/StoppedAgentsBanner.test.tsx",
-      "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx"
-    ],
-    "actualChangedFiles": [
-      "docs/COMMAND-DECK-RESTORATION.md",
-      "src/dashboard/frontend/src/App.tsx",
-      "src/dashboard/frontend/src/App/AppChrome.tsx",
-      "src/dashboard/frontend/src/components/AgentPillPopoverRow.test.tsx",
-      "src/dashboard/frontend/src/components/AgentPillPopoverRow.tsx",
-      "src/dashboard/frontend/src/components/RunningAgentsPill.test.tsx",
-      "src/dashboard/frontend/src/components/RunningAgentsPill.tsx",
-      "src/dashboard/frontend/src/components/StoppedAgentsBanner.tsx",
-      "src/dashboard/frontend/src/components/__tests__/StoppedAgentsBanner.test.tsx"
-    ],
-    "recordedAt": "2026-07-19T00:46:57.524Z"
   }
 }
