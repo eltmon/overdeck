@@ -1,6 +1,6 @@
 import { Data, Effect } from 'effect';
 
-export const MODEL_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:/@-]{0,127})$/;
+export const MODEL_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:/@-]|\[|\]){0,127}$/;
 
 /** Tagged error for model-validation Effect variants. */
 export class ModelValidationError extends Data.TaggedError('ModelValidationError')<{
@@ -16,7 +16,7 @@ export function normalizeModelOverrideSync(value: unknown): string | undefined {
   const trimmed = value.trim();
   if (trimmed.length === 0) return undefined;
   if (!MODEL_ID_PATTERN.test(trimmed)) {
-    throw new Error('model must match [A-Za-z0-9._:/@-]{1,128} with no whitespace or shell metacharacters.');
+    throw new Error('model must match [A-Za-z0-9._:/@-] plus square brackets, with 1-128 characters and no whitespace or shell metacharacters.');
   }
   return trimmed;
 }

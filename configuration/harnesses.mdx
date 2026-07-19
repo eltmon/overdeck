@@ -38,9 +38,12 @@ skills, MCP, and AGENTS.md — see the [Harness Landscape](/reference/harness-la
   The maximum tells Claude Code the route's capacity; the auto-compact window is
   the capacity used by Claude Code's normal proactive compaction calculation,
   not an instruction to compact at exactly that token count. GPT-5.5 keeps its
-  separately measured conservative `150000` auto-compact policy, Kimi K2.7 Code
-  keeps `262144`, and Anthropic models receive neither override so Claude Code's
-  native context behavior remains in control.
+  separately measured conservative `150000` auto-compact policy and Kimi K2.7
+  Code keeps its `262144` auto-compact policy without a maximum override. Kimi
+  K3 exports both values from its model capability: `262144` for `k3` and
+  `1048576` for `k3[1m]`, matching Kimi's Claude Code recipe. Anthropic models
+  receive neither override, so Claude Code's native context behavior remains in
+  control.
 
 ### oh-my-pi / ohmypi (alternative)
 
