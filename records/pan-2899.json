@@ -3,15 +3,15 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-19T03:01:24.444Z",
-  "updated": "2026-07-19T04:18:37.317Z",
+  "updated": "2026-07-19T05:49:09.636Z",
   "pipeline": {
     "issueId": "PAN-2899",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "mergeStatus": "queued",
+    "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-19T04:18:37.032Z",
+    "updatedAt": "2026-07-19T05:49:09.605Z",
     "mergeNotes": "Strike merge request failed: fetch failed; recovery delivery failed: Cannot find module '/home/eltmon/Projects/overdeck/dist/dashboard/remote-agents-Ck1TfVOf.js' imported from /home/eltmon/Projects/overdeck/dist/dashboard/queries-_IF8mtNS.js",
     "strikeReadyHead": "b3ce699615db076e86a04fb9bdf10d3248aa2ea6",
     "strikeReadyAt": "2026-07-19T04:06:26.064Z",
@@ -25,7 +25,9 @@
         "outcome": "failed",
         "detail": "Strike merge request failed: fetch failed; recovery delivery failed: Cannot find module '/home/eltmon/Projects/overdeck/dist/dashboard/remote-agents-Ck1TfVOf.js' imported from /home/eltmon/Projects/overdeck/dist/dashboard/queries-_IF8mtNS.js"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-19T05:49:09.605Z"
   },
   "closeOut": {
     "usage": {
@@ -53,7 +55,105 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-19T05:49:09.622Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed",
+          "observed": "reviewStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-review",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-19T05:49:01.700Z"
+          }
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed",
+          "observed": "testStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-tests",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-19T05:49:01.700Z"
+          }
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed at lastVerifiedCommit",
+          "observed": "verificationStatus: missing",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-19T05:49:01.700Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge",
+          "observed": "Branch already cleaned up (squash-merged); PR #2912 MERGED at 2026-07-19T05:37:16Z",
+          "status": "pass",
+          "mergedAt": "2026-07-19T05:37:16Z",
+          "mergeCommit": "11c1b3761d3ca9b7cdb17f800fdd3c6e37db6656"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: todo; no running work/planning agents",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-post-merge",
+            "by": "flywheel-orchestrator",
+            "at": "2026-07-19T05:49:01.700Z"
+          }
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 11c1b3761d3ca9b7cdb17f800fdd3c6e37db6656",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 11c1b376 contains merge 11c1b376",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 1 agent state directory; Preserved local branch strike/pan-2899 — not merged to main; Preserved remote branch strike/pan-2899 — not merged to main; Pruned 54 checkpoint ref(s) for agent-pan-2899, planning-pan-2899, strike-pan-2899; No specialist registry entries for PAN-2899"
+        }
+      ],
+      "accepted": [
+        "review",
+        "tests",
+        "verification",
+        "post-merge"
+      ]
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol"
