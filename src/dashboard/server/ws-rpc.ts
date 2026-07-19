@@ -14,6 +14,7 @@ import { PanOpen } from './services/open.js';
 import { EventStoreService } from './services/domain-services.js';
 import { ReadModelService, type ReadModelServiceShape } from './read-model.js';
 import { TerminalService } from './services/terminal-service.js';
+import { shouldBroadcastDashboardEvent, streamAgentOutput } from './services/agent-output-stream.js';
 import { getConversationByName } from '../../lib/overdeck/conversations.js';
 import { contextUsageFromParseResult, gateSnapshotEmission, parseConversationMessages, parseEntireConversation, watchConversation, type ParseState, type ParseResult } from './services/conversation-service.js';
 import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conversation-parser.js';
@@ -59,10 +60,11 @@ function storedToDomainEvent(stored: StoredEvent): DomainEvent {
 // wedging the dashboard in a permanent "Reconnecting…" loop (same failure
 // class as PAN-2225). Validate at the boundary: drop loudly instead.
 const isKnownDomainEvent = Schema.is(DomainEventSchema);
-function passesDomainEventSchema(event: DomainEvent): boolean {
+function passesDomainEventSchema(event: unknown): event is DomainEvent {
   if (isKnownDomainEvent(event)) return true;
+  const candidate = event as { type?: unknown; sequence?: unknown };
   console.error(
-    `[ws-rpc] dropping domain event that fails DomainEvent schema validation — add it to the contracts union: type=${event.type} seq=${event.sequence}`,
+    `[ws-rpc] dropping domain event that fails DomainEvent schema validation — add it to the contracts union: type=${String(candidate.type)} seq=${String(candidate.sequence)}`,
   );
   return false;
 }
@@ -757,9 +759,6 @@ const PanRpcLayer = PanRpcGroup.toLayer(
     const terminalService = yield* TerminalService;
     const panOpen = yield* PanOpen;
 
-    // PAN-1249: handler set is incomplete — missing routes are stubbed by other code paths.
-    // Suppress the exhaustiveness check until the missing handlers are reintegrated.
-    // @ts-expect-error — missing handlers (getWorkspaceDetail, startPlanning, startAgent, deepWipe, etc.)
     return PanRpcGroup.of({
       // ── subscribeDomainEvents ────────────────────────────────────────────────
       [WS_METHODS.subscribeDomainEvents]: (_input) => {
@@ -768,6 +767,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
           Stream.map(createSystemHeartbeatEvent),
         );
         return eventStore.streamEvents.pipe(
+          Stream.filter(shouldBroadcastDashboardEvent),
           Stream.map(storedToDomainEvent),
           Stream.filter(passesDomainEventSchema),
           Stream.merge(heartbeats),
@@ -793,6 +793,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
       [WS_METHODS.subscribeIssueEvents]: (input) => {
         console.log(`[ws-rpc] subscribeIssueEvents invoked issueId=${input.issueId}`);
         return eventStore.streamEvents.pipe(
+          Stream.filter(shouldBroadcastDashboardEvent),
           Stream.map(storedToDomainEvent),
           Stream.filter(passesDomainEventSchema),
           Stream.mapEffect((event) =>
@@ -810,19 +811,7 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       // ── subscribeAgentOutput — live agent stdout lines ───────────────────────
       // Filtered view of the domain event stream for a specific agent
-      [WS_METHODS.subscribeAgentOutput]: (input) =>
-        eventStore.streamEvents.pipe(
-          Stream.filter(
-            (e) => e.type === 'agent.output_received' &&
-              (e.payload as Record<string, unknown>)['agentId'] === input.agentId,
-          ),
-          Stream.flatMap((e) => {
-            const payload = e.payload as { agentId: string; lines: string[] };
-            return Stream.fromIterable(
-              payload.lines.map((line) => ({ agentId: payload.agentId, line })),
-            );
-          }),
-        ),
+      [WS_METHODS.subscribeAgentOutput]: (input) => streamAgentOutput(eventStore, input.agentId),
 
       // ── getSnapshot — returns clean read model data (PAN-433) ─────────────────
       [WS_METHODS.getSnapshot]: (_input) =>

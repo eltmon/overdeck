@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Effect, Stream } from 'effect';
 import { buildEnrichSessionsJobPayload, conversationDiscoveringStream, filterDomainEventForIssue } from '../ws-rpc.js';
+import { shouldBroadcastDashboardEvent } from '../services/agent-output-stream.js';
 import type { DomainEvent } from '@overdeck/contracts';
 import type { RuntimeConversationsConfig } from '../../../lib/config-yaml.js';
 
@@ -69,6 +70,13 @@ describe('ws-rpc enrichSessions payload', () => {
       skipAlreadyEnriched: true,
       force: true,
     });
+  });
+});
+
+describe('dashboard domain event routing', () => {
+  it('routes ephemeral output only through subscribeAgentOutput', () => {
+    expect(shouldBroadcastDashboardEvent({ type: 'agent.output_received' })).toBe(false);
+    expect(shouldBroadcastDashboardEvent({ type: 'agent.status_changed' })).toBe(true);
   });
 });
 

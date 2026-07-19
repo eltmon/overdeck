@@ -174,8 +174,8 @@ if (isPeerDashboard) {
 startAgentEnrichmentService();
 console.log('[overdeck] AgentEnrichmentService started');
 
-// Start background agent output poller — emits agent.output_received domain events
-// so DrawerActiveAgent and other consumers receive live stream excerpts.
+// Enable demand-driven agent output capture. The poller starts only while an
+// RPC or public SSE subscriber has expressed output interest.
 startAgentOutputService();
 console.log('[overdeck] AgentOutputService started');
 

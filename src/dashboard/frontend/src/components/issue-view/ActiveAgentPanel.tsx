@@ -13,6 +13,7 @@ import {
   selectPendingPermissionAgentIds,
 } from '../../lib/store';
 import { cn } from '../../lib/utils';
+import { useAgentOutputSubscription } from '../../hooks/useAgentOutputSubscription';
 import { ACTIVE_AGENT_PANEL_SECTIONS } from './inventory';
 
 export type StreamLineKind = 'verb-line' | 'ok' | 'warn' | 'err' | 'neutral';
@@ -91,6 +92,7 @@ export function ActiveAgentPanel({
   const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
   const agentOutput = useDashboardStore(selectAgentOutput(agentId));
   const [sending, setSending] = useState(false);
+  useAgentOutputSubscription(agentId, Boolean(agent && !isTerminalStatus(agent.status)));
 
   const sectionId = density === 'console' ? 'active-agent' : undefined;
 
