@@ -116,6 +116,9 @@ const checkApiErrorAgents = deaconMod.checkApiErrorAgents;
 const contextOverflowRecoveryState = deaconMod.contextOverflowRecoveryState;
 const contextProactiveCompactState = deaconMod.contextProactiveCompactState;
 const stuckOverflowNativeRecoveryState = deaconMod.stuckOverflowNativeRecoveryState;
+const { orchestratedCompactionContinuations } = await import(
+  '../../../src/lib/cloister/orchestrated-compaction.js'
+);
 
 // ── Suite ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +141,7 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     contextOverflowRecoveryState.clear();
     contextProactiveCompactState.clear();
     stuckOverflowNativeRecoveryState.clear();
+    orchestratedCompactionContinuations.clear();
   });
 
   it('(a) detects overflow at an idle prompt → Overdeck-side compacts via resumeAgent (never /compact) and records attempt 1', async () => {

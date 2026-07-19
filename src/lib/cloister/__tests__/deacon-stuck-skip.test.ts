@@ -113,6 +113,13 @@ vi.mock('fs', async (importOriginal) => {
 
 import { existsSync, readFileSync } from 'fs';
 import { checkApiErrorAgents, contextOverflowRecoveryState, isSynthesisForActiveReviewRun, patrolWorkAgentResolutions } from '../deacon.js';
+import {
+  COMPACTION_CONTINUE_MAX_WAIT_MS,
+  COMPACTION_CONTINUE_MIN_SETTLE_MS,
+  ORCHESTRATED_COMPACTION_CONTINUE_MESSAGE,
+  orchestratedCompactionContinuations,
+  scheduleOrchestratedCompactionContinuation,
+} from '../orchestrated-compaction.js';
 import { listRunningAgentsSync, getAgentRuntimeStateSync, resumeAgent } from '../../../lib/agents.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { capturePane, listSessionNames, sendKeys } from '../../../lib/tmux.js';
@@ -295,6 +302,7 @@ describe('checkApiErrorAgents context overflow recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     contextOverflowRecoveryState.clear();
+    orchestratedCompactionContinuations.clear();
     mockGetAgentRuntimeState.mockReturnValue({
       state: 'active',
       lastActivity: new Date().toISOString(),
@@ -310,6 +318,7 @@ describe('checkApiErrorAgents context overflow recovery', () => {
 
   afterEach(() => {
     contextOverflowRecoveryState.clear();
+    orchestratedCompactionContinuations.clear();
   });
 
   it('recovers work-agent context overflow by compact-respawning instead of sending /clear', async () => {
@@ -338,6 +347,75 @@ describe('checkApiErrorAgents context overflow recovery', () => {
       compactAttempts: 1,
       mechanism: 'harness-compact',
     });
+    expect(orchestratedCompactionContinuations.has('specialist-review-pan-1781')).toBe(true);
+
+    scheduleOrchestratedCompactionContinuation(
+      'specialist-review-pan-1781',
+      Date.now() - COMPACTION_CONTINUE_MIN_SETTLE_MS,
+    );
+    mockCapturePane.mockReturnValue(Effect.succeed('Compacted summary\n❯'));
+
+    const continuationActions = await checkApiErrorAgents();
+
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      'specialist-review-pan-1781',
+      ORCHESTRATED_COMPACTION_CONTINUE_MESSAGE,
+    );
+    expect(continuationActions).toContain(
+      'Context compaction recovery: resumed specialist-review-pan-1781 after compaction',
+    );
+    expect(orchestratedCompactionContinuations.has('specialist-review-pan-1781')).toBe(false);
+  });
+
+  it('does not let the transient API cooldown suppress a compact continuation', async () => {
+    const sessionName = 'planning-pan-2899';
+    mockListSessionNames.mockReturnValue(Effect.succeed([sessionName]));
+    mockCapturePane.mockReturnValue(Effect.succeed('API Error: Overloaded\n❯'));
+
+    await checkApiErrorAgents();
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      sessionName,
+      expect.stringContaining('transient API error'),
+    );
+
+    mockSendKeysAsync.mockClear();
+    scheduleOrchestratedCompactionContinuation(
+      sessionName,
+      Date.now() - COMPACTION_CONTINUE_MIN_SETTLE_MS,
+    );
+    mockCapturePane.mockReturnValue(Effect.succeed('Compacted summary\n❯'));
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      sessionName,
+      ORCHESTRATED_COMPACTION_CONTINUE_MESSAGE,
+    );
+    expect(actions).toContain(`Context compaction recovery: resumed ${sessionName} after compaction`);
+  });
+
+  it('returns a failed compaction to the bounded overflow retry ladder', async () => {
+    const sessionName = 'specialist-review-pan-2899';
+    const now = Date.now();
+    mockListSessionNames.mockReturnValue(Effect.succeed([sessionName]));
+    contextOverflowRecoveryState.set(sessionName, {
+      lastAttempt: now - COMPACTION_CONTINUE_MAX_WAIT_MS,
+      compactAttempts: 1,
+      mechanism: 'harness-compact',
+    });
+    scheduleOrchestratedCompactionContinuation(
+      sessionName,
+      now - COMPACTION_CONTINUE_MAX_WAIT_MS,
+    );
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(sessionName, '/compact');
+    expect(actions).toContain(`Context overflow recovery: compacting ${sessionName} (attempt 2)`);
+    expect(contextOverflowRecoveryState.get(sessionName)).toMatchObject({
+      compactAttempts: 2,
+      mechanism: 'harness-compact',
+    });
   });
 
   it('does not recover convoy reviewer sub-role sessions — they are owned by monitorReviewConvoySignals (PAN-1818)', async () => {
@@ -349,6 +427,26 @@ describe('checkApiErrorAgents context overflow recovery', () => {
     expect(mockResumeAgent).not.toHaveBeenCalled();
     expect(mockSendKeysAsync).not.toHaveBeenCalled();
     expect(actions).toEqual([]);
+  });
+
+  it('finishes a pending compaction for convoy reviewer sessions without entering their overflow recovery', async () => {
+    const sessionName = 'agent-pan-1815-review-correctness';
+    mockListSessionNames.mockReturnValue(Effect.succeed([sessionName]));
+    mockCapturePane.mockReturnValue(Effect.succeed('Compacted summary\n❯'));
+    scheduleOrchestratedCompactionContinuation(
+      sessionName,
+      Date.now() - COMPACTION_CONTINUE_MIN_SETTLE_MS,
+    );
+
+    const actions = await checkApiErrorAgents();
+
+    expect(mockCapturePane).toHaveBeenCalledWith(sessionName, 100);
+    expect(mockSendKeysAsync).toHaveBeenCalledWith(
+      sessionName,
+      ORCHESTRATED_COMPACTION_CONTINUE_MESSAGE,
+    );
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(actions).toContain(`Context compaction recovery: resumed ${sessionName} after compaction`);
   });
 
   it('still recovers a normal work agent with context overflow (PAN-1818 regression guard)', async () => {
