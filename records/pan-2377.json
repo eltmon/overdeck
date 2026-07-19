@@ -319,18 +319,18 @@
     "recordedAt": "2026-07-19T00:54:19.291Z"
   },
   "created": "2026-07-17T12:54:30.819Z",
-  "updated": "2026-07-19T07:00:46.252Z",
+  "updated": "2026-07-19T07:00:53.386Z",
   "pipeline": {
     "issueId": "PAN-2377",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-19T00:54:56.018Z",
-    "updatedAt": "2026-07-19T07:00:45.106Z",
+    "updatedAt": "2026-07-19T07:00:53.369Z",
     "reviewNotes": "Mainline merges preserve approved order-book behavior and integrate cleanly with atomic agent-start placeholders; full tests and typecheck pass",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2894",
@@ -351,9 +351,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10771355,
-            "output": 453990,
-            "cacheRead": 95700992,
+            "input": 10781513,
+            "output": 454635,
+            "cacheRead": 96166400,
             "cacheWrite": 0
           }
         },
@@ -390,9 +390,9 @@
           "cacheWrite": 169467
         },
         "openai/gpt-5.6-sol": {
-          "input": 31562462,
-          "output": 1912493,
-          "cacheRead": 780640768,
+          "input": 31572620,
+          "output": 1913138,
+          "cacheRead": 781106176,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -403,8 +403,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 618.859607,
-        "pricingAsOf": "2026-07-19T07:00:45.124Z"
+        "usd": 619.162451,
+        "pricingAsOf": "2026-07-19T07:00:53.377Z"
       }
     },
     "merges": [
@@ -413,7 +413,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "workModel": "gpt-5.6-sol",
   "tasks": {
     "sequence": 38,
