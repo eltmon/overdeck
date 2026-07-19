@@ -27,12 +27,12 @@ const CONFIG: ResolveTierConfig = {
 };
 
 describe('resolveTier', () => {
-  it('returns the metadata.model override regardless of kind and difficulty', () => {
+  it.each(['kimi-k2.7-code', 'k3', 'k3[1m]'])('returns the metadata.model override %s regardless of kind and difficulty', (model) => {
     const resolved = resolveTier(
-      { id: 'item-1', title: 't', metadata: { model: 'kimi-k2.7-code', kind: 'docs', difficulty: 'expert' } },
+      { id: 'item-1', title: 't', metadata: { model, kind: 'docs', difficulty: 'expert' } },
       CONFIG,
     );
-    expect(resolved.model).toBe('kimi-k2.7-code');
+    expect(resolved.model).toBe(model);
     expect(resolved.tierName).toBe(OVERRIDE_TIER_NAME);
   });
 

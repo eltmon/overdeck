@@ -114,6 +114,7 @@ const PROVIDER_ENV_KEYS = [
 // still consumed by dashboard usage, model-switch safety, and Deacon compaction.
 const GPT_56_CODEX_CLIENT_CONTEXT_WINDOW = 372_000;
 const GPT_56_MODELS = new Set(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
+const KIMI_K3_MODELS = new Set(['k3', 'k3[1m]']);
 
 interface ClaudeCodeContextPolicy {
   autoCompactWindow?: number;
@@ -132,7 +133,15 @@ function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeContextPol
     };
   }
   if (!hasModelCapabilitySync(resolvedModel)) return {};
-  return { autoCompactWindow: getModelCapabilitySync(resolvedModel).contextWindow };
+
+  const contextWindow = getModelCapabilitySync(resolvedModel).contextWindow;
+  if (KIMI_K3_MODELS.has(resolvedModel)) {
+    return {
+      autoCompactWindow: contextWindow,
+      maxContextTokens: contextWindow,
+    };
+  }
+  return { autoCompactWindow: contextWindow };
 }
 
 export async function getProviderExportsForModel(model: string): Promise<string> {

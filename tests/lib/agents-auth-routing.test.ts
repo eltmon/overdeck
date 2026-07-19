@@ -78,7 +78,7 @@ describe('agents auth routing', () => {
       if (model.startsWith('minimax-')) {
         return { name: 'minimax', displayName: 'MiniMax', compatibility: 'direct', authType: 'static' };
       }
-      if (model.startsWith('kimi-')) {
+      if (model.startsWith('kimi-') || model === 'k3' || model === 'k3[1m]') {
         return { name: 'kimi', displayName: 'Kimi', compatibility: 'direct', authType: 'static' };
       }
       if (model.startsWith('glm-')) {
@@ -184,9 +184,9 @@ describe('agents auth routing', () => {
     );
   });
 
-  it('launches Kimi models directly with Claude Code', async () => {
-    expect(await getAgentRuntimeBaseCommand('kimi-k2.6')).toBe(
-      "claude --permission-mode bypassPermissions --model 'kimi-k2.6'"
+  it.each(['kimi-k2.6', 'k3', 'k3[1m]'])('launches Kimi model %s directly with Claude Code', async (model) => {
+    expect(await getAgentRuntimeBaseCommand(model)).toBe(
+      `claude --permission-mode bypassPermissions --model '${model}'`
     );
   });
 
@@ -321,7 +321,7 @@ describe('agents auth routing', () => {
     expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('150000');
   });
 
-  it('exports the registry context window as Claude Code auto-compact window for Kimi launches', async () => {
+  it('exports the registry context window as Claude Code auto-compact window for Kimi K2.7', async () => {
     mockLoadYamlConfig.mockReturnValue({
       config: {
         apiKeys: { kimi: 'kimi-test-key' },
@@ -344,6 +344,56 @@ describe('agents auth routing', () => {
 
     expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="262144"');
     expect(launcher).toContain("exec claude --agent pan-work-agent --model 'kimi-k2.7-code'");
+  });
+
+  it.each([
+    ['k3', '262144'],
+    ['k3[1m]', '1048576'],
+  ])('exports both Claude Code context limits for %s', async (model, contextWindow) => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: { kimi: 'kimi-test-key' },
+        providerAuth: {},
+      },
+    });
+
+    const providerExports = await getProviderExportsForModel(model);
+    expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
+    expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
+    expect(providerExports).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
+    expect(providerExports).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
+
+    const launcher = generateLauncherScriptSync({
+      role: 'work',
+      workingDir: '/workspace/project',
+      providerExports,
+      baseCommand: `claude --agent pan-work-agent --model '${model}'`,
+    });
+
+    expect(launcher).toContain(`export CLAUDE_CODE_AUTO_COMPACT_WINDOW="${contextWindow}"`);
+    expect(launcher).toContain(`export CLAUDE_CODE_MAX_CONTEXT_TOKENS="${contextWindow}"`);
+    expect(launcher).toContain(`exec claude --agent pan-work-agent --model '${model}'`);
+  });
+
+  it('sanitizes and sets both context limits for programmatic K3 spawns', async () => {
+    mockLoadYamlConfig.mockReturnValue({
+      config: {
+        apiKeys: { kimi: 'kimi-test-key' },
+        providerAuth: {},
+      },
+    });
+
+    const env = await buildSpawnEnvForModel('k3[1m]', {
+      PATH: '/usr/bin',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '200000',
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '200000',
+    });
+
+    expect(env).toMatchObject({
+      PATH: '/usr/bin',
+      CLAUDE_CODE_AUTO_COMPACT_WINDOW: '1048576',
+      CLAUDE_CODE_MAX_CONTEXT_TOKENS: '1048576',
+    });
   });
 
   it('clears inherited Claude Code context overrides for Anthropic launchers and direct spawns', async () => {
